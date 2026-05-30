@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/privacy-policy.html?raw";
 
 export const Route = createFileRoute("/privacy-policy")({
   head: () => ({
@@ -10,17 +11,5 @@ export const Route = createFileRoute("/privacy-policy")({
       { property: "og:description", content: "Privacy practices for Business Help Services." },
     ],
   }),
-  component: () => (
-    <PageHero title="Privacy Policy">
-      <p>
-        We collect only the information necessary to provide consultancy
-        assistance — applicant name, email, mobile, state, language preference,
-        and selected service — along with documents you voluntarily share with
-        us for processing.
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Full privacy policy content will be ported from udyamadhar.in/privacy-policy.
-      </p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="Privacy Policy" html={html} />,
 });

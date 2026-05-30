@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { createFileRoute } from "@tanstack/react-router";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/about-us.html?raw";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -10,25 +11,5 @@ export const Route = createFileRoute("/about")({
       { property: "og:description", content: "Learn about Business Help Services and our Udyam Registration consultancy assistance." },
     ],
   }),
-  component: () => (
-    <PageHero title="About Us">
-      <p>
-        <strong>Business Help Services</strong> is a private consultancy that
-        helps Indian micro, small and medium enterprises navigate the Udyam
-        Registration process end-to-end. We assist with new registrations,
-        certificate updates, downloads, Udyog Aadhaar migration, mobile/email
-        recovery, and PAN/Aadhaar corrections.
-      </p>
-      <p>
-        We are <strong>not affiliated with, authorized by, endorsed by, or
-        associated with any government authority or department</strong>. All
-        charges collected on this website are strictly consultancy and
-        assistance service fees, not any government fee.
-      </p>
-      <p>
-        Ready to begin? <Link to="/">Apply on the homepage</Link> or{" "}
-        <Link to="/contact">contact us</Link>.
-      </p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="About Us" html={html} />,
 });

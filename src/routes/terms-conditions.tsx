@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/terms-conditions.html?raw";
 
 export const Route = createFileRoute("/terms-conditions")({
   head: () => ({
@@ -10,17 +11,5 @@ export const Route = createFileRoute("/terms-conditions")({
       { property: "og:description", content: "Terms and conditions for Business Help Services." },
     ],
   }),
-  component: () => (
-    <PageHero title="Terms & Conditions">
-      <p>
-        By using this website and submitting any details, you agree to these
-        Terms &amp; Conditions, our Privacy Policy, Refund &amp; Cancellation
-        Policy, Disclaimer, Pricing Transparency statement, and Consents &amp;
-        Acknowledgements.
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Full terms content will be ported verbatim from the existing site at udyamadhar.in/terms-conditions.
-      </p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="Terms & Conditions" html={html} />,
 });

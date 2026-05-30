@@ -6,8 +6,14 @@ const FOOTER_LINKS = [
   { to: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
   { to: "/disclaimer", label: "Disclaimer" },
   { to: "/pricing-transparency", label: "Pricing Transparency" },
-  { to: "/consent-acknowledgment", label: "Consents & Acknowledgements" },
+  { to: "/service-delivery-policy", label: "Service Delivery Policy" },
+  { to: "/consent-acknowledgment", label: "Consent & Acknowledgment" },
   { to: "/complaint-grievance-policy", label: "Complaint & Grievance Policy" },
+  { to: "/compliance-statement", label: "Compliance Statement" },
+  { to: "/cookie-policy", label: "Cookie Policy" },
+  { to: "/aml-anti-fraud-policy", label: "AML / Anti-Fraud Policy" },
+  { to: "/payment-notice-service-acknowledgment", label: "Payment Notice & Service Acknowledgment" },
+  { to: "/important-notice", label: "Important Notice" },
   { to: "/contact", label: "Contact Us" },
 ] as const;
 

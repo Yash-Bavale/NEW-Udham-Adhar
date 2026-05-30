@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/contact-us.html?raw";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -10,18 +11,5 @@ export const Route = createFileRoute("/contact")({
       { property: "og:description", content: "Reach out to Business Help Services for help with your Udyam Registration." },
     ],
   }),
-  component: () => (
-    <PageHero title="Contact Us">
-      <p>For consultancy assistance and queries:</p>
-      <ul>
-        <li>Email: <a href="mailto:support@udyamadhar.in">support@udyamadhar.in</a></li>
-        <li>Hours: Monday – Saturday, 10:00 AM – 7:00 PM IST</li>
-      </ul>
-      <p>
-        For a new application or a service request, please use the
-        <a href="/"> Udyam Registration form on our homepage</a> — our team will
-        contact you on the mobile/email you submit.
-      </p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="Contact Us" html={html} />,
 });
