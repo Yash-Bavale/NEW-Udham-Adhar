@@ -1,0 +1,15 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/udyam-apply.html?raw";
+
+export const Route = createFileRoute("/udyam-apply")({
+  head: () => ({
+    meta: [
+      { title: "Udyam Apply - Registration Online — Udyam Registration Consultancy" },
+      { name: "description", content: "Udyam Apply Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prades" },
+      { property: "og:title", content: "Udyam Apply - Registration Online" },
+      { property: "og:description", content: "Udyam Apply Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prades" },
+    ],
+  }),
+  component: () => <WpPage title="Udyam Apply - Registration Online" html={html} />,
+});
