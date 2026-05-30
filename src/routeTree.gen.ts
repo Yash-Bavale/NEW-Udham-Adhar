@@ -98,6 +98,7 @@ import { Route as UdhayamAadharDownloadRouteImport } from './routes/udhayam-aadh
 import { Route as UdharAadharRegistrationRouteImport } from './routes/udhar-aadhar-registration'
 import { Route as UdhamAadharDownloadRouteImport } from './routes/udham-aadhar-download'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as RegisterMsmeRouteImport } from './routes/register-msme'
 import { Route as RegisterForMsmeRouteImport } from './routes/register-for-msme'
@@ -629,6 +630,11 @@ const TermsConditionsRoute = TermsConditionsRouteImport.update({
   path: '/terms-conditions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
   id: '/service-delivery-policy',
   path: '/service-delivery-policy',
@@ -1045,6 +1051,7 @@ export interface FileRoutesByFullPath {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1203,6 +1210,7 @@ export interface FileRoutesByTo {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1362,6 +1370,7 @@ export interface FileRoutesById {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1522,6 +1531,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1680,6 +1690,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1838,6 +1849,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1997,6 +2009,7 @@ export interface RootRouteChildren {
   RegisterForMsmeRoute: typeof RegisterForMsmeRoute
   RegisterMsmeRoute: typeof RegisterMsmeRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UdhamAadharDownloadRoute: typeof UdhamAadharDownloadRoute
   UdharAadharRegistrationRoute: typeof UdharAadharRegistrationRoute
@@ -2715,6 +2728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsConditionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/service-delivery-policy': {
       id: '/service-delivery-policy'
       path: '/service-delivery-policy'
@@ -3256,6 +3276,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterForMsmeRoute: RegisterForMsmeRoute,
   RegisterMsmeRoute: RegisterMsmeRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UdhamAadharDownloadRoute: UdhamAadharDownloadRoute,
   UdharAadharRegistrationRoute: UdharAadharRegistrationRoute,
@@ -3352,13 +3373,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
