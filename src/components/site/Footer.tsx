@@ -39,7 +39,8 @@ export function Footer() {
   const handleHomeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     const now = Date.now();
-    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 3000);
+    const isHomePage = window.location.pathname === "/";
+    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 10000);
 
     if (clickTimes.current.length >= 3) {
       clickTimes.current = [];
@@ -49,14 +50,16 @@ export function Footer() {
     }
 
     if (clickTimer.current) clearTimeout(clickTimer.current);
+    if (isHomePage) return;
+
     clickTimer.current = setTimeout(() => {
       clickTimes.current = [];
       navigate({ to: "/" });
-    }, 3000);
+    }, 1200);
   };
 
   useEffect(() => {
-    if (!open || pages !== null) return;
+    if (pages !== null || loading) return;
     setLoading(true);
     setLoadError(false);
     loadSeoPages()
@@ -68,7 +71,7 @@ export function Footer() {
         setPages([]);
       })
       .finally(() => setLoading(false));
-  }, [loadSeoPages, open, pages]);
+  }, [loadSeoPages, loading, pages]);
 
   // Close on Escape
   useEffect(() => {
