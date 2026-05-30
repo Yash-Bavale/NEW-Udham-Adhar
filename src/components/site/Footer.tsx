@@ -39,7 +39,7 @@ export function Footer() {
   const handleHomeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     const now = Date.now();
-    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 1000);
+    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 3000);
 
     if (clickTimes.current.length >= 3) {
       clickTimes.current = [];
@@ -52,7 +52,7 @@ export function Footer() {
     clickTimer.current = setTimeout(() => {
       clickTimes.current = [];
       navigate({ to: "/" });
-    }, 1000);
+    }, 3000);
   };
 
   useEffect(() => {
