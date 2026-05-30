@@ -1,0 +1,26 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { PageHero } from "@/components/site/PageHero";
+
+export const Route = createFileRoute("/other-problem")({
+  head: () => ({
+    meta: [
+      { title: "Other Udyam Problems — Forgot OTP, Mobile, PAN/Aadhaar Issues" },
+      { name: "description", content: "Help with forgotten registered mobile/email, PAN/Aadhaar name mismatch, and other Udyam Registration issues." },
+      { property: "og:title", content: "Other Udyam Registration Problems" },
+      { property: "og:description", content: "Get consultancy help for forgotten OTP, mobile/email recovery, PAN/Aadhaar corrections, and more." },
+    ],
+  }),
+  component: () => (
+    <PageHero title="Other Udyam Problems">
+      <p>We assist with a range of common Udyam Registration problems:</p>
+      <ul>
+        <li>Forgot Registered Mobile / Email</li>
+        <li>Correct PAN / Aadhaar Name in Udyam</li>
+        <li>OTP not received during registration / update</li>
+        <li>NIC activity mismatch</li>
+        <li>General queries — “Talk to Expert” service</li>
+      </ul>
+      <p><Link to="/">Submit a request →</Link></p>
+    </PageHero>
+  ),
+});
