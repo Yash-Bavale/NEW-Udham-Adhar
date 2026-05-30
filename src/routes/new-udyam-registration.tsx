@@ -1,0 +1,24 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { PageHero } from "@/components/site/PageHero";
+
+export const Route = createFileRoute("/new-udyam-registration")({
+  head: () => ({
+    meta: [
+      { title: "New Udyam Registration — Apply Online with Consultancy Help" },
+      { name: "description", content: "Apply for a new Udyam Registration for your micro, small or medium enterprise with assistance from Business Help Services." },
+      { property: "og:title", content: "New Udyam Registration — Apply Online" },
+      { property: "og:description", content: "Get consultancy help applying for a new Udyam Registration certificate." },
+    ],
+  }),
+  component: () => (
+    <PageHero title="New Udyam Registration">
+      <p>
+        Apply for a new Udyam Registration with end-to-end consultancy
+        assistance — we help you compile the required information, verify
+        details, and complete the application on the official Udyam portal.
+      </p>
+      <p><strong>What you'll need:</strong> Aadhaar number of the proprietor / authorised signatory, PAN, business address, NIC activity, employment count, and bank details.</p>
+      <p><Link to="/">Start your application →</Link></p>
+    </PageHero>
+  ),
+});
