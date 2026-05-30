@@ -165,7 +165,6 @@ import { Route as AadhaarUdyamRouteImport } from './routes/aadhaar-udyam'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
-import { Route as WwwUdyamadharInRouteImport } from './routes/www.udyamadhar.in'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -979,11 +978,6 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   path: '/payment-pending/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WwwUdyamadharInRoute = WwwUdyamadharInRouteImport.update({
-  id: '/www/udyamadhar/in',
-  path: '/www/udyamadhar/in',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1142,7 +1136,6 @@ export interface FileRoutesByFullPath {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1301,7 +1294,6 @@ export interface FileRoutesByTo {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1461,7 +1453,6 @@ export interface FileRoutesById {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1622,7 +1613,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1781,7 +1771,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   id:
     | '__root__'
     | '/'
@@ -1940,7 +1929,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2100,7 +2088,6 @@ export interface RootRouteChildren {
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
-  WwwUdyamadharInRoute: typeof WwwUdyamadharInRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3197,13 +3184,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentPendingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/www/udyamadhar/in': {
-      id: '/www/udyamadhar/in'
-      path: '/www/udyamadhar/in'
-      fullPath: '/www/udyamadhar/in'
-      preLoaderRoute: typeof WwwUdyamadharInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -3368,7 +3348,6 @@ const rootRouteChildren: RootRouteChildren = {
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
-  WwwUdyamadharInRoute: WwwUdyamadharInRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
