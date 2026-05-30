@@ -96,7 +96,7 @@ export function LeadForm() {
         <h2 className="text-xl font-bold font-display">Udyam Registration Form</h2>
       </div>
 
-      <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5" noValidate>
+      <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
         <Field label="Applicant Name / आवेदक का नाम">
           <input name="name" required className={inputCls} placeholder="Enter Applicant Name" />
         </Field>
