@@ -98,6 +98,7 @@ import { Route as UdhayamAadharDownloadRouteImport } from './routes/udhayam-aadh
 import { Route as UdharAadharRegistrationRouteImport } from './routes/udhar-aadhar-registration'
 import { Route as UdhamAadharDownloadRouteImport } from './routes/udham-aadhar-download'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as RegisterMsmeRouteImport } from './routes/register-msme'
 import { Route as RegisterForMsmeRouteImport } from './routes/register-for-msme'
@@ -165,7 +166,6 @@ import { Route as AadhaarUdyamRouteImport } from './routes/aadhaar-udyam'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
-import { Route as WwwUdyamadharInRouteImport } from './routes/www.udyamadhar.in'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -630,6 +630,11 @@ const TermsConditionsRoute = TermsConditionsRouteImport.update({
   path: '/terms-conditions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
   id: '/service-delivery-policy',
   path: '/service-delivery-policy',
@@ -979,11 +984,6 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   path: '/payment-pending/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WwwUdyamadharInRoute = WwwUdyamadharInRouteImport.update({
-  id: '/www/udyamadhar/in',
-  path: '/www/udyamadhar/in',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1051,6 +1051,7 @@ export interface FileRoutesByFullPath {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1142,7 +1143,6 @@ export interface FileRoutesByFullPath {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1210,6 +1210,7 @@ export interface FileRoutesByTo {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1301,7 +1302,6 @@ export interface FileRoutesByTo {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1370,6 +1370,7 @@ export interface FileRoutesById {
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1461,7 +1462,6 @@ export interface FileRoutesById {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
-  '/www/udyamadhar/in': typeof WwwUdyamadharInRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1531,6 +1531,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1622,7 +1623,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1690,6 +1690,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1781,7 +1782,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   id:
     | '__root__'
     | '/'
@@ -1849,6 +1849,7 @@ export interface FileRouteTypes {
     | '/register-for-msme'
     | '/register-msme'
     | '/service-delivery-policy'
+    | '/sitemap.xml'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -1940,7 +1941,6 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
     | '/success/$leadCode'
-    | '/www/udyamadhar/in'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2009,6 +2009,7 @@ export interface RootRouteChildren {
   RegisterForMsmeRoute: typeof RegisterForMsmeRoute
   RegisterMsmeRoute: typeof RegisterMsmeRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UdhamAadharDownloadRoute: typeof UdhamAadharDownloadRoute
   UdharAadharRegistrationRoute: typeof UdharAadharRegistrationRoute
@@ -2100,7 +2101,6 @@ export interface RootRouteChildren {
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
-  WwwUdyamadharInRoute: typeof WwwUdyamadharInRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2728,6 +2728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsConditionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/service-delivery-policy': {
       id: '/service-delivery-policy'
       path: '/service-delivery-policy'
@@ -3197,13 +3204,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentPendingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/www/udyamadhar/in': {
-      id: '/www/udyamadhar/in'
-      path: '/www/udyamadhar/in'
-      fullPath: '/www/udyamadhar/in'
-      preLoaderRoute: typeof WwwUdyamadharInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -3276,6 +3276,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterForMsmeRoute: RegisterForMsmeRoute,
   RegisterMsmeRoute: RegisterMsmeRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UdhamAadharDownloadRoute: UdhamAadharDownloadRoute,
   UdharAadharRegistrationRoute: UdharAadharRegistrationRoute,
@@ -3368,18 +3369,7 @@ const rootRouteChildren: RootRouteChildren = {
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
-  WwwUdyamadharInRoute: WwwUdyamadharInRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
