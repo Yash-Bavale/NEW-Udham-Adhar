@@ -23,6 +23,7 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function Footer() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,17 +31,26 @@ export function Footer() {
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleHomeClick = (e: React.MouseEvent) => {
-    clickCount.current += 1;
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => {
-      clickCount.current = 0;
-    }, 600);
-    if (clickCount.current >= 3) {
-      e.preventDefault();
+    e.preventDefault();
+    // Native detail counts rapid consecutive clicks
+    const detail = (e as unknown as { detail: number }).detail;
+    if (detail >= 3) {
       clickCount.current = 0;
       if (clickTimer.current) clearTimeout(clickTimer.current);
       setOpen(true);
+      return;
     }
+    clickCount.current += 1;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      const c = clickCount.current;
+      clickCount.current = 0;
+      if (c >= 3) {
+        setOpen(true);
+      } else {
+        navigate({ to: "/" });
+      }
+    }, 350);
   };
 
   useEffect(() => {
@@ -83,16 +93,17 @@ export function Footer() {
           </p>
 
           <div className="mt-5">
-            <Link
-              to="/"
+            <button
+              type="button"
               onClick={handleHomeClick}
-              className="text-sm text-white/85 hover:text-white hover:underline select-none"
+              className="text-sm text-white/85 hover:text-white hover:underline select-none bg-transparent p-0 cursor-pointer"
               aria-label="Home"
             >
               Home
-            </Link>
+            </button>
           </div>
         </div>
+
 
         <div>
           <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">
