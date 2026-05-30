@@ -47,20 +47,20 @@
   --foreground: oklch(0.18 0.02 260);
 
   /* Brand palette — pulled from udyamadhar.in */
-  --brand-red: oklch(0.515 0.215 27);          /* #b91c1c-ish logo red */
-  --brand-navy: oklch(0.32 0.13 264);          /* #1e3a8a navy */
-  --brand-navy-deep: oklch(0.27 0.11 264);     /* darker navy for buttons */
-  --brand-gold: oklch(0.73 0.16 75);           /* #d99a18-ish menu gold */
-  --nav-bg: oklch(0.94 0.025 244);             /* light blue strip */
-  --disclaimer-bg: oklch(0.38 0.10 251);       /* mid-dark blue marquee */
-  --form-header: oklch(0.30 0.12 264);         /* form card header */
+  --brand-red: oklch(0.515 0.215 27); /* #b91c1c-ish logo red */
+  --brand-navy: oklch(0.32 0.13 264); /* #1e3a8a navy */
+  --brand-navy-deep: oklch(0.27 0.11 264); /* darker navy for buttons */
+  --brand-gold: oklch(0.73 0.16 75); /* #d99a18-ish menu gold */
+  --nav-bg: oklch(0.94 0.025 244); /* light blue strip */
+  --disclaimer-bg: oklch(0.38 0.1 251); /* mid-dark blue marquee */
+  --form-header: oklch(0.3 0.12 264); /* form card header */
 
   --primary: var(--brand-navy);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.96 0.01 248);
-  --secondary-foreground: oklch(0.20 0.04 264);
+  --secondary-foreground: oklch(0.2 0.04 264);
   --muted: oklch(0.97 0.005 248);
-  --muted-foreground: oklch(0.50 0.03 257);
+  --muted-foreground: oklch(0.5 0.03 257);
   --accent: oklch(0.95 0.02 244);
   --accent-foreground: var(--brand-navy);
   --destructive: oklch(0.577 0.245 27);
@@ -69,7 +69,7 @@
   --card-foreground: oklch(0.18 0.02 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.02 260);
-  --border: oklch(0.90 0.01 255);
+  --border: oklch(0.9 0.01 255);
   --input: oklch(0.93 0.01 255);
   --ring: var(--brand-navy);
 
@@ -78,19 +78,34 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body { font-family: var(--font-body); }
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    font-family: var(--font-body);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
-  h1, h2, h3, h4, h5 { font-family: var(--font-display); }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    font-family: var(--font-display);
+  }
 }
 
 /* Marquee for disclaimer bar */
 @keyframes marquee {
-  from { transform: translateX(0%); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0%);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 .marquee-track {
   display: inline-flex;

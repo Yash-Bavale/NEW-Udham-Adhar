@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
-
 type SeoPageRow = { id: string; slug: string; label: string };
 
 const FALLBACK_SEO_PAGES: SeoPageRow[] = [
@@ -16,19 +15,67 @@ const FALLBACK_SEO_PAGES: SeoPageRow[] = [
   { id: "fallback-register-for-msme", slug: "register-for-msme", label: "Register For MSME" },
   { id: "fallback-register-msme", slug: "register-msme", label: "Register MSME" },
   { id: "fallback-udyam-aadhar", slug: "udyam-aadhar", label: "Udyam Aadhar" },
-  { id: "fallback-udyam-reg-certificate", slug: "udyam-reg-certificate", label: "Udyam Reg Certificate" },
-  { id: "fallback-udyam-regn-certificate", slug: "udyam-regn-certificate", label: "Udyam Regn Certificate" },
-  { id: "fallback-udyamregistration-gov-in", slug: "udyamregistration-gov-in", label: "Udyamregistration Gov In" },
-  { id: "fallback-aadhar-udyog-registration", slug: "aadhar-udyog-registration", label: "Aadhar Udyog Registration" },
-  { id: "fallback-udyog-aadhar-certificate-download", slug: "udyog-aadhar-certificate-download", label: "Udyog Aadhar Certificate Download" },
-  { id: "fallback-official-msme-registration-website", slug: "msme-registration-portal", label: "Official MSME Registration Website" },
+  {
+    id: "fallback-udyam-reg-certificate",
+    slug: "udyam-reg-certificate",
+    label: "Udyam Reg Certificate",
+  },
+  {
+    id: "fallback-udyam-regn-certificate",
+    slug: "udyam-regn-certificate",
+    label: "Udyam Regn Certificate",
+  },
+  {
+    id: "fallback-udyamregistration-gov-in",
+    slug: "udyamregistration-gov-in",
+    label: "Udyamregistration Gov In",
+  },
+  {
+    id: "fallback-aadhar-udyog-registration",
+    slug: "aadhar-udyog-registration",
+    label: "Aadhar Udyog Registration",
+  },
+  {
+    id: "fallback-udyog-aadhar-certificate-download",
+    slug: "udyog-aadhar-certificate-download",
+    label: "Udyog Aadhar Certificate Download",
+  },
+  {
+    id: "fallback-official-msme-registration-website",
+    slug: "msme-registration-portal",
+    label: "Official MSME Registration Website",
+  },
   { id: "fallback-aadhaar-udyam", slug: "aadhaar-udyam", label: "Aadhaar Udyam" },
-  { id: "fallback-msme-registration-process", slug: "msme-registration-process", label: "MSME Registration Process" },
-  { id: "fallback-udyam-aadhaar-download-pdf", slug: "udyam-aadhaar-download-pdf", label: "Udyam Aadhaar Download PDF" },
-  { id: "fallback-udyog-aadhar-registration", slug: "udyog-aadhar-registration", label: "Udyog Aadhar Registration" },
-  { id: "fallback-udhayam-aadhar-download", slug: "udhayam-aadhar-download", label: "Udhayam Aadhar Download" },
-  { id: "fallback-print-msme-udyam-certificate", slug: "print-msme-udyam-certificate", label: "Print MSME Udyam Certificate" },
-  { id: "fallback-udyam-registration-online", slug: "udyam-registration-online", label: "Udyam Registration Online" },
+  {
+    id: "fallback-msme-registration-process",
+    slug: "msme-registration-process",
+    label: "MSME Registration Process",
+  },
+  {
+    id: "fallback-udyam-aadhaar-download-pdf",
+    slug: "udyam-aadhaar-download-pdf",
+    label: "Udyam Aadhaar Download PDF",
+  },
+  {
+    id: "fallback-udyog-aadhar-registration",
+    slug: "udyog-aadhar-registration",
+    label: "Udyog Aadhar Registration",
+  },
+  {
+    id: "fallback-udhayam-aadhar-download",
+    slug: "udhayam-aadhar-download",
+    label: "Udhayam Aadhar Download",
+  },
+  {
+    id: "fallback-print-msme-udyam-certificate",
+    slug: "print-msme-udyam-certificate",
+    label: "Print MSME Udyam Certificate",
+  },
+  {
+    id: "fallback-udyam-registration-online",
+    slug: "udyam-registration-online",
+    label: "Udyam Registration Online",
+  },
 ];
 
 const FOOTER_LINKS = [
@@ -43,7 +90,10 @@ const FOOTER_LINKS = [
   { to: "/compliance-statement", label: "Compliance Statement" },
   { to: "/cookie-policy", label: "Cookie Policy" },
   { to: "/aml-anti-fraud-policy", label: "AML / Anti-Fraud Policy" },
-  { to: "/payment-notice-service-acknowledgment", label: "Payment Notice & Service Acknowledgment" },
+  {
+    to: "/payment-notice-service-acknowledgment",
+    label: "Payment Notice & Service Acknowledgment",
+  },
   { to: "/important-notice", label: "Important Notice" },
   { to: "/contact", label: "Contact Us" },
 ] as const;
@@ -107,14 +157,11 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
         <div>
           <div className="text-xl font-bold font-display">Udyam Registration</div>
-          <div className="text-sm text-white/80 mt-1">
-            Business Help Consultancy Services
-          </div>
+          <div className="text-sm text-white/80 mt-1">Business Help Consultancy Services</div>
           <p className="text-xs text-white/70 mt-4 leading-relaxed">
-            Business Help Services is a private consultancy and assistance
-            service provider and is not affiliated with, authorized by,
-            endorsed by, or associated with any government authority or
-            department.
+            Business Help Services is a private consultancy and assistance service provider and is
+            not affiliated with, authorized by, endorsed by, or associated with any government
+            authority or department.
           </p>
 
           <div className="mt-5">
@@ -129,11 +176,8 @@ export function Footer() {
           </div>
         </div>
 
-
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">
-            Policies
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Policies</h4>
           <ul className="space-y-2 text-sm text-white/85">
             {FOOTER_LINKS.map((l) => (
               <li key={l.to}>
@@ -146,18 +190,14 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">
-            Reach Us
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Reach Us</h4>
           <p className="text-sm text-white/85">
             Email:{" "}
             <a href="mailto:support@udyamadhar.in" className="hover:underline">
               support@udyamadhar.in
             </a>
           </p>
-          <p className="text-sm text-white/85 mt-1">
-            Hours: Mon – Sat, 10:00 AM – 7:00 PM IST
-          </p>
+          <p className="text-sm text-white/85 mt-1">Hours: Mon – Sat, 10:00 AM – 7:00 PM IST</p>
         </div>
       </div>
 
@@ -178,28 +218,30 @@ export function Footer() {
           >
             <div className="sticky top-0 z-10 bg-brand-navy px-6 py-4 border-b border-white/15">
               <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="font-display text-2xl font-bold leading-tight">MSME / Udyog Aadhaar</h3>
-                <p className="text-sm text-white/75">
-                  {pages ? `${pages.length} pages` : "Loading…"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/seo-admin"
-                  className="text-sm font-semibold text-brand-gold hover:underline"
-                  onClick={() => setOpen(false)}
-                >
-                  Manage
-                </Link>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-2xl leading-none px-2 py-1 text-white hover:text-brand-gold"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
+                <div>
+                  <h3 className="font-display text-2xl font-bold leading-tight">
+                    MSME / Udyog Aadhaar
+                  </h3>
+                  <p className="text-sm text-white/75">
+                    {pages ? `${pages.length} pages` : "Loading…"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/seo-admin"
+                    className="text-sm font-semibold text-brand-gold hover:underline"
+                    onClick={() => setOpen(false)}
+                  >
+                    Manage
+                  </Link>
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-2xl leading-none px-2 py-1 text-white hover:text-brand-gold"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
             <nav className="px-6 py-5" aria-label="Hidden SEO landing pages">
@@ -227,7 +269,10 @@ export function Footer() {
                         className="flex items-start gap-3 text-white hover:text-brand-gold"
                         onClick={() => setOpen(false)}
                       >
-                        <ChevronRight className="mt-0.5 h-6 w-6 shrink-0 stroke-[3]" aria-hidden="true" />
+                        <ChevronRight
+                          className="mt-0.5 h-6 w-6 shrink-0 stroke-[3]"
+                          aria-hidden="true"
+                        />
                         <span>{p.label}</span>
                       </a>
                     </li>
