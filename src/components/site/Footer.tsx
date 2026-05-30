@@ -172,16 +172,13 @@ export function Footer() {
                 <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                   {pages.map((p) => (
                     <li key={p.id}>
-                      <Link
-                        to={"/$slug" as never}
-                        params={{ slug: p.slug } as never}
-                        // Fall back to href because slugs map to existing top-level routes
+                      <a
                         href={`/${p.slug}`}
                         className="text-foreground/80 hover:text-primary hover:underline"
                         onClick={() => setOpen(false)}
                       >
                         {p.label}
-                      </Link>
+                      </a>
                     </li>
                   ))}
                 </ul>

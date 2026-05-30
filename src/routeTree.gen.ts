@@ -100,6 +100,7 @@ import { Route as UdhamAadharDownloadRouteImport } from './routes/udham-aadhar-d
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
+import { Route as SeoAdminRouteImport } from './routes/seo-admin'
 import { Route as RegisterMsmeRouteImport } from './routes/register-msme'
 import { Route as RegisterForMsmeRouteImport } from './routes/register-for-msme'
 import { Route as RefundCancellationPolicyRouteImport } from './routes/refund-cancellation-policy'
@@ -154,6 +155,7 @@ import { Route as ComplianceStatementRouteImport } from './routes/compliance-sta
 import { Route as ComplaintGrievancePolicyRouteImport } from './routes/complaint-grievance-policy'
 import { Route as ComplaintRouteImport } from './routes/complaint'
 import { Route as AmlAntiFraudPolicyRouteImport } from './routes/aml-anti-fraud-policy'
+import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AadharUdyogRegistrationRouteImport } from './routes/aadhar-udyog-registration'
 import { Route as AadharUdyogRouteImport } from './routes/aadhar-udyog'
@@ -640,6 +642,11 @@ const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
   path: '/service-delivery-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeoAdminRoute = SeoAdminRouteImport.update({
+  id: '/seo-admin',
+  path: '/seo-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterMsmeRoute = RegisterMsmeRouteImport.update({
   id: '/register-msme',
   path: '/register-msme',
@@ -924,6 +931,11 @@ const AmlAntiFraudPolicyRoute = AmlAntiFraudPolicyRouteImport.update({
   path: '/aml-anti-fraud-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin-login',
+  path: '/admin-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -996,6 +1008,7 @@ export interface FileRoutesByFullPath {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
@@ -1050,6 +1063,7 @@ export interface FileRoutesByFullPath {
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
+  '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
@@ -1155,6 +1169,7 @@ export interface FileRoutesByTo {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
@@ -1209,6 +1224,7 @@ export interface FileRoutesByTo {
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
+  '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
@@ -1315,6 +1331,7 @@ export interface FileRoutesById {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
@@ -1369,6 +1386,7 @@ export interface FileRoutesById {
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/register-for-msme': typeof RegisterForMsmeRoute
   '/register-msme': typeof RegisterMsmeRoute
+  '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms-conditions': typeof TermsConditionsRoute
@@ -1476,6 +1494,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
     | '/complaint-grievance-policy'
@@ -1530,6 +1549,7 @@ export interface FileRouteTypes {
     | '/refund-cancellation-policy'
     | '/register-for-msme'
     | '/register-msme'
+    | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
     | '/terms-conditions'
@@ -1635,6 +1655,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
     | '/complaint-grievance-policy'
@@ -1689,6 +1710,7 @@ export interface FileRouteTypes {
     | '/refund-cancellation-policy'
     | '/register-for-msme'
     | '/register-msme'
+    | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
     | '/terms-conditions'
@@ -1794,6 +1816,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
     | '/complaint-grievance-policy'
@@ -1848,6 +1871,7 @@ export interface FileRouteTypes {
     | '/refund-cancellation-policy'
     | '/register-for-msme'
     | '/register-msme'
+    | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
     | '/terms-conditions'
@@ -1954,6 +1978,7 @@ export interface RootRouteChildren {
   AadharUdyogRoute: typeof AadharUdyogRoute
   AadharUdyogRegistrationRoute: typeof AadharUdyogRegistrationRoute
   AboutRoute: typeof AboutRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   AmlAntiFraudPolicyRoute: typeof AmlAntiFraudPolicyRoute
   ComplaintRoute: typeof ComplaintRoute
   ComplaintGrievancePolicyRoute: typeof ComplaintGrievancePolicyRoute
@@ -2008,6 +2033,7 @@ export interface RootRouteChildren {
   RefundCancellationPolicyRoute: typeof RefundCancellationPolicyRoute
   RegisterForMsmeRoute: typeof RegisterForMsmeRoute
   RegisterMsmeRoute: typeof RegisterMsmeRoute
+  SeoAdminRoute: typeof SeoAdminRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
@@ -2742,6 +2768,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServiceDeliveryPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/seo-admin': {
+      id: '/seo-admin'
+      path: '/seo-admin'
+      fullPath: '/seo-admin'
+      preLoaderRoute: typeof SeoAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register-msme': {
       id: '/register-msme'
       path: '/register-msme'
@@ -3120,6 +3153,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AmlAntiFraudPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin-login': {
+      id: '/admin-login'
+      path: '/admin-login'
+      fullPath: '/admin-login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -3218,6 +3258,7 @@ const rootRouteChildren: RootRouteChildren = {
   AadharUdyogRoute: AadharUdyogRoute,
   AadharUdyogRegistrationRoute: AadharUdyogRegistrationRoute,
   AboutRoute: AboutRoute,
+  AdminLoginRoute: AdminLoginRoute,
   AmlAntiFraudPolicyRoute: AmlAntiFraudPolicyRoute,
   ComplaintRoute: ComplaintRoute,
   ComplaintGrievancePolicyRoute: ComplaintGrievancePolicyRoute,
@@ -3275,6 +3316,7 @@ const rootRouteChildren: RootRouteChildren = {
   RefundCancellationPolicyRoute: RefundCancellationPolicyRoute,
   RegisterForMsmeRoute: RegisterForMsmeRoute,
   RegisterMsmeRoute: RegisterMsmeRoute,
+  SeoAdminRoute: SeoAdminRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsConditionsRoute: TermsConditionsRoute,
