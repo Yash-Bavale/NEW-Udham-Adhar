@@ -148,7 +148,7 @@ function HomePage() {
       </section>
 
       {/* Process Steps */}
-      <section className="bg-[hsl(var(--brand-navy)/0.08)]">
+      <section className="bg-brand-navy/10">
         <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
           <h2 className="text-center text-3xl md:text-4xl font-bold font-display text-foreground">
             Udyam Assistance Process – Fast &amp; Simple
