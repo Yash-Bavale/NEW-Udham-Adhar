@@ -1,4 +1,8 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type SeoPageRow = { id: string; slug: string; label: string };
 
 const FOOTER_LINKS = [
   { to: "/terms-conditions", label: "Terms & Conditions" },
@@ -18,6 +22,50 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function Footer() {
+  const [open, setOpen] = useState(false);
+  const [pages, setPages] = useState<SeoPageRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const clickCount = useRef(0);
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleHomeClick = (e: React.MouseEvent) => {
+    clickCount.current += 1;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      clickCount.current = 0;
+    }, 600);
+    if (clickCount.current >= 3) {
+      e.preventDefault();
+      clickCount.current = 0;
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      setOpen(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!open || pages !== null) return;
+    setLoading(true);
+    supabase
+      .from("seo_pages")
+      .select("id, slug, label")
+      .eq("enabled", true)
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => {
+        setPages((data ?? []) as SeoPageRow[]);
+        setLoading(false);
+      });
+  }, [open, pages]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
       <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
@@ -32,6 +80,17 @@ export function Footer() {
             endorsed by, or associated with any government authority or
             department.
           </p>
+
+          <div className="mt-5">
+            <Link
+              to="/"
+              onClick={handleHomeClick}
+              className="text-sm text-white/85 hover:text-white hover:underline select-none"
+              aria-label="Home"
+            >
+              Home
+            </Link>
+          </div>
         </div>
 
         <div>
@@ -70,6 +129,67 @@ export function Footer() {
           © {new Date().getFullYear()} Business Help Services. All rights reserved.
         </div>
       </div>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white text-foreground rounded-xl shadow-2xl max-w-3xl w-full my-8 max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <div>
+                <h3 className="font-semibold text-base">Hidden SEO Landing Pages</h3>
+                <p className="text-xs text-muted-foreground">
+                  {pages ? `${pages.length} pages` : "Loading…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/seo-admin"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => setOpen(false)}
+                >
+                  Manage
+                </Link>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="text-sm px-2 py-1 rounded hover:bg-muted"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              {loading && <p className="text-sm text-muted-foreground">Loading pages…</p>}
+              {pages && pages.length === 0 && (
+                <p className="text-sm text-muted-foreground">No pages yet.</p>
+              )}
+              {pages && pages.length > 0 && (
+                <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                  {pages.map((p) => (
+                    <li key={p.id}>
+                      <Link
+                        to={"/$slug" as never}
+                        params={{ slug: p.slug } as never}
+                        // Fall back to href because slugs map to existing top-level routes
+                        href={`/${p.slug}`}
+                        className="text-foreground/80 hover:text-primary hover:underline"
+                        onClick={() => setOpen(false)}
+                      >
+                        {p.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </footer>
   );
 }
