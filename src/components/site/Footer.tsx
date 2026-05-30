@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
+import { ChevronRight } from "lucide-react";
+import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 type SeoPageRow = { id: string; slug: string; label: string };
 
@@ -17,55 +18,66 @@ const FOOTER_LINKS = [
   { to: "/compliance-statement", label: "Compliance Statement" },
   { to: "/cookie-policy", label: "Cookie Policy" },
   { to: "/aml-anti-fraud-policy", label: "AML / Anti-Fraud Policy" },
-  { to: "/payment-notice-service-acknowledgment", label: "Payment Notice & Service Acknowledgment" },
+  {
+    to: "/payment-notice-service-acknowledgment",
+    label: "Payment Notice & Service Acknowledgment",
+  },
   { to: "/important-notice", label: "Important Notice" },
   { to: "/contact", label: "Contact Us" },
 ] as const;
 
 export function Footer() {
   const navigate = useNavigate();
+  const loadSeoPages = useServerFn(listPublicSeoPages);
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const clickCount = useRef(0);
+  const [loadError, setLoadError] = useState(false);
+  const clickTimes = useRef<number[]>([]);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleHomeTrigger = () => {
+    const now = Date.now();
+    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 10000);
+
+    if (clickTimes.current.length >= 3) {
+      clickTimes.current = [];
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      setOpen(true);
+      return true;
+    }
+
+    return false;
+  };
 
   const handleHomeClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Native detail counts rapid consecutive clicks
-    const detail = (e as unknown as { detail: number }).detail;
-    if (detail >= 3) {
-      clickCount.current = 0;
-      if (clickTimer.current) clearTimeout(clickTimer.current);
-      setOpen(true);
-      return;
-    }
-    clickCount.current += 1;
+    const isHomePage = window.location.pathname === "/";
+    if (handleHomeTrigger()) return;
+
     if (clickTimer.current) clearTimeout(clickTimer.current);
+    if (isHomePage) return;
+
     clickTimer.current = setTimeout(() => {
-      const c = clickCount.current;
-      clickCount.current = 0;
-      if (c >= 3) {
-        setOpen(true);
-      } else {
-        navigate({ to: "/" });
-      }
-    }, 350);
+      clickTimes.current = [];
+      navigate({ to: "/" });
+    }, 1200);
   };
 
   useEffect(() => {
-    if (!open || pages !== null) return;
+    if (pages !== null || loading) return;
     setLoading(true);
-    supabase
-      .from("seo_pages")
-      .select("id, slug, label")
-      .eq("enabled", true)
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => {
+    setLoadError(false);
+    loadSeoPages()
+      .then((data) => {
         setPages((data ?? []) as SeoPageRow[]);
-        setLoading(false);
-      });
-  }, [open, pages]);
+      })
+      .catch(() => {
+        setLoadError(true);
+        setPages([]);
+      })
+      .finally(() => setLoading(false));
+  }, [loadSeoPages, loading, pages]);
 
   // Close on Escape
   useEffect(() => {
@@ -82,20 +94,20 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
         <div>
           <div className="text-xl font-bold font-display">Udyam Registration</div>
-          <div className="text-sm text-white/80 mt-1">
-            Business Help Consultancy Services
-          </div>
+          <div className="text-sm text-white/80 mt-1">Business Help Consultancy Services</div>
           <p className="text-xs text-white/70 mt-4 leading-relaxed">
-            Business Help Services is a private consultancy and assistance
-            service provider and is not affiliated with, authorized by,
-            endorsed by, or associated with any government authority or
-            department.
+            Business Help Services is a private consultancy and assistance service provider and is
+            not affiliated with, authorized by, endorsed by, or associated with any government
+            authority or department.
           </p>
 
           <div className="mt-5">
             <button
               type="button"
               onClick={handleHomeClick}
+              onPointerDown={(e) => {
+                if (e.pointerType === "touch") handleHomeTrigger();
+              }}
               className="text-sm text-white/85 hover:text-white hover:underline select-none bg-transparent p-0 cursor-pointer"
               aria-label="Home"
             >
@@ -104,11 +116,8 @@ export function Footer() {
           </div>
         </div>
 
-
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">
-            Policies
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Policies</h4>
           <ul className="space-y-2 text-sm text-white/85">
             {FOOTER_LINKS.map((l) => (
               <li key={l.to}>
@@ -121,18 +130,14 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">
-            Reach Us
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Reach Us</h4>
           <p className="text-sm text-white/85">
             Email:{" "}
             <a href="mailto:support@udyamadhar.in" className="hover:underline">
               support@udyamadhar.in
             </a>
           </p>
-          <p className="text-sm text-white/85 mt-1">
-            Hours: Mon – Sat, 10:00 AM – 7:00 PM IST
-          </p>
+          <p className="text-sm text-white/85 mt-1">Hours: Mon – Sat, 10:00 AM – 7:00 PM IST</p>
         </div>
       </div>
 
@@ -144,58 +149,85 @@ export function Footer() {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 bg-black/65 overflow-y-auto"
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-white text-foreground rounded-xl shadow-2xl max-w-3xl w-full my-8 max-h-[85vh] flex flex-col"
+            className="min-h-screen w-full max-w-xl bg-brand-navy text-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <div>
-                <h3 className="font-semibold text-base">Hidden SEO Landing Pages</h3>
-                <p className="text-xs text-muted-foreground">
-                  {pages ? `${pages.length} pages` : "Loading…"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Link
-                  to="/seo-admin"
-                  className="text-xs font-medium text-primary hover:underline"
-                  onClick={() => setOpen(false)}
-                >
-                  Manage
-                </Link>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-sm px-2 py-1 rounded hover:bg-muted"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
+            <div className="sticky top-0 z-10 bg-brand-navy px-6 py-4 border-b border-white/15">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-2xl font-bold leading-tight">
+                    MSME / Udyog Aadhaar
+                  </h3>
+                  <p className="text-sm text-white/75">
+                    {pages ? `${pages.length} pages` : "Loading…"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/seo-admin"
+                    className="text-sm font-semibold text-brand-gold hover:underline"
+                    onClick={() => setOpen(false)}
+                  >
+                    Manage
+                  </Link>
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-2xl leading-none px-2 py-1 text-white hover:text-brand-gold"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="overflow-y-auto px-5 py-4">
-              {loading && <p className="text-sm text-muted-foreground">Loading pages…</p>}
-              {pages && pages.length === 0 && (
-                <p className="text-sm text-muted-foreground">No pages yet.</p>
+            <nav className="px-6 py-5" aria-label="Hidden SEO landing pages">
+              <Link
+                to="/"
+                className="mb-4 flex items-center gap-3 text-lg font-semibold text-white hover:text-brand-gold"
+                onClick={() => setOpen(false)}
+              >
+                <ChevronRight className="h-6 w-6 shrink-0 stroke-[3]" aria-hidden="true" />
+                Home
+              </Link>
+
+              <div className="mb-3 flex items-center gap-3 text-xl font-bold text-brand-gold">
+                <span className="text-2xl leading-none">⌄</span>
+                Udyamregistration
+              </div>
+
+              {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
+              {loadError && (
+                <p className="py-3 text-sm text-white/75">
+                  Could not load SEO pages. Please try again.
+                </p>
               )}
-              {pages && pages.length > 0 && (
-                <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+              {!loading && !loadError && pages && pages.length === 0 && (
+                <p className="py-3 text-sm text-white/75">No pages yet.</p>
+              )}
+              {!loadError && pages && pages.length > 0 && (
+                <ul className="space-y-3 text-lg font-semibold leading-snug">
                   {pages.map((p) => (
                     <li key={p.id}>
                       <a
                         href={`/${p.slug}`}
-                        className="text-foreground/80 hover:text-primary hover:underline"
+                        className="flex items-start gap-3 text-white hover:text-brand-gold"
                         onClick={() => setOpen(false)}
                       >
-                        {p.label}
+                        <ChevronRight
+                          className="mt-0.5 h-6 w-6 shrink-0 stroke-[3]"
+                          aria-hidden="true"
+                        />
+                        <span>{p.label}</span>
                       </a>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
+            </nav>
           </div>
         </div>
       )}
