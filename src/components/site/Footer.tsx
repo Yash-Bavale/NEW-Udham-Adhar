@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
 
 type SeoPageRow = { id: string; slug: string; label: string };
 
