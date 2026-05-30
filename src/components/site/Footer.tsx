@@ -6,78 +6,6 @@ import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 type SeoPageRow = { id: string; slug: string; label: string };
 
-const FALLBACK_SEO_PAGES: SeoPageRow[] = [
-  { id: "fallback-udyamregistration", slug: "udyamregistration", label: "Udyamregistration" },
-  { id: "fallback-udyam-regn", slug: "udyam-regn", label: "Udyam Regn" },
-  { id: "fallback-udyam", slug: "udyam", label: "Udyam" },
-  { id: "fallback-udyog-aadhar", slug: "udyog-aadhar", label: "Udyog Aadhar" },
-  { id: "fallback-udyam-certificate", slug: "udyam-certificate", label: "Udyam Certificate" },
-  { id: "fallback-register-for-msme", slug: "register-for-msme", label: "Register For MSME" },
-  { id: "fallback-register-msme", slug: "register-msme", label: "Register MSME" },
-  { id: "fallback-udyam-aadhar", slug: "udyam-aadhar", label: "Udyam Aadhar" },
-  {
-    id: "fallback-udyam-reg-certificate",
-    slug: "udyam-reg-certificate",
-    label: "Udyam Reg Certificate",
-  },
-  {
-    id: "fallback-udyam-regn-certificate",
-    slug: "udyam-regn-certificate",
-    label: "Udyam Regn Certificate",
-  },
-  {
-    id: "fallback-udyamregistration-gov-in",
-    slug: "udyamregistration-gov-in",
-    label: "Udyamregistration Gov In",
-  },
-  {
-    id: "fallback-aadhar-udyog-registration",
-    slug: "aadhar-udyog-registration",
-    label: "Aadhar Udyog Registration",
-  },
-  {
-    id: "fallback-udyog-aadhar-certificate-download",
-    slug: "udyog-aadhar-certificate-download",
-    label: "Udyog Aadhar Certificate Download",
-  },
-  {
-    id: "fallback-official-msme-registration-website",
-    slug: "msme-registration-portal",
-    label: "Official MSME Registration Website",
-  },
-  { id: "fallback-aadhaar-udyam", slug: "aadhaar-udyam", label: "Aadhaar Udyam" },
-  {
-    id: "fallback-msme-registration-process",
-    slug: "msme-registration-process",
-    label: "MSME Registration Process",
-  },
-  {
-    id: "fallback-udyam-aadhaar-download-pdf",
-    slug: "udyam-aadhaar-download-pdf",
-    label: "Udyam Aadhaar Download PDF",
-  },
-  {
-    id: "fallback-udyog-aadhar-registration",
-    slug: "udyog-aadhar-registration",
-    label: "Udyog Aadhar Registration",
-  },
-  {
-    id: "fallback-udhayam-aadhar-download",
-    slug: "udhayam-aadhar-download",
-    label: "Udhayam Aadhar Download",
-  },
-  {
-    id: "fallback-print-msme-udyam-certificate",
-    slug: "print-msme-udyam-certificate",
-    label: "Print MSME Udyam Certificate",
-  },
-  {
-    id: "fallback-udyam-registration-online",
-    slug: "udyam-registration-online",
-    label: "Udyam Registration Online",
-  },
-];
-
 const FOOTER_LINKS = [
   { to: "/terms-conditions", label: "Terms & Conditions" },
   { to: "/privacy-policy", label: "Privacy Policy" },
@@ -104,41 +32,41 @@ export function Footer() {
   const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const clickCount = useRef(0);
+  const [loadError, setLoadError] = useState(false);
+  const clickTimes = useRef<number[]>([]);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleHomeClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Native detail counts rapid consecutive clicks
-    const detail = (e as unknown as { detail: number }).detail;
-    if (detail >= 3) {
-      clickCount.current = 0;
+    const now = Date.now();
+    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 1000);
+
+    if (clickTimes.current.length >= 3) {
+      clickTimes.current = [];
       if (clickTimer.current) clearTimeout(clickTimer.current);
       setOpen(true);
       return;
     }
-    clickCount.current += 1;
+
     if (clickTimer.current) clearTimeout(clickTimer.current);
     clickTimer.current = setTimeout(() => {
-      const c = clickCount.current;
-      clickCount.current = 0;
-      if (c >= 3) {
-        setOpen(true);
-      } else {
-        navigate({ to: "/" });
-      }
-    }, 350);
+      clickTimes.current = [];
+      navigate({ to: "/" });
+    }, 1000);
   };
 
   useEffect(() => {
     if (!open || pages !== null) return;
     setLoading(true);
+    setLoadError(false);
     loadSeoPages()
       .then((data) => {
-        const rows = (data ?? []) as SeoPageRow[];
-        setPages(rows.length > 0 ? rows : FALLBACK_SEO_PAGES);
+        setPages((data ?? []) as SeoPageRow[]);
       })
-      .catch(() => setPages(FALLBACK_SEO_PAGES))
+      .catch(() => {
+        setLoadError(true);
+        setPages([]);
+      })
       .finally(() => setLoading(false));
   }, [loadSeoPages, open, pages]);
 
@@ -260,7 +188,15 @@ export function Footer() {
               </div>
 
               {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
-              {pages && pages.length > 0 && (
+              {loadError && (
+                <p className="py-3 text-sm text-white/75">
+                  Could not load SEO pages. Please try again.
+                </p>
+              )}
+              {!loading && !loadError && pages && pages.length === 0 && (
+                <p className="py-3 text-sm text-white/75">No pages yet.</p>
+              )}
+              {!loadError && pages && pages.length > 0 && (
                 <ul className="space-y-3 text-lg font-semibold leading-snug">
                   {pages.map((p) => (
                     <li key={p.id}>
