@@ -11,18 +11,23 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
+import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as RefundCancellationPolicyRouteImport } from './routes/refund-cancellation-policy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as PricingTransparencyRouteImport } from './routes/pricing-transparency'
+import { Route as PaymentNoticeServiceAcknowledgmentRouteImport } from './routes/payment-notice-service-acknowledgment'
 import { Route as OtherProblemRouteImport } from './routes/other-problem'
 import { Route as NewUdyamRegistrationRouteImport } from './routes/new-udyam-registration'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as DownloadUdyamCertificateRouteImport } from './routes/download-udyam-certificate'
 import { Route as DisclaimerRouteImport } from './routes/disclaimer'
+import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ConsentAcknowledgmentRouteImport } from './routes/consent-acknowledgment'
+import { Route as ComplianceStatementRouteImport } from './routes/compliance-statement'
 import { Route as ComplaintGrievancePolicyRouteImport } from './routes/complaint-grievance-policy'
+import { Route as AmlAntiFraudPolicyRouteImport } from './routes/aml-anti-fraud-policy'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
@@ -36,6 +41,11 @@ const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
 const TermsConditionsRoute = TermsConditionsRouteImport.update({
   id: '/terms-conditions',
   path: '/terms-conditions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
+  id: '/service-delivery-policy',
+  path: '/service-delivery-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RefundCancellationPolicyRoute =
@@ -54,6 +64,12 @@ const PricingTransparencyRoute = PricingTransparencyRouteImport.update({
   path: '/pricing-transparency',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentNoticeServiceAcknowledgmentRoute =
+  PaymentNoticeServiceAcknowledgmentRouteImport.update({
+    id: '/payment-notice-service-acknowledgment',
+    path: '/payment-notice-service-acknowledgment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const OtherProblemRoute = OtherProblemRouteImport.update({
   id: '/other-problem',
   path: '/other-problem',
@@ -86,6 +102,11 @@ const DisclaimerRoute = DisclaimerRouteImport.update({
   path: '/disclaimer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CookiePolicyRoute = CookiePolicyRouteImport.update({
+  id: '/cookie-policy',
+  path: '/cookie-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
@@ -96,12 +117,22 @@ const ConsentAcknowledgmentRoute = ConsentAcknowledgmentRouteImport.update({
   path: '/consent-acknowledgment',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ComplianceStatementRoute = ComplianceStatementRouteImport.update({
+  id: '/compliance-statement',
+  path: '/compliance-statement',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ComplaintGrievancePolicyRoute =
   ComplaintGrievancePolicyRouteImport.update({
     id: '/complaint-grievance-policy',
     path: '/complaint-grievance-policy',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AmlAntiFraudPolicyRoute = AmlAntiFraudPolicyRouteImport.update({
+  id: '/aml-anti-fraud-policy',
+  path: '/aml-anti-fraud-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -126,18 +157,23 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
+  '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/other-problem': typeof OtherProblemRoute
+  '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -146,18 +182,23 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
+  '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/other-problem': typeof OtherProblemRoute
+  '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -167,18 +208,23 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint-grievance-policy': typeof ComplaintGrievancePolicyRoute
+  '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/other-problem': typeof OtherProblemRoute
+  '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -189,18 +235,23 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/aml-anti-fraud-policy'
     | '/complaint-grievance-policy'
+    | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/cookie-policy'
     | '/disclaimer'
     | '/download-udyam-certificate'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/new-udyam-registration'
     | '/other-problem'
+    | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/service-delivery-policy'
     | '/terms-conditions'
     | '/update-udyam-certificate'
     | '/payment-pending/$leadCode'
@@ -209,18 +260,23 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/aml-anti-fraud-policy'
     | '/complaint-grievance-policy'
+    | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/cookie-policy'
     | '/disclaimer'
     | '/download-udyam-certificate'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/new-udyam-registration'
     | '/other-problem'
+    | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/service-delivery-policy'
     | '/terms-conditions'
     | '/update-udyam-certificate'
     | '/payment-pending/$leadCode'
@@ -229,18 +285,23 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/aml-anti-fraud-policy'
     | '/complaint-grievance-policy'
+    | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/cookie-policy'
     | '/disclaimer'
     | '/download-udyam-certificate'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/new-udyam-registration'
     | '/other-problem'
+    | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/service-delivery-policy'
     | '/terms-conditions'
     | '/update-udyam-certificate'
     | '/payment-pending/$leadCode'
@@ -250,18 +311,23 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AmlAntiFraudPolicyRoute: typeof AmlAntiFraudPolicyRoute
   ComplaintGrievancePolicyRoute: typeof ComplaintGrievancePolicyRoute
+  ComplianceStatementRoute: typeof ComplianceStatementRoute
   ConsentAcknowledgmentRoute: typeof ConsentAcknowledgmentRoute
   ContactRoute: typeof ContactRoute
+  CookiePolicyRoute: typeof CookiePolicyRoute
   DisclaimerRoute: typeof DisclaimerRoute
   DownloadUdyamCertificateRoute: typeof DownloadUdyamCertificateRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
   NewUdyamRegistrationRoute: typeof NewUdyamRegistrationRoute
   OtherProblemRoute: typeof OtherProblemRoute
+  PaymentNoticeServiceAcknowledgmentRoute: typeof PaymentNoticeServiceAcknowledgmentRoute
   PricingTransparencyRoute: typeof PricingTransparencyRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   RefundCancellationPolicyRoute: typeof RefundCancellationPolicyRoute
+  ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
@@ -284,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsConditionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/service-delivery-policy': {
+      id: '/service-delivery-policy'
+      path: '/service-delivery-policy'
+      fullPath: '/service-delivery-policy'
+      preLoaderRoute: typeof ServiceDeliveryPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/refund-cancellation-policy': {
       id: '/refund-cancellation-policy'
       path: '/refund-cancellation-policy'
@@ -303,6 +376,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing-transparency'
       fullPath: '/pricing-transparency'
       preLoaderRoute: typeof PricingTransparencyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-notice-service-acknowledgment': {
+      id: '/payment-notice-service-acknowledgment'
+      path: '/payment-notice-service-acknowledgment'
+      fullPath: '/payment-notice-service-acknowledgment'
+      preLoaderRoute: typeof PaymentNoticeServiceAcknowledgmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/other-problem': {
@@ -347,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DisclaimerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cookie-policy': {
+      id: '/cookie-policy'
+      path: '/cookie-policy'
+      fullPath: '/cookie-policy'
+      preLoaderRoute: typeof CookiePolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -361,11 +448,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsentAcknowledgmentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compliance-statement': {
+      id: '/compliance-statement'
+      path: '/compliance-statement'
+      fullPath: '/compliance-statement'
+      preLoaderRoute: typeof ComplianceStatementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/complaint-grievance-policy': {
       id: '/complaint-grievance-policy'
       path: '/complaint-grievance-policy'
       fullPath: '/complaint-grievance-policy'
       preLoaderRoute: typeof ComplaintGrievancePolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aml-anti-fraud-policy': {
+      id: '/aml-anti-fraud-policy'
+      path: '/aml-anti-fraud-policy'
+      fullPath: '/aml-anti-fraud-policy'
+      preLoaderRoute: typeof AmlAntiFraudPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -402,18 +503,24 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AmlAntiFraudPolicyRoute: AmlAntiFraudPolicyRoute,
   ComplaintGrievancePolicyRoute: ComplaintGrievancePolicyRoute,
+  ComplianceStatementRoute: ComplianceStatementRoute,
   ConsentAcknowledgmentRoute: ConsentAcknowledgmentRoute,
   ContactRoute: ContactRoute,
+  CookiePolicyRoute: CookiePolicyRoute,
   DisclaimerRoute: DisclaimerRoute,
   DownloadUdyamCertificateRoute: DownloadUdyamCertificateRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
   NewUdyamRegistrationRoute: NewUdyamRegistrationRoute,
   OtherProblemRoute: OtherProblemRoute,
+  PaymentNoticeServiceAcknowledgmentRoute:
+    PaymentNoticeServiceAcknowledgmentRoute,
   PricingTransparencyRoute: PricingTransparencyRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   RefundCancellationPolicyRoute: RefundCancellationPolicyRoute,
+  ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
@@ -422,3 +529,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/refund-cancellation-policy.html?raw";
 
 export const Route = createFileRoute("/refund-cancellation-policy")({
   head: () => ({
@@ -10,17 +11,5 @@ export const Route = createFileRoute("/refund-cancellation-policy")({
       { property: "og:description", content: "When and how refunds may be issued for consultancy fees." },
     ],
   }),
-  component: () => (
-    <PageHero title="Refund & Cancellation Policy">
-      <p>
-        Charges paid on this website are consultancy and assistance service
-        fees. Refund eligibility depends on the stage of work performed and
-        cooperation provided (such as supplying correct information, documents,
-        and OTP/verification inputs on time).
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Full refund policy content will be ported from udyamadhar.in/refund-cancellation-policy.
-      </p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="Refund & Cancellation Policy" html={html} />,
 });

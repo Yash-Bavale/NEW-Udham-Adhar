@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { WpPage } from "@/components/site/PageHero";
+import html from "@/content/wp/grievance-redressal-policy.html?raw";
 
 export const Route = createFileRoute("/complaint-grievance-policy")({
   head: () => ({
@@ -10,24 +11,5 @@ export const Route = createFileRoute("/complaint-grievance-policy")({
       { property: "og:description", content: "Complaint and grievance redressal policy for Business Help Services." },
     ],
   }),
-  component: () => (
-    <PageHero title="Complaint & Grievance Policy">
-      <p>
-        We take customer feedback seriously. If you have a complaint or
-        grievance regarding any service or transaction, please write to{" "}
-        <a href="mailto:support@udyamadhar.in">support@udyamadhar.in</a> with
-        your registered mobile, email and a description of the issue.
-      </p>
-      <ul>
-        <li>Acknowledgement: within 24 working hours.</li>
-        <li>First response / resolution attempt: within 3 working days.</li>
-        <li>Final resolution: typically within 7–10 working days, depending on complexity.</li>
-      </ul>
-      <p>
-        Note: government portal processing timelines are outside our control —
-        refer to our Refund &amp; Cancellation Policy for refund eligibility.
-      </p>
-      <p className="text-sm text-muted-foreground">Full policy content will be ported from the existing site.</p>
-    </PageHero>
-  ),
+  component: () => <WpPage title="Complaint & Grievance Policy" html={html} />,
 });
