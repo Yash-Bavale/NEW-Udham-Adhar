@@ -14,7 +14,110 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      leads: {
+        Row: {
+          base_amount: number
+          created_at: string
+          email: string
+          gst_amount: number
+          id: string
+          language: string
+          lead_code: string | null
+          mobile: string
+          name: string
+          notes: string | null
+          service: string
+          state: string
+          status: Database["public"]["Enums"]["lead_status"]
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          base_amount?: number
+          created_at?: string
+          email: string
+          gst_amount?: number
+          id?: string
+          language: string
+          lead_code?: string | null
+          mobile: string
+          name: string
+          notes?: string | null
+          service: string
+          state: string
+          status?: Database["public"]["Enums"]["lead_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          base_amount?: number
+          created_at?: string
+          email?: string
+          gst_amount?: number
+          id?: string
+          language?: string
+          lead_code?: string | null
+          mobile?: string
+          name?: string
+          notes?: string | null
+          service?: string
+          state?: string
+          status?: Database["public"]["Enums"]["lead_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          lead_id: string
+          raw_response: Json | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          razorpay_signature: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          lead_id: string
+          raw_response?: Json | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          lead_id?: string
+          raw_response?: Json | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +126,17 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      lead_status:
+        | "lead_created"
+        | "payment_pending"
+        | "payment_successful"
+        | "details_pending"
+        | "documents_pending"
+        | "under_review"
+        | "under_process"
+        | "completed"
+        | "closed"
+      payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +263,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      lead_status: [
+        "lead_created",
+        "payment_pending",
+        "payment_successful",
+        "details_pending",
+        "documents_pending",
+        "under_review",
+        "under_process",
+        "completed",
+        "closed",
+      ],
+      payment_status: ["created", "attempted", "paid", "failed", "refunded"],
+    },
   },
 } as const
