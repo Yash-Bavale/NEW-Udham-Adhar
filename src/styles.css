@@ -33,6 +33,7 @@
   --color-brand-red: var(--brand-red);
   --color-brand-navy: var(--brand-navy);
   --color-brand-navy-deep: var(--brand-navy-deep);
+  --color-brand-gold: var(--brand-gold);
   --color-nav-bg: var(--nav-bg);
   --color-disclaimer-bg: var(--disclaimer-bg);
   --color-form-header: var(--form-header);
@@ -49,6 +50,7 @@
   --brand-red: oklch(0.515 0.215 27);          /* #b91c1c-ish logo red */
   --brand-navy: oklch(0.32 0.13 264);          /* #1e3a8a navy */
   --brand-navy-deep: oklch(0.27 0.11 264);     /* darker navy for buttons */
+  --brand-gold: oklch(0.73 0.16 75);           /* #d99a18-ish menu gold */
   --nav-bg: oklch(0.94 0.025 244);             /* light blue strip */
   --disclaimer-bg: oklch(0.38 0.10 251);       /* mid-dark blue marquee */
   --form-header: oklch(0.30 0.12 264);         /* form card header */
