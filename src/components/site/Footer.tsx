@@ -36,18 +36,24 @@ export function Footer() {
   const clickTimes = useRef<number[]>([]);
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleHomeClick = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleHomeTrigger = () => {
     const now = Date.now();
-    const isHomePage = window.location.pathname === "/";
     clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 10000);
 
     if (clickTimes.current.length >= 3) {
       clickTimes.current = [];
       if (clickTimer.current) clearTimeout(clickTimer.current);
       setOpen(true);
-      return;
+      return true;
     }
+
+    return false;
+  };
+
+  const handleHomeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const isHomePage = window.location.pathname === "/";
+    if (handleHomeTrigger()) return;
 
     if (clickTimer.current) clearTimeout(clickTimer.current);
     if (isHomePage) return;
@@ -99,6 +105,9 @@ export function Footer() {
             <button
               type="button"
               onClick={handleHomeClick}
+              onPointerDown={(e) => {
+                if (e.pointerType === "touch") handleHomeTrigger();
+              }}
               className="text-sm text-white/85 hover:text-white hover:underline select-none bg-transparent p-0 cursor-pointer"
               aria-label="Home"
             >
