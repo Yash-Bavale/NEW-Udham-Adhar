@@ -184,7 +184,15 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin"
+      app_role: "admin" | "super_admin" | "operations" | "support" | "accounts"
+      application_status:
+        | "awaiting_payment"
+        | "payment_received"
+        | "details_pending"
+        | "documents_pending"
+        | "under_review"
+        | "under_process"
+        | "completed"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -195,6 +203,9 @@ export type Database = {
         | "under_process"
         | "completed"
         | "closed"
+        | "new_lead"
+        | "contacted"
+        | "refund_requested"
       payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
     }
     CompositeTypes: {
@@ -323,7 +334,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin"],
+      app_role: ["admin", "super_admin", "operations", "support", "accounts"],
+      application_status: [
+        "awaiting_payment",
+        "payment_received",
+        "details_pending",
+        "documents_pending",
+        "under_review",
+        "under_process",
+        "completed",
+      ],
       lead_status: [
         "lead_created",
         "payment_pending",
@@ -334,6 +354,9 @@ export const Constants = {
         "under_process",
         "completed",
         "closed",
+        "new_lead",
+        "contacted",
+        "refund_requested",
       ],
       payment_status: ["created", "attempted", "paid", "failed", "refunded"],
     },
