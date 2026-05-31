@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { createFileRoute } from "@tanstack/react-router";
+import { ServicePageLayout } from "@/components/site/ServicePageLayout";
 
 export const Route = createFileRoute("/other-problem")({
   head: () => ({
@@ -11,16 +11,15 @@ export const Route = createFileRoute("/other-problem")({
     ],
   }),
   component: () => (
-    <PageHero title="Other Udyam Problems">
+    <ServicePageLayout title="Other Udyam Problems">
       <p>We assist with a range of common Udyam Registration problems:</p>
       <ul>
         <li>Forgot Registered Mobile / Email</li>
         <li>Correct PAN / Aadhaar Name in Udyam</li>
         <li>OTP not received during registration / update</li>
         <li>NIC activity mismatch</li>
-        <li>General queries — “Talk to Expert” service</li>
+        <li>General queries — "Talk to Expert" service</li>
       </ul>
-      <p><Link to="/">Submit a request →</Link></p>
-    </PageHero>
+    </ServicePageLayout>
   ),
 });

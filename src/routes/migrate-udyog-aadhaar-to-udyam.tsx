@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { createFileRoute } from "@tanstack/react-router";
+import { ServicePageLayout } from "@/components/site/ServicePageLayout";
 
 export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
   head: () => ({
@@ -11,13 +11,13 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
     ],
   }),
   component: () => (
-    <PageHero title="Migrate Udyog Aadhaar to Udyam">
+    <ServicePageLayout title="Migrate Udyog Aadhaar to Udyam">
       <p>
         If you have an old <strong>Udyog Aadhaar Memorandum (UAM)</strong>
-        registration, it must be migrated to the new <strong>Udyam Registration</strong>
-        system. We assist with the entire migration process end-to-end.
+        registration, it must be migrated to the new <strong>Udyam
+        Registration</strong> system. We assist with the entire migration
+        process end-to-end.
       </p>
-      <p><Link to="/">Start migration →</Link></p>
-    </PageHero>
+    </ServicePageLayout>
   ),
 });
