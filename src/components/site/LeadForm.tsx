@@ -113,7 +113,7 @@ export function LeadForm() {
           disabled={busy}
           className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold py-3 transition-colors disabled:opacity-60"
         >
-          {busy ? "Processing…" : "Submit & Proceed to Payment"}
+          {busy ? "Submitting…" : "Submit"}
         </button>
 
         <p className="text-center text-xs text-muted-foreground">
