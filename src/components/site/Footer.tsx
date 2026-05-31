@@ -1,7 +1,19 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, ChevronDown, Home as HomeIcon } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Home as HomeIcon,
+  Briefcase,
+  Mail,
+  Phone,
+  MapPin,
+  Facebook,
+  Instagram,
+  Youtube,
+  MessageCircle,
+} from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 type SeoPageRow = { id: string; slug: string; label: string };
@@ -228,39 +240,78 @@ export function Footer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  return (
+    return (
     <footer className="bg-brand-navy-deep text-white mt-12">
-      <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
+      <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
+        {/* Col 1: Brand + socials */}
         <div>
-          <div className="text-xl font-bold font-display">Udyam Registration</div>
-          <div className="text-sm text-white/80 mt-1">Business Help Consultancy Services</div>
-          <p className="text-xs text-white/70 mt-4 leading-relaxed">
-            Business Help Services is a private consultancy and assistance service provider and is
-            not affiliated with, authorized by, endorsed by, or associated with any government
-            authority or department.
-          </p>
-
-          <div className="mt-5">
-            <button
-              type="button"
-              onClick={handleHomeClick}
-              onPointerDown={(e) => {
-                if (e.pointerType === "touch") handleHomeTrigger();
-              }}
-              className="text-sm text-white/85 hover:text-white hover:underline select-none bg-transparent p-0 cursor-pointer"
-              aria-label="Home"
+          <h3 className="text-2xl font-bold font-display leading-tight">
+            © Business Help Services
+          </h3>
+          <div className="mt-6 flex items-center gap-3">
+            <a
+              href="https://wa.me/919767870331"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#25D366] text-white hover:opacity-90 transition"
             >
-              Home
-            </button>
+              <MessageCircle className="h-5 w-5" />
+            </a>
+            <a
+              href="#"
+              aria-label="YouTube"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#FF0000] text-white hover:opacity-90 transition"
+            >
+              <Youtube className="h-5 w-5" />
+            </a>
+            <a
+              href="#"
+              aria-label="Instagram"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1a1a1a] text-white hover:opacity-90 transition"
+            >
+              <Instagram className="h-5 w-5" />
+            </a>
+            <a
+              href="#"
+              aria-label="Facebook"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1877F2] text-white hover:opacity-90 transition"
+            >
+              <Facebook className="h-5 w-5" />
+            </a>
           </div>
         </div>
 
-
-
+        {/* Col 2: MSME / Udyog Aadhaar with hidden triple-click Home */}
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Policies</h4>
-          <ul className="space-y-2 text-sm text-white/85">
-            {FOOTER_LINKS.map((l) => (
+          <h4 className="text-2xl font-bold font-display leading-tight">
+            MSME / Udyog Aadhaar
+          </h4>
+          <ul className="mt-6 space-y-3 text-[15px]">
+            <li>
+              <button
+                type="button"
+                onClick={handleHomeClick}
+                onPointerDown={(e) => {
+                  if (e.pointerType === "touch") handleHomeTrigger();
+                }}
+                className="inline-flex items-center gap-2 text-white/90 hover:text-white bg-transparent p-0 cursor-pointer select-none"
+                aria-label="Home"
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span>Home</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        {/* Col 3: Useful Links */}
+        <div>
+          <h4 className="text-2xl font-bold font-display leading-tight">
+            Useful Links
+          </h4>
+          <ul className="mt-6 space-y-2.5 text-[15px] text-white/90">
+            {FOOTER_LINKS.filter((l) => l.to !== "/contact" && l.to !== "/important-notice").map((l) => (
               <li key={l.to}>
                 <Link to={l.to} className="hover:text-white hover:underline">
                   {l.label}
@@ -270,33 +321,53 @@ export function Footer() {
           </ul>
         </div>
 
+        {/* Col 4: Get in touch */}
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Reach Us</h4>
-          <p className="text-sm text-white/85 font-semibold">Business Help Services</p>
-          <p className="text-sm text-white/85 mt-2">
-            📧{" "}
-            <a href="mailto:help@businesshelpservices.com" className="hover:underline">
-              help@businesshelpservices.com
-            </a>
-          </p>
-          <p className="text-sm text-white/85 mt-1">
-            📞{" "}
-            <a href="tel:+919767870331" className="hover:underline">
-              +91-9767870331
-            </a>
-          </p>
-          <p className="text-sm text-white/85 mt-1 leading-relaxed">
-            📍 Koregaon Bk, Khed, Pune,
-            <br />
-            Maharashtra – 410505, India
-          </p>
-          <p className="text-sm text-white/70 mt-3">Hours: Mon – Sat, 10:00 AM – 7:00 PM IST</p>
+          <h4 className="text-2xl font-bold font-display leading-tight">
+            Get in touch
+          </h4>
+          <ul className="mt-6 space-y-5 text-[15px] text-white/90">
+            <li className="flex items-start gap-3">
+              <Briefcase className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+              <span>
+                Working Hours: 10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <Mail className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+              <span>
+                Email:
+                <br />
+                <a
+                  href="mailto:help@businesshelpservices.com"
+                  className="hover:underline break-all"
+                >
+                  help@businesshelpservices.com
+                </a>
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+              <span>
+                Phone:{" "}
+                <a href="tel:+919767870331" className="hover:underline">
+                  +91-9767870331
+                </a>
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+              <span>
+                Address: Business Help Services Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India
+              </span>
+            </li>
+          </ul>
         </div>
       </div>
 
       <div className="border-t border-white/10">
-        <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-white/70">
-          © {new Date().getFullYear()} Business Help Services. All rights reserved.
+        <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
+          Operated by Business Help Services
         </div>
       </div>
 
