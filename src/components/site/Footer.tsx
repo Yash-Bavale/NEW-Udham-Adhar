@@ -337,50 +337,8 @@ export function Footer() {
                 </div>
               </div>
             </div>
-            <nav className="px-6 py-5" aria-label="Hidden SEO landing pages">
-              <Link
-                to="/"
-                className="mb-4 flex items-center gap-3 text-lg font-semibold text-white hover:text-brand-gold"
-                onClick={() => setOpen(false)}
-              >
-                <ChevronRight className="h-6 w-6 shrink-0 stroke-[3]" aria-hidden="true" />
-                Home
-              </Link>
+            <SeoTree pages={pages} loading={loading} loadError={loadError} onNavigate={() => setOpen(false)} />
 
-              <div className="mb-3 flex items-center gap-3 text-xl font-bold text-brand-gold">
-                <span className="text-2xl leading-none">⌄</span>
-                Udyamregistration
-              </div>
-
-              {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
-              {loadError && (
-                <p className="py-3 text-sm text-white/75">
-                  Could not load SEO pages. Please try again.
-                </p>
-              )}
-              {!loading && !loadError && pages && pages.length === 0 && (
-                <p className="py-3 text-sm text-white/75">No pages yet.</p>
-              )}
-              {!loadError && pages && pages.length > 0 && (
-                <ul className="space-y-3 text-lg font-semibold leading-snug">
-                  {pages.map((p) => (
-                    <li key={p.id}>
-                      <a
-                        href={`/${p.slug}`}
-                        className="flex items-start gap-3 text-white hover:text-brand-gold"
-                        onClick={() => setOpen(false)}
-                      >
-                        <ChevronRight
-                          className="mt-0.5 h-6 w-6 shrink-0 stroke-[3]"
-                          aria-hidden="true"
-                        />
-                        <span>{p.label}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </nav>
           </div>
         </div>
       )}
