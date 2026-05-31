@@ -179,6 +179,7 @@ import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
+import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
@@ -1065,6 +1066,11 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AdminRoute,
 } as any)
+const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
+  id: '/done',
+  path: '/done',
+  getParentRoute: () => OnboardingLeadCodeRoute,
+} as any)
 const OnboardingLeadCodeDocumentsRoute =
   OnboardingLeadCodeDocumentsRouteImport.update({
     id: '/documents',
@@ -1255,6 +1261,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
+  '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesByTo {
@@ -1429,6 +1436,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
+  '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesById {
@@ -1605,6 +1613,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
+  '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRouteTypes {
@@ -1782,6 +1791,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
+    | '/onboarding/$leadCode/done'
     | '/api/public/webhooks/payu'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1956,6 +1966,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
+    | '/onboarding/$leadCode/done'
     | '/api/public/webhooks/payu'
   id:
     | '__root__'
@@ -2131,6 +2142,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
+    | '/onboarding/$leadCode/done'
     | '/api/public/webhooks/payu'
   fileRoutesById: FileRoutesById
 }
@@ -3493,6 +3505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/onboarding/$leadCode/done': {
+      id: '/onboarding/$leadCode/done'
+      path: '/done'
+      fullPath: '/onboarding/$leadCode/done'
+      preLoaderRoute: typeof OnboardingLeadCodeDoneRouteImport
+      parentRoute: typeof OnboardingLeadCodeRoute
+    }
     '/onboarding/$leadCode/documents': {
       id: '/onboarding/$leadCode/documents'
       path: '/documents'
@@ -3553,10 +3572,12 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface OnboardingLeadCodeRouteChildren {
   OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
+  OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
 }
 
 const OnboardingLeadCodeRouteChildren: OnboardingLeadCodeRouteChildren = {
   OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
+  OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
 }
 
 const OnboardingLeadCodeRouteWithChildren =
