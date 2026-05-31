@@ -27,7 +27,7 @@ export function Header() {
 
       {/* Main header */}
       <header className="bg-background border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-5 bg-[#d2e3f3]">
+        <div className="mx-auto max-w-7xl px-4 py-5 bg-slate-50">
           {/* Mobile */}
           <div className="md:hidden">
             <button
