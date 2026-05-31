@@ -223,7 +223,7 @@ function SeoAdminPage() {
               required
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
-              placeholder="Udyam Registration"
+              placeholder="Business Help Services"
               className="w-full rounded-md border px-3 py-2 text-sm"
             />
           </div>

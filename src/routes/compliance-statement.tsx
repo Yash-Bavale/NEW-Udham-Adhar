@@ -5,8 +5,8 @@ import html from "@/content/wp/compliance-statement.html?raw";
 export const Route = createFileRoute("/compliance-statement")({
   head: () => ({
     meta: [
-      { title: "Compliance Statement — Udyam Registration Consultancy" },
-      { name: "description", content: "Compliance statement for Business Help Services regarding Udyam Registration consultancy." },
+      { title: "Compliance Statement — Business Help Services Consultancy" },
+      { name: "description", content: "Compliance statement for Business Help Services regarding Business Help Services consultancy." },
       { property: "og:title", content: "Compliance Statement" },
       { property: "og:description", content: "Read our compliance commitments and obligations." },
     ],

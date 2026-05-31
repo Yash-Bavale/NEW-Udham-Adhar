@@ -5,8 +5,8 @@ import html from "@/content/wp/terms-conditions.html?raw";
 export const Route = createFileRoute("/terms-conditions")({
   head: () => ({
     meta: [
-      { title: "Terms & Conditions — Udyam Registration Consultancy" },
-      { name: "description", content: "Terms and conditions governing the use of Udyam Registration consultancy services on this website." },
+      { title: "Terms & Conditions — Business Help Services Consultancy" },
+      { name: "description", content: "Terms and conditions governing the use of Business Help Services consultancy services on this website." },
       { property: "og:title", content: "Terms & Conditions" },
       { property: "og:description", content: "Terms and conditions for Business Help Services." },
     ],

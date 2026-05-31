@@ -11,17 +11,17 @@ import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-r
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Udyam Registration Online — Apply, Update, Download & Migrate" },
+      { title: "Business Help Services Online — Apply, Update, Download & Migrate" },
       {
         name: "description",
         content:
-          "Get assistance with new Udyam Registration, certificate updates, downloads, Udyog Aadhaar migration and corrections — Business Help Consultancy Services.",
+          "Get assistance with new Business Help Services, certificate updates, downloads, Udyog Aadhaar migration and corrections — Business Help Consultancy Services.",
       },
-      { property: "og:title", content: "Udyam Registration — Business Help Consultancy" },
+      { property: "og:title", content: "Business Help Services — Business Help Consultancy" },
       {
         property: "og:description",
         content:
-          "Consultancy assistance for MSME / Udyam Registration. Apply, update, download or migrate your certificate.",
+          "Consultancy assistance for MSME / Business Help Services. Apply, update, download or migrate your certificate.",
       },
     ],
   }),
@@ -30,19 +30,19 @@ export const Route = createFileRoute("/")({
 
 const FAQS = [
   {
-    q: "1. What is Udyam Registration?",
-    a: "Udyam Registration is an online registration process for Micro, Small, and Medium Enterprises (MSMEs) in India, subject to applicable eligibility criteria and regulations.",
+    q: "1. What is Business Help Services?",
+    a: "Business Help Services is an online registration process for Micro, Small, and Medium Enterprises (MSMEs) in India, subject to applicable eligibility criteria and regulations.",
   },
   {
-    q: "2. Who can apply for Udyam Registration?",
+    q: "2. Who can apply for Business Help Services?",
     a: "Eligible proprietors, startups, traders, service providers, manufacturers, partnerships, companies, and other business entities operating as MSMEs may apply subject to applicable rules and eligibility conditions.",
   },
   {
-    q: "3. What is the use of Udyam Registration for businesses?",
-    a: "Udyam Registration may help businesses maintain MSME registration records and may be used wherever applicable for business-related documentation, compliance, financial, operational, or institutional purposes subject to applicable policies and eligibility conditions.",
+    q: "3. What is the use of Business Help Services for businesses?",
+    a: "Business Help Services may help businesses maintain MSME registration records and may be used wherever applicable for business-related documentation, compliance, financial, operational, or institutional purposes subject to applicable policies and eligibility conditions.",
   },
   {
-    q: "4. Can I update or modify my Udyam Registration details?",
+    q: "4. Can I update or modify my Business Help Services details?",
     a: "Subject to applicable rules and portal functionality, certain business details such as address, mobile number, email, business activity, or other information may be updated through the relevant process and verification requirements.",
   },
   {
@@ -100,12 +100,12 @@ function HomePage() {
           <div className="p-6">
             <img
               src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
-              alt="Sample Udyam Registration Certificate"
+              alt="Sample Business Help Services Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
-              Sample Udyam Registration Certificate shown for reference purposes only.
+              Sample Business Help Services Certificate shown for reference purposes only.
             </p>
           </div>
         </div>
@@ -117,7 +117,7 @@ function HomePage() {
           Frequently Asked Questions for MSME registration in India.
         </h2>
         <p className="mt-4 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground">
-          MSME Udyam Registration Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
+          MSME Business Help Services Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
         </p>
 
         <Accordion type="single" collapsible className="mt-8 md:mt-10 space-y-3">

@@ -4,16 +4,16 @@ import { ServicePageLayout } from "@/components/site/ServicePageLayout";
 export const Route = createFileRoute("/new-udyam-registration")({
   head: () => ({
     meta: [
-      { title: "New Udyam Registration — Apply Online with Consultancy Help" },
-      { name: "description", content: "Apply for a new Udyam Registration for your micro, small or medium enterprise with assistance from Business Help Services." },
-      { property: "og:title", content: "New Udyam Registration — Apply Online" },
-      { property: "og:description", content: "Get consultancy help applying for a new Udyam Registration certificate." },
+      { title: "New Business Help Services — Apply Online with Consultancy Help" },
+      { name: "description", content: "Apply for a new Business Help Services for your micro, small or medium enterprise with assistance from Business Help Services." },
+      { property: "og:title", content: "New Business Help Services — Apply Online" },
+      { property: "og:description", content: "Get consultancy help applying for a new Business Help Services certificate." },
     ],
   }),
   component: () => (
-    <ServicePageLayout title="New Udyam Registration">
+    <ServicePageLayout title="New Business Help Services">
       <p>
-        Apply for a new Udyam Registration with end-to-end consultancy
+        Apply for a new Business Help Services with end-to-end consultancy
         assistance — we help you compile the required information, verify
         details, and complete the application on the official Udyam portal.
       </p>

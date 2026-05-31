@@ -65,12 +65,12 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
           <div className="p-6">
             <img
               src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
-              alt="Sample Udyam Registration Certificate"
+              alt="Sample Business Help Services Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
-              Sample Udyam Registration Certificate shown for reference purposes only.
+              Sample Business Help Services Certificate shown for reference purposes only.
             </p>
           </div>
         </div>

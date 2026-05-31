@@ -5,14 +5,14 @@ export const Route = createFileRoute("/other-problem")({
   head: () => ({
     meta: [
       { title: "Other Udyam Problems — Forgot OTP, Mobile, PAN/Aadhaar Issues" },
-      { name: "description", content: "Help with forgotten registered mobile/email, PAN/Aadhaar name mismatch, and other Udyam Registration issues." },
-      { property: "og:title", content: "Other Udyam Registration Problems" },
+      { name: "description", content: "Help with forgotten registered mobile/email, PAN/Aadhaar name mismatch, and other Business Help Services issues." },
+      { property: "og:title", content: "Other Business Help Services Problems" },
       { property: "og:description", content: "Get consultancy help for forgotten OTP, mobile/email recovery, PAN/Aadhaar corrections, and more." },
     ],
   }),
   component: () => (
     <ServicePageLayout title="Other Udyam Problems">
-      <p>We assist with a range of common Udyam Registration problems:</p>
+      <p>We assist with a range of common Business Help Services problems:</p>
       <ul>
         <li>Forgot Registered Mobile / Email</li>
         <li>Correct PAN / Aadhaar Name in Udyam</li>

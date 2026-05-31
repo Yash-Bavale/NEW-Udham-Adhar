@@ -4,10 +4,10 @@ import { ContactPage } from "@/components/site/ContactPage";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact Us — Udyam Registration Consultancy" },
-      { name: "description", content: "Contact Business Help Services for Udyam Registration consultancy assistance — email, phone and address details." },
+      { title: "Contact Us — Business Help Services Consultancy" },
+      { name: "description", content: "Contact Business Help Services for Business Help Services consultancy assistance — email, phone and address details." },
       { property: "og:title", content: "Contact Us — Business Help Services" },
-      { property: "og:description", content: "Reach out to Business Help Services for help with your Udyam Registration." },
+      { property: "og:description", content: "Reach out to Business Help Services for help with your Business Help Services." },
     ],
   }),
   component: ContactPage,

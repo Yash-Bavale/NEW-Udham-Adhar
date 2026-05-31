@@ -5,8 +5,8 @@ import html from "@/content/wp/consent-acknowledgment.html?raw";
 export const Route = createFileRoute("/consent-acknowledgment")({
   head: () => ({
     meta: [
-      { title: "Consents & Acknowledgements — Udyam Registration Consultancy" },
-      { name: "description", content: "Consents and acknowledgements you provide when using Business Help Services for Udyam Registration." },
+      { title: "Consents & Acknowledgements — Business Help Services Consultancy" },
+      { name: "description", content: "Consents and acknowledgements you provide when using Business Help Services for Business Help Services." },
       { property: "og:title", content: "Consents & Acknowledgements" },
       { property: "og:description", content: "Read the consents and acknowledgements that apply to using our services." },
     ],
