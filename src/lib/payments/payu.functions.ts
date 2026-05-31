@@ -104,7 +104,7 @@ export const createPayUOrder = createServerFn({ method: "POST" })
 
     const hash = computeRequestHash({
       key, salt, txnid, amount, productinfo, firstname, email,
-      udf1: lead.id, udf2: application?.id ?? "", udf3: lead.lead_code,
+      udf1: lead.id, udf2: application?.id ?? "", udf3: leadCode,
     });
 
     return {
