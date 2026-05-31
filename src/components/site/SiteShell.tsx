@@ -6,7 +6,7 @@ import { Footer } from "./Footer";
 
 export function SiteShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background bg-[#194170]">
       <Header />
       <Nav />
       <DisclaimerBar />
