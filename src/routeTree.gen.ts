@@ -179,6 +179,7 @@ import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
+import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 
@@ -1064,6 +1065,12 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AdminRoute,
 } as any)
+const OnboardingLeadCodeDocumentsRoute =
+  OnboardingLeadCodeDocumentsRouteImport.update({
+    id: '/documents',
+    path: '/documents',
+    getParentRoute: () => OnboardingLeadCodeRoute,
+  } as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -1240,13 +1247,14 @@ export interface FileRoutesByFullPath {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesByTo {
@@ -1413,13 +1421,14 @@ export interface FileRoutesByTo {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesById {
@@ -1588,13 +1597,14 @@ export interface FileRoutesById {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRouteTypes {
@@ -1771,6 +1781,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/onboarding/$leadCode/documents'
     | '/api/public/webhooks/payu'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1944,6 +1955,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin'
     | '/admin/leads/$leadId'
+    | '/onboarding/$leadCode/documents'
     | '/api/public/webhooks/payu'
   id:
     | '__root__'
@@ -2118,6 +2130,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/onboarding/$leadCode/documents'
     | '/api/public/webhooks/payu'
   fileRoutesById: FileRoutesById
 }
@@ -2280,7 +2293,7 @@ export interface RootRouteChildren {
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
-  OnboardingLeadCodeRoute: typeof OnboardingLeadCodeRoute
+  OnboardingLeadCodeRoute: typeof OnboardingLeadCodeRouteWithChildren
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
@@ -3480,6 +3493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/onboarding/$leadCode/documents': {
+      id: '/onboarding/$leadCode/documents'
+      path: '/documents'
+      fullPath: '/onboarding/$leadCode/documents'
+      preLoaderRoute: typeof OnboardingLeadCodeDocumentsRouteImport
+      parentRoute: typeof OnboardingLeadCodeRoute
+    }
     '/admin/leads/$leadId': {
       id: '/admin/leads/$leadId'
       path: '/$leadId'
@@ -3530,6 +3550,17 @@ const AdminRouteChildren: AdminRouteChildren = {
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface OnboardingLeadCodeRouteChildren {
+  OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
+}
+
+const OnboardingLeadCodeRouteChildren: OnboardingLeadCodeRouteChildren = {
+  OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
+}
+
+const OnboardingLeadCodeRouteWithChildren =
+  OnboardingLeadCodeRoute._addFileChildren(OnboardingLeadCodeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -3694,7 +3725,7 @@ const rootRouteChildren: RootRouteChildren = {
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
-  OnboardingLeadCodeRoute: OnboardingLeadCodeRoute,
+  OnboardingLeadCodeRoute: OnboardingLeadCodeRouteWithChildren,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,

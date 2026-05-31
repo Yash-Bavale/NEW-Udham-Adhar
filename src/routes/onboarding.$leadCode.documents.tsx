@@ -51,7 +51,7 @@ function DocsPage() {
         leadCode={leadCode}
         docs={data.schema.documents}
         existing={data.documents}
-        onChanged={() => refetch()}
+        onChanged={async () => { await refetch(); }}
       />
 
       <div className="flex flex-col-reverse sm:flex-row gap-3 justify-between items-stretch sm:items-center pt-6 mt-6 border-t border-border">
