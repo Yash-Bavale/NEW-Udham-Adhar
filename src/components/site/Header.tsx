@@ -1,12 +1,43 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
+
+declare global {
+  interface Window {
+    google?: any;
+    googleTranslateElementInit?: () => void;
+  }
+}
 
 export function Header() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (document.getElementById("google-translate-script")) return;
+    window.googleTranslateElementInit = () => {
+      new window.google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages:
+            "en,hi,bn,gu,kn,ml,mr,pa,sd,ta,te,ur",
+          layout:
+            window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false,
+        },
+        "google_translate_element",
+      );
+    };
+    const s = document.createElement("script");
+    s.id = "google-translate-script";
+    s.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    s.async = true;
+    document.body.appendChild(s);
+  }, []);
 
   const handleTitleClick = () => {
     if (pathname === "/") {
@@ -20,10 +51,12 @@ export function Header() {
     <>
       {/* Top thin bar */}
       <div className="bg-muted text-xs text-muted-foreground border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-2 flex justify-center md:justify-end bg-[#d2e3f3]">
-          <span>Change Language</span>
+        <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-center md:justify-end gap-3 bg-[#d2e3f3]">
+          <span className="font-medium text-brand-navy">Change Language</span>
+          <div id="google_translate_element" className="gtranslate-host" />
         </div>
       </div>
+
 
       {/* Main header */}
       <header className="bg-background border-b border-border">
