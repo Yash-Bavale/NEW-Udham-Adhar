@@ -116,6 +116,93 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip: string | null
+          new_value: Json | null
+          old_value: Json | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip?: string | null
+          new_value?: Json | null
+          old_value?: Json | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip?: string | null
+          new_value?: Json | null
+          old_value?: Json | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          application_id: string | null
+          base_amount: number
+          created_at: string
+          gst_amount: number
+          id: string
+          invoice_number: string | null
+          issued_at: string
+          lead_id: string
+          payment_id: string
+          pdf_path: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          base_amount: number
+          created_at?: string
+          gst_amount: number
+          id?: string
+          invoice_number?: string | null
+          issued_at?: string
+          lead_id: string
+          payment_id: string
+          pdf_path?: string | null
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string | null
+          base_amount?: number
+          created_at?: string
+          gst_amount?: number
+          id?: string
+          invoice_number?: string | null
+          issued_at?: string
+          lead_id?: string
+          payment_id?: string
+          pdf_path?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lead_notes: {
         Row: {
           created_at: string
@@ -222,45 +309,105 @@ export type Database = {
           },
         ]
       }
+      payment_gateways: {
+        Row: {
+          config: Json
+          created_at: string
+          display_name: string
+          id: string
+          is_enabled: boolean
+          name: string
+          priority: number
+          updated_at: string
+          webhook_secret_name: string | null
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          display_name: string
+          id?: string
+          is_enabled?: boolean
+          name: string
+          priority?: number
+          updated_at?: string
+          webhook_secret_name?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_enabled?: boolean
+          name?: string
+          priority?: number
+          updated_at?: string
+          webhook_secret_name?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
+          application_id: string | null
+          base_amount: number
           created_at: string
           currency: string
+          gateway_name: string
+          gst_amount: number
           id: string
+          idempotency_key: string | null
           lead_id: string
+          payment_date: string | null
           raw_response: Json | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           razorpay_signature: string | null
           status: Database["public"]["Enums"]["payment_status"]
+          transaction_id: string | null
           updated_at: string
+          webhook_response: Json | null
         }
         Insert: {
           amount: number
+          application_id?: string | null
+          base_amount?: number
           created_at?: string
           currency?: string
+          gateway_name?: string
+          gst_amount?: number
           id?: string
+          idempotency_key?: string | null
           lead_id: string
+          payment_date?: string | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          transaction_id?: string | null
           updated_at?: string
+          webhook_response?: Json | null
         }
         Update: {
           amount?: number
+          application_id?: string | null
+          base_amount?: number
           created_at?: string
           currency?: string
+          gateway_name?: string
+          gst_amount?: number
           id?: string
+          idempotency_key?: string | null
           lead_id?: string
+          payment_date?: string | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          transaction_id?: string | null
           updated_at?: string
+          webhook_response?: Json | null
         }
         Relationships: [
           {
@@ -394,7 +541,44 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      payments_safe: {
+        Row: {
+          application_id: string | null
+          created_at: string | null
+          gateway_name: string | null
+          id: string | null
+          lead_id: string | null
+          payment_date: string | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string | null
+          gateway_name?: string | null
+          id?: string | null
+          lead_id?: string | null
+          payment_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string | null
+          gateway_name?: string | null
+          id?: string | null
+          lead_id?: string | null
+          payment_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       current_user_is_admin: { Args: never; Returns: boolean }
@@ -406,9 +590,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_finance_viewer: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "super_admin" | "operations" | "support" | "accounts"
+      app_role:
+        | "admin"
+        | "super_admin"
+        | "operations"
+        | "support"
+        | "accounts"
+        | "finance"
       application_status:
         | "awaiting_payment"
         | "payment_received"
@@ -558,7 +750,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "super_admin", "operations", "support", "accounts"],
+      app_role: [
+        "admin",
+        "super_admin",
+        "operations",
+        "support",
+        "accounts",
+        "finance",
+      ],
       application_status: [
         "awaiting_payment",
         "payment_received",
