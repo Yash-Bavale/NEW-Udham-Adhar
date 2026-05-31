@@ -168,6 +168,7 @@ import { Route as AadhaarUdyamRouteImport } from './routes/aadhaar-udyam'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
+import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
 
 const WwwUdyamregistrationGovInRoute =
@@ -997,6 +998,11 @@ const ProcessingLeadCodeRoute = ProcessingLeadCodeRouteImport.update({
   path: '/processing/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentLeadCodeRoute = PaymentLeadCodeRouteImport.update({
+  id: '/payment/$leadCode',
+  path: '/payment/$leadCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   id: '/payment-pending/$leadCode',
   path: '/payment-pending/$leadCode',
@@ -1162,6 +1168,7 @@ export interface FileRoutesByFullPath {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
+  '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
 }
@@ -1324,6 +1331,7 @@ export interface FileRoutesByTo {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
+  '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
 }
@@ -1487,6 +1495,7 @@ export interface FileRoutesById {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
+  '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
 }
@@ -1651,6 +1660,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
+    | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
   fileRoutesByTo: FileRoutesByTo
@@ -1813,6 +1823,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
+    | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
   id:
@@ -1975,6 +1986,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/payment-pending/$leadCode'
+    | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
   fileRoutesById: FileRoutesById
@@ -2138,6 +2150,7 @@ export interface RootRouteChildren {
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
+  PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
 }
@@ -3257,6 +3270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProcessingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment/$leadCode': {
+      id: '/payment/$leadCode'
+      path: '/payment/$leadCode'
+      fullPath: '/payment/$leadCode'
+      preLoaderRoute: typeof PaymentLeadCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/payment-pending/$leadCode': {
       id: '/payment-pending/$leadCode'
       path: '/payment-pending/$leadCode'
@@ -3430,6 +3450,7 @@ const rootRouteChildren: RootRouteChildren = {
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
+  PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
 }
