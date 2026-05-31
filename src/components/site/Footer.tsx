@@ -391,13 +391,6 @@ export function Footer() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Link
-                    to="/seo-admin"
-                    className="text-sm font-semibold text-brand-gold hover:underline"
-                    onClick={() => setOpen(false)}
-                  >
-                    Manage
-                  </Link>
                   <button
                     onClick={() => setOpen(false)}
                     className="text-2xl leading-none px-2 py-1 text-white hover:text-brand-gold"
@@ -406,6 +399,7 @@ export function Footer() {
                     ✕
                   </button>
                 </div>
+
               </div>
             </div>
             <SeoTree pages={pages} loading={loading} loadError={loadError} onNavigate={() => setOpen(false)} />
