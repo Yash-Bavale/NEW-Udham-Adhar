@@ -59,13 +59,16 @@ export const createPayUOrder = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
+    if (!lead.lead_code) throw new Error("Lead is missing a lead code");
+    const leadCode: string = lead.lead_code;
+
     let txnid: string;
     let paymentId: string;
     if (existing && existing.transaction_id) {
       txnid = existing.transaction_id;
       paymentId = existing.id;
     } else {
-      txnid = buildTxnId(lead.lead_code);
+      txnid = buildTxnId(leadCode);
       const { data: inserted, error: insErr } = await supabaseAdmin
         .from("payments")
         .insert({
