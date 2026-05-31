@@ -20,7 +20,7 @@ export function Header() {
     <>
       {/* Top thin bar */}
       <div className="bg-muted text-xs text-muted-foreground border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-2 flex justify-center md:justify-end">
+        <div className="mx-auto max-w-7xl px-4 py-2 flex justify-center md:justify-end bg-sky-300">
           <span>Change Language</span>
         </div>
       </div>
