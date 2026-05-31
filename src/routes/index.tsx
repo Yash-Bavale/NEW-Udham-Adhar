@@ -149,12 +149,12 @@ function HomePage() {
 
       {/* Process Steps */}
       <section className="bg-brand-navy/10">
-        <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
-          <h2 className="text-center text-3xl md:text-4xl font-bold font-display text-foreground">
+        <div className="mx-auto max-w-6xl px-4 py-10 md:py-12">
+          <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
             Udyam Assistance Process – Fast &amp; Simple
           </h2>
 
-          <div className="mt-10 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-4 items-start">
+          <div className="mt-8 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-4 items-start">
             {STEPS.map((s, i) => {
               const Icon = s.icon;
               return (
@@ -180,7 +180,7 @@ function HomePage() {
       </section>
 
       {/* India Coverage */}
-      <section className="mx-auto max-w-5xl px-4 py-12 md:py-16">
+      <section className="mx-auto max-w-5xl px-4 py-10 md:py-12">
         <div className="rounded-lg border border-border overflow-hidden bg-card">
           <div className="bg-muted/40 px-6 py-5 border-b border-border">
             <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
