@@ -60,11 +60,17 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         </Field>
 
         <Field label="Mobile No / मोबाइल नंबर">
-          <input
-            name="mobile" required inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10}
-            className={inputCls} placeholder="Enter Mobile No / मोबाइल नंबर"
-          />
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm text-foreground/80 font-medium">
+              +91
+            </span>
+            <input
+              name="mobile" required inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10}
+              className={`${inputCls} pl-14`} placeholder="Enter 10-digit mobile number"
+            />
+          </div>
         </Field>
+
 
         <Field label="State / राज्य">
           <select name="state" required defaultValue="" className={inputCls}>
@@ -88,7 +94,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         </Field>
 
         <label className="flex gap-3 items-start text-xs text-foreground/80 leading-relaxed">
-          <input type="checkbox" name="consent" required className="mt-1 h-4 w-4 accent-[var(--brand-navy)] my-[6px] px-[6px] py-[6px]" />
+          <input type="checkbox" name="consent" required className="mt-1 h-5 w-5 shrink-0 accent-brand-navy-deep border-2 border-brand-navy-deep rounded-sm cursor-pointer" style={{ accentColor: '#0a1f44' }} />
           <span>
             I confirm that I have read and agreed to all applicable{" "}
             <a href="/terms-conditions" className="text-brand-navy underline">Terms &amp; Conditions</a>,{" "}

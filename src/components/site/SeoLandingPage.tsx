@@ -9,14 +9,42 @@ const proseClasses =
   "[&_a]:text-brand-navy [&_a]:underline " +
   "[&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 " +
   "[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-1 " +
-  "[&_img]:rounded-md [&_img]:border [&_img]:border-border [&_img]:my-3 " +
+  "[&_img]:rounded-md [&_img]:border [&_img]:border-border [&_img]:my-3 [&_img]:max-w-full [&_img]:h-auto " +
+  "[&_svg]:hidden " +
   "[&_p]:my-3 [&_strong]:text-foreground";
+
+/**
+ * Strip duplicate content from imported WordPress HTML.
+ * The React layout already renders its own LeadForm + Sample Certificate card,
+ * and the source HTML contains oversized inline SVG icons we don't want.
+ */
+function sanitize(html: string): string {
+  let out = html;
+  // Remove all inline <style> and <script> blocks
+  out = out.replace(/<style\b[\s\S]*?<\/style>/gi, "");
+  out = out.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+  // Remove all inline <svg>...</svg> (huge whatsapp icons etc.)
+  out = out.replace(/<svg\b[\s\S]*?<\/svg>/gi, "");
+  // Remove the duplicate "Sample Certificate" block (heading + lightbox anchor + caption)
+  out = out.replace(
+    /<h2[^>]*>\s*Sample Certificate\s*<\/h2>[\s\S]*?<\/a>\s*(?:<p[^>]*>[^<]*reference purposes only\.?[^<]*<\/p>)?/i,
+    "",
+  );
+  // Remove the duplicate "Fill application" / form remnants near the top
+  out = out.replace(/<h2[^>]*>\s*Fill application\s*<\/h2>/i, "");
+  out = out.replace(/<p[^>]*role=["']status["'][^>]*>[\s\S]*?<\/p>/gi, "");
+  out = out.replace(/<ul>\s*<\/ul>/gi, "");
+  // Remove the "Click to Connect with Expert" leftover text label
+  out = out.replace(/Click to Connect with Expert/gi, "");
+  return out;
+}
 
 /**
  * SEO landing page layout: lead form + page-named title on top, prose content below.
  * Form heading mirrors the page title so each landing page collects leads under its own brand.
  */
 export function SeoLandingPage({ title, html }: { title: string; html: string }) {
+  const cleanHtml = sanitize(html);
   return (
     <>
       <div className="bg-brand-navy text-white">
@@ -50,7 +78,7 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
 
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className={proseClasses} dangerouslySetInnerHTML={{ __html: html }} />
+          <div className={proseClasses} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
         </div>
       </section>
     </>
