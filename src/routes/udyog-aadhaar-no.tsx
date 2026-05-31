@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-no.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-no")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyog-aadhaar-no")({
       { property: "og:description", content: "Udyog Aadhaar Number (UAN) Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your Stat" },
     ],
   }),
-  component: () => <WpPage title="Udyog Aadhaar Number (UAN) – Find, Verify & Update UAN" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Number (UAN) – Find, Verify & Update UAN" html={html} />,
 });

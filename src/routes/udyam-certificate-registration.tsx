@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-certificate-registration.html?raw";
 
 export const Route = createFileRoute("/udyam-certificate-registration")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam-certificate-registration")({
       { property: "og:description", content: "Udyam Certificate Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your " },
     ],
   }),
-  component: () => <WpPage title="Udyam Certificate Registration - How to Register and Get MSM" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Certificate Registration - How to Register and Get MSM" html={html} />,
 });

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-certificate-download-pdf.html?raw";
 
 export const Route = createFileRoute("/udyam-certificate-download-pdf")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam-certificate-download-pdf")({
       { property: "og:description", content: "Udyam Certificate Download PDF Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your " },
     ],
   }),
-  component: () => <WpPage title="Udyam Certificate Download PDF | Get MSME Certificate Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Certificate Download PDF | Get MSME Certificate Online" html={html} />,
 });

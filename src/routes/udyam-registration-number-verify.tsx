@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-number-verify.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-number-verify")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam-registration-number-verify")({
       { property: "og:description", content: "Udyam Registration Number Verify Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select You" },
     ],
   }),
-  component: () => <WpPage title="Udyam Registration Number Verify | MSME Certificate Validati" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Number Verify | MSME Certificate Validati" html={html} />,
 });

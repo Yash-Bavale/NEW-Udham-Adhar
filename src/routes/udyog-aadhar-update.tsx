@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhar-update.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhar-update")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyog-aadhar-update")({
       { property: "og:description", content: "Udyog Aadhar Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhr" },
     ],
   }),
-  component: () => <WpPage title="Udyog Aadhar Update - How to Update Your MSME Details" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Update - How to Update Your MSME Details" html={html} />,
 });

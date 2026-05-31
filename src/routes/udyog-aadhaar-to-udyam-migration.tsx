@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-to-udyam-migration.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-to-udyam-migration")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyog-aadhaar-to-udyam-migration")({
       { property: "og:description", content: "Udyog Aadhaar to Udyam Migration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select You" },
     ],
   }),
-  component: () => <WpPage title="Udyog Aadhaar to Udyam Migration | Update Old UAN to Udyam C" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar to Udyam Migration | Update Old UAN to Udyam C" html={html} />,
 });

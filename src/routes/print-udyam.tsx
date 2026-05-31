@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/print-udyam.html?raw";
 
 export const Route = createFileRoute("/print-udyam")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/print-udyam")({
       { property: "og:description", content: "Print Udyam Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State A" },
     ],
   }),
-  component: () => <WpPage title="Print Udyam Certificate | MSME Certificate Print Online" html={html} />,
+  component: () => <SeoLandingPage title="Print Udyam Certificate | MSME Certificate Print Online" html={html} />,
 });

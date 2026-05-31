@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udhayam-aadhar-download.html?raw";
 
 export const Route = createFileRoute("/udhayam-aadhar-download")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udhayam-aadhar-download")({
       { property: "og:description", content: "Udhayam Aadhar Download Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State A" },
     ],
   }),
-  component: () => <WpPage title="Udhayam Aadhar Download | MSME Udyam Certificate PDF" html={html} />,
+  component: () => <SeoLandingPage title="Udhayam Aadhar Download | MSME Udyam Certificate PDF" html={html} />,
 });
