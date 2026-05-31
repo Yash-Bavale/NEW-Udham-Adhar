@@ -1,10 +1,149 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, ChevronDown, Home as HomeIcon } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 type SeoPageRow = { id: string; slug: string; label: string };
+
+type Category = {
+  key: string;
+  label: string;
+  slug: string | null; // null = Home
+  match?: (slug: string, label: string) => boolean;
+};
+
+// Priority-ordered. Each page gets bucketed into the first matching category.
+const CATEGORIES: Category[] = [
+  { key: "home", label: "Home", slug: null },
+  {
+    key: "udyamregistration",
+    label: "Udyamregistration",
+    slug: "udyam-registration",
+    match: (s) =>
+      s === "udyam-registration" ||
+      s.startsWith("udyam-registr") ||
+      s.startsWith("udyamregistration"),
+  },
+  {
+    key: "udyam-reg-certificate",
+    label: "Udyam Regn Certificate",
+    slug: "udyam-reg-certificate",
+    match: (s) =>
+      s === "udyam-reg-certificate" ||
+      s.startsWith("udyam-certificate") ||
+      s === "udyam-cer" ||
+      s === "udyam-card" ||
+      s === "udyam-number",
+  },
+  {
+    key: "udyamregistration-gov-in",
+    label: "Udyamregistration gov in",
+    slug: "https-udyamregistration-gov-in",
+    match: (s) => s.includes("udyamregistration-gov-in") || s === "udyam-portal",
+  },
+  {
+    key: "aadhar-udyog-registration",
+    label: "Aadhar Udyog registration",
+    slug: "aadhar-udyog-registration",
+    match: (s) => s.startsWith("aadhar-udyog") || s.startsWith("udhar-aadhar"),
+  },
+  {
+    key: "udyog-aadhar-certificate-download",
+    label: "Udyog Aadhar certificate download",
+    slug: "msme-udyog-aadhar",
+    match: (s) => s.startsWith("udyog-aadhar") || s === "msme-udyog-aadhar",
+  },
+  {
+    key: "official-msme-registration-website",
+    label: "Official MSME Registration Website",
+    slug: "msme-registration-portal",
+    match: (s) =>
+      s === "msme-registration-portal" ||
+      s === "msme-online-registration" ||
+      s === "msme-apply-online" ||
+      s === "register-msme" ||
+      s === "register-for-msme" ||
+      s === "msme-registration-login",
+  },
+  {
+    key: "aadhaar-udyam",
+    label: "Aadhaar Udyam",
+    slug: "aadhaar-udyam",
+    match: (s) =>
+      s === "aadhaar-udyam" ||
+      s.startsWith("aadhar-udyam") ||
+      s.startsWith("udyam-aadhaar") ||
+      s.startsWith("udyam-aadhar") ||
+      s.startsWith("udyam-adhaar") ||
+      s.startsWith("udyam-adhar"),
+  },
+  {
+    key: "msme-registration-process",
+    label: "MSME Registration Process",
+    slug: "msme-registration-process",
+    match: (s) =>
+      s === "msme-registration-process" ||
+      s.startsWith("msme-registration-") ||
+      s.startsWith("msme-certificate") ||
+      s === "ms-me-certificate" ||
+      s === "msme-cer" ||
+      s === "msme-updation",
+  },
+  {
+    key: "udyam-aadhaar-download-pdf",
+    label: "Udyam Aadhaar Download PDF",
+    slug: "udyam-aadhaar-download-pdf",
+    match: (s) =>
+      s === "udyam-aadhaar-download-pdf" ||
+      s.startsWith("udyam-download") ||
+      s.startsWith("download-udyam") ||
+      s === "download-msme-certificate" ||
+      s === "free-msme-registration-certificate-download" ||
+      s === "udham-aadhar-download" ||
+      s === "udyam-card-download",
+  },
+  {
+    key: "udyog-aadhar-registration",
+    label: "Udyog Aadhar Registration",
+    slug: "udyog-aadhar-registration",
+    match: (s) => s === "udyog-aadhar-registration",
+  },
+  {
+    key: "udhayam-aadhar-download",
+    label: "Udhayam Aadhar Download",
+    slug: "udhayam-aadhar-download",
+    match: (s) => s === "udhayam-aadhar-download",
+  },
+  {
+    key: "print-msme-udyam-certificate",
+    label: "Print MSME Udyam Certificate",
+    slug: "print-msme-udyam-certificate",
+    match: (s) =>
+      s.startsWith("print-msme") ||
+      s.startsWith("print-udyam") ||
+      s.startsWith("msme-print") ||
+      s.startsWith("udyam-print"),
+  },
+  {
+    key: "udyam-registration-online",
+    label: "Udyam Registration Online",
+    slug: "udyam-online-registration",
+    match: (s) =>
+      s === "udyam-online-registration" ||
+      s === "udyam-new-registration" ||
+      s === "udyam-application" ||
+      s === "udyam-apply" ||
+      s === "udyam-pan-registration" ||
+      s === "udyam-msme-registration" ||
+      s.startsWith("udyam-register") ||
+      s.startsWith("udyam-msme") ||
+      s === "udyam" ||
+      s === "udyam-edit",
+  },
+];
+
+
 
 const FOOTER_LINKS = [
   { to: "/terms-conditions", label: "Terms & Conditions" },
@@ -198,53 +337,125 @@ export function Footer() {
                 </div>
               </div>
             </div>
-            <nav className="px-6 py-5" aria-label="Hidden SEO landing pages">
-              <Link
-                to="/"
-                className="mb-4 flex items-center gap-3 text-lg font-semibold text-white hover:text-brand-gold"
-                onClick={() => setOpen(false)}
-              >
-                <ChevronRight className="h-6 w-6 shrink-0 stroke-[3]" aria-hidden="true" />
-                Home
-              </Link>
+            <SeoTree pages={pages} loading={loading} loadError={loadError} onNavigate={() => setOpen(false)} />
 
-              <div className="mb-3 flex items-center gap-3 text-xl font-bold text-brand-gold">
-                <span className="text-2xl leading-none">⌄</span>
-                Udyamregistration
-              </div>
-
-              {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
-              {loadError && (
-                <p className="py-3 text-sm text-white/75">
-                  Could not load SEO pages. Please try again.
-                </p>
-              )}
-              {!loading && !loadError && pages && pages.length === 0 && (
-                <p className="py-3 text-sm text-white/75">No pages yet.</p>
-              )}
-              {!loadError && pages && pages.length > 0 && (
-                <ul className="space-y-3 text-lg font-semibold leading-snug">
-                  {pages.map((p) => (
-                    <li key={p.id}>
-                      <a
-                        href={`/${p.slug}`}
-                        className="flex items-start gap-3 text-white hover:text-brand-gold"
-                        onClick={() => setOpen(false)}
-                      >
-                        <ChevronRight
-                          className="mt-0.5 h-6 w-6 shrink-0 stroke-[3]"
-                          aria-hidden="true"
-                        />
-                        <span>{p.label}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </nav>
           </div>
         </div>
       )}
     </footer>
   );
 }
+
+function SeoTree({
+  pages,
+  loading,
+  loadError,
+  onNavigate,
+}: {
+  pages: SeoPageRow[] | null;
+  loading: boolean;
+  loadError: boolean;
+  onNavigate: () => void;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, SeoPageRow[]>();
+    CATEGORIES.forEach((c) => map.set(c.key, []));
+    if (!pages) return map;
+    const mainSlugs = new Set(
+      CATEGORIES.map((c) => c.slug).filter((s): s is string => !!s),
+    );
+    for (const p of pages) {
+      if (mainSlugs.has(p.slug)) continue; // main category itself, don't nest under self
+      const cat = CATEGORIES.find((c) => c.match?.(p.slug, p.label));
+      if (cat) map.get(cat.key)!.push(p);
+    }
+    return map;
+  }, [pages]);
+
+  const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
+
+  return (
+    <nav className="px-6 py-5" aria-label="SEO landing pages">
+      {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
+      {loadError && (
+        <p className="py-3 text-sm text-white/75">
+          Could not load SEO pages. Please try again.
+        </p>
+      )}
+      {!loading && (
+        <ul className="space-y-1 text-base font-semibold leading-snug">
+          {CATEGORIES.map((cat) => {
+            const children = grouped.get(cat.key) ?? [];
+            const isOpen = expanded[cat.key];
+            const hasChildren = children.length > 0;
+            return (
+              <li key={cat.key}>
+                <div className="flex items-center gap-1">
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(cat.key)}
+                      className="p-1 text-white/85 hover:text-brand-gold"
+                      aria-label={isOpen ? "Collapse" : "Expand"}
+                      aria-expanded={isOpen}
+                    >
+                      {isOpen ? (
+                        <ChevronDown className="h-5 w-5 stroke-[3]" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 stroke-[3]" />
+                      )}
+                    </button>
+                  ) : (
+                    <span className="inline-flex h-7 w-7 items-center justify-center text-white/40">
+                      {cat.slug === null ? (
+                        <HomeIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </span>
+                  )}
+                  {cat.slug === null ? (
+                    <Link
+                      to="/"
+                      className="flex-1 py-2 text-white hover:text-brand-gold"
+                      onClick={onNavigate}
+                    >
+                      {cat.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={`/${cat.slug}`}
+                      className="flex-1 py-2 text-white hover:text-brand-gold"
+                      onClick={onNavigate}
+                    >
+                      {cat.label}
+                    </a>
+                  )}
+                </div>
+                {hasChildren && isOpen && (
+                  <ul className="ml-7 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
+                    {children.map((p) => (
+                      <li key={p.id}>
+                        <a
+                          href={`/${p.slug}`}
+                          className="flex items-start gap-2 py-1.5 text-white/85 hover:text-brand-gold"
+                          onClick={onNavigate}
+                        >
+                          <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{p.label}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </nav>
+  );
+}
+
