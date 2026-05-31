@@ -5,7 +5,7 @@ import { createLead } from "@/lib/leads.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
 
-export function LeadForm() {
+export function LeadForm({ title = "Udyam Registration Form" }: { title?: string } = {}) {
   const navigate = useNavigate();
   const submitLead = useServerFn(createLead);
 
@@ -47,7 +47,7 @@ export function LeadForm() {
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="bg-form-header text-white text-center py-4">
-        <h2 className="text-xl font-bold font-display">Udyam Registration Form</h2>
+        <h2 className="text-xl font-bold font-display">{title}</h2>
       </div>
 
       <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
