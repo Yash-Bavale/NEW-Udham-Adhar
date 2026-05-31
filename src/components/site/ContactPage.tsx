@@ -166,7 +166,72 @@ export function ContactPage() {
           </form>
         )}
       </div>
+
+      {/* Full-width: communication, support, disclaimer */}
+      <div className="lg:col-span-2 space-y-10 mt-4">
+        <InfoBlock title="Communication & Support">
+          <ul>
+            <li>Official communication may ordinarily be conducted through email or other written communication channels.</li>
+            <li>Users are advised to regularly monitor their registered communication channels for updates, verification requests, confirmations, and operational communication.</li>
+            <li>For operational, verification, compliance, quality-control, and record-management purposes, users may be requested to communicate through written communication channels.</li>
+            <li>Customer support and communication are currently available only in Marathi, Hindi, and English languages.</li>
+            <li>Support response timelines are indicative and may vary depending upon workload, operational requirements, holidays, technical conditions, or external dependencies.</li>
+          </ul>
+        </InfoBlock>
+
+        <InfoBlock title="Before Contacting Support">
+          <p>To help us assist you more efficiently, users are advised to keep the following details ready while contacting support:</p>
+          <ul>
+            <li>Registered Name</li>
+            <li>Registered Mobile Number</li>
+            <li>Registered Email Address</li>
+            <li>Order / Application Number</li>
+            <li>Payment Reference Number (if applicable)</li>
+            <li>Relevant screenshot or error details (if applicable)</li>
+          </ul>
+        </InfoBlock>
+
+        <InfoBlock title="Important Disclaimer">
+          <p>Business Help Services is a private consultancy and assistance service provider.</p>
+          <ul>
+            <li>We are not affiliated with, authorized by, endorsed by, or associated with any government authority or department.</li>
+            <li>Services provided through this Platform are consultancy and assistance-based professional services.</li>
+            <li>Users may independently access official services directly through respective official portals wherever applicable.</li>
+          </ul>
+          <p>
+            We appreciate the opportunity to assist you and look forward to supporting your
+            business, documentation, registration, and process-related requirements.
+          </p>
+        </InfoBlock>
+
+        <div className="rounded-2xl border border-border bg-card p-6 md:p-8 text-center">
+          <h3 className="text-xl md:text-2xl font-bold font-display text-foreground">
+            For more information or questions, please contact our customer care.
+          </h3>
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-brand-navy font-semibold">
+            <a href="tel:+919767870331" className="inline-flex items-center gap-2 hover:underline">
+              <Phone className="w-5 h-5" /> +91-9767870331
+            </a>
+            <a href="mailto:help@businesshelpservices.com" className="inline-flex items-center gap-2 hover:underline">
+              <Mail className="w-5 h-5" /> help@businesshelpservices.com
+            </a>
+          </div>
+        </div>
+      </div>
     </section>
+  );
+}
+
+function InfoBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="bg-form-header text-white px-6 py-3">
+        <h3 className="text-lg font-bold font-display tracking-wide uppercase">{title}</h3>
+      </div>
+      <div className="p-6 md:p-8 space-y-3 text-foreground/85 text-[15px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1.5 [&_p]:my-2">
+        {children}
+      </div>
+    </div>
   );
 }
 
