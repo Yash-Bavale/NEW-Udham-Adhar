@@ -76,10 +76,10 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           return redirectToSuccess(get("udf3") || fields.txnid);
         }
 
-        const newStatus =
+        const newStatus: "paid" | "failed" | "attempted" =
           fields.status === "success" ? "paid" :
           fields.status === "failure" ? "failed" :
-          "pending";
+          "attempted";
 
         const rawPayload: Record<string, string> = {};
         form.forEach((v, k) => { rawPayload[k] = typeof v === "string" ? v : "[file]"; });
