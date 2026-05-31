@@ -122,11 +122,11 @@ export const createPayUOrder = createServerFn({ method: "POST" })
         hash,
         udf1: lead.id,
         udf2: application?.id ?? "",
-        udf3: lead.lead_code,
+        udf3: leadCode,
         service_provider: "payu_paisa",
       } as Record<string, string>,
       paymentId,
-      leadCode: lead.lead_code,
+      leadCode,
       totalAmount: Number(lead.total_amount),
     };
   });
