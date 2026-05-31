@@ -143,7 +143,7 @@ export function Header() {
   return (
     <>
       {/* Top thin bar */}
-      <div className="sticky top-0 z-40 bg-[#d2e3f3] border-b border-border">
+      <div className="bg-[#d2e3f3] border-b border-border">
         <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-center md:justify-end gap-3">
           <Globe className="w-4 h-4 text-brand-navy" aria-hidden />
           <label htmlFor="site-lang" className="text-xs font-semibold text-brand-navy">
