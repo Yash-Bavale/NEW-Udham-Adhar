@@ -14,8 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          activity_description: string
+          activity_type: string
+          application_id: string | null
+          created_at: string
+          id: string
+          lead_id: string | null
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          activity_description: string
+          activity_type: string
+          application_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          activity_description?: string
+          activity_type?: string
+          application_id?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      applications: {
+        Row: {
+          application_code: string | null
+          application_status: Database["public"]["Enums"]["application_status"]
+          assigned_to: string | null
+          created_at: string
+          document_status: string
+          form_status: string
+          id: string
+          lead_id: string
+          service_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_code?: string | null
+          application_status?: Database["public"]["Enums"]["application_status"]
+          assigned_to?: string | null
+          created_at?: string
+          document_status?: string
+          form_status?: string
+          id?: string
+          lead_id: string
+          service_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_code?: string | null
+          application_status?: Database["public"]["Enums"]["application_status"]
+          assigned_to?: string | null
+          created_at?: string
+          document_status?: string
+          form_status?: string
+          id?: string
+          lead_id?: string
+          service_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_notes: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          note: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          note: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
+          assigned_to: string | null
           base_amount: number
           created_at: string
           email: string
@@ -23,16 +158,20 @@ export type Database = {
           id: string
           language: string
           lead_code: string | null
+          lead_source: string
           mobile: string
           name: string
           notes: string | null
+          remarks: string | null
           service: string
+          service_id: string | null
           state: string
           status: Database["public"]["Enums"]["lead_status"]
           total_amount: number
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           base_amount?: number
           created_at?: string
           email: string
@@ -40,16 +179,20 @@ export type Database = {
           id?: string
           language: string
           lead_code?: string | null
+          lead_source?: string
           mobile: string
           name: string
           notes?: string | null
+          remarks?: string | null
           service: string
+          service_id?: string | null
           state: string
           status?: Database["public"]["Enums"]["lead_status"]
           total_amount?: number
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           base_amount?: number
           created_at?: string
           email?: string
@@ -57,16 +200,27 @@ export type Database = {
           id?: string
           language?: string
           lead_code?: string | null
+          lead_source?: string
           mobile?: string
           name?: string
           notes?: string | null
+          remarks?: string | null
           service?: string
+          service_id?: string | null
           state?: string
           status?: Database["public"]["Enums"]["lead_status"]
           total_amount?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
@@ -118,6 +272,33 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       seo_pages: {
         Row: {
           created_at: string
@@ -144,6 +325,48 @@ export type Database = {
           label?: string
           slug?: string
           sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          base_amount: number
+          created_at: string
+          description: string | null
+          gst_amount: number
+          id: string
+          is_active: boolean
+          service_code: string
+          service_name: string
+          sort_order: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          base_amount: number
+          created_at?: string
+          description?: string | null
+          gst_amount?: number
+          id?: string
+          is_active?: boolean
+          service_code: string
+          service_name: string
+          sort_order?: number
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          base_amount?: number
+          created_at?: string
+          description?: string | null
+          gst_amount?: number
+          id?: string
+          is_active?: boolean
+          service_code?: string
+          service_name?: string
+          sort_order?: number
+          total_amount?: number
           updated_at?: string
         }
         Relationships: []
@@ -175,6 +398,7 @@ export type Database = {
     }
     Functions: {
       current_user_is_admin: { Args: never; Returns: boolean }
+      has_any_staff_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -184,7 +408,15 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin"
+      app_role: "admin" | "super_admin" | "operations" | "support" | "accounts"
+      application_status:
+        | "awaiting_payment"
+        | "payment_received"
+        | "details_pending"
+        | "documents_pending"
+        | "under_review"
+        | "under_process"
+        | "completed"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -195,6 +427,9 @@ export type Database = {
         | "under_process"
         | "completed"
         | "closed"
+        | "new_lead"
+        | "contacted"
+        | "refund_requested"
       payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
     }
     CompositeTypes: {
@@ -323,7 +558,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin"],
+      app_role: ["admin", "super_admin", "operations", "support", "accounts"],
+      application_status: [
+        "awaiting_payment",
+        "payment_received",
+        "details_pending",
+        "documents_pending",
+        "under_review",
+        "under_process",
+        "completed",
+      ],
       lead_status: [
         "lead_created",
         "payment_pending",
@@ -334,6 +578,9 @@ export const Constants = {
         "under_process",
         "completed",
         "closed",
+        "new_lead",
+        "contacted",
+        "refund_requested",
       ],
       payment_status: ["created", "attempted", "paid", "failed", "refunded"],
     },

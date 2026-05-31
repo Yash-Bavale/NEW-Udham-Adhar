@@ -24,7 +24,7 @@ function AdminLoginPage() {
   // If already signed in, go straight to admin
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/seo-admin" });
+      if (data.session) navigate({ to: "/admin/dashboard" });
     });
   }, [navigate]);
 
@@ -38,7 +38,7 @@ function AdminLoginPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/seo-admin` },
+          options: { emailRedirectTo: `${window.location.origin}/admin/dashboard` },
         });
         if (error) throw error;
         setInfo("Account created. Check your email to confirm, then sign in.");
@@ -46,7 +46,7 @@ function AdminLoginPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/seo-admin" });
+        navigate({ to: "/admin/dashboard" });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

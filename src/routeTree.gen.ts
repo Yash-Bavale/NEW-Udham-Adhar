@@ -156,6 +156,7 @@ import { Route as ComplaintGrievancePolicyRouteImport } from './routes/complaint
 import { Route as ComplaintRouteImport } from './routes/complaint'
 import { Route as AmlAntiFraudPolicyRouteImport } from './routes/aml-anti-fraud-policy'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AadharUdyogRegistrationRouteImport } from './routes/aadhar-udyog-registration'
 import { Route as AadharUdyogRouteImport } from './routes/aadhar-udyog'
@@ -166,10 +167,18 @@ import { Route as AadharUdyamCertificateRouteImport } from './routes/aadhar-udya
 import { Route as AadharUdyamRouteImport } from './routes/aadhar-udyam'
 import { Route as AadhaarUdyamRouteImport } from './routes/aadhaar-udyam'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
+import { Route as AdminActivityRouteImport } from './routes/admin.activity'
+import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -938,6 +947,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin-login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -988,6 +1002,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const SuccessLeadCodeRoute = SuccessLeadCodeRouteImport.update({
   id: '/success/$leadCode',
   path: '/success/$leadCode',
@@ -1008,6 +1027,41 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   path: '/payment-pending/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminServicesRoute = AdminServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeadsRoute = AdminLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminApplicationsRoute = AdminApplicationsRouteImport.update({
+  id: '/applications',
+  path: '/applications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
+  id: '/$leadId',
+  path: '/$leadId',
+  getParentRoute: () => AdminLeadsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1020,6 +1074,7 @@ export interface FileRoutesByFullPath {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
@@ -1167,10 +1222,18 @@ export interface FileRoutesByFullPath {
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1330,10 +1393,18 @@ export interface FileRoutesByTo {
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1347,6 +1418,7 @@ export interface FileRoutesById {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
@@ -1494,10 +1566,18 @@ export interface FileRoutesById {
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
+  '/admin/activity': typeof AdminActivityRoute
+  '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/services': typeof AdminServicesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1512,6 +1592,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/admin'
     | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
@@ -1659,10 +1740,18 @@ export interface FileRouteTypes {
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
+    | '/admin/activity'
+    | '/admin/applications'
+    | '/admin/dashboard'
+    | '/admin/leads'
+    | '/admin/services'
+    | '/admin/users'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
+    | '/admin/'
+    | '/admin/leads/$leadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1822,10 +1911,18 @@ export interface FileRouteTypes {
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
+    | '/admin/activity'
+    | '/admin/applications'
+    | '/admin/dashboard'
+    | '/admin/leads'
+    | '/admin/services'
+    | '/admin/users'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
+    | '/admin'
+    | '/admin/leads/$leadId'
   id:
     | '__root__'
     | '/'
@@ -1838,6 +1935,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/admin'
     | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
@@ -1985,10 +2083,18 @@ export interface FileRouteTypes {
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
+    | '/admin/activity'
+    | '/admin/applications'
+    | '/admin/dashboard'
+    | '/admin/leads'
+    | '/admin/services'
+    | '/admin/users'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
     | '/success/$leadCode'
+    | '/admin/'
+    | '/admin/leads/$leadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2002,6 +2108,7 @@ export interface RootRouteChildren {
   AadharUdyogRoute: typeof AadharUdyogRoute
   AadharUdyogRegistrationRoute: typeof AadharUdyogRegistrationRoute
   AboutRoute: typeof AboutRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AmlAntiFraudPolicyRoute: typeof AmlAntiFraudPolicyRoute
   ComplaintRoute: typeof ComplaintRoute
@@ -3186,6 +3293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -3256,6 +3370,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/success/$leadCode': {
       id: '/success/$leadCode'
       path: '/success/$leadCode'
@@ -3284,8 +3405,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentPendingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/services': {
+      id: '/admin/services'
+      path: '/services'
+      fullPath: '/admin/services'
+      preLoaderRoute: typeof AdminServicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leads': {
+      id: '/admin/leads'
+      path: '/leads'
+      fullPath: '/admin/leads'
+      preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/applications': {
+      id: '/admin/applications'
+      path: '/applications'
+      fullPath: '/admin/applications'
+      preLoaderRoute: typeof AdminApplicationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leads/$leadId': {
+      id: '/admin/leads/$leadId'
+      path: '/$leadId'
+      fullPath: '/admin/leads/$leadId'
+      preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
+      parentRoute: typeof AdminLeadsRoute
+    }
   }
 }
+
+interface AdminLeadsRouteChildren {
+  AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
+}
+
+const AdminLeadsRouteChildren: AdminLeadsRouteChildren = {
+  AdminLeadsLeadIdRoute: AdminLeadsLeadIdRoute,
+}
+
+const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
+  AdminLeadsRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminActivityRoute: typeof AdminActivityRoute
+  AdminApplicationsRoute: typeof AdminApplicationsRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
+  AdminServicesRoute: typeof AdminServicesRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminActivityRoute: AdminActivityRoute,
+  AdminApplicationsRoute: AdminApplicationsRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
+  AdminLeadsRoute: AdminLeadsRouteWithChildren,
+  AdminServicesRoute: AdminServicesRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -3298,6 +3502,7 @@ const rootRouteChildren: RootRouteChildren = {
   AadharUdyogRoute: AadharUdyogRoute,
   AadharUdyogRegistrationRoute: AadharUdyogRegistrationRoute,
   AboutRoute: AboutRoute,
+  AdminRoute: AdminRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AmlAntiFraudPolicyRoute: AmlAntiFraudPolicyRoute,
   ComplaintRoute: ComplaintRoute,
