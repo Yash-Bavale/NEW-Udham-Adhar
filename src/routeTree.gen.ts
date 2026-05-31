@@ -172,6 +172,7 @@ import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
+import { Route as OnboardingLeadCodeRouteImport } from './routes/onboarding.$leadCode'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
@@ -1028,6 +1029,11 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   path: '/payment-pending/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingLeadCodeRoute = OnboardingLeadCodeRouteImport.update({
+  id: '/onboarding/$leadCode',
+  path: '/onboarding/$leadCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -1234,6 +1240,7 @@ export interface FileRoutesByFullPath {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1406,6 +1413,7 @@ export interface FileRoutesByTo {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1580,6 +1588,7 @@ export interface FileRoutesById {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1755,6 +1764,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/onboarding/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -1927,6 +1937,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/onboarding/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -2100,6 +2111,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/onboarding/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -2268,6 +2280,7 @@ export interface RootRouteChildren {
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
+  OnboardingLeadCodeRoute: typeof OnboardingLeadCodeRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
@@ -3418,6 +3431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentPendingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/$leadCode': {
+      id: '/onboarding/$leadCode'
+      path: '/onboarding/$leadCode'
+      fullPath: '/onboarding/$leadCode'
+      preLoaderRoute: typeof OnboardingLeadCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -3674,6 +3694,7 @@ const rootRouteChildren: RootRouteChildren = {
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
+  OnboardingLeadCodeRoute: OnboardingLeadCodeRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
