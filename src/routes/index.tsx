@@ -91,15 +91,15 @@ function HomePage() {
     <>
       {/* Business Help Services strip */}
       <div className="bg-brand-navy text-white">
-        <div className="mx-auto max-w-7xl px-4 py-4 md:py-5">
-          <h2 className="text-right text-xl md:text-2xl font-bold font-display">
+        <div className="mx-auto max-w-7xl px-4 py-3">
+          <h2 className="text-center md:text-right text-lg md:text-2xl font-bold font-display">
             Business Help Services
           </h2>
         </div>
       </div>
 
       {/* Form + Sample Certificate */}
-      <section className="mx-auto max-w-7xl px-4 py-8 md:py-10 grid gap-8 lg:grid-cols-2 items-start">
+      <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm />
 
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -121,8 +121,8 @@ function HomePage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="mx-auto max-w-4xl px-4 py-10 md:py-14">
-        <h2 className="text-center text-3xl md:text-4xl font-bold font-display text-foreground leading-tight">
+      <section className="mx-auto max-w-4xl px-4 py-8 md:py-12">
+        <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground leading-tight">
           Frequently Asked Questions for MSME registration in India.
         </h2>
         <p className="mt-4 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground">
