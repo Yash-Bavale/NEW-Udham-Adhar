@@ -345,3 +345,117 @@ export function Footer() {
     </footer>
   );
 }
+
+function SeoTree({
+  pages,
+  loading,
+  loadError,
+  onNavigate,
+}: {
+  pages: SeoPageRow[] | null;
+  loading: boolean;
+  loadError: boolean;
+  onNavigate: () => void;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, SeoPageRow[]>();
+    CATEGORIES.forEach((c) => map.set(c.key, []));
+    if (!pages) return map;
+    const mainSlugs = new Set(
+      CATEGORIES.map((c) => c.slug).filter((s): s is string => !!s),
+    );
+    for (const p of pages) {
+      if (mainSlugs.has(p.slug)) continue; // main category itself, don't nest under self
+      const cat = CATEGORIES.find((c) => c.match?.(p.slug, p.label));
+      if (cat) map.get(cat.key)!.push(p);
+    }
+    return map;
+  }, [pages]);
+
+  const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
+
+  return (
+    <nav className="px-6 py-5" aria-label="SEO landing pages">
+      {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
+      {loadError && (
+        <p className="py-3 text-sm text-white/75">
+          Could not load SEO pages. Please try again.
+        </p>
+      )}
+      {!loading && (
+        <ul className="space-y-1 text-base font-semibold leading-snug">
+          {CATEGORIES.map((cat) => {
+            const children = grouped.get(cat.key) ?? [];
+            const isOpen = expanded[cat.key];
+            const hasChildren = children.length > 0;
+            return (
+              <li key={cat.key}>
+                <div className="flex items-center gap-1">
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(cat.key)}
+                      className="p-1 text-white/85 hover:text-brand-gold"
+                      aria-label={isOpen ? "Collapse" : "Expand"}
+                      aria-expanded={isOpen}
+                    >
+                      {isOpen ? (
+                        <ChevronDown className="h-5 w-5 stroke-[3]" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 stroke-[3]" />
+                      )}
+                    </button>
+                  ) : (
+                    <span className="inline-flex h-7 w-7 items-center justify-center text-white/40">
+                      {cat.slug === null ? (
+                        <HomeIcon className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </span>
+                  )}
+                  {cat.slug === null ? (
+                    <Link
+                      to="/"
+                      className="flex-1 py-2 text-white hover:text-brand-gold"
+                      onClick={onNavigate}
+                    >
+                      {cat.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={`/${cat.slug}`}
+                      className="flex-1 py-2 text-white hover:text-brand-gold"
+                      onClick={onNavigate}
+                    >
+                      {cat.label}
+                    </a>
+                  )}
+                </div>
+                {hasChildren && isOpen && (
+                  <ul className="ml-7 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
+                    {children.map((p) => (
+                      <li key={p.id}>
+                        <a
+                          href={`/${p.slug}`}
+                          className="flex items-start gap-2 py-1.5 text-white/85 hover:text-brand-gold"
+                          onClick={onNavigate}
+                        >
+                          <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{p.label}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </nav>
+  );
+}
+
