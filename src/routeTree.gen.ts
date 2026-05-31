@@ -179,6 +179,7 @@ import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
+import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -1062,6 +1063,11 @@ const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => AdminLeadsRoute,
 } as any)
+const ApiPublicWebhooksPayuRoute = ApiPublicWebhooksPayuRouteImport.update({
+  id: '/api/public/webhooks/payu',
+  path: '/api/public/webhooks/payu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1234,6 +1240,7 @@ export interface FileRoutesByFullPath {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1405,6 +1412,7 @@ export interface FileRoutesByTo {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1578,6 +1586,7 @@ export interface FileRoutesById {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1752,6 +1761,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/api/public/webhooks/payu'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1923,6 +1933,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin'
     | '/admin/leads/$leadId'
+    | '/api/public/webhooks/payu'
   id:
     | '__root__'
     | '/'
@@ -2095,6 +2106,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/api/public/webhooks/payu'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2260,6 +2272,7 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
+  ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3454,6 +3467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
       parentRoute: typeof AdminLeadsRoute
     }
+    '/api/public/webhooks/payu': {
+      id: '/api/public/webhooks/payu'
+      path: '/api/public/webhooks/payu'
+      fullPath: '/api/public/webhooks/payu'
+      preLoaderRoute: typeof ApiPublicWebhooksPayuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -3658,6 +3678,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
+  ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
