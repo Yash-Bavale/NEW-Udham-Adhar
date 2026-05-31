@@ -9,6 +9,9 @@ export const Route = createFileRoute("/update-udyam-certificate")({
       { property: "og:title", content: "Update Udyam Certificate Online" },
       { property: "og:description", content: "Edit your Udyam certificate details with consultancy assistance from Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/update-udyam-certificate" },
+    ],
   }),
   component: () => (
     <ServicePageLayout title="Update Udyam Certificate">

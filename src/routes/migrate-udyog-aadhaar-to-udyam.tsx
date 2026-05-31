@@ -9,6 +9,9 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
       { property: "og:title", content: "Migrate Udyog Aadhaar to Udyam" },
       { property: "og:description", content: "Convert your existing Udyog Aadhaar to the new Business Help Services with help from Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/migrate-udyog-aadhaar-to-udyam" },
+    ],
   }),
   component: () => (
     <ServicePageLayout title="Migrate Udyog Aadhaar to Udyam">

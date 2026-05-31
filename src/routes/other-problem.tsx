@@ -9,6 +9,9 @@ export const Route = createFileRoute("/other-problem")({
       { property: "og:title", content: "Other Business Help Services Problems" },
       { property: "og:description", content: "Get consultancy help for forgotten OTP, mobile/email recovery, PAN/Aadhaar corrections, and more." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/other-problem" },
+    ],
   }),
   component: () => (
     <ServicePageLayout title="Other Udyam Problems">

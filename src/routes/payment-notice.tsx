@@ -10,6 +10,9 @@ export const Route = createFileRoute("/payment-notice")({
       { property: "og:title", content: "Payment Notice" },
       { property: "og:description", content: "Payment Notice Important Payment &amp; Service Acknowledgment By proceeding with payment on this website, the User acknowledges, understands, and agrees th" },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/payment-notice" },
+    ],
   }),
   component: () => <WpPage title="Payment Notice" html={html} />,
 });

@@ -10,6 +10,9 @@ export const Route = createFileRoute("/complaint-grievance-policy")({
       { property: "og:title", content: "Complaint & Grievance Policy" },
       { property: "og:description", content: "Complaint and grievance redressal policy for Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/complaint-grievance-policy" },
+    ],
   }),
   component: () => <WpPage title="Complaint & Grievance Policy" html={html} />,
 });
