@@ -48,12 +48,12 @@
 
   /* Brand palette — pulled from udyamadhar.in */
   --brand-red: oklch(0.515 0.215 27); /* #b91c1c-ish logo red */
-  --brand-navy: oklch(0.32 0.13 264); /* #1e3a8a navy */
-  --brand-navy-deep: oklch(0.27 0.11 264); /* darker navy for buttons */
+  --brand-navy: #1A4171;
+  --brand-navy-deep: #1A4171;
   --brand-gold: oklch(0.73 0.16 75); /* #d99a18-ish menu gold */
   --nav-bg: oklch(0.94 0.025 244); /* light blue strip */
   --disclaimer-bg: oklch(0.38 0.1 251); /* mid-dark blue marquee */
-  --form-header: oklch(0.3 0.12 264); /* form card header */
+  --form-header: #1A4171;
 
   --primary: var(--brand-navy);
   --primary-foreground: oklch(1 0 0);
