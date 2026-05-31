@@ -93,28 +93,40 @@ export function Footer() {
     <footer className="bg-brand-navy-deep text-white mt-12">
       <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
         <div>
-          <div className="text-xl font-bold font-display">Udyam Registration</div>
-          <div className="text-sm text-white/80 mt-1">Business Help Consultancy Services</div>
-          <p className="text-xs text-white/70 mt-4 leading-relaxed">
-            Business Help Services is a private consultancy and assistance service provider and is
-            not affiliated with, authorized by, endorsed by, or associated with any government
-            authority or department.
-          </p>
-
-          <div className="mt-5">
-            <button
-              type="button"
-              onClick={handleHomeClick}
-              onPointerDown={(e) => {
-                if (e.pointerType === "touch") handleHomeTrigger();
-              }}
-              className="text-sm text-white/85 hover:text-white hover:underline select-none bg-transparent p-0 cursor-pointer"
-              aria-label="Home"
-            >
-              Home
-            </button>
-          </div>
+          <h4 className="text-lg font-bold font-display mb-4">MSME / Udyog Aadhaar</h4>
+          <ul className="space-y-2 text-sm">
+            <li>
+              <button
+                type="button"
+                onClick={handleHomeClick}
+                onPointerDown={(e) => {
+                  if (e.pointerType === "touch") handleHomeTrigger();
+                }}
+                className="flex items-start gap-2 text-white hover:text-brand-gold bg-transparent p-0 cursor-pointer text-left"
+                aria-label="Home"
+              >
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>Home</span>
+              </button>
+            </li>
+            {loading && <li className="text-white/70">Loading pages…</li>}
+            {loadError && <li className="text-white/70">Could not load pages.</li>}
+            {!loadError &&
+              pages &&
+              pages.map((p) => (
+                <li key={p.id}>
+                  <a
+                    href={`/${p.slug}`}
+                    className="flex items-start gap-2 text-brand-gold hover:text-white"
+                  >
+                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>{p.label}</span>
+                  </a>
+                </li>
+              ))}
+          </ul>
         </div>
+
 
         <div>
           <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Policies</h4>
