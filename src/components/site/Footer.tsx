@@ -139,7 +139,7 @@ const CATEGORIES: Category[] = [
   },
   {
     key: "udyam-registration-online",
-    label: "Udyam Registration Online",
+    label: "Business Help Services Online",
     slug: "udyam-online-registration",
     match: (s) =>
       s === "udyam-online-registration" ||
