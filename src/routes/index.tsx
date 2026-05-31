@@ -89,15 +89,6 @@ const FACTS: [string, string][] = [
 function HomePage() {
   return (
     <>
-      {/* Business Help Services strip */}
-      <div className="bg-brand-navy text-white">
-        <div className="mx-auto max-w-7xl px-4 py-3">
-          <h2 className="text-center md:text-right text-lg md:text-2xl font-bold font-display">
-            Business Help Services
-          </h2>
-        </div>
-      </div>
-
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm />

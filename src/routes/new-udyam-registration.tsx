@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { createFileRoute } from "@tanstack/react-router";
+import { ServicePageLayout } from "@/components/site/ServicePageLayout";
 
 export const Route = createFileRoute("/new-udyam-registration")({
   head: () => ({
@@ -11,14 +11,17 @@ export const Route = createFileRoute("/new-udyam-registration")({
     ],
   }),
   component: () => (
-    <PageHero title="New Udyam Registration">
+    <ServicePageLayout title="New Udyam Registration">
       <p>
         Apply for a new Udyam Registration with end-to-end consultancy
         assistance — we help you compile the required information, verify
         details, and complete the application on the official Udyam portal.
       </p>
-      <p><strong>What you'll need:</strong> Aadhaar number of the proprietor / authorised signatory, PAN, business address, NIC activity, employment count, and bank details.</p>
-      <p><Link to="/">Start your application →</Link></p>
-    </PageHero>
+      <p>
+        <strong>What you'll need:</strong> Aadhaar number of the proprietor /
+        authorised signatory, PAN, business address, NIC activity, employment
+        count, and bank details.
+      </p>
+    </ServicePageLayout>
   ),
 });

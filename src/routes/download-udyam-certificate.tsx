@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHero } from "@/components/site/PageHero";
+import { createFileRoute } from "@tanstack/react-router";
+import { ServicePageLayout } from "@/components/site/ServicePageLayout";
 
 export const Route = createFileRoute("/download-udyam-certificate")({
   head: () => ({
@@ -11,13 +11,12 @@ export const Route = createFileRoute("/download-udyam-certificate")({
     ],
   }),
   component: () => (
-    <PageHero title="Download Udyam Certificate">
+    <ServicePageLayout title="Download Udyam Certificate">
       <p>
         Get assistance to download a fresh, digitally-signed copy of your Udyam
         Registration certificate using your registration number and registered
         mobile or email.
       </p>
-      <p><Link to="/">Request your download →</Link></p>
-    </PageHero>
+    </ServicePageLayout>
   ),
 });
