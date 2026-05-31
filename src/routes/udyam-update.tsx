@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-update.html?raw";
 
 export const Route = createFileRoute("/udyam-update")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam-update")({
       { property: "og:description", content: "Udyam Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prade" },
     ],
   }),
-  component: () => <WpPage title="Udyam Update - How to Update Your MSME Details Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Update - How to Update Your MSME Details Online" html={html} />,
 });

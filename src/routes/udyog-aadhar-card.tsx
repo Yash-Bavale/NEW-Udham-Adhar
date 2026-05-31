@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhar-card.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhar-card")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyog-aadhar-card")({
       { property: "og:description", content: "Udyog Aadhar Card Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra " },
     ],
   }),
-  component: () => <WpPage title="Udyog Aadhar Card - Old MSME Registration Document" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Card - Old MSME Registration Document" html={html} />,
 });

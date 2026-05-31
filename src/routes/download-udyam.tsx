@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/download-udyam.html?raw";
 
 export const Route = createFileRoute("/download-udyam")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/download-udyam")({
       { property: "og:description", content: "Download Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pra" },
     ],
   }),
-  component: () => <WpPage title="Udyam Free Registration - No Charges for MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Free Registration - No Charges for MSME Registration" html={html} />,
 });

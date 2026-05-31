@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam.html?raw";
 
 export const Route = createFileRoute("/udyam")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam")({
       { property: "og:description", content: "Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pradesh Arun" },
     ],
   }),
-  component: () => <WpPage title="Udyam - Government Portal for MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam - Government Portal for MSME Registration" html={html} />,
 });

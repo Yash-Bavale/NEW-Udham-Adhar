@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-registration-process.html?raw";
 
 export const Route = createFileRoute("/msme-registration-process")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/msme-registration-process")({
       { property: "og:description", content: "MSME Registration Process Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
     ],
   }),
-  component: () => <WpPage title="MSME Registration Process – Step-by-Step Guide for Udyam MSM" html={html} />,
+  component: () => <SeoLandingPage title="MSME Registration Process – Step-by-Step Guide for Udyam MSM" html={html} />,
 });

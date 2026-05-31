@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-form.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-form")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyam-registration-form")({
       { property: "og:description", content: "Udyam Registration Form Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State A" },
     ],
   }),
-  component: () => <WpPage title="Udyam Registration Form - Online MSME Registration Applicati" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Form - Online MSME Registration Applicati" html={html} />,
 });

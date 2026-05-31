@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-register.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-register")({
@@ -11,5 +11,5 @@ export const Route = createFileRoute("/udyog-aadhaar-register")({
       { property: "og:description", content: "Udyog Aadhaar Register Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
     ],
   }),
-  component: () => <WpPage title="Udyog Aadhaar Register – MSME Registration for Small Busines" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Register – MSME Registration for Small Busines" html={html} />,
 });
