@@ -3,7 +3,7 @@ import { NAV_LINKS } from "@/lib/constants";
 
 export function Nav() {
   return (
-    <nav className="bg-nav-bg border-b border-border">
+    <nav className="hidden md:block bg-nav-bg border-b border-border">
       <div className="mx-auto max-w-7xl px-4">
         <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-3 text-sm font-medium text-brand-navy">
           {NAV_LINKS.map((l) => (
