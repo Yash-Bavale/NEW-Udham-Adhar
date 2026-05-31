@@ -275,18 +275,16 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const patch: Record<string, unknown> = {
-      status: data.status,
-      remarks: data.remarks ?? null,
-    };
-    if (data.status === "verified") {
-      patch.verified_by = userId;
-      patch.verified_at = new Date().toISOString();
-    } else {
-      patch.verified_by = null;
-      patch.verified_at = null;
-    }
-    const { error } = await supabase.from("documents").update(patch).eq("id", data.id);
+    const verified = data.status === "verified";
+    const { error } = await supabase
+      .from("documents")
+      .update({
+        status: data.status,
+        remarks: data.remarks ?? null,
+        verified_by: verified ? userId : null,
+        verified_at: verified ? new Date().toISOString() : null,
+      })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
