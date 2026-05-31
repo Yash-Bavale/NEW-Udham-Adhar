@@ -112,3 +112,27 @@
   white-space: nowrap;
   animation: marquee 60s linear infinite;
 }
+
+/* Google Translate widget styling */
+.gtranslate-host .goog-te-gadget {
+  font-family: inherit;
+  font-size: 0;
+  color: transparent;
+}
+.gtranslate-host .goog-te-gadget .goog-te-combo {
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid #1A4171;
+  border-radius: 6px;
+  background: #fff;
+  color: #1A4171;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gtranslate-host .goog-te-gadget > span {
+  display: none;
+}
+body { top: 0 !important; }
+.skiptranslate iframe.goog-te-banner-frame { display: none !important; }
+
