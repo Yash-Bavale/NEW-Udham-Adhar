@@ -174,33 +174,32 @@ export function Header() {
 
       {/* Main header */}
       <header className="bg-background border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-5 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-3 md:py-5 bg-white">
           {/* Mobile */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-3">
             <button
               type="button"
               onClick={handleTitleClick}
-              className="block w-full text-center bg-transparent p-0 cursor-pointer"
+              className="flex-1 text-left bg-transparent p-0 cursor-pointer min-w-0"
               aria-label="Go to homepage"
             >
-              <h1 className="text-xl font-bold text-brand-red font-display leading-tight">
+              <h1 className="text-base font-bold text-brand-red font-display leading-snug">
                 सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
               </h1>
-              <p className="text-xs tracking-wider text-brand-navy font-semibold font-display mt-1">
-                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES 
+              <p className="text-[10px] tracking-wide text-brand-navy font-semibold font-display mt-0.5 leading-tight">
+                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
               </p>
             </button>
-            <div className="mt-5 pt-4 border-t border-border flex justify-end">
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                aria-label="Open menu"
-                className="inline-flex items-center justify-center w-11 h-11 rounded-md border-2 border-brand-navy text-brand-navy bg-transparent"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+              className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-md border-2 border-brand-navy text-brand-navy bg-transparent"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
           </div>
+
 
           {/* Desktop */}
           <div className="hidden md:grid grid-cols-3 items-center gap-4">
