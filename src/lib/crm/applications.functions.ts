@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { APPLICATION_STATUSES } from "./types";
+import { APPLICATION_STATUSES, type ApplicationStatus } from "./types";
+
 
 const ListInput = z.object({
   page: z.number().int().min(1).default(1),
@@ -27,7 +28,7 @@ export const listApplications = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .range(from, to);
 
-    if (data.status) q = q.eq("application_status", data.status);
+    if (data.status) q = q.eq("application_status", data.status as ApplicationStatus);
     if (data.search) {
       const s = data.search.trim();
       q = q.or(`application_code.ilike.%${s}%`);
@@ -52,7 +53,10 @@ export const updateApplication = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { id, ...patch } = data;
-    const { error } = await supabase.from("applications").update(patch).eq("id", id);
+    const { error } = await supabase
+      .from("applications")
+      .update(patch as Record<string, unknown>)
+      .eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

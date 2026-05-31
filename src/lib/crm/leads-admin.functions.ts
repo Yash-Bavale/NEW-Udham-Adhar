@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { LEAD_STATUSES } from "./types";
+import { LEAD_STATUSES, type LeadStatus } from "./types";
 
 const ListInput = z.object({
   page: z.number().int().min(1).default(1),
@@ -28,7 +28,7 @@ export const listLeads = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .range(from, to);
 
-    if (data.status) q = q.eq("status", data.status);
+    if (data.status) q = q.eq("status", data.status as LeadStatus);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
     if (data.search) {
       const s = data.search.replace(/[,()]/g, " ").trim();
@@ -91,7 +91,10 @@ export const updateLead = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { id, ...patch } = data;
-    const { error } = await supabase.from("leads").update(patch).eq("id", id);
+    const { error } = await supabase
+      .from("leads")
+      .update(patch as Record<string, unknown>)
+      .eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

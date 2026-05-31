@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { STAFF_ROLES } from "./types";
+import { STAFF_ROLES, type StaffRole } from "./types";
 
 async function assertAdmin(userId: string) {
   const { data, error } = await supabaseAdmin
@@ -61,7 +61,10 @@ export const grantRole = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const { error } = await supabaseAdmin
       .from("user_roles")
-      .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
+      .upsert(
+        { user_id: data.user_id, role: data.role as StaffRole },
+        { onConflict: "user_id,role" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -75,7 +78,7 @@ export const revokeRole = createServerFn({ method: "POST" })
       .from("user_roles")
       .delete()
       .eq("user_id", data.user_id)
-      .eq("role", data.role);
+      .eq("role", data.role as StaffRole);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

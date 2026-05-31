@@ -9,23 +9,22 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const headCount = (q: ReturnType<typeof supabase.from>) =>
-      // @ts-expect-error supabase-js typing for head:true
-      q.select("*", { count: "exact", head: true });
+    const headCount = (tbl: "leads" | "applications") =>
+      supabase.from(tbl).select("*", { count: "exact", head: true });
 
     const [total, today, week, inProgress, completed, pending, recentLeads, recentActivity, byStatus, byService] =
       await Promise.all([
-        headCount(supabase.from("leads")),
-        headCount(supabase.from("leads")).gte("created_at", startOfToday),
-        headCount(supabase.from("leads")).gte("created_at", sevenDaysAgo),
-        headCount(supabase.from("applications")).in("application_status", [
+        headCount("leads"),
+        headCount("leads").gte("created_at", startOfToday),
+        headCount("leads").gte("created_at", sevenDaysAgo),
+        headCount("applications").in("application_status", [
           "details_pending",
           "documents_pending",
           "under_review",
           "under_process",
         ]),
-        headCount(supabase.from("applications")).eq("application_status", "completed"),
-        headCount(supabase.from("applications")).eq("application_status", "awaiting_payment"),
+        headCount("applications").eq("application_status", "completed"),
+        headCount("applications").eq("application_status", "awaiting_payment"),
         supabase
           .from("leads")
           .select("id, lead_code, name, service, status, created_at")
