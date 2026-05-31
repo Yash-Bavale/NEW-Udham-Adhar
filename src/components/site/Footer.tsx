@@ -1,6 +1,6 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -31,9 +31,9 @@ const CATEGORIES: Category[] = [
   {
     key: "udyamregistration",
     label: "Udyamregistration",
-    slug: "udyam-registration",
+    slug: "udyam-registration-online",
     match: (s) =>
-      s === "udyam-registration" ||
+      s === "udyam-registration-online" ||
       s.startsWith("udyam-registr") ||
       s.startsWith("udyamregistration"),
   },
@@ -155,8 +155,6 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-
-
 const FOOTER_LINKS = [
   { to: "/terms-conditions", label: "Terms & Conditions" },
   { to: "/privacy-policy", label: "Privacy Policy" },
@@ -178,51 +176,17 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function Footer() {
-  const navigate = useNavigate();
   const loadSeoPages = useServerFn(listPublicSeoPages);
-  const [open, setOpen] = useState(false);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const clickTimes = useRef<number[]>([]);
-  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleHomeTrigger = () => {
-    const now = Date.now();
-    clickTimes.current = [...clickTimes.current, now].filter((time) => now - time < 10000);
-
-    if (clickTimes.current.length >= 3) {
-      clickTimes.current = [];
-      if (clickTimer.current) clearTimeout(clickTimer.current);
-      setOpen(true);
-      return true;
-    }
-
-    return false;
-  };
-
-  const handleHomeClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const isHomePage = window.location.pathname === "/";
-    if (handleHomeTrigger()) return;
-
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    if (isHomePage) return;
-
-    clickTimer.current = setTimeout(() => {
-      clickTimes.current = [];
-      navigate({ to: "/" });
-    }, 1200);
-  };
 
   useEffect(() => {
     if (pages !== null || loading) return;
     setLoading(true);
     setLoadError(false);
     loadSeoPages()
-      .then((data) => {
-        setPages((data ?? []) as SeoPageRow[]);
-      })
+      .then((data) => setPages((data ?? []) as SeoPageRow[]))
       .catch(() => {
         setLoadError(true);
         setPages([]);
@@ -230,17 +194,7 @@ export function Footer() {
       .finally(() => setLoading(false));
   }, [loadSeoPages, loading, pages]);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-    return (
+  return (
     <footer className="bg-brand-navy-deep text-white mt-12">
       <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
         {/* Col 1: Brand + socials */}
@@ -258,51 +212,24 @@ export function Footer() {
             >
               <MessageCircle className="h-5 w-5" />
             </a>
-            <a
-              href="#"
-              aria-label="YouTube"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#FF0000] text-white hover:opacity-90 transition"
-            >
+            <a href="#" aria-label="YouTube" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#FF0000] text-white hover:opacity-90 transition">
               <Youtube className="h-5 w-5" />
             </a>
-            <a
-              href="#"
-              aria-label="Instagram"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1a1a1a] text-white hover:opacity-90 transition"
-            >
+            <a href="#" aria-label="Instagram" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1a1a1a] text-white hover:opacity-90 transition">
               <Instagram className="h-5 w-5" />
             </a>
-            <a
-              href="#"
-              aria-label="Facebook"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1877F2] text-white hover:opacity-90 transition"
-            >
+            <a href="#" aria-label="Facebook" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1877F2] text-white hover:opacity-90 transition">
               <Facebook className="h-5 w-5" />
             </a>
           </div>
         </div>
 
-        {/* Col 2: MSME / Udyog Aadhaar with hidden triple-click Home */}
+        {/* Col 2: MSME / Udyog Aadhaar — full SEO tree inline (client review mode) */}
         <div>
           <h4 className="text-2xl font-bold font-display leading-tight">
             MSME / Udyog Aadhaar
           </h4>
-          <ul className="mt-6 space-y-3 text-[15px]">
-            <li>
-              <button
-                type="button"
-                onClick={handleHomeClick}
-                onPointerDown={(e) => {
-                  if (e.pointerType === "touch") handleHomeTrigger();
-                }}
-                className="inline-flex items-center gap-2 text-white/90 hover:text-white bg-transparent p-0 cursor-pointer select-none"
-                aria-label="Home"
-              >
-                <ChevronRight className="h-4 w-4" />
-                <span>Home</span>
-              </button>
-            </li>
-          </ul>
+          <SeoTree pages={pages} loading={loading} loadError={loadError} />
         </div>
 
         {/* Col 3: Useful Links */}
@@ -329,19 +256,13 @@ export function Footer() {
           <ul className="mt-6 space-y-5 text-[15px] text-white/90">
             <li className="flex items-start gap-3">
               <Briefcase className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>
-                Working Hours: 10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)
-              </span>
+              <span>Working Hours: 10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)</span>
             </li>
             <li className="flex items-start gap-3">
               <Mail className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
               <span>
-                Email:
-                <br />
-                <a
-                  href="mailto:help@businesshelpservices.com"
-                  className="hover:underline break-all"
-                >
+                Email:<br />
+                <a href="mailto:help@businesshelpservices.com" className="hover:underline break-all">
                   help@businesshelpservices.com
                 </a>
               </span>
@@ -350,16 +271,12 @@ export function Footer() {
               <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
               <span>
                 Phone:{" "}
-                <a href="tel:+919767870331" className="hover:underline">
-                  +91-9767870331
-                </a>
+                <a href="tel:+919767870331" className="hover:underline">+91-9767870331</a>
               </span>
             </li>
             <li className="flex items-start gap-3">
               <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>
-                Address: Business Help Services Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India
-              </span>
+              <span>Address: Business Help Services Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India</span>
             </li>
           </ul>
         </div>
@@ -370,43 +287,6 @@ export function Footer() {
           Operated by Business Help Services
         </div>
       </div>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/65 overflow-y-auto"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="min-h-screen w-full max-w-xl bg-brand-navy text-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 z-10 bg-brand-navy px-6 py-4 border-b border-white/15">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-display text-2xl font-bold leading-tight">
-                    MSME / Udyog Aadhaar
-                  </h3>
-                  <p className="text-sm text-white/75">
-                    {pages ? `${pages.length} pages` : "Loading…"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="text-2xl leading-none px-2 py-1 text-white hover:text-brand-gold"
-                    aria-label="Close"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-              </div>
-            </div>
-            <SeoTree pages={pages} loading={loading} loadError={loadError} onNavigate={() => setOpen(false)} />
-
-          </div>
-        </div>
-      )}
     </footer>
   );
 }
@@ -415,12 +295,10 @@ function SeoTree({
   pages,
   loading,
   loadError,
-  onNavigate,
 }: {
   pages: SeoPageRow[] | null;
   loading: boolean;
   loadError: boolean;
-  onNavigate: () => void;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -432,7 +310,7 @@ function SeoTree({
       CATEGORIES.map((c) => c.slug).filter((s): s is string => !!s),
     );
     for (const p of pages) {
-      if (mainSlugs.has(p.slug)) continue; // main category itself, don't nest under self
+      if (mainSlugs.has(p.slug)) continue;
       const cat = CATEGORIES.find((c) => c.match?.(p.slug, p.label));
       if (cat) map.get(cat.key)!.push(p);
     }
@@ -442,15 +320,13 @@ function SeoTree({
   const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
   return (
-    <nav className="px-6 py-5" aria-label="SEO landing pages">
-      {loading && <p className="py-3 text-sm text-white/75">Loading pages…</p>}
+    <nav className="mt-6" aria-label="SEO landing pages">
+      {loading && <p className="py-2 text-sm text-white/75">Loading pages…</p>}
       {loadError && (
-        <p className="py-3 text-sm text-white/75">
-          Could not load SEO pages. Please try again.
-        </p>
+        <p className="py-2 text-sm text-white/75">Could not load SEO pages.</p>
       )}
       {!loading && (
-        <ul className="space-y-1 text-base font-semibold leading-snug">
+        <ul className="space-y-1 text-[15px] font-semibold leading-snug">
           {CATEGORIES.map((cat) => {
             const children = grouped.get(cat.key) ?? [];
             const isOpen = expanded[cat.key];
@@ -467,46 +343,37 @@ function SeoTree({
                       aria-expanded={isOpen}
                     >
                       {isOpen ? (
-                        <ChevronDown className="h-5 w-5 stroke-[3]" />
+                        <ChevronDown className="h-4 w-4 stroke-[3]" />
                       ) : (
-                        <ChevronRight className="h-5 w-5 stroke-[3]" />
+                        <ChevronRight className="h-4 w-4 stroke-[3]" />
                       )}
                     </button>
                   ) : (
-                    <span className="inline-flex h-7 w-7 items-center justify-center text-white/40">
+                    <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
                       {cat.slug === null ? (
-                        <HomeIcon className="h-4 w-4" />
+                        <HomeIcon className="h-3.5 w-3.5" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-3.5 w-3.5" />
                       )}
                     </span>
                   )}
                   {cat.slug === null ? (
-                    <Link
-                      to="/"
-                      className="flex-1 py-2 text-white hover:text-brand-gold"
-                      onClick={onNavigate}
-                    >
+                    <Link to="/" className="flex-1 py-1.5 text-white hover:text-brand-gold">
                       {cat.label}
                     </Link>
                   ) : (
-                    <a
-                      href={`/${cat.slug}`}
-                      className="flex-1 py-2 text-white hover:text-brand-gold"
-                      onClick={onNavigate}
-                    >
+                    <a href={`/${cat.slug}`} className="flex-1 py-1.5 text-white hover:text-brand-gold">
                       {cat.label}
                     </a>
                   )}
                 </div>
                 {hasChildren && isOpen && (
-                  <ul className="ml-7 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
+                  <ul className="ml-6 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
                     {children.map((p) => (
                       <li key={p.id}>
                         <a
                           href={`/${p.slug}`}
-                          className="flex items-start gap-2 py-1.5 text-white/85 hover:text-brand-gold"
-                          onClick={onNavigate}
+                          className="flex items-start gap-2 py-1 text-white/85 hover:text-brand-gold"
                         >
                           <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span>{p.label}</span>
@@ -523,4 +390,3 @@ function SeoTree({
     </nav>
   );
 }
-
