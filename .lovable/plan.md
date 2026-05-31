@@ -1,90 +1,89 @@
-## PayU — what to check & how to proceed
+## 3B — Onboarding + Dynamic Forms + Document Center
 
-Code, secrets, webhook route, invoice generator, success/failure pages are all in place. What's left is **configuration + testing + go-live**, not new code. Below is the exact order to follow.
+After a customer pays, they currently land on a static "thank you" page. We need a guided onboarding flow where they submit the service-specific details we need to actually file their work, then upload supporting documents. Staff sees and verifies everything in the existing admin panel.
 
----
+### What the customer sees
 
-### 1. Confirm what's already wired (no action needed)
+```text
+/payment/UA-...  →  /success/UA-...
+                         │
+                         ▼  "Continue to onboarding →"
+                 /onboarding/UA-...           (Step 1: details form)
+                         │
+                         ▼
+                 /onboarding/UA-.../documents (Step 2: file uploads)
+                         │
+                         ▼
+                 /onboarding/UA-.../done      (Step 3: confirmation)
+```
 
-- Secrets present in Cloud: `PAYU_MERCHANT_KEY`, `PAYU_MERCHANT_SALT` ✅
-- Checkout route: `/payment/:leadCode` → auto-posts to PayU
-- Server-to-server callback: `POST /api/public/webhooks/payu` (verifies SHA512, idempotent, updates `payments` + `leads` + `applications`, generates invoice)
-- Result pages: `/success/:leadCode`, `/payment-pending/:leadCode`
-- Mode defaults to `test` (uses `https://test.payu.in/_payment`)
+The `lead_code` (e.g. `UA-2026-001010`) acts as the access token — same pattern already used by `/payment/:leadCode`. No login required for the customer.
 
----
+### Dynamic forms (per service)
 
-### 2. Configure your PayU merchant dashboard
+Each service gets its own field set. We define schemas in a single file `src/lib/onboarding/schemas.ts`:
 
-Log in at https://onboarding.payu.in (test) or https://merchant.payu.in (live) and set:
+- **udyam-registration**: Aadhaar number, PAN, applicant DOB, business name, business type (proprietor/partnership/etc.), commencement date, address, bank A/c + IFSC, NIC activity, mobile (Aadhaar-linked), social category, gender.
+- **udyam-update**: existing Udyam number + which field(s) to update + new values.
+- **udyam-print / download**: existing Udyam number + registered mobile only.
+- **migration udyog→udyam**: old UAM number + Aadhaar + PAN.
+- Default fallback: name, mobile, email, free-text "details" textarea.
 
-| Field | Value |
-|---|---|
-| Success URL (SURL) | `https://everythinghappensqindiaserver4cored.lovable.app/api/public/webhooks/payu` |
-| Failure URL (FURL) | same as above |
-| Webhook / S2S URL | same as above |
-| Webhook events | `payment_success`, `payment_failure`, `payment_pending` |
+Each field is `{ key, label, type, required, options?, validate? }`. The renderer turns it into a controlled form using the same input styles as `LeadForm`.
 
-Note: the app already sends SURL/FURL with each request, but PayU also validates them against the dashboard whitelist — they MUST match.
+### Document center
 
----
+Pre-defined doc types per service (e.g. Aadhaar front, Aadhaar back, PAN card, bank passbook, business proof). Customer uploads PDF/JPG/PNG (max 5 MB each) into the private `documents` storage bucket; admin reviews + marks each `verified | rejected` with optional remarks.
 
-### 3. Test mode end-to-end (do this first)
+### Admin side
 
-1. Open `/payment/<lead_code>` for any existing lead with a `total_amount > 0`
-2. Click **Proceed to Payment** → you should land on `test.payu.in`
-3. Use PayU test cards:
-   - **Success**: `5123 4567 8901 2346`, CVV `123`, expiry `05/30`, OTP `123456`
-   - **Failure**: `4012 0010 3714 1112`, CVV `123`, expiry `05/30`
-4. After redirect, verify:
-   - Browser lands on `/success/<lead_code>` (or `/payment-pending/...`)
-   - `payments` row: `status = paid`, `payment_date` set, `webhook_response` populated
-   - `leads.status = payment_successful`
-   - `applications.application_status = payment_received` (if app exists)
-   - `invoices` row created with auto-numbered `INV-YYYY-NNNNNN`
-   - Invoice PDF present in the `invoices` storage bucket
+The existing `/admin/leads/$leadId` page gets two new sections:
+- **Onboarding submission** — read-only JSON pretty-print of what the customer submitted.
+- **Documents** — table of uploaded files with preview link (signed URL), status dropdown, remarks field.
 
-If hash mismatch shows in logs → salt mismatch between dashboard and `PAYU_MERCHANT_SALT` secret.
+When all required docs are `verified` and onboarding is `submitted`, a one-click "Mark ready for processing" button moves the lead to `under_process`.
 
 ---
 
-### 4. Common things to verify if a test fails
+### Technical details
 
-- **"Gateway not configured"** → secret missing/typo
-- **"Signature verification failed"** → wrong salt, or test creds used against live URL
-- **Stuck on PayU page** → SURL/FURL not whitelisted in dashboard
-- **Webhook hits but lead not updated** → check `payment.lead_id` matches; inspect `webhook_response` JSON in `payments` row
-- **Invoice not generated** → check server logs for `[payu] invoice generation failed`; bucket permissions
+**Migration** (one file):
+- `onboarding_submissions` — `lead_id`, `application_id`, `service_code`, `form_data jsonb`, `status` (`draft|submitted`), `submitted_at`. Unique on `lead_id`.
+- `documents` — `lead_id`, `application_id`, `doc_type`, `file_path`, `file_name`, `mime_type`, `size_bytes`, `status` (`pending|verified|rejected`), `remarks`, `uploaded_at`, `verified_by`, `verified_at`.
+- Storage bucket `documents` (private). RLS: only staff can read/write directly; customer uploads go through a signed-upload-URL server fn that uses `supabaseAdmin`.
+- Staff RLS via existing `has_role` / `is_finance_viewer` helpers; service_role full access.
 
----
+**Server functions** (`src/lib/onboarding/*.functions.ts`):
+- `getOnboarding({ leadCode })` — public, returns lead summary + schema + existing submission + uploaded docs.
+- `submitOnboarding({ leadCode, data })` — public, Zod-validates against the schema, upserts submission.
+- `requestDocumentUpload({ leadCode, docType, fileName, mimeType, sizeBytes })` — public, validates type/size, returns a Supabase signed upload URL.
+- `confirmDocumentUpload({ leadCode, docType, filePath, ... })` — public, inserts/updates the `documents` row.
+- `listDocumentsAdmin({ leadId })`, `setDocumentStatus({ id, status, remarks })`, `getDocumentSignedUrl({ id })` — staff only.
 
-### 5. Switch to live (only after test passes)
+All public ones use `supabaseAdmin` + `lead_code` lookup (not RLS), exactly like the existing payment flow.
 
-1. Get production Merchant Key + Salt from PayU (separate from test creds)
-2. Update secrets: `PAYU_MERCHANT_KEY`, `PAYU_MERCHANT_SALT` (replace test values)
-3. Add a new runtime secret `PAYU_MODE = live` — the helper switches to `https://secure.payu.in/_payment` automatically
-4. Whitelist the production SURL/FURL in the live merchant dashboard
-5. Run one small real transaction (₹1 if possible), then verify the same checklist as step 3
-6. Refund the test transaction from PayU dashboard
+**Routes**:
+- `src/routes/onboarding.$leadCode.tsx` — details form.
+- `src/routes/onboarding.$leadCode.documents.tsx` — upload center.
+- `src/routes/onboarding.$leadCode.done.tsx` — confirmation.
+- Update `src/routes/success.$leadCode.tsx` with a "Continue to onboarding" CTA.
+- Extend `src/routes/admin.leads.$leadId.tsx` with the two new sections.
 
----
+**Files involved**
+- new: migration, `src/lib/onboarding/schemas.ts`, `src/lib/onboarding/*.functions.ts`, three onboarding routes, `src/components/onboarding/*` (form renderer + uploader).
+- edited: `success.$leadCode.tsx`, `admin.leads.$leadId.tsx`.
 
-### 6. Suggested follow-ups (optional, after go-live)
+### Scope guardrails (NOT in this slice)
+- No email/SMS notifications (deferred).
+- No OCR / Aadhaar verification API calls (deferred).
+- No customer login — `lead_code` is the access token, same as `/payment/:leadCode`.
+- No re-payment flow if customer needs to upgrade service.
 
-- Add a **finance dashboard** card in `/admin` showing today's PayU collection vs failures (data already in `payments`)
-- Add a **manual reconciliation** action in admin: re-fetch a transaction by `txnid` via PayU's verify API for stuck rows
-- Add **email receipt**: trigger when invoice PDF is created (deferred earlier — needs email domain setup)
+### Order of execution
+1. Run migration (creates tables + bucket + RLS) — needs your approval.
+2. Define schemas + server fns.
+3. Build the 3 customer routes + form/upload components.
+4. Wire admin sections.
+5. Quick QA against an existing paid lead.
 
----
-
-### Files involved (reference only, no changes proposed now)
-
-- `src/lib/payments/payu.server.ts` — hash + URL helpers
-- `src/lib/payments/payu.functions.ts` — `createPayUOrder` server fn
-- `src/routes/payment.$leadCode.tsx` — customer checkout page
-- `src/routes/api/public/webhooks/payu.ts` — S2S callback
-- `src/lib/invoices/pdf.server.ts` + `src/lib/crm/invoices.functions.ts` — invoice engine
-
----
-
-**Want me to switch to build mode and add anything from section 6 (admin finance card, reconciliation action), or are you going to run the test transaction first?**
+Ready to ship — kicking off with the migration next.
