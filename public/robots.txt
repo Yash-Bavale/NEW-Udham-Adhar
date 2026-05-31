@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.udyamadhar.in/sitemap.xml
+Sitemap: https://everythinghappensqindiaserver4cored.lovable.app/sitemap.xml
