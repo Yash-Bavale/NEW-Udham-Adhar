@@ -10,6 +10,9 @@ export const Route = createFileRoute("/payment-notice-service-acknowledgment")({
       { property: "og:title", content: "Payment Notice & Service Acknowledgment" },
       { property: "og:description", content: "Payment notice and service acknowledgment details." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/payment-notice-service-acknowledgment" },
+    ],
   }),
   component: () => <WpPage title="Payment Notice & Service Acknowledgment" html={html} />,
 });

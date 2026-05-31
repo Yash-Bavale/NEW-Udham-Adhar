@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/download-udyam.html?raw";
 
 export const Route = createFileRoute("/download-udyam")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Free Registration - No Charges for MSME Registration — Business Help Services Consultancy" },
-      { name: "description", content: "Download Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pra" },
+      { title: "Udyam Free Registration - No Charges for MSME Registration" },
+      { name: "description", content: "Expert consultancy assistance for udyam free registration - no charges for msme registration. Get help with Udyam/MSME registration, updates and certificates..." },
       { property: "og:title", content: "Udyam Free Registration - No Charges for MSME Registration" },
-      { property: "og:description", content: "Download Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pra" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam free registration - no charges for msme registration. Get help with Udyam/MSME registration, updates and certificates..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Free Registration - No Charges for MSME Registration" html={html} />,

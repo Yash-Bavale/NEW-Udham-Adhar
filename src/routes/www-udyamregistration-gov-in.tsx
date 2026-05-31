@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/www-udyamregistration-gov-in.html?raw";
 
 export const Route = createFileRoute("/www-udyamregistration-gov-in")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "www.udyamregistration.gov.in - Official MSME Registration Website — Business Help Services Consultancy" },
-      { name: "description", content: "www.udyamregistration.gov.in Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your St" },
-      { property: "og:title", content: "www.udyamregistration.gov.in - Official MSME Registration We" },
-      { property: "og:description", content: "www.udyamregistration.gov.in Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your St" },
+      { title: "www.udyamregistration.gov.in - Official MSME Registratio..." },
+      { name: "description", content: "Expert consultancy assistance for www.udyamregistration.gov.in - official msme registratio.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "www.udyamregistration.gov.in - Official MSME Registratio..." },
+      { property: "og:description", content: "Expert consultancy assistance for www.udyamregistration.gov.in - official msme registratio.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/www-udyamregistration-gov-in" },
     ],
   }),
   component: () => <SeoLandingPage title="www.udyamregistration.gov.in - Official MSME Registration We" html={html} />,

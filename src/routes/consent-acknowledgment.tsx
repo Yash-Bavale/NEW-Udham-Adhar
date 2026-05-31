@@ -10,6 +10,9 @@ export const Route = createFileRoute("/consent-acknowledgment")({
       { property: "og:title", content: "Consents & Acknowledgements" },
       { property: "og:description", content: "Read the consents and acknowledgements that apply to using our services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/consent-acknowledgment" },
+    ],
   }),
   component: () => <WpPage title="Consent & Acknowledgment" html={html} />,
 });

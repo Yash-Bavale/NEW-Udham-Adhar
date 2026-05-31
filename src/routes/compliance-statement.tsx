@@ -10,6 +10,9 @@ export const Route = createFileRoute("/compliance-statement")({
       { property: "og:title", content: "Compliance Statement" },
       { property: "og:description", content: "Read our compliance commitments and obligations." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/compliance-statement" },
+    ],
   }),
   component: () => <WpPage title="Compliance Statement" html={html} />,
 });

@@ -11,18 +11,21 @@ import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-r
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Business Help Services Online — Apply, Update, Download & Migrate" },
+      { title: "Business Help Services — Apply, Update, Download" },
       {
         name: "description",
         content:
-          "Get assistance with new Business Help Services, certificate updates, downloads, Udyog Aadhaar migration and corrections — Business Help Consultancy Services.",
+          "Get expert consultancy for Udyam/MSME registration, certificate updates, downloads, and Udyog Aadhaar migration across India.",
       },
-      { property: "og:title", content: "Business Help Services — Business Help Consultancy" },
+      { property: "og:title", content: "Business Help Services — Apply, Update, Download" },
       {
         property: "og:description",
         content:
-          "Consultancy assistance for MSME / Business Help Services. Apply, update, download or migrate your certificate.",
+          "Expert consultancy assistance for Udyam/MSME registration, certificate updates, downloads and migration.",
       },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/" },
     ],
   }),
   component: HomePage,

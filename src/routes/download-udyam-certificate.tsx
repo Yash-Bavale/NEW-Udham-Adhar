@@ -9,6 +9,9 @@ export const Route = createFileRoute("/download-udyam-certificate")({
       { property: "og:title", content: "Download Udyam Certificate Online" },
       { property: "og:description", content: "Download a copy of your Business Help Services certificate with consultancy assistance." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam-certificate" },
+    ],
   }),
   component: () => (
     <ServicePageLayout title="Download Udyam Certificate">

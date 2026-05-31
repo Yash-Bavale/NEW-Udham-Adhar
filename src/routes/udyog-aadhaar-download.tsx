@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-download.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-download")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyog Aadhaar Download | Old UAN Certificate Online — Business Help Services Consultancy" },
-      { name: "description", content: "Udyog Aadhaar Download Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
+      { title: "Udyog Aadhaar Download | Old UAN Certificate Online" },
+      { name: "description", content: "Expert consultancy assistance for udyog aadhaar download | old uan certificate online. Get help with Udyam/MSME registration, updates and certificates across..." },
       { property: "og:title", content: "Udyog Aadhaar Download | Old UAN Certificate Online" },
-      { property: "og:description", content: "Udyog Aadhaar Download Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
+      { property: "og:description", content: "Expert consultancy assistance for udyog aadhaar download | old uan certificate online. Get help with Udyam/MSME registration, updates and certificates across..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-download" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyog Aadhaar Download | Old UAN Certificate Online" html={html} />,

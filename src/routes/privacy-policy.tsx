@@ -10,6 +10,9 @@ export const Route = createFileRoute("/privacy-policy")({
       { property: "og:title", content: "Privacy Policy" },
       { property: "og:description", content: "Privacy practices for Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/privacy-policy" },
+    ],
   }),
   component: () => <WpPage title="Privacy Policy" html={html} />,
 });

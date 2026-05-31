@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 import { FileRoutesByTo } from "@/routeTree.gen";
 
-const BASE_URL = "https://www.udyamadhar.in";
+const BASE_URL = "https://udyamadhar.everythinghappens.in";
 
 function getStaticPaths(): string[] {
   // Extract every static (non-param) route from the generated route tree.

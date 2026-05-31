@@ -10,6 +10,9 @@ export const Route = createFileRoute("/important-notice")({
       { property: "og:title", content: "Important Notice" },
       { property: "og:description", content: "Important notice and disclaimer from Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/important-notice" },
+    ],
   }),
   component: () => <WpPage title="Important Notice" html={html} />,
 });

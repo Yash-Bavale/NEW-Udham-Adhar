@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhar-update.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhar-update")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyog Aadhar Update - How to Update Your MSME Details — Business Help Services Consultancy" },
-      { name: "description", content: "Udyog Aadhar Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhr" },
+      { title: "Udyog Aadhar Update - How to Update Your MSME Details" },
+      { name: "description", content: "Expert consultancy assistance for udyog aadhar update - how to update your msme details. Get help with Udyam/MSME registration, updates and certificates acro..." },
       { property: "og:title", content: "Udyog Aadhar Update - How to Update Your MSME Details" },
-      { property: "og:description", content: "Udyog Aadhar Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhr" },
+      { property: "og:description", content: "Expert consultancy assistance for udyog aadhar update - how to update your msme details. Get help with Udyam/MSME registration, updates and certificates acro..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhar-update" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyog Aadhar Update - How to Update Your MSME Details" html={html} />,

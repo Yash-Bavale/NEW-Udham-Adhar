@@ -9,6 +9,9 @@ export const Route = createFileRoute("/new-udyam-registration")({
       { property: "og:title", content: "New Business Help Services — Apply Online" },
       { property: "og:description", content: "Get consultancy help applying for a new Business Help Services certificate." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/new-udyam-registration" },
+    ],
   }),
   component: () => (
     <ServicePageLayout title="New Business Help Services">

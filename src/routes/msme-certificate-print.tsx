@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-certificate-print.html?raw";
 
 export const Route = createFileRoute("/msme-certificate-print")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "MSME Certificate Print Online | Download Udyam/MSME Certificate — Business Help Services Consultancy" },
-      { name: "description", content: "MSME Certificate Print Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
-      { property: "og:title", content: "MSME Certificate Print Online | Download Udyam/MSME Certific" },
-      { property: "og:description", content: "MSME Certificate Print Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
+      { title: "MSME Certificate Print Online" },
+      { name: "description", content: "Expert consultancy assistance for msme certificate print online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "MSME Certificate Print Online" },
+      { property: "og:description", content: "Expert consultancy assistance for msme certificate print online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-certificate-print" },
     ],
   }),
   component: () => <SeoLandingPage title="MSME Certificate Print Online | Download Udyam/MSME Certific" html={html} />,

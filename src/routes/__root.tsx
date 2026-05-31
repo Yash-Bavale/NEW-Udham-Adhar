@@ -79,24 +79,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Udyam Registration — Business Help Consultancy Services" },
+      { title: "Udyam Registration — Business Help Consultancy" },
       {
         name: "description",
         content:
-          "Private consultancy assistance for Udyam Registration, updates, downloads, Udyog Aadhaar migration, and related MSME registration help.",
+          "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance.",
       },
-      { property: "og:title", content: "Udyam Registration — Business Help Consultancy Services" },
+      { property: "og:title", content: "Udyam Registration — Business Help Consultancy" },
       {
         property: "og:description",
         content:
-          "Consultancy assistance for new Udyam Registration, certificate update, download, migration and corrections.",
+          "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Udyam Registration — Business Help Consultancy Services" },
-      { name: "description", content: "Udyam Registration, MSME Registration, Business Registration" },
-      { property: "og:description", content: "Udyam Registration, MSME Registration, Business Registration" },
-      { name: "twitter:description", content: "Udyam Registration, MSME Registration, Business Registration" },
+      { name: "twitter:title", content: "Udyam Registration — Business Help Consultancy" },
+      { name: "twitter:description", content: "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
     ],

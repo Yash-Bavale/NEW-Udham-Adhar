@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-update.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-update")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyog Aadhaar Update – Modify UAN Details Online — Business Help Services Consultancy" },
-      { name: "description", content: "Udyog Aadhaar Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andh" },
+      { title: "Udyog Aadhaar Update – Modify UAN Details Online" },
+      { name: "description", content: "Expert consultancy assistance for udyog aadhaar update – modify uan details online. Get help with Udyam/MSME registration, updates and certificates across In..." },
       { property: "og:title", content: "Udyog Aadhaar Update – Modify UAN Details Online" },
-      { property: "og:description", content: "Udyog Aadhaar Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andh" },
+      { property: "og:description", content: "Expert consultancy assistance for udyog aadhaar update – modify uan details online. Get help with Udyam/MSME registration, updates and certificates across In..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-update" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyog Aadhaar Update – Modify UAN Details Online" html={html} />,

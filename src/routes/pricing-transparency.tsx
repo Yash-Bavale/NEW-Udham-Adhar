@@ -10,6 +10,9 @@ export const Route = createFileRoute("/pricing-transparency")({
       { property: "og:title", content: "Pricing Transparency" },
       { property: "og:description", content: "How our consultancy fees are structured and disclosed." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/pricing-transparency" },
+    ],
   }),
   component: () => <WpPage title="Pricing Transparency" html={html} />,
 });

@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-adhaar.html?raw";
 
 export const Route = createFileRoute("/udyam-adhaar")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Adhaar Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prade" },
-      { property: "og:title", content: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Registra" },
-      { property: "og:description", content: "Udyam Adhaar Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prade" },
+      { title: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Regi..." },
+      { name: "description", content: "Expert consultancy assistance for udyam aadhaar - aadhaar-based verification for msme regi.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Regi..." },
+      { property: "og:description", content: "Expert consultancy assistance for udyam aadhaar - aadhaar-based verification for msme regi.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhaar" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Aadhaar - Aadhaar-Based Verification for MSME Registra" html={html} />,

@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/free-msme-registration-certificate-download.html?raw";
 
 export const Route = createFileRoute("/free-msme-registration-certificate-download")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "MSME Registration Certificate Download - Get Your Certificate Online — Business Help Services Consultancy" },
-      { name: "description", content: "Free MSME Registration Certificate Download Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य" },
-      { property: "og:title", content: "MSME Registration Certificate Download - Get Your Certificat" },
-      { property: "og:description", content: "Free MSME Registration Certificate Download Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य" },
+      { title: "MSME Registration Certificate Download - Get Your Certif..." },
+      { name: "description", content: "Expert consultancy assistance for msme registration certificate download - get your certif.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "MSME Registration Certificate Download - Get Your Certif..." },
+      { property: "og:description", content: "Expert consultancy assistance for msme registration certificate download - get your certif.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/free-msme-registration-certificate-download" },
     ],
   }),
   component: () => <SeoLandingPage title="MSME Registration Certificate Download - Get Your Certificat" html={html} />,

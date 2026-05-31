@@ -10,6 +10,9 @@ export const Route = createFileRoute("/terms-conditions")({
       { property: "og:title", content: "Terms & Conditions" },
       { property: "og:description", content: "Terms and conditions for Business Help Services." },
     ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/terms-conditions" },
+    ],
   }),
   component: () => <WpPage title="Terms & Conditions" html={html} />,
 });

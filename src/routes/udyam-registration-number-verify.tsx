@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-number-verify.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-number-verify")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Business Help Services Number Verify | MSME Certificate Validation — Business Help Services Consultancy" },
-      { name: "description", content: "Business Help Services Number Verify Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select You" },
-      { property: "og:title", content: "Business Help Services Number Verify | MSME Certificate Validati" },
-      { property: "og:description", content: "Business Help Services Number Verify Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select You" },
+      { title: "Number Verify | MSME Certificate Validati" },
+      { name: "description", content: "Expert consultancy assistance for number verify | msme certificate validati. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Number Verify | MSME Certificate Validati" },
+      { property: "og:description", content: "Expert consultancy assistance for number verify | msme certificate validati. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-number-verify" },
     ],
   }),
   component: () => <SeoLandingPage title="Business Help Services Number Verify | MSME Certificate Validati" html={html} />,

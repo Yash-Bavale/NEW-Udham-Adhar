@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-portal.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-portal")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Business Help Services Portal - Official MSME Registration Website — Business Help Services Consultancy" },
-      { name: "description", content: "Business Help Services Portal Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
-      { property: "og:title", content: "Business Help Services Portal - Official MSME Registration Websi" },
-      { property: "og:description", content: "Business Help Services Portal Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
+      { title: "Portal - Official MSME Registration Websi" },
+      { name: "description", content: "Expert consultancy assistance for portal - official msme registration websi. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Portal - Official MSME Registration Websi" },
+      { property: "og:description", content: "Expert consultancy assistance for portal - official msme registration websi. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-portal" },
     ],
   }),
   component: () => <SeoLandingPage title="Business Help Services Portal - Official MSME Registration Websi" html={html} />,
