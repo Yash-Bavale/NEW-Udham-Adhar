@@ -5,7 +5,7 @@ export function Nav() {
   return (
     <nav className="hidden md:block bg-nav-bg border-b border-border">
       <div className="mx-auto max-w-7xl px-4">
-        <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-3 text-sm font-medium text-brand-navy">
+        <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-3 text-sm font-medium text-brand-navy bg-[#d2e3f3]">
           {NAV_LINKS.map((l) => (
             <li key={`${l.to}-${l.label}`}>
               <Link
