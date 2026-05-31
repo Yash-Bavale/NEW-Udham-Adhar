@@ -20,7 +20,7 @@ export const INDIAN_STATES = [
   "Uttar Pradesh","West Bengal",
 ];
 
-export const LANGUAGES = ["English", "Hindi", "Marathi"];
+export const LANGUAGES = ["English", "Hindi"];
 
 export const GST_RATE = 0.18;
 
