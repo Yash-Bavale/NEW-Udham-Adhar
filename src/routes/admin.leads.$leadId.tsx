@@ -94,6 +94,8 @@ function LeadDetailPage() {
         )}
       </Card>
 
+      <AdminOnboardingPanel leadId={leadId} />
+
       <Card title="Internal Notes">
         <div className="flex gap-2 mb-3">
           <input
