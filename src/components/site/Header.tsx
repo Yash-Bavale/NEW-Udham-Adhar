@@ -20,14 +20,14 @@ export function Header() {
     <>
       {/* Top thin bar */}
       <div className="bg-muted text-xs text-muted-foreground border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-2 flex justify-center md:justify-end bg-[#dfeefb]">
+        <div className="mx-auto max-w-7xl px-4 py-2 flex justify-center md:justify-end bg-[#d2e3f3]">
           <span>Change Language</span>
         </div>
       </div>
 
       {/* Main header */}
       <header className="bg-background border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-5">
+        <div className="mx-auto max-w-7xl px-4 py-5 bg-[#d2e3f3]">
           {/* Mobile */}
           <div className="md:hidden">
             <button
