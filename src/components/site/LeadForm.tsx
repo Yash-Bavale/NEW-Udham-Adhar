@@ -88,7 +88,7 @@ export function LeadForm({ title = "Udyam Registration Form" }: { title?: string
         </Field>
 
         <label className="flex gap-3 items-start text-xs text-foreground/80 leading-relaxed">
-          <input type="checkbox" name="consent" required className="mt-1 h-4 w-4 accent-[var(--brand-navy)]" />
+          <input type="checkbox" name="consent" required className="mt-1 h-4 w-4 accent-[var(--brand-navy)] my-[6px]" />
           <span>
             I confirm that I have read and agreed to all applicable{" "}
             <a href="/terms-conditions" className="text-brand-navy underline">Terms &amp; Conditions</a>,{" "}
