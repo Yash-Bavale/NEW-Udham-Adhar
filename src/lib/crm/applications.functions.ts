@@ -53,10 +53,17 @@ export const updateApplication = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { id, ...patch } = data;
-    const { error } = await supabase
-      .from("applications")
-      .update(patch as Record<string, unknown>)
-      .eq("id", id);
+    const typedPatch: {
+      application_status?: ApplicationStatus;
+      form_status?: string;
+      document_status?: string;
+      assigned_to?: string | null;
+    } = {};
+    if (patch.application_status) typedPatch.application_status = patch.application_status as ApplicationStatus;
+    if (patch.form_status !== undefined) typedPatch.form_status = patch.form_status;
+    if (patch.document_status !== undefined) typedPatch.document_status = patch.document_status;
+    if (patch.assigned_to !== undefined) typedPatch.assigned_to = patch.assigned_to;
+    const { error } = await supabase.from("applications").update(typedPatch).eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

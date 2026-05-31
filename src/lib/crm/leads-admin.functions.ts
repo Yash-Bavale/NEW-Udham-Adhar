@@ -91,10 +91,11 @@ export const updateLead = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
     const { id, ...patch } = data;
-    const { error } = await supabase
-      .from("leads")
-      .update(patch as Record<string, unknown>)
-      .eq("id", id);
+    const typedPatch: { status?: LeadStatus; assigned_to?: string | null; remarks?: string | null } = {};
+    if (patch.status) typedPatch.status = patch.status as LeadStatus;
+    if (patch.assigned_to !== undefined) typedPatch.assigned_to = patch.assigned_to;
+    if (patch.remarks !== undefined) typedPatch.remarks = patch.remarks;
+    const { error } = await supabase.from("leads").update(typedPatch).eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

@@ -9,22 +9,22 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const headCount = (tbl: "leads" | "applications") =>
-      supabase.from(tbl).select("*", { count: "exact", head: true });
+    const leadHead = () => supabase.from("leads").select("*", { count: "exact", head: true });
+    const appHead = () => supabase.from("applications").select("*", { count: "exact", head: true });
 
     const [total, today, week, inProgress, completed, pending, recentLeads, recentActivity, byStatus, byService] =
       await Promise.all([
-        headCount("leads"),
-        headCount("leads").gte("created_at", startOfToday),
-        headCount("leads").gte("created_at", sevenDaysAgo),
-        headCount("applications").in("application_status", [
+        leadHead(),
+        leadHead().gte("created_at", startOfToday),
+        leadHead().gte("created_at", sevenDaysAgo),
+        appHead().in("application_status", [
           "details_pending",
           "documents_pending",
           "under_review",
           "under_process",
         ]),
-        headCount("applications").eq("application_status", "completed"),
-        headCount("applications").eq("application_status", "awaiting_payment"),
+        appHead().eq("application_status", "completed"),
+        appHead().eq("application_status", "awaiting_payment"),
         supabase
           .from("leads")
           .select("id, lead_code, name, service, status, created_at")
