@@ -21,8 +21,8 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
       entity_type: entry.entityType,
       entity_id: entry.entityId ?? null,
       action: entry.action,
-      old_value: entry.oldValue ?? null,
-      new_value: entry.newValue ?? null,
+      old_value: (entry.oldValue ?? null) as never,
+      new_value: (entry.newValue ?? null) as never,
       ip: entry.ip ?? null,
       user_agent: entry.userAgent ?? null,
     });
