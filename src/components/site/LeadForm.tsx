@@ -5,7 +5,7 @@ import { createLead } from "@/lib/leads.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
 
-export function LeadForm({ title = "Udyam Registration Form" }: { title?: string } = {}) {
+export function LeadForm({ title = "Fill application" }: { title?: string } = {}) {
   const navigate = useNavigate();
   const submitLead = useServerFn(createLead);
 
@@ -117,7 +117,7 @@ export function LeadForm({ title = "Udyam Registration Form" }: { title?: string
         </button>
 
         <p className="text-center text-xs text-muted-foreground">
-          Consultancy fee ₹99 + 18% GST. All charges are service fees only, not government fees.
+          {"\u200B"}
         </p>
       </form>
     </div>

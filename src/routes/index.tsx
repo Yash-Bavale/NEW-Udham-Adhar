@@ -104,7 +104,7 @@ function HomePage() {
 
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="bg-form-header text-white text-center py-4">
-            <h2 className="text-xl font-bold font-display">Udyam Sample Certificate</h2>
+            <h2 className="text-xl font-bold font-display">Sample Certificate</h2>
           </div>
           <div className="p-6">
             <img
@@ -113,7 +113,7 @@ function HomePage() {
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
             />
-            <p className="mt-3 text-center text-sm text-muted-foreground">
+            <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Sample Udyam Registration Certificate shown for reference purposes only.
             </p>
           </div>

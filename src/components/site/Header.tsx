@@ -37,10 +37,10 @@ export function Header() {
               aria-label="Go to homepage"
             >
               <h1 className="text-xl font-bold text-brand-red font-display leading-tight">
-                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सेवा
+                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
               </h1>
               <p className="text-xs tracking-wider text-brand-navy font-semibold font-display mt-1">
-                REGISTRATION FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
+                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES 
               </p>
             </button>
             <div className="mt-5 pt-4 border-t border-border flex justify-end">
@@ -73,10 +73,10 @@ export function Header() {
               aria-label="Go to homepage"
             >
               <h1 className="text-2xl font-bold text-brand-red font-display leading-tight">
-                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सेवा
+                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
               </h1>
               <p className="text-xs tracking-wider text-brand-navy font-semibold mt-1">
-                REGISTRATION FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
+                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES 
               </p>
             </button>
 
