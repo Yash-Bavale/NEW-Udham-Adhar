@@ -78,24 +78,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Udyam Registration — Business Help Consultancy Services" },
+      { title: "Business Help Services — Business Help Consultancy Services" },
       {
         name: "description",
         content:
-          "Private consultancy assistance for Udyam Registration, updates, downloads, Udyog Aadhaar migration, and related MSME registration help.",
+          "Private consultancy assistance for Business Help Services, updates, downloads, Udyog Aadhaar migration, and related MSME registration help.",
       },
-      { property: "og:title", content: "Udyam Registration — Business Help Consultancy Services" },
+      { property: "og:title", content: "Business Help Services — Business Help Consultancy Services" },
       {
         property: "og:description",
         content:
-          "Consultancy assistance for new Udyam Registration, certificate update, download, migration and corrections.",
+          "Consultancy assistance for new Business Help Services, certificate update, download, migration and corrections.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Udyam Registration — Business Help Consultancy Services" },
-      { name: "description", content: "Udyam Registration, MSME Registration, Business Registration" },
-      { property: "og:description", content: "Udyam Registration, MSME Registration, Business Registration" },
-      { name: "twitter:description", content: "Udyam Registration, MSME Registration, Business Registration" },
+      { name: "twitter:title", content: "Business Help Services — Business Help Consultancy Services" },
+      { name: "description", content: "Business Help Services, MSME Registration, Business Registration" },
+      { property: "og:description", content: "Business Help Services, MSME Registration, Business Registration" },
+      { name: "twitter:description", content: "Business Help Services, MSME Registration, Business Registration" },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
     ],

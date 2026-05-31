@@ -5,8 +5,8 @@ import html from "@/content/wp/pricing-transparency.html?raw";
 export const Route = createFileRoute("/pricing-transparency")({
   head: () => ({
     meta: [
-      { title: "Pricing Transparency — Udyam Registration Consultancy" },
-      { name: "description", content: "Transparent pricing for our Udyam Registration consultancy and assistance services." },
+      { title: "Pricing Transparency — Business Help Services Consultancy" },
+      { name: "description", content: "Transparent pricing for our Business Help Services consultancy and assistance services." },
       { property: "og:title", content: "Pricing Transparency" },
       { property: "og:description", content: "How our consultancy fees are structured and disclosed." },
     ],

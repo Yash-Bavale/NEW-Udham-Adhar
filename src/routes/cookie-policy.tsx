@@ -5,7 +5,7 @@ import html from "@/content/wp/cookie-policy.html?raw";
 export const Route = createFileRoute("/cookie-policy")({
   head: () => ({
     meta: [
-      { title: "Cookie Policy — Udyam Registration Consultancy" },
+      { title: "Cookie Policy — Business Help Services Consultancy" },
       { name: "description", content: "How we use cookies and similar technologies on this website." },
       { property: "og:title", content: "Cookie Policy" },
       { property: "og:description", content: "Cookie policy for Business Help Services." },

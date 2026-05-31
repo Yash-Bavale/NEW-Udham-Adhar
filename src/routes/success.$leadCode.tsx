@@ -4,7 +4,7 @@ import { PageHero } from "@/components/site/PageHero";
 export const Route = createFileRoute("/success/$leadCode")({
   head: () => ({
     meta: [
-      { title: "Payment Successful — Udyam Registration Consultancy" },
+      { title: "Payment Successful — Business Help Services Consultancy" },
       { name: "description", content: "Your consultancy fee has been received. Our team will contact you shortly." },
       { name: "robots", content: "noindex,nofollow" },
     ],

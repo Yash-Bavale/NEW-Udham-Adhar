@@ -5,7 +5,7 @@ import { Lock, CreditCard, Smartphone, Building2 } from "lucide-react";
 export const Route = createFileRoute("/payment/$leadCode")({
   head: () => ({
     meta: [
-      { title: "Complete Payment — Udyam Registration Consultancy" },
+      { title: "Complete Payment — Business Help Services Consultancy" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
