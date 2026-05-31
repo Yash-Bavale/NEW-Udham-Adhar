@@ -26,11 +26,20 @@ function SuccessPage() {
         Please save it for any future communication.
       </p>
       <p>
-        Our team will contact you on your registered mobile or email within one
-        working day to collect the remaining details and begin processing.
+        <strong>Next step:</strong> complete a short onboarding form and upload
+        your supporting documents so our expert can start work right away.
       </p>
-      <p>
-        <Link to="/">Back to Home</Link> · <Link to="/contact">Contact Us</Link>
+      <p className="mt-4 flex flex-wrap gap-3">
+        <Link
+          to="/onboarding/$leadCode"
+          params={{ leadCode }}
+          className="inline-flex items-center rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-6 py-2.5 transition-colors"
+        >
+          Continue to onboarding →
+        </Link>
+        <Link to="/contact" className="inline-flex items-center text-brand-navy underline px-2 py-2">
+          Contact us
+        </Link>
       </p>
     </PageHero>
   );

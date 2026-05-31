@@ -158,6 +158,60 @@ export type Database = {
         }
         Relationships: []
       }
+      documents: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          doc_type: string
+          file_name: string
+          file_path: string
+          id: string
+          lead_id: string
+          mime_type: string
+          remarks: string | null
+          size_bytes: number
+          status: string
+          updated_at: string
+          uploaded_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          doc_type: string
+          file_name: string
+          file_path: string
+          id?: string
+          lead_id: string
+          mime_type: string
+          remarks?: string | null
+          size_bytes: number
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          doc_type?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          lead_id?: string
+          mime_type?: string
+          remarks?: string | null
+          size_bytes?: number
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           application_id: string | null
@@ -308,6 +362,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_submissions: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          form_data: Json
+          id: string
+          lead_id: string
+          service_code: string
+          status: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          form_data?: Json
+          id?: string
+          lead_id: string
+          service_code: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          form_data?: Json
+          id?: string
+          lead_id?: string
+          service_code?: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       payment_gateways: {
         Row: {

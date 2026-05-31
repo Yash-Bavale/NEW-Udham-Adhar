@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getLead, updateLead, addLeadNote } from "@/lib/crm/leads-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
+import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 
 export const Route = createFileRoute("/admin/leads/$leadId")({ component: LeadDetailPage });
 
@@ -92,6 +93,8 @@ function LeadDetailPage() {
           </table>
         )}
       </Card>
+
+      <AdminOnboardingPanel leadId={leadId} />
 
       <Card title="Internal Notes">
         <div className="flex gap-2 mb-3">
