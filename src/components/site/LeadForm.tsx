@@ -94,9 +94,9 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
           </select>
         </Field>
 
-        <label className="flex gap-3 items-start text-xs text-foreground/80 leading-relaxed">
+        <label htmlFor={`${baseId}-consent`} className="flex gap-3 items-start text-xs text-foreground/80 leading-relaxed">
           <input id={`${baseId}-consent`} type="checkbox" name="consent" required className="mt-1 h-5 w-5 shrink-0 accent-brand-navy-deep border-2 border-brand-navy-deep rounded-sm cursor-pointer" style={{ accentColor: '#0a1f44' }} />
-          <span htmlFor={`${baseId}-consent`}>
+          <span>
             I confirm that I have read and agreed to all applicable{" "}
             <a href="/terms-conditions" className="text-brand-navy underline">Terms &amp; Conditions</a>,{" "}
             <a href="/privacy-policy" className="text-brand-navy underline">Privacy Policy</a>,{" "}
