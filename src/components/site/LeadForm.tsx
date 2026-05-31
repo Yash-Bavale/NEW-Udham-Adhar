@@ -26,7 +26,6 @@ function loadRazorpayScript(): Promise<boolean> {
 export function LeadForm() {
   const navigate = useNavigate();
   const submitLead = useServerFn(createLead);
-  const submitOrder = useServerFn(createRazorpayOrder);
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -49,37 +48,10 @@ export function LeadForm() {
 
     try {
       const lead = await submitLead({ data: payload as never });
-      const order = await submitOrder({ data: { leadId: lead.leadId } });
-
-      if (!order.configured) {
-        // No keys yet — send the user to a friendly "we'll reach out" page.
-        navigate({
-          to: "/payment-pending/$leadCode",
-          params: { leadCode: lead.leadCode },
-        });
-        return;
-      }
-
-      const ok = await loadRazorpayScript();
-      if (!ok || !window.Razorpay) throw new Error("Could not load payment widget");
-
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        order_id: order.orderId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "Udyam Registration",
-        description: payload.service,
-        prefill: order.prefill,
-        theme: { color: "#1e3a8a" },
-        handler: () => {
-          navigate({ to: "/success/$leadCode", params: { leadCode: lead.leadCode } });
-        },
-        modal: {
-          ondismiss: () => setBusy(false),
-        },
+      navigate({
+        to: "/processing/$leadCode",
+        params: { leadCode: lead.leadCode },
       });
-      rzp.open();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Something went wrong. Please try again.";
       setErr(msg);
