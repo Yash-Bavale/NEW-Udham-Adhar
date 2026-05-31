@@ -72,7 +72,7 @@ export function Header() {
               className="text-center bg-transparent p-0 cursor-pointer"
               aria-label="Go to homepage"
             >
-              <h1 className="text-2xl font-bold text-brand-red font-display leading-tight">
+              <h1 className="text-2xl font-bold text-brand-red font-display leading-tight border-2">
                 सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सेवा
               </h1>
               <p className="text-xs tracking-wider text-brand-navy font-semibold mt-1">
