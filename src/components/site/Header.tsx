@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
 
@@ -10,11 +10,61 @@ declare global {
   }
 }
 
+const LANGS: { code: string; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "mr", label: "मराठी" },
+  { code: "bn", label: "বাংলা" },
+  { code: "gu", label: "ગુજરાતી" },
+  { code: "kn", label: "ಕನ್ನಡ" },
+  { code: "ml", label: "മലയാളം" },
+  { code: "pa", label: "ਪੰਜਾਬੀ" },
+  { code: "sd", label: "سنڌي" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "te", label: "తెలుగు" },
+  { code: "ur", label: "اردو" },
+];
+
+const STORAGE_KEY = "site_lang";
+
+function setGoogTransCookie(lang: string) {
+  const value = `/en/${lang}`;
+  // Set on current host and parent domain so it persists across SPA navigation.
+  document.cookie = `googtrans=${value};path=/`;
+  const host = window.location.hostname;
+  const parts = host.split(".");
+  if (parts.length > 1) {
+    const parent = "." + parts.slice(-2).join(".");
+    document.cookie = `googtrans=${value};path=/;domain=${parent}`;
+  }
+  document.cookie = `googtrans=${value};path=/;domain=.${host}`;
+}
+
+function readStoredLang(): string {
+  if (typeof window === "undefined") return "en";
+  return localStorage.getItem(STORAGE_KEY) || "en";
+}
+
+function applyLang(lang: string) {
+  const combo = document.querySelector<HTMLSelectElement>(".goog-te-combo");
+  if (!combo) return false;
+  combo.value = lang;
+  combo.dispatchEvent(new Event("change"));
+  return true;
+}
+
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [lang, setLang] = useState<string>("en");
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Hydrate selected language from storage
+  useEffect(() => {
+    setLang(readStoredLang());
+  }, []);
+
+  // Bootstrap Google Translate widget once
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (document.getElementById("google-translate-script")) return;
@@ -22,14 +72,21 @@ export function Header() {
       new window.google.translate.TranslateElement(
         {
           pageLanguage: "en",
-          includedLanguages:
-            "en,hi,bn,gu,kn,ml,mr,pa,sd,ta,te,ur",
-          layout:
-            window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+          includedLanguages: LANGS.map((l) => l.code).join(","),
+          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
           autoDisplay: false,
         },
         "google_translate_element",
       );
+      // Re-apply stored language after widget mounts
+      const stored = readStoredLang();
+      if (stored && stored !== "en") {
+        const tryApply = (n = 0) => {
+          if (applyLang(stored)) return;
+          if (n < 20) setTimeout(() => tryApply(n + 1), 200);
+        };
+        tryApply();
+      }
     };
     const s = document.createElement("script");
     s.id = "google-translate-script";
@@ -38,6 +95,42 @@ export function Header() {
     s.async = true;
     document.body.appendChild(s);
   }, []);
+
+  // Re-apply translation after each SPA route change
+  useEffect(() => {
+    const stored = readStoredLang();
+    if (!stored || stored === "en") return;
+    setGoogTransCookie(stored);
+    const tryApply = (n = 0) => {
+      if (applyLang(stored)) return;
+      if (n < 25) setTimeout(() => tryApply(n + 1), 200);
+    };
+    // Give the new page a tick to mount before re-translating
+    const t = setTimeout(() => tryApply(), 50);
+    return () => clearTimeout(t);
+  }, [pathname]);
+
+  const onLangChange = (code: string) => {
+    setLang(code);
+    localStorage.setItem(STORAGE_KEY, code);
+    setGoogTransCookie(code);
+    if (code === "en") {
+      // Restore original by clearing cookie + reload (most reliable)
+      document.cookie = "googtrans=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      const host = window.location.hostname;
+      const parts = host.split(".");
+      if (parts.length > 1) {
+        const parent = "." + parts.slice(-2).join(".");
+        document.cookie = `googtrans=;path=/;domain=${parent};expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      }
+      window.location.reload();
+      return;
+    }
+    if (!applyLang(code)) {
+      // Widget not ready yet — full reload picks up the cookie
+      window.location.reload();
+    }
+  };
 
   const handleTitleClick = () => {
     if (pathname === "/") {
@@ -50,12 +143,33 @@ export function Header() {
   return (
     <>
       {/* Top thin bar */}
-      <div className="bg-muted text-xs text-muted-foreground border-b border-border">
-        <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-center md:justify-end gap-3 bg-[#d2e3f3]">
-          <span className="font-medium text-brand-navy">Change Language</span>
-          <div id="google_translate_element" className="gtranslate-host" />
+      <div className="sticky top-0 z-40 bg-[#d2e3f3] border-b border-border">
+        <div className="mx-auto max-w-7xl px-4 py-2 flex items-center justify-center md:justify-end gap-3">
+          <Globe className="w-4 h-4 text-brand-navy" aria-hidden />
+          <label htmlFor="site-lang" className="text-xs font-semibold text-brand-navy">
+            Change Language
+          </label>
+          <select
+            id="site-lang"
+            value={lang}
+            onChange={(e) => onLangChange(e.target.value)}
+            className="notranslate rounded-md border border-brand-navy bg-white px-2 py-1 text-xs font-semibold text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+          >
+            {LANGS.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          {/* Hidden Google widget host (required for script to mount) */}
+          <div
+            id="google_translate_element"
+            className="gtranslate-host sr-only"
+            aria-hidden
+          />
         </div>
       </div>
+
 
 
       {/* Main header */}
