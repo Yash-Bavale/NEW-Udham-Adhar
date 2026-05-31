@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-registration-fee.html?raw";
 
 export const Route = createFileRoute("/msme-registration-fee")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "MSME Registration Fee - Free Online MSME Registration Process — Business Help Services Consultancy" },
-      { name: "description", content: "MSME registration fee Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State And" },
-      { property: "og:title", content: "MSME Registration Fee - Free Online MSME Registration Proces" },
-      { property: "og:description", content: "MSME registration fee Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State And" },
+      { title: "MSME Registration Fee - Free Online MSME Registration Pr..." },
+      { name: "description", content: "Expert consultancy assistance for msme registration fee - free online msme registration pr.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "MSME Registration Fee - Free Online MSME Registration Pr..." },
+      { property: "og:description", content: "Expert consultancy assistance for msme registration fee - free online msme registration pr.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-registration-fee" },
     ],
   }),
   component: () => <SeoLandingPage title="MSME Registration Fee - Free Online MSME Registration Proces" html={html} />,

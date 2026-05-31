@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-aadhar-registration.html?raw";
 
 export const Route = createFileRoute("/udyam-aadhar-registration")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Aadhar Registration - Aadhaar Linked MSME Registration — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Aadhar Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
-      { property: "og:title", content: "Udyam Aadhar Registration - Aadhaar Linked MSME Registration" },
-      { property: "og:description", content: "Udyam Aadhar Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
+      { title: "Udyam Aadhar Registration - Aadhaar Linked MSME Registra..." },
+      { name: "description", content: "Expert consultancy assistance for udyam aadhar registration - aadhaar linked msme registra.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "Udyam Aadhar Registration - Aadhaar Linked MSME Registra..." },
+      { property: "og:description", content: "Expert consultancy assistance for udyam aadhar registration - aadhaar linked msme registra.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhar-registration" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Aadhar Registration - Aadhaar Linked MSME Registration" html={html} />,

@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-pan-registration.html?raw";
 
 export const Route = createFileRoute("/udyam-pan-registration")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam PAN Registration | Link PAN With MSME Udyam Certificate — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam PAN Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
-      { property: "og:title", content: "Udyam PAN Registration | Link PAN With MSME Udyam Certificat" },
-      { property: "og:description", content: "Udyam PAN Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State An" },
+      { title: "Udyam PAN Registration" },
+      { name: "description", content: "Expert consultancy assistance for udyam pan registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyam PAN Registration" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam pan registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-pan-registration" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam PAN Registration | Link PAN With MSME Udyam Certificat" html={html} />,

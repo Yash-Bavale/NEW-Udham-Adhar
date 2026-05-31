@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-download-certificate.html?raw";
 
 export const Route = createFileRoute("/udyam-download-certificate")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Download Certificate - Instant MSME Certificate Access — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Download Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your Stat" },
-      { property: "og:title", content: "Udyam Download Certificate - Instant MSME Certificate Access" },
-      { property: "og:description", content: "Udyam Download Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your Stat" },
+      { title: "Udyam Download Certificate - Instant MSME Certificate Ac..." },
+      { name: "description", content: "Expert consultancy assistance for udyam download certificate - instant msme certificate ac.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "Udyam Download Certificate - Instant MSME Certificate Ac..." },
+      { property: "og:description", content: "Expert consultancy assistance for udyam download certificate - instant msme certificate ac.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-download-certificate" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Download Certificate - Instant MSME Certificate Access" html={html} />,

@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-download-online.html?raw";
 
 export const Route = createFileRoute("/udyam-download-online")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Download Online — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Download Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State And" },
+      { title: "Udyam Download Online" },
+      { name: "description", content: "Expert consultancy assistance for udyam download online. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Download Online" },
-      { property: "og:description", content: "Udyam Download Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State And" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam download online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-download-online" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Download Online" html={html} />,

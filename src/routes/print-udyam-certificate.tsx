@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/print-udyam-certificate.html?raw";
 
 export const Route = createFileRoute("/print-udyam-certificate")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Print Udyam Certificate Online | Download Business Help Services Certificate — Business Help Services Consultancy" },
-      { name: "description", content: "Print Udyam Certificate Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your " },
-      { property: "og:title", content: "Print Udyam Certificate Online | Download Business Help Services" },
-      { property: "og:description", content: "Print Udyam Certificate Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your " },
+      { title: "Print Udyam Certificate Online" },
+      { name: "description", content: "Expert consultancy assistance for print udyam certificate online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Print Udyam Certificate Online" },
+      { property: "og:description", content: "Expert consultancy assistance for print udyam certificate online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/print-udyam-certificate" },
     ],
   }),
   component: () => <SeoLandingPage title="Print Udyam Certificate Online | Download Business Help Services" html={html} />,

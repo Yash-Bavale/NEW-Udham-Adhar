@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam.html?raw";
 
 export const Route = createFileRoute("/udyam")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam - Government Portal for MSME Registration — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pradesh Arun" },
+      { title: "Udyam - Government Portal for MSME Registration" },
+      { name: "description", content: "Expert consultancy assistance for udyam - government portal for msme registration. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam - Government Portal for MSME Registration" },
-      { property: "og:description", content: "Udyam Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pradesh Arun" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam - government portal for msme registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam - Government Portal for MSME Registration" html={html} />,

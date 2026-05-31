@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-update.html?raw";
 
 export const Route = createFileRoute("/udyam-update")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Update - How to Update Your MSME Details Online — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prade" },
+      { title: "Udyam Update - How to Update Your MSME Details Online" },
+      { name: "description", content: "Expert consultancy assistance for udyam update - how to update your msme details online. Get help with Udyam/MSME registration, updates and certificates acro..." },
       { property: "og:title", content: "Udyam Update - How to Update Your MSME Details Online" },
-      { property: "og:description", content: "Udyam Update Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prade" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam update - how to update your msme details online. Get help with Udyam/MSME registration, updates and certificates acro..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-update" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Update - How to Update Your MSME Details Online" html={html} />,

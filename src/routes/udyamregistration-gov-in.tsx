@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyamregistration-gov-in.html?raw";
 
 export const Route = createFileRoute("/udyamregistration-gov-in")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyamregistration Gov In - Official MSME Registration Portal — Business Help Services Consultancy" },
-      { name: "description", content: "Udyamregistration gov in Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
-      { property: "og:title", content: "Udyamregistration Gov In - Official MSME Registration Portal" },
-      { property: "og:description", content: "Udyamregistration gov in Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
+      { title: "Udyamregistration Gov In - Official MSME Registration Po..." },
+      { name: "description", content: "Expert consultancy assistance for udyamregistration gov in - official msme registration po.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "Udyamregistration Gov In - Official MSME Registration Po..." },
+      { property: "og:description", content: "Expert consultancy assistance for udyamregistration gov in - official msme registration po.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyamregistration-gov-in" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyamregistration Gov In - Official MSME Registration Portal" html={html} />,

@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-check.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-check")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Business Help Services Check | Verify MSME Status Online — Business Help Services Consultancy" },
-      { name: "description", content: "Business Help Services Check Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
+      { title: "Business Help Services Check | Verify MSME Status Online" },
+      { name: "description", content: "Expert consultancy assistance for udyam/msme check | verify msme status online. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Business Help Services Check | Verify MSME Status Online" },
-      { property: "og:description", content: "Business Help Services Check Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
+      { property: "og:description", content: "Expert consultancy assistance for udyam/msme check | verify msme status online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-check" },
     ],
   }),
   component: () => <SeoLandingPage title="Business Help Services Check | Verify MSME Status Online" html={html} />,

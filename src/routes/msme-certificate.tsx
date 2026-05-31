@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-certificate.html?raw";
 
 export const Route = createFileRoute("/msme-certificate")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "MSME Certificate - Benefits and Online Registration — Business Help Services Consultancy" },
-      { name: "description", content: "MSME Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra P" },
+      { title: "MSME Certificate - Benefits and Online Registration" },
+      { name: "description", content: "Expert consultancy assistance for msme certificate - benefits and online registration. Get help with Udyam/MSME registration, updates and certificates across..." },
       { property: "og:title", content: "MSME Certificate - Benefits and Online Registration" },
-      { property: "og:description", content: "MSME Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra P" },
+      { property: "og:description", content: "Expert consultancy assistance for msme certificate - benefits and online registration. Get help with Udyam/MSME registration, updates and certificates across..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-certificate" },
     ],
   }),
   component: () => <SeoLandingPage title="MSME Certificate - Benefits and Online Registration" html={html} />,

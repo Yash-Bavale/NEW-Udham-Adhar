@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-udyam-registration.html?raw";
 
 export const Route = createFileRoute("/msme-udyam-registration")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "MSME Business Help Services - Quick and Free MSME Registration — Business Help Services Consultancy" },
-      { name: "description", content: "MSME Business Help Services Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State A" },
-      { property: "og:title", content: "MSME Business Help Services - Quick and Free MSME Registration" },
-      { property: "og:description", content: "MSME Business Help Services Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State A" },
+      { title: "MSME Business Help Services - Quick and Free MSME Regist..." },
+      { name: "description", content: "Expert consultancy assistance for msme udyam/msme - quick and free msme regist.... Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "MSME Business Help Services - Quick and Free MSME Regist..." },
+      { property: "og:description", content: "Expert consultancy assistance for msme udyam/msme - quick and free msme regist.... Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-udyam-registration" },
     ],
   }),
   component: () => <SeoLandingPage title="MSME Business Help Services - Quick and Free MSME Registration" html={html} />,

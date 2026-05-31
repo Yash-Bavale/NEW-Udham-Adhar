@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-application.html?raw";
 
 export const Route = createFileRoute("/udyam-application")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Application Online | Apply for MSME Registration (Udyam Portal) — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Application Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
-      { property: "og:title", content: "Udyam Application Online | Apply for MSME Registration (Udya" },
-      { property: "og:description", content: "Udyam Application Online Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
+      { title: "Udyam Application Online" },
+      { name: "description", content: "Expert consultancy assistance for udyam application online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyam Application Online" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam application online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-application" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Application Online | Apply for MSME Registration (Udya" html={html} />,

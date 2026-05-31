@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyog Aadhaar - Previous MSME Registration System — Business Help Services Consultancy" },
-      { name: "description", content: "Udyog Aadhaar Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prad" },
+      { title: "Udyog Aadhaar - Previous MSME Registration System" },
+      { name: "description", content: "Expert consultancy assistance for udyog aadhaar - previous msme registration system. Get help with Udyam/MSME registration, updates and certificates across I..." },
       { property: "og:title", content: "Udyog Aadhaar - Previous MSME Registration System" },
-      { property: "og:description", content: "Udyog Aadhaar Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Prad" },
+      { property: "og:description", content: "Expert consultancy assistance for udyog aadhaar - previous msme registration system. Get help with Udyam/MSME registration, updates and certificates across I..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyog Aadhaar - Previous MSME Registration System" html={html} />,

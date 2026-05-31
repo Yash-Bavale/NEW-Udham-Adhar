@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udhar-aadhar-registration.html?raw";
 
 export const Route = createFileRoute("/udhar-aadhar-registration")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udhar Aadhar Registration Online – Easy Process, Eligibility & Benefits Guide — Business Help Services Consultancy" },
-      { name: "description", content: "Udyog Aadhar Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
-      { property: "og:title", content: "Udhar Aadhar Registration Online – Easy Process, Eligibility" },
-      { property: "og:description", content: "Udyog Aadhar Registration Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State" },
+      { title: "Udhar Aadhar Registration Online" },
+      { name: "description", content: "Expert consultancy assistance for udhar aadhar registration online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udhar Aadhar Registration Online" },
+      { property: "og:description", content: "Expert consultancy assistance for udhar aadhar registration online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udhar-aadhar-registration" },
     ],
   }),
   component: () => <SeoLandingPage title="Udhar Aadhar Registration Online – Easy Process, Eligibility" html={html} />,

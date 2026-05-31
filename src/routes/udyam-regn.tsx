@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-regn.html?raw";
 
 export const Route = createFileRoute("/udyam-regn")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Udyam Regn - Quick MSME Registration Online — Business Help Services Consultancy" },
-      { name: "description", content: "Udyam Regn Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pradesh" },
+      { title: "Udyam Regn - Quick MSME Registration Online" },
+      { name: "description", content: "Expert consultancy assistance for udyam regn - quick msme registration online. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Regn - Quick MSME Registration Online" },
-      { property: "og:description", content: "Udyam Regn Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State Andhra Pradesh" },
+      { property: "og:description", content: "Expert consultancy assistance for udyam regn - quick msme registration online. Get help with Udyam/MSME registration, updates and certificates across India." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-regn" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Regn - Quick MSME Registration Online" html={html} />,

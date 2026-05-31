@@ -3,12 +3,15 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/aadhar-udyam-certificate.html?raw";
 
 export const Route = createFileRoute("/aadhar-udyam-certificate")({
-  head: () => ({
+    head: () => ({
     meta: [
-      { title: "Aadhar Udyam Certificate - Aadhaar Linked MSME Certification — Business Help Services Consultancy" },
-      { name: "description", content: "Aadhar Udyam Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
-      { property: "og:title", content: "Aadhar Udyam Certificate - Aadhaar Linked MSME Certification" },
-      { property: "og:description", content: "Aadhar Udyam Certificate Please leave this field empty. Applicant Name / आवेदक का नाम Email / ईमेल Mobile No / मोबाइल नंबर State / राज्य Select Your State " },
+      { title: "Aadhar Udyam Certificate - Aadhaar Linked MSME Certifica..." },
+      { name: "description", content: "Expert consultancy assistance for aadhar udyam certificate - aadhaar linked msme certifica.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { property: "og:title", content: "Aadhar Udyam Certificate - Aadhaar Linked MSME Certifica..." },
+      { property: "og:description", content: "Expert consultancy assistance for aadhar udyam certificate - aadhaar linked msme certifica.... Get help with Udyam/MSME registration, updates and certificate..." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aadhar-udyam-certificate" },
     ],
   }),
   component: () => <SeoLandingPage title="Aadhar Udyam Certificate - Aadhaar Linked MSME Certification" html={html} />,
