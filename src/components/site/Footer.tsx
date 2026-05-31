@@ -1,10 +1,149 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, ChevronDown, Home as HomeIcon } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 type SeoPageRow = { id: string; slug: string; label: string };
+
+type Category = {
+  key: string;
+  label: string;
+  slug: string | null; // null = Home
+  match?: (slug: string, label: string) => boolean;
+};
+
+// Priority-ordered. Each page gets bucketed into the first matching category.
+const CATEGORIES: Category[] = [
+  { key: "home", label: "Home", slug: null },
+  {
+    key: "udyamregistration",
+    label: "Udyamregistration",
+    slug: "udyam-registration",
+    match: (s) =>
+      s === "udyam-registration" ||
+      s.startsWith("udyam-registr") ||
+      s.startsWith("udyamregistration"),
+  },
+  {
+    key: "udyam-reg-certificate",
+    label: "Udyam Regn Certificate",
+    slug: "udyam-reg-certificate",
+    match: (s) =>
+      s === "udyam-reg-certificate" ||
+      s.startsWith("udyam-certificate") ||
+      s === "udyam-cer" ||
+      s === "udyam-card" ||
+      s === "udyam-number",
+  },
+  {
+    key: "udyamregistration-gov-in",
+    label: "Udyamregistration gov in",
+    slug: "https-udyamregistration-gov-in",
+    match: (s) => s.includes("udyamregistration-gov-in") || s === "udyam-portal",
+  },
+  {
+    key: "aadhar-udyog-registration",
+    label: "Aadhar Udyog registration",
+    slug: "aadhar-udyog-registration",
+    match: (s) => s.startsWith("aadhar-udyog") || s.startsWith("udhar-aadhar"),
+  },
+  {
+    key: "udyog-aadhar-certificate-download",
+    label: "Udyog Aadhar certificate download",
+    slug: "msme-udyog-aadhar",
+    match: (s) => s.startsWith("udyog-aadhar") || s === "msme-udyog-aadhar",
+  },
+  {
+    key: "official-msme-registration-website",
+    label: "Official MSME Registration Website",
+    slug: "msme-registration-portal",
+    match: (s) =>
+      s === "msme-registration-portal" ||
+      s === "msme-online-registration" ||
+      s === "msme-apply-online" ||
+      s === "register-msme" ||
+      s === "register-for-msme" ||
+      s === "msme-registration-login",
+  },
+  {
+    key: "aadhaar-udyam",
+    label: "Aadhaar Udyam",
+    slug: "aadhaar-udyam",
+    match: (s) =>
+      s === "aadhaar-udyam" ||
+      s.startsWith("aadhar-udyam") ||
+      s.startsWith("udyam-aadhaar") ||
+      s.startsWith("udyam-aadhar") ||
+      s.startsWith("udyam-adhaar") ||
+      s.startsWith("udyam-adhar"),
+  },
+  {
+    key: "msme-registration-process",
+    label: "MSME Registration Process",
+    slug: "msme-registration-process",
+    match: (s) =>
+      s === "msme-registration-process" ||
+      s.startsWith("msme-registration-") ||
+      s.startsWith("msme-certificate") ||
+      s === "ms-me-certificate" ||
+      s === "msme-cer" ||
+      s === "msme-updation",
+  },
+  {
+    key: "udyam-aadhaar-download-pdf",
+    label: "Udyam Aadhaar Download PDF",
+    slug: "udyam-aadhaar-download-pdf",
+    match: (s) =>
+      s === "udyam-aadhaar-download-pdf" ||
+      s.startsWith("udyam-download") ||
+      s.startsWith("download-udyam") ||
+      s === "download-msme-certificate" ||
+      s === "free-msme-registration-certificate-download" ||
+      s === "udham-aadhar-download" ||
+      s === "udyam-card-download",
+  },
+  {
+    key: "udyog-aadhar-registration",
+    label: "Udyog Aadhar Registration",
+    slug: "udyog-aadhar-registration",
+    match: (s) => s === "udyog-aadhar-registration",
+  },
+  {
+    key: "udhayam-aadhar-download",
+    label: "Udhayam Aadhar Download",
+    slug: "udhayam-aadhar-download",
+    match: (s) => s === "udhayam-aadhar-download",
+  },
+  {
+    key: "print-msme-udyam-certificate",
+    label: "Print MSME Udyam Certificate",
+    slug: "print-msme-udyam-certificate",
+    match: (s) =>
+      s.startsWith("print-msme") ||
+      s.startsWith("print-udyam") ||
+      s.startsWith("msme-print") ||
+      s.startsWith("udyam-print"),
+  },
+  {
+    key: "udyam-registration-online",
+    label: "Udyam Registration Online",
+    slug: "udyam-online-registration",
+    match: (s) =>
+      s === "udyam-online-registration" ||
+      s === "udyam-new-registration" ||
+      s === "udyam-application" ||
+      s === "udyam-apply" ||
+      s === "udyam-pan-registration" ||
+      s === "udyam-msme-registration" ||
+      s.startsWith("udyam-register") ||
+      s.startsWith("udyam-msme") ||
+      s === "udyam" ||
+      s === "udyam-edit",
+  },
+];
+
+
 
 const FOOTER_LINKS = [
   { to: "/terms-conditions", label: "Terms & Conditions" },
