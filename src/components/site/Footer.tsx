@@ -131,13 +131,25 @@ export function Footer() {
 
         <div>
           <h4 className="text-sm font-semibold uppercase tracking-wider mb-3">Reach Us</h4>
-          <p className="text-sm text-white/85">
-            Email:{" "}
-            <a href="mailto:support@udyamadhar.in" className="hover:underline">
-              support@udyamadhar.in
+          <p className="text-sm text-white/85 font-semibold">Business Help Services</p>
+          <p className="text-sm text-white/85 mt-2">
+            📧{" "}
+            <a href="mailto:help@businesshelpservices.com" className="hover:underline">
+              help@businesshelpservices.com
             </a>
           </p>
-          <p className="text-sm text-white/85 mt-1">Hours: Mon – Sat, 10:00 AM – 7:00 PM IST</p>
+          <p className="text-sm text-white/85 mt-1">
+            📞{" "}
+            <a href="tel:+919767870331" className="hover:underline">
+              +91-9767870331
+            </a>
+          </p>
+          <p className="text-sm text-white/85 mt-1 leading-relaxed">
+            📍 Koregaon Bk, Khed, Pune,
+            <br />
+            Maharashtra – 410505, India
+          </p>
+          <p className="text-sm text-white/70 mt-3">Hours: Mon – Sat, 10:00 AM – 7:00 PM IST</p>
         </div>
       </div>
 
