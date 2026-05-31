@@ -37,6 +37,24 @@ function sanitize(html: string): string {
   // Remove the "Click to Connect with Expert" leftover text label
   out = out.replace(/Click to Connect with Expert/gi, "");
 
+  // Remove inline duplicate certificate images that some WP pages embed in
+  // the body (we already render our own Sample Certificate card on the right).
+  // Strip the <img> and any <a>/<figure> wrapper around it.
+  const dupImagePattern =
+    /(udyam-aadhar\.jpe?g|udyam-certificate-design|udyam-certificate\.(?:png|jpe?g|webp))/i;
+  out = out.replace(
+    /<a\b[^>]*>\s*<img\b[^>]*src="[^"]*"[^>]*>\s*<\/a>/gi,
+    (m) => (dupImagePattern.test(m) ? "" : m),
+  );
+  out = out.replace(
+    /<figure\b[^>]*>[\s\S]*?<\/figure>/gi,
+    (m) => (dupImagePattern.test(m) ? "" : m),
+  );
+  out = out.replace(
+    /<img\b[^>]*src="[^"]*"[^>]*>/gi,
+    (m) => (dupImagePattern.test(m) ? "" : m),
+  );
+
   // De-duplicate stacked top headings that repeat the page title.
   // WP source typically renders: <h2>title</h2> ... <h1>title</h1> ... <a href="/"><h1>descriptive</h1></a>
   // Keep only the middle bold <h1>; strip the leading <h2> and the home-linked descriptive <h1>.
