@@ -88,11 +88,9 @@ function PaymentPage() {
         </div>
       </div>
 
-      {/* Hidden auto-submit form posting to PayU. target="_top" breaks out of
-          the Lovable preview iframe — PayU sends X-Frame-Options: DENY, so an
-          iframe POST is blocked by the browser as "refused to connect". */}
+      {/* Hidden auto-submit form posting to PayU */}
       {order && (
-        <form ref={formRef} method="POST" action={order.actionUrl} target="_top" className="hidden">
+        <form ref={formRef} method="POST" action={order.actionUrl} className="hidden">
           {Object.entries(order.fields).map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
           ))}
