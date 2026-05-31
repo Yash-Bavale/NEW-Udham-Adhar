@@ -1,95 +1,131 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from "recharts";
+import { Users, TrendingUp, CheckCircle2, Clock, Activity as ActivityIcon, Wallet } from "lucide-react";
 import { getDashboardStats } from "@/lib/crm/dashboard.functions";
+import { StatCard, SectionCard, TableSkeleton, StatusBadge, Timeline } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({ component: DashboardPage });
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value.toLocaleString("en-IN")}</div>
-    </div>
-  );
-}
+const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
 
 function DashboardPage() {
   const fn = useServerFn(getDashboardStats);
   const { data, isLoading, error } = useQuery({ queryKey: ["admin.dashboard"], queryFn: () => fn() });
 
-  if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
   if (error) return <div className="text-sm text-red-700">{(error as Error).message}</div>;
-  if (!data) return null;
+
+  const totals = data?.totals;
+  const trend = (data as { trend?: Array<{ date: string; count: number }> })?.trend ?? [];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>Overview of leads, applications and revenue activity.</p>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Stat label="Total Leads" value={data.totals.totalLeads} />
-        <Stat label="Today" value={data.totals.todayLeads} />
-        <Stat label="This Week" value={data.totals.weekLeads} />
-        <Stat label="In Progress" value={data.totals.inProgress} />
-        <Stat label="Completed" value={data.totals.completed} />
-        <Stat label="Pending" value={data.totals.pending} />
+        <StatCard index={0} label="Total Leads" value={totals?.totalLeads ?? 0} icon={<Users className="size-4" />} gradient="primary" loading={isLoading} />
+        <StatCard index={1} label="Today" value={totals?.todayLeads ?? 0} icon={<TrendingUp className="size-4" />} gradient="success" loading={isLoading} />
+        <StatCard index={2} label="This Week" value={totals?.weekLeads ?? 0} icon={<ActivityIcon className="size-4" />} gradient="primary" loading={isLoading} />
+        <StatCard index={3} label="In Progress" value={totals?.inProgress ?? 0} icon={<Clock className="size-4" />} gradient="warn" loading={isLoading} />
+        <StatCard index={4} label="Completed" value={totals?.completed ?? 0} icon={<CheckCircle2 className="size-4" />} gradient="success" loading={isLoading} />
+        <StatCard index={5} label="Pending" value={totals?.pending ?? 0} icon={<Wallet className="size-4" />} gradient="danger" loading={isLoading} />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border bg-white">
-          <div className="px-4 py-3 border-b text-sm font-semibold">Latest Leads</div>
-          <table className="w-full text-sm">
-            <tbody>
-              {data.recentLeads.map((l) => (
-                <tr key={l.id} className="border-b last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">{l.lead_code}</td>
-                  <td className="px-4 py-2">{l.name}</td>
-                  <td className="px-4 py-2 text-slate-500 truncate max-w-[180px]">{l.service}</td>
-                  <td className="px-4 py-2 text-xs">{l.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="rounded-lg border bg-white">
-          <div className="px-4 py-3 border-b text-sm font-semibold">Recent Activity</div>
-          <ul className="divide-y">
-            {data.recentActivity.map((a) => (
-              <li key={a.id} className="px-4 py-2 text-sm">
-                <div className="text-xs text-slate-500">{new Date(a.created_at).toLocaleString("en-IN")}</div>
-                <div>{a.activity_description}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Distribution title="Lead Status" rows={data.statusDistribution} />
-        <Distribution title="Services" rows={data.serviceDistribution} />
-      </div>
-    </div>
-  );
-}
-
-function Distribution({ title, rows }: { title: string; rows: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <div className="rounded-lg border bg-white p-4">
-      <div className="text-sm font-semibold mb-3">{title}</div>
-      <div className="space-y-2">
-        {rows.slice(0, 10).map((r) => (
-          <div key={r.label} className="text-xs">
-            <div className="flex justify-between mb-0.5">
-              <span className="truncate">{r.label}</span>
-              <span className="font-medium">{r.value}</span>
-            </div>
-            <div className="h-1.5 bg-slate-100 rounded">
-              <div className="h-full bg-slate-700 rounded" style={{ width: `${(r.value / max) * 100}%` }} />
-            </div>
+      <div className="grid lg:grid-cols-3 gap-4">
+        <SectionCard title="Lead Trend (30d)" className="lg:col-span-2">
+          <div className="h-64 px-2 pt-2 pb-3">
+            {isLoading || trend.length === 0 ? (
+              <div className="h-full w-full animate-pulse rounded" style={{ background: "var(--admin-surface-2)" }} />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend}>
+                  <defs>
+                    <linearGradient id="leadFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--admin-border)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--admin-fg-muted)" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--admin-fg-muted)" }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "var(--admin-surface)", border: "1px solid var(--admin-border)", borderRadius: 8, fontSize: 12 }} />
+                  <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#leadFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
-        ))}
+        </SectionCard>
+
+        <SectionCard title="Lead Status">
+          <div className="h-64 flex items-center justify-center p-2">
+            {isLoading || !data ? (
+              <div className="h-full w-full animate-pulse rounded" style={{ background: "var(--admin-surface-2)" }} />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={data.statusDistribution.slice(0, 6)} dataKey="value" nameKey="label" innerRadius={45} outerRadius={75} paddingAngle={3}>
+                    {data.statusDistribution.slice(0, 6).map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "var(--admin-surface)", border: "1px solid var(--admin-border)", borderRadius: 8, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </SectionCard>
       </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <SectionCard title="Latest Leads" action={<Link to="/admin/leads" className="text-xs font-medium hover:underline" style={{ color: "var(--admin-accent)" }}>View all →</Link>}>
+          {isLoading ? <TableSkeleton rows={5} cols={4} /> : (
+            <ul className="divide-y" style={{ borderColor: "var(--admin-border)" }}>
+              {data?.recentLeads.map((l) => (
+                <li key={l.id} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--admin-surface-2)] transition-colors">
+                  <span className="font-mono text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_code}</span>
+                  <span className="flex-1 truncate font-medium">{l.name}</span>
+                  <span className="hidden md:block text-xs truncate max-w-[160px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
+                  <StatusBadge status={l.status} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Recent Activity" action={<Link to="/admin/activity" className="text-xs font-medium hover:underline" style={{ color: "var(--admin-accent)" }}>View all →</Link>}>
+          <div className="p-4">
+            {isLoading ? <TableSkeleton rows={5} cols={2} /> : (
+              <Timeline items={(data?.recentActivity ?? []).slice(0, 6).map((a) => ({
+                id: a.id, time: a.created_at, type: a.activity_type, description: a.activity_description,
+              }))} />
+            )}
+          </div>
+        </SectionCard>
+      </div>
+
+      <SectionCard title="Top Services">
+        <div className="p-4 space-y-2">
+          {isLoading ? <TableSkeleton rows={4} cols={1} /> : (() => {
+            const rows = data?.serviceDistribution ?? [];
+            const max = Math.max(1, ...rows.map((r) => r.value));
+            return rows.slice(0, 8).map((r) => (
+              <div key={r.label} className="text-xs">
+                <div className="flex justify-between mb-1">
+                  <span className="truncate font-medium">{r.label}</span>
+                  <span className="tabular-nums" style={{ color: "var(--admin-fg-muted)" }}>{r.value}</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--admin-surface-2)" }}>
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(r.value / max) * 100}%`, background: "var(--gradient-admin)" }} />
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </SectionCard>
     </div>
   );
 }
