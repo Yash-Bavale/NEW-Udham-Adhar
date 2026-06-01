@@ -76,7 +76,6 @@ function OnboardingDetailsPage() {
         busy={false}
         onSaveDraft={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: true } });
-          await refetch();
         }}
         onSubmit={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: false } });
