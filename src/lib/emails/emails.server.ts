@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getSmtpTransport, renderTemplate } from "./smtp.server";
-import { sendLovableEmail, EmailAPIError } from "@lovable.dev/email-js";
+import { renderTemplate } from "./smtp.server";
+import { sendLovableEmail } from "@lovable.dev/email-js";
 
 const LOVABLE_SENDER_DOMAIN = "notify.businesshelpservices.com";
 
@@ -89,15 +89,10 @@ export async function processQueueInternal(limit = 20) {
     return { processed: 0, sent: 0, failed: 0, skipped: "smtp_disabled" };
   }
 
-  // Lazy-init Zoho fallback transport
-  let zohoTransport: ReturnType<typeof getSmtpTransport> | null = null;
-  const getZoho = () => {
-    if (zohoTransport) return zohoTransport;
-    try { zohoTransport = getSmtpTransport(); return zohoTransport; }
-    catch { return null; }
-  };
-
   const lovableApiKey = process.env.LOVABLE_API_KEY;
+  if (!lovableApiKey) {
+    return { processed: 0, sent: 0, failed: 0, skipped: "lovable_api_key_missing" };
+  }
   const fromEmail = settings.from_email;
   const fromName = settings.from_name;
 
@@ -108,60 +103,27 @@ export async function processQueueInternal(limit = 20) {
     await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
 
     const attempt = (row.attempts ?? 0) + 1;
-    let provider = "lovable";
     let smtpResponse: string | null = null;
     let lastError: string | null = null;
     let ok = false;
 
-    // 1) Try Lovable Emails first
-    if (lovableApiKey) {
-      try {
-        const res = await sendLovableEmail(
-          {
-            to: row.to_email,
-            from: `${fromName} <${fromEmail}>`,
-            sender_domain: LOVABLE_SENDER_DOMAIN,
-            subject: row.subject,
-            html: row.body_html,
-            text: row.body_text ?? "",
-            reply_to: settings.reply_to ?? undefined,
-          },
-          { apiKey: lovableApiKey },
-        );
-        smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
-        ok = true;
-      } catch (e) {
-        lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
-        if (e instanceof EmailAPIError && !e.retryable) {
-          // permanent error — still try Zoho as backup
-        }
-      }
-    } else {
-      lastError = "[lovable] LOVABLE_API_KEY missing";
-    }
-
-    // 2) Fallback to Zoho SMTP
-    if (!ok) {
-      const t = getZoho();
-      if (!t) {
-        lastError = (lastError ?? "") + " | [zoho] transport unavailable";
-      } else {
-        provider = "zoho";
-        try {
-          const info = await t.sendMail({
-            from: `${fromName} <${fromEmail}>`,
-            to: row.to_name ? `${row.to_name} <${row.to_email}>` : row.to_email,
-            replyTo: settings.reply_to ?? undefined,
-            subject: row.subject,
-            html: row.body_html,
-            text: row.body_text ?? undefined,
-          });
-          smtpResponse = `[zoho] ${info.response ?? "ok"}`;
-          ok = true;
-        } catch (e) {
-          lastError = (lastError ?? "") + ` | [zoho] ${e instanceof Error ? e.message : "unknown"}`;
-        }
-      }
+    try {
+      const res = await sendLovableEmail(
+        {
+          to: row.to_email,
+          from: `${fromName} <${fromEmail}>`,
+          sender_domain: LOVABLE_SENDER_DOMAIN,
+          subject: row.subject,
+          html: row.body_html,
+          text: row.body_text ?? "",
+          reply_to: settings.reply_to ?? undefined,
+        },
+        { apiKey: lovableApiKey },
+      );
+      smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
+      ok = true;
+    } catch (e) {
+      lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
     }
 
     if (ok) {
@@ -199,7 +161,7 @@ export async function processQueueInternal(limit = 20) {
           to_email: row.to_email,
           subject: row.subject,
           status: "failed",
-          smtp_response: `[${provider}] failed`,
+          smtp_response: `[lovable] failed`,
           error_message: errMsg,
           attempt,
           lead_id: row.lead_id,
