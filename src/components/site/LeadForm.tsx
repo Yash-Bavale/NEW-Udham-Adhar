@@ -62,7 +62,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         <h2 className="text-xl font-bold font-display">{title}</h2>
       </div>
 
-      <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
+      <form onSubmit={onSubmit} onFocus={onFirstInteract} className="p-6 md:p-8 space-y-5">
         <Field id={`${baseId}-name`} label="Applicant Name / आवेदक का नाम">
           <input id={`${baseId}-name`} name="name" required className={inputCls} placeholder="Enter Applicant Name" />
         </Field>
