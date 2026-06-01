@@ -212,6 +212,179 @@ export type Database = {
         }
         Relationships: []
       }
+      email_logs: {
+        Row: {
+          application_id: string | null
+          attempt: number
+          created_at: string
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          queue_id: string | null
+          sent_at: string
+          smtp_response: string | null
+          status: Database["public"]["Enums"]["email_log_status"]
+          subject: string
+          template_code: string | null
+          to_email: string
+        }
+        Insert: {
+          application_id?: string | null
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          queue_id?: string | null
+          sent_at?: string
+          smtp_response?: string | null
+          status: Database["public"]["Enums"]["email_log_status"]
+          subject: string
+          template_code?: string | null
+          to_email: string
+        }
+        Update: {
+          application_id?: string | null
+          attempt?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          queue_id?: string | null
+          sent_at?: string
+          smtp_response?: string | null
+          status?: Database["public"]["Enums"]["email_log_status"]
+          subject?: string
+          template_code?: string | null
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "email_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_queue: {
+        Row: {
+          application_id: string | null
+          attempts: number
+          body_html: string
+          body_text: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          last_error: string | null
+          lead_id: string | null
+          max_attempts: number
+          next_attempt_at: string
+          scheduled_at: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["email_queue_status"]
+          subject: string
+          template_code: string | null
+          to_email: string
+          to_name: string | null
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          application_id?: string | null
+          attempts?: number
+          body_html: string
+          body_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_queue_status"]
+          subject: string
+          template_code?: string | null
+          to_email: string
+          to_name?: string | null
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          application_id?: string | null
+          attempts?: number
+          body_html?: string
+          body_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["email_queue_status"]
+          subject?: string
+          template_code?: string | null
+          to_email?: string
+          to_name?: string | null
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          body_html: string
+          body_text: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_enabled: boolean
+          is_system: boolean
+          name: string
+          subject: string
+          updated_at: string
+          variables: string[]
+        }
+        Insert: {
+          body_html: string
+          body_text?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          is_system?: boolean
+          name: string
+          subject: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Update: {
+          body_html?: string
+          body_text?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          is_system?: boolean
+          name?: string
+          subject?: string
+          updated_at?: string
+          variables?: string[]
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           application_id: string | null
@@ -608,6 +781,45 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_settings: {
+        Row: {
+          created_at: string
+          daily_quota: number
+          from_email: string
+          from_name: string
+          id: string
+          is_enabled: boolean
+          notes: string | null
+          reply_to: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          daily_quota?: number
+          from_email: string
+          from_name?: string
+          id?: string
+          is_enabled?: boolean
+          notes?: string | null
+          reply_to?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          daily_quota?: number
+          from_email?: string
+          from_name?: string
+          id?: string
+          is_enabled?: boolean
+          notes?: string | null
+          reply_to?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -699,6 +911,8 @@ export type Database = {
         | "under_review"
         | "under_process"
         | "completed"
+      email_log_status: "sent" | "failed" | "bounced"
+      email_queue_status: "queued" | "sending" | "sent" | "failed" | "dlq"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -857,6 +1071,8 @@ export const Constants = {
         "under_process",
         "completed",
       ],
+      email_log_status: ["sent", "failed", "bounced"],
+      email_queue_status: ["queued", "sending", "sent", "failed", "dlq"],
       lead_status: [
         "lead_created",
         "payment_pending",
