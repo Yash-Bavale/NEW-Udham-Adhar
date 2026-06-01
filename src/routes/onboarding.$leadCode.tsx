@@ -22,7 +22,7 @@ function OnboardingDetailsPage() {
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["onboarding", leadCode],
     queryFn: () => fetchFn({ data: { leadCode } }),
   });
@@ -76,7 +76,6 @@ function OnboardingDetailsPage() {
         busy={false}
         onSaveDraft={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: true } });
-          await refetch();
         }}
         onSubmit={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: false } });

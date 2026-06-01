@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import type { FieldDef, OnboardingSchema } from "@/lib/onboarding/schemas";
 
 const inputCls =
-  "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+  "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
+
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function OnboardingForm({
   schema,
@@ -19,6 +23,40 @@ export function OnboardingForm({
 }) {
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [err, setErr] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Debounced autosave
+  const timer = useRef<number | null>(null);
+  const lastSavedJson = useRef<string>(JSON.stringify(initial));
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (!onSaveDraft) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const current = JSON.stringify(values);
+    if (current === lastSavedJson.current) return;
+
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(async () => {
+      try {
+        setSaveState("saving");
+        await onSaveDraft(values);
+        lastSavedJson.current = current;
+        setSavedAt(Date.now());
+        setSaveState("saved");
+      } catch {
+        setSaveState("error");
+      }
+    }, 1500);
+
+    return () => {
+      if (timer.current) window.clearTimeout(timer.current);
+    };
+  }, [values, onSaveDraft]);
 
   function update(k: string, v: string) {
     setValues((s) => ({ ...s, [k]: v }));
@@ -48,17 +86,8 @@ export function OnboardingForm({
         </div>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-2">
-        {onSaveDraft && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onSaveDraft(values)}
-            className="rounded-full border border-border bg-background hover:bg-muted text-foreground font-medium px-6 py-2.5 transition-colors disabled:opacity-60"
-          >
-            Save draft
-          </button>
-        )}
+      <div className="flex flex-col-reverse sm:flex-row gap-3 justify-between items-stretch sm:items-center pt-2">
+        <SaveIndicator state={saveState} savedAt={savedAt} />
         <button
           type="submit"
           disabled={busy}
@@ -69,6 +98,66 @@ export function OnboardingForm({
       </div>
     </form>
   );
+}
+
+function SaveIndicator({ state, savedAt }: { state: SaveState; savedAt: number | null }) {
+  const [, force] = useState(0);
+  // Tick once a minute so the relative timestamp stays fresh
+  useEffect(() => {
+    const id = window.setInterval(() => force((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const rel = savedAt ? relativeTime(savedAt) : null;
+
+  return (
+    <div className="text-xs text-muted-foreground flex items-center gap-1.5 min-h-[20px]">
+      <AnimatePresence mode="wait">
+        {state === "saving" && (
+          <motion.span
+            key="saving"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="flex items-center gap-1.5"
+          >
+            <Loader2 className="w-3 h-3 animate-spin" /> Saving draft…
+          </motion.span>
+        )}
+        {state === "saved" && rel && (
+          <motion.span
+            key="saved"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="flex items-center gap-1.5 text-emerald-600"
+          >
+            <Check className="w-3 h-3" /> Saved {rel}
+          </motion.span>
+        )}
+        {state === "error" && (
+          <motion.span
+            key="error"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="text-destructive"
+          >
+            Couldn't autosave — your edits stay on this page.
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function relativeTime(ts: number) {
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m / 60)}h ago`;
 }
 
 function FieldRenderer({
@@ -102,7 +191,7 @@ function FieldRenderer({
       {field.type === "textarea" ? (
         <textarea {...common} rows={3} />
       ) : field.type === "select" ? (
-        <select {...common} defaultValue="">
+        <select {...common} defaultValue={value || ""}>
           <option value="" disabled>
             Select…
           </option>
