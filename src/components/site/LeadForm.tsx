@@ -41,7 +41,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
     try {
       const lead = await submitLead({ data: payload as never });
-      trackEvent("lead_created", { service: payload.service }, { lead_id: lead.id ?? null });
+      trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });
       navigate({
         to: "/processing/$leadCode",
         params: { leadCode: lead.leadCode },
