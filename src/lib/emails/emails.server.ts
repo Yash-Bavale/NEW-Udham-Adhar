@@ -78,6 +78,8 @@ export async function processQueueInternal(limit = 20) {
   const { data: settings } = await supabaseAdmin
     .from("smtp_settings")
     .select("from_email, from_name, reply_to, is_enabled")
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!settings?.is_enabled) {
     return { processed: 0, sent: 0, failed: 0, skipped: "smtp_disabled" };
