@@ -109,6 +109,11 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
           <div className={proseClasses} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
         </div>
       </section>
+
+      <FaqSection />
+    </>
+  );
+}
     </>
   );
 }
