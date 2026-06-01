@@ -117,6 +117,8 @@ export async function processQueueInternal(limit = 20) {
           html: row.body_html,
           text: row.body_text ?? "",
           reply_to: settings.reply_to ?? undefined,
+          purpose: "transactional",
+          idempotency_key: `bhs-${row.id}-${attempt}`,
         },
         { apiKey: lovableApiKey },
       );

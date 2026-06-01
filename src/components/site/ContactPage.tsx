@@ -5,6 +5,7 @@ import { Mail, Phone, MapPin, Clock } from "lucide-react";
 export function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const inputCls =
     "w-full rounded-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
@@ -12,18 +13,34 @@ export function ContactPage() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
-    // Best-effort: open user's mail client with the message pre-filled.
+    setError(null);
     const fd = new FormData(e.currentTarget);
-    const subject = encodeURIComponent(
-      `Contact request from ${String(fd.get("name") ?? "")}`,
-    );
-    const body = encodeURIComponent(
-      `Name: ${fd.get("name") ?? ""}\nEmail: ${fd.get("email") ?? ""}\nMobile: +91${fd.get("mobile") ?? ""}\nState: ${fd.get("state") ?? ""}\nLanguage: ${fd.get("language") ?? ""}\n\nMessage:\n${fd.get("message") ?? ""}`,
-    );
-    window.location.href = `mailto:help@businesshelpservices.com?subject=${subject}&body=${body}`;
-    setSubmitted(true);
-    setBusy(false);
+    const payload = {
+      name: String(fd.get("name") ?? "").trim(),
+      email: String(fd.get("email") ?? "").trim(),
+      mobile: String(fd.get("mobile") ?? "").trim(),
+      state: String(fd.get("state") ?? "").trim(),
+      language: String(fd.get("language") ?? "").trim(),
+      message: String(fd.get("message") ?? "").trim(),
+    };
+    try {
+      const res = await fetch("/api/public/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Could not submit. Please try again.");
+      }
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
   }
+
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:py-12 grid gap-8 lg:grid-cols-2 items-start">
@@ -85,11 +102,12 @@ export function ContactPage() {
           <div className="p-6 md:p-8 text-center space-y-3">
             <p className="text-lg font-semibold text-foreground">Thank you!</p>
             <p className="text-sm text-muted-foreground">
-              Your mail client has been opened with your message. We will respond
-              within working hours.
+              We've received your message and sent a confirmation to your email.
+              Our team will respond within working hours.
             </p>
           </div>
         ) : (
+
           <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
             <Field label="Applicant Name / आवेदक का नाम">
               <input
@@ -156,6 +174,9 @@ export function ContactPage() {
               />
             </Field>
 
+            {error && (
+              <p className="text-sm text-red-600 -mt-2">{error}</p>
+            )}
             <button
               type="submit"
               disabled={busy}
@@ -163,6 +184,7 @@ export function ContactPage() {
             >
               {busy ? "Submitting…" : "SUBMIT"}
             </button>
+
           </form>
         )}
       </div>

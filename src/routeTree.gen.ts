@@ -177,6 +177,7 @@ import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
@@ -184,6 +185,8 @@ import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
+import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCode.summary'
+import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -1063,6 +1066,11 @@ const AdminLeadsRoute = AdminLeadsRouteImport.update({
   path: '/leads',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminGatewaysRoute = AdminGatewaysRouteImport.update({
+  id: '/gateways',
+  path: '/gateways',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminEmailsRoute = AdminEmailsRouteImport.update({
   id: '/emails',
   path: '/emails',
@@ -1097,6 +1105,16 @@ const OnboardingLeadCodeDocumentsRoute =
 const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
   id: '/lovable/email/suppression',
   path: '/lovable/email/suppression',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApplyLeadCodeSummaryRoute = ApplyLeadCodeSummaryRouteImport.update({
+  id: '/apply/$leadCode/summary',
+  path: '/apply/$leadCode/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicContactRoute = ApiPublicContactRouteImport.update({
+  id: '/api/public/contact',
+  path: '/api/public/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
@@ -1297,6 +1315,7 @@ export interface FileRoutesByFullPath {
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -1308,6 +1327,8 @@ export interface FileRoutesByFullPath {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/contact': typeof ApiPublicContactRoute
+  '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
@@ -1479,6 +1500,7 @@ export interface FileRoutesByTo {
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -1490,6 +1512,8 @@ export interface FileRoutesByTo {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/contact': typeof ApiPublicContactRoute
+  '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
@@ -1663,6 +1687,7 @@ export interface FileRoutesById {
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
@@ -1674,6 +1699,8 @@ export interface FileRoutesById {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/contact': typeof ApiPublicContactRoute
+  '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
@@ -1848,6 +1875,7 @@ export interface FileRouteTypes {
     | '/admin/applications'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
@@ -1859,6 +1887,8 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/api/public/contact'
+    | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
@@ -2030,6 +2060,7 @@ export interface FileRouteTypes {
     | '/admin/applications'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
@@ -2041,6 +2072,8 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin'
     | '/admin/leads/$leadId'
+    | '/api/public/contact'
+    | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
@@ -2213,6 +2246,7 @@ export interface FileRouteTypes {
     | '/admin/applications'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
@@ -2224,6 +2258,8 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/leads/$leadId'
+    | '/api/public/contact'
+    | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
@@ -2399,6 +2435,8 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
+  ApiPublicContactRoute: typeof ApiPublicContactRoute
+  ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
@@ -3585,6 +3623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/gateways': {
+      id: '/admin/gateways'
+      path: '/gateways'
+      fullPath: '/admin/gateways'
+      preLoaderRoute: typeof AdminGatewaysRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/emails': {
       id: '/admin/emails'
       path: '/emails'
@@ -3632,6 +3677,20 @@ declare module '@tanstack/react-router' {
       path: '/lovable/email/suppression'
       fullPath: '/lovable/email/suppression'
       preLoaderRoute: typeof LovableEmailSuppressionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/apply/$leadCode/summary': {
+      id: '/apply/$leadCode/summary'
+      path: '/apply/$leadCode/summary'
+      fullPath: '/apply/$leadCode/summary'
+      preLoaderRoute: typeof ApplyLeadCodeSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/contact': {
+      id: '/api/public/contact'
+      path: '/api/public/contact'
+      fullPath: '/api/public/contact'
+      preLoaderRoute: typeof ApiPublicContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/leads/$leadId': {
@@ -3696,6 +3755,7 @@ interface AdminRouteChildren {
   AdminApplicationsRoute: typeof AdminApplicationsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
+  AdminGatewaysRoute: typeof AdminGatewaysRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminServicesRoute: typeof AdminServicesRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -3707,6 +3767,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminApplicationsRoute: AdminApplicationsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
+  AdminGatewaysRoute: AdminGatewaysRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminServicesRoute: AdminServicesRoute,
   AdminUsersRoute: AdminUsersRoute,
@@ -3897,6 +3958,8 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
+  ApiPublicContactRoute: ApiPublicContactRoute,
+  ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
