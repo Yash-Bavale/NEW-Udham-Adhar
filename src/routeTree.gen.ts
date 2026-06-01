@@ -183,6 +183,7 @@ import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 
@@ -1089,6 +1090,12 @@ const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => AdminLeadsRoute,
 } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicWebhooksPayuRoute = ApiPublicWebhooksPayuRouteImport.update({
   id: '/api/public/webhooks/payu',
   path: '/api/public/webhooks/payu',
@@ -1278,6 +1285,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1455,6 +1463,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1634,6 +1643,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1814,6 +1824,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
+    | '/lovable/email/queue/process'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1991,6 +2002,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
+    | '/lovable/email/queue/process'
   id:
     | '__root__'
     | '/'
@@ -2169,6 +2181,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
+    | '/lovable/email/queue/process'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2337,6 +2350,7 @@ export interface RootRouteChildren {
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
+  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3559,6 +3573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
       parentRoute: typeof AdminLeadsRoute
     }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/webhooks/payu': {
       id: '/api/public/webhooks/payu'
       path: '/api/public/webhooks/payu'
@@ -3795,6 +3816,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
+  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
