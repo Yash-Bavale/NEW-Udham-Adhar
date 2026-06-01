@@ -30,7 +30,7 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
       counts("dlq"),
       supabase.from("email_logs").select("*", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since24h).then((r) => r.count ?? 0),
       supabase.from("email_logs").select("*", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since7d).then((r) => r.count ?? 0),
-      supabase.from("email_logs").select("id, to_email, subject, status, error_message, sent_at, template_code").order("sent_at", { ascending: false }).limit(20),
+      supabase.from("email_logs").select("id, to_email, subject, status, error_message, smtp_response, sent_at, template_code").order("sent_at", { ascending: false }).limit(20),
       supabase.from("email_queue").select("id, to_email, subject, last_error, attempts").eq("status", "dlq").order("updated_at", { ascending: false }).limit(10),
     ]);
 
