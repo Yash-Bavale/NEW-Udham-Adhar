@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity,
+  LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity, Mail,
   LogOut, Menu, Moon, Sun, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ const NAV = [
   { to: "/admin/leads", label: "Leads", icon: Users },
   { to: "/admin/applications", label: "Applications", icon: FileText },
   { to: "/admin/services", label: "Services", icon: Briefcase },
+  { to: "/admin/emails", label: "Emails", icon: Mail },
   { to: "/admin/users", label: "Users", icon: UserCog },
   { to: "/admin/activity", label: "Activity", icon: Activity },
 ] as const;
