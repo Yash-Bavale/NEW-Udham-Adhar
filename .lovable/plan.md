@@ -1,41 +1,55 @@
-## Root cause
+## Sub-Phase 4B + 4A Bug Sweep
 
-`src/lib/emails/emails.functions.ts` mixes two kinds of exports:
+Tackled in 2 turns so each ships clean.
 
-- plain async helpers: `enqueueEmailInternal`, `enqueueFromTemplateInternal`, `processQueueInternal`
-- `createServerFn` RPCs: `getEmailDashboard`, `getSmtpSettings`, `sendTestEmail`, etc.
+---
 
-The file is imported by `src/routes/admin.emails.tsx` (a client route). TanStack's server-fn transformer only strips the `.handler()` bodies of `createServerFn` exports — it does NOT strip top-level imports of files that also export plain helpers. So `smtp.server.ts` (which imports `nodemailer`) and `client.server.ts` get bundled into the browser. Nodemailer pulls in `os`, `stream`, `child_process`, etc., which Vite externalizes for the browser, producing:
+### Turn 1 — Foundation & high-leverage pieces
 
-```
-TypeError: Class extends value undefined is not a constructor or null
-  at node_modules/nodemailer/lib/base64/index.js
-```
+**4A bug sweep + fixes (do first, unblocks everything):**
+1. Verify Lovable Emails path end-to-end: enqueue → cron → send → log. Query `email_queue` / `email_logs` to confirm last sends.
+2. Confirm `pg_cron` job `process-email-queue` exists and points at the right URL.
+3. Strip dead Zoho UI from `/admin/emails` (SMTP_HOST/PORT/USER/PASS fields) — keep only sender identity (from_email, from_name, reply_to, enable toggle). Mark obsolete secrets as removable.
+4. Remove unused `nodemailer` + `getSmtpTransport` imports from `smtp.server.ts`; keep `renderTemplate` only.
+5. Bug sweep recent files (lead create, payu webhook, onboarding) for: missing `await`, unescaped template vars, missing error handling, hardcoded statuses, RLS GRANT gaps. Fix or note in `/mnt/documents/phase4a-sweep.md`.
 
-That crash happens during admin route hydration, which is also why the admin login feels slow (the page errors into the `CatchBoundary`, re-renders, retries).
+**4B-1 — Contact form → CRM + email (highest leverage):**
+6. Public server route `POST /api/public/contact` (rate-limited by IP+email, Zod-validated): inserts into `leads` with `lead_source='contact_form'`, status `lead_created`; logs activity; enqueues `contact_ack` email to customer; enqueues `admin_new_lead` email to admin.
+7. Add `admin_new_lead` template + (re-)seed if missing.
+8. Wire the existing public Contact form (find current handler) to the new endpoint. Show success state.
 
-## Fix
+**4B-2 — Application Summary page + gateway picker:**
+9. Route `/apply/:leadCode/summary`: shows service, customer, **pricing breakdown (base/GST/total) — super_admin only via server fn**, list of enabled `payment_gateways` (radio), "Pay now" → existing PayU flow (others = placeholder buttons disabled with "coming soon").
+10. New super_admin admin page `/admin/gateways` to toggle `is_enabled` / `priority` (table already exists, seed 5 rows if empty: razorpay, cashfree, payu, phonepe, ccavenue).
 
-Split the email module so the client only ever imports the thin server-fn surface.
+---
 
-1. **Create `src/lib/emails/emails.server.ts`** containing:
-   - the `nodemailer` / `smtp.server` imports
-   - the three plain helpers: `enqueueEmailInternal`, `enqueueFromTemplateInternal`, `processQueueInternal`
-   - `supabaseAdmin` usage they need
+### Turn 2 — Analytics & UX polish
 
-2. **Rewrite `src/lib/emails/emails.functions.ts`** to be thin:
-   - keep ONLY the `createServerFn` exports
-   - import helpers from `./emails.server` (the `.server.ts` suffix is import-protected from client bundles)
-   - import `supabaseAdmin` and `requireSupabaseAuth` as before — they're only referenced inside `.handler()` bodies, which the transformer strips out of the client bundle
+**4B-3 — Analytics events:**
+11. Migration: `analytics_events` table (event_name, lead_id, application_id, session_id, metadata, created_at) + RLS (insert: anyone; read: staff) + GRANTs.
+12. Tiny client helper `trackEvent(name, props)` → POST `/api/public/analytics/track`.
+13. Instrument 11 events: page_view (landing/service), service_selected, contact_submit, lead_created, summary_viewed, gateway_selected, payment_initiated, payment_success, payment_failed, onboarding_started, onboarding_submitted.
+14. Funnel cards on admin dashboard: counts + drop-off % between stages, last 7/30 days filter.
 
-3. **Update `src/routes/api/public/cron/process-emails.ts`** to import `processQueueInternal` from `@/lib/emails/emails.server` instead of `emails.functions`.
+**4B-4 — Premium loading screen:**
+15. Animated component (Framer Motion, brand palette, ~20–25s sequence): "Securing your details" → "Generating application code" → "Preparing payment" with progress bar + ticks. Used between Submit and gateway redirect.
 
-4. **No changes** to `admin.emails.tsx`, `smtp.server.ts`, or the database.
+---
 
-## Verification
+### Technical notes
 
-- Reload `/admin/emails` — no more `Class extends value undefined` console error, no CatchBoundary fallback.
-- Admin pages load at normal speed (no failed dynamic-import retries).
-- Sending a test email and the cron processor still work (they run on the server, where the split modules behave identically).
+- Public POST routes go under `src/routes/api/public/*` (auth bypass per Lovable conventions). All Zod-validated; rate-limit via simple in-memory token bucket keyed on IP (best-effort, since workers are stateless — also dedupe by `(email, created_at within 60s)` in DB).
+- `emails.functions.ts` already has `enqueueFromTemplateInternal` — reuse it. No new template engine.
+- Application Summary pricing visibility uses a server fn returning a stripped DTO for non-super_admin (no `base_amount/gst_amount/total_amount`).
+- Gateway picker reads `payment_gateways` filtered by `is_enabled=true`, sorted by `priority`. PayU is the only one wired; rest render disabled.
+- Analytics dashboard uses dedup-by-`session_id` for unique visitor counts.
+- Animated loading screen uses CSS + Framer Motion; no heavy lib.
 
-After this is in, I'll continue with Sub-Phase 4B.
+### Deliverable now (Turn 1)
+- `/mnt/documents/phase4a-sweep.md` with findings + fixes applied
+- Working Contact form → lead + emails
+- Application Summary page + gateway picker + `/admin/gateways`
+- Cleaned `/admin/emails` (no dead Zoho fields)
+
+Turn 2 ships analytics + loading screen after you confirm Turn 1 is solid.
