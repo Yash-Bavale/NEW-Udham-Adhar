@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Lock, Loader2 } from "lucide-react";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
+import { trackEvent } from "@/lib/analytics/track";
 
 export const Route = createFileRoute("/payment/$leadCode")({
   head: () => ({
@@ -22,9 +23,14 @@ function PaymentPage() {
   const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    trackEvent("payment_page_viewed", { leadCode });
+  }, [leadCode]);
+
   async function pay() {
     setBusy(true);
     setError(null);
+    trackEvent("payment_initiated", { gateway: "payu", leadCode });
     try {
       const res = await createOrder({ data: { leadCode } });
       setOrder(res);

@@ -62,6 +62,42 @@ export type Database = {
           },
         ]
       }
+      analytics_events: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          event_name: string
+          id: string
+          lead_id: string | null
+          metadata: Json
+          page_url: string | null
+          session_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          event_name: string
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          page_url?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          event_name?: string
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          page_url?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       applications: {
         Row: {
           application_code: string | null

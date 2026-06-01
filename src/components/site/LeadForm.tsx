@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { createLead } from "@/lib/leads.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
+import { trackEvent } from "@/lib/analytics/track";
 
 
 export function LeadForm({ title = "Fill application" }: { title?: string } = {}) {
@@ -12,6 +13,13 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const startedRef = useRef(false);
+
+  function onFirstInteract() {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    trackEvent("form_started");
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -29,8 +37,11 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
       consent: fd.get("consent") === "on",
     };
 
+    trackEvent("form_submitted", { service: payload.service, state: payload.state });
+
     try {
       const lead = await submitLead({ data: payload as never });
+      trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });
       navigate({
         to: "/processing/$leadCode",
         params: { leadCode: lead.leadCode },
@@ -51,7 +62,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         <h2 className="text-xl font-bold font-display">{title}</h2>
       </div>
 
-      <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
+      <form onSubmit={onSubmit} onFocus={onFirstInteract} className="p-6 md:p-8 space-y-5">
         <Field id={`${baseId}-name`} label="Applicant Name / आवेदक का नाम">
           <input id={`${baseId}-name`} name="name" required className={inputCls} placeholder="Enter Applicant Name" />
         </Field>

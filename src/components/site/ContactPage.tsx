@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
+import { trackEvent } from "@/lib/analytics/track";
 
 export function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -34,6 +35,7 @@ export function ContactPage() {
         throw new Error(json?.error || "Could not submit. Please try again.");
       }
       setSubmitted(true);
+      trackEvent("contact_form_submitted", { state: payload.state });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
