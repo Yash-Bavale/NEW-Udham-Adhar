@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSmtpTransport, renderTemplate } from "./smtp.server";
+import { sendLovableEmail, EmailAPIError } from "@lovable.dev/email-js";
+
+const LOVABLE_SENDER_DOMAIN = "notify.businesshelpservices.com";
+
 
 // ─────────────────────────── Public-server helpers ───────────────────────────
 // Used internally by other server fns (createLead, payu webhook, etc.).
@@ -85,12 +89,17 @@ export async function processQueueInternal(limit = 20) {
     return { processed: 0, sent: 0, failed: 0, skipped: "smtp_disabled" };
   }
 
-  let transport;
-  try {
-    transport = getSmtpTransport();
-  } catch (e) {
-    return { processed: 0, sent: 0, failed: 0, skipped: (e as Error).message };
-  }
+  // Lazy-init Zoho fallback transport
+  let zohoTransport: ReturnType<typeof getSmtpTransport> | null = null;
+  const getZoho = () => {
+    if (zohoTransport) return zohoTransport;
+    try { zohoTransport = getSmtpTransport(); return zohoTransport; }
+    catch { return null; }
+  };
+
+  const lovableApiKey = process.env.LOVABLE_API_KEY;
+  const fromEmail = settings.from_email;
+  const fromName = settings.from_name;
 
   let sent = 0;
   let failed = 0;
@@ -99,16 +108,63 @@ export async function processQueueInternal(limit = 20) {
     await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
 
     const attempt = (row.attempts ?? 0) + 1;
-    try {
-      const info = await transport.sendMail({
-        from: `${settings.from_name} <${settings.from_email}>`,
-        to: row.to_name ? `${row.to_name} <${row.to_email}>` : row.to_email,
-        replyTo: settings.reply_to ?? undefined,
-        subject: row.subject,
-        html: row.body_html,
-        text: row.body_text ?? undefined,
-      });
+    let provider = "lovable";
+    let smtpResponse: string | null = null;
+    let lastError: string | null = null;
+    let ok = false;
 
+    // 1) Try Lovable Emails first
+    if (lovableApiKey) {
+      try {
+        const res = await sendLovableEmail(
+          {
+            to: row.to_email,
+            from: `${fromName} <${fromEmail}>`,
+            sender_domain: LOVABLE_SENDER_DOMAIN,
+            subject: row.subject,
+            html: row.body_html,
+            text: row.body_text ?? "",
+            reply_to: settings.reply_to ?? undefined,
+          },
+          { apiKey: lovableApiKey },
+        );
+        smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
+        ok = true;
+      } catch (e) {
+        lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
+        if (e instanceof EmailAPIError && !e.retryable) {
+          // permanent error — still try Zoho as backup
+        }
+      }
+    } else {
+      lastError = "[lovable] LOVABLE_API_KEY missing";
+    }
+
+    // 2) Fallback to Zoho SMTP
+    if (!ok) {
+      const t = getZoho();
+      if (!t) {
+        lastError = (lastError ?? "") + " | [zoho] transport unavailable";
+      } else {
+        provider = "zoho";
+        try {
+          const info = await t.sendMail({
+            from: `${fromName} <${fromEmail}>`,
+            to: row.to_name ? `${row.to_name} <${row.to_email}>` : row.to_email,
+            replyTo: settings.reply_to ?? undefined,
+            subject: row.subject,
+            html: row.body_html,
+            text: row.body_text ?? undefined,
+          });
+          smtpResponse = `[zoho] ${info.response ?? "ok"}`;
+          ok = true;
+        } catch (e) {
+          lastError = (lastError ?? "") + ` | [zoho] ${e instanceof Error ? e.message : "unknown"}`;
+        }
+      }
+    }
+
+    if (ok) {
       await Promise.all([
         supabaseAdmin
           .from("email_queue")
@@ -120,27 +176,22 @@ export async function processQueueInternal(limit = 20) {
           to_email: row.to_email,
           subject: row.subject,
           status: "sent",
-          smtp_response: info.response ?? null,
+          smtp_response: smtpResponse,
           attempt,
           lead_id: row.lead_id,
           application_id: row.application_id,
         }),
       ]);
       sent++;
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : "Unknown error";
+    } else {
+      const errMsg = (lastError ?? "Unknown error").slice(0, 1000);
       const isDlq = attempt >= (row.max_attempts ?? 5);
       const delayMin = RETRY_BACKOFF_MIN[Math.min(attempt - 1, RETRY_BACKOFF_MIN.length - 1)];
       const next = new Date(Date.now() + delayMin * 60_000).toISOString();
       await Promise.all([
         supabaseAdmin
           .from("email_queue")
-          .update({
-            status: isDlq ? "dlq" : "failed",
-            attempts: attempt,
-            next_attempt_at: next,
-            last_error: errMsg.slice(0, 1000),
-          })
+          .update({ status: isDlq ? "dlq" : "failed", attempts: attempt, next_attempt_at: next, last_error: errMsg })
           .eq("id", row.id),
         supabaseAdmin.from("email_logs").insert({
           queue_id: row.id,
@@ -148,7 +199,8 @@ export async function processQueueInternal(limit = 20) {
           to_email: row.to_email,
           subject: row.subject,
           status: "failed",
-          error_message: errMsg.slice(0, 1000),
+          smtp_response: `[${provider}] failed`,
+          error_message: errMsg,
           attempt,
           lead_id: row.lead_id,
           application_id: row.application_id,
@@ -159,3 +211,4 @@ export async function processQueueInternal(limit = 20) {
   }
   return { processed: rows.length, sent, failed };
 }
+

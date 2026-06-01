@@ -86,28 +86,39 @@ function DashboardTab() {
       </div>
 
       <Section title="Recent send attempts">
+        <div className="mb-2 text-xs text-slate-500">
+          Primary provider: <span className="font-medium text-emerald-700">Lovable Emails</span> · Fallback: <span className="font-medium text-slate-700">Zoho SMTP</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr><th className="p-2">When</th><th className="p-2">To</th><th className="p-2">Subject</th><th className="p-2">Status</th><th className="p-2">Error</th></tr>
+              <tr><th className="p-2">When</th><th className="p-2">To</th><th className="p-2">Subject</th><th className="p-2">Provider</th><th className="p-2">Status</th><th className="p-2">Error</th></tr>
             </thead>
             <tbody>
-              {(data?.recentLogs ?? []).map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-2 text-xs">{new Date(r.sent_at).toLocaleString()}</td>
-                  <td className="p-2">{r.to_email}</td>
-                  <td className="p-2">{r.subject}</td>
-                  <td className="p-2"><StatusBadge status={r.status} /></td>
-                  <td className="p-2 text-xs text-red-600 truncate max-w-xs">{r.error_message ?? ""}</td>
-                </tr>
-              ))}
+              {(data?.recentLogs ?? []).map((r) => {
+                const resp = (r as { smtp_response?: string | null }).smtp_response ?? "";
+                const prov = resp.startsWith("[lovable]") ? "Lovable" : resp.startsWith("[zoho]") ? "Zoho" : "—";
+                return (
+                  <tr key={r.id} className="border-t">
+                    <td className="p-2 text-xs">{new Date(r.sent_at).toLocaleString()}</td>
+                    <td className="p-2">{r.to_email}</td>
+                    <td className="p-2">{r.subject}</td>
+                    <td className="p-2 text-xs">
+                      <span className={`px-2 py-0.5 rounded ${prov === "Lovable" ? "bg-emerald-100 text-emerald-700" : prov === "Zoho" ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-500"}`}>{prov}</span>
+                    </td>
+                    <td className="p-2"><StatusBadge status={r.status} /></td>
+                    <td className="p-2 text-xs text-red-600 truncate max-w-xs">{r.error_message ?? ""}</td>
+                  </tr>
+                );
+              })}
               {(data?.recentLogs ?? []).length === 0 && (
-                <tr><td colSpan={5} className="p-4 text-center text-slate-400 text-sm">No emails sent yet.</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-slate-400 text-sm">No emails sent yet.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </Section>
+
     </div>
   );
 }
