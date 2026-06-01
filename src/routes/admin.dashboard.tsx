@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import { Users, TrendingUp, CheckCircle2, Clock, Activity as ActivityIcon, Wallet } from "lucide-react";
 import { getDashboardStats } from "@/lib/crm/dashboard.functions";
+import { getFunnelStats } from "@/lib/analytics/funnel.functions";
 import { StatCard, SectionCard, TableSkeleton, StatusBadge, Timeline } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({ component: DashboardPage });
@@ -13,6 +14,8 @@ const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b
 function DashboardPage() {
   const fn = useServerFn(getDashboardStats);
   const { data, isLoading, error } = useQuery({ queryKey: ["admin.dashboard"], queryFn: () => fn() });
+  const funnelFn = useServerFn(getFunnelStats);
+  const { data: funnel, isLoading: funnelLoading } = useQuery({ queryKey: ["admin.funnel"], queryFn: () => funnelFn() });
 
   if (error) return <div className="text-sm text-red-700">{(error as Error).message}</div>;
 
@@ -106,6 +109,35 @@ function DashboardPage() {
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard title={`Conversion Funnel (last ${funnel?.windowDays ?? 30}d, unique sessions)`}>
+        <div className="p-4 space-y-3">
+          {funnelLoading || !funnel ? (
+            <TableSkeleton rows={6} cols={1} />
+          ) : (
+            funnel.steps.map((s, i) => {
+              const prev = i > 0 ? funnel.steps[i - 1].count : s.count;
+              const dropoff = prev > 0 ? Math.max(0, Math.round(((prev - s.count) / prev) * 100)) : 0;
+              return (
+                <div key={s.key} className="text-xs">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-medium flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>{i + 1}</span>
+                      {s.label}
+                    </span>
+                    <span className="tabular-nums" style={{ color: "var(--admin-fg-muted)" }}>
+                      {s.count} {i > 0 && <span className="text-red-500 ml-2">−{dropoff}%</span>}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--admin-surface-2)" }}>
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct}%`, background: "var(--gradient-admin)" }} />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </SectionCard>
 
       <SectionCard title="Top Services">
         <div className="p-4 space-y-2">
