@@ -161,7 +161,7 @@ export async function processQueueInternal(limit = 20) {
           to_email: row.to_email,
           subject: row.subject,
           status: "failed",
-          smtp_response: `[${provider}] failed`,
+          smtp_response: `[lovable] failed`,
           error_message: errMsg,
           attempt,
           lead_id: row.lead_id,
