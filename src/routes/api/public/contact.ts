@@ -14,8 +14,8 @@ const ContactSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email().max(160),
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile"),
-  state: z.string().trim().refine((v) => INDIAN_STATES.includes(v as never), "Invalid state"),
-  language: z.string().trim().refine((v) => LANGUAGES.includes(v as never), "Invalid language"),
+  state: z.string().trim().refine((v) => INDIAN_STATES.includes(v), "Invalid state"),
+  language: z.string().trim().refine((v) => LANGUAGES.includes(v), "Invalid language"),
   message: z.string().trim().min(5).max(1000),
 });
 
