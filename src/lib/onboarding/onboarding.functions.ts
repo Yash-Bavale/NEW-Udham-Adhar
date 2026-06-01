@@ -142,6 +142,45 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         .eq("id", app.id);
     }
 
+    // Fire completion emails on final submit (best-effort, never blocks)
+    if (!data.draft) {
+      const { count: docCount } = await supabaseAdmin
+        .from("documents")
+        .select("id", { count: "exact", head: true })
+        .eq("lead_id", lead.id);
+
+      const baseVars = {
+        leadCode: lead.lead_code ?? "",
+        name: lead.name ?? "",
+        mobile: lead.mobile ?? "",
+        email: lead.email ?? "",
+        service: lead.service ?? "",
+        docCount: String(docCount ?? 0),
+        adminUrl: `https://${process.env.PUBLIC_SITE_HOST ?? "udyamadhar.everythinghappens.in"}/admin/leads`,
+      };
+
+      if (lead.email) {
+        await enqueueFromTemplateInternal("onboarding_complete", lead.email, baseVars, {
+          toName: lead.name ?? undefined,
+          leadId: lead.id,
+          applicationId: app?.id ?? undefined,
+        }).catch((e) => console.error("onboarding_complete enqueue failed:", e));
+      }
+
+      const { data: smtp } = await supabaseAdmin
+        .from("smtp_settings")
+        .select("reply_to")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const adminTo = smtp?.reply_to ?? DEFAULT_ADMIN_EMAIL;
+
+      await enqueueFromTemplateInternal("admin_onboarding_submitted", adminTo, baseVars, {
+        leadId: lead.id,
+        applicationId: app?.id ?? undefined,
+      }).catch((e) => console.error("admin_onboarding_submitted enqueue failed:", e));
+    }
+
     return { ok: true };
   });
 
