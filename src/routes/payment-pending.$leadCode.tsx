@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHero } from "@/components/site/PageHero";
+import { trackEvent } from "@/lib/analytics/track";
 
 export const Route = createFileRoute("/payment-pending/$leadCode")({
   head: () => ({
@@ -14,6 +16,9 @@ export const Route = createFileRoute("/payment-pending/$leadCode")({
 
 function PendingPage() {
   const { leadCode } = Route.useParams();
+  useEffect(() => {
+    trackEvent("payment_failed", { leadCode, reason: "pending" });
+  }, [leadCode]);
   return (
     <PageHero title="Request Received">
       <p>
