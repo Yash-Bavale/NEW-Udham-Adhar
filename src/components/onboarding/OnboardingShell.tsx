@@ -2,13 +2,12 @@ import { Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
 import { motion } from "motion/react";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 const STEPS: { n: Step; label: string }[] = [
   { n: 1, label: "Details" },
   { n: 2, label: "Documents" },
-  { n: 3, label: "Review" },
-  { n: 4, label: "Done" },
+  { n: 3, label: "Done" },
 ];
 
 export function OnboardingShell({
