@@ -1,6 +1,6 @@
 // pg_cron calls this every minute with the anon apikey header.
 import { createFileRoute } from "@tanstack/react-router";
-import { processQueueInternal } from "@/lib/emails/emails.functions";
+import { processQueueInternal } from "@/lib/emails/emails.server";
 
 export const Route = createFileRoute("/api/public/cron/process-emails")({
   server: {
