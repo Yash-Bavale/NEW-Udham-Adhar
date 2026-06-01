@@ -102,7 +102,7 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
               loading="lazy"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
-              Sample Business Help Services Certificate shown for reference purposes only.
+              Note: Sample Business Help Services Certificate shown for reference purposes only.
             </p>
           </div>
         </div>
