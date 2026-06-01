@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
 import {
@@ -7,6 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
+import { trackEvent } from "@/lib/analytics/track";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -90,6 +92,9 @@ const FACTS: [string, string][] = [
 ];
 
 function HomePage() {
+  useEffect(() => {
+    trackEvent("page_view_landing", { path: "/" });
+  }, []);
   return (
     <>
       {/* Form + Sample Certificate */}
