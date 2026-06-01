@@ -79,13 +79,8 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
   const cleanHtml = sanitize(html);
   return (
     <>
-      <div className="bg-brand-navy text-white">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <h1 className="text-center md:text-right text-lg md:text-2xl font-bold font-display">
-            {title}
-          </h1>
-        </div>
-      </div>
+      {/* Visually hidden H1 retained for SEO; the visible blue title bar was removed per client request. */}
+      <h1 className="sr-only">{title}</h1>
 
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm title={title} />
