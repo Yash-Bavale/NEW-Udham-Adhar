@@ -13,6 +13,13 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const startedRef = useRef(false);
+
+  function onFirstInteract() {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    trackEvent("form_started");
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,8 +37,11 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
       consent: fd.get("consent") === "on",
     };
 
+    trackEvent("form_submitted", { service: payload.service, state: payload.state });
+
     try {
       const lead = await submitLead({ data: payload as never });
+      trackEvent("lead_created", { service: payload.service }, { lead_id: lead.id ?? null });
       navigate({
         to: "/processing/$leadCode",
         params: { leadCode: lead.leadCode },
