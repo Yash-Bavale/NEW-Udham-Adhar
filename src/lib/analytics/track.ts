@@ -43,7 +43,7 @@ export function trackEvent(
     lead_id: refs?.lead_id ?? null,
     application_id: refs?.application_id ?? null,
     page_url: window.location.pathname + window.location.search,
-    metadata,
+    metadata: metadata as never,
     user_agent: window.navigator.userAgent.slice(0, 500),
   };
   // Fire-and-forget; never block UI on analytics.
