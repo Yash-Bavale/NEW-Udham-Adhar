@@ -9,6 +9,9 @@ import {
   type OnboardingSchema,
 } from "./schemas";
 import { SERVICES } from "@/lib/constants";
+import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
+
+const DEFAULT_ADMIN_EMAIL = "help@businesshelpservices.com";
 
 const LeadCode = z.string().trim().regex(/^[A-Z]{2}-\d{4}-\d{6}$/, "Invalid reference code");
 
