@@ -1,5 +1,4 @@
 import { LeadForm } from "@/components/site/LeadForm";
-import { FaqSection } from "@/components/site/FaqSection";
 
 const proseClasses =
   "p-6 md:p-8 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
@@ -109,8 +108,6 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
           <div className={proseClasses} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
         </div>
       </section>
-
-      <FaqSection />
     </>
   );
 }
