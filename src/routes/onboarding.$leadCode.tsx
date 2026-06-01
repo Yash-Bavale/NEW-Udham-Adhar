@@ -22,7 +22,7 @@ function OnboardingDetailsPage() {
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["onboarding", leadCode],
     queryFn: () => fetchFn({ data: { leadCode } }),
   });
