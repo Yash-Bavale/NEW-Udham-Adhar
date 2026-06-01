@@ -48,6 +48,8 @@ export const getSmtpSettings = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("smtp_settings")
       .select("id, from_email, from_name, reply_to, daily_quota, is_enabled, notes, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (error) throw new Error(error.message);
     return {
@@ -72,7 +74,7 @@ export const saveSmtpSettings = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SmtpInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: existing } = await supabase.from("smtp_settings").select("id").maybeSingle();
+    const { data: existing } = await supabase.from("smtp_settings").select("id").order("updated_at", { ascending: false }).limit(1).maybeSingle();
     const payload = { ...data, updated_by: userId };
     if (existing) {
       const { error } = await supabase.from("smtp_settings").update(payload).eq("id", existing.id);
