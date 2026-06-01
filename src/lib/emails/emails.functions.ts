@@ -174,10 +174,12 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const counts = async (status: string, sinceCol = "created_at", since?: string) => {
-      let q = supabase.from("email_queue").select("*", { count: "exact", head: true }).eq("status", status);
-      if (since) q = q.gte(sinceCol, since);
-      const { count } = await q;
+    type QStatus = "queued" | "sending" | "sent" | "failed" | "dlq";
+    const counts = async (status: QStatus) => {
+      const { count } = await supabase
+        .from("email_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", status);
       return count ?? 0;
     };
 
