@@ -183,6 +183,7 @@ import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
+import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -1087,6 +1088,12 @@ const ApiPublicWebhooksPayuRoute = ApiPublicWebhooksPayuRouteImport.update({
   path: '/api/public/webhooks/payu',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCronProcessEmailsRoute =
+  ApiPublicCronProcessEmailsRouteImport.update({
+    id: '/api/public/cron/process-emails',
+    path: '/api/public/cron/process-emails',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1262,6 +1269,7 @@ export interface FileRoutesByFullPath {
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesByTo {
@@ -1437,6 +1445,7 @@ export interface FileRoutesByTo {
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRoutesById {
@@ -1614,6 +1623,7 @@ export interface FileRoutesById {
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
 }
 export interface FileRouteTypes {
@@ -1792,6 +1802,7 @@ export interface FileRouteTypes {
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1967,6 +1978,7 @@ export interface FileRouteTypes {
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
   id:
     | '__root__'
@@ -2143,6 +2155,7 @@ export interface FileRouteTypes {
     | '/admin/leads/$leadId'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
   fileRoutesById: FileRoutesById
 }
@@ -2310,6 +2323,7 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
+  ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
 }
 
@@ -3533,6 +3547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksPayuRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/process-emails': {
+      id: '/api/public/cron/process-emails'
+      path: '/api/public/cron/process-emails'
+      fullPath: '/api/public/cron/process-emails'
+      preLoaderRoute: typeof ApiPublicCronProcessEmailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -3751,18 +3772,9 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
+  ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
