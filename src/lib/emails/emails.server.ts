@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSmtpTransport, renderTemplate } from "./smtp.server";
+import { sendLovableEmail, EmailAPIError } from "@lovable.dev/email-js";
+
+const LOVABLE_SENDER_DOMAIN = "notify.businesshelpservices.com";
+
 
 // ─────────────────────────── Public-server helpers ───────────────────────────
 // Used internally by other server fns (createLead, payu webhook, etc.).
