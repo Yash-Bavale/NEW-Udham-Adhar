@@ -114,6 +114,3 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
     </>
   );
 }
-    </>
-  );
-}
