@@ -160,8 +160,7 @@ function SummaryPage() {
 
   return (
     <section className="mx-auto max-w-2xl px-4 py-6 md:py-10">
-      {/* Sticky session timer */}
-      <SessionBar secondsLeft={secondsLeft} />
+
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
