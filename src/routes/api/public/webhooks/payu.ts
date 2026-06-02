@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { computeResponseHash, getPayUCreds } from "@/lib/payments/payu.server";
+import { computeResponseHash, getPayUCreds, verifyPayUPayment } from "@/lib/payments/payu.server";
 import { generateInvoiceInternal } from "@/lib/crm/invoices.functions";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
@@ -43,8 +43,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         };
         const receivedHash = get("hash");
         const additionalCharges = get("additionalCharges");
-        const mihpayid = get("mihpayid");
-        const bankrefnum = get("bankrefnum");
+        let mihpayid = get("mihpayid");
+        let bankrefnum = get("bankrefnum");
 
         if (!receivedHash || !fields.txnid) {
           return new Response("Invalid payload", { status: 400 });
