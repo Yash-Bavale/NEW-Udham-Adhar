@@ -1,38 +1,43 @@
-# Client Presentation: Architecture & Web Flow
+## Goal
 
-I'll generate a polished `.pptx` deck (delivered to `/mnt/documents/`) that you can send directly to the client. No code changes — this is a document artifact.
+1. Stop the admin login from glitching/feeling slow.
+2. Remove the public "Create Admin Account" signup from `/admin-login` — new users must only be created by an existing admin via the Users page (server-side, role-gated).
 
-## Deck outline (~18 slides)
+## Root causes
 
-1. **Cover** — Project name, tagline, date, prepared-for client
-2. **Executive Summary** — What the platform does, business goal
-3. **High-Level Architecture** — Frontend, Backend (Lovable Cloud), Payments (PayU), Email (SMTP), Admin CRM — block diagram
-4. **Technology Stack** — TanStack Start, React 19, Tailwind v4, Postgres, Edge runtime, PayU, Resend/SMTP
-5. **User-Facing Web Flow** — Landing → Service selection → Lead form → Payment → Onboarding form → Document upload → Status tracking
-6. **Lead Capture Flow** — Form fields, validation, dedup (count duplicates, don't block reuse of email/mobile)
-7. **Payment Flow (PayU)** — Hosted checkout sequence, hash signing, success/failure callbacks, test vs live mode
-8. **Post-Payment Flow** — Application creation, invoice generation, confirmation email, onboarding form trigger
-9. **Onboarding & Document Flow** — Service-specific forms, document upload, verification states
-10. **Admin / CRM Panel** — Dashboard, Leads, Applications, Payments, Documents, Emails, Settings
-11. **Roles & Permissions** — super_admin, operations, support, accounts, finance + RLS model
-12. **Database Schema (key tables)** — leads, applications, payments, invoices, documents, services, user_roles, email_queue
-13. **Email System** — Templates, queue, SMTP, suppression, unsubscribe
-14. **Security** — RLS, role-based access, PayU hash verification, audit logs, secrets handling
-15. **Analytics & Activity Logs** — Events captured, dashboards
-16. **Deployment & Environments** — Preview vs Live URLs, stable project URLs, custom domain
-17. **Web Flow Diagram (visual)** — End-to-end customer journey
-18. **Next Steps & Roadmap** — Go-live checklist (PayU live keys, SMTP, domain), future enhancements
+**Login glitch / slowness** in `src/routes/admin-login.tsx` + `src/routes/admin.tsx`:
 
-## Design
+- `admin-login` fires `supabase.auth.getSession()` in a `useEffect`. While Supabase is hydrating the session from `localStorage` on first paint, this can return `null`, so the redirect-if-already-signed-in path is unreliable and the form flashes before navigation.
+- After `signInWithPassword` succeeds, we call `navigate({ to: "/admin/dashboard" })` immediately. The `/admin` `beforeLoad` then calls `getSession()` again — sometimes it races the just-issued session and bounces back to `/admin-login`, causing a visible flicker / "stuck" feel.
+- `/admin` uses `getSession()` (cached, not re-validated) instead of `getUser()` (per knowledge: prefer `getUser()` for server/route gates that must trust identity, and it awaits session hydration).
+- There is no `onAuthStateChange` listener, so token refresh / sign-in events don't trigger a router invalidation — the UI keeps showing stale state until manual nav.
 
-- Clean professional theme — Navy + warm accent (suited for a govt/services brand like Udyam Adhar)
-- Diagrams rendered as vector shapes inside slides (no external images required)
-- Each slide has a clear title, body, and footer with page number
+**Signup in admin panel**: the `/admin-login` page contains a mode toggle that calls `supabase.auth.signUp`. Combined with the DB trigger `bootstrap_first_admin`, anyone hitting `/admin-login` could create the first admin. This must go. New staff users are created only from `/admin/users` (already wired to `listStaffUsers` / `grantRole` server fns gated by `assertAdmin`).
 
-## Process
+## Changes
 
-- Use `pptxgenjs` to build the deck
-- Render to PDF and inspect every slide for layout/overflow issues
-- Fix any issues, re-verify, then deliver the final `.pptx` (plus a PDF preview)
+### 1. `src/routes/admin-login.tsx`
+- Remove `mode` state, the signup branch, the "Need to create the first admin account?" toggle button, and the `signUp` call entirely. Page is **login-only**.
+- Replace `getSession()` effect with an `onAuthStateChange` subscription + an initial `getUser()` call. When a session exists, `navigate({ to: "/admin/dashboard", replace: true })`.
+- After successful `signInWithPassword`, wait for the auth event (or simply rely on the listener) before navigating, so `/admin` `beforeLoad` always sees the session. Use `replace: true` to avoid back-button bounce.
+- Keep email/password form, errors, "Back to site" link.
 
-After you approve, I'll generate the file and share both the `.pptx` and a PDF preview.
+### 2. `src/routes/admin.tsx`
+- Change `beforeLoad` to use `supabase.auth.getUser()` (re-validates + awaits hydration) instead of `getSession()`. Redirect to `/admin-login` only when `error || !data.user`.
+- This eliminates the race where the dashboard kicks the user back to login right after sign-in.
+
+### 3. `src/routes/__root.tsx` (light touch — add listener if not already present)
+- Add a single root-level `onAuthStateChange` that calls `router.invalidate()` + `queryClient.invalidateQueries()` so sign-in/out immediately refreshes route gates and queries. (Per `tanstack-supabase-integration` cache-invalidation guidance.) If the root already has one, leave it alone.
+
+### 4. No DB / RLS changes
+- `user_roles` policies + `assertAdmin` in `users-admin.functions.ts` already restrict role management to admins.
+- The existing `bootstrap_first_admin` trigger stays (harmless — only fires when no admin exists; once you have one admin it's a no-op). Bootstrapping a brand-new project still works by an admin signing up directly via Supabase or by temporarily inserting a row.
+
+## Out of scope
+- No changes to `/admin/users` (it already is the correct admin-only "create/manage users" surface).
+- No visual redesign of the login card.
+
+## Expected outcome
+- `/admin-login` shows only a Sign In form — no signup toggle.
+- Signing in navigates to `/admin/dashboard` in one smooth transition, no flash back to login.
+- Refreshing while signed in lands on the dashboard immediately without a login flash.
