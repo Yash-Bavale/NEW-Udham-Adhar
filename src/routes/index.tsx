@@ -157,7 +157,7 @@ function HomePage() {
             className="bg-brand-navy text-white hover:bg-brand-navy-deep shadow-sm"
           >
             <Link to="/faqs">
-              Read all 115 FAQs <ArrowRight className="ml-2 h-4 w-4" />
+              View All FAQs <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </div>
