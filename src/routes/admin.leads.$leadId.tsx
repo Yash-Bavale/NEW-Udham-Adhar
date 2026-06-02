@@ -129,6 +129,10 @@ function LeadDetailPage() {
         </ul>
       </Card>
 
+      <Card title="Finance">
+        <LeadFinanceTab leadId={leadId} />
+      </Card>
+
       <Card title="Timeline">
         <LeadTimeline leadId={leadId} />
       </Card>
