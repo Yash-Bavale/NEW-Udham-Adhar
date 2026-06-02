@@ -1,0 +1,100 @@
+import { useEffect } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { XCircle, RefreshCw, MessageCircle, ShieldCheck } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { getApplicationSummary } from "@/lib/payments/gateways.functions";
+import { trackEvent } from "@/lib/analytics/track";
+
+export const Route = createFileRoute("/payment-failed/$leadCode")({
+  head: () => ({
+    meta: [
+      { title: "Payment Failed — Business Help Services" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+  }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    reason: typeof s.reason === "string" ? s.reason : undefined,
+  }),
+  component: FailedPage,
+});
+
+function FailedPage() {
+  const { leadCode } = Route.useParams();
+  const { reason } = Route.useSearch();
+  const getSummary = useServerFn(getApplicationSummary);
+
+  const { data } = useQuery({
+    queryKey: ["summary", leadCode],
+    queryFn: () => getSummary({ data: { leadCode } }),
+  });
+
+  useEffect(() => {
+    trackEvent("payment_failed_page_view", { leadCode, reason });
+  }, [leadCode, reason]);
+
+  const lead = data?.lead;
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center p-4 bg-gradient-to-b from-red-50/40 to-slate-50">
+      <div className="w-full max-w-lg">
+        <Card className="overflow-hidden shadow-xl border-red-200">
+          <div className="p-8 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 mb-4 ring-8 ring-red-50">
+              <XCircle className="w-12 h-12 text-red-600" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-brand-navy font-display mb-2">
+              Payment Failed
+            </h1>
+            <p className="text-slate-600 text-sm mb-1">
+              {reason || "Your payment could not be completed."} You can try again — no application is filed until payment succeeds.
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              Ref: <span className="font-mono font-semibold text-brand-navy">{leadCode}</span>
+            </p>
+          </div>
+
+          {lead && (
+            <div className="px-6 pb-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Service</span>
+                  <span className="font-semibold text-brand-navy text-right">{lead.service}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Amount</span>
+                  <span className="font-semibold text-brand-navy">
+                    ₹{lead.totalAmount?.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-slate-200 p-6 space-y-3">
+            <Link to="/payment/$leadCode" params={{ leadCode }} className="block">
+              <Button className="w-full bg-brand-red hover:bg-brand-red-deep text-white font-bold h-12 rounded-full">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry Payment
+              </Button>
+            </Link>
+            <Link to="/contact" className="block">
+              <Button variant="outline" className="w-full rounded-full">
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Contact Support
+              </Button>
+            </Link>
+            <div className="flex items-start gap-2 pt-2 text-[11px] text-slate-500">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                If any amount was debited from your account, it will be auto-refunded by your bank within 3–5 business days.
+              </span>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
