@@ -42,11 +42,23 @@ async function generateAndStore(paymentId: string): Promise<string> {
     .eq("payment_id", paymentId)
     .maybeSingle();
 
+  // Compute GST split based on customer state vs company state
+  const customerState = (lead.state ?? "").trim();
+  const isIntraState = customerState && customerState.toLowerCase() === COMPANY_STATE;
+  const gstTotal = Number(payment.gst_amount);
+  const cgst = isIntraState ? gstTotal / 2 : 0;
+  const sgst = isIntraState ? gstTotal / 2 : 0;
+  const igst = isIntraState ? 0 : gstTotal;
+
   let invoiceId: string;
   let invoiceNumber: string;
   if (existing) {
     invoiceId = existing.id;
     invoiceNumber = existing.invoice_number!;
+    await supabaseAdmin.from("invoices").update({
+      cgst_amount: cgst, sgst_amount: sgst, igst_amount: igst,
+      place_of_supply: customerState || null,
+    }).eq("id", invoiceId);
   } else {
     const { data: row, error: invErr } = await supabaseAdmin
       .from("invoices")
@@ -55,8 +67,12 @@ async function generateAndStore(paymentId: string): Promise<string> {
         application_id: payment.application_id,
         payment_id: payment.id,
         base_amount: Number(payment.base_amount),
-        gst_amount: Number(payment.gst_amount),
+        gst_amount: gstTotal,
         total_amount: Number(payment.amount),
+        cgst_amount: cgst,
+        sgst_amount: sgst,
+        igst_amount: igst,
+        place_of_supply: customerState || null,
       })
       .select("id, invoice_number")
       .single();
