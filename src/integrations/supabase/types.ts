@@ -659,6 +659,8 @@ export type Database = {
           mobile: string
           name: string
           notes: string | null
+          onboarding_reminded_at: string | null
+          onboarding_reminder_count: number
           remarks: string | null
           service: string
           service_id: string | null
@@ -680,6 +682,8 @@ export type Database = {
           mobile: string
           name: string
           notes?: string | null
+          onboarding_reminded_at?: string | null
+          onboarding_reminder_count?: number
           remarks?: string | null
           service: string
           service_id?: string | null
@@ -701,6 +705,8 @@ export type Database = {
           mobile?: string
           name?: string
           notes?: string | null
+          onboarding_reminded_at?: string | null
+          onboarding_reminder_count?: number
           remarks?: string | null
           service?: string
           service_id?: string | null
