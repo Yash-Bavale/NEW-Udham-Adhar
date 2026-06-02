@@ -13,15 +13,34 @@ const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
+    console.log("[getApplicationSummary] leadCode:", data.leadCode);
     const { data: lead, error } = await supabaseAdmin
       .from("leads")
-      .select(
-        "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status",
-      )
+      .select("id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id")
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!lead) throw new Error("Application not found");
+
+    // Fetch service description separately
+    let serviceDescription = "";
+    if (lead.service_id) {
+      const { data: svc } = await supabaseAdmin
+        .from("services")
+        .select("description")
+        .eq("id", lead.service_id)
+        .maybeSingle();
+      if (svc) serviceDescription = svc.description || "";
+    }
+
+    // Fetch payment record separately
+    const { data: payments } = await supabaseAdmin
+      .from("payments")
+      .select("transaction_id, gateway_name, payment_date, status, amount")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false });
+
+    const successfulPayment = payments?.find(p => p.status === 'paid') || null;
 
     const { data: gateways } = await supabaseAdmin
       .from("payment_gateways")
@@ -36,10 +55,12 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         email: lead.email,
         mobile: lead.mobile,
         service: lead.service,
+        serviceDescription,
         baseAmount: Number(lead.base_amount ?? 0),
         gstAmount: Number(lead.gst_amount ?? 0),
         totalAmount: Number(lead.total_amount ?? 0),
         status: lead.status,
+        payment: successfulPayment,
       },
       gateways: gateways ?? [],
     };
