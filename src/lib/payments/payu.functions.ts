@@ -48,49 +48,53 @@ export const createPayUOrder = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
-    // 4. Reuse latest pending payment row (idempotent on refresh)
-    const { data: existing } = await supabaseAdmin
-      .from("payments")
-      .select("id, idempotency_key, transaction_id, amount")
-      .eq("lead_id", lead.id)
-      .eq("gateway_name", "payu")
-      .eq("status", "created")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
     if (!lead.lead_code) throw new Error("Lead is missing a lead code");
     const leadCode: string = lead.lead_code;
 
-    let txnid: string;
-    let paymentId: string;
-    if (existing && existing.transaction_id) {
-      txnid = existing.transaction_id;
-      paymentId = existing.id;
-    } else {
-      txnid = buildTxnId(leadCode);
-      const { data: inserted, error: insErr } = await supabaseAdmin
-        .from("payments")
-        .insert({
-          lead_id: lead.id,
-          application_id: application?.id ?? null,
-          gateway_name: "payu",
-          transaction_id: txnid,
-          razorpay_order_id: txnid, // reuse column for cross-gateway order id
-          amount: Number(lead.total_amount),
-          base_amount: Number(lead.base_amount),
-          gst_amount: Number(lead.gst_amount),
-          currency: "INR",
-          status: "created",
-          idempotency_key: `payu:${txnid}`,
-        })
-        .select("id")
-        .single();
-      if (insErr || !inserted) {
-        throw new Error(insErr?.message ?? "Could not create payment");
-      }
-      paymentId = inserted.id;
+    // 4. If already paid, block creating a new order.
+    const { data: paidAlready } = await supabaseAdmin
+      .from("payments")
+      .select("id")
+      .eq("lead_id", lead.id)
+      .eq("status", "paid")
+      .limit(1)
+      .maybeSingle();
+    if (paidAlready) {
+      throw new Error("This application has already been paid.");
     }
+
+    // 5. Mark any stale 'created' / 'attempted' PayU rows as failed so they
+    // don't block retries and PayU never sees the same txnid twice.
+    await supabaseAdmin
+      .from("payments")
+      .update({ status: "failed" })
+      .eq("lead_id", lead.id)
+      .eq("gateway_name", "payu")
+      .in("status", ["created", "attempted"]);
+
+    // 6. Always create a fresh txnid for every new attempt — PayU rejects reused txnids.
+    const txnid = buildTxnId(leadCode);
+    const { data: inserted, error: insErr } = await supabaseAdmin
+      .from("payments")
+      .insert({
+        lead_id: lead.id,
+        application_id: application?.id ?? null,
+        gateway_name: "payu",
+        transaction_id: txnid,
+        razorpay_order_id: txnid, // reuse column for cross-gateway order id
+        amount: Number(lead.total_amount),
+        base_amount: Number(lead.base_amount),
+        gst_amount: Number(lead.gst_amount),
+        currency: "INR",
+        status: "created",
+        idempotency_key: `payu:${txnid}`,
+      })
+      .select("id")
+      .single();
+    if (insErr || !inserted) {
+      throw new Error(insErr?.message ?? "Could not create payment");
+    }
+    const paymentId = inserted.id;
 
     const amount = Number(lead.total_amount).toFixed(2);
     const productinfo = (lead.service ?? "Service").slice(0, 100);
