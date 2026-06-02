@@ -196,7 +196,20 @@ function LeadsPage() {
                           {l.lead_code}
                         </Link>
                       </td>
-                      <td className="px-4 py-2.5 font-medium">{l.name}</td>
+                      <td className="px-4 py-2.5 font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{l.name}</span>
+                          {(l as { is_repeat?: boolean }).is_repeat && (
+                            <span
+                              className="text-[10px] font-semibold uppercase rounded px-1.5 py-0.5"
+                              style={{ background: "var(--admin-surface-2)", color: "var(--admin-accent)" }}
+                              title="This email has multiple leads"
+                            >
+                              Repeat
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 text-xs">
                         <div>{l.email}</div>
                         <div style={{ color: "var(--admin-fg-muted)" }}>{l.mobile}</div>
