@@ -42,7 +42,7 @@ function SuccessPage() {
   const getSummary = useServerFn(getApplicationSummary);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["success.summary", leadCode],
     queryFn: () => getSummary({ data: { leadCode } }),
   });
@@ -61,6 +61,23 @@ function SuccessPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-brand-red border-t-transparent rounded-full animate-spin" />
           <p className="text-brand-navy font-semibold">Loading receipt...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <p className="text-brand-red font-bold mb-2">Error loading summary</p>
+          <p className="text-slate-600 text-sm">{(error as Error).message}</p>
+          <Button 
+            className="mt-4" 
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
