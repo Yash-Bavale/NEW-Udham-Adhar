@@ -194,3 +194,24 @@ export const listInvoices = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
   });
+
+// Customer-facing: get signed URL by leadCode (no auth — scoped to that lead only)
+export const getCustomerInvoiceUrl = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ leadCode: z.string().min(3).max(50) }).parse(i))
+  .handler(async ({ data }) => {
+    const { data: lead } = await supabaseAdmin
+      .from("leads").select("id").eq("lead_code", data.leadCode).maybeSingle();
+    if (!lead) throw new Error("Lead not found");
+    const { data: inv } = await supabaseAdmin
+      .from("invoices")
+      .select("pdf_path, invoice_number")
+      .eq("lead_id", lead.id)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!inv?.pdf_path) throw new Error("Invoice not ready yet");
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from(BUCKET).createSignedUrl(inv.pdf_path, 60 * 10);
+    if (error) throw new Error(error.message);
+    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
+  });
