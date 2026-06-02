@@ -142,6 +142,7 @@ import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as HttpsUdyamregistrationGovInRouteImport } from './routes/https-udyamregistration-gov-in'
 import { Route as FreeMsmeRegistrationCertificateDownloadRouteImport } from './routes/free-msme-registration-certificate-download'
+import { Route as FaqsRouteImport } from './routes/faqs'
 import { Route as DownloadUdyamCertificateOnlineRouteImport } from './routes/download-udyam-certificate-online'
 import { Route as DownloadUdyamCertificateRouteImport } from './routes/download-udyam-certificate'
 import { Route as DownloadUdyamAadharRouteImport } from './routes/download-udyam-aadhar'
@@ -892,6 +893,11 @@ const FreeMsmeRegistrationCertificateDownloadRoute =
     path: '/free-msme-registration-certificate-download',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FaqsRoute = FaqsRouteImport.update({
+  id: '/faqs',
+  path: '/faqs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DownloadUdyamCertificateOnlineRoute =
   DownloadUdyamCertificateOnlineRouteImport.update({
     id: '/download-udyam-certificate-online',
@@ -1203,6 +1209,7 @@ export interface FileRoutesByFullPath {
   '/download-udyam-aadhar': typeof DownloadUdyamAadharRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
+  '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1392,6 +1399,7 @@ export interface FileRoutesByTo {
   '/download-udyam-aadhar': typeof DownloadUdyamAadharRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
+  '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1583,6 +1591,7 @@ export interface FileRoutesById {
   '/download-udyam-aadhar': typeof DownloadUdyamAadharRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
+  '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1775,6 +1784,7 @@ export interface FileRouteTypes {
     | '/download-udyam-aadhar'
     | '/download-udyam-certificate'
     | '/download-udyam-certificate-online'
+    | '/faqs'
     | '/free-msme-registration-certificate-download'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
@@ -1964,6 +1974,7 @@ export interface FileRouteTypes {
     | '/download-udyam-aadhar'
     | '/download-udyam-certificate'
     | '/download-udyam-certificate-online'
+    | '/faqs'
     | '/free-msme-registration-certificate-download'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
@@ -2154,6 +2165,7 @@ export interface FileRouteTypes {
     | '/download-udyam-aadhar'
     | '/download-udyam-certificate'
     | '/download-udyam-certificate-online'
+    | '/faqs'
     | '/free-msme-registration-certificate-download'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
@@ -2345,6 +2357,7 @@ export interface RootRouteChildren {
   DownloadUdyamAadharRoute: typeof DownloadUdyamAadharRoute
   DownloadUdyamCertificateRoute: typeof DownloadUdyamCertificateRoute
   DownloadUdyamCertificateOnlineRoute: typeof DownloadUdyamCertificateOnlineRoute
+  FaqsRoute: typeof FaqsRoute
   FreeMsmeRegistrationCertificateDownloadRoute: typeof FreeMsmeRegistrationCertificateDownloadRoute
   HttpsUdyamregistrationGovInRoute: typeof HttpsUdyamregistrationGovInRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
@@ -3429,6 +3442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FreeMsmeRegistrationCertificateDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faqs': {
+      id: '/faqs'
+      path: '/faqs'
+      fullPath: '/faqs'
+      preLoaderRoute: typeof FaqsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/download-udyam-certificate-online': {
       id: '/download-udyam-certificate-online'
       path: '/download-udyam-certificate-online'
@@ -3898,6 +3918,7 @@ const rootRouteChildren: RootRouteChildren = {
   DownloadUdyamAadharRoute: DownloadUdyamAadharRoute,
   DownloadUdyamCertificateRoute: DownloadUdyamCertificateRoute,
   DownloadUdyamCertificateOnlineRoute: DownloadUdyamCertificateOnlineRoute,
+  FaqsRoute: FaqsRoute,
   FreeMsmeRegistrationCertificateDownloadRoute:
     FreeMsmeRegistrationCertificateDownloadRoute,
   HttpsUdyamregistrationGovInRoute: HttpsUdyamregistrationGovInRoute,
