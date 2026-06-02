@@ -185,6 +185,6 @@ function redirectToFailure(leadCode: string, reason: string) {
   const q = new URLSearchParams({ reason }).toString();
   return new Response(null, {
     status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}?${q}` },
+    headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
   });
 }

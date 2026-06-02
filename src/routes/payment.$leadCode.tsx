@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Lock, Loader2 } from "lucide-react";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
+import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
+
+const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
 
 export const Route = createFileRoute("/payment/$leadCode")({
   head: () => ({
@@ -17,7 +20,9 @@ export const Route = createFileRoute("/payment/$leadCode")({
 
 function PaymentPage() {
   const { leadCode } = Route.useParams();
+  const navigate = useNavigate();
   const createOrder = useServerFn(createPayUOrder);
+  const getSummary = useServerFn(getApplicationSummary);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
@@ -25,7 +30,16 @@ function PaymentPage() {
 
   useEffect(() => {
     trackEvent("payment_page_viewed", { leadCode });
-  }, [leadCode]);
+    (async () => {
+      try {
+        const res = await getSummary({ data: { leadCode } });
+        const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
+        if (isPaid) {
+          navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [leadCode, getSummary, navigate]);
 
   async function pay() {
     setBusy(true);
