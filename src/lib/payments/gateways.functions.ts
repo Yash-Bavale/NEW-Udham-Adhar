@@ -13,14 +13,31 @@ const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
-    console.log("[getApplicationSummary] leadCode:", data.leadCode);
-    const { data: lead, error } = await supabaseAdmin
-      .from("leads")
-      .select("id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id")
-      .eq("lead_code", data.leadCode)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
+    console.log("[getApplicationSummary] code:", data.leadCode);
+    const code = data.leadCode.trim();
+    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id";
+
+    // Accept either a lead_code (UA-...) or an application_code (AP-...).
+    let lead: any = null;
+    if (code.toUpperCase().startsWith("AP-")) {
+      const { data: app, error: appErr } = await supabaseAdmin
+        .from("applications")
+        .select(`lead_id, leads:lead_id (${cols})`)
+        .eq("application_code", code)
+        .maybeSingle();
+      if (appErr) throw new Error(appErr.message);
+      lead = (app as any)?.leads ?? null;
+    } else {
+      const { data: byLead, error } = await supabaseAdmin
+        .from("leads")
+        .select(cols)
+        .eq("lead_code", code)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      lead = byLead;
+    }
     if (!lead) throw new Error("Application not found");
+
 
     // Fetch service description separately
     let serviceDescription = "";
