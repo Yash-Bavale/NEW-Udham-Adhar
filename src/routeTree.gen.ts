@@ -195,6 +195,7 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
+import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -1163,6 +1164,12 @@ const ApiPublicCronProcessEmailsRoute =
     path: '/api/public/cron/process-emails',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronOnboardingRemindersRoute =
+  ApiPublicCronOnboardingRemindersRouteImport.update({
+    id: '/api/public/cron/onboarding-reminders',
+    path: '/api/public/cron/onboarding-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1346,6 +1353,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1533,6 +1541,7 @@ export interface FileRoutesByTo {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1722,6 +1731,7 @@ export interface FileRoutesById {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1912,6 +1922,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -2099,6 +2110,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -2287,6 +2299,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -2462,6 +2475,7 @@ export interface RootRouteChildren {
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -3773,6 +3787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronProcessEmailsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/onboarding-reminders': {
+      id: '/api/public/cron/onboarding-reminders'
+      path: '/api/public/cron/onboarding-reminders'
+      fullPath: '/api/public/cron/onboarding-reminders'
+      preLoaderRoute: typeof ApiPublicCronOnboardingRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -4003,6 +4024,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,

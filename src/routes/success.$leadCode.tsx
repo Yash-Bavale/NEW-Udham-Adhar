@@ -53,8 +53,8 @@ function SuccessPage() {
     let cancelled = false;
 
     (async () => {
-      // Poll briefly to give PayU's webhook a chance to mark the payment paid
-      const maxAttempts = 6;
+      // Poll up to ~30s to give PayU's S2S webhook time to mark the payment paid
+      const maxAttempts = 15;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           const res = await getSummary({ data: { leadCode } });
@@ -74,8 +74,9 @@ function SuccessPage() {
         await new Promise((r) => setTimeout(r, 2000));
       }
       if (cancelled) return;
-      // Webhook never confirmed payment — bounce back to the payment page
-      navigate({ to: "/payment/$leadCode", params: { leadCode }, replace: true });
+      // Still no confirmation — show the pending page (NOT the payment page;
+      // the user may have actually paid and webhook is just delayed).
+      navigate({ to: "/payment-pending/$leadCode", params: { leadCode }, replace: true });
     })();
 
     return () => {
@@ -236,8 +237,8 @@ function SuccessPage() {
         </div>
 
         {/* Detailed receipt (collapsed by default) */}
-        {(showReceipt || typeof window !== "undefined") && (
-          <div className={showReceipt ? "block mt-4 print:block print:mt-0" : "hidden print:block print:mt-0"}>
+        {showReceipt && (
+          <div className="block mt-4 print:block print:mt-0">
             <Card className="overflow-hidden border-slate-200 shadow-lg print:shadow-none print:border-none">
               <div className="bg-brand-navy text-white p-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-2">

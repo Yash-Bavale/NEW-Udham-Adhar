@@ -1,42 +1,94 @@
-# Test PayU webhook end-to-end with ₹1 sandbox payment
+## What's actually happening (not a bug — diagnostic first)
 
-The webhook (`/api/public/webhooks/payu`) is already implemented — it verifies the response hash, marks the payment row paid, updates lead + application, generates the invoice, and redirects to `/success/:leadCode`. The goal now is to (a) flip back to **test mode**, (b) simulate a signed PayU callback so we know the handler works without depending on PayU's UI, then (c) do one real ₹1 test transaction.
+The page in your screenshot is **correct**. Here's why:
 
-## Changes
+**Database state for `UA-2026-001021` right now:**
 
-### 1. Switch back to TEST mode
-- Update the `PAYU_MODE` secret to `test` so the form posts to `https://test.payu.in/_payment`.
-- `PAYU_MERCHANT_KEY` / `PAYU_MERCHANT_SALT` must hold your PayU **test/sandbox** credentials (from PayU dashboard → Test Console). If they're currently live values, I'll prompt you to update them via the secrets form.
+| Field | Value |
+|---|---|
+| `leads.status` | `new_lead` |
+| Latest `payments` row | status `created` (PayU order initiated **but never completed**) |
+| `invoices` for this lead | none |
 
-### 2. Harden the webhook handler (small fixes)
-File: `src/routes/api/public/webhooks/payu.ts`
-- **Redirects are currently relative paths** (`/success/...`). PayU's browser POST originates from `test.payu.in`, so a relative `Location` is resolved against the browser context — works, but fragile. Switch to **absolute URLs** using `APP_BASE_URL` (or fall back to the published domain), matching what `surl`/`furl` already do.
-- **Tolerate amount mismatch detection**: log a warning if `Number(form.amount) !== Number(payment.amount)` so we catch tampering attempts (no behavior change, just a log).
-- **Always return 200 to PayU's S2S** when called without a browser context (PayU's S2S retries on non-2xx). Detect S2S vs browser by `Accept` header / absence of cookies, and respond `"OK"` 200 instead of a 303 redirect for the S2S call. Browser-initiated POST (from `surl`) still gets the 303.
+You see `Proceed to Payment` because **no payment is confirmed** for this lead in the DB. The previous live PayU attempt at 13:28 created an order but PayU never posted back a `success` to our webhook → so we correctly stay on the payment page.
 
-### 3. Build a webhook test script
-File: `scripts/payu-webhook-test.ts` (new, exec-only — not part of the app bundle)
-- Reads `PAYU_MERCHANT_KEY` / `PAYU_MERCHANT_SALT` from env.
-- Loads the latest `created` payment row for lead `UA-2026-001021` (₹1, already exists).
-- Builds a `success` PayU response payload, computes the correct response hash, and POSTs it as `application/x-www-form-urlencoded` to the **published** webhook URL `https://everythinghappensqindiaserver4cored.lovable.app/api/public/webhooks/payu`.
-- Prints the response and then queries the `payments` table to confirm `status = 'paid'`, `razorpay_payment_id` set, and that the invoice was generated.
+There is no "showing UI for confirmed payments" bug — it's showing the payment UI because **the payment is genuinely unconfirmed**.
 
-This proves the handler works end-to-end without needing PayU's UI.
+## Current end-to-end flow (verified by reading the code)
 
-### 4. Real ₹1 sandbox payment
-After steps 1–3 pass:
-- Open `/apply/UA-2026-001021/summary` (already ₹1 total).
-- Click **Pay** → browser posts to `test.payu.in/_payment`.
-- Use a PayU sandbox test card (e.g. `5123 4567 8901 2346`, CVV `123`, expiry `05/30`, OTP `123456`).
-- On success, PayU posts back to `/api/public/webhooks/payu`, handler marks payment paid, browser lands on `/success/UA-2026-001021`. PayU also fires the S2S callback to the same URL — handler is idempotent so the second call is a no-op.
+```text
+[Lead form submit]
+   └─> /payment/$leadCode  (payment.$leadCode.tsx)
+         • Calls createPayUOrder server fn
+         • Creates `payments` row (status='created')
+         • Auto-submits hidden form to PayU (test or live URL by PAYU_MODE)
 
-## Verification checklist (I'll run after each step)
-- [ ] `PAYU_MODE` secret = `test`, form `action` in network tab = `https://test.payu.in/_payment`.
-- [ ] Webhook test script: response 303 (or 200 for S2S simulation), DB row flipped to `paid`, invoice generated.
-- [ ] Real ₹1 transaction completes, `/success/...` page loads, lead status = `payment_successful`.
+[User pays on PayU]
+   └─> PayU POSTs result to /api/public/webhooks/payu
+         • Verifies sha512 response hash
+         • Updates payments.status → 'paid' / 'failed' / 'attempted'
+         • On 'paid':
+              - leads.status = 'payment_successful'
+              - applications.application_status = 'payment_received'
+              - generateInvoiceInternal(payment.id)
+              - 303 redirect → /success/$leadCode  (for browser-return)
+         • On 'failed': 303 → /payment-pending/$leadCode
 
-## Out of scope
-- Razorpay / Cashfree wiring.
-- Refund webhook handling.
-- Per-environment admin toggle UI.
-- Pre-creating a separate dedicated ₹1 test lead (the existing UA-2026-001021 already totals ₹1).
+[/success/$leadCode]
+   • Polls getApplicationSummary up to 6× / 2s
+   • If still not paid after 12s → bounces back to /payment/$leadCode
+   • CTA → /onboarding/$leadCode
+
+[/onboarding/$leadCode]   (Aadhaar + business info)
+   └─> /onboarding/$leadCode/documents   (PAN, photo, etc.)
+         └─> /onboarding/$leadCode/done  (sets lead → 'under_process')
+```
+
+## Likely root cause of the "abandoned" PayU attempt
+
+`PAYU_MODE=live` is set, so we now POST to `https://secure.payu.in/_payment`. If `PAYU_MERCHANT_KEY` / `PAYU_MERCHANT_SALT` are still **test credentials**, the live endpoint rejects the request and the user never reaches a paying screen → no webhook → lead stays `new_lead`. We need to verify the live key/salt actually correspond to a live PayU account, otherwise this is a config issue not a code bug.
+
+## Bugs / weak spots found while tracing the flow
+
+1. **`success` page bounce-back race**: If PayU's S2S webhook is delayed >12s the user is sent back to `/payment/$leadCode` even when their card was actually charged. Fix: poll longer (e.g. 30s) and on timeout send to `/payment-pending/$leadCode` (it's pending, not "needs to pay again").
+2. **`PAYU_MODE` default is `live`** in code. Safer to default `test` and only flip when explicitly set, so a missing env var can never accidentally hit live.
+3. **No email confirmation today** after successful payment. We don't send the customer their invoice or a welcome / onboarding-link email anywhere.
+4. **No reminder** if a user pays but never finishes `/onboarding/$leadCode`. There's no scheduled job or trigger that emails them their dynamic onboarding link + invoice + welcome.
+5. **Email infrastructure not initialised**: `src/lib/email-templates/registry.ts` is empty, no `send-transactional-email` route, no queue tables. We need to scaffold it before we can send anything.
+6. **`success` page receipt is hidden in dev**: `(showReceipt || typeof window !== 'undefined')` always evaluates true client-side, so the receipt block is rendered with `hidden` toggling — minor, but worth cleaning up to plain `showReceipt`.
+
+## Plan (in order)
+
+### Step 1 — Verify config (no code change)
+Confirm with you that `PAYU_MERCHANT_KEY` / `PAYU_MERCHANT_SALT` are the **live PayU dashboard** credentials, not test. If they are still test creds, switch `PAYU_MODE` back to `test` until live keys are issued. Without this, no live payment will ever succeed regardless of code fixes.
+
+### Step 2 — Reset the stale `created` PayU order
+Delete the stuck `created` payment row + idempotency key for `UA-2026-001021` so a fresh ₹1 live test can be made cleanly.
+
+### Step 3 — Harden the post-payment UX
+- `success.$leadCode.tsx`: increase poll window to ~30s, on timeout route to `/payment-pending/$leadCode` instead of `/payment/$leadCode`.
+- Default `PAYU_MODE` to `test` in `payu.server.ts`.
+- Clean up the `typeof window !== 'undefined'` receipt-render quirk.
+
+### Step 4 — Set up email infrastructure (Lovable Cloud)
+Scaffold the transactional-email pipeline (queues, `send-transactional-email` route, suppression, unsubscribe page) since none of it exists yet. This is a prerequisite for any email in steps 5–6.
+
+### Step 5 — Build 3 email templates and wire triggers
+1. **`payment-receipt-welcome`** — sent from the PayU webhook on successful `paid`. Contains: greeting, payment receipt, tax invoice download link, and a CTA "Complete your onboarding" → `/onboarding/$leadCode`.
+2. **`onboarding-link`** — same onboarding CTA, lighter content, used by the reminder job.
+3. **`application-submitted`** — sent from `onboarding/$leadCode/done` on `under_process`.
+
+### Step 6 — Abandoned-onboarding reminder
+Create a `/api/public/cron/onboarding-reminders` route + pg_cron job that runs every hour and, for any lead with `status='payment_successful'` whose onboarding submission is missing/incomplete and last reminded > 24h ago, enqueues the `onboarding-link` email. Track `last_reminded_at` / `reminder_count` on the lead (max 3 reminders, then stop).
+
+### Step 7 — End-to-end retest
+With live creds (or test mode if creds aren't live yet): submit lead → pay ₹1 → confirm webhook flips lead/application/invoice → confirm receipt email arrives → finish onboarding → confirm submission email arrives. Then separately reset onboarding to test the reminder by manually invoking the cron route.
+
+## Technical notes
+
+- Step 4 uses `email_domain--setup_email_infra` then `email_domain--scaffold_transactional_email`. I'll verify the email domain status first; if none is set, I'll surface the domain setup dialog.
+- All emails will go through Lovable Cloud's queue (auth_emails / transactional_emails), no third-party provider.
+- Reminder cron uses a service-role call to `/api/public/cron/onboarding-reminders` guarded by an HMAC secret header so it can't be triggered by anyone hitting the URL.
+- Schema add: `leads.onboarding_reminded_at TIMESTAMPTZ`, `leads.onboarding_reminder_count INT DEFAULT 0` (migration, with GRANTs untouched on existing table).
+
+Want me to confirm the PayU live credentials assumption with you, or just proceed with Steps 2–7 assuming whatever creds are in the secrets are correct?
