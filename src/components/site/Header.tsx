@@ -183,7 +183,7 @@ export function Header() {
               className="flex-1 text-left bg-transparent p-0 cursor-pointer min-w-0"
               aria-label="Go to homepage"
             >
-              <h2 className="text-base font-bold text-brand-red font-display leading-snug">
+              <h2 className="font-bold text-brand-red font-display leading-snug text-center text-lg">
                 सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
               </h2>
               <p className="text-[10px] tracking-wide text-brand-navy font-semibold font-display mt-0.5 leading-tight">
