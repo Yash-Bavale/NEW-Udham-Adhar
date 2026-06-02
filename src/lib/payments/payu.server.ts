@@ -14,6 +14,23 @@ export const PAYU_BASE_URL =
     ? "https://secure.payu.in/_payment"
     : "https://test.payu.in/_payment";
 
+const PAYU_POSTSERVICE_URL =
+  PAYU_MODE === "live"
+    ? "https://secure.payu.in/merchant/postservice?form=2"
+    : "https://test.payu.in/merchant/postservice?form=2";
+
+export type PayUVerifiedPayment = {
+  txnid: string;
+  mihpayid?: string;
+  bank_ref_num?: string;
+  amt?: string;
+  transaction_amount?: string;
+  status?: string;
+  unmappedstatus?: string;
+  error_Message?: string;
+  [key: string]: unknown;
+};
+
 export function getPayUCreds() {
   const key = process.env.PAYU_MERCHANT_KEY;
   const salt = process.env.PAYU_MERCHANT_SALT;
@@ -23,6 +40,32 @@ export function getPayUCreds() {
     );
   }
   return { key, salt };
+}
+
+export async function verifyPayUPayment(txnid: string): Promise<PayUVerifiedPayment | null> {
+  const { key, salt } = getPayUCreds();
+  const command = "verify_payment";
+  const hash = createHash("sha512")
+    .update(`${key}|${command}|${txnid}|${salt}`)
+    .digest("hex");
+
+  const body = new URLSearchParams({ key, command, var1: txnid, hash });
+  const response = await fetch(PAYU_POSTSERVICE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    throw new Error(`PayU verification failed with HTTP ${response.status}`);
+  }
+
+  const payload = await response.json() as {
+    status?: number;
+    transaction_details?: Record<string, PayUVerifiedPayment | string>;
+  };
+  const details = payload.transaction_details?.[txnid];
+  return details && typeof details === "object" ? details : null;
 }
 
 // Outgoing hash (request to PayU):

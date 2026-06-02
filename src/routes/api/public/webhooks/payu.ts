@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { computeResponseHash, getPayUCreds } from "@/lib/payments/payu.server";
+import { computeResponseHash, getPayUCreds, verifyPayUPayment } from "@/lib/payments/payu.server";
 import { generateInvoiceInternal } from "@/lib/crm/invoices.functions";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
@@ -43,12 +43,19 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         };
         const receivedHash = get("hash");
         const additionalCharges = get("additionalCharges");
-        const mihpayid = get("mihpayid");
-        const bankrefnum = get("bankrefnum");
+        let mihpayid = get("mihpayid");
+        let bankrefnum = get("bankrefnum");
+
+        // Detect S2S vs browser-return: PayU's server-to-server webhook
+        // doesn't send Accept: text/html. Browser-return POST does.
+        const accept = request.headers.get("accept") ?? "";
+        const isBrowser = accept.includes("text/html");
 
         if (!receivedHash || !fields.txnid) {
           return new Response("Invalid payload", { status: 400 });
         }
+
+        let verifiedPayment: Awaited<ReturnType<typeof verifyPayUPayment>> | null = null;
 
         const expected = computeResponseHash({
           ...fields, salt: creds.salt,
@@ -56,14 +63,21 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         });
 
         if (expected.toLowerCase() !== receivedHash.toLowerCase()) {
-          console.error("[payu] hash mismatch", { txnid: fields.txnid });
-          return redirectToFailure(get("udf3") || fields.txnid, "Signature verification failed");
-        }
+          try {
+            verifiedPayment = await verifyPayUPayment(fields.txnid);
+          } catch (e) {
+            console.error("[payu] verification lookup failed after hash mismatch", { txnid: fields.txnid, error: e });
+          }
 
-        // Detect S2S vs browser-return: PayU's server-to-server webhook
-        // doesn't send Accept: text/html. Browser-return POST does.
-        const accept = request.headers.get("accept") ?? "";
-        const isBrowser = accept.includes("text/html");
+          if (!isPayUSuccess(verifiedPayment)) {
+            console.error("[payu] hash mismatch", { txnid: fields.txnid });
+            return isBrowser
+              ? redirectToPending(get("udf3") || fields.txnid)
+              : new Response("hash-mismatch", { status: 200 });
+          }
+
+          console.warn("[payu] callback hash mismatch but PayU verification confirms success", { txnid: fields.txnid });
+        }
 
         // Load payment by txnid (we stored it as both transaction_id and razorpay_order_id)
         const { data: payment } = await supabaseAdmin
@@ -94,8 +108,15 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             : new Response("OK", { status: 200 });
         }
 
+        const verifiedSuccess = isPayUSuccess(verifiedPayment);
+        if (verifiedPayment?.mihpayid && !mihpayid) mihpayid = String(verifiedPayment.mihpayid);
+        if (verifiedPayment?.bank_ref_num && !bankrefnum) bankrefnum = String(verifiedPayment.bank_ref_num);
+        const safeVerifiedPayment = verifiedPayment
+          ? JSON.parse(JSON.stringify(verifiedPayment))
+          : null;
+
         const newStatus: "paid" | "failed" | "attempted" =
-          fields.status === "success" ? "paid" :
+          verifiedSuccess || fields.status === "success" ? "paid" :
           fields.status === "failure" ? "failed" :
           "attempted";
 
@@ -108,7 +129,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           razorpay_signature: receivedHash,
           payment_date: newStatus === "paid" ? new Date().toISOString() : null,
           webhook_response: rawPayload,
-          raw_response: { mihpayid, bankrefnum, ...fields },
+          raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: safeVerifiedPayment } as any,
         }).eq("id", payment.id);
 
         if (newStatus === "paid") {
@@ -181,10 +202,22 @@ function redirectToSuccess(leadCode: string) {
     headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
   });
 }
+function redirectToPending(leadCode: string) {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
+  });
+}
 function redirectToFailure(leadCode: string, reason: string) {
   const q = new URLSearchParams({ reason }).toString();
   return new Response(null, {
     status: 303,
     headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
   });
+}
+
+function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
+  const status = String(payment?.status ?? "").toLowerCase();
+  const unmapped = String(payment?.unmappedstatus ?? "").toLowerCase();
+  return status === "success" || unmapped === "captured";
 }
