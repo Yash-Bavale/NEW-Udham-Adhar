@@ -111,6 +111,9 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         const verifiedSuccess = isPayUSuccess(verifiedPayment);
         if (verifiedPayment?.mihpayid && !mihpayid) mihpayid = String(verifiedPayment.mihpayid);
         if (verifiedPayment?.bank_ref_num && !bankrefnum) bankrefnum = String(verifiedPayment.bank_ref_num);
+        const safeVerifiedPayment = verifiedPayment
+          ? JSON.parse(JSON.stringify(verifiedPayment))
+          : null;
 
         const newStatus: "paid" | "failed" | "attempted" =
           verifiedSuccess || fields.status === "success" ? "paid" :
@@ -126,7 +129,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           razorpay_signature: receivedHash,
           payment_date: newStatus === "paid" ? new Date().toISOString() : null,
           webhook_response: rawPayload,
-          raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: verifiedPayment },
+          raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: safeVerifiedPayment } as any,
         }).eq("id", payment.id);
 
         if (newStatus === "paid") {
@@ -199,10 +202,22 @@ function redirectToSuccess(leadCode: string) {
     headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
   });
 }
+function redirectToPending(leadCode: string) {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
+  });
+}
 function redirectToFailure(leadCode: string, reason: string) {
   const q = new URLSearchParams({ reason }).toString();
   return new Response(null, {
     status: 303,
     headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
   });
+}
+
+function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
+  const status = String(payment?.status ?? "").toLowerCase();
+  const unmapped = String(payment?.unmappedstatus ?? "").toLowerCase();
+  return status === "success" || unmapped === "captured";
 }
