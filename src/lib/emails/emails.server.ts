@@ -108,9 +108,39 @@ export async function processQueueInternal(limit = 20) {
     let ok = false;
 
     try {
+      const recipient = row.to_email.toLowerCase().trim();
+
+      // Ensure a per-recipient unsubscribe token exists (one row per email address).
+      let unsubscribeToken: string | null = null;
+      const { data: existing } = await supabaseAdmin
+        .from("email_unsubscribe_tokens")
+        .select("token")
+        .eq("email", recipient)
+        .maybeSingle();
+      if (existing?.token) {
+        unsubscribeToken = existing.token;
+      } else {
+        const newToken = crypto.randomUUID();
+        const { error: insErr } = await supabaseAdmin
+          .from("email_unsubscribe_tokens")
+          .insert({ email: recipient, token: newToken });
+        if (insErr) {
+          // Likely a race on the unique(email) constraint — re-select.
+          const { data: again } = await supabaseAdmin
+            .from("email_unsubscribe_tokens")
+            .select("token")
+            .eq("email", recipient)
+            .maybeSingle();
+          unsubscribeToken = again?.token ?? null;
+          if (!unsubscribeToken) throw new Error(insErr.message);
+        } else {
+          unsubscribeToken = newToken;
+        }
+      }
+
       const res = await sendLovableEmail(
         {
-          to: row.to_email,
+          to: recipient,
           from: `${fromName} <${fromEmail}>`,
           sender_domain: LOVABLE_SENDER_DOMAIN,
           subject: row.subject,
@@ -119,6 +149,7 @@ export async function processQueueInternal(limit = 20) {
           reply_to: settings.reply_to ?? undefined,
           purpose: "transactional",
           idempotency_key: `bhs-${row.id}-${attempt}`,
+          unsubscribe_token: unsubscribeToken!,
         },
         { apiKey: lovableApiKey },
       );
