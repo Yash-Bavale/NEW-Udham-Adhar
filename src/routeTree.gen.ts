@@ -188,6 +188,7 @@ import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/em
 import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCode.summary'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
+import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -1123,6 +1124,11 @@ const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => AdminLeadsRoute,
 } as any)
+const AdminFinanceSettlementsRoute = AdminFinanceSettlementsRouteImport.update({
+  id: '/finance/settlements',
+  path: '/finance/settlements',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFinanceGstRoute = AdminFinanceGstRouteImport.update({
   id: '/finance/gst',
   path: '/finance/gst',
@@ -1333,6 +1339,7 @@ export interface FileRoutesByFullPath {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
+  '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
@@ -1519,6 +1526,7 @@ export interface FileRoutesByTo {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
+  '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
@@ -1707,6 +1715,7 @@ export interface FileRoutesById {
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
+  '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
@@ -1896,6 +1905,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/finance/gst'
+    | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
@@ -2082,6 +2092,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin'
     | '/admin/finance/gst'
+    | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
@@ -2269,6 +2280,7 @@ export interface FileRouteTypes {
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/finance/gst'
+    | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
@@ -3712,6 +3724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
       parentRoute: typeof AdminLeadsRoute
     }
+    '/admin/finance/settlements': {
+      id: '/admin/finance/settlements'
+      path: '/finance/settlements'
+      fullPath: '/admin/finance/settlements'
+      preLoaderRoute: typeof AdminFinanceSettlementsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/finance/gst': {
       id: '/admin/finance/gst'
       path: '/finance/gst'
@@ -3780,6 +3799,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFinanceGstRoute: typeof AdminFinanceGstRoute
+  AdminFinanceSettlementsRoute: typeof AdminFinanceSettlementsRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -3793,6 +3813,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFinanceGstRoute: AdminFinanceGstRoute,
+  AdminFinanceSettlementsRoute: AdminFinanceSettlementsRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
