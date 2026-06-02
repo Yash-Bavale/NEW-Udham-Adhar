@@ -181,26 +181,53 @@ const MIGRATE: OnboardingSchema = {
 };
 
 const FORGOT_MOBILE: OnboardingSchema = {
-  title: "Recover Registered Mobile / Email",
-  description: "Help us identify your record so we can reset the registered contact details.",
+  title: "Forgot Registered Mobile / Email — Incomplete Information",
+  description: "Fill the applicant contact and identity details required to prepare the update request and signed application.",
+  fields: [
+    { key: "user_type", label: "Select Type of User", type: "select", required: true, options: FORGOT_USER_TYPES },
+    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
+    { key: "applicant_name", label: "Name (as per Aadhaar)", type: "text", required: true, maxLength: 120 },
+    { key: "aadhaar_address", label: "Address (as per Aadhaar)", type: "textarea", required: true, maxLength: 600 },
+    { key: "pan_number", label: "PAN Card Number", type: "text", required: true, pattern: "^[A-Z]{5}\\d{4}[A-Z]$", maxLength: 10 },
+    { key: "pincode", label: "PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
+    { key: "state", label: "State", type: "text", required: true, maxLength: 80 },
+    { key: "district", label: "District", type: "text", required: true, maxLength: 80 },
+    { key: "new_email", label: "Email ID (please enter correct email)", type: "email", required: true },
+    { key: "new_mobile", label: "Mobile Number (+91)", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "udyam_or_uam_number", label: "UAM / Udyam Registration Number (if available)", type: "text", required: false, maxLength: 40 },
+  ],
+  documents: [
+    { key: "aadhaar_card_pdf", label: "Aadhaar Card PDF", required: true },
+    { key: "pan_card_pdf", label: "PAN Card PDF", required: true },
+    { key: "signed_application_format", label: "Signed Application Format", required: false, help: "Download the generated application, sign it, then upload it here." },
+  ],
+};
+
+const CORRECT_PAN_AADHAAR: OnboardingSchema = {
+  title: "Correct PAN / Aadhaar Name in Udyam — Incomplete Information",
+  description: "Provide your Udyam number and registered contact details so our team can assist with correction requirements.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "udyam_number", label: "Udyam Number (if known)", type: "text", required: false, maxLength: 40 },
-    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
-    { key: "new_mobile", label: "New mobile to register", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "new_email", label: "New email to register", type: "email", required: true },
-    { key: "reason", label: "Reason / details", type: "textarea", required: false, maxLength: 600 },
+    { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, placeholder: "UDYAM-XX-00-0000000" },
+    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
+    { key: "correction_needed", label: "Correction required", type: "textarea", required: false, maxLength: 800, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
   ],
-  documents: COMMON_DOCS,
+  documents: [
+    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
+    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
+    { key: "pan_card", label: "PAN Card", required: false },
+  ],
 };
 
 const DEFAULT: OnboardingSchema = {
-  title: "Tell us more about your requirement",
-  description: "Share details and any supporting documents so our expert can call you with a clear plan.",
+  title: "Talk to Expert — Suitable Service Selection",
+  description: "Select the service you need help with and share any context so our expert can guide the next step.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
+    { key: "selected_service", label: "Select Service", type: "select", required: true, options: TALK_TO_EXPERT_OPTIONS },
     { key: "alt_mobile", label: "Alternate Mobile", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
-    { key: "details", label: "Describe your requirement", type: "textarea", required: true, maxLength: 1200 },
+    { key: "details", label: "Describe your requirement", type: "textarea", required: false, maxLength: 1200 },
   ],
   documents: [
     { key: "aadhaar_front", label: "Aadhaar Card (front)", required: false },
@@ -214,7 +241,7 @@ export const ONBOARDING_SCHEMAS: Record<string, OnboardingSchema> = {
   "download-udyam-certificate": UDYAM_DOWNLOAD,
   "migrate-udyog-aadhaar-to-udyam": MIGRATE,
   "forgot-mobile-email": FORGOT_MOBILE,
-  "correct-pan-aadhaar": UDYAM_UPDATE,
+  "correct-pan-aadhaar": CORRECT_PAN_AADHAAR,
   "talk-to-expert": DEFAULT,
 };
 
