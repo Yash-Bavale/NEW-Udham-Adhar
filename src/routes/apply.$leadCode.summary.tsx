@@ -80,7 +80,7 @@ const GATEWAY_BRAND: Record<
   ccavenue: { bg: "#E11D48", fg: "#ffffff", label: "CCAvenue", tag: "Cards · Net Banking" },
 };
 
-const SESSION_SECONDS = 120; // 2 minutes
+
 
 function SummaryPage() {
   const { leadCode } = Route.useParams();
