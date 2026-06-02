@@ -6,6 +6,7 @@ import { getLead, updateLead, addLeadNote } from "@/lib/crm/leads-admin.function
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
+import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 
 export const Route = createFileRoute("/admin/leads/$leadId")({ component: LeadDetailPage });
 
@@ -126,6 +127,10 @@ function LeadDetailPage() {
           ))}
           {notes.length === 0 && <li className="text-sm text-slate-500">No notes yet.</li>}
         </ul>
+      </Card>
+
+      <Card title="Finance">
+        <LeadFinanceTab leadId={leadId} />
       </Card>
 
       <Card title="Timeline">
