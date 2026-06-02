@@ -167,17 +167,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </header>
 
         <div className="flex-1 px-5 py-6 max-w-[1400px] w-full mx-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={path}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={path}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.15 }}
+          >
+            {children}
+          </motion.div>
         </div>
       </main>
     </div>
