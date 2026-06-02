@@ -32,6 +32,8 @@ export const listLeads = createServerFn({ method: "POST" })
 
     if (data.status) q = q.eq("status", data.status as LeadStatus);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+    if (data.dateTo) q = q.lte("created_at", data.dateTo);
     if (data.search) {
       const s = data.search.replace(/[,()]/g, " ").trim();
       q = q.or(
