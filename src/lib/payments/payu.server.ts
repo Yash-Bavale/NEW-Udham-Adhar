@@ -4,8 +4,9 @@
 // Live URL: https://secure.payu.in/_payment
 import { createHash } from "crypto";
 
+// Safer default: 'test'. Only flip to 'live' when explicitly set.
 export const PAYU_MODE: "test" | "live" =
-  (process.env.PAYU_MODE as "test" | "live") || "live";
+  process.env.PAYU_MODE === "live" ? "live" : "test";
 
 
 export const PAYU_BASE_URL =
