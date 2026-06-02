@@ -107,7 +107,10 @@ async function generateAndStore(paymentId: string): Promise<string> {
     .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
   if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
-  await supabaseAdmin.from("invoices").update({ pdf_path: path }).eq("id", invoiceId);
+  await supabaseAdmin.from("invoices").update({
+    pdf_path: path,
+    pdf_generated_at: new Date().toISOString(),
+  }).eq("id", invoiceId);
 
   return invoiceId;
 }
