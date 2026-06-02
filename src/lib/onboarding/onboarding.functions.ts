@@ -40,7 +40,7 @@ export const getOnboarding = createServerFn({ method: "POST" })
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema: OnboardingSchema = getSchema(serviceCode);
 
-    const [submissionRes, docsRes] = await Promise.all([
+    const [submissionRes, docsRes, paidPaymentRes] = await Promise.all([
       supabaseAdmin
         .from("onboarding_submissions")
         .select("id, form_data, status, submitted_at, updated_at")
@@ -51,12 +51,23 @@ export const getOnboarding = createServerFn({ method: "POST" })
         .select("id, doc_type, file_name, mime_type, size_bytes, status, remarks, uploaded_at")
         .eq("lead_id", lead.id)
         .order("uploaded_at", { ascending: false }),
+      supabaseAdmin
+        .from("payments")
+        .select("id")
+        .eq("lead_id", lead.id)
+        .eq("status", "paid")
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     if (submissionRes.error) throw new Error(submissionRes.error.message);
     if (docsRes.error) throw new Error(docsRes.error.message);
 
-    const paid = lead.status === "payment_successful" || lead.status === "under_process" || lead.status === "completed";
+    const paid =
+      !!paidPaymentRes.data ||
+      lead.status === "payment_successful" ||
+      lead.status === "under_process" ||
+      lead.status === "completed";
 
     return {
       lead: {
