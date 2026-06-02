@@ -353,7 +353,7 @@ function SuccessPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-center print:hidden">
+                <div className="flex flex-wrap justify-center gap-2 print:hidden">
                   <Button
                     onClick={() => window.print()}
                     variant="outline"
@@ -362,6 +362,21 @@ function SuccessPage() {
                   >
                     <Printer className="w-3.5 h-3.5 mr-2" />
                     Print Receipt
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const { url } = await getCustomerInvoiceUrl({ data: { leadCode } });
+                        window.open(url, "_blank", "noopener");
+                      } catch (e: any) {
+                        alert(e?.message ?? "Tax invoice is being generated. Try again in a moment.");
+                      }
+                    }}
+                    size="sm"
+                    className="bg-brand-navy text-white hover:bg-brand-navy/90 rounded-full"
+                  >
+                    <FileText className="w-3.5 h-3.5 mr-2" />
+                    Download Tax Invoice
                   </Button>
                 </div>
               </div>
