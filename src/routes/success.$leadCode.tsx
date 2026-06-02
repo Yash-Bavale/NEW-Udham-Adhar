@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CheckCircle2,
@@ -35,8 +35,11 @@ export const Route = createFileRoute("/success/$leadCode")({
   component: SuccessPage,
 });
 
+const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
+
 function SuccessPage() {
   const { leadCode } = Route.useParams();
+  const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
 
   const [data, setData] = useState<any>(null);
@@ -46,17 +49,38 @@ function SuccessPage() {
 
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
+    let cancelled = false;
+
     (async () => {
-      try {
-        const res = await getSummary({ data: { leadCode } });
-        setData(res);
-      } catch (err: any) {
-        setError(err?.message || "Failed to load details");
-      } finally {
-        setIsLoading(false);
+      // Poll briefly to give PayU's webhook a chance to mark the payment paid
+      const maxAttempts = 6;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          const res = await getSummary({ data: { leadCode } });
+          if (cancelled) return;
+          const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
+          if (isPaid) {
+            setData(res);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err: any) {
+          if (cancelled) return;
+          setError(err?.message || "Failed to load details");
+          setIsLoading(false);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
       }
+      if (cancelled) return;
+      // Webhook never confirmed payment — bounce back to the payment page
+      navigate({ to: "/payment/$leadCode", params: { leadCode }, replace: true });
     })();
-  }, [leadCode, getSummary]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [leadCode, getSummary, navigate]);
 
   if (isLoading) {
     return (
@@ -64,6 +88,7 @@ function SuccessPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-brand-red border-t-transparent rounded-full animate-spin" />
           <p className="text-brand-navy font-semibold">Confirming payment…</p>
+          <p className="text-xs text-slate-500">This can take a few seconds.</p>
         </div>
       </div>
     );
@@ -85,6 +110,8 @@ function SuccessPage() {
       </div>
     );
   }
+
+  if (!data) return null;
 
   const lead = data?.lead;
   const payment = lead?.payment;
