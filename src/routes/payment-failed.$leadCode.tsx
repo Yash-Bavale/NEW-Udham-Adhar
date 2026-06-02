@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { XCircle, RefreshCw, MessageCircle, ShieldCheck } from "lucide-react";
@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
+
+const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
 
 export const Route = createFileRoute("/payment-failed/$leadCode")({
   head: () => ({
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/payment-failed/$leadCode")({
 function FailedPage() {
   const { leadCode } = Route.useParams();
   const { reason } = Route.useSearch();
+  const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
 
   const { data } = useQuery({
@@ -34,6 +37,13 @@ function FailedPage() {
   useEffect(() => {
     trackEvent("payment_failed_page_view", { leadCode, reason });
   }, [leadCode, reason]);
+
+  useEffect(() => {
+    const isPaid = !!data?.lead?.payment || PAID_STATUSES.has(data?.lead?.status);
+    if (isPaid) {
+      navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
+    }
+  }, [data?.lead?.payment, data?.lead?.status, leadCode, navigate]);
 
   const lead = data?.lead;
 
