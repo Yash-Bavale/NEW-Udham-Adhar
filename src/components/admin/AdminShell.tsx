@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity, Mail, CreditCard,
-  LogOut, Menu, Moon, Sun, ChevronRight,
+  LogOut, Menu, Moon, Sun, ChevronRight, Receipt, Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/theme";
@@ -14,6 +14,8 @@ const NAV = [
   { to: "/admin/applications", label: "Applications", icon: FileText },
   { to: "/admin/services", label: "Services", icon: Briefcase },
   { to: "/admin/gateways", label: "Gateways", icon: CreditCard },
+  { to: "/admin/finance/gst", label: "GST Report", icon: Receipt },
+  { to: "/admin/finance/settlements", label: "Settlements", icon: Wallet },
   { to: "/admin/emails", label: "Emails", icon: Mail },
   { to: "/admin/users", label: "Users", icon: UserCog },
   { to: "/admin/activity", label: "Activity", icon: Activity },
