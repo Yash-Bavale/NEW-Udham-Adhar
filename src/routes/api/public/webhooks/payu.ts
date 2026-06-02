@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { computeResponseHash, getPayUCreds } from "@/lib/payments/payu.server";
 import { generateInvoiceInternal } from "@/lib/crm/invoices.functions";
+import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
 /**
  * PayU return / S2S endpoint. PayU posts x-www-form-urlencoded with the
@@ -123,6 +124,33 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
 
           try { await generateInvoiceInternal(payment.id); }
           catch (e) { console.error("[payu] invoice generation failed", e); }
+
+          // Send welcome+receipt+onboarding email (best-effort, never blocks)
+          try {
+            const { data: leadRow } = await supabaseAdmin
+              .from("leads")
+              .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+              .eq("id", payment.lead_id)
+              .maybeSingle();
+            if (leadRow?.email && leadRow.lead_code) {
+              const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+              await enqueueFromTemplateInternal(
+                "payment_success",
+                leadRow.email,
+                {
+                  name: leadRow.name ?? "",
+                  lead_code: leadRow.lead_code,
+                  service: leadRow.service ?? "",
+                  base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
+                  gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
+                  total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                  onboarding_url: onboardingUrl,
+                  support_email: "help@businesshelpservices.com",
+                },
+                { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: payment.application_id ?? undefined },
+              );
+            }
+          } catch (e) { console.error("[payu] payment_success email enqueue failed", e); }
 
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
