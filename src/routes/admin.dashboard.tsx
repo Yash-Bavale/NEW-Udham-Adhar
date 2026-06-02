@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from "recharts";
-import { Users, TrendingUp, CheckCircle2, Clock, Activity as ActivityIcon, Wallet } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, Clock, Activity as ActivityIcon, Wallet, UserCheck, AlertTriangle } from "lucide-react";
 import { getDashboardStats } from "@/lib/crm/dashboard.functions";
 import { getFunnelStats } from "@/lib/analytics/funnel.functions";
 import { StatCard, SectionCard, TableSkeleton, StatusBadge, Timeline } from "@/components/admin/ui";
@@ -20,7 +20,10 @@ function DashboardPage() {
   if (error) return <div className="text-sm text-red-700">{(error as Error).message}</div>;
 
   const totals = data?.totals;
-  const trend = (data as { trend?: Array<{ date: string; count: number }> })?.trend ?? [];
+  const trend = data?.trend ?? [];
+  const currentUser = data?.currentUser;
+  const repeatCount = (totals?.totalLeads ?? 0) - (totals?.uniqueCustomers ?? 0);
+  const showRoleBanner = !isLoading && data && currentUser && !currentUser.hasStaffRole;
 
   return (
     <div className="space-y-6">
@@ -29,13 +32,35 @@ function DashboardPage() {
         <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>Overview of leads, applications and revenue activity.</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {showRoleBanner && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">No staff role assigned to your account.</div>
+            <div className="text-xs mt-1">
+              You're signed in, but you don't have any of <code>admin / super_admin / operations / support / accounts / finance</code>.
+              Row-Level Security will hide leads, payments, and applications from you. Ask an existing admin to add a role in <strong>Admin → Users</strong>, or run a database insert into <code>public.user_roles</code>.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard index={0} label="Total Leads" value={totals?.totalLeads ?? 0} icon={<Users className="size-4" />} gradient="primary" loading={isLoading} />
-        <StatCard index={1} label="Today" value={totals?.todayLeads ?? 0} icon={<TrendingUp className="size-4" />} gradient="success" loading={isLoading} />
-        <StatCard index={2} label="This Week" value={totals?.weekLeads ?? 0} icon={<ActivityIcon className="size-4" />} gradient="primary" loading={isLoading} />
-        <StatCard index={3} label="In Progress" value={totals?.inProgress ?? 0} icon={<Clock className="size-4" />} gradient="warn" loading={isLoading} />
-        <StatCard index={4} label="Completed" value={totals?.completed ?? 0} icon={<CheckCircle2 className="size-4" />} gradient="success" loading={isLoading} />
-        <StatCard index={5} label="Pending" value={totals?.pending ?? 0} icon={<Wallet className="size-4" />} gradient="danger" loading={isLoading} />
+        <StatCard
+          index={1}
+          label="Unique Customers"
+          value={totals?.uniqueCustomers ?? 0}
+          icon={<UserCheck className="size-4" />}
+          gradient="primary"
+          loading={isLoading}
+          hint={repeatCount > 0 ? `${repeatCount} repeat lead${repeatCount === 1 ? "" : "s"}` : "no repeats"}
+        />
+        <StatCard index={2} label="Today" value={totals?.todayLeads ?? 0} icon={<TrendingUp className="size-4" />} gradient="success" loading={isLoading} />
+        <StatCard index={3} label="This Week" value={totals?.weekLeads ?? 0} icon={<ActivityIcon className="size-4" />} gradient="primary" loading={isLoading} />
+        <StatCard index={4} label="In Progress" value={totals?.inProgress ?? 0} icon={<Clock className="size-4" />} gradient="warn" loading={isLoading} />
+        <StatCard index={5} label="Completed" value={totals?.completed ?? 0} icon={<CheckCircle2 className="size-4" />} gradient="success" loading={isLoading} />
+        <StatCard index={6} label="Pending" value={totals?.pending ?? 0} icon={<Wallet className="size-4" />} gradient="danger" loading={isLoading} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
