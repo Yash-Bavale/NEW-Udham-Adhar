@@ -59,21 +59,38 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           return redirectToFailure(get("udf3") || fields.txnid, "Signature verification failed");
         }
 
+        // Detect S2S vs browser-return: PayU's server-to-server webhook
+        // doesn't send Accept: text/html. Browser-return POST does.
+        const accept = request.headers.get("accept") ?? "";
+        const isBrowser = accept.includes("text/html");
+
         // Load payment by txnid (we stored it as both transaction_id and razorpay_order_id)
         const { data: payment } = await supabaseAdmin
           .from("payments")
-          .select("id, lead_id, application_id, status")
+          .select("id, lead_id, application_id, status, amount")
           .or(`transaction_id.eq.${fields.txnid},razorpay_order_id.eq.${fields.txnid}`)
           .maybeSingle();
 
         if (!payment) {
           console.error("[payu] payment row missing", fields.txnid);
-          return redirectToFailure(get("udf3") || fields.txnid, "Payment record not found");
+          return isBrowser
+            ? redirectToFailure(get("udf3") || fields.txnid, "Payment record not found")
+            : new Response("payment-not-found", { status: 200 });
         }
 
-        // Idempotency: if already paid, just redirect
+        if (Number(fields.amount) !== Number(payment.amount)) {
+          console.warn("[payu] amount mismatch", {
+            txnid: fields.txnid,
+            expected: payment.amount,
+            received: fields.amount,
+          });
+        }
+
+        // Idempotency: if already paid, just acknowledge
         if (payment.status === "paid" && fields.status === "success") {
-          return redirectToSuccess(get("udf3") || fields.txnid);
+          return isBrowser
+            ? redirectToSuccess(get("udf3") || fields.txnid)
+            : new Response("OK", { status: 200 });
         }
 
         const newStatus: "paid" | "failed" | "attempted" =
@@ -94,7 +111,6 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         }).eq("id", payment.id);
 
         if (newStatus === "paid") {
-          // Update lead + application
           await supabaseAdmin.from("leads")
             .update({ status: "payment_successful" })
             .eq("id", payment.lead_id);
@@ -105,30 +121,42 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
               .eq("id", payment.application_id);
           }
 
-          // Generate invoice (non-fatal)
           try { await generateInvoiceInternal(payment.id); }
           catch (e) { console.error("[payu] invoice generation failed", e); }
 
-          return redirectToSuccess(get("udf3") || fields.txnid);
+          return isBrowser
+            ? redirectToSuccess(get("udf3") || fields.txnid)
+            : new Response("OK", { status: 200 });
         }
 
         if (newStatus === "failed") {
           await supabaseAdmin.from("leads")
             .update({ status: "payment_pending" })
             .eq("id", payment.lead_id);
-          return redirectToFailure(get("udf3") || fields.txnid, "Payment failed");
+          return isBrowser
+            ? redirectToFailure(get("udf3") || fields.txnid, "Payment failed")
+            : new Response("OK", { status: 200 });
         }
 
-        return new Response("ok", { status: 200 });
+        return new Response("OK", { status: 200 });
       },
     },
   },
 });
 
+const APP_ORIGIN = process.env.APP_BASE_URL ||
+  "https://everythinghappensqindiaserver4cored.lovable.app";
+
 function redirectToSuccess(leadCode: string) {
-  return new Response(null, { status: 303, headers: { Location: `/success/${encodeURIComponent(leadCode)}` } });
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
+  });
 }
 function redirectToFailure(leadCode: string, reason: string) {
   const q = new URLSearchParams({ reason }).toString();
-  return new Response(null, { status: 303, headers: { Location: `/payment-pending/${encodeURIComponent(leadCode)}?${q}` } });
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}?${q}` },
+  });
 }
