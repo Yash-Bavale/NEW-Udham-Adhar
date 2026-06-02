@@ -39,7 +39,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false });
 
-    const successfulPayment = payments?.find(p => p.status === 'paid' || p.status === 'captured') || null;
+    const successfulPayment = payments?.find(p => p.status === 'paid') || null;
 
     const { data: gateways } = await supabaseAdmin
       .from("payment_gateways")
