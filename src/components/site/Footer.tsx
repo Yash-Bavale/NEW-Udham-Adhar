@@ -13,10 +13,9 @@ import {
   Instagram,
   Youtube,
   MessageCircle,
-  HelpCircle,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
-import { getPopularFaqs, FAQ_CATEGORIES } from "@/lib/faqs-data";
+
 
 type SeoPageRow = { id: string; slug: string; label: string };
 
@@ -284,67 +283,6 @@ export function Footer() {
         </div>
       </div>
 
-      {/* FAQ band */}
-      <div className="border-t border-white/10 bg-brand-navy-deep/40">
-        <div className="mx-auto max-w-7xl px-4 py-10 grid gap-8 md:grid-cols-3">
-          <div>
-            <h4 className="flex items-center gap-2 text-xl font-bold font-display">
-              <HelpCircle className="h-5 w-5" /> Popular FAQs
-            </h4>
-            <p className="mt-2 text-sm text-white/70">
-              Quick answers about Udyam registration, MSME certificate and Udyog Aadhaar.
-            </p>
-            <ul className="mt-4 space-y-2 text-[14px] text-white/90">
-              {getPopularFaqs(8).map((f) => (
-                <li key={f.id}>
-                  <Link
-                    to="/faqs"
-                    hash={`q-${f.id}`}
-                    className="hover:text-brand-gold hover:underline flex items-start gap-2"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5 mt-1 shrink-0" />
-                    <span>{f.q}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-xl font-bold font-display">Browse FAQs by Topic</h4>
-            <p className="mt-2 text-sm text-white/70">
-              Categorized for fast discovery and easier indexing by search engines.
-            </p>
-            <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[14px] text-white/90">
-              {FAQ_CATEGORIES.map((c) => (
-                <li key={c.key}>
-                  <Link
-                    to="/faqs"
-                    hash={c.key}
-                    className="hover:text-brand-gold hover:underline flex items-center gap-2"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                    <span>{c.title}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="md:text-right">
-            <h4 className="text-xl font-bold font-display">Need more help?</h4>
-            <p className="mt-2 text-sm text-white/70 md:ml-auto md:max-w-xs">
-              Read all 115 detailed Udyam, MSME and Udyog Aadhaar FAQs in one searchable knowledge base.
-            </p>
-            <Link
-              to="/faqs"
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-deep hover:opacity-90 transition"
-            >
-              View all FAQs <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </div>
       <div className="border-t border-white/10">
 
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
