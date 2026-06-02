@@ -9,6 +9,8 @@ const ListInput = z.object({
   search: z.string().trim().max(200).optional(),
   status: z.enum(LEAD_STATUSES as [string, ...string[]]).optional(),
   assignedTo: z.string().uuid().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 });
 
 export const listLeads = createServerFn({ method: "POST" })
