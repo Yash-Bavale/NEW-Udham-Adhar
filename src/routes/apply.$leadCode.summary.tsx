@@ -102,14 +102,6 @@ function SummaryPage() {
   const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // 2-minute session timer
-  const [secondsLeft, setSecondsLeft] = useState(SESSION_SECONDS);
-  useEffect(() => {
-    if (secondsLeft <= 0 || order) return;
-    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [secondsLeft, order]);
-
   useEffect(() => {
     trackEvent("summary_viewed", { leadCode });
   }, [leadCode]);
