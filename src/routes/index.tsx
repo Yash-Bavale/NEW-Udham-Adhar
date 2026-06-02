@@ -146,6 +146,21 @@ function HomePage() {
             </AccordionItem>
           ))}
         </Accordion>
+
+        <div className="mt-8 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-muted-foreground">
+            Browse 100+ detailed answers on Udyam, MSME &amp; Udyog Aadhaar — registration, download, print, updates and more.
+          </p>
+          <Button
+            asChild
+            size="lg"
+            className="bg-brand-navy text-white hover:bg-brand-navy-deep shadow-sm"
+          >
+            <Link to="/faqs">
+              Read all 115 FAQs <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </section>
 
       {/* Process Steps */}
