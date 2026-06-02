@@ -418,8 +418,6 @@ function SummaryPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Opening secure payment…
               </span>
-            ) : sessionExpired ? (
-              "Session expired — refresh to retry"
             ) : (
               <>Pay ₹{lead.totalAmount.toFixed(2)} securely →</>
             )}
