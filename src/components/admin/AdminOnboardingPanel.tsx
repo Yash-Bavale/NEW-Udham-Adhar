@@ -7,6 +7,7 @@ import {
   getDocumentSignedUrl,
   setDocumentStatus,
 } from "@/lib/onboarding/onboarding.functions";
+import { getSchema } from "@/lib/onboarding/schemas";
 
 export function AdminOnboardingPanel({ leadId }: { leadId: string }) {
   const qc = useQueryClient();
@@ -24,6 +25,8 @@ export function AdminOnboardingPanel({ leadId }: { leadId: string }) {
 
   const sub = data.submission;
   const docs = data.documents;
+  const schema = sub ? getSchema(sub.service_code) : null;
+  const labels = new Map(schema?.fields.map((f) => [f.key, f.label]) ?? []);
 
   return (
     <div className="space-y-5">
@@ -54,11 +57,11 @@ export function AdminOnboardingPanel({ leadId }: { leadId: string }) {
                   <> · Submitted {new Date(sub.submitted_at).toLocaleString("en-IN")}</>
                 )}
               </div>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 {Object.entries((sub.form_data ?? {}) as Record<string, unknown>).map(([k, v]) => (
-                  <div key={k} className="flex flex-col py-1 border-b last:border-0">
-                    <dt className="text-xs text-slate-500">{k}</dt>
-                    <dd className="font-medium break-words">{String(v ?? "—")}</dd>
+                  <div key={k} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                    <dt className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">{labels.get(k) ?? k.replace(/_/g, " ")}</dt>
+                    <dd className="font-medium break-words text-slate-900 mt-0.5">{String(v ?? "—") || "—"}</dd>
                   </div>
                 ))}
               </dl>
