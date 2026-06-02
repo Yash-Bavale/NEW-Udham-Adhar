@@ -122,8 +122,27 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const bareLayout = path.startsWith("/admin") || path === "/admin-login";
+
+  useEffect(() => {
+    let mounted = false;
+    // Skip the initial INITIAL_SESSION event to avoid a redundant invalidate.
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (!mounted) {
+          mounted = true;
+          if (event === "INITIAL_SESSION") return;
+        }
+        router.invalidate();
+        queryClient.invalidateQueries();
+      });
+      cleanup = () => subscription.unsubscribe();
+    });
+    let cleanup: (() => void) | undefined;
+    return () => cleanup?.();
+  }, [router, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
