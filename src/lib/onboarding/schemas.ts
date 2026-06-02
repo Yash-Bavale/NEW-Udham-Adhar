@@ -136,40 +136,48 @@ const NEW_UDYAM: OnboardingSchema = {
 };
 
 const UDYAM_UPDATE: OnboardingSchema = {
-  title: "Update Your Existing Udyam Certificate",
-  description: "Tell us what needs to change. We'll request OTP on your Aadhaar-linked mobile.",
-  fields: [
-    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "udyam_number", label: "Existing Udyam Registration Number", type: "text", required: true, placeholder: "UDYAM-XX-00-0000000" },
-    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
-    { key: "aadhaar_mobile", label: "Mobile linked to Aadhaar", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "fields_to_update", label: "What do you want to update?", type: "textarea", required: true, maxLength: 600, help: "List each field and its new value." },
-  ],
-  documents: COMMON_DOCS,
-};
-
-const UDYAM_DOWNLOAD: OnboardingSchema = {
-  title: "Download / Print Udyam Certificate",
-  description: "We need your existing Udyam number and Aadhaar-linked mobile to fetch the certificate.",
+  title: "Update Udyam Certificate — Incomplete Information",
+  description: "Share your existing Udyam number and registered contact details so our team can process the update request.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
     { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, placeholder: "UDYAM-XX-00-0000000" },
-    { key: "aadhaar_mobile", label: "Mobile linked to Aadhaar", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$", placeholder: "10 digit registered mobile" },
+    { key: "registered_email", label: "Registered Email ID", type: "email", required: false, placeholder: "Registered email, if available" },
+    { key: "fields_to_update", label: "What details need to be updated?", type: "textarea", required: false, maxLength: 1200, help: "Mention any details our team should update or verify." },
+  ],
+  documents: [
+    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
+    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
+    { key: "pan_card", label: "PAN Card", required: false },
+  ],
+};
+
+const UDYAM_DOWNLOAD: OnboardingSchema = {
+  title: "Download Udyam Certificate — Incomplete Information",
+  description: "Provide the existing Udyam number and registered mobile number/email ID so we can assist with certificate download.",
+  fields: [
+    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
+    { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, placeholder: "UDYAM-XX-00-0000000" },
+    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
   ],
   documents: [],
 };
 
 const MIGRATE: OnboardingSchema = {
-  title: "Migrate Udyog Aadhaar to Udyam",
-  description: "Old UAM number plus your current Aadhaar and PAN.",
+  title: "Migrate Udyog Aadhaar to Udyam — Incomplete Information",
+  description: "Share your Udyog Aadhaar number so our experts can verify migration requirements.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "uam_number", label: "Existing Udyog Aadhaar (UAM) Number", type: "text", required: true, maxLength: 30 },
-    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
-    { key: "pan_number", label: "PAN Number", type: "text", required: true, pattern: "^[A-Z]{5}\\d{4}[A-Z]$", maxLength: 10 },
-    { key: "aadhaar_mobile", label: "Mobile linked to Aadhaar", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "uam_number", label: "Udyog Aadhaar Number", type: "text", required: true, pattern: "^[A-Z]{2}\\d{2}[A-Z]\\d{7}$", placeholder: "DL05A0000001", maxLength: 12, help: "Format: first 2 alphabets, then 2 digits, then 1 alphabet, then 7 digits." },
+    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
+    { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
   ],
-  documents: COMMON_DOCS,
+  documents: [
+    { key: "udyog_aadhaar_certificate", label: "Existing Udyog Aadhaar / UAM Certificate", required: false },
+    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
+    { key: "pan_card", label: "PAN Card", required: false },
+  ],
 };
 
 const FORGOT_MOBILE: OnboardingSchema = {
