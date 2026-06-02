@@ -7,15 +7,17 @@ const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 
 /**
  * Public summary used on /apply/:leadCode/summary.
- * Returns service name, customer name, total amount, and enabled payment gateways.
- * Pricing breakdown (base/GST) is intentionally NOT exposed publicly — only `total`.
+ * Returns service info, customer contact, full pricing breakdown (base/GST/total)
+ * and enabled payment gateways.
  */
 export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
     const { data: lead, error } = await supabaseAdmin
       .from("leads")
-      .select("id, lead_code, name, email, mobile, service, total_amount, status")
+      .select(
+        "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status",
+      )
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -34,11 +36,48 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         email: lead.email,
         mobile: lead.mobile,
         service: lead.service,
+        baseAmount: Number(lead.base_amount ?? 0),
+        gstAmount: Number(lead.gst_amount ?? 0),
         totalAmount: Number(lead.total_amount ?? 0),
         status: lead.status,
       },
       gateways: gateways ?? [],
     };
+  });
+
+// ── Customer self-edit of contact details (pre-payment only) ──
+
+const UpdateContact = z.object({
+  leadCode: z.string().trim().min(3).max(80),
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(160),
+  mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+});
+
+export const updateLeadContact = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => UpdateContact.parse(i))
+  .handler(async ({ data }) => {
+    // Only allow edits before payment is captured
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("id, status")
+      .eq("lead_code", data.leadCode)
+      .maybeSingle();
+    if (!lead) throw new Error("Application not found");
+    if (lead.status === "payment_successful" || lead.status === "completed") {
+      throw new Error("Details can't be changed after payment.");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("leads")
+      .update({
+        name: data.name,
+        email: data.email.toLowerCase(),
+        mobile: data.mobile,
+      })
+      .eq("id", lead.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ── Admin: gateway management ──
