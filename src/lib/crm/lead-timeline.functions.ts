@@ -12,7 +12,7 @@ export interface TimelineItem {
   title: string;
   detail?: string;
   actorId?: string | null;
-  meta?: Record<string, unknown>;
+  meta?: Record<string, string | number | boolean | null>;
 }
 
 export const getLeadTimeline = createServerFn({ method: "POST" })
