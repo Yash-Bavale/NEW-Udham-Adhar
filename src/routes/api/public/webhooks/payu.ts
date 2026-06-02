@@ -108,8 +108,12 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             : new Response("OK", { status: 200 });
         }
 
+        const verifiedSuccess = isPayUSuccess(verifiedPayment);
+        if (verifiedPayment?.mihpayid && !mihpayid) mihpayid = String(verifiedPayment.mihpayid);
+        if (verifiedPayment?.bank_ref_num && !bankrefnum) bankrefnum = String(verifiedPayment.bank_ref_num);
+
         const newStatus: "paid" | "failed" | "attempted" =
-          fields.status === "success" ? "paid" :
+          verifiedSuccess || fields.status === "success" ? "paid" :
           fields.status === "failure" ? "failed" :
           "attempted";
 
@@ -122,7 +126,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           razorpay_signature: receivedHash,
           payment_date: newStatus === "paid" ? new Date().toISOString() : null,
           webhook_response: rawPayload,
-          raw_response: { mihpayid, bankrefnum, ...fields },
+          raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: verifiedPayment },
         }).eq("id", payment.id);
 
         if (newStatus === "paid") {
