@@ -228,14 +228,9 @@ function FaqsPage() {
                     className="border border-border rounded-lg px-4 bg-card data-[state=open]:shadow-sm"
                   >
                     <AccordionTrigger className="text-left text-[15px] md:text-base font-semibold font-display hover:no-underline">
-                      <span className="flex gap-3">
-                        <span className="text-muted-foreground font-mono text-xs md:text-sm pt-0.5">
-                          Q{f.id}
-                        </span>
-                        <span>{f.q}</span>
-                      </span>
+                      <span>{f.q}</span>
                     </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground leading-relaxed text-[15px] pl-9">
+                    <AccordionContent className="text-muted-foreground leading-relaxed text-[15px]">
                       {f.a}
                     </AccordionContent>
                   </AccordionItem>
