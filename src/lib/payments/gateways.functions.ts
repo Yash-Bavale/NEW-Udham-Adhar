@@ -64,7 +64,7 @@ export const updateLeadContact = createServerFn({ method: "POST" })
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (!lead) throw new Error("Application not found");
-    if (lead.status === "payment_received" || lead.status === "completed") {
+    if (lead.status === "payment_successful" || lead.status === "completed") {
       throw new Error("Details can't be changed after payment.");
     }
 
