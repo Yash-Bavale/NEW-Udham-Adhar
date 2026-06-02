@@ -5,7 +5,7 @@
 import { createHash } from "crypto";
 
 export const PAYU_MODE: "test" | "live" =
-  (process.env.PAYU_MODE as "test" | "live") || "test";
+  (process.env.PAYU_MODE as "test" | "live") || "live";
 
 export const PAYU_BASE_URL =
   PAYU_MODE === "live"
