@@ -4,6 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
 
+// Place of supply for the seller. Change here if your registered office moves.
+const COMPANY_STATE = (process.env.COMPANY_STATE ?? "Delhi").trim().toLowerCase();
+
 const BUCKET = "invoices";
 
 async function generateAndStore(paymentId: string): Promise<string> {
