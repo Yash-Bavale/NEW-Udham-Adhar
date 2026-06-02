@@ -172,6 +172,7 @@ import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
 import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
+import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
 import { Route as OnboardingLeadCodeRouteImport } from './routes/onboarding.$leadCode'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -1044,6 +1045,11 @@ const PaymentPendingLeadCodeRoute = PaymentPendingLeadCodeRouteImport.update({
   path: '/payment-pending/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PaymentFailedLeadCodeRoute = PaymentFailedLeadCodeRouteImport.update({
+  id: '/payment-failed/$leadCode',
+  path: '/payment-failed/$leadCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingLeadCodeRoute = OnboardingLeadCodeRouteImport.update({
   id: '/onboarding/$leadCode',
   path: '/onboarding/$leadCode',
@@ -1340,6 +1346,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
+  '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1528,6 +1535,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
+  '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1718,6 +1726,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
+  '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
@@ -1909,6 +1918,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/email/unsubscribe'
     | '/onboarding/$leadCode'
+    | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -2097,6 +2107,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/email/unsubscribe'
     | '/onboarding/$leadCode'
+    | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -2286,6 +2297,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/email/unsubscribe'
     | '/onboarding/$leadCode'
+    | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
@@ -2468,6 +2480,7 @@ export interface RootRouteChildren {
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   OnboardingLeadCodeRoute: typeof OnboardingLeadCodeRouteWithChildren
+  PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
@@ -3626,6 +3639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentPendingLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/payment-failed/$leadCode': {
+      id: '/payment-failed/$leadCode'
+      path: '/payment-failed/$leadCode'
+      fullPath: '/payment-failed/$leadCode'
+      preLoaderRoute: typeof PaymentFailedLeadCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/$leadCode': {
       id: '/onboarding/$leadCode'
       path: '/onboarding/$leadCode'
@@ -4017,6 +4037,7 @@ const rootRouteChildren: RootRouteChildren = {
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   OnboardingLeadCodeRoute: OnboardingLeadCodeRouteWithChildren,
+  PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
