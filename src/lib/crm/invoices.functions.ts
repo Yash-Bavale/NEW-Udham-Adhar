@@ -4,6 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
 
+// Place of supply for the seller. Change here if your registered office moves.
+const COMPANY_STATE = (process.env.COMPANY_STATE ?? "Delhi").trim().toLowerCase();
+
 const BUCKET = "invoices";
 
 async function generateAndStore(paymentId: string): Promise<string> {
@@ -39,11 +42,23 @@ async function generateAndStore(paymentId: string): Promise<string> {
     .eq("payment_id", paymentId)
     .maybeSingle();
 
+  // Compute GST split based on customer state vs company state
+  const customerState = (lead.state ?? "").trim();
+  const isIntraState = customerState && customerState.toLowerCase() === COMPANY_STATE;
+  const gstTotal = Number(payment.gst_amount);
+  const cgst = isIntraState ? gstTotal / 2 : 0;
+  const sgst = isIntraState ? gstTotal / 2 : 0;
+  const igst = isIntraState ? 0 : gstTotal;
+
   let invoiceId: string;
   let invoiceNumber: string;
   if (existing) {
     invoiceId = existing.id;
     invoiceNumber = existing.invoice_number!;
+    await supabaseAdmin.from("invoices").update({
+      cgst_amount: cgst, sgst_amount: sgst, igst_amount: igst,
+      place_of_supply: customerState || null,
+    }).eq("id", invoiceId);
   } else {
     const { data: row, error: invErr } = await supabaseAdmin
       .from("invoices")
@@ -52,8 +67,12 @@ async function generateAndStore(paymentId: string): Promise<string> {
         application_id: payment.application_id,
         payment_id: payment.id,
         base_amount: Number(payment.base_amount),
-        gst_amount: Number(payment.gst_amount),
+        gst_amount: gstTotal,
         total_amount: Number(payment.amount),
+        cgst_amount: cgst,
+        sgst_amount: sgst,
+        igst_amount: igst,
+        place_of_supply: customerState || null,
       })
       .select("id, invoice_number")
       .single();
@@ -88,7 +107,10 @@ async function generateAndStore(paymentId: string): Promise<string> {
     .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
   if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
-  await supabaseAdmin.from("invoices").update({ pdf_path: path }).eq("id", invoiceId);
+  await supabaseAdmin.from("invoices").update({
+    pdf_path: path,
+    pdf_generated_at: new Date().toISOString(),
+  }).eq("id", invoiceId);
 
   return invoiceId;
 }
@@ -171,4 +193,25 @@ export const listInvoices = createServerFn({ method: "GET" })
       .limit(200);
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
+  });
+
+// Customer-facing: get signed URL by leadCode (no auth — scoped to that lead only)
+export const getCustomerInvoiceUrl = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ leadCode: z.string().min(3).max(50) }).parse(i))
+  .handler(async ({ data }) => {
+    const { data: lead } = await supabaseAdmin
+      .from("leads").select("id").eq("lead_code", data.leadCode).maybeSingle();
+    if (!lead) throw new Error("Lead not found");
+    const { data: inv } = await supabaseAdmin
+      .from("invoices")
+      .select("pdf_path, invoice_number")
+      .eq("lead_id", lead.id)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!inv?.pdf_path) throw new Error("Invoice not ready yet");
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from(BUCKET).createSignedUrl(inv.pdf_path, 60 * 10);
+    if (error) throw new Error(error.message);
+    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
   });

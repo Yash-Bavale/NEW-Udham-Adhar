@@ -1,71 +1,72 @@
-## Phase 4C — Turn 2: Admin productivity
+# Phase 4C — Turn 3: Finance
 
-Single turn, ship all four pieces on the admin **Leads** screen and lead-detail drawer/page.
+Single turn. Builds on existing `payments`, `invoices`, and `audit_logs` tables and on the lead-timeline shipped in Turn 2.
 
-### 1) CSV export
+## 1. Invoice PDFs (GST-compliant)
 
-- Toolbar button **Export CSV** next to filters.
-- Respects current filter set (search, status, service, assigned, date range) and current sort, ignores pagination — exports everything matching.
-- Server fn `exportLeadsCsv` (auth-only, ops+ roles) streams CSV from `leads` joined with `services` + `profiles` (assignee).
-- Columns: `lead_code, created_at, name, email, mobile, state, language, service, status, base_amount, gst_amount, total_amount, assigned_to_name, lead_source, last_activity_at`.
-- Logs an `audit_logs` row: action `leads.export_csv`, with filter snapshot + row count.
-- Downloads as `leads_YYYY-MM-DD_HHmm.csv`.
+- Server fn `generateInvoicePdf({ paymentId })` in `src/lib/invoices/invoices.functions.ts`, using `src/lib/invoices/pdf.server.ts` (already present) with `pdf-lib`.
+- Layout: company header + GSTIN, invoice no (`INV-YYYY-####`, sequential per FY), invoice date, lead/buyer block (name, mobile, email, address, state), service line item, base + CGST 9% + SGST 9% (or IGST 18% for inter-state), total in words, signature block, "Computer-generated" footer.
+- Storage: bucket `invoices` (private), path `invoices/{fy}/{invoice_no}.pdf`. Signed URL on download.
+- DB: extend `invoices` with `pdf_path`, `pdf_generated_at`, `place_of_supply`, `cgst_amount`, `sgst_amount`, `igst_amount` (migration with explicit GRANTs + RLS preserved).
+- Triggers: auto-generate on `payment.status = 'success'` via server fn called from PayU webhook handler; also a "Regenerate" admin button.
+- Customer access: download link on `/success/$leadCode` (collapsed receipt card) and emailed via existing template registry — new template `invoice_ready`.
+- Admin: download button on lead detail + leads table row menu.
 
-### 2) Bulk actions
+## 2. GST Report
 
-- Row checkboxes + header "select all on page" + "select all matching filter" (banner appears once page-select is used).
-- Bulk action bar shows: **Change status**, **Assign to**, **Send email**, **Delete**.
-- Confirmation modal for every action; delete requires typing `DELETE` to confirm.
-- Server fns (all auth + role-gated, all batch-safe with chunking of 200):
-  - `bulkUpdateLeadStatus({ ids, status })` — ops+; writes `activity_logs` rows.
-  - `bulkAssignLeads({ ids, assignee })` — ops+; assignee must be active staff.
-  - `bulkDeleteLeads({ ids })` — admin/super_admin only; cascades nothing destructive — also deletes related `applications`, `onboarding_submissions`, `documents` rows; storage cleanup for `documents` bucket; `payments` and `invoices` are **preserved** (financial record) and just orphaned from the lead by nulling `lead_id` would break NOT NULL → instead block delete if a paid payment exists and surface the count in the modal.
-  - `bulkEmailLeads({ ids, templateCode, variablesOverride? })` — ops+; enqueues via existing `enqueueFromTemplateInternal` per lead; template picker filters `email_templates` where `is_enabled = true`; uses lead `email` + `name` + `lead_code` as default vars; respects `suppressed_emails`.
-- Toast summary: `X succeeded, Y skipped (suppressed), Z failed`.
+- Route `/admin/finance/gst` (admin/finance role only).
+- Filters: month picker (default current FY month), state, gateway.
+- Server fn `getGstReport({ month, state?, gateway? })` aggregates from `invoices` joined to `payments` + `leads`: taxable value, CGST, SGST, IGST, total, count — grouped by HSN/SAC (single SAC `998311` for consultancy) and by place-of-supply state for GSTR-1 B2C/B2B split.
+- Export buttons: CSV (per-invoice rows) and GSTR-1 JSON stub (B2CS section) for accountant import.
+- Summary KPIs at top: total taxable, total tax, total invoiced, invoice count.
 
-### 3) Saved filters
+## 3. Settlement reconciliation
 
-- New table `saved_lead_filters` (per-user): `id, user_id, name, filter_json, is_default, created_at, updated_at`. RLS: a user reads / writes their own rows; admins read all.
-- Filter bar gets a **Saved views** dropdown: list, apply, set default, rename, delete; "Save current as…" captures current query state.
-- On admin leads page load, if user has a default saved filter, apply it (overridable by URL search params).
+- New table `gateway_settlements` (id, gateway, settlement_id, settled_at, gross, fees, tax_on_fees, net, currency, raw jsonb, created_at). RLS: admin/finance read; service_role write. Explicit GRANTs.
+- New table `payment_settlements` (payment_id, settlement_id, settled_amount, fee, net) — links payments to settlements.
+- Server fn `importSettlementCsv({ gateway, csvText })` — admin-only, parses PayU/Razorpay settlement CSVs, upserts settlements + links by `transaction_id`/`payment_id`. Logs to `audit_logs`.
+- Route `/admin/finance/settlements`: list settlements (date, gateway, gross, fees, net, # payments), drill-down shows linked payments + unmatched rows.
+- "Unreconciled payments" widget: payments older than 7 days with `status=success` but no settlement link → action item.
 
-### 4) Lead detail timeline
+## 4. Finance views on lead detail
 
-- New route `/admin/leads/$leadId` (or expand existing drawer if one exists; verify in `AdminShell` / `AdminLeadsPanel`). Plan defaults to a full page route with a back-to-list link.
-- Sections:
-  - Header: lead code, name, mobile/email (click-to-copy), service, total amount (finance-gated), current status pill, assignee.
-  - Quick actions: change status, reassign, add note, send template email, mark do-not-contact.
-  - **Timeline** (vertical, newest first): merged feed of `activity_logs` (status/assignment/created), `lead_notes`, `email_logs` (sent/failed with subject), `payments` (created/paid/failed), `onboarding_submissions` (draft/submitted), `documents` (uploaded/verified/rejected), `analytics_events` filtered to that lead. Each item has icon, actor (when known), timestamp (relative + absolute on hover), one-line summary, expandable detail.
-  - Right sidebar: payments list (amount masked unless finance), invoices list with download link, documents list with preview link.
-- Server fn `getLeadTimeline({ leadId })` fans out the 7 queries in parallel and returns a single sorted feed (cap 500 items, with "Load older" for pagination).
+- New "Finance" tab on `/admin/leads/$leadId` (alongside Timeline): payment summary, invoice download/regenerate, settlement status (Settled on DD MMM / Pending), refund button (stub — opens dialog, records `refund_requested` audit log, no actual gateway call this turn).
 
-### Cross-cutting
+## 5. Cross-cutting
 
-- All new tables get explicit `GRANT`s + RLS per project rules.
-- All new mutating server fns: input validated with Zod, role-checked via `has_role` / `current_user_is_admin`, write an `audit_logs` entry.
-- No new client libraries — reuse existing shadcn (DataTable, Dialog, DropdownMenu, Command for template/assignee pickers), `motion/react` for timeline reveal.
-- Mobile: bulk-action bar collapses to a sticky bottom sheet; timeline switches to single column; export and saved-views move into the overflow `…` menu.
+- All new server fns: `requireSupabaseAuth` + role check (`admin` or new `finance` role; add via migration to the existing `app_role` enum).
+- All exports + regenerations write `audit_logs`.
+- Reuse shadcn `Card`, `Table`, `Tabs`, `DatePicker`, `Dialog`. `motion/react` only for tab transitions.
+- Mobile: GST report + settlements collapse to card list; finance tab single column.
 
-### Out of scope (deferred to Turn 3 — Finance)
+## Files
 
-- Invoice PDF generation, GST report, settlement reconciliation.
-- Any finance-only views on the lead detail page beyond surfacing existing `invoices` / `payments` rows.
+New:
+- `supabase/migrations/<ts>_invoices_gst_finance.sql` (invoice columns, settlement tables, `finance` role, storage bucket policies)
+- `src/lib/invoices/invoices.functions.ts`
+- `src/lib/finance/gst-report.functions.ts`
+- `src/lib/finance/settlements.functions.ts`
+- `src/routes/admin.finance.gst.tsx`
+- `src/routes/admin.finance.settlements.tsx`
+- `src/components/admin/LeadFinanceTab.tsx`
+- `src/components/admin/SettlementImportDialog.tsx`
+- `src/lib/email-templates/invoice-ready.ts` (registered in `registry.ts`)
 
-### Technical notes
+Modified:
+- `src/lib/invoices/pdf.server.ts` — finalize GST layout
+- `src/lib/payments/payu.server.ts` — call `generateInvoicePdf` on success
+- `src/routes/success.$leadCode.tsx` — add "Download tax invoice" link in receipt
+- `src/routes/admin.leads.$leadId.tsx` — add Finance tab
+- `src/components/admin/AdminShell.tsx` — Finance section in nav
+- `src/integrations/supabase/types.ts` — auto-regenerated
 
-- **DB additions** (one migration):
-  - `saved_lead_filters` table + RLS + GRANTs.
-  - No schema changes to `leads` / `applications` / `payments`.
-- **Files added** (approx):
-  - `src/lib/crm/leads-bulk.functions.ts` — bulk + export server fns.
-  - `src/lib/crm/saved-filters.functions.ts` — CRUD.
-  - `src/lib/crm/lead-timeline.functions.ts` — `getLeadTimeline`.
-  - `src/routes/admin.leads.$leadId.tsx` — detail page.
-  - `src/components/admin/LeadsBulkBar.tsx`, `SavedFiltersMenu.tsx`, `LeadTimeline.tsx`, `BulkEmailDialog.tsx`.
-- **Files modified**:
-  - `src/components/admin/AdminLeadsPanel.tsx` (or current leads table) — checkboxes, bulk bar, export button, saved-filter dropdown, row click → detail page.
-  - `src/lib/crm/leads-admin.functions.ts` — extend list query to accept the saved-filter JSON shape if it differs.
+## Out of scope (4D)
 
-### After this turn
+- Real refund/chargeback API calls
+- Multi-currency
+- Customer-facing invoice history page
+- TDS / 26AS reconciliation
 
-- Turn 3 (Finance: invoice PDFs, GST report, settlement reconciliation) is the only remaining 4C work. Then 4D scope discussion.
+## After this turn
+
+Phase 4C is complete. Next discussion: Phase 4D scope (likely: customer portal, refunds, multi-user team roles, reporting dashboards).
