@@ -6,6 +6,7 @@ import { getLead, updateLead, addLeadNote } from "@/lib/crm/leads-admin.function
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
+import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 
 export const Route = createFileRoute("/admin/leads/$leadId")({ component: LeadDetailPage });
 
