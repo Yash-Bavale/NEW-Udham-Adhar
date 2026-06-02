@@ -1,47 +1,38 @@
-## Goal
+## What I found
 
-Keep the existing **Payment Successful** UI (the screenshot you shared — green tick + "Action Needed: We need a few details" + "Start Onboarding" CTA). On top of that, properly handle the two other outcomes coming back from PayU: **pending** (webhook delayed / awaiting confirmation) and **failed** (PayU returned `failure` or signature mismatch).
+The backend is healthy, but the latest lead `UA-2026-001024` has a PayU payment stuck as `created` with transaction ID `UA-2026-001024-MPWRPUO5-KGA2YJ`.
 
-Today everything that isn't a clean success gets dumped into `/payment-pending/$leadCode`, which shows a generic "we'll contact you" message — wrong for both a real failure and a real pending state.
+The PayU screenshot says: “This txnid has been used previously or was successfully captured.” That matches the current code: it reuses the latest `created` PayU transaction on retry. PayU requires every payment attempt to use a fresh unique `txnid`, so retries can fail before payment completion.
 
-## Changes
+## Plan
 
-### 1. `src/routes/success.$leadCode.tsx` — keep, just clarify pending fallback
-- Keep the current success UI exactly as in your screenshot (green check, Action Needed card, Start Onboarding button, collapsible receipt).
-- Polling logic stays. If after ~30s the payment is still not marked paid, redirect to `/payment-pending/$leadCode` (already does this) — but pending page will now look correct (see #2).
+1. **Stop reusing failed/stale PayU transaction IDs**
+   - Change PayU order creation so every new click creates a fresh `txnid`.
+   - Only block/reuse when there is already a successful paid payment for the lead.
+   - Mark older `created` / `attempted` PayU rows for the same lead as `failed` or superseded before creating the new attempt.
 
-### 2. `src/routes/payment-pending.$leadCode.tsx` — rewrite as true "Pending / Confirming" state
-New UI:
-- Amber/blue spinner hero: **"Confirming your payment…"**
-- Sub-line: "PayU is still confirming the transaction. This usually takes under a minute."
-- Reference number shown.
-- Auto-poll `getApplicationSummary` every 4s; the moment payment flips to paid → redirect to `/success/$leadCode` (which then shows the success UI + onboarding CTA).
-- After ~2 min still pending → show secondary block: "Taking longer than usual" with two actions: **Retry Payment** (→ `/payment/$leadCode`) and **Contact Support** (→ `/contact`). Reassurance: "If money was deducted, it will be auto-reconciled — do not pay twice."
+2. **Make webhook completion more reliable**
+   - Keep verifying PayU response hash.
+   - Ensure successful PayU responses update:
+     - payment status to `paid`
+     - lead status to `payment_successful`
+     - application status to `payment_received`
+   - Store PayU response details for audit/debugging.
 
-### 3. New `src/routes/payment-failed.$leadCode.tsx`
-- Red X hero: **"Payment Failed"**.
-- Reads `?reason=` query param to show PayU's failure reason (e.g. "Card declined", "Insufficient funds").
-- Reference number + service summary (via `getApplicationSummary`).
-- Primary CTA: **Retry Payment** → `/payment/$leadCode`.
-- Secondary CTA: **Contact Support**.
-- Reassurance line: "No amount has been charged. If your account shows a debit, it will auto-refund in 3–5 business days."
+3. **Improve failed/pending return handling**
+   - If PayU returns duplicate-txn or failure, record that failure in the payment row instead of leaving it as `created`.
+   - Redirect customer to the app failure page with a clear retry path.
 
-### 4. `src/routes/api/public/webhooks/payu.ts` — split pending vs failed redirects
-- Currently `redirectToFailure` sends users to `/payment-pending` regardless. Split into two helpers:
-  - `redirectToFailure(leadCode, reason)` → `/payment-failed/$leadCode?reason=…` (used when PayU `status=failure` or signature mismatch).
-  - `redirectToPending(leadCode)` → `/payment-pending/$leadCode` (only used when status is unknown / still processing).
-- Signature-verification failure also goes to `/payment-failed` (not pending) since it's a hard error.
+4. **Add defensive database protection**
+   - Add/confirm a unique index on PayU `transaction_id` so duplicate transaction IDs cannot be inserted silently.
+   - Add a safe helper migration if needed for consistent retry cleanup.
 
-### 5. `src/routes/payment.$leadCode.tsx` — quick guard
-- On mount, if `getApplicationSummary` shows lead is already `paid`, auto-redirect to `/success/$leadCode` instead of re-showing the pay form (prevents double-payment loop after a successful txn).
+5. **Validate the flow**
+   - Check the latest payment rows for the affected lead after the fix.
+   - Confirm the next retry generates a different PayU `txnid` and no longer hits the “txnid used previously” issue.
 
-## Route summary after change
+## Files likely to change
 
-```text
-/payment/$leadCode          → pay form (skips if already paid)
-/success/$leadCode          → ✅ confirmation + Start Onboarding (unchanged UI)
-/payment-pending/$leadCode  → ⏳ confirming, auto-redirect on success
-/payment-failed/$leadCode   → ❌ failed, retry CTA
-```
-
-No DB / business-logic changes. Frontend + one webhook redirect tweak only.
+- `src/lib/payments/payu.functions.ts`
+- `src/routes/api/public/webhooks/payu.ts`
+- One database migration if the unique transaction/index cleanup is missing
