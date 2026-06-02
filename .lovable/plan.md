@@ -1,41 +1,30 @@
-## Phase 4C — Onboarding + Admin + Finance
+## What to change
 
-Skipping customer self-service portal (server cost concern). Splitting into 3 focused turns so each ships clean.
+### 1) `src/routes/apply.$leadCode.summary.tsx` — remove 2-min session timer
+- Delete `SESSION_SECONDS`, the `secondsLeft` state, its `useEffect` ticker, the `SessionBar` component and its render.
+- Remove `sessionExpired` from the `canPay` formula so the Pay button stays enabled as long as PayU is selected and no order is in-flight.
+- Remove the "Session expired — refresh to retry" branch from the Pay button label.
+- Keep everything else (gateway list, GST breakdown, edit-details, hidden auto-submit PayU form) untouched — the PayU integration path (`createPayUOrder` → set `order` → auto-submit form to `order.actionUrl`) is unchanged and continues to open the gateway in the same tab without a second intermediate page.
 
----
+### 2) `src/routes/success.$leadCode.tsx` — show success + onboarding CTA, not a receipt
+Rebuild the page so the *first* thing the user sees after PayU returns is:
+- Large green check + "Payment Successful" headline + ref code.
+- A prominent **"Action needed"** card explaining we now need their business/Aadhaar details and documents to file the application, with 2–3 short bullets (e.g. "Aadhaar details", "Business info", "Supporting documents").
+- A single primary CTA: **Start Onboarding →** (links to `/onboarding/$leadCode`).
+- A secondary, low-emphasis **"View receipt"** disclosure (collapsible / link) that reveals the existing detailed receipt block (payment row, GST split, applicant info, print button) for users who still want it. The receipt content itself is preserved — just demoted from the default view.
+- Keep `getApplicationSummary` call and print behavior intact behind the disclosure.
 
-### Turn 1 — Onboarding polish
+### 3) `src/lib/onboarding/onboarding.functions.ts` — fix false "Payment required" after onboarding submit
+Root cause: `getOnboarding` decides `paid` purely from `lead.status` ∈ {`payment_successful`, `under_process`, `completed`}. If `lead.status` drifts (e.g. an admin moves it back, or a future flow writes a different status) the user is bounced to "Go to Payment" even though a successful PayU payment row exists.
 
-1. **Animated stepper** on `/onboarding/$leadCode` — 4 steps (Personal → Business → Documents → Review), Framer Motion progress indicator, smooth transitions between steps.
-2. **Doc upload UX** — drag-and-drop zone, per-file progress, inline preview thumbnails for images/PDFs, size/type validation, remove button. Uses existing `documents` storage bucket.
-3. **Autosave** — debounced (1.5s) save of `form_data` JSON to `onboarding_submissions`. "Saved Xs ago" indicator. Resumes from last saved state on revisit.
-4. **Completion email** — on submit, set `status='submitted'`, enqueue `onboarding_complete` template to customer + `admin_onboarding_submitted` to admin. Seed both templates.
+Fix: make `paid` authoritative by checking the `payments` table:
+- In the `getOnboarding` handler, after loading the lead, also `select id from payments where lead_id = lead.id and status = 'paid' limit 1`.
+- Set `paid = !!paidPaymentRow || lead.status ∈ {payment_successful, under_process, completed}`.
+- Return the same shape (just a more reliable `paid` flag); no UI change needed in `onboarding.$leadCode.tsx`.
 
-### Turn 2 — Admin productivity
+This guarantees that once PayU has confirmed a payment (which is the source of truth), the onboarding screen never re-prompts for payment regardless of subsequent `lead.status` edits.
 
-5. **Bulk actions** on `/admin/leads` — checkbox column, multi-select, bulk: assign, change status, delete (super_admin), export selection.
-6. **CSV export** — server fn `exportLeads` / `exportApplications` streaming CSV with current filter applied. Download button on each list page.
-7. **Saved filters** — new `admin_saved_filters` table (user_id, name, page, filter_json). Save current filter set, name it, reload from dropdown.
-8. **Lead detail timeline** — `/admin/leads/$leadId` page showing: lead info + applications + payments + activity_logs + email_logs + documents + notes, all unified in a vertical timeline ordered by created_at.
-
-### Turn 3 — Finance
-
-9. **Invoice PDF generation** — on `payment.status='paid'`, server fn generates branded PDF via `pdf-lib` (Worker-safe), uploads to `invoices` bucket, stores `pdf_path`. Re-generate button for super_admin. Customer gets `invoice_ready` email with link.
-10. **GST report** — `/admin/finance/gst` page: month picker, table of all paid invoices with base/GST/total, GSTIN, customer, summary totals, CSV export for filing.
-11. **Settlement reconciliation** — `/admin/finance/settlements`: upload PayU settlement CSV, match each row to internal `payments.transaction_id`, flag mismatches (amount diff, missing, extra), persist into new `settlements` + `settlement_rows` tables.
-
----
-
-### Technical notes
-
-- All admin pages use existing `AdminShell.tsx` nav.
-- PDF generation uses `pdf-lib` (pure JS, Worker-compatible). No native deps.
-- Autosave uses a single server fn `saveOnboardingDraft` with optimistic UI.
-- Bulk actions use server fns with `requireSupabaseAuth` + role gates.
-- CSV export streamed via server route (`/api/admin/export/leads.csv`) with admin auth check; never `/api/public/`.
-- Saved filters scoped per-user (RLS: `user_id = auth.uid()`).
-- Settlement parser: Zod-validated rows, tolerant of header variations.
-- Reuse existing email enqueue (`enqueueFromTemplateInternal`) — no new templates engine.
-
-### Order
-Shipping Turn 1 first; confirm before Turn 2; confirm before Turn 3.
+## Out of scope
+- No changes to PayU webhook, payment table schema, or invoice generation.
+- No design/route changes to `/onboarding/$leadCode/*` other than the server-side `paid` computation.
+- No new timers, polling, or session UX on the summary page.
