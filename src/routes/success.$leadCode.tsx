@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
+import { getCustomerInvoiceUrl } from "@/lib/crm/invoices.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
