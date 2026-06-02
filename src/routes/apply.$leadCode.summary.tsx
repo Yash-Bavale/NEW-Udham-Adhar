@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
@@ -124,6 +124,7 @@ const GATEWAY_BRAND: Record<
 
 function SummaryPage() {
   const { leadCode } = Route.useParams();
+  const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const updateContact = useServerFn(updateLeadContact);
   const createOrder = useServerFn(createPayUOrder);
@@ -153,6 +154,12 @@ function SummaryPage() {
 
   const lead = data?.lead;
   const gateways = data?.gateways ?? [];
+
+  useEffect(() => {
+    if (lead?.payment || ["payment_successful", "under_process", "completed"].includes(lead?.status)) {
+      navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
+    }
+  }, [lead?.payment, lead?.status, leadCode, navigate]);
 
   const activeGateway = useMemo(() => {
     if (chosen) return chosen;

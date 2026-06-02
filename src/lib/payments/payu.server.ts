@@ -84,7 +84,7 @@ export function computeResponseHash(args: {
   const base = [
     args.salt,
     args.status,
-    "", "", "", "", "", "", // 6 empty (udf10..udf6)
+    "", "", "", "", "", // 5 empty fields (udf10..udf6)
     args.udf5 ?? "",
     args.udf4 ?? "",
     args.udf3 ?? "",
