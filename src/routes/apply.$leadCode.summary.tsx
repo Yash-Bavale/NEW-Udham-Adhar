@@ -454,39 +454,6 @@ function SummaryPage() {
   );
 }
 
-function SessionBar({ secondsLeft }: { secondsLeft: number }) {
-  const m = Math.floor(Math.max(0, secondsLeft) / 60);
-  const s = Math.max(0, secondsLeft) % 60;
-  const pct = (Math.max(0, secondsLeft) / SESSION_SECONDS) * 100;
-  const expired = secondsLeft <= 0;
-  const danger = secondsLeft <= 30;
-
-  return (
-    <div
-      className={`rounded-xl border px-4 py-2.5 flex items-center justify-between ${
-        expired
-          ? "border-red-200 bg-red-50 text-red-700"
-          : danger
-          ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-      }`}
-    >
-      <div className="flex items-center gap-2 text-xs font-semibold">
-        <Clock className="w-4 h-4" />
-        {expired
-          ? "Session expired"
-          : `Reserved price expires in ${m}:${s.toString().padStart(2, "0")}`}
-      </div>
-      <div className="w-24 h-1.5 rounded-full bg-white/60 overflow-hidden">
-        <motion.div
-          className={`h-full ${expired ? "bg-red-500" : danger ? "bg-amber-500" : "bg-emerald-500"}`}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.4, ease: "linear" }}
-        />
-      </div>
-    </div>
-  );
-}
 
 function Field({
   label,
