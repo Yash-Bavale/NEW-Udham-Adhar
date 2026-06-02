@@ -142,8 +142,7 @@ function SummaryPage() {
     );
   }
 
-  const sessionExpired = secondsLeft <= 0;
-  const canPay = activeGateway === "payu" && !sessionExpired && !payBusy && !order;
+  const canPay = activeGateway === "payu" && !payBusy && !order;
 
   async function handlePay() {
     if (!canPay) return;
