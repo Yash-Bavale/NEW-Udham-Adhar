@@ -44,7 +44,31 @@ export const listLeads = createServerFn({ method: "POST" })
     const { data: rows, error, count } = await q;
     if (error) throw new Error(error.message);
 
-    return { rows: rows ?? [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+    // Compute "repeat" flag — true when this email has >1 lead in total.
+    const emails = Array.from(
+      new Set((rows ?? []).map((r) => r.email?.trim().toLowerCase()).filter(Boolean) as string[]),
+    );
+    const repeatSet = new Set<string>();
+    if (emails.length > 0) {
+      const { data: dupes } = await supabase
+        .from("leads")
+        .select("email")
+        .in("email", emails)
+        .limit(5000);
+      const counter: Record<string, number> = {};
+      (dupes ?? []).forEach((d: { email?: string | null }) => {
+        const k = d.email?.trim().toLowerCase();
+        if (!k) return;
+        counter[k] = (counter[k] ?? 0) + 1;
+      });
+      Object.entries(counter).forEach(([k, v]) => { if (v > 1) repeatSet.add(k); });
+    }
+    const enriched = (rows ?? []).map((r) => ({
+      ...r,
+      is_repeat: r.email ? repeatSet.has(r.email.trim().toLowerCase()) : false,
+    }));
+
+    return { rows: enriched, total: count ?? 0, page: data.page, pageSize: data.pageSize };
   });
 
 export const getLead = createServerFn({ method: "POST" })

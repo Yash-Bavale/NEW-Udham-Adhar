@@ -9,6 +9,7 @@ export function StatCard({
   gradient,
   index = 0,
   loading,
+  hint,
 }: {
   label: string;
   value: number | string;
@@ -17,6 +18,7 @@ export function StatCard({
   gradient?: "primary" | "success" | "warn" | "danger";
   index?: number;
   loading?: boolean;
+  hint?: string;
 }) {
   const grad =
     gradient === "success" ? "var(--gradient-success)" :
@@ -48,6 +50,9 @@ export function StatCard({
         <div className="mt-2 text-2xl font-semibold tabular-nums" style={{ color: "var(--admin-fg)" }}>
           {typeof value === "number" ? value.toLocaleString("en-IN") : value}
         </div>
+      )}
+      {hint && !loading && (
+        <div className="mt-1 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{hint}</div>
       )}
       {delta && !loading && (
         <div className={`mt-1 text-xs font-medium ${delta.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
