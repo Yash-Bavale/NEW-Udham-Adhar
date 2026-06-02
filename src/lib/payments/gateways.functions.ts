@@ -13,6 +13,7 @@ const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
+    console.log("[getApplicationSummary] leadCode:", data.leadCode);
     const { data: lead, error } = await supabaseAdmin
       .from("leads")
       .select("id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id")
