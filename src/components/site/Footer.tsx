@@ -13,10 +13,9 @@ import {
   Instagram,
   Youtube,
   MessageCircle,
-  HelpCircle,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
-import { getPopularFaqs, FAQ_CATEGORIES } from "@/lib/faqs-data";
+
 
 type SeoPageRow = { id: string; slug: string; label: string };
 
