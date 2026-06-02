@@ -7,6 +7,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
 
