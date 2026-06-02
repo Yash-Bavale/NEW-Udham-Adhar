@@ -508,46 +508,106 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_settlements: {
+        Row: {
+          created_at: string
+          currency: string
+          fees: number
+          gateway: string
+          gross: number
+          id: string
+          net: number
+          raw: Json | null
+          settled_at: string
+          settlement_id: string
+          tax_on_fees: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          fees?: number
+          gateway: string
+          gross?: number
+          id?: string
+          net?: number
+          raw?: Json | null
+          settled_at: string
+          settlement_id: string
+          tax_on_fees?: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          fees?: number
+          gateway?: string
+          gross?: number
+          id?: string
+          net?: number
+          raw?: Json | null
+          settled_at?: string
+          settlement_id?: string
+          tax_on_fees?: number
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           application_id: string | null
           base_amount: number
+          cgst_amount: number
           created_at: string
           gst_amount: number
           id: string
+          igst_amount: number
           invoice_number: string | null
           issued_at: string
           lead_id: string
           payment_id: string
+          pdf_generated_at: string | null
           pdf_path: string | null
+          place_of_supply: string | null
+          sac_code: string
+          sgst_amount: number
           total_amount: number
           updated_at: string
         }
         Insert: {
           application_id?: string | null
           base_amount: number
+          cgst_amount?: number
           created_at?: string
           gst_amount: number
           id?: string
+          igst_amount?: number
           invoice_number?: string | null
           issued_at?: string
           lead_id: string
           payment_id: string
+          pdf_generated_at?: string | null
           pdf_path?: string | null
+          place_of_supply?: string | null
+          sac_code?: string
+          sgst_amount?: number
           total_amount: number
           updated_at?: string
         }
         Update: {
           application_id?: string | null
           base_amount?: number
+          cgst_amount?: number
           created_at?: string
           gst_amount?: number
           id?: string
+          igst_amount?: number
           invoice_number?: string | null
           issued_at?: string
           lead_id?: string
           payment_id?: string
+          pdf_generated_at?: string | null
           pdf_path?: string | null
+          place_of_supply?: string | null
+          sac_code?: string
+          sgst_amount?: number
           total_amount?: number
           updated_at?: string
         }
@@ -730,6 +790,44 @@ export type Database = {
           webhook_secret_name?: string | null
         }
         Relationships: []
+      }
+      payment_settlements: {
+        Row: {
+          created_at: string
+          fee: number
+          id: string
+          net: number
+          payment_id: string
+          settled_amount: number
+          settlement_id: string
+        }
+        Insert: {
+          created_at?: string
+          fee?: number
+          id?: string
+          net?: number
+          payment_id: string
+          settled_amount?: number
+          settlement_id: string
+        }
+        Update: {
+          created_at?: string
+          fee?: number
+          id?: string
+          net?: number
+          payment_id?: string
+          settled_amount?: number
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_settlements_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "gateway_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
