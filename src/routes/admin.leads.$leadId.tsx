@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getLead, updateLead, addLeadNote } from "@/lib/crm/leads-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
+import { LeadTimeline } from "@/components/admin/LeadTimeline";
 
 export const Route = createFileRoute("/admin/leads/$leadId")({ component: LeadDetailPage });
 
@@ -25,7 +26,7 @@ function LeadDetailPage() {
 
   if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
   if (!data) return null;
-  const { lead, applications, notes, activity } = data;
+  const { lead, applications, notes } = data;
 
   return (
     <div className="space-y-5">
@@ -128,14 +129,7 @@ function LeadDetailPage() {
       </Card>
 
       <Card title="Timeline">
-        <ul className="space-y-1">
-          {activity.map((a) => (
-            <li key={a.id} className="text-sm flex gap-3">
-              <span className="text-xs text-slate-500 w-44 shrink-0">{new Date(a.created_at).toLocaleString("en-IN")}</span>
-              <span>{a.activity_description}</span>
-            </li>
-          ))}
-        </ul>
+        <LeadTimeline leadId={leadId} />
       </Card>
     </div>
   );
