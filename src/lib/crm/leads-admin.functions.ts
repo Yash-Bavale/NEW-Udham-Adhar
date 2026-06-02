@@ -9,6 +9,8 @@ const ListInput = z.object({
   search: z.string().trim().max(200).optional(),
   status: z.enum(LEAD_STATUSES as [string, ...string[]]).optional(),
   assignedTo: z.string().uuid().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 });
 
 export const listLeads = createServerFn({ method: "POST" })
@@ -30,6 +32,8 @@ export const listLeads = createServerFn({ method: "POST" })
 
     if (data.status) q = q.eq("status", data.status as LeadStatus);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+    if (data.dateTo) q = q.lte("created_at", data.dateTo);
     if (data.search) {
       const s = data.search.replace(/[,()]/g, " ").trim();
       q = q.or(

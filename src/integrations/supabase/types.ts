@@ -832,6 +832,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_lead_filters: {
+        Row: {
+          created_at: string
+          filter_json: Json
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filter_json?: Json
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filter_json?: Json
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       seo_pages: {
         Row: {
           created_at: string
