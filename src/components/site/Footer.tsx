@@ -345,7 +345,7 @@ export function Footer() {
           </div>
         </div>
       </div>
-
+      <div className="border-t border-white/10">
 
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
           Operated by Business Help Services
