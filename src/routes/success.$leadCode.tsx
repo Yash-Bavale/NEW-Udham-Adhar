@@ -131,7 +131,7 @@ function SuccessPage() {
             Payment Successful!
           </h1>
           <p className="text-slate-600 text-sm sm:text-base">
-            We've received your consultancy fee.
+            We've received your application fee. Please complete the service-wise information below so processing can begin.
           </p>
           <p className="text-xs text-slate-500 mt-1">
             Ref: <span className="font-mono font-semibold text-brand-navy">{leadCode}</span>
@@ -147,25 +147,25 @@ function SuccessPage() {
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-widest font-bold text-amber-700 mb-0.5">
-                  Action Needed
+                  Attention Needed
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-brand-navy font-display leading-tight">
-                  We need a few details to file your application
+                  Fill incomplete information
                 </h2>
               </div>
             </div>
 
             <p className="text-sm text-slate-700 mb-4 leading-relaxed">
               Your payment is confirmed. To start processing, our experts need
-              your business and Aadhaar information plus a few supporting documents.
+              the remaining information and supporting documents for your selected service.
               It takes <strong>under 3 minutes</strong>.
             </p>
 
             <ul className="space-y-2 mb-6">
               {[
-                { icon: User, text: "Aadhaar & applicant details" },
-                { icon: FileText, text: "Business information (name, address, activity)" },
-                { icon: ShieldCheck, text: "Supporting documents (PAN, photo, etc.)" },
+                { icon: User, text: "Service-wise applicant details" },
+                { icon: FileText, text: "Required business or registration information" },
+                { icon: ShieldCheck, text: "Supporting documents, if required" },
               ].map((item) => (
                 <li key={item.text} className="flex items-center gap-2.5 text-sm text-slate-700">
                   <div className="w-7 h-7 rounded-md bg-white border border-amber-200 flex items-center justify-center shrink-0">
@@ -179,7 +179,7 @@ function SuccessPage() {
             <Link to="/onboarding/$leadCode" params={{ leadCode }} className="block">
               <Button className="w-full bg-brand-red hover:bg-brand-red-deep text-white font-bold h-14 px-10 rounded-full shadow-xl shadow-brand-red/30 group text-base">
                 <Sparkles className="w-5 h-5 mr-2" />
-                Start Onboarding
+                Fill Incomplete Info
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>

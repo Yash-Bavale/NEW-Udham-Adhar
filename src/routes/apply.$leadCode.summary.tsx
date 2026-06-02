@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
@@ -25,7 +25,7 @@ import { trackEvent } from "@/lib/analytics/track";
 export const Route = createFileRoute("/apply/$leadCode/summary")({
   head: () => ({
     meta: [
-      { title: "Review & Pay — Business Help Services" },
+      { title: "Pay Application Fee — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -38,32 +38,72 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
     tagline: "Government-compliant filing handled end-to-end by our experts.",
     bullets: [
       "Application prepared & filed by certified consultants",
-      "Real-time WhatsApp + Email updates on every step",
-      "Free re-submission if portal rejects on a fixable reason",
+      "Real-time Email updates on every step",
+      "Additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "New Business Help Services": {
+    tagline: "Get guided assistance for your new Udyam registration application.",
+    bullets: [
+      "Application prepared & filed by certified consultants",
+      "Real-time Email updates on every step",
+      "Basic Aadhaar, PAN, business details, and additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "New Udyam Registration": {
+    tagline: "Get guided assistance for your new Udyam registration application.",
+    bullets: [
+      "Application prepared & filed by certified consultants",
+      "Real-time Email updates on every step",
+      "Basic Aadhaar, PAN, business details, and additional documents or information may be required depending upon processing requirements.",
     ],
   },
   "Update Udyam Certificate": {
     tagline: "Amend your Udyam / MSME details on the official portal — fast.",
     bullets: [
       "Update name, address, NIC, bank, mobile, email & investment data",
-      "OTP-based portal verification handled by our team",
-      "Updated certificate delivered to your email in 1–2 working days",
+      "Real-time Email updates on every step",
+      "Current Udyam registered mobile number/email ID and additional documents or information may be required depending upon processing requirements.",
     ],
   },
-  "New Udyam Registration": {
-    tagline: "Get your MSME / Udyam Registration Certificate the right way.",
+  "Download Udyam Certificate": {
+    tagline: "Get guided assistance to download your existing Udyam certificate.",
     bullets: [
-      "Aadhaar + PAN based registration as per MSME Ministry guidelines",
-      "Lifetime valid Udyam Registration Number issued by Govt. portal",
-      "Certificate delivered to email within 1–2 working days",
+      "Certificate download support by trained consultants",
+      "Real-time Email updates on every step",
+      "Current Udyam registered mobile number/email ID and additional documents or information may be required depending upon processing requirements.",
     ],
   },
-  "Print Udyam Certificate": {
-    tagline: "Get a print-ready Udyam Certificate copy mailed to you instantly.",
+  "Migrate Udyog Aadhaar to Udyam": {
+    tagline: "Move your old Udyog Aadhaar details into the current Udyam process.",
     bullets: [
-      "Official format PDF, ready for bank / tender / GST use",
-      "Annexure included on request",
-      "Delivered within 30 minutes during business hours",
+      "Migration support handled by certified consultants",
+      "Real-time Email updates on every step",
+      "Current Udyog registered mobile number/email ID and additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "Forgot Registered Mobile / Email": {
+    tagline: "Assistance for recovering or updating inaccessible registered contact details.",
+    bullets: [
+      "Application and complaint documentation support",
+      "Real-time Email updates on every step",
+      "Current Udyam applicant PAN Card, Aadhaar Card, and additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "Correct PAN / Aadhaar Name in Udyam": {
+    tagline: "Guided correction support for PAN/Aadhaar name mismatch in Udyam records.",
+    bullets: [
+      "Correction request reviewed by certified consultants",
+      "Real-time Email updates on every step",
+      "Current Udyam details, Aadhaar, PAN, business details, and additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "Talk to Expert – Suitable Service Selection": {
+    tagline: "Get guided consultation before choosing the right service.",
+    bullets: [
+      "Requirement reviewed by an expert consultant",
+      "Real-time Email updates on every step",
+      "Basic consultation service intended to help identify suitable service requirements.",
     ],
   },
 };
@@ -170,7 +210,7 @@ function SummaryPage() {
       >
         <div className="bg-form-header text-white px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold font-display">Review & Pay</h1>
+            <h1 className="text-lg font-bold font-display">Pay Application Fee</h1>
             <p className="text-xs text-white/80">Ref: {lead.leadCode}</p>
           </div>
           <div className="flex items-center gap-1 text-xs">
@@ -419,9 +459,21 @@ function SummaryPage() {
                 Opening secure payment…
               </span>
             ) : (
-              <>Pay ₹{lead.totalAmount.toFixed(2)} securely →</>
+              <>Pay Now ₹{lead.totalAmount.toFixed(2)} securely →</>
             )}
           </motion.button>
+
+          <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+            By clicking “Pay Now” you confirm that you have read and agreed to our{" "}
+            <Link to="/terms-conditions" className="font-semibold text-brand-navy underline">
+              Terms &amp; Conditions
+            </Link>{" "}
+            and{" "}
+            <Link to="/refund-cancellation-policy" className="font-semibold text-brand-navy underline">
+              Refund &amp; Cancellation Policy
+            </Link>
+            , and acknowledge that this website provides private consultancy and assistance services. Service initiation shall take place only after confirmation through email or other written communication. Please review all submitted details carefully before proceeding with payment.
+          </p>
 
           {/* Trust strip */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
@@ -436,9 +488,6 @@ function SummaryPage() {
             </span>
           </div>
 
-          <p className="text-center text-[11px] text-muted-foreground">
-            By proceeding you agree to our terms and refund policy.
-          </p>
         </div>
       </motion.div>
 

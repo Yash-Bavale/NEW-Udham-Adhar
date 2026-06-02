@@ -17,7 +17,7 @@ export const getLeadFinance = createServerFn({ method: "POST" })
     const [paymentsRes, invoicesRes, settlementsRes] = await Promise.all([
       supabaseAdmin
         .from("payments")
-        .select("id, amount, base_amount, gst_amount, status, gateway_name, transaction_id, payment_date, created_at")
+        .select("id, amount, base_amount, gst_amount, status, gateway_name, transaction_id, razorpay_payment_id, payment_date, created_at, raw_response, webhook_response")
         .eq("lead_id", data.leadId)
         .order("created_at", { ascending: false }),
       supabaseAdmin
