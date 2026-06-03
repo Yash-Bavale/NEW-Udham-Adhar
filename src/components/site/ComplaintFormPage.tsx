@@ -166,8 +166,12 @@ export function ComplaintFormPage() {
           </a>
         </div>
       </div>
-    </section>
-  );
+
+      <article
+        className="mt-10 prose prose-sm md:prose-base max-w-none prose-headings:font-display prose-headings:text-foreground prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-a:text-brand-navy"
+        dangerouslySetInnerHTML={{ __html: policyHtml }}
+      />
+    </section>);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
