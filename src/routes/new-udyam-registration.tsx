@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-online.html?raw";
 
-const TITLE = "New Udyam Registration - Apply Online with Consultancy Help";
+const TITLE = "New Udyam Registration";
 
 export const Route = createFileRoute("/new-udyam-registration")({
   head: () => ({
