@@ -93,6 +93,10 @@ function sanitize(html: string, title: string): string {
     "$1",
   );
 
+  // Strip any remaining imported SEO headings at the very start of the body.
+  // We render the only intended H1 + linked H2 above the imported HTML.
+  out = out.replace(/^\s*(?:<h[12]\b[^>]*>[\s\S]*?<\/h[12]\s*>\s*)+/i, "");
+
   // Replace "Business Help Services" mentions inside SEO body
   out = out.replace(/Business Help Services/gi, "Udyam Adhar");
 
