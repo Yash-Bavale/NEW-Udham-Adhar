@@ -58,9 +58,23 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="bg-form-header text-white text-center py-4">
-        <h2 className="text-xl font-bold font-display">{title}</h2>
+      <div className="bg-form-header text-white text-center py-4 px-3">
+        {(() => {
+          const idx = title.indexOf(" - ");
+          if (idx === -1) {
+            return <h2 className="text-xl font-bold font-display">{title}</h2>;
+          }
+          const main = title.slice(0, idx);
+          const sub = title.slice(idx + 3);
+          return (
+            <>
+              <h2 className="text-xl font-bold font-display leading-tight">{main}</h2>
+              <p className="mt-1 text-sm font-medium text-white/90 leading-snug">{sub}</p>
+            </>
+          );
+        })()}
       </div>
+
 
       <form onSubmit={onSubmit} onFocus={onFirstInteract} className="p-6 md:p-8 space-y-5">
         <Field id={`${baseId}-name`} label="Applicant Name / आवेदक का नाम">
