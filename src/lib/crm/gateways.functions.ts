@@ -44,6 +44,7 @@ export const updateGateway = createServerFn({ method: "POST" })
       .from("payment_gateways").update(patch).eq("id", id);
     if (error) throw new Error(error.message);
     await writeAudit({
+      supabase: context.supabase,
       actorId: context.userId,
       entityType: "payment_gateway",
       entityId: id,

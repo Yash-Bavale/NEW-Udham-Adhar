@@ -69,7 +69,7 @@ const FORGOT_USER_TYPES = [
 const TALK_TO_EXPERT_OPTIONS = [
   "New Udyam Registration",
   "Update Udyam Certificate",
-  "Download Udyam Certificate",
+  "Udyam Registration Certificate Download",
   "Migrate Udyog Aadhaar to Udyam",
   "Forgot Registered Mobile / Email",
   "Correct PAN / Aadhaar Name in Udyam",
@@ -157,7 +157,7 @@ const UDYAM_UPDATE: OnboardingSchema = {
 };
 
 const UDYAM_DOWNLOAD: OnboardingSchema = {
-  title: "Download Udyam Certificate — Incomplete Information",
+  title: "Udyam Registration Certificate Download — Incomplete Information",
   description: "Provide the existing Udyam number and registered mobile number/email ID so we can assist with certificate download.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },

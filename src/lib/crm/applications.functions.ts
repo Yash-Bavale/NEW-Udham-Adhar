@@ -1,69 +1,100 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { APPLICATION_STATUSES, type ApplicationStatus } from "./types";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertRole, writeAudit } from "@/lib/audit";
 
+const APPLICATION_STATUS_ENUM = [
+  "awaiting_payment",
+  "payment_received",
+  "details_pending",
+  "documents_pending",
+  "under_review",
+  "under_process",
+  "completed",
+] as const;
 
-const ListInput = z.object({
-  page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(100).default(25),
-  status: z.enum(APPLICATION_STATUSES as [string, ...string[]]).optional(),
-  search: z.string().trim().max(200).optional(),
-});
-
-export const listApplications = createServerFn({ method: "POST" })
+export const getApplicationDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => ListInput.parse(i ?? {}))
+  .inputValidator(z.object({ applicationId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const from = (data.page - 1) * data.pageSize;
-    const to = from + data.pageSize - 1;
-
-    let q = supabase
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    
+    const { data: app, error } = await supabaseAdmin
       .from("applications")
-      .select(
-        "id, application_code, application_status, created_at, assigned_to, lead_id, leads(lead_code, name, email, service), services(service_name)",
-        { count: "exact" },
-      )
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .select("*, lead:leads(*), certificates(*)")
+      .eq("id", data.applicationId)
+      .single();
 
-    if (data.status) q = q.eq("application_status", data.status as ApplicationStatus);
-    if (data.search) {
-      const s = data.search.trim();
-      q = q.or(`application_code.ilike.%${s}%`);
-    }
+    if (error || !app) throw new Error("Application not found");
 
-    const { data: rows, error, count } = await q;
-    if (error) throw new Error(error.message);
-    return { rows: rows ?? [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+    return { 
+      application: app,
+      lead: app.lead,
+      certificates: app.certificates || []
+    };
   });
 
-const UpdateInput = z.object({
-  id: z.string().uuid(),
-  application_status: z.enum(APPLICATION_STATUSES as [string, ...string[]]).optional(),
-  form_status: z.string().max(50).optional(),
-  document_status: z.string().max(50).optional(),
-  assigned_to: z.string().uuid().nullable().optional(),
-});
+export const listApplications = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    page: z.number().default(1),
+    pageSize: z.number().default(25),
+    status: z.enum(APPLICATION_STATUS_ENUM).optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+
+    let query = supabaseAdmin
+      .from("applications")
+      .select("*, leads(*)", { count: "exact" });
+
+    if (data.status) {
+      query = query.eq("application_status", data.status);
+    }
+
+    const { data: rows, count, error } = await query
+      .order("created_at", { ascending: false })
+      .range((data.page - 1) * data.pageSize, data.page * data.pageSize - 1);
+
+    if (error) throw new Error(error.message);
+    return { rows: rows || [], total: count || 0 };
+  });
 
 export const updateApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => UpdateInput.parse(i))
+  .inputValidator(z.object({
+    id: z.string().uuid(),
+    application_status: z.enum(APPLICATION_STATUS_ENUM).optional(),
+    document_status: z.string().optional(),
+    form_status: z.string().optional(),
+  }))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
     const { id, ...patch } = data;
-    const typedPatch: {
-      application_status?: ApplicationStatus;
-      form_status?: string;
-      document_status?: string;
-      assigned_to?: string | null;
-    } = {};
-    if (patch.application_status) typedPatch.application_status = patch.application_status as ApplicationStatus;
-    if (patch.form_status !== undefined) typedPatch.form_status = patch.form_status;
-    if (patch.document_status !== undefined) typedPatch.document_status = patch.document_status;
-    if (patch.assigned_to !== undefined) typedPatch.assigned_to = patch.assigned_to;
-    const { error } = await supabase.from("applications").update(typedPatch).eq("id", id);
+
+    const { data: prev } = await supabaseAdmin
+      .from("applications")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    const { error } = await supabaseAdmin
+      .from("applications")
+      .update(patch)
+      .eq("id", id);
+
     if (error) throw new Error(error.message);
+
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "application",
+      entityId: id,
+      action: "update_application",
+      oldValue: prev,
+      newValue: { ...prev, ...patch },
+      actorId: context.userId,
+    });
+
     return { ok: true };
   });

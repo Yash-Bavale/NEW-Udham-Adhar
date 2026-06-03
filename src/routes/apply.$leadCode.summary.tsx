@@ -66,7 +66,7 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
       "Current Udyam registered mobile number/email ID and additional documents or information may be required depending upon processing requirements.",
     ],
   },
-  "Download Udyam Certificate": {
+  "Udyam Registration Certificate Download": {
     tagline: "Get guided assistance to download your existing Udyam certificate.",
     bullets: [
       "Certificate download support by trained consultants",

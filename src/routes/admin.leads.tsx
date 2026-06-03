@@ -57,8 +57,8 @@ function LeadsPage() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin.leads"] });
   const clearSel = () => setSelected(new Set());
 
-  const allOnPage = (data?.rows ?? []).map((l) => l.id);
-  const allSelected = allOnPage.length > 0 && allOnPage.every((id) => selected.has(id));
+  const allOnPage = (data?.rows ?? []).map((l: any) => l.id);
+  const allSelected = allOnPage.length > 0 && allOnPage.every((id: string) => selected.has(id));
 
   const handleExport = async () => {
     setBusy(true);
@@ -161,8 +161,8 @@ function LeadsPage() {
                       checked={allSelected}
                       onChange={() => {
                         const next = new Set(selected);
-                        if (allSelected) allOnPage.forEach((id) => next.delete(id));
-                        else allOnPage.forEach((id) => next.add(id));
+                        if (allSelected) allOnPage.forEach((id: string) => next.delete(id));
+                        else allOnPage.forEach((id: string) => next.add(id));
                         setSelected(next);
                       }}
                     />
@@ -176,7 +176,7 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.rows.map((l) => {
+                {data?.rows.map((l: any) => {
                   const checked = selected.has(l.id);
                   return (
                     <tr key={l.id} className={`border-t hover:bg-[var(--admin-surface-2)] transition-colors ${checked ? "bg-[var(--admin-surface-2)]" : ""}`} style={{ borderColor: "var(--admin-border)" }}>
