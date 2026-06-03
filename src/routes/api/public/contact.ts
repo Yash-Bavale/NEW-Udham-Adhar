@@ -7,8 +7,9 @@ import {
 } from "@/lib/emails/emails.server";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
-// Internal admin notification target. Falls back to Reply-To from smtp_settings.
-const DEFAULT_ADMIN_EMAIL = "help@businesshelpservices.com";
+// Internal admin notification target. Configured via env secret.
+const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
+
 
 const ContactSchema = z.object({
   name: z.string().trim().min(2).max(120),
