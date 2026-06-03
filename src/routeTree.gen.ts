@@ -182,6 +182,7 @@ import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
@@ -189,6 +190,7 @@ import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboar
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCode.summary'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
+import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
@@ -1097,6 +1099,11 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminApplicationsRoute = AdminApplicationsRouteImport.update({
   id: '/applications',
   path: '/applications',
@@ -1131,6 +1138,11 @@ const ApplyLeadCodeSummaryRoute = ApplyLeadCodeSummaryRouteImport.update({
 const ApiPublicContactRoute = ApiPublicContactRouteImport.update({
   id: '/api/public/contact',
   path: '/api/public/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
+  id: '/api/public/complaint',
+  path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
@@ -1352,6 +1364,7 @@ export interface FileRoutesByFullPath {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1369,6 +1382,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -1543,6 +1557,7 @@ export interface FileRoutesByTo {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1560,6 +1575,7 @@ export interface FileRoutesByTo {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -1736,6 +1752,7 @@ export interface FileRoutesById {
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRoute
+  '/admin/complaints': typeof AdminComplaintsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1753,6 +1770,7 @@ export interface FileRoutesById {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -1930,6 +1948,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -1947,6 +1966,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/api/public/complaint'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
@@ -2121,6 +2141,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -2138,6 +2159,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/api/public/complaint'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
@@ -2313,6 +2335,7 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -2330,6 +2353,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/api/public/complaint'
     | '/api/public/contact'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
@@ -2511,6 +2535,7 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
+  ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
@@ -3736,6 +3761,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDashboardRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/complaints': {
+      id: '/admin/complaints'
+      path: '/complaints'
+      fullPath: '/admin/complaints'
+      preLoaderRoute: typeof AdminComplaintsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/applications': {
       id: '/admin/applications'
       path: '/applications'
@@ -3783,6 +3815,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/contact'
       fullPath: '/api/public/contact'
       preLoaderRoute: typeof ApiPublicContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/complaint': {
+      id: '/api/public/complaint'
+      path: '/api/public/complaint'
+      fullPath: '/api/public/complaint'
+      preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/leads/$leadId': {
@@ -3873,6 +3912,7 @@ const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRoute
+  AdminComplaintsRoute: typeof AdminComplaintsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminGatewaysRoute: typeof AdminGatewaysRoute
@@ -3887,6 +3927,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminApplicationsRoute: AdminApplicationsRoute,
+  AdminComplaintsRoute: AdminComplaintsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminGatewaysRoute: AdminGatewaysRoute,
@@ -4084,6 +4125,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
+  ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
