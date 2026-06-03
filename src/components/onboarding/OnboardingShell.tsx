@@ -77,7 +77,7 @@ export function OnboardingShell({
                       : "text-muted-foreground border-border")
                 }
               >
-                {done ? <Check className="w-3.5 h-3.5" /> : s.n}
+                {done ? <Check className="w-3.5 h-3.5" /> : displayNumber(s)}
               </motion.span>
               <span className={active ? "font-semibold text-foreground" : "text-muted-foreground"}>
                 {s.label}
