@@ -69,7 +69,7 @@ const FORGOT_USER_TYPES = [
 const TALK_TO_EXPERT_OPTIONS = [
   "New Udyam Registration",
   "Update Udyam Certificate",
-  "Download Udyam Certificate",
+  "Udyam Registration Certificate Download",
   "Migrate Udyog Aadhaar to Udyam",
   "Forgot Registered Mobile / Email",
   "Correct PAN / Aadhaar Name in Udyam",
