@@ -71,6 +71,10 @@ function sanitize(html: string, title: string): string {
     /<a\b[^>]*href=["']\/["'][^>]*>\s*<\/a>/gi,
     "",
   );
+  out = out.replace(
+    /<a\b[^>]*href=["']\/["'][^>]*>\s*<\/a>/gi,
+    "",
+  );
 
   // Strip the linked descriptive heading <h2><a href="/">...</a></h2> —
   // we render that ourselves with the correct same-page href.
@@ -92,6 +96,10 @@ function sanitize(html: string, title: string): string {
     /(<h([1-3])[^>]*>\s*([\s\S]*?)\s*<\/h\2>)(\s*<h\2[^>]*>\s*\3\s*<\/h\2>)+/gi,
     "$1",
   );
+
+  // Strip any remaining imported SEO headings at the very start of the body.
+  // We render the only intended H1 + linked H2 above the imported HTML.
+  out = out.replace(/^\s*(?:<h[12]\b[^>]*>[\s\S]*?<\/h[12]\s*>\s*)+/i, "");
 
   // Replace "Business Help Services" mentions inside SEO body
   out = out.replace(/Business Help Services/gi, "Udyam Adhar");
