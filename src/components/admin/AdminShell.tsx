@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity, Mail, CreditCard,
   LogOut, Menu, Moon, Sun, ChevronRight, Receipt, Wallet, MessageSquareWarning,
+  Award, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/theme";
@@ -13,6 +14,7 @@ const NAV = [
   { to: "/admin/leads", label: "Leads", icon: Users },
   { to: "/admin/applications", label: "Applications", icon: FileText },
   { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning },
+  { to: "/admin/certificates", label: "Certificates", icon: Award },
   { to: "/admin/services", label: "Services", icon: Briefcase },
   { to: "/admin/gateways", label: "Gateways", icon: CreditCard },
   { to: "/admin/finance/gst", label: "GST Report", icon: Receipt },
@@ -20,7 +22,9 @@ const NAV = [
   { to: "/admin/emails", label: "Emails", icon: Mail },
   { to: "/admin/users", label: "Users", icon: UserCog },
   { to: "/admin/activity", label: "Activity", icon: Activity },
+  { to: "/admin/audit", label: "Audit Log", icon: ShieldCheck },
 ] as const;
+
 
 export function AdminShell({ children, email }: { children: ReactNode; email?: string }) {
   return (
