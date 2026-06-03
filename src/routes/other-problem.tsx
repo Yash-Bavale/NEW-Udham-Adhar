@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ServicePageLayout } from "@/components/site/ServicePageLayout";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
+import html from "@/content/wp/msme-registration-process.html?raw";
 
 export const Route = createFileRoute("/other-problem")({
   head: () => ({
@@ -13,16 +14,5 @@ export const Route = createFileRoute("/other-problem")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/other-problem" },
     ],
   }),
-  component: () => (
-    <ServicePageLayout title="Other Udyam Problems">
-      <p>We assist with a range of common Business Help Services problems:</p>
-      <ul>
-        <li>Forgot Registered Mobile / Email</li>
-        <li>Correct PAN / Aadhaar Name in Udyam</li>
-        <li>OTP not received during registration / update</li>
-        <li>NIC activity mismatch</li>
-        <li>General queries — "Talk to Expert" service</li>
-      </ul>
-    </ServicePageLayout>
-  ),
+  component: () => <SeoLandingPage title="Other Udyam Problems" html={html} />,
 });
