@@ -38,7 +38,7 @@ export const getOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
-    const schema: OnboardingSchema = getSchema(serviceCode);
+    const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
 
     const [submissionRes, docsRes, paidPaymentRes] = await Promise.all([
       supabaseAdmin
