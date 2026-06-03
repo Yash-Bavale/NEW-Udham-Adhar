@@ -75,13 +75,19 @@ function OnboardingDetailsPage() {
       <OnboardingForm
         schema={data.schema}
         initial={initial}
-        busy={false}
+        busy={submitting}
         onSaveDraft={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: true } });
         }}
         onSubmit={async (values) => {
-          await submitFn({ data: { leadCode, data: values, draft: false } });
-          navigate({ to: "/onboarding/$leadCode/documents", params: { leadCode } });
+          if (submitting) return;
+          setSubmitting(true);
+          try {
+            await submitFn({ data: { leadCode, data: values, draft: false } });
+            navigate({ to: "/onboarding/$leadCode/documents", params: { leadCode } });
+          } finally {
+            setSubmitting(false);
+          }
         }}
       />
     </OnboardingShell>
