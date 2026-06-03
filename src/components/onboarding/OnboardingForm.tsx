@@ -26,14 +26,38 @@ export function OnboardingForm({
   const [err, setErr] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // Debounced autosave
   const timer = useRef<number | null>(null);
   const lastSavedJson = useRef<string>(JSON.stringify(initial));
+  const lastInitialJson = useRef<string>(JSON.stringify(initial));
+  const onSaveDraftRef = useRef(onSaveDraft);
   const mounted = useRef(false);
 
   useEffect(() => {
-    if (!onSaveDraft) return;
+    onSaveDraftRef.current = onSaveDraft;
+  }, [onSaveDraft]);
+
+  useEffect(() => {
+    const nextInitialJson = JSON.stringify(initial);
+    if (nextInitialJson === lastInitialJson.current) return;
+    lastInitialJson.current = nextInitialJson;
+    lastSavedJson.current = nextInitialJson;
+    mounted.current = false;
+    setValues(initial);
+    setErr(null);
+    setSubmitSuccess(false);
+    setSaveState("idle");
+    setSavedAt(null);
+  }, [initial]);
+
+  useEffect(() => {
+    if (!onSaveDraftRef.current) return;
+    if (busy) {
+      if (timer.current) window.clearTimeout(timer.current);
+      return;
+    }
     if (!mounted.current) {
       mounted.current = true;
       return;
@@ -45,7 +69,7 @@ export function OnboardingForm({
     timer.current = window.setTimeout(async () => {
       try {
         setSaveState("saving");
-        await onSaveDraft(values);
+        await onSaveDraftRef.current?.(values);
         lastSavedJson.current = current;
         setSavedAt(Date.now());
         setSaveState("saved");
@@ -57,7 +81,7 @@ export function OnboardingForm({
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [values, onSaveDraft]);
+  }, [values, busy]);
 
   function update(k: string, v: string) {
     setValues((s) => ({ ...s, [k]: v }));
@@ -65,9 +89,14 @@ export function OnboardingForm({
 
   async function handle(e: React.FormEvent) {
     e.preventDefault();
+    if (timer.current) window.clearTimeout(timer.current);
     setErr(null);
+    setSubmitSuccess(false);
     try {
       await onSubmit(values);
+      setSubmitSuccess(true);
+      setSaveState("saved");
+      setSavedAt(Date.now());
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save. Please try again.");
     }
@@ -93,14 +122,21 @@ export function OnboardingForm({
         </div>
       )}
 
+      {submitSuccess && !err && (
+        <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-sm px-3 py-2 flex items-center gap-2">
+          <Check className="w-4 h-4" /> Details submitted successfully. Opening next step…
+        </div>
+      )}
+
       <div className="flex flex-col-reverse sm:flex-row gap-3 justify-between items-stretch sm:items-center pt-2">
         <SaveIndicator state={saveState} savedAt={savedAt} />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-8 py-2.5 transition-colors disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-8 py-2.5 transition-colors disabled:opacity-60"
         >
-          {busy ? "Saving…" : "Save & Continue"}
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          {busy ? "Opening next step…" : "Save & Continue"}
         </button>
       </div>
     </form>
