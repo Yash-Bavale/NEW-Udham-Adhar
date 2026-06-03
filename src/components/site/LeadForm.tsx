@@ -59,7 +59,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="bg-form-header text-white text-center py-4 px-3">
-        <h2 className="text-xl font-bold font-display leading-tight">{title}</h2>
+        <h2 className="text-xl font-bold font-display leading-tight">MSME Registration Process</h2>
       </div>
 
 
@@ -136,7 +136,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         </button>
 
         <p className="text-center text-xs text-muted-foreground">
-          {"\u200B"}
+          {"\n\u200B"}
         </p>
       </form>
     </div>
