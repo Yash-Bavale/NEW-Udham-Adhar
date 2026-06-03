@@ -71,10 +71,6 @@ function sanitize(html: string, title: string): string {
     /<a\b[^>]*href=["']\/["'][^>]*>\s*<\/a>/gi,
     "",
   );
-  out = out.replace(
-    /<a\b[^>]*href=["']\/["'][^>]*>\s*<\/a>/gi,
-    "",
-  );
 
   // Strip the linked descriptive heading <h2><a href="/">...</a></h2> —
   // we render that ourselves with the correct same-page href.
