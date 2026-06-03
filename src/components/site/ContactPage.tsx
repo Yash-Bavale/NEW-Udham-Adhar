@@ -33,12 +33,15 @@ export function ContactPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Could not submit. Please try again.");
+        throw new Error(json?.error || `Could not submit (status ${res.status}). Please try again.`);
       }
       setSubmitted(true);
+      toast.success("Message sent. We'll be in touch soon.");
       trackEvent("contact_form_submitted", { state: payload.state });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const msg = err instanceof Error ? err.message : "Network error. Please check your connection and try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
