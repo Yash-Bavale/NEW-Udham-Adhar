@@ -119,7 +119,7 @@ function LeadDetailPage() {
           >Add</button>
         </div>
         <ul className="space-y-2">
-          {notes.map((n) => (
+          {notes.map((n: any) => (
             <li key={n.id} className="text-sm border-l-2 border-slate-200 pl-3">
               <div className="text-xs text-slate-500">{new Date(n.created_at).toLocaleString("en-IN")}</div>
               <div>{n.note}</div>
