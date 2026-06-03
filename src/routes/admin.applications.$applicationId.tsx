@@ -23,7 +23,7 @@ function ApplicationDetailPage() {
 
   if (isLoading) return <div className="p-10 text-center text-slate-500">Loading application…</div>;
   if (!data) return null;
-  const { application, lead, certificates } = data;
+  const { application, lead, certificates } = data as any;
 
   return (
     <div className="space-y-6">

@@ -183,6 +183,8 @@ import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
+import { Route as AdminCertificatesRouteImport } from './routes/admin.certificates'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
@@ -194,6 +196,8 @@ import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/comp
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
+import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
+import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -1104,6 +1108,16 @@ const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
   path: '/complaints',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCertificatesRoute = AdminCertificatesRouteImport.update({
+  id: '/certificates',
+  path: '/certificates',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminApplicationsRoute = AdminApplicationsRouteImport.update({
   id: '/applications',
   path: '/applications',
@@ -1160,6 +1174,18 @@ const AdminFinanceGstRoute = AdminFinanceGstRouteImport.update({
   path: '/finance/gst',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminComplaintsComplaintIdRoute =
+  AdminComplaintsComplaintIdRouteImport.update({
+    id: '/$complaintId',
+    path: '/$complaintId',
+    getParentRoute: () => AdminComplaintsRoute,
+  } as any)
+const AdminApplicationsApplicationIdRoute =
+  AdminApplicationsApplicationIdRouteImport.update({
+    id: '/$applicationId',
+    path: '/$applicationId',
+    getParentRoute: () => AdminApplicationsRoute,
+  } as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
     id: '/lovable/email/transactional/send',
@@ -1363,8 +1389,10 @@ export interface FileRoutesByFullPath {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
-  '/admin/applications': typeof AdminApplicationsRoute
-  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/applications': typeof AdminApplicationsRouteWithChildren
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/certificates': typeof AdminCertificatesRoute
+  '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1379,6 +1407,8 @@ export interface FileRoutesByFullPath {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
+  '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -1556,8 +1586,10 @@ export interface FileRoutesByTo {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
-  '/admin/applications': typeof AdminApplicationsRoute
-  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/applications': typeof AdminApplicationsRouteWithChildren
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/certificates': typeof AdminCertificatesRoute
+  '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1572,6 +1604,8 @@ export interface FileRoutesByTo {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
+  '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -1751,8 +1785,10 @@ export interface FileRoutesById {
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
-  '/admin/applications': typeof AdminApplicationsRoute
-  '/admin/complaints': typeof AdminComplaintsRoute
+  '/admin/applications': typeof AdminApplicationsRouteWithChildren
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/certificates': typeof AdminCertificatesRoute
+  '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1767,6 +1803,8 @@ export interface FileRoutesById {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
+  '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -1948,6 +1986,8 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/audit'
+    | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
@@ -1963,6 +2003,8 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
+    | '/admin/applications/$applicationId'
+    | '/admin/complaints/$complaintId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -2141,6 +2183,8 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/audit'
+    | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
@@ -2156,6 +2200,8 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin'
+    | '/admin/applications/$applicationId'
+    | '/admin/complaints/$complaintId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -2335,6 +2381,8 @@ export interface FileRouteTypes {
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
     | '/admin/applications'
+    | '/admin/audit'
+    | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/dashboard'
     | '/admin/emails'
@@ -2350,6 +2398,8 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
+    | '/admin/applications/$applicationId'
+    | '/admin/complaints/$complaintId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -3768,6 +3818,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminComplaintsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/certificates': {
+      id: '/admin/certificates'
+      path: '/certificates'
+      fullPath: '/admin/certificates'
+      preLoaderRoute: typeof AdminCertificatesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/applications': {
       id: '/admin/applications'
       path: '/applications'
@@ -3845,6 +3909,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceGstRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/complaints/$complaintId': {
+      id: '/admin/complaints/$complaintId'
+      path: '/$complaintId'
+      fullPath: '/admin/complaints/$complaintId'
+      preLoaderRoute: typeof AdminComplaintsComplaintIdRouteImport
+      parentRoute: typeof AdminComplaintsRoute
+    }
+    '/admin/applications/$applicationId': {
+      id: '/admin/applications/$applicationId'
+      path: '/$applicationId'
+      fullPath: '/admin/applications/$applicationId'
+      preLoaderRoute: typeof AdminApplicationsApplicationIdRouteImport
+      parentRoute: typeof AdminApplicationsRoute
+    }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
       path: '/lovable/email/transactional/send'
@@ -3897,6 +3975,29 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminApplicationsRouteChildren {
+  AdminApplicationsApplicationIdRoute: typeof AdminApplicationsApplicationIdRoute
+}
+
+const AdminApplicationsRouteChildren: AdminApplicationsRouteChildren = {
+  AdminApplicationsApplicationIdRoute: AdminApplicationsApplicationIdRoute,
+}
+
+const AdminApplicationsRouteWithChildren =
+  AdminApplicationsRoute._addFileChildren(AdminApplicationsRouteChildren)
+
+interface AdminComplaintsRouteChildren {
+  AdminComplaintsComplaintIdRoute: typeof AdminComplaintsComplaintIdRoute
+}
+
+const AdminComplaintsRouteChildren: AdminComplaintsRouteChildren = {
+  AdminComplaintsComplaintIdRoute: AdminComplaintsComplaintIdRoute,
+}
+
+const AdminComplaintsRouteWithChildren = AdminComplaintsRoute._addFileChildren(
+  AdminComplaintsRouteChildren,
+)
+
 interface AdminLeadsRouteChildren {
   AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
 }
@@ -3911,8 +4012,10 @@ const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
 
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
-  AdminApplicationsRoute: typeof AdminApplicationsRoute
-  AdminComplaintsRoute: typeof AdminComplaintsRoute
+  AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminCertificatesRoute: typeof AdminCertificatesRoute
+  AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminGatewaysRoute: typeof AdminGatewaysRoute
@@ -3926,8 +4029,10 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
-  AdminApplicationsRoute: AdminApplicationsRoute,
-  AdminComplaintsRoute: AdminComplaintsRoute,
+  AdminApplicationsRoute: AdminApplicationsRouteWithChildren,
+  AdminAuditRoute: AdminAuditRoute,
+  AdminCertificatesRoute: AdminCertificatesRoute,
+  AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminGatewaysRoute: AdminGatewaysRoute,
