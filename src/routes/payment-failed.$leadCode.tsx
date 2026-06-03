@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -28,10 +28,12 @@ function FailedPage() {
   const { reason } = Route.useSearch();
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
+  const [allowFailureView, setAllowFailureView] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["summary", leadCode],
     queryFn: () => getSummary({ data: { leadCode } }),
+    refetchInterval: allowFailureView ? false : 2000,
   });
 
   useEffect(() => {
@@ -45,7 +47,26 @@ function FailedPage() {
     }
   }, [data?.lead?.payment, data?.lead?.status, leadCode, navigate]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAllowFailureView(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [leadCode]);
+
   const lead = data?.lead;
+
+  if (!allowFailureView) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-4 bg-gradient-to-b from-amber-50/40 to-slate-50">
+        <div className="text-center max-w-sm">
+          <div className="w-10 h-10 border-4 border-brand-red border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-brand-navy font-display mb-2">Verifying payment status…</h1>
+          <p className="text-sm text-slate-600">
+            We are checking the final PayU confirmation before marking this transaction as failed.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4 bg-gradient-to-b from-red-50/40 to-slate-50">

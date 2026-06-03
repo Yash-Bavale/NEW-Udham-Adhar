@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        let creds: { key: string; salt: string };
+        let creds: ReturnType<typeof getPayUCreds>;
         try {
           creds = getPayUCreds();
         } catch (e) {
@@ -45,6 +45,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         const additionalCharges = get("additionalCharges");
         let mihpayid = get("mihpayid");
         let bankrefnum = get("bankrefnum");
+        const normalizedStatus = normalizePayUStatus(fields.status);
 
         // Detect S2S vs browser-return: PayU's server-to-server webhook
         // doesn't send Accept: text/html. Browser-return POST does.
@@ -62,7 +63,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           additionalCharges: additionalCharges || undefined,
         });
 
-        if (expected.toLowerCase() !== receivedHash.toLowerCase()) {
+        const hashMatches = expected.toLowerCase() === receivedHash.toLowerCase();
+        if (!hashMatches) {
           try {
             verifiedPayment = await verifyPayUPayment(fields.txnid);
           } catch (e) {
@@ -79,6 +81,21 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           console.warn("[payu] callback hash mismatch but PayU verification confirms success", { txnid: fields.txnid });
         }
 
+        if (!verifiedPayment && shouldVerifyWithPayU(normalizedStatus)) {
+          try {
+            verifiedPayment = await verifyPayUPayment(fields.txnid);
+            console.info("[payu] verify_payment result", {
+              txnid: fields.txnid,
+              postedStatus: fields.status,
+              verifiedStatus: verifiedPayment?.status,
+              verifiedUnmappedStatus: verifiedPayment?.unmappedstatus,
+              mihpayid: verifiedPayment?.mihpayid,
+            });
+          } catch (e) {
+            console.error("[payu] verification lookup failed", { txnid: fields.txnid, postedStatus: fields.status, error: e });
+          }
+        }
+
         // Load payment by txnid (we stored it as both transaction_id and razorpay_order_id)
         const { data: payment } = await supabaseAdmin
           .from("payments")
@@ -89,7 +106,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         if (!payment) {
           console.error("[payu] payment row missing", fields.txnid);
           return isBrowser
-            ? redirectToFailure(get("udf3") || fields.txnid, "Payment record not found")
+            ? redirectToPending(get("udf3") || fields.txnid)
             : new Response("payment-not-found", { status: 200 });
         }
 
@@ -101,14 +118,15 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           });
         }
 
-        // Idempotency: if already paid, just acknowledge
-        if (payment.status === "paid" && fields.status === "success") {
+        // Idempotency: once paid, never let a later browser/S2S retry downgrade it.
+        if (payment.status === "paid") {
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
             : new Response("OK", { status: 200 });
         }
 
         const verifiedSuccess = isPayUSuccess(verifiedPayment);
+        const verifiedFailure = isPayUFailure(verifiedPayment);
         if (verifiedPayment?.mihpayid && !mihpayid) mihpayid = String(verifiedPayment.mihpayid);
         if (verifiedPayment?.bank_ref_num && !bankrefnum) bankrefnum = String(verifiedPayment.bank_ref_num);
         const safeVerifiedPayment = verifiedPayment
@@ -116,14 +134,28 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           : null;
 
         const newStatus: "paid" | "failed" | "attempted" =
-          verifiedSuccess || fields.status === "success" ? "paid" :
-          fields.status === "failure" ? "failed" :
+          verifiedSuccess || normalizedStatus === "success" || normalizedStatus === "captured" ? "paid" :
+          verifiedFailure ? "failed" :
           "attempted";
 
         const rawPayload: Record<string, string> = {};
         form.forEach((v, k) => { rawPayload[k] = typeof v === "string" ? v : "[file]"; });
 
-        await supabaseAdmin.from("payments").update({
+        console.info("[payu] callback decision", {
+          txnid: fields.txnid,
+          leadCode: get("udf3") || null,
+          isBrowser,
+          hashMatches,
+          expectedHashPrefix: expected.slice(0, 12),
+          receivedHashPrefix: receivedHash.slice(0, 12),
+          postedStatus: fields.status,
+          normalizedStatus,
+          verifiedSuccess,
+          verifiedFailure,
+          newStatus,
+        });
+
+        const { error: paymentUpdateError } = await supabaseAdmin.from("payments").update({
           status: newStatus,
           razorpay_payment_id: mihpayid || null,
           razorpay_signature: receivedHash,
@@ -131,16 +163,24 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           webhook_response: rawPayload,
           raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: safeVerifiedPayment } as any,
         }).eq("id", payment.id);
+        if (paymentUpdateError) {
+          console.error("[payu] payment update failed", { txnid: fields.txnid, error: paymentUpdateError });
+          return isBrowser
+            ? redirectToPending(get("udf3") || fields.txnid)
+            : new Response("payment-update-failed", { status: 200 });
+        }
 
         if (newStatus === "paid") {
-          await supabaseAdmin.from("leads")
+          const { error: leadUpdateError } = await supabaseAdmin.from("leads")
             .update({ status: "payment_successful" })
             .eq("id", payment.lead_id);
+          if (leadUpdateError) console.error("[payu] lead update failed", { txnid: fields.txnid, leadId: payment.lead_id, error: leadUpdateError });
 
           if (payment.application_id) {
-            await supabaseAdmin.from("applications")
+            const { error: applicationUpdateError } = await supabaseAdmin.from("applications")
               .update({ application_status: "payment_received" })
               .eq("id", payment.application_id);
+            if (applicationUpdateError) console.error("[payu] application update failed", { txnid: fields.txnid, applicationId: payment.application_id, error: applicationUpdateError });
           }
 
           try { await generateInvoiceInternal(payment.id); }
@@ -187,14 +227,17 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             : new Response("OK", { status: 200 });
         }
 
-        return new Response("OK", { status: 200 });
+        return isBrowser
+          ? redirectToPending(get("udf3") || fields.txnid)
+          : new Response("OK", { status: 200 });
       },
     },
   },
 });
 
 const APP_ORIGIN = process.env.APP_BASE_URL ||
-  "https://everythinghappensqindiaserver4cored.lovable.app";
+  process.env.PUBLIC_SITE_URL ||
+  "https://udyamadhar.everythinghappens.in";
 
 function redirectToSuccess(leadCode: string) {
   return new Response(null, {
@@ -217,7 +260,21 @@ function redirectToFailure(leadCode: string, reason: string) {
 }
 
 function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
-  const status = String(payment?.status ?? "").toLowerCase();
-  const unmapped = String(payment?.unmappedstatus ?? "").toLowerCase();
+  const status = normalizePayUStatus(payment?.status);
+  const unmapped = normalizePayUStatus(payment?.unmappedstatus);
   return status === "success" || unmapped === "captured";
+}
+
+function isPayUFailure(payment: Record<string, unknown> | null | undefined) {
+  const status = normalizePayUStatus(payment?.status);
+  const unmapped = normalizePayUStatus(payment?.unmappedstatus);
+  return status === "failure" || status === "failed" || ["bounced", "dropped", "failed", "usercancelled"].includes(unmapped);
+}
+
+function normalizePayUStatus(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function shouldVerifyWithPayU(status: string) {
+  return status === "success" || status === "failure" || status === "failed" || status === "";
 }

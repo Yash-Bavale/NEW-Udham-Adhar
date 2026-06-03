@@ -6,7 +6,7 @@ import { createHash } from "crypto";
 
 // Safer default: 'test'. Only flip to 'live' when explicitly set.
 export const PAYU_MODE: "test" | "live" =
-  process.env.PAYU_MODE === "live" ? "live" : "test";
+  String(process.env.PAYU_MODE ?? "").trim().toLowerCase() === "live" ? "live" : "test";
 
 
 export const PAYU_BASE_URL =
@@ -32,14 +32,15 @@ export type PayUVerifiedPayment = {
 };
 
 export function getPayUCreds() {
-  const key = process.env.PAYU_MERCHANT_KEY;
-  const salt = process.env.PAYU_MERCHANT_SALT;
+  const key = process.env.PAYU_MERCHANT_KEY || process.env.PAYU_KEY;
+  const salt = process.env.PAYU_MERCHANT_SALT || process.env.PAYU_SALT;
+  const merchantId = process.env.PAYU_MERCHANT_ID || process.env.MERCHANT_ID;
   if (!key || !salt) {
     throw new Error(
-      "PayU is not configured. Set PAYU_MERCHANT_KEY and PAYU_MERCHANT_SALT.",
+      "PayU is not configured. Set PAYU_MERCHANT_KEY/PAYU_KEY and PAYU_MERCHANT_SALT/PAYU_SALT.",
     );
   }
-  return { key, salt };
+  return { key, salt, merchantId };
 }
 
 export async function verifyPayUPayment(txnid: string): Promise<PayUVerifiedPayment | null> {
