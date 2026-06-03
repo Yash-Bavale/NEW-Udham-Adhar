@@ -145,6 +145,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
+      <Toaster />
     </QueryClientProvider>
   );
 }
