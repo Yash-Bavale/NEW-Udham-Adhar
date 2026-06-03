@@ -4,6 +4,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
 
+const APPLICATION_STATUS_ENUM = [
+  "awaiting_payment",
+  "payment_received",
+  "details_pending",
+  "documents_pending",
+  "under_review",
+  "under_process",
+  "completed",
+] as const;
+
 export const getApplicationDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ applicationId: z.string().uuid() }))
@@ -30,7 +40,7 @@ export const listApplications = createServerFn({ method: "GET" })
   .inputValidator(z.object({
     page: z.number().default(1),
     pageSize: z.number().default(25),
-    status: z.string().optional(),
+    status: z.enum(APPLICATION_STATUS_ENUM).optional(),
   }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
@@ -55,7 +65,7 @@ export const updateApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
     id: z.string().uuid(),
-    application_status: z.string().optional(),
+    application_status: z.enum(APPLICATION_STATUS_ENUM).optional(),
     document_status: z.string().optional(),
     form_status: z.string().optional(),
   }))
@@ -71,7 +81,7 @@ export const updateApplication = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin
       .from("applications")
-      .update(patch as any)
+      .update(patch)
       .eq("id", id);
 
     if (error) throw new Error(error.message);
