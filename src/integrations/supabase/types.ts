@@ -134,6 +134,47 @@ export type Database = {
         }
         Relationships: []
       }
+      application_status_history: {
+        Row: {
+          actor_id: string | null
+          application_id: string
+          created_at: string
+          from_status: string | null
+          id: string
+          metadata: Json
+          reason: string | null
+          to_status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          application_id: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          to_status: string
+        }
+        Update: {
+          actor_id?: string | null
+          application_id?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_status_history_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       applications: {
         Row: {
           application_code: string | null
@@ -1514,6 +1555,17 @@ export type Database = {
         | "under_review"
         | "under_process"
         | "completed"
+        | "form_submitted"
+        | "documents_submitted"
+        | "certificate_uploaded"
+        | "certificate_ready"
+        | "on_hold"
+        | "cancelled"
+        | "refund_pending"
+        | "refunded"
+        | "consultation_pending"
+        | "consultation_scheduled"
+        | "rejected"
       email_log_status: "sent" | "failed" | "bounced"
       email_queue_status: "queued" | "sending" | "sent" | "failed" | "dlq"
       lead_status:
@@ -1673,6 +1725,17 @@ export const Constants = {
         "under_review",
         "under_process",
         "completed",
+        "form_submitted",
+        "documents_submitted",
+        "certificate_uploaded",
+        "certificate_ready",
+        "on_hold",
+        "cancelled",
+        "refund_pending",
+        "refunded",
+        "consultation_pending",
+        "consultation_scheduled",
+        "rejected",
       ],
       email_log_status: ["sent", "failed", "bounced"],
       email_queue_status: ["queued", "sending", "sent", "failed", "dlq"],
