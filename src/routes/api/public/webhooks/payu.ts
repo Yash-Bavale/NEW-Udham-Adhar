@@ -251,7 +251,15 @@ function redirectToFailure(leadCode: string, reason: string) {
 }
 
 function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
-  const status = String(payment?.status ?? "").toLowerCase();
-  const unmapped = String(payment?.unmappedstatus ?? "").toLowerCase();
+  const status = normalizePayUStatus(payment?.status);
+  const unmapped = normalizePayUStatus(payment?.unmappedstatus);
   return status === "success" || unmapped === "captured";
+}
+
+function normalizePayUStatus(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function shouldVerifyWithPayU(status: string) {
+  return status === "success" || status === "failure" || status === "failed" || status === "";
 }
