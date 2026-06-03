@@ -3,11 +3,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  getSchema,
   MAX_DOC_SIZE_BYTES,
   ALLOWED_DOC_MIME,
   type OnboardingSchema,
 } from "./schemas";
+import { loadServiceSchema } from "@/lib/forms/schema-loader.server";
 import { SERVICES } from "@/lib/constants";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
