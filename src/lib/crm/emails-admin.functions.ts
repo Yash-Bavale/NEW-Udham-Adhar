@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole } from "@/lib/audit";
-import { render } from "@react-email/render";
+import { render } from "@react-email/components";
 import { TEMPLATES } from "../email-templates/registry";
 import React from "react";
 
