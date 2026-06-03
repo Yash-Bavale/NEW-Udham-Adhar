@@ -1,12 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  enqueueFromTemplateInternal,
-  enqueueEmailInternal,
-} from "@/lib/emails/emails.server";
+import { enqueueEmailInternal } from "@/lib/emails/emails.server";
 
-const DEFAULT_ADMIN_EMAIL = "help@businesshelpservices.com";
+const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
 
 const ComplaintSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -15,6 +12,7 @@ const ComplaintSchema = z.object({
   application_ref: z.string().trim().max(80).optional().default(""),
   message: z.string().trim().min(10).max(2000),
 });
+
 
 function genComplaintNumber() {
   const d = new Date();
