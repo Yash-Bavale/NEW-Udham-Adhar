@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { assertRole } from "@/lib/audit";
+import { assertRole, writeAudit } from "@/lib/audit";
 
 export const getApplicationDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -23,4 +23,68 @@ export const getApplicationDetail = createServerFn({ method: "GET" })
       lead: app.lead,
       certificates: app.certificates || []
     };
+  });
+
+export const listApplications = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    page: z.number().default(1),
+    pageSize: z.number().default(25),
+    status: z.string().optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+
+    let query = supabaseAdmin
+      .from("applications")
+      .select("*, leads(*)", { count: "exact" });
+
+    if (data.status) {
+      query = query.eq("application_status", data.status);
+    }
+
+    const { data: rows, count, error } = await query
+      .order("created_at", { ascending: false })
+      .range((data.page - 1) * data.pageSize, data.page * data.pageSize - 1);
+
+    if (error) throw new Error(error.message);
+    return { rows: rows || [], total: count || 0 };
+  });
+
+export const updateApplication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({
+    id: z.string().uuid(),
+    application_status: z.string().optional(),
+    document_status: z.string().optional(),
+    form_status: z.string().optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    const { id, ...patch } = data;
+
+    const { data: prev } = await supabaseAdmin
+      .from("applications")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    const { error } = await supabaseAdmin
+      .from("applications")
+      .update(patch as any)
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "application",
+      entityId: id,
+      action: "update_application",
+      oldValue: prev,
+      newValue: { ...prev, ...patch },
+      actorId: context.userId,
+    });
+
+    return { ok: true };
   });
