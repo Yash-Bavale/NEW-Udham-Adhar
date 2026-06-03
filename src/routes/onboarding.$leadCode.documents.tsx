@@ -35,6 +35,12 @@ function DocsPage() {
   }
   if (!data) return null;
 
+  // If this service requires no documents at all, skip straight to done.
+  if ((data.schema.documents?.length ?? 0) === 0) {
+    navigate({ to: "/onboarding/$leadCode/done", params: { leadCode }, replace: true });
+    return null;
+  }
+
   const requiredDocs = data.schema.documents.filter((d) => d.required);
   const allRequiredUploaded = requiredDocs.every((d) =>
     data.documents.some((u) => u.doc_type === d.key),
