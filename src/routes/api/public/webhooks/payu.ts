@@ -236,7 +236,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
 });
 
 const APP_ORIGIN = process.env.APP_BASE_URL ||
-  "https://everythinghappensqindiaserver4cored.lovable.app";
+  process.env.PUBLIC_SITE_URL ||
+  "https://udyamadhar.everythinghappens.in";
 
 function redirectToSuccess(leadCode: string) {
   return new Response(null, {
