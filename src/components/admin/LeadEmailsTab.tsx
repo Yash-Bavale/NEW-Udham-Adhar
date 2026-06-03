@@ -80,7 +80,7 @@ export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadSer
   if (isLoading) return <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
   const history = [...(data?.logs || []), ...(data?.queue || [])].sort(
-    (a, b) => new Date(b.created_at || b.sent_at).getTime() - new Date(a.created_at || a.sent_at).getTime()
+    (a, b) => new Date(b.created_at || b.sent_at || 0).getTime() - new Date(a.created_at || a.sent_at || 0).getTime()
   );
 
   return (
