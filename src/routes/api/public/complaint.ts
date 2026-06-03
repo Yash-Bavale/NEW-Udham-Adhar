@@ -1,12 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  enqueueFromTemplateInternal,
-  enqueueEmailInternal,
-} from "@/lib/emails/emails.server";
+import { enqueueEmailInternal } from "@/lib/emails/emails.server";
 
-const DEFAULT_ADMIN_EMAIL = "help@businesshelpservices.com";
+const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
 
 const ComplaintSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -15,6 +12,7 @@ const ComplaintSchema = z.object({
   application_ref: z.string().trim().max(80).optional().default(""),
   message: z.string().trim().min(10).max(2000),
 });
+
 
 function genComplaintNumber() {
   const d = new Date();
@@ -125,54 +123,35 @@ export const Route = createFileRoute("/api/public/complaint")({
           metadata: { source: "complaint_form", complaint_id: complaint.id } as never,
         });
 
-        // Admin recipient
-        const { data: smtp } = await supabaseAdmin
-          .from("smtp_settings")
-          .select("reply_to")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const adminTo = smtp?.reply_to || DEFAULT_ADMIN_EMAIL;
+        // Internal notification recipient (private, env-configured)
+
+        const adminTo =
+          process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
 
         const origin = new URL(request.url).origin;
-        const variables = {
-          name: parsed.name,
-          email: parsed.email,
-          mobile: parsed.mobile,
-          complaint_number: complaint.complaint_number,
-          application_ref: parsed.application_ref || "—",
-          message: parsed.message,
-          admin_url: `${origin}/admin/complaints`,
-        };
 
         try {
-          await Promise.all([
-            // Customer acknowledgement
-            enqueueFromTemplateInternal("complaint_submitted", parsed.email, variables, {
-              toName: parsed.name,
-              leadId,
-            }).catch(() => undefined),
-            // Admin notification (inline — no dedicated template)
-            enqueueEmailInternal({
-              toEmail: adminTo,
-              subject: `New complaint ${complaint.complaint_number} — ${parsed.name}`,
-              bodyHtml: `
-                <h2>New complaint received</h2>
-                <p><b>Complaint #:</b> ${complaint.complaint_number}</p>
-                <p><b>Name:</b> ${parsed.name}</p>
-                <p><b>Email:</b> ${parsed.email}</p>
-                <p><b>Mobile:</b> +91 ${parsed.mobile}</p>
-                <p><b>Application Ref:</b> ${parsed.application_ref || "—"}</p>
-                <p><b>Message:</b></p>
-                <p style="white-space:pre-wrap">${parsed.message.replace(/</g, "&lt;")}</p>
-                <p><a href="${origin}/admin/complaints">Open in CRM →</a></p>
-              `,
-              leadId,
-            }),
-          ]);
+          // Admin/internal notification only — no customer acknowledgement
+          await enqueueEmailInternal({
+            toEmail: adminTo,
+            subject: `New complaint ${complaint.complaint_number} — ${parsed.name}`,
+            bodyHtml: `
+              <h2>New complaint received</h2>
+              <p><b>Complaint #:</b> ${complaint.complaint_number}</p>
+              <p><b>Name:</b> ${parsed.name}</p>
+              <p><b>Email:</b> ${parsed.email}</p>
+              <p><b>Mobile:</b> +91 ${parsed.mobile}</p>
+              <p><b>Application Ref:</b> ${parsed.application_ref || "—"}</p>
+              <p><b>Message:</b></p>
+              <p style="white-space:pre-wrap">${parsed.message.replace(/</g, "&lt;")}</p>
+              <p><a href="${origin}/admin/complaints">Open in CRM →</a></p>
+            `,
+            leadId,
+          });
         } catch {
           /* never block user on email backend */
         }
+
 
         return new Response(
           JSON.stringify({ ok: true, complaintNumber: complaint.complaint_number }),
