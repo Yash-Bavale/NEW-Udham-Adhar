@@ -66,7 +66,6 @@ function OnboardingDetailsPage() {
   initial.aadhaar_mobile ||= data.lead.mobile ?? "";
 
   const hasRequiredDocs = (data.schema.documents ?? []).some((d) => d.required);
-  const hasAnyDocs = (data.schema.documents?.length ?? 0) > 0;
   const totalSteps: 2 | 3 = hasRequiredDocs ? 3 : 2;
 
   return (
