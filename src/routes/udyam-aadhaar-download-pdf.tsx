@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-aadhaar-download-pdf")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhaar-download-pdf" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Aadhaar Download PDF – Get Your MSME Certificate" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Aadhaar Download PDF" linkTitle="Udyam Aadhaar Download PDF – Get Your MSME Certificate" html={html} />,
 });

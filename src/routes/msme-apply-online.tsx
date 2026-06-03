@@ -14,5 +14,5 @@ export const Route = createFileRoute("/msme-apply-online")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-apply-online" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME Apply Online | Udyam Registration for Small Businesses" html={html} />,
+  component: () => <SeoLandingPage title="MSME Apply Online" linkTitle="MSME Apply Online | Udyam Registration for Small Businesses" html={html} />,
 });

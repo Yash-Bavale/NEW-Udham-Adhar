@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-no")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-no" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Number (UAN) – Find, Verify & Update UAN" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar No" linkTitle="Udyog Aadhaar Number (UAN) – Find, Verify & Update UAN" html={html} />,
 });

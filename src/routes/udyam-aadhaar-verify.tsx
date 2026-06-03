@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-aadhaar-verify")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhaar-verify" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Aadhaar Verify | Check MSME Udyam Registration Status" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Aadhaar Verify" linkTitle="Udyam Aadhaar Verify | Check MSME Udyam Registration Status" html={html} />,
 });

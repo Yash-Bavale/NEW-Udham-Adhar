@@ -14,5 +14,5 @@ export const Route = createFileRoute("/aadhar-udyog")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aadhar-udyog" },
     ],
   }),
-  component: () => <SeoLandingPage title="Aadhar Udyog - Aadhaar Based Udyog Aadhar Registration" html={html} />,
+  component: () => <SeoLandingPage title="Aadhar Udyog" linkTitle="Aadhar Udyog - Aadhaar Based Udyog Aadhar Registration" html={html} />,
 });

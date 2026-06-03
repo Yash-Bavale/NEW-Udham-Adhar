@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-to-udyam-migration")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-to-udyam-migration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Migrate" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar To Udyam Migration" linkTitle="Migrate" html={html} />,
 });

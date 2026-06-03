@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udham-aadhar-download")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udham-aadhar-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udham Aadhar Download | Get Udyam Certificate Online" html={html} />,
+  component: () => <SeoLandingPage title="Udham Aadhar Download" linkTitle="Udham Aadhar Download | Get Udyam Certificate Online" html={html} />,
 });
