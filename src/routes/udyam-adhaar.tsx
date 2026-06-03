@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-adhaar")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhaar" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Adhaar" linkTitle="Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration" html={html} />,
 });

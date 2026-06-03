@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-print-certificate")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-print-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Print Certificate | MSME Certificate Printing Guide" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Print Certificate" linkTitle="Udyam Print Certificate | MSME Certificate Printing Guide" html={html} />,
 });

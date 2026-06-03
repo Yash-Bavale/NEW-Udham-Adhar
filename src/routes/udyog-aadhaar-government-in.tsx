@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-government-in")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-government-in" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Government Portal – MSME Registration Details" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Government IN" linkTitle="Udyog Aadhaar Government Portal – MSME Registration Details" html={html} />,
 });

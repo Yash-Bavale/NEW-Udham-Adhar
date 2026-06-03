@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-print-with-annexure")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-print-with-annexure" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Print With Annexure | Download Full MSME Certificate" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Print With Annexure" linkTitle="Udyam Print With Annexure | Download Full MSME Certificate" html={html} />,
 });

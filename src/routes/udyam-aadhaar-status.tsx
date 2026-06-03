@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-aadhaar-status")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhaar-status" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Aadhaar Status | Track Your MSME Registration Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Aadhaar Status" linkTitle="Udyam Aadhaar Status | Track Your MSME Registration Online" html={html} />,
 });

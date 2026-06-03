@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhar-registration-online")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhar-registration-online" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhar Registration Online Udyog Aadhar Registration Online – Simple Process, Benefits & Eligibility Guide" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Registration Online" linkTitle="Udyog Aadhar Registration Online Udyog Aadhar Registration Online – Simple Process, Benefits & Eligibility Guide" html={html} />,
 });
