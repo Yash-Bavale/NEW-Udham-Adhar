@@ -55,15 +55,8 @@ function sanitize(html: string): string {
     (m) => (dupImagePattern.test(m) ? "" : m),
   );
 
-  // De-duplicate stacked top headings that repeat the page title.
-  // WP source typically renders: <h2>title</h2> ... <h1>title</h1> ... <a href="/"><h1>descriptive</h1></a>
-  // Keep only the middle bold <h1>; strip the leading <h2> and the home-linked descriptive <h1>.
-  out = out.replace(/^\s*(?:<h2[^>]*>[\s\S]*?<\/h2>\s*)+/i, "");
-  out = out.replace(
-    /<a[^>]*href=["']\/?["'][^>]*>\s*<h1[\s\S]*?<\/h1\s*>\s*<\/a>/gi,
-    "",
-  );
-  // Collapse any remaining run of identical consecutive headings to a single one.
+  // Collapse any run of identical consecutive headings to a single one
+  // (defensive — keeps the page H1 + linked H2 block intact for SEO).
   out = out.replace(
     /(<h([1-3])[^>]*>\s*([\s\S]*?)\s*<\/h\2>)(\s*<h\2[^>]*>\s*\3\s*<\/h\2>)+/gi,
     "$1",
