@@ -84,7 +84,7 @@ function LeadDetailPage() {
               <tr><th className="text-left py-1">Code</th><th className="text-left">Status</th><th className="text-left">Created</th></tr>
             </thead>
             <tbody>
-              {applications.map((a) => (
+              {applications.map((a: any) => (
                 <tr key={a.id} className="border-t">
                   <td className="py-1 font-mono text-xs">{a.application_code}</td>
                   <td>{a.application_status}</td>
