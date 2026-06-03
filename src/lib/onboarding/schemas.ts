@@ -70,7 +70,7 @@ const TALK_TO_EXPERT_OPTIONS = [
   "New Udyam Registration",
   "Update Udyam Certificate",
   "Udyam Registration Certificate Download",
-  "Udyog Aadhaar to Udyam Migration",
+  "Migrate",
   "Forgot Registered Mobile / Email",
   "Correct PAN / Aadhaar Name in Udyam",
 ] as const;
@@ -169,7 +169,7 @@ const UDYAM_DOWNLOAD: OnboardingSchema = {
 };
 
 const MIGRATE: OnboardingSchema = {
-  title: "Udyog Aadhaar to Udyam Migration — Incomplete Information",
+  title: "Migrate — Incomplete Information",
   description: "Share your Udyog Aadhaar number so our experts can verify migration requirements.",
   fields: [
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
