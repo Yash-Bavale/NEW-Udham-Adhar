@@ -8,7 +8,8 @@ export type FieldType =
   | "number"
   | "date"
   | "select"
-  | "textarea";
+  | "textarea"
+  | "nic";
 
 export type FieldDef = {
   key: string;
@@ -20,6 +21,9 @@ export type FieldDef = {
   pattern?: string;
   maxLength?: number;
   help?: string;
+  nicDigits?: 2 | 4 | 5;
+  /** For nic fields: read activity_type from this sibling field key */
+  activityFrom?: string;
 };
 
 export type DocDef = {
@@ -116,9 +120,9 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "bank_ifsc", label: "IFSC Code", type: "text", required: true, pattern: "^[A-Z]{4}0[A-Z0-9]{6}$", maxLength: 11 },
     { key: "bank_account_no", label: "Bank Account Number", type: "text", required: true, maxLength: 30 },
     { key: "major_activity", label: "Major Activity of Unit", type: "select", required: true, options: ACTIVITY_TYPES },
-    { key: "nic_2_digit", label: "NIC 2 Digit Code", type: "text", required: false, maxLength: 120 },
-    { key: "nic_4_digit", label: "NIC 4 Digit Code", type: "text", required: false, maxLength: 120 },
-    { key: "nic_5_digit", label: "NIC 5 Digit Code", type: "text", required: false, maxLength: 120 },
+    { key: "nic_2_digit", label: "NIC 2 Digit Code", type: "nic", required: true, nicDigits: 2, activityFrom: "major_activity", help: "Search and select your business division." },
+    { key: "nic_4_digit", label: "NIC 4 Digit Code", type: "nic", required: true, nicDigits: 4, activityFrom: "major_activity", help: "Narrow down to your business group." },
+    { key: "nic_5_digit", label: "NIC 5 Digit Code", type: "nic", required: true, nicDigits: 5, activityFrom: "major_activity", help: "Pick the exact 5-digit sub-class for your activity." },
     { key: "employees_male", label: "Number of persons employed — Male", type: "number", required: false },
     { key: "employees_female", label: "Number of persons employed — Female", type: "number", required: false },
     { key: "employees_others", label: "Number of persons employed — Others", type: "number", required: false },
