@@ -122,18 +122,17 @@ const CATEGORIES: Category[] = [
     key: "udhayam-aadhar-download",
     label: "Udhayam Aadhar Download",
     slug: "udhayam-aadhar-download",
-    match: (s) => s === "udhayam-aadhar-download",
+    match: (s) =>
+      ["udhayam-aadhar-download","udyam-print","print-udyam","udyam-register-print","udyam-print-download","udyam-reprint","udyam-print-certificate","msme-print-udyam-certificate","aadhar-udyam-print","msme-print-certificate"].includes(s),
   },
   {
     key: "print-msme-udyam-certificate",
     label: "Print MSME Udyam Certificate",
     slug: "print-msme-udyam-certificate",
     match: (s) =>
-      s.startsWith("print-msme") ||
-      s.startsWith("print-udyam") ||
-      s.startsWith("msme-print") ||
-      s.startsWith("udyam-print"),
+      ["print-msme-udyam-certificate","print-udyam-certificate-download","udyam-print-with-annexure","udyam-adhar-download","udyog-aadhaar-download","udyam-aadhaar-verify","udyam-aadhaar-status","udyam-registration-number-verify","udyam-pan-registration","udyam-aadhaar-login","print-udyam-certificate"].includes(s),
   },
+
   {
     key: "udyam-registration-online",
     label: "Business Help Services Online",
