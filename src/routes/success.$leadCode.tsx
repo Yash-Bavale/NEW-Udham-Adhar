@@ -96,6 +96,18 @@ function SuccessPage() {
     };
   }, [leadCode, getSummary, navigate]);
 
+  // Countdown + auto-redirect once payment is confirmed and user hasn't cancelled.
+  useEffect(() => {
+    if (isLoading || error || !data || !autoRedirect) return;
+    if (secondsLeft <= 0) {
+      trackEvent("post_payment_auto_redirect", { leadCode, cancelled: false });
+      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
+      return;
+    }
+    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [isLoading, error, data, autoRedirect, secondsLeft, leadCode, navigate]);
+
   if (isLoading) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
