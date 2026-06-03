@@ -14,7 +14,7 @@ export const Route = createFileRoute("/other-problem")({
     ],
   }),
   component: () => (
-    <ServicePageLayout title="Other Udyam Problems">
+    <ServicePageLayout title="Other Udyam Problems" showSampleCertificate>
       <p>We assist with a range of common Business Help Services problems:</p>
       <ul>
         <li>Forgot Registered Mobile / Email</li>
