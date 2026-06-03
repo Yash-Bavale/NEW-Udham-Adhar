@@ -1,92 +1,63 @@
-# Admin Panel UI completion + Phase D Status Engine
+# Sync SEO page content from Udyam_website_information.docx
 
-Last pass added the new lead-detail tabs/components, but several admin pages referenced by links/nav were never created and several modules from the "Deep Pass" plan are still missing. This pass finishes the UI and then ships the Phase D status workflow engine.
+## Scope
 
-## Part 1 — Finish Admin Panel UI
+Treat the uploaded doc as the source of new copy. For each entry in the doc, fuzzy-match the entry name to a slug under `src/content/wp/*.html`. For matched pages, append the doc's **Title** and **Meta Description** as extra lines — only if they are not already present. Existing copy is never overwritten.
 
-### A. Missing detail pages (currently 404 / type errors)
+No `.tsx` route files, no `head()` metadata, no React components change. Only the WordPress-style HTML snippets under `src/content/wp/` are edited.
 
-1. `src/routes/admin.applications.$applicationId.tsx`
-   - Loads `getApplicationDetail` (already exists in `applications.functions.ts`).
-   - Header: application_code, status badge, linked lead summary card with link to `/admin/leads/$leadId`.
-   - Status workflow buttons (Next / Hold / Reject) — wired to `updateApplication` with `assertRole(["super_admin","operations"])`.
-   - Tabs: Overview · Onboarding (embeds `AdminOnboardingPanel`) · Documents · Finance (embeds `LeadFinanceTab` scoped via lead_id) · Certificates · Activity (embeds `LeadTimeline` filtered to application).
+## How a page renders today
 
-2. `src/routes/admin.complaints.$complaintId.tsx`
-   - New server fn `getComplaintDetail` in `complaints.functions.ts`.
-   - Header: complaint code, status, severity, linked lead/application chips.
-   - Status workflow (open → in_progress → resolved → closed) via existing `updateComplaintStatus`.
-   - Sections: Customer message, Internal notes (reuses notes pattern), Linked entities, Resolution log.
+`SeoLandingPage.tsx` strips inline styles/scripts/svg, the Sample Certificate block, and a few other duplicates, then renders the remaining HTML through Tailwind prose. The 3 visible spots that this task touches:
 
-### B. New modules
+1. **Form header** — first `<h2>...</h2>` at the top (e.g. `<h2>Udyog Aadhaar to Udyam Migration</h2>`).
+2. **Linked heading** — `<h2><a href="/">...</a></h2>` (or `<h1>` inside `<a href="/">`); long descriptive title.
+3. **Content box** — the body `<p>...</p>` paragraph(s).
 
-3. `src/routes/admin.certificates.tsx` + supporting server fns
-   - New file `src/lib/crm/certificates.functions.ts`:
-     - `listCertificates` (filters: status, service, date range)
-     - `uploadCertificate` — upload PDF to `documents` bucket at `certificates/<application_id>/<filename>`, insert row in `certificates` table.
-     - `deliverCertificate` — set `delivered_at`, transition application to `completed`, enqueue email via existing `email_queue` using `client-info-request` registry (new template variant `certificate-delivered`) with signed URL.
-   - Page: table of all certificates, upload dialog, "Deliver" action button.
-   - Storage bucket guard: create `documents` bucket if absent (private) via migration.
+## Append rules (per matched page)
 
-4. `src/routes/admin.audit.tsx` + `src/lib/crm/audit.functions.ts`
-   - `listAuditLogs` server fn: filters by entity_type, entity_id, actor, date range. `super_admin` only.
-   - Table view: timestamp, actor, entity, action, old → new diff (JSON viewer collapsible).
+For each of the 3 spots, do a case-insensitive, whitespace-collapsed `includes()` check against the full visible text of that spot:
 
-### C. AdminShell nav additions
+- **Form header**: if the spot's text does NOT already contain the doc **Title**, insert a new `<h2>{Title}</h2>` immediately after the existing first `<h2>` (or at the top if no header found).
+- **Linked heading**: if the existing `<a href="/"><h1|h2>...</h1|h2></a>` does NOT contain the doc **Title**, insert a new `<h2><a href="/">{Title}</a></h2>` immediately after it. If the page has no linked heading at all, append one before the first body `<p>`.
+- **Content box**: if no existing `<p>` already contains the doc **Meta Description** (compared on the first ~80 chars to handle long paragraphs), append a new `<p>{MetaDescription}</p>` at the end of the file.
 
-5. `src/components/admin/AdminShell.tsx`
-   - Add nav items: Certificates (`Award` icon), Audit (`ShieldCheck` icon, only visible if user has `super_admin`).
-   - Add small role badge near user menu.
+If all 3 spots already include the doc text, the file is left untouched.
 
-### D. Editable onboarding answers + doc re-upload
+## Matching doc → slug
 
-6. `src/lib/crm/onboarding-admin.functions.ts` (new)
-   - `adminUpdateOnboardingField` — merges into `onboarding_submissions.form_data` jsonb, writes audit log.
-   - `requestDocumentReupload` — sets doc row `status='re_upload_requested'`, enqueues email.
-7. Enhance `AdminOnboardingPanel.tsx` so each field row has inline edit (super_admin + operations) and each document row gets a "Request re-upload" button.
+1. Parse `Udyam_website_information.docx` into entries `{ name, title, metaDescription }` (numbered list — entries 1..~125).
+2. Normalize each `name` to a slug candidate: lowercase, strip punctuation, collapse whitespace to `-`.
+3. Look up `src/content/wp/{slug}.html`. If miss, try common variants: drop trailing `s`, swap `aadhar`↔`aadhaar`, swap `udyam-`↔`udhayam-`/`udham-`/`udhar-`, etc.
+4. Skip entries with no confident match. Print a summary at the end listing matched / unmatched.
 
-### E. Payments tooling on Finance tab
+Pages with no doc match are left fully untouched.
 
-8. Enhance `LeadFinanceTab.tsx`:
-   - Collapsible JSON viewer per webhook payload.
-   - `resyncPayment` button (super_admin) → new server fn in `payments.functions.ts` that re-queries gateway and updates `payments` row.
-   - `Record offline payment` dialog (super_admin).
+## Implementation
 
-## Part 2 — Phase D: Status Workflow Engine
+A single Node script run from `/tmp`:
 
-### F. Centralised state machine
+```text
+/tmp/sync-seo-from-doc.mjs
+  ├── parseDoc()      // read /mnt/user-uploads/Udyam_website_information.docx via mammoth
+  ├── slugify(name)
+  ├── findHtmlFile(slug)
+  ├── patchHtml(html, title, metaDesc)  // 3 append rules, idempotent
+  └── main: walk entries → patch matched files → log report
+```
 
-9. `src/lib/crm/status-engine.ts` (pure, client-safe — no Supabase imports)
-   - Defines transition graphs for `lead_status`, `application_status`, `complaint_status`, `certificate_status`.
-   - `getAllowedTransitions(current, role)` → returns allowed next states by role.
-   - `validateTransition(from, to, role)` → throws on invalid.
+The script is run once, prints a report (`matched: N, modified: M, untouched: K, unmatched: U` plus the unmatched list), then is discarded. Nothing in the repo references it.
 
-10. `src/lib/crm/status-engine.server.ts`
-    - `transitionLead`, `transitionApplication`, `transitionComplaint`, `transitionCertificate` server fns that:
-      a. validate transition via shared rules,
-      b. apply DB update,
-      c. write `audit_logs`,
-      d. enqueue side-effect emails (e.g. application → `in_progress` sends "Work started" email; → `completed` sends certificate delivery).
+## Out of scope
 
-11. Replace ad-hoc status `<select>` dropdowns in lead/application/complaint detail pages with a shared `<StatusTransition>` component that reads allowed transitions and renders action buttons (e.g. "Move to In Progress", "Mark Completed", "Put on Hold").
+- Route `.tsx` files, `head()` titles/descriptions, canonical/og tags.
+- Creating new pages for unmatched doc entries.
+- Editing the React `SeoLandingPage.tsx` layout, the Sample Certificate card, or the `LeadForm` component.
+- Any backend, RLS, or admin changes.
 
-### G. Side-effect side-table
+## Verification
 
-12. New table `status_transitions` migration:
-    - columns: `id`, `entity_type`, `entity_id`, `from_status`, `to_status`, `actor_id`, `note`, `created_at`.
-    - GRANTs + RLS (super_admin/operations select, server-side insert via service role).
-    - Backfill insert from existing audit rows is out of scope — start fresh.
-
-13. Timeline component reads from `status_transitions` in addition to current sources for a unified chronological view.
-
-## Technical Notes
-
-- All new server fns use `requireSupabaseAuth` middleware + `assertRole` from `src/lib/audit.ts`.
-- Email side-effects use the existing `email_queue` insert pattern (already done by `sendLeadEmail`) so no worker changes are needed.
-- Storage bucket `documents` must exist; migration creates it if missing with `private` access. Signed URLs generated server-side (1 hour TTL) for certificate delivery emails.
-- No changes to client.ts, auth-middleware.ts, types.ts (auto-gen).
-
-## Resume order after this pass
-
-→ Phase E (tokenized magic links for client form access)
-→ Phase F (PDF invoice/certificate redesign)
+After the script runs, spot-check 3 representative files (`udyog-aadhaar-to-udyam-migration.html`, `udyam-certificate.html`, `msme-certificate-download.html`) to confirm:
+- Pre-existing copy is intact.
+- Added lines appear in the right spot.
+- Re-running the script is a no-op (idempotency).
