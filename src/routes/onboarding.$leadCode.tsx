@@ -22,6 +22,7 @@ function OnboardingDetailsPage() {
   const navigate = useNavigate();
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
+  const [submitting, setSubmitting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding", leadCode],
