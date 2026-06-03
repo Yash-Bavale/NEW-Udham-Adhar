@@ -300,7 +300,7 @@ function SuccessPage() {
         {/* Receipt disclosure - secondary */}
         <div className="mt-8 print:hidden">
           <button
-            onClick={() => setShowReceipt((v) => !v)}
+            onClick={() => { cancelAutoRedirect(); setShowReceipt((v) => !v); }}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-navy/30 transition-colors text-sm font-semibold text-brand-navy"
           >
             <span className="flex items-center gap-2">
