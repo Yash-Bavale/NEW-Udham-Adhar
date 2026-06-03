@@ -107,7 +107,7 @@ function OnboardingDetailsPage() {
         onSubmitted={async () => {
           try {
             await navigate({
-              to: hasRequiredDocs || hasAnyDocs
+              to: hasRequiredDocs
                 ? "/onboarding/$leadCode/documents"
                 : "/onboarding/$leadCode/done",
               params: { leadCode },
