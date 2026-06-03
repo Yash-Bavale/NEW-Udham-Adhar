@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ServicePageLayout } from "@/components/site/ServicePageLayout";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
+import html from "@/content/wp/udyam-update.html?raw";
 
 export const Route = createFileRoute("/update-udyam-certificate")({
   head: () => ({
@@ -13,13 +14,5 @@ export const Route = createFileRoute("/update-udyam-certificate")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/update-udyam-certificate" },
     ],
   }),
-  component: () => (
-    <ServicePageLayout title="Update Udyam Certificate">
-      <p>
-        Update your existing Business Help Services certificate — change of business
-        name, address, NIC activity, investment, turnover, mobile or email — with
-        end-to-end consultancy assistance.
-      </p>
-    </ServicePageLayout>
-  ),
+  component: () => <SeoLandingPage title="Update Udyam Certificate" html={html} />,
 });

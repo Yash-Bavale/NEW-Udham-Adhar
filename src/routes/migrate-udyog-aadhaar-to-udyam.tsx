@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ServicePageLayout } from "@/components/site/ServicePageLayout";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
+import html from "@/content/wp/udyog-aadhaar-to-udyam-migration.html?raw";
 
 export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
   head: () => ({
@@ -13,14 +14,5 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/migrate-udyog-aadhaar-to-udyam" },
     ],
   }),
-  component: () => (
-    <ServicePageLayout title="Migrate Udyog Aadhaar to Udyam">
-      <p>
-        If you have an old <strong>Udyog Aadhaar Memorandum (UAM)</strong>
-        registration, it must be migrated to the new <strong>Udyam
-        Registration</strong> system. We assist with the entire migration
-        process end-to-end.
-      </p>
-    </ServicePageLayout>
-  ),
+  component: () => <SeoLandingPage title="Migrate Udyog Aadhaar to Udyam" html={html} />,
 });

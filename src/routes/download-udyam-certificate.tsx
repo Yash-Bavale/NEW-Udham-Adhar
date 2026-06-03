@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ServicePageLayout } from "@/components/site/ServicePageLayout";
+import { SeoLandingPage } from "@/components/site/SeoLandingPage";
+import html from "@/content/wp/download-udyam-certificate.html?raw";
 
 export const Route = createFileRoute("/download-udyam-certificate")({
   head: () => ({
@@ -13,13 +14,5 @@ export const Route = createFileRoute("/download-udyam-certificate")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam-certificate" },
     ],
   }),
-  component: () => (
-    <ServicePageLayout title="Download Udyam Certificate">
-      <p>
-        Get assistance to download a fresh, digitally-signed copy of your Udyam
-        Registration certificate using your registration number and registered
-        mobile or email.
-      </p>
-    </ServicePageLayout>
-  ),
+  component: () => <SeoLandingPage title="Download Udyam Certificate" html={html} />,
 });
