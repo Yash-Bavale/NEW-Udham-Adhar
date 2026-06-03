@@ -19,135 +19,89 @@ type Category = {
   key: string;
   label: string;
   slug: string | null; // null = Home
-  match?: (slug: string, label: string) => boolean;
+  childSlugs: string[];
 };
 
-// Priority-ordered. Each page gets bucketed into the first matching category.
+// Explicit parent → children map matching the client's exact ordered list.
 const CATEGORIES: Category[] = [
-  { key: "home", label: "Home", slug: null },
+  { key: "home", label: "Home", slug: null, childSlugs: [] },
   {
     key: "udyamregistration",
     label: "Udyamregistration",
-    slug: "udyam-registration-online",
-    match: (s) =>
-      s === "udyam-registration-online" ||
-      s.startsWith("udyam-registr") ||
-      s.startsWith("udyamregistration"),
+    slug: "udyamregistration",
+    childSlugs: ["udyam-regn","udyam","udyog-aadhar","udyam-certificate","register-for-msme","register-msme","udyam-aadhar"],
   },
   {
-    key: "udyam-reg-certificate",
+    key: "udyam-regn-certificate",
     label: "Udyam Regn Certificate",
-    slug: "udyam-reg-certificate",
-    match: (s) =>
-      s === "udyam-reg-certificate" ||
-      s.startsWith("udyam-certificate") ||
-      s === "udyam-cer" ||
-      s === "udyam-card" ||
-      s === "udyam-number",
+    slug: "udyam-regn-certificate",
+    childSlugs: ["udyog-aadhar-registration","msme-certificate","msme-certificate-download","aadhar-udyog","udyam-certificate-download","msme-online-registration","aadhar-udyam","udyam-portal","udyog-aadhar-download","msme-udyam-download"],
   },
   {
     key: "udyamregistration-gov-in",
-    label: "Udyamregistration gov in",
-    slug: "https-udyamregistration-gov-in",
-    match: (s) => s.includes("udyamregistration-gov-in") || s === "udyam-portal",
+    label: "Udyamregistration Gov In",
+    slug: "udyamregistration-gov-in",
+    childSlugs: ["udyog-aadhar-registration-2","udyam-download","msme-udyam-registration","udyam-aadhar-registration","udyam-registration-certificate-download","udyam-registration-download","udyam-registration-form","udyam-registration-number","udyam-registration-online","udyam-registration-portal"],
   },
   {
     key: "aadhar-udyog-registration",
-    label: "Aadhar Udyog registration",
+    label: "Aadhar Udyog Registration",
     slug: "aadhar-udyog-registration",
-    match: (s) => s.startsWith("aadhar-udyog") || s.startsWith("udhar-aadhar"),
+    childSlugs: ["udyog-aadhar-certificate","udyam-certificate-registration","msme-certificate-registration","udyog-aadhaar","udyog-aadhar-update","msme-udyog-aadhar","udyam-online-registration","msme-udyam-certificate-download","download-msme-certificate"],
   },
   {
     key: "udyog-aadhar-certificate-download",
-    label: "Udyog Aadhar certificate download",
-    slug: "msme-udyog-aadhar",
-    match: (s) => s.startsWith("udyog-aadhar") || s === "msme-udyog-aadhar",
+    label: "Udyog Aadhar Certificate Download",
+    slug: "udyog-aadhar-certificate-download",
+    childSlugs: ["udyam-register","udyam-new-registration","udyam-update","udyam-certificate-update","udyam-msme-certificate","udyam-adhaar","udyam-number","aadhar-udyam-certificate","udyog-aadhaar-number"],
   },
   {
     key: "official-msme-registration-website",
     label: "Official MSME Registration Website",
-    slug: "msme-registration-portal",
-    match: (s) =>
-      s === "msme-registration-portal" ||
-      s === "msme-online-registration" ||
-      s === "msme-apply-online" ||
-      s === "register-msme" ||
-      s === "register-for-msme" ||
-      s === "msme-registration-login",
+    slug: "udyam-reg-certificate",
+    childSlugs: ["www-udyamregistration-gov-in","udyam-aadhaar-registration","udyog-aadhar-free-registration","udyam-certificate-apply","udyam-update-online","udyam-msme","msme-certificate-update","udyam-card","udyog-aadhar-card","msme-updation"],
   },
   {
     key: "aadhaar-udyam",
     label: "Aadhaar Udyam",
     slug: "aadhaar-udyam",
-    match: (s) =>
-      s === "aadhaar-udyam" ||
-      s.startsWith("aadhar-udyam") ||
-      s.startsWith("udyam-aadhaar") ||
-      s.startsWith("udyam-aadhar") ||
-      s.startsWith("udyam-adhaar") ||
-      s.startsWith("udyam-adhar"),
+    childSlugs: ["udyam-register-certificate-download","udyam-download-certificate","aadhar-udyam-download","aadhar-udyam-registration","download-udyam","free-msme-registration-certificate-download","msme-registration-charges","msme-registration-fee","msme-registration-portal"],
   },
   {
     key: "msme-registration-process",
     label: "MSME Registration Process",
     slug: "msme-registration-process",
-    match: (s) =>
-      s === "msme-registration-process" ||
-      s.startsWith("msme-registration-") ||
-      s.startsWith("msme-certificate") ||
-      s === "ms-me-certificate" ||
-      s === "msme-cer" ||
-      s === "msme-updation",
+    childSlugs: ["udyam-card-download","udyam-edit","udyam-msme-registration","udyog-aadhaar-government-in","udyog-aadhaar-no","udyog-aadhaar-register","udyog-aadhaar-update","udyog-aadhaar-govin","www-udyamregistration"],
   },
   {
     key: "udyam-aadhaar-download-pdf",
     label: "Udyam Aadhaar Download PDF",
     slug: "udyam-aadhaar-download-pdf",
-    match: (s) =>
-      s === "udyam-aadhaar-download-pdf" ||
-      s.startsWith("udyam-download") ||
-      s.startsWith("download-udyam") ||
-      s === "download-msme-certificate" ||
-      s === "free-msme-registration-certificate-download" ||
-      s === "udham-aadhar-download" ||
-      s === "udyam-card-download",
+    childSlugs: ["msme-registration-free","https-udyamregistration-gov-in","msme-registration-certificate-download","download-udyam-certificate","print-udyam-certificate","udyam-certificate-print","udyam-application","msme-certificate-print","print-msme-certificate"],
   },
   {
     key: "udyog-aadhar-registration",
     label: "Udyog Aadhar Registration",
-    slug: "udyog-aadhar-registration",
-    match: (s) => s === "udyog-aadhar-registration",
+    slug: "udyam-aadhaar",
+    childSlugs: ["udhar-aadhar-registration","udyog-aadhaar-to-udyam-migration","download-udyam-certificate-online","udyam-adhar-2","msme-apply-online","udyam-certificate-download-pdf","ms-me-certificate","msme-cer","download-udyam-aadhar","udham-aadhar-download"],
   },
   {
     key: "udhayam-aadhar-download",
     label: "Udhayam Aadhar Download",
     slug: "udhayam-aadhar-download",
-    match: (s) =>
-      ["udhayam-aadhar-download","udyam-print","print-udyam","udyam-register-print","udyam-print-download","udyam-reprint","udyam-print-certificate","msme-print-udyam-certificate","aadhar-udyam-print","msme-print-certificate"].includes(s),
+    childSlugs: ["udyam-print","print-udyam","udyam-register-print","udyam-print-download","udyam-reprint","udyam-print-certificate","msme-print-udyam-certificate","aadhar-udyam-print","msme-print-certificate"],
   },
   {
     key: "print-msme-udyam-certificate",
     label: "Print MSME Udyam Certificate",
     slug: "print-msme-udyam-certificate",
-    match: (s) =>
-      ["print-msme-udyam-certificate","print-udyam-certificate-download","udyam-print-with-annexure","udyam-adhar-download","udyog-aadhaar-download","udyam-aadhaar-verify","udyam-aadhaar-status","udyam-registration-number-verify","udyam-pan-registration","udyam-aadhaar-login","print-udyam-certificate"].includes(s),
+    childSlugs: ["print-udyam-certificate-download","udyam-print-with-annexure","udyam-adhar-download","udyog-aadhaar-download","udyam-aadhaar-verify","udyam-aadhaar-status","udyam-registration-number-verify","udyam-pan-registration","udyam-aadhaar-login"],
   },
-
   {
     key: "udyam-registration-online",
     label: "Udyam Registration Online",
-    slug: "udyam-online-registration",
-    match: (s) =>
-      s === "udyam-online-registration" ||
-      s === "udyam-new-registration" ||
-      s === "udyam-application" ||
-      s === "udyam-apply" ||
-      s === "udyam-pan-registration" ||
-      s === "udyam-msme-registration" ||
-      s.startsWith("udyam-register") ||
-      s.startsWith("udyam-msme") ||
-      s === "udyam" ||
-      s === "udyam-edit",
+    slug: "udyog-aadhar-registration-online",
+    childSlugs: ["udyam-apply","udyam-certificate-apply-online","msme-registration-login","udyam-registration-check","udyam-download-online","udyam-certificate-status","udyam-registration-update","udyam-certificate-reprint","udyam-msme-certificate-download"],
   },
 ];
 
