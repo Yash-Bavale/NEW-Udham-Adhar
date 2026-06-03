@@ -30,7 +30,7 @@ function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSche
     title: row.title || fallback.title,
     description: row.description ?? fallback.description,
     fields,
-    documents: row.documents?.length ? row.documents : fallback.documents,
+    documents: row.documents ?? fallback.documents,
   };
 }
 
