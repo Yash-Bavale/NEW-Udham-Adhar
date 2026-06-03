@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        let creds: { key: string; salt: string };
+        let creds: ReturnType<typeof getPayUCreds>;
         try {
           creds = getPayUCreds();
         } catch (e) {
@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         if (!payment) {
           console.error("[payu] payment row missing", fields.txnid);
           return isBrowser
-            ? redirectToFailure(get("udf3") || fields.txnid, "Payment record not found")
+            ? redirectToPending(get("udf3") || fields.txnid)
             : new Response("payment-not-found", { status: 200 });
         }
 
