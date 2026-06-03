@@ -25,7 +25,7 @@ export const searchNicCodes = createServerFn({ method: "POST" })
     try {
       const { data: rows, error } = await supabaseAdmin.rpc("search_nic_codes", {
         q: data.q,
-        activity: data.activity ?? null,
+        activity: data.activity ?? undefined,
         limit_n: data.limit,
       });
       if (error) {
