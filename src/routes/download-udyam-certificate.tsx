@@ -2,17 +2,27 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/download-udyam-certificate.html?raw";
 
+const TITLE = "Download Udyam Certificate – Official MSME PDF Download Online";
+const DESC =
+  "Download Udyam Certificate enables businesses to obtain their official MSME registration document instantly from the Udyam portal by entering the Udyam Registration Number and verifying via OTP.";
+
 export const Route = createFileRoute("/download-udyam-certificate")({
   head: () => ({
     meta: [
-      { title: "Udyam Registration Certificate Download — Get a Copy with Consultancy Help" },
-      { name: "description", content: "Lost your Udyam certificate? Get assistance to download a fresh signed copy of your Udyam Adhar certificate." },
-      { property: "og:title", content: "Udyam Registration Certificate Download" },
-      { property: "og:description", content: "Download a copy of your Udyam Adhar certificate with consultancy assistance." },
+      { title: TITLE },
+      { name: "description", content: DESC },
+      { property: "og:title", content: TITLE },
+      { property: "og:description", content: DESC },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Download Udyam Certificate" linkTitle="Download Udyam" html={html} />,
+  component: () => (
+    <SeoLandingPage
+      title="Download Udyam Certificate"
+      linkTitle="Download Udyam Certificate – Official MSME PDF Download Online"
+      html={html}
+    />
+  ),
 });
