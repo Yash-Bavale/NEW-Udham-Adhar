@@ -115,7 +115,16 @@ export const Route = createFileRoute("/api/public/complaint")({
           );
         }
 
+        // Activity log (best-effort)
+        await supabaseAdmin.from("activity_logs").insert({
+          lead_id: leadId,
+          activity_type: "complaint_submitted",
+          activity_description: `Complaint ${complaint.complaint_number} submitted by ${parsed.name}`,
+          metadata: { source: "complaint_form", complaint_id: complaint.id } as never,
+        });
+
         // Internal notification recipient (private, env-configured)
+
         const adminTo =
           process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
 
