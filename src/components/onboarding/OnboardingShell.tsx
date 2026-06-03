@@ -31,6 +31,8 @@ export function OnboardingShell({
     : ALL_STEPS;
   const activeIndex = STEPS.findIndex((s) => s.n === step);
   const progress = (Math.max(activeIndex, 0) / (STEPS.length - 1)) * 100;
+  // Display number is the 1-based position within the (possibly collapsed) STEPS list.
+  const displayNumber = (s: { n: Step }) => STEPS.findIndex((x) => x.n === s.n) + 1;
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 md:py-12">
       <div className="mb-6 text-center">
@@ -75,7 +77,7 @@ export function OnboardingShell({
                       : "text-muted-foreground border-border")
                 }
               >
-                {done ? <Check className="w-3.5 h-3.5" /> : s.n}
+                {done ? <Check className="w-3.5 h-3.5" /> : displayNumber(s)}
               </motion.span>
               <span className={active ? "font-semibold text-foreground" : "text-muted-foreground"}>
                 {s.label}
