@@ -98,7 +98,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
-    const schema = getSchema(serviceCode);
+    const schema = await loadServiceSchema(serviceCode);
 
     // Validate required fields on submit
     if (!data.draft) {
