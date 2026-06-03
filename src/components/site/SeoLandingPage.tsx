@@ -40,7 +40,6 @@ function sanitize(html: string): string {
 
   // Remove inline duplicate certificate images that some WP pages embed in
   // the body (we already render our own Sample Certificate card on the right).
-  // Strip the <img> and any <a>/<figure> wrapper around it.
   const dupImagePattern =
     /(udyam-aadhar\.jpe?g|udyam-certificate-design|udyam-certificate\.(?:png|jpe?g|webp))/i;
   out = out.replace(
@@ -57,11 +56,26 @@ function sanitize(html: string): string {
   );
 
   // Collapse any run of identical consecutive headings to a single one
-  // (defensive — keeps the page H1 + linked H2 block intact for SEO).
   out = out.replace(
     /(<h([1-3])[^>]*>\s*([\s\S]*?)\s*<\/h\2>)(\s*<h\2[^>]*>\s*\3\s*<\/h\2>)+/gi,
     "$1",
   );
+
+  // Remove the duplicate small bold heading that repeats the H1 text on
+  // every SEO page. Keeps the linked <h2><a href="/">...</a></h2> intact
+  // (those contain an <a> tag and are preserved for SEO).
+  const h1Match = out.match(/<h1\b[^>]*>\s*([\s\S]*?)\s*<\/h1>/i);
+  if (h1Match) {
+    const h1Text = h1Match[1].replace(/<[^>]+>/g, "").trim().toLowerCase();
+    out = out.replace(
+      /<h2\b[^>]*>\s*([\s\S]*?)\s*<\/h2>/gi,
+      (full, inner) => {
+        if (/<a\b/i.test(inner)) return full;
+        const text = String(inner).replace(/<[^>]+>/g, "").trim().toLowerCase();
+        return text === h1Text ? "" : full;
+      },
+    );
+  }
   return out;
 }
 
