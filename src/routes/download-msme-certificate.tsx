@@ -14,5 +14,5 @@ export const Route = createFileRoute("/download-msme-certificate")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-msme-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Download MSME Certificate - Importance and Benefits for Smal" html={html} />,
+  component: () => <SeoLandingPage title="Download MSME Certificate - Importance and Benefits for Small Businesses" html={html} />,
 });

@@ -1,63 +1,26 @@
-# Sync SEO page content from Udyam_website_information.docx
+## Problem
 
-## Scope
+On most SEO pages, the form card header (the colored band above the lead form) is cut mid-word and doesn't match the linked title in the content card. Example on `/udyog-aadhaar-to-udyam-migration`:
 
-Treat the uploaded doc as the source of new copy. For each entry in the doc, fuzzy-match the entry name to a slug under `src/content/wp/*.html`. For matched pages, append the doc's **Title** and **Meta Description** as extra lines — only if they are not already present. Existing copy is never overwritten.
+- Form header: `Udyog Aadhaar to Udyam Migration | Update Old UAN to Udyam C`
+- Content link/H1: `Udyog Aadhaar to Udyam Migration | Update Old UAN to Udyam Certificate`
 
-No `.tsx` route files, no `head()` metadata, no React components change. Only the WordPress-style HTML snippets under `src/content/wp/` are edited.
+Root cause: in every route file under `src/routes/`, the `title` prop passed to `<SeoLandingPage title="..." html={html} />` was truncated to ~64 characters. `SeoLandingPage` forwards that prop into `<LeadForm>`, which renders it as the form's `<h2>` header. The content HTML in `src/content/wp/*.html` already has the full title in `<h1>`.
 
-## How a page renders today
+No CSS clipping is involved — the string itself is short. We just need the full string in the prop.
 
-`SeoLandingPage.tsx` strips inline styles/scripts/svg, the Sample Certificate block, and a few other duplicates, then renders the remaining HTML through Tailwind prose. The 3 visible spots that this task touches:
+## Fix
 
-1. **Form header** — first `<h2>...</h2>` at the top (e.g. `<h2>Udyog Aadhaar to Udyam Migration</h2>`).
-2. **Linked heading** — `<h2><a href="/">...</a></h2>` (or `<h1>` inside `<a href="/">`); long descriptive title.
-3. **Content box** — the body `<p>...</p>` paragraph(s).
+For every route file that uses `<SeoLandingPage>`:
 
-## Append rules (per matched page)
+1. Read the matching `src/content/wp/<slug>.html` file.
+2. Extract the full title from the first `<h1>...</h1>` (which already matches the linked `<h2><a href="/">...</a></h2>`).
+3. Replace the truncated `title="..."` value in the route file with the full title (HTML-decoded, single line).
+4. Leave everything else untouched — no changes to `SeoLandingPage`, `LeadForm`, content HTML, or styling.
 
-For each of the 3 spots, do a case-insensitive, whitespace-collapsed `includes()` check against the full visible text of that spot:
-
-- **Form header**: if the spot's text does NOT already contain the doc **Title**, insert a new `<h2>{Title}</h2>` immediately after the existing first `<h2>` (or at the top if no header found).
-- **Linked heading**: if the existing `<a href="/"><h1|h2>...</h1|h2></a>` does NOT contain the doc **Title**, insert a new `<h2><a href="/">{Title}</a></h2>` immediately after it. If the page has no linked heading at all, append one before the first body `<p>`.
-- **Content box**: if no existing `<p>` already contains the doc **Meta Description** (compared on the first ~80 chars to handle long paragraphs), append a new `<p>{MetaDescription}</p>` at the end of the file.
-
-If all 3 spots already include the doc text, the file is left untouched.
-
-## Matching doc → slug
-
-1. Parse `Udyam_website_information.docx` into entries `{ name, title, metaDescription }` (numbered list — entries 1..~125).
-2. Normalize each `name` to a slug candidate: lowercase, strip punctuation, collapse whitespace to `-`.
-3. Look up `src/content/wp/{slug}.html`. If miss, try common variants: drop trailing `s`, swap `aadhar`↔`aadhaar`, swap `udyam-`↔`udhayam-`/`udham-`/`udhar-`, etc.
-4. Skip entries with no confident match. Print a summary at the end listing matched / unmatched.
-
-Pages with no doc match are left fully untouched.
-
-## Implementation
-
-A single Node script run from `/tmp`:
-
-```text
-/tmp/sync-seo-from-doc.mjs
-  ├── parseDoc()      // read /mnt/user-uploads/Udyam_website_information.docx via mammoth
-  ├── slugify(name)
-  ├── findHtmlFile(slug)
-  ├── patchHtml(html, title, metaDesc)  // 3 append rules, idempotent
-  └── main: walk entries → patch matched files → log report
-```
-
-The script is run once, prints a report (`matched: N, modified: M, untouched: K, unmatched: U` plus the unmatched list), then is discarded. Nothing in the repo references it.
-
-## Out of scope
-
-- Route `.tsx` files, `head()` titles/descriptions, canonical/og tags.
-- Creating new pages for unmatched doc entries.
-- Editing the React `SeoLandingPage.tsx` layout, the Sample Certificate card, or the `LeadForm` component.
-- Any backend, RLS, or admin changes.
+I'll do this with one script that walks all ~130 route files, matches each to its `html` import path, parses the H1, and rewrites the `title="..."` attribute only when the current value is a strict prefix of the full title (so already-correct titles are left alone, and any manually-set ones aren't clobbered).
 
 ## Verification
 
-After the script runs, spot-check 3 representative files (`udyog-aadhaar-to-udyam-migration.html`, `udyam-certificate.html`, `msme-certificate-download.html`) to confirm:
-- Pre-existing copy is intact.
-- Added lines appear in the right spot.
-- Re-running the script is a no-op (idempotency).
+- Spot-check `/udyog-aadhaar-to-udyam-migration` and 2–3 other long-title pages: form header should read the full title and visually match the linked content title.
+- Confirm no route files were modified where the title already matched.

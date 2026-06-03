@@ -14,5 +14,5 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/migrate-udyog-aadhaar-to-udyam" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar to Udyam Migration" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar to Udyam Migration | Update Old UAN to Udyam Certificate" html={html} />,
 });

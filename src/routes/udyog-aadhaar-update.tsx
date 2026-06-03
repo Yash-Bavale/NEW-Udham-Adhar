@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-update")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-update" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Update – Modify UAN Details Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Update - How to Update Your MSME Details" html={html} />,
 });

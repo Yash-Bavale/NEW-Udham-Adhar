@@ -14,5 +14,5 @@ export const Route = createFileRoute("/free-msme-registration-certificate-downlo
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/free-msme-registration-certificate-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME Registration Certificate Download - Get Your Certificat" html={html} />,
+  component: () => <SeoLandingPage title="MSME Registration Certificate Download - Get Your Certificate Online" html={html} />,
 });
