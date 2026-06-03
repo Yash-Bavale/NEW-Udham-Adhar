@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
 import { isTransitionAllowed } from "./status-engine";
+import type { LeadStatus, ApplicationStatus } from "./types";
 
 async function getRoles(supabase: any, userId: string): Promise<string[]> {
   const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
@@ -21,7 +22,7 @@ export const transitionLead = createServerFn({ method: "POST" })
     if (!isTransitionAllowed("lead", prev.status, data.to, roles as any)) {
       throw new Error(`Transition ${prev.status} → ${data.to} not allowed for your role`);
     }
-    const { error } = await supabaseAdmin.from("leads").update({ status: data.to }).eq("id", data.id);
+    const { error } = await supabaseAdmin.from("leads").update({ status: data.to as LeadStatus }).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit({
       supabase: context.supabase, entityType: "lead", entityId: data.id,
@@ -42,7 +43,7 @@ export const transitionApplication = createServerFn({ method: "POST" })
     if (!isTransitionAllowed("application", prev.application_status, data.to, roles as any)) {
       throw new Error(`Transition ${prev.application_status} → ${data.to} not allowed for your role`);
     }
-    const { error } = await supabaseAdmin.from("applications").update({ application_status: data.to }).eq("id", data.id);
+    const { error } = await supabaseAdmin.from("applications").update({ application_status: data.to as ApplicationStatus }).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit({
       supabase: context.supabase, entityType: "application", entityId: data.id,

@@ -11,19 +11,22 @@ export const getComplaintDetail = createServerFn({ method: "GET" })
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
     const { data: complaint, error } = await supabaseAdmin
       .from("complaints")
-      .select("*, lead:leads(*), application:applications(id, application_code, application_status)")
+      .select("*")
       .eq("id", data.id)
       .single();
     if (error || !complaint) throw new Error("Complaint not found");
 
-    const { data: audits } = await supabaseAdmin
-      .from("audit_logs")
-      .select("*")
-      .eq("entity_type", "complaint")
-      .eq("entity_id", data.id)
-      .order("created_at", { ascending: false });
+    const [{ data: lead }, { data: app }, { data: audits }] = await Promise.all([
+      complaint.lead_id
+        ? supabaseAdmin.from("leads").select("*").eq("id", complaint.lead_id).single()
+        : Promise.resolve({ data: null as any }),
+      complaint.application_id
+        ? supabaseAdmin.from("applications").select("id, application_code, application_status").eq("id", complaint.application_id).single()
+        : Promise.resolve({ data: null as any }),
+      supabaseAdmin.from("audit_logs").select("*").eq("entity_type", "complaint").eq("entity_id", data.id).order("created_at", { ascending: false }),
+    ]);
 
-    return { complaint, audits: audits ?? [] };
+    return { complaint: { ...complaint, lead, application: app }, audits: audits ?? [] };
   });
 
 export const updateComplaintNotes = createServerFn({ method: "POST" })

@@ -4,6 +4,30 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
 
+// We do NOT use PostgREST nested selects because the DB has no FK constraints.
+// Fetch certificates, then hydrate leads/applications manually.
+
+async function hydrate(rows: any[]) {
+  if (rows.length === 0) return [];
+  const leadIds = Array.from(new Set(rows.map((r) => r.lead_id).filter(Boolean)));
+  const appIds = Array.from(new Set(rows.map((r) => r.application_id).filter(Boolean)));
+  const [leadsRes, appsRes] = await Promise.all([
+    leadIds.length
+      ? supabaseAdmin.from("leads").select("id, name, email, mobile, lead_code, service").in("id", leadIds)
+      : Promise.resolve({ data: [] as any[] }),
+    appIds.length
+      ? supabaseAdmin.from("applications").select("id, application_code, application_status").in("id", appIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
+  const appMap = new Map((appsRes.data ?? []).map((a: any) => [a.id, a]));
+  return rows.map((r) => ({
+    ...r,
+    lead: r.lead_id ? leadMap.get(r.lead_id) ?? null : null,
+    application: r.application_id ? appMap.get(r.application_id) ?? null : null,
+  }));
+}
+
 export const listCertificates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
@@ -12,25 +36,22 @@ export const listCertificates = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
-    let q = supabaseAdmin
-      .from("certificates")
-      .select("*, lead:leads(id, name, email, mobile, lead_code, service), application:applications(id, application_code, application_status)")
-      .order("created_at", { ascending: false });
+    let q = supabaseAdmin.from("certificates").select("*").order("created_at", { ascending: false });
     if (data.delivered === "yes") q = q.not("delivered_at", "is", null);
     if (data.delivered === "no") q = q.is("delivered_at", null);
     const { data: rows, error } = await q.limit(500);
     if (error) throw new Error(error.message);
-    let filtered = rows ?? [];
+    let hydrated = await hydrate(rows ?? []);
     if (data.search) {
       const s = data.search.toLowerCase();
-      filtered = filtered.filter((r: any) =>
+      hydrated = hydrated.filter((r: any) =>
         r.certificate_number?.toLowerCase().includes(s) ||
         r.lead?.name?.toLowerCase().includes(s) ||
         r.lead?.email?.toLowerCase().includes(s) ||
         r.lead?.lead_code?.toLowerCase().includes(s)
       );
     }
-    return { rows: filtered };
+    return { rows: hydrated };
   });
 
 export const uploadCertificate = createServerFn({ method: "POST" })
@@ -88,11 +109,21 @@ export const deliverCertificate = createServerFn({ method: "POST" })
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
     const { data: cert } = await supabaseAdmin
       .from("certificates")
-      .select("*, application:applications(id, application_code), lead:leads(id, name, email)")
+      .select("*")
       .eq("id", data.certificateId)
       .single();
     if (!cert) throw new Error("Certificate not found");
     if (cert.delivered_at) throw new Error("Already delivered");
+    if (!cert.file_path) throw new Error("Certificate has no file");
+
+    const [{ data: lead }, { data: app }] = await Promise.all([
+      cert.lead_id
+        ? supabaseAdmin.from("leads").select("id, name, email").eq("id", cert.lead_id).single()
+        : Promise.resolve({ data: null as any }),
+      cert.application_id
+        ? supabaseAdmin.from("applications").select("id, application_code").eq("id", cert.application_id).single()
+        : Promise.resolve({ data: null as any }),
+    ]);
 
     const { data: signed } = await supabaseAdmin.storage
       .from("documents")
@@ -103,20 +134,19 @@ export const deliverCertificate = createServerFn({ method: "POST" })
       .update({ delivered_at: new Date().toISOString() })
       .eq("id", data.certificateId);
 
-    if (cert.application?.id) {
+    if (app?.id) {
       await supabaseAdmin
         .from("applications")
         .update({ application_status: "completed" })
-        .eq("id", cert.application.id);
+        .eq("id", app.id);
     }
 
-    // Enqueue delivery email
-    if (cert.lead?.email && signed?.signedUrl) {
-      const subject = `Your Udyam Certificate is ready — Order ${cert.application?.application_code ?? ""}`;
+    if (lead?.email && signed?.signedUrl) {
+      const subject = `Your Udyam Certificate is ready — Order ${app?.application_code ?? ""}`;
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
           <h2 style="color:#0f3460">Your certificate is ready</h2>
-          <p>Dear ${cert.lead.name},</p>
+          <p>Dear ${lead.name},</p>
           <p>Your Udyam Registration certificate has been issued and is ready to download.</p>
           <p style="text-align:center;margin:32px 0">
             <a href="${signed.signedUrl}" style="background:#0f3460;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600">
@@ -125,16 +155,16 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           </p>
           <p style="font-size:12px;color:#666">Link valid for 7 days. Save the file locally for future reference.</p>
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-          <p style="font-size:12px;color:#999">Order: ${cert.application?.application_code ?? "—"}</p>
+          <p style="font-size:12px;color:#999">Order: ${app?.application_code ?? "—"}</p>
         </div>`;
       await supabaseAdmin.from("email_queue").insert({
-        to_email: cert.lead.email,
-        to_name: cert.lead.name,
+        to_email: lead.email,
+        to_name: lead.name,
         subject,
         body_html: html,
         template_code: "certificate-delivered",
-        lead_id: cert.lead.id,
-        application_id: cert.application?.id ?? null,
+        lead_id: lead.id,
+        application_id: app?.id ?? null,
         variables: { certificateId: cert.id },
         created_by: user.id,
       });
@@ -157,7 +187,7 @@ export const getCertificateUrl = createServerFn({ method: "GET" })
       .select("file_path")
       .eq("id", data.certificateId)
       .single();
-    if (!cert) throw new Error("Not found");
+    if (!cert || !cert.file_path) throw new Error("Not found");
     const { data: signed } = await supabaseAdmin.storage
       .from("documents")
       .createSignedUrl(cert.file_path, 60 * 10);

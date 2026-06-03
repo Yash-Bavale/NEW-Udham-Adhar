@@ -42,20 +42,26 @@ export const requestDocumentReupload = createServerFn({ method: "POST" })
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
     const { data: doc } = await supabaseAdmin
       .from("documents")
-      .select("*, lead:leads(name, email)")
+      .select("*")
       .eq("id", data.documentId)
       .single();
     if (!doc) throw new Error("Document not found");
+
+    const { data: lead } = doc.lead_id
+      ? await supabaseAdmin.from("leads").select("id, name, email").eq("id", doc.lead_id).single()
+      : { data: null as any };
+
     await supabaseAdmin
       .from("documents")
       .update({ status: "re_upload_requested", remarks: data.reason ?? null })
       .eq("id", data.documentId);
-    if (doc.lead?.email) {
+
+    if (lead?.email) {
       await supabaseAdmin.from("email_queue").insert({
-        to_email: doc.lead.email,
-        to_name: doc.lead.name,
+        to_email: lead.email,
+        to_name: lead.name,
         subject: `Action Needed: Please re-upload your ${doc.doc_type}`,
-        body_html: `<div style="font-family:Arial,sans-serif;padding:20px"><p>Dear ${doc.lead.name},</p><p>We need you to re-upload your <b>${doc.doc_type}</b>.</p>${data.reason ? `<p><b>Reason:</b> ${data.reason}</p>` : ""}<p>Please log in to your application and upload the new document.</p></div>`,
+        body_html: `<div style="font-family:Arial,sans-serif;padding:20px"><p>Dear ${lead.name},</p><p>We need you to re-upload your <b>${doc.doc_type}</b>.</p>${data.reason ? `<p><b>Reason:</b> ${data.reason}</p>` : ""}<p>Please log in to your application and upload the new document.</p></div>`,
         template_code: "document-reupload-request",
         lead_id: doc.lead_id,
         application_id: doc.application_id,
