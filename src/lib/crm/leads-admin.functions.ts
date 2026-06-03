@@ -128,8 +128,8 @@ export const getLead = createServerFn({ method: "GET" })
 
     return { 
       lead, 
-      applications: lead.applications || [], 
-      notes: (lead as any).lead_notes || [] 
+      applications: lead.applications ?? [], 
+      notes: lead.lead_notes ?? [] 
     };
   });
 
