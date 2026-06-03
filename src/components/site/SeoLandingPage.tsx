@@ -2,8 +2,9 @@ import { LeadForm } from "@/components/site/LeadForm";
 
 const proseClasses =
   "p-6 md:p-8 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
-  "[&_h1]:font-display [&_h1]:text-foreground [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:first:mt-0 " +
-  "[&_h2]:font-display [&_h2]:text-foreground [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:first:mt-0 " +
+  "[&_h1]:font-display [&_h1]:text-brand-navy-deep [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:first:mt-0 [&_h1]:text-center " +
+  "[&_h2]:font-display [&_h2]:text-brand-navy-deep [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:first:mt-0 [&_h2]:text-center " +
+  "[&_h2_a]:text-brand-navy-deep [&_h2_a]:no-underline hover:[&_h2_a]:underline " +
   "[&_h3]:font-display [&_h3]:text-foreground [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-5 " +
   "[&_h4]:font-display [&_h4]:text-foreground [&_h4]:text-base [&_h4]:font-semibold [&_h4]:mt-5 " +
   "[&_a]:text-brand-navy [&_a]:underline " +
