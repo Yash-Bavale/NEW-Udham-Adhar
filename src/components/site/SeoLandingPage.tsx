@@ -66,16 +66,14 @@ function sanitize(html: string): string {
 }
 
 /**
- * SEO landing page layout: lead form + page-named title on top, prose content below.
- * Form heading mirrors the page title so each landing page collects leads under its own brand.
+ * SEO landing page layout: lead form + sample certificate on top, prose content below.
+ * The XML content carries its own real <h1> (page name) and <h2><a href="/">descriptive</a></h2>
+ * linked heading — both preserved so each page has one crawlable H1 and a clickable H2 link.
  */
 export function SeoLandingPage({ title, html }: { title: string; html: string }) {
   const cleanHtml = sanitize(html);
   return (
     <>
-      {/* Visually hidden H1 retained for SEO; the visible blue title bar was removed per client request. */}
-      <h1 className="sr-only">{title}</h1>
-
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm title={title} />
 
