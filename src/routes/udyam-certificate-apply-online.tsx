@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-certificate-apply-online")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-apply-online" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Certificate Apply Online – Easy Registration Process &" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Certificate Apply | Register Your MSME Online" html={html} />,
 });
