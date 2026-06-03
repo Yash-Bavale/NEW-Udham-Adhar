@@ -110,7 +110,7 @@ export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadSer
                     <SelectItem value="new_udyam">New Udyam Registration</SelectItem>
                     <SelectItem value="update_udyam">Update Udyam Certificate</SelectItem>
                     <SelectItem value="download_udyam">Download Udyam Certificate</SelectItem>
-                    <SelectItem value="migrate_udyam">Migrate Udyog Aadhaar to Udyam</SelectItem>
+                    <SelectItem value="migrate_udyam">Udyog Aadhaar to Udyam Migration</SelectItem>
                     <SelectItem value="forgot_contact">Forgot Mobile / Email Recovery</SelectItem>
                     <SelectItem value="correct_pan">PAN / Aadhaar Correction</SelectItem>
                     <SelectItem value="talk_expert">Talk to Expert</SelectItem>
