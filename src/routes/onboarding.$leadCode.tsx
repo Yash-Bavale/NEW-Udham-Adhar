@@ -86,11 +86,6 @@ function OnboardingDetailsPage() {
           try {
             await submitFn({ data: { leadCode, data: values, draft: false } });
             toast.success("Details submitted successfully");
-            const hasDocs = (data.schema.documents?.length ?? 0) > 0;
-            navigate({
-              to: hasDocs ? "/onboarding/$leadCode/documents" : "/onboarding/$leadCode/done",
-              params: { leadCode },
-            });
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
             toast.error(msg);
@@ -98,6 +93,14 @@ function OnboardingDetailsPage() {
           } finally {
             setSubmitting(false);
           }
+        }}
+        onSubmitted={() => {
+          const hasDocs = (data.schema.documents?.length ?? 0) > 0;
+          return navigate({
+            to: hasDocs ? "/onboarding/$leadCode/documents" : "/onboarding/$leadCode/done",
+            params: { leadCode },
+            replace: true,
+          });
         }}
       />
     </OnboardingShell>

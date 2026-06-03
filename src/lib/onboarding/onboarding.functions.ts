@@ -28,8 +28,31 @@ async function loadLeadByCode(leadCode: string) {
 
 function serviceCodeFromLabel(serviceLabel: string | null): string {
   if (!serviceLabel) return "talk-to-expert";
-  const match = SERVICES.find((s) => s.label === serviceLabel);
-  return match?.slug ?? "talk-to-expert";
+  const normalized = serviceLabel
+    .trim()
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ");
+
+  const aliases: Record<string, string> = {
+    "new udyam registration": "new-udyam-registration",
+    "new business help services": "new-udyam-registration",
+    "update udyam certificate": "update-udyam-certificate",
+    "download udyam certificate": "download-udyam-certificate",
+    "udyam registration certificate download": "download-udyam-certificate",
+    migrate: "migrate-udyog-aadhaar-to-udyam",
+    "udyog aadhaar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
+    "udyog aadhar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
+    "forgot registered mobile / email": "forgot-mobile-email",
+    "forgot registered mobile/email": "forgot-mobile-email",
+    "correct pan / aadhaar name in udyam": "correct-pan-aadhaar",
+    "correct pan / aadhar name in udyam": "correct-pan-aadhaar",
+    "talk to expert": "talk-to-expert",
+    "talk to expert - suitable service selection": "talk-to-expert",
+  };
+
+  const match = SERVICES.find((s) => s.label.trim().toLowerCase().replace(/[–—]/g, "-") === normalized);
+  return aliases[normalized] ?? match?.slug ?? "talk-to-expert";
 }
 
 /** Public: read everything needed to render the onboarding form. */
