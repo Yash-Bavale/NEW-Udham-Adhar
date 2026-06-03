@@ -112,7 +112,7 @@ export const transitionStatus = createServerFn({ method: "POST" })
       to_status: to,
       reason: data.reason ?? null,
       actor_id: userId,
-      metadata: data.metadata ?? {},
+      metadata: (data.metadata ?? {}) as never,
     });
 
     return { ok: true, noop: false as const, from, to };
