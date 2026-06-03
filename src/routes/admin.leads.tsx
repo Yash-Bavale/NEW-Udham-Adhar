@@ -57,8 +57,8 @@ function LeadsPage() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin.leads"] });
   const clearSel = () => setSelected(new Set());
 
-  const allOnPage = (data?.rows ?? []).map((l) => l.id);
-  const allSelected = allOnPage.length > 0 && allOnPage.every((id) => selected.has(id));
+  const allOnPage = (data?.rows ?? []).map((l: any) => l.id);
+  const allSelected = allOnPage.length > 0 && allOnPage.every((id: string) => selected.has(id));
 
   const handleExport = async () => {
     setBusy(true);
