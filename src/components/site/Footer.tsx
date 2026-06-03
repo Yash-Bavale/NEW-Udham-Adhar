@@ -69,7 +69,7 @@ const CATEGORIES: Category[] = [
   },
   {
     key: "msme-registration-process",
-    label: "MSME Registration Process",
+    label: "Udyog Aadhar Registration\u00A0",
     slug: "msme-registration-process",
     childSlugs: ["udyam-card-download","udyam-edit","udyam-msme-registration","udyog-aadhaar-government-in","udyog-aadhaar-no","udyog-aadhaar-register","udyog-aadhaar-update","udyog-aadhaar-govin","www-udyamregistration"],
   },
