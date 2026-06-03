@@ -14,7 +14,7 @@ export const Route = createFileRoute("/new-udyam-registration")({
     ],
   }),
   component: () => (
-    <ServicePageLayout title="New Business Help Services">
+    <ServicePageLayout title="New Udyam Registration">
       <p>
         Apply for a new Business Help Services with end-to-end consultancy
         assistance — we help you compile the required information, verify

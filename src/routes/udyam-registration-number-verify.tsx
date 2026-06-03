@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-registration-number-verify")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-number-verify" },
     ],
   }),
-  component: () => <SeoLandingPage title="Business Help Services Number Verify | MSME Certificate Validati" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Number Verify" html={html} />,
 });
