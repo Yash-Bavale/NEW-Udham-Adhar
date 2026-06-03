@@ -14,12 +14,14 @@ export function OnboardingForm({
   initial,
   busy,
   onSubmit,
+  onSubmitted,
   onSaveDraft,
 }: {
   schema: OnboardingSchema;
   initial: Record<string, string>;
   busy: boolean;
   onSubmit: (data: Record<string, string>) => Promise<void> | void;
+  onSubmitted?: () => Promise<void> | void;
   onSaveDraft?: (data: Record<string, string>) => Promise<void> | void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(initial);
@@ -97,8 +99,11 @@ export function OnboardingForm({
       setSubmitSuccess(true);
       setSaveState("saved");
       setSavedAt(Date.now());
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      await onSubmitted?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save. Please try again.");
+      setSubmitSuccess(false);
     }
   }
 
@@ -132,11 +137,11 @@ export function OnboardingForm({
         <SaveIndicator state={saveState} savedAt={savedAt} />
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || submitSuccess}
           className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-8 py-2.5 transition-colors disabled:opacity-60"
         >
-          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-          {busy ? "Opening next step…" : "Save & Continue"}
+          {(busy || submitSuccess) && <Loader2 className="w-4 h-4 animate-spin" />}
+          {busy || submitSuccess ? "Opening next step…" : "Save & Continue"}
         </button>
       </div>
     </form>
