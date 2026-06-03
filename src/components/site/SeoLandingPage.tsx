@@ -2,8 +2,9 @@ import { LeadForm } from "@/components/site/LeadForm";
 
 const proseClasses =
   "p-6 md:p-8 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
-  "[&_h1]:font-display [&_h1]:text-foreground [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:first:mt-0 " +
-  "[&_h2]:font-display [&_h2]:text-foreground [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:first:mt-0 " +
+  "[&_h1]:font-display [&_h1]:text-brand-navy-deep [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:first:mt-0 [&_h1]:text-center " +
+  "[&_h2]:font-display [&_h2]:text-brand-navy-deep [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:first:mt-0 [&_h2]:text-center " +
+  "[&_h2_a]:text-brand-navy-deep [&_h2_a]:no-underline hover:[&_h2_a]:underline " +
   "[&_h3]:font-display [&_h3]:text-foreground [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-5 " +
   "[&_h4]:font-display [&_h4]:text-foreground [&_h4]:text-base [&_h4]:font-semibold [&_h4]:mt-5 " +
   "[&_a]:text-brand-navy [&_a]:underline " +
@@ -55,15 +56,8 @@ function sanitize(html: string): string {
     (m) => (dupImagePattern.test(m) ? "" : m),
   );
 
-  // De-duplicate stacked top headings that repeat the page title.
-  // WP source typically renders: <h2>title</h2> ... <h1>title</h1> ... <a href="/"><h1>descriptive</h1></a>
-  // Keep only the middle bold <h1>; strip the leading <h2> and the home-linked descriptive <h1>.
-  out = out.replace(/^\s*(?:<h2[^>]*>[\s\S]*?<\/h2>\s*)+/i, "");
-  out = out.replace(
-    /<a[^>]*href=["']\/?["'][^>]*>\s*<h1[\s\S]*?<\/h1\s*>\s*<\/a>/gi,
-    "",
-  );
-  // Collapse any remaining run of identical consecutive headings to a single one.
+  // Collapse any run of identical consecutive headings to a single one
+  // (defensive — keeps the page H1 + linked H2 block intact for SEO).
   out = out.replace(
     /(<h([1-3])[^>]*>\s*([\s\S]*?)\s*<\/h\2>)(\s*<h\2[^>]*>\s*\3\s*<\/h\2>)+/gi,
     "$1",
@@ -72,16 +66,14 @@ function sanitize(html: string): string {
 }
 
 /**
- * SEO landing page layout: lead form + page-named title on top, prose content below.
- * Form heading mirrors the page title so each landing page collects leads under its own brand.
+ * SEO landing page layout: lead form + sample certificate on top, prose content below.
+ * The XML content carries its own real <h1> (page name) and <h2><a href="/">descriptive</a></h2>
+ * linked heading — both preserved so each page has one crawlable H1 and a clickable H2 link.
  */
 export function SeoLandingPage({ title, html }: { title: string; html: string }) {
   const cleanHtml = sanitize(html);
   return (
     <>
-      {/* Visually hidden H1 retained for SEO; the visible blue title bar was removed per client request. */}
-      <h1 className="sr-only">{title}</h1>
-
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm title={title} />
 

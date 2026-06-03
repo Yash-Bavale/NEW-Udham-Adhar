@@ -135,7 +135,7 @@ const CATEGORIES: Category[] = [
 
   {
     key: "udyam-registration-online",
-    label: "Business Help Services Online",
+    label: "Udyam Registration Online",
     slug: "udyam-online-registration",
     match: (s) =>
       s === "udyam-online-registration" ||
