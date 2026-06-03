@@ -162,7 +162,7 @@ export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadSer
                   </TableCell>
                   <TableCell className="text-xs">{item.to_email}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(item.sent_at || item.created_at).toLocaleString("en-IN")}
+                    {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
                   </TableCell>
                 </TableRow>
               ))
