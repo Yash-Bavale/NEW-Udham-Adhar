@@ -1,37 +1,39 @@
 ## Goal
 
-1. Stop sending the customer acknowledgment email on complaint submission.
-2. Route admin/internal notifications (both complaint form **and** contact form) to a private internal email address that is **not hardcoded** in the codebase.
-3. Default it to `vinoddaware28@gmail.com` but keep the value private so it can be changed later without a code edit.
+After a successful payment, the customer lands on `/success/$leadCode` and is given a **15-second countdown** with a strong "attention needed" message before being **automatically redirected** to the onboarding form (`/onboarding/$leadCode`).
 
-## Approach
+## Scope
 
-Store the internal recipient as a server secret named `INTERNAL_NOTIFICATION_EMAIL`. Server code reads it from `process.env` at request time. If unset, it falls back to `vinoddaware28@gmail.com`. The literal email never appears in committed source except as a last-resort fallback constant — and even that can be removed later by simply setting the secret.
+Single file: `src/routes/success.$leadCode.tsx`. No backend, schema, or routing changes. The existing "Attention Needed → Fill Incomplete Info" amber card is where the countdown lives.
 
-I'll also retire the old hardcoded `help@businesshelpservices.com` fallback in the two public endpoints so all internal notifications consistently use the new secret-driven recipient.
+## Behavior
 
-## Changes
+1. Once payment is confirmed (existing polling already does this), the success page shows the amber card.
+2. A **15 → 0** countdown starts immediately, displayed prominently inside the card.
+3. The card copy emphasizes: *"Attention — you have incomplete information. We'll redirect you to the form in N seconds."*
+4. A circular progress ring (or animated bar) wraps the number for visual urgency.
+5. A secondary "Pause / Stay on this page" link cancels the auto-redirect (so users who want to view the receipt aren't yanked away). This is important: opening the receipt accordion or clicking print should also cancel the timer.
+6. When the countdown hits 0 (and not cancelled), call `navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true })`.
+7. On unmount, clear the interval. `replace: true` keeps the back button sane.
+8. Fire a `trackEvent("post_payment_auto_redirect", { leadCode, cancelled })` on either auto-redirect or cancel for analytics.
 
-### 1. Add secret
-- Add secret `INTERNAL_NOTIFICATION_EMAIL` via the secrets tool. User enters `vinoddaware28@gmail.com` (or any future address) in the secure form.
+## Edge cases
 
-### 2. `src/routes/api/public/complaint.ts`
-- Remove the `enqueueFromTemplateInternal("complaint_submitted", ...)` call (customer ack).
-- Replace `DEFAULT_ADMIN_EMAIL` + `smtp.reply_to` lookup with:
-  ```ts
-  const adminTo = process.env.INTERNAL_NOTIFICATION_EMAIL || "vinoddaware28@gmail.com";
-  ```
-- Keep the internal admin HTML notification (`enqueueEmailInternal`) pointed at `adminTo`.
-- Drop the now-unused `smtp_settings` query and `enqueueFromTemplateInternal` import.
+- Don't start the countdown until `isLoading === false` and `data` is present — otherwise the user could be bounced before the page even paints.
+- Don't start it on the `error` branch or the pending fallback.
+- If user clicks the manual "Go Now" button, cancel timer first to prevent double navigation.
+- Print receipt flow: clicking "Print Receipt" or "Download Tax Invoice" auto-cancels the timer.
 
-### 3. `src/routes/api/public/contact.ts`
-- Same recipient logic: read `process.env.INTERNAL_NOTIFICATION_EMAIL` with the same fallback.
-- Keep existing customer-facing template flow as-is (user only asked to change complaint customer ack). Internal admin notification recipient switches to the new secret.
+## Visual treatment
 
-### 4. Leave untouched
-- `src/lib/onboarding/onboarding.functions.ts` — separate flow, not in scope of this request.
-- Email templates, queue worker, admin Emails settings page.
+- Number rendered in a 64px display font inside a circular ring that animates from full to empty over 15s (CSS `stroke-dasharray` + `transition`).
+- Amber/red accent matching the existing `border-amber-300` card.
+- Subtext: *"Redirecting in **N** seconds…"* with a small "Stay on this page" ghost button beneath.
 
-## Notes
-- Response payload to the frontend stays the same (`{ ok, complaintNumber }`), so the existing complaint form UI keeps working with no client changes.
-- Because the value lives in env, the user can later change it in Settings → Secrets without redeploying code.
+## After this ships
+
+Resume **Phases C → L** (the paused roadmap from message #350) starting with **Phase C — NIC 2008 dataset**. I'll ping you for the CSV/JSON when we get there.
+
+## Files touched
+
+- `src/routes/success.$leadCode.tsx` — add `useState`/`useEffect` countdown, ring SVG, cancel handlers; relabel button.

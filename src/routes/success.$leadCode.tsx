@@ -48,6 +48,18 @@ function SuccessPage() {
   const [error, setError] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
 
+  // 15-second auto-redirect to onboarding once payment is confirmed.
+  const REDIRECT_SECONDS = 15;
+  const [secondsLeft, setSecondsLeft] = useState(REDIRECT_SECONDS);
+  const [autoRedirect, setAutoRedirect] = useState(true);
+
+  const cancelAutoRedirect = () => {
+    if (autoRedirect) {
+      setAutoRedirect(false);
+      trackEvent("post_payment_auto_redirect", { leadCode, cancelled: true });
+    }
+  };
+
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
     let cancelled = false;
