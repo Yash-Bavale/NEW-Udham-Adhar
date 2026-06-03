@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Mail, Phone, ShieldAlert } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import policyHtml from "@/content/wp/grievance-redressal-policy.html?raw";
 
 export function ComplaintFormPage() {
   const [submitted, setSubmitted] = useState<string | null>(null);
