@@ -41,7 +41,7 @@ const SERVICES_DATA: Record<string, any> = {
     fields: ["Udyam Registration Number", "Registered mobile number linked to your Udyam account"],
   },
   migrate_udyam: {
-    label: "Udyog Aadhaar to Udyam Migration",
+    label: "Migrate",
     subject: "Action Required: Provide Your Udyog Aadhaar Details for Migration – Order No. [ORDER NUMBER]",
     intro: "Thank you for choosing our Udyog Aadhaar to Udyam Migration service. To proceed with the migration, please provide the following information.",
     fields: ["Udyog Aadhaar Number – 12-digit"],
