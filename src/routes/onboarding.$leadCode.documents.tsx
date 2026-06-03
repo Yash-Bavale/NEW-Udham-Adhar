@@ -57,13 +57,12 @@ function DocsPage() {
   const allRequiredUploaded = requiredDocs.every((d) =>
     data.documents.some((u) => u.doc_type === d.key),
   );
-  const totalSteps: 2 | 3 = requiredDocs.length > 0 ? 3 : 3;
-  );
 
   return (
     <OnboardingShell
       leadCode={leadCode}
       step={2}
+      totalSteps={3}
       title="Upload supporting documents"
       subtitle="Clear photos or scans only. Max 5 MB each. PDF, JPG, PNG or WEBP."
     >
