@@ -47,7 +47,7 @@ export const updateComplaintStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const patch: Record<string, unknown> = { status: data.status };
+    const patch: { status: string; resolved_at?: string } = { status: data.status };
     if (data.status === "resolved" || data.status === "closed") {
       patch.resolved_at = new Date().toISOString();
     }
