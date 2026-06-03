@@ -1,28 +1,16 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CheckCircle2,
-  ArrowRight,
-  FileText,
-  ShieldCheck,
-  Printer,
-  History,
-  BadgeCheck as BadgeCheckIcon,
-  ChevronDown,
-  ChevronUp,
+  Loader2,
   AlertCircle,
-  User,
-  CreditCard,
+  History,
   Sparkles,
 } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
-import { getCustomerInvoiceUrl } from "@/lib/crm/invoices.functions";
 import { trackEvent } from "@/lib/analytics/track";
-import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/success/$leadCode")({
@@ -37,6 +25,9 @@ export const Route = createFileRoute("/success/$leadCode")({
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
+const REDIRECT_SECONDS = 15;
+
+type Phase = "confirming" | "confirmed" | "action";
 
 function SuccessPage() {
   const { leadCode } = Route.useParams();
@@ -46,26 +37,13 @@ function SuccessPage() {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showReceipt, setShowReceipt] = useState(false);
-
-  // 15-second auto-redirect to onboarding once payment is confirmed.
-  const REDIRECT_SECONDS = 15;
   const [secondsLeft, setSecondsLeft] = useState(REDIRECT_SECONDS);
-  const [autoRedirect, setAutoRedirect] = useState(true);
-
-  const cancelAutoRedirect = () => {
-    if (autoRedirect) {
-      setAutoRedirect(false);
-      trackEvent("post_payment_auto_redirect", { leadCode, cancelled: true });
-    }
-  };
 
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
     let cancelled = false;
 
     (async () => {
-      // Poll up to ~30s to give PayU's S2S webhook time to mark the payment paid
       const maxAttempts = 15;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
@@ -86,8 +64,6 @@ function SuccessPage() {
         await new Promise((r) => setTimeout(r, 2000));
       }
       if (cancelled) return;
-      // Still no confirmation — show the pending page (NOT the payment page;
-      // the user may have actually paid and webhook is just delayed).
       navigate({ to: "/payment-pending/$leadCode", params: { leadCode }, replace: true });
     })();
 
@@ -96,9 +72,9 @@ function SuccessPage() {
     };
   }, [leadCode, getSummary, navigate]);
 
-  // Countdown + auto-redirect once payment is confirmed and user hasn't cancelled.
+  // Countdown — starts once payment confirmed.
   useEffect(() => {
-    if (isLoading || error || !data || !autoRedirect) return;
+    if (isLoading || error || !data) return;
     if (secondsLeft <= 0) {
       trackEvent("post_payment_auto_redirect", { leadCode, cancelled: false });
       navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
@@ -106,7 +82,7 @@ function SuccessPage() {
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [isLoading, error, data, autoRedirect, secondsLeft, leadCode, navigate]);
+  }, [isLoading, error, data, secondsLeft, leadCode, navigate]);
 
   if (isLoading) {
     return (
@@ -139,336 +115,135 @@ function SuccessPage() {
 
   if (!data) return null;
 
-  const lead = data?.lead;
-  const payment = lead?.payment;
+  // Phase derived from countdown — confirming (15-11) → confirmed (10-6) → action (5-0)
+  const elapsed = REDIRECT_SECONDS - secondsLeft;
+  const phase: Phase = elapsed < 5 ? "confirming" : elapsed < 10 ? "confirmed" : "action";
+  const ringCirc = 2 * Math.PI * 44;
+  const ringProgress = ringCirc * (1 - secondsLeft / REDIRECT_SECONDS);
+
+  const palette = {
+    confirming: {
+      bg: "from-slate-50 to-blue-50/60",
+      border: "border-slate-300",
+      accent: "text-blue-600",
+      ring: "stroke-blue-500",
+      chipBg: "bg-blue-100 text-blue-700",
+      chipLabel: "Step 1 of 3",
+    },
+    confirmed: {
+      bg: "from-emerald-50 to-green-50/60",
+      border: "border-emerald-300",
+      accent: "text-emerald-600",
+      ring: "stroke-emerald-500",
+      chipBg: "bg-emerald-100 text-emerald-700",
+      chipLabel: "Step 2 of 3",
+    },
+    action: {
+      bg: "from-amber-50 to-orange-50",
+      border: "border-amber-400",
+      accent: "text-brand-red",
+      ring: "stroke-brand-red",
+      chipBg: "bg-amber-100 text-amber-800",
+      chipLabel: "Step 3 of 3",
+    },
+  }[phase];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/40 via-slate-50 to-slate-50 pb-20 pt-8 print:bg-white print:pt-0 print:pb-0">
-      <div className="mx-auto max-w-2xl px-4 sm:px-6">
-
-        {/* Success hero */}
-        <div className="text-center mb-6 print:hidden">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4 animate-in zoom-in duration-500 ring-8 ring-green-50">
-            <CheckCircle2 className="w-12 h-12 text-green-600" />
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-10 bg-gradient-to-b from-slate-50 to-white">
+      <Card
+        className={`w-full max-w-lg border-2 ${palette.border} bg-gradient-to-br ${palette.bg} shadow-2xl overflow-hidden transition-colors duration-700`}
+      >
+        <div className="p-8 sm:p-10 flex flex-col items-center text-center">
+          <div className={`text-[10px] uppercase tracking-[0.18em] font-bold px-3 py-1 rounded-full ${palette.chipBg} mb-6`}>
+            {palette.chipLabel}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-brand-navy font-display mb-2">
-            Payment Successful!
-          </h1>
-          <p className="text-slate-600 text-sm sm:text-base">
-            We've received your application fee. Please complete the service-wise information below so processing can begin.
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Ref: <span className="font-mono font-semibold text-brand-navy">{leadCode}</span>
-          </p>
-        </div>
 
-        {/* Action needed card — the PRIMARY focus */}
-        <Card className="border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50/50 overflow-hidden shadow-xl print:hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="p-6 sm:p-8">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-widest font-bold text-amber-700 mb-0.5">
-                  Attention Needed
+          {/* Center stage: ring + icon */}
+          <div className="relative w-44 h-44 mb-6">
+            <svg className="w-44 h-44 -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" strokeWidth="6" className="stroke-slate-200" />
+              <circle
+                cx="50"
+                cy="50"
+                r="44"
+                fill="none"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={ringCirc}
+                strokeDashoffset={ringProgress}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+                className={palette.ring}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              {phase === "confirming" && (
+                <Loader2 className={`w-16 h-16 ${palette.accent} animate-spin`} key="confirming" />
+              )}
+              {phase === "confirmed" && (
+                <div key="confirmed" className="animate-in zoom-in-50 fade-in duration-500">
+                  <CheckCircle2 className={`w-20 h-20 ${palette.accent} drop-shadow`} />
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold text-brand-navy font-display leading-tight">
-                  Fill incomplete information
-                </h2>
-              </div>
+              )}
+              {phase === "action" && (
+                <div key="action" className="animate-in zoom-in-75 fade-in duration-300 motion-safe:animate-pulse">
+                  <AlertCircle className={`w-20 h-20 ${palette.accent}`} />
+                </div>
+              )}
             </div>
+          </div>
 
-            <p className="text-sm text-slate-700 mb-4 leading-relaxed">
-              Your payment is confirmed. To start processing, our experts need
-              the remaining information and supporting documents for your selected service.
-              It takes <strong>under 3 minutes</strong>.
-            </p>
-
-            <ul className="space-y-2 mb-6">
-              {[
-                { icon: User, text: "Service-wise applicant details" },
-                { icon: FileText, text: "Required business or registration information" },
-                { icon: ShieldCheck, text: "Supporting documents, if required" },
-              ].map((item) => (
-                <li key={item.text} className="flex items-center gap-2.5 text-sm text-slate-700">
-                  <div className="w-7 h-7 rounded-md bg-white border border-amber-200 flex items-center justify-center shrink-0">
-                    <item.icon className="w-3.5 h-3.5 text-amber-600" />
-                  </div>
-                  <span>{item.text}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* Countdown ring (visible while auto-redirect is active) */}
-            {autoRedirect && (
-              <div className="flex flex-col items-center mb-5">
-                <div className="relative w-24 h-24">
-                  <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
-                    <circle
-                      cx="50" cy="50" r="44"
-                      fill="none"
-                      stroke="hsl(var(--muted))"
-                      strokeWidth="8"
-                      className="opacity-40"
-                    />
-                    <circle
-                      cx="50" cy="50" r="44"
-                      fill="none"
-                      stroke="hsl(var(--brand-red, 0 80% 50%))"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={2 * Math.PI * 44}
-                      strokeDashoffset={2 * Math.PI * 44 * (1 - secondsLeft / REDIRECT_SECONDS)}
-                      style={{ transition: "stroke-dashoffset 1s linear" }}
-                      className="text-brand-red"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl font-bold font-display text-brand-red tabular-nums">
-                      {secondsLeft}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs font-semibold text-amber-700 uppercase tracking-wider">
-                  Redirecting in {secondsLeft}s
-                </p>
-              </div>
-            )}
-
-            <Link
-              to="/onboarding/$leadCode"
-              params={{ leadCode }}
-              className="block"
-              onClick={() => setAutoRedirect(false)}
-            >
-              <Button className="w-full bg-brand-red hover:bg-brand-red-deep text-white font-bold h-14 px-10 rounded-full shadow-xl shadow-brand-red/30 group text-base">
-                <Sparkles className="w-5 h-5 mr-2" />
-                {autoRedirect ? "Go Now" : "Fill Incomplete Info"}
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-
-            {autoRedirect ? (
-              <button
-                type="button"
-                onClick={cancelAutoRedirect}
-                className="mt-3 w-full text-xs text-slate-500 hover:text-brand-navy underline-offset-2 hover:underline"
-              >
-                Stay on this page
-              </button>
-            ) : (
-              <p className="text-[11px] text-center text-slate-500 mt-3">
-                Skip this and your application can't be filed.
+          {/* Phase-specific message */}
+          {phase === "confirming" && (
+            <div key="t-confirming" className="animate-in fade-in duration-500">
+              <h1 className="text-2xl sm:text-3xl font-bold font-display text-brand-navy mb-2">
+                Confirming your payment…
+              </h1>
+              <p className="text-sm text-slate-600 max-w-sm">
+                Please wait while we verify your transaction with the gateway. Do not close or refresh this page.
               </p>
-            )}
-          </div>
-        </Card>
-
-        {/* What happens after */}
-        <div className="mt-8 grid grid-cols-3 gap-3 print:hidden">
-          {[
-            { step: 1, title: "Onboarding", desc: "Submit details & docs", icon: FileText, active: true },
-            { step: 2, title: "Verification", desc: "Expert review & filing", icon: ShieldCheck, active: false },
-            { step: 3, title: "Delivery", desc: "Certificate by email", icon: BadgeCheckIcon, active: false },
-          ].map((s) => (
-            <div
-              key={s.step}
-              className={`p-3 sm:p-4 rounded-xl border text-center ${
-                s.active
-                  ? "bg-white border-brand-red/30 shadow-sm ring-2 ring-brand-red/10"
-                  : "bg-white/50 border-slate-200"
-              }`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full mx-auto mb-1.5 flex items-center justify-center ${
-                  s.active ? "bg-brand-red text-white" : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                <s.icon className="w-4 h-4" />
-              </div>
-              <div className={`text-[11px] font-bold ${s.active ? "text-brand-navy" : "text-slate-500"}`}>
-                {s.title}
-              </div>
-              <div className="text-[10px] text-slate-500 leading-tight mt-0.5 hidden sm:block">
-                {s.desc}
-              </div>
             </div>
-          ))}
-        </div>
+          )}
+          {phase === "confirmed" && (
+            <div key="t-confirmed" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <h1 className="text-2xl sm:text-3xl font-bold font-display text-emerald-700 mb-2">
+                Payment confirmed ✓
+              </h1>
+              <p className="text-sm text-slate-700 max-w-sm">
+                Thank you! Your application fee has been received. Preparing your onboarding form…
+              </p>
+            </div>
+          )}
+          {phase === "action" && (
+            <div key="t-action" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-red text-white text-[11px] uppercase tracking-widest font-bold mb-3 motion-safe:animate-pulse">
+                <Sparkles className="w-3.5 h-3.5" /> Action Needed
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold font-display text-brand-navy mb-2 leading-tight">
+                Fill incomplete information
+              </h1>
+              <p className="text-sm text-slate-700 max-w-sm">
+                Our experts need a few more details to file your application. Opening the form automatically — please don't leave this page.
+              </p>
+            </div>
+          )}
 
-        {/* Receipt disclosure - secondary */}
-        <div className="mt-8 print:hidden">
-          <button
-            onClick={() => { cancelAutoRedirect(); setShowReceipt((v) => !v); }}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-navy/30 transition-colors text-sm font-semibold text-brand-navy"
-          >
-            <span className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              View payment receipt
+          {/* Countdown line — always visible, becomes urgent in phase 3 */}
+          <div className="mt-7 flex items-baseline gap-2">
+            <span
+              className={`text-5xl font-bold font-display tabular-nums transition-colors duration-500 ${palette.accent}`}
+            >
+              {secondsLeft}
             </span>
-            {showReceipt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {/* Detailed receipt (collapsed by default) */}
-        {showReceipt && (
-          <div className="block mt-4 print:block print:mt-0">
-            <Card className="overflow-hidden border-slate-200 shadow-lg print:shadow-none print:border-none">
-              <div className="bg-brand-navy text-white p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                  <div>
-                    <h2 className="text-base font-bold font-display uppercase tracking-wider mb-0.5">
-                      Consultancy Receipt
-                    </h2>
-                    <p className="text-slate-300 text-xs">
-                      Ref: <span className="font-mono text-white">{leadCode}</span>
-                    </p>
-                  </div>
-                  <div className="text-right hidden sm:block">
-                    <div className="font-bold text-sm">Business Help Services</div>
-                    <div className="text-[10px] text-slate-300 uppercase tracking-tight">
-                      Govt. Registration Advisory
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 sm:p-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Status</span>
-                    <div className="flex">
-                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 uppercase text-[10px] font-bold">
-                        Paid
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Date</span>
-                    <p className="text-xs font-semibold text-brand-navy">
-                      {payment?.payment_date
-                        ? format(new Date(payment.payment_date), "dd MMM yyyy")
-                        : format(new Date(), "dd MMM yyyy")}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Txn ID</span>
-                    <p className="text-xs font-mono font-semibold text-brand-navy break-all">
-                      {payment?.transaction_id || "TXN-" + leadCode.split("-").pop()}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Method</span>
-                    <p className="text-xs font-semibold text-brand-navy capitalize">
-                      {payment?.gateway_name || "Digital"}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <User className="w-3 h-3" /> Applicant
-                    </h3>
-                    <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
-                      <div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Name</p>
-                        <p className="font-semibold text-brand-navy">{lead?.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Email</p>
-                        <p className="font-semibold text-brand-navy break-all">{lead?.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">Mobile</p>
-                        <p className="font-semibold text-brand-navy">+91 {lead?.mobile}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <FileText className="w-3 h-3" /> Service
-                    </h3>
-                    <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs h-full">
-                      <p className="font-bold text-brand-red">{lead?.service}</p>
-                      {lead?.serviceDescription && (
-                        <p className="text-[10px] text-slate-600 leading-relaxed italic">
-                          {lead.serviceDescription}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
-                  <div className="p-3 space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">Consultancy Base</span>
-                      <span className="font-semibold text-brand-navy">
-                        ₹{lead?.baseAmount?.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-600">GST (18%)</span>
-                      <span className="font-semibold text-brand-navy">
-                        ₹{lead?.gstAmount?.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-brand-navy/5 p-3 flex justify-between items-center border-t border-slate-200">
-                    <span className="font-bold text-brand-navy text-sm">Net Paid</span>
-                    <span className="text-lg font-bold text-brand-red font-display">
-                      ₹{lead?.totalAmount?.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap justify-center gap-2 print:hidden">
-                  <Button
-                    onClick={() => window.print()}
-                    variant="outline"
-                    size="sm"
-                    className="border-brand-navy text-brand-navy hover:bg-slate-100 rounded-full"
-                  >
-                    <Printer className="w-3.5 h-3.5 mr-2" />
-                    Print Receipt
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        const { url } = await getCustomerInvoiceUrl({ data: { leadCode } });
-                        window.open(url, "_blank", "noopener");
-                      } catch (e: any) {
-                        alert(e?.message ?? "Tax invoice is being generated. Try again in a moment.");
-                      }
-                    }}
-                    size="sm"
-                    className="bg-brand-navy text-white hover:bg-brand-navy/90 rounded-full"
-                  >
-                    <FileText className="w-3.5 h-3.5 mr-2" />
-                    Download Tax Invoice
-                  </Button>
-                </div>
-              </div>
-            </Card>
+            <span className="text-xs uppercase tracking-widest font-semibold text-slate-500">
+              {phase === "action" ? "Opening form" : "seconds"}
+            </span>
           </div>
-        )}
 
-        <div className="mt-8 text-center print:hidden">
-          <p className="text-xs text-slate-500">
-            Need help?{" "}
-            <Link to="/contact" className="text-brand-navy font-bold hover:underline">
-              Contact our experts
-            </Link>
+          <p className="mt-6 text-[11px] text-slate-400 font-mono">
+            Ref: <span className="text-brand-navy font-semibold">{leadCode}</span>
           </p>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
