@@ -176,7 +176,7 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.rows.map((l) => {
+                {data?.rows.map((l: any) => {
                   const checked = selected.has(l.id);
                   return (
                     <tr key={l.id} className={`border-t hover:bg-[var(--admin-surface-2)] transition-colors ${checked ? "bg-[var(--admin-surface-2)]" : ""}`} style={{ borderColor: "var(--admin-border)" }}>
