@@ -101,8 +101,8 @@ export const createPayUOrder = createServerFn({ method: "POST" })
     const firstname = (lead.name ?? "Customer").slice(0, 60);
     const email = lead.email;
 
-    const origin = process.env.APP_BASE_URL ||
-      "https://everythinghappensqindiaserver4cored.lovable.app";
+    const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
+      "https://udyamadhar.everythinghappens.in";
     const surl = `${origin}/api/public/webhooks/payu`;
     const furl = `${origin}/api/public/webhooks/payu`;
 
