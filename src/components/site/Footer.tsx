@@ -29,7 +29,7 @@ const CATEGORIES: Category[] = [
     key: "udyamregistration",
     label: "Udyamregistration",
     slug: "udyamregistration",
-    childSlugs: ["udyam-regn","udyam","udyog-aadhar","udyam-certificate","register-for-msme","register-msme","udyam-aadhar"],
+    childSlugs: ["udyam-regn","udyam","udyog-aadhar","udyam-certificate","register-for-msme","register-msme","udyam-aadhar","udyam-reg-certificate"],
   },
   {
     key: "udyam-regn-certificate",
