@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.functions";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
