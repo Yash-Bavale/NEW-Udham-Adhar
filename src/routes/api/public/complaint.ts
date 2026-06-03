@@ -115,62 +115,34 @@ export const Route = createFileRoute("/api/public/complaint")({
           );
         }
 
-        // Activity log (best-effort)
-        await supabaseAdmin.from("activity_logs").insert({
-          lead_id: leadId,
-          activity_type: "complaint_submitted",
-          activity_description: `Complaint ${complaint.complaint_number} submitted by ${parsed.name}`,
-          metadata: { source: "complaint_form", complaint_id: complaint.id } as never,
-        });
-
-        // Admin recipient
-        const { data: smtp } = await supabaseAdmin
-          .from("smtp_settings")
-          .select("reply_to")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const adminTo = smtp?.reply_to || DEFAULT_ADMIN_EMAIL;
+        // Internal notification recipient (private, env-configured)
+        const adminTo =
+          process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
 
         const origin = new URL(request.url).origin;
-        const variables = {
-          name: parsed.name,
-          email: parsed.email,
-          mobile: parsed.mobile,
-          complaint_number: complaint.complaint_number,
-          application_ref: parsed.application_ref || "—",
-          message: parsed.message,
-          admin_url: `${origin}/admin/complaints`,
-        };
 
         try {
-          await Promise.all([
-            // Customer acknowledgement
-            enqueueFromTemplateInternal("complaint_submitted", parsed.email, variables, {
-              toName: parsed.name,
-              leadId,
-            }).catch(() => undefined),
-            // Admin notification (inline — no dedicated template)
-            enqueueEmailInternal({
-              toEmail: adminTo,
-              subject: `New complaint ${complaint.complaint_number} — ${parsed.name}`,
-              bodyHtml: `
-                <h2>New complaint received</h2>
-                <p><b>Complaint #:</b> ${complaint.complaint_number}</p>
-                <p><b>Name:</b> ${parsed.name}</p>
-                <p><b>Email:</b> ${parsed.email}</p>
-                <p><b>Mobile:</b> +91 ${parsed.mobile}</p>
-                <p><b>Application Ref:</b> ${parsed.application_ref || "—"}</p>
-                <p><b>Message:</b></p>
-                <p style="white-space:pre-wrap">${parsed.message.replace(/</g, "&lt;")}</p>
-                <p><a href="${origin}/admin/complaints">Open in CRM →</a></p>
-              `,
-              leadId,
-            }),
-          ]);
+          // Admin/internal notification only — no customer acknowledgement
+          await enqueueEmailInternal({
+            toEmail: adminTo,
+            subject: `New complaint ${complaint.complaint_number} — ${parsed.name}`,
+            bodyHtml: `
+              <h2>New complaint received</h2>
+              <p><b>Complaint #:</b> ${complaint.complaint_number}</p>
+              <p><b>Name:</b> ${parsed.name}</p>
+              <p><b>Email:</b> ${parsed.email}</p>
+              <p><b>Mobile:</b> +91 ${parsed.mobile}</p>
+              <p><b>Application Ref:</b> ${parsed.application_ref || "—"}</p>
+              <p><b>Message:</b></p>
+              <p style="white-space:pre-wrap">${parsed.message.replace(/</g, "&lt;")}</p>
+              <p><a href="${origin}/admin/complaints">Open in CRM →</a></p>
+            `,
+            leadId,
+          });
         } catch {
           /* never block user on email backend */
         }
+
 
         return new Response(
           JSON.stringify({ ok: true, complaintNumber: complaint.complaint_number }),
