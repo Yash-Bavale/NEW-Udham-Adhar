@@ -57,6 +57,8 @@ function DocsPage() {
   const allRequiredUploaded = requiredDocs.every((d) =>
     data.documents.some((u) => u.doc_type === d.key),
   );
+  const totalSteps: 2 | 3 = requiredDocs.length > 0 ? 3 : 3;
+  );
 
   return (
     <OnboardingShell
