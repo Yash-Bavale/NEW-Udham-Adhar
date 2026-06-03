@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.functions";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
@@ -84,7 +85,16 @@ function OnboardingDetailsPage() {
           setSubmitting(true);
           try {
             await submitFn({ data: { leadCode, data: values, draft: false } });
-            navigate({ to: "/onboarding/$leadCode/documents", params: { leadCode } });
+            toast.success("Details submitted successfully");
+            const hasDocs = (data.schema.documents?.length ?? 0) > 0;
+            navigate({
+              to: hasDocs ? "/onboarding/$leadCode/documents" : "/onboarding/$leadCode/done",
+              params: { leadCode },
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
+            toast.error(msg);
+            throw e;
           } finally {
             setSubmitting(false);
           }
