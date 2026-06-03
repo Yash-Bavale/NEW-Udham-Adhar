@@ -144,7 +144,7 @@ export const addLeadNote = createServerFn({ method: "POST" })
       .insert({
         lead_id: data.lead_id,
         note: data.note,
-        created_by: context.userId,
+        user_id: context.userId,
       });
 
     if (error) throw new Error(error.message);
