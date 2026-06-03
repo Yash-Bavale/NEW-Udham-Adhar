@@ -45,6 +45,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         const additionalCharges = get("additionalCharges");
         let mihpayid = get("mihpayid");
         let bankrefnum = get("bankrefnum");
+        const normalizedStatus = normalizePayUStatus(fields.status);
 
         // Detect S2S vs browser-return: PayU's server-to-server webhook
         // doesn't send Accept: text/html. Browser-return POST does.
@@ -62,7 +63,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           additionalCharges: additionalCharges || undefined,
         });
 
-        if (expected.toLowerCase() !== receivedHash.toLowerCase()) {
+        const hashMatches = expected.toLowerCase() === receivedHash.toLowerCase();
+        if (!hashMatches) {
           try {
             verifiedPayment = await verifyPayUPayment(fields.txnid);
           } catch (e) {
@@ -77,6 +79,21 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           }
 
           console.warn("[payu] callback hash mismatch but PayU verification confirms success", { txnid: fields.txnid });
+        }
+
+        if (!verifiedPayment && shouldVerifyWithPayU(normalizedStatus)) {
+          try {
+            verifiedPayment = await verifyPayUPayment(fields.txnid);
+            console.info("[payu] verify_payment result", {
+              txnid: fields.txnid,
+              postedStatus: fields.status,
+              verifiedStatus: verifiedPayment?.status,
+              verifiedUnmappedStatus: verifiedPayment?.unmappedstatus,
+              mihpayid: verifiedPayment?.mihpayid,
+            });
+          } catch (e) {
+            console.error("[payu] verification lookup failed", { txnid: fields.txnid, postedStatus: fields.status, error: e });
+          }
         }
 
         // Load payment by txnid (we stored it as both transaction_id and razorpay_order_id)
@@ -102,7 +119,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         }
 
         // Idempotency: if already paid, just acknowledge
-        if (payment.status === "paid" && fields.status === "success") {
+        if (payment.status === "paid" && (normalizedStatus === "success" || isPayUSuccess(verifiedPayment))) {
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
             : new Response("OK", { status: 200 });
@@ -116,14 +133,25 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           : null;
 
         const newStatus: "paid" | "failed" | "attempted" =
-          verifiedSuccess || fields.status === "success" ? "paid" :
-          fields.status === "failure" ? "failed" :
+          verifiedSuccess || normalizedStatus === "success" ? "paid" :
+          normalizedStatus === "failure" ? "failed" :
           "attempted";
 
         const rawPayload: Record<string, string> = {};
         form.forEach((v, k) => { rawPayload[k] = typeof v === "string" ? v : "[file]"; });
 
-        await supabaseAdmin.from("payments").update({
+        console.info("[payu] callback decision", {
+          txnid: fields.txnid,
+          leadCode: get("udf3") || null,
+          isBrowser,
+          hashMatches,
+          postedStatus: fields.status,
+          normalizedStatus,
+          verifiedSuccess,
+          newStatus,
+        });
+
+        const { error: paymentUpdateError } = await supabaseAdmin.from("payments").update({
           status: newStatus,
           razorpay_payment_id: mihpayid || null,
           razorpay_signature: receivedHash,
@@ -131,6 +159,12 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           webhook_response: rawPayload,
           raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: safeVerifiedPayment } as any,
         }).eq("id", payment.id);
+        if (paymentUpdateError) {
+          console.error("[payu] payment update failed", { txnid: fields.txnid, error: paymentUpdateError });
+          return isBrowser
+            ? redirectToPending(get("udf3") || fields.txnid)
+            : new Response("payment-update-failed", { status: 200 });
+        }
 
         if (newStatus === "paid") {
           await supabaseAdmin.from("leads")
