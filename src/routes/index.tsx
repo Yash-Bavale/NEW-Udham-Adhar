@@ -126,9 +126,9 @@ function HomePage() {
         <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground leading-tight">
           Frequently Asked Questions for MSME registration in India.
         </h2>
-        <p className="mt-4 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground">
-          MSME Business Help Services Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
-        </p>
+        <div className="mt-8 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground whitespace-pre-line">
+          {"MSME BUSINESS HELP SERVICES ONLINE, SSI – SMALL SCALE INDUSTRIES CERTIFICATE – UPDATE, EDIT, AND DOWNLOAD ACKNOWLEDGEMENT\n\n1. What is Business Help Services?\n2. Who can apply for Business Help Services?\n3. What is the use of Business Help Services for businesses?\n4. Can I update or modify my Business Help Services details?\n5. What should I do if my registered mobile number or email is no longer accessible?\n6. Can I download my Udyam Certificate online?\n7. What documents or information may be required for Udyam-related services?\n8. Is OTP verification required for certain Udyam-related processes?\n9. Can businesses update business activity or classification details in Udyam records?\n10. What happens if incorrect information is submitted during registration or update?"}
+        </div>
 
         <Accordion type="single" collapsible className="mt-8 md:mt-10 space-y-3">
           {FAQS.map((f, i) => (
@@ -149,7 +149,7 @@ function HomePage() {
 
         <div className="mt-8 flex flex-col items-center gap-3 text-center">
           <p className="text-sm text-muted-foreground">
-            Browse 100+ detailed answers on Udyam, MSME &amp; Udyog Aadhaar — registration, download, print, updates and more.
+            {"\n"}
           </p>
           <Button
             asChild
@@ -157,7 +157,7 @@ function HomePage() {
             className="bg-brand-navy text-white hover:bg-brand-navy-deep shadow-sm"
           >
             <Link to="/faqs">
-              View All FAQs <ArrowRight className="ml-2 h-4 w-4" />
+              Read More <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </div>
