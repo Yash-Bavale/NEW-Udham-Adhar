@@ -3,11 +3,11 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  getSchema,
   MAX_DOC_SIZE_BYTES,
   ALLOWED_DOC_MIME,
   type OnboardingSchema,
 } from "./schemas";
+import { loadServiceSchema } from "@/lib/forms/schema-loader.server";
 import { SERVICES } from "@/lib/constants";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
@@ -38,7 +38,7 @@ export const getOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
-    const schema: OnboardingSchema = getSchema(serviceCode);
+    const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
 
     const [submissionRes, docsRes, paidPaymentRes] = await Promise.all([
       supabaseAdmin
@@ -98,7 +98,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
-    const schema = getSchema(serviceCode);
+    const schema = await loadServiceSchema(serviceCode);
 
     // Validate required fields on submit
     if (!data.draft) {
