@@ -1,11 +1,19 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../integrations/supabase/types";
 
-export type AuditEntity = "lead" | "application" | "payment" | "complaint" | "onboarding" | "document" | "certificate";
+export type AuditEntity = 
+  | "lead" 
+  | "application" 
+  | "payment" 
+  | "complaint" 
+  | "onboarding" 
+  | "document" 
+  | "certificate"
+  | "payment_gateway";
 
 export async function writeAudit(
-  supabase: SupabaseClient<Database>,
   params: {
+    supabase: SupabaseClient<Database>;
     entityType: AuditEntity;
     entityId: string;
     action: string;
@@ -15,9 +23,9 @@ export async function writeAudit(
     actorEmail?: string;
   }
 ) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await params.supabase.auth.getUser();
   
-  await supabase.from("audit_logs").insert({
+  await params.supabase.from("audit_logs").insert({
     entity_type: params.entityType,
     entity_id: params.entityId,
     action: params.action,
@@ -30,18 +38,19 @@ export async function writeAudit(
 
 export async function assertRole(
   supabase: SupabaseClient<Database>,
-  roles: Database["public"]["Enums"]["user_role"][]
+  roles: Database["public"]["Enums"]["app_role"][]
 ) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const { data: profile } = await supabase
-    .from("profiles")
+  const { data: userRoles } = await supabase
+    .from("user_roles")
     .select("role")
-    .eq("id", user.id)
-    .single();
+    .eq("user_id", user.id);
 
-  if (!profile || !roles.includes(profile.role)) {
+  const hasRole = userRoles?.some(ur => roles.includes(ur.role));
+
+  if (!hasRole) {
     throw new Error("Forbidden: You do not have permission to perform this action.");
   }
 
