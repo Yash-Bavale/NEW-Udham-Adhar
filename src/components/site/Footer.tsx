@@ -57,7 +57,7 @@ const CATEGORIES: Category[] = [
   },
   {
     key: "official-msme-registration-website",
-    label: "Official MSME Registration Website",
+    label: "Udyam Reg",
     slug: "udyam-reg-certificate",
     childSlugs: ["www-udyamregistration-gov-in","udyam-aadhaar-registration","udyog-aadhar-free-registration","udyam-certificate-apply","udyam-update-online","udyam-msme","msme-certificate-update","udyam-card","udyog-aadhar-card","msme-updation"],
   },
