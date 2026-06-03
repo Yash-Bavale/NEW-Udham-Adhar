@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +22,7 @@ function OnboardingDetailsPage() {
   const navigate = useNavigate();
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
+  const [submitting, setSubmitting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding", leadCode],
@@ -73,13 +75,19 @@ function OnboardingDetailsPage() {
       <OnboardingForm
         schema={data.schema}
         initial={initial}
-        busy={false}
+        busy={submitting}
         onSaveDraft={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: true } });
         }}
         onSubmit={async (values) => {
-          await submitFn({ data: { leadCode, data: values, draft: false } });
-          navigate({ to: "/onboarding/$leadCode/documents", params: { leadCode } });
+          if (submitting) return;
+          setSubmitting(true);
+          try {
+            await submitFn({ data: { leadCode, data: values, draft: false } });
+            navigate({ to: "/onboarding/$leadCode/documents", params: { leadCode } });
+          } finally {
+            setSubmitting(false);
+          }
         }}
       />
     </OnboardingShell>
