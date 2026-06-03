@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ComplaintFormPage } from "@/components/site/ComplaintFormPage";
+import { PolicyContent } from "@/components/site/PolicyContent";
+import policyHtml from "@/content/wp/grievance-redressal-policy.html?raw";
 
 export const Route = createFileRoute("/complaint-grievance-policy")({
   head: () => ({
@@ -13,5 +15,10 @@ export const Route = createFileRoute("/complaint-grievance-policy")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/complaint-grievance-policy" },
     ],
   }),
-  component: ComplaintFormPage,
+  component: () => (
+    <>
+      <ComplaintFormPage />
+      <PolicyContent html={policyHtml} />
+    </>
+  ),
 });
