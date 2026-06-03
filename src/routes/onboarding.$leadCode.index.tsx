@@ -8,7 +8,7 @@ import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.fun
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 
-export const Route = createFileRoute("/onboarding/$leadCode")({
+export const Route = createFileRoute("/onboarding/$leadCode/")({
   head: () => ({
     meta: [
       { title: "Complete your application — Business Help Services" },
