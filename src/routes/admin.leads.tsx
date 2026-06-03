@@ -161,8 +161,8 @@ function LeadsPage() {
                       checked={allSelected}
                       onChange={() => {
                         const next = new Set(selected);
-                        if (allSelected) allOnPage.forEach((id) => next.delete(id));
-                        else allOnPage.forEach((id) => next.add(id));
+                        if (allSelected) allOnPage.forEach((id: string) => next.delete(id));
+                        else allOnPage.forEach((id: string) => next.add(id));
                         setSelected(next);
                       }}
                     />
