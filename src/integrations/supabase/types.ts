@@ -1482,6 +1482,19 @@ export type Database = {
           read_ct: number
         }[]
       }
+      search_nic_codes: {
+        Args: { activity?: string; limit_n?: number; q?: string }
+        Returns: {
+          activity_type: string
+          class_code: string
+          code: string
+          description: string
+          division: string
+          group_code: string
+          rank: number
+          section: string
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
