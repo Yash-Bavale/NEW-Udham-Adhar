@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Mail, Phone, ShieldAlert } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import policyHtml from "@/content/wp/grievance-redressal-policy.html?raw";
 
 export function ComplaintFormPage() {
   const [submitted, setSubmitted] = useState<string | null>(null);
@@ -165,8 +166,12 @@ export function ComplaintFormPage() {
           </a>
         </div>
       </div>
-    </section>
-  );
+
+      <article
+        className="mt-10 prose prose-sm md:prose-base max-w-none prose-headings:font-display prose-headings:text-foreground prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-a:text-brand-navy"
+        dangerouslySetInnerHTML={{ __html: policyHtml }}
+      />
+    </section>);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
