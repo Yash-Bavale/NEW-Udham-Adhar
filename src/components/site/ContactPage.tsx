@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
@@ -32,12 +33,15 @@ export function ContactPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Could not submit. Please try again.");
+        throw new Error(json?.error || `Could not submit (status ${res.status}). Please try again.`);
       }
       setSubmitted(true);
+      toast.success("Message sent. We'll be in touch soon.");
       trackEvent("contact_form_submitted", { state: payload.state });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const msg = err instanceof Error ? err.message : "Network error. Please check your connection and try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -65,30 +69,29 @@ export function ContactPage() {
           <li className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
             <span>
-              <strong>Working Hours:</strong> 10:00 AM to 05:00 PM (IST) (Sunday
-              &amp; Public Holidays off)
+              <strong>Working Hours:</strong>{" "}
+              <span>10:00 AM to 05:00 PM (IST) (Sunday &amp; Public Holidays off)</span>
             </span>
           </li>
           <li className="flex items-start gap-3">
             <Mail className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
-            <a
-              href="mailto:help@businesshelpservices.com"
-              className="text-brand-navy hover:underline"
-            >
-              <strong>Email:</strong> help@businesshelpservices.com
+            <a href="mailto:help@businesshelpservices.com" className="text-brand-navy hover:underline">
+              <strong>Email:</strong>{" "}
+              <span>help@businesshelpservices.com</span>
             </a>
           </li>
           <li className="flex items-start gap-3">
             <Phone className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
             <a href="tel:+919767870331" className="text-brand-navy hover:underline">
-              <strong>Phone:</strong> +91-9767870331
+              <strong>Phone:</strong>{" "}
+              <span>+91-9767870331</span>
             </a>
           </li>
           <li className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
             <span>
-              <strong>Address:</strong> Koregaon Bk, Khed, Pune, Maharashtra –
-              410505, India
+              <strong>Address:</strong>{" "}
+              <span>Koregaon Bk, Khed, Pune, Maharashtra – 410505, India</span>
             </span>
           </li>
         </ul>

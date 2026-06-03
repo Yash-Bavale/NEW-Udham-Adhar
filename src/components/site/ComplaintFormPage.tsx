@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Mail, Phone, ShieldAlert } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
 
@@ -30,12 +31,15 @@ export function ComplaintFormPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Could not submit. Please try again.");
+        throw new Error(json?.error || `Could not submit (status ${res.status}). Please try again.`);
       }
       setSubmitted(json.complaintNumber || "submitted");
+      toast.success("Complaint recorded. We'll review it shortly.");
       trackEvent("complaint_form_submitted", {});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const msg = err instanceof Error ? err.message : "Network error. Please check your connection and try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
