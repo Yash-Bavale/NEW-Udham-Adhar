@@ -1129,9 +1129,9 @@ const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
-  id: '/done',
-  path: '/done',
-  getParentRoute: () => OnboardingLeadCodeRoute,
+  id: '/onboarding/$leadCode/done',
+  path: '/onboarding/$leadCode/done',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingLeadCodeDocumentsRoute =
   OnboardingLeadCodeDocumentsRouteImport.update({
@@ -2589,6 +2589,7 @@ export interface RootRouteChildren {
   ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
+  OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
   OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
@@ -3849,10 +3850,10 @@ declare module '@tanstack/react-router' {
     }
     '/onboarding/$leadCode/done': {
       id: '/onboarding/$leadCode/done'
-      path: '/done'
+      path: '/onboarding/$leadCode/done'
       fullPath: '/onboarding/$leadCode/done'
       preLoaderRoute: typeof OnboardingLeadCodeDoneRouteImport
-      parentRoute: typeof OnboardingLeadCodeRoute
+      parentRoute: typeof rootRouteImport
     }
     '/onboarding/$leadCode/documents': {
       id: '/onboarding/$leadCode/documents'
@@ -4222,6 +4223,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
+  OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
   OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
@@ -4234,13 +4236,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

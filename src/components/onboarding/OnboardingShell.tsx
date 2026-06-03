@@ -20,11 +20,17 @@ export function OnboardingShell({
 }: {
   leadCode: string;
   step: Step;
+  totalSteps?: 2 | 3;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
 }) {
-  const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+  // For 2-step flows (no documents), use Details + Done only.
+  const STEPS = totalSteps === 2
+    ? [ALL_STEPS[0], { n: 3 as Step, label: "Done" }]
+    : ALL_STEPS;
+  const activeIndex = STEPS.findIndex((s) => s.n === step);
+  const progress = (Math.max(activeIndex, 0) / (STEPS.length - 1)) * 100;
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 md:py-12">
       <div className="mb-6 text-center">
