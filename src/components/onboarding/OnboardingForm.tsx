@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { FieldDef, OnboardingSchema } from "@/lib/onboarding/schemas";
+import { NicCodePicker } from "./NicCodePicker";
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
@@ -76,7 +77,13 @@ export function OnboardingForm({
     <form onSubmit={handle} className="space-y-5">
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => (
-          <FieldRenderer key={f.key} field={f} value={values[f.key] ?? ""} onChange={(v) => update(f.key, v)} />
+          <FieldRenderer
+            key={f.key}
+            field={f}
+            value={values[f.key] ?? ""}
+            allValues={values}
+            onChange={(v) => update(f.key, v)}
+          />
         ))}
       </div>
 
@@ -163,13 +170,15 @@ function relativeTime(ts: number) {
 function FieldRenderer({
   field,
   value,
+  allValues,
   onChange,
 }: {
   field: FieldDef;
   value: string;
+  allValues: Record<string, string>;
   onChange: (v: string) => void;
 }) {
-  const colSpan = field.type === "textarea" ? "md:col-span-2" : "";
+  const colSpan = field.type === "textarea" || field.type === "nic" ? "md:col-span-2" : "";
   const common = {
     id: `f-${field.key}`,
     name: field.key,
@@ -182,6 +191,13 @@ function FieldRenderer({
       onChange(e.target.value),
     className: inputCls,
   };
+
+  const activityRaw = field.activityFrom ? allValues[field.activityFrom] : undefined;
+  const activity =
+    activityRaw === "Manufacturing" || activityRaw === "Services" || activityRaw === "Trading"
+      ? activityRaw
+      : null;
+
   return (
     <div className={colSpan}>
       <label htmlFor={common.id} className="block text-sm font-semibold text-foreground mb-1.5">
@@ -201,6 +217,15 @@ function FieldRenderer({
             </option>
           ))}
         </select>
+      ) : field.type === "nic" ? (
+        <NicCodePicker
+          id={common.id}
+          value={value}
+          onChange={onChange}
+          digits={field.nicDigits ?? 5}
+          activity={activity}
+          required={field.required}
+        />
       ) : (
         <input type={field.type} {...common} />
       )}
