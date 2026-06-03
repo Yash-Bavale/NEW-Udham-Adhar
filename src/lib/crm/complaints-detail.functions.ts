@@ -1,0 +1,43 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertRole, writeAudit } from "@/lib/audit";
+
+export const getComplaintDetail = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
+    const { data: complaint, error } = await supabaseAdmin
+      .from("complaints")
+      .select("*, lead:leads(*), application:applications(id, application_code, application_status)")
+      .eq("id", data.id)
+      .single();
+    if (error || !complaint) throw new Error("Complaint not found");
+
+    const { data: audits } = await supabaseAdmin
+      .from("audit_logs")
+      .select("*")
+      .eq("entity_type", "complaint")
+      .eq("entity_id", data.id)
+      .order("created_at", { ascending: false });
+
+    return { complaint, audits: audits ?? [] };
+  });
+
+export const updateComplaintNotes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid(), notes: z.string() }))
+  .handler(async ({ data, context }) => {
+    const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
+    const { data: prev } = await supabaseAdmin.from("complaints").select("notes").eq("id", data.id).single();
+    const { error } = await supabaseAdmin.from("complaints").update({ notes: data.notes }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await writeAudit({
+      supabase: context.supabase, entityType: "complaint", entityId: data.id,
+      action: "notes_updated", oldValue: { notes: prev?.notes }, newValue: { notes: data.notes },
+      actorId: user.id,
+    });
+    return { ok: true };
+  });
