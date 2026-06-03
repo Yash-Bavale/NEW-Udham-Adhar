@@ -118,14 +118,15 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           });
         }
 
-        // Idempotency: if already paid, just acknowledge
-        if (payment.status === "paid" && (normalizedStatus === "success" || isPayUSuccess(verifiedPayment))) {
+        // Idempotency: once paid, never let a later browser/S2S retry downgrade it.
+        if (payment.status === "paid") {
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
             : new Response("OK", { status: 200 });
         }
 
         const verifiedSuccess = isPayUSuccess(verifiedPayment);
+        const verifiedFailure = isPayUFailure(verifiedPayment);
         if (verifiedPayment?.mihpayid && !mihpayid) mihpayid = String(verifiedPayment.mihpayid);
         if (verifiedPayment?.bank_ref_num && !bankrefnum) bankrefnum = String(verifiedPayment.bank_ref_num);
         const safeVerifiedPayment = verifiedPayment
@@ -133,8 +134,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           : null;
 
         const newStatus: "paid" | "failed" | "attempted" =
-          verifiedSuccess || normalizedStatus === "success" ? "paid" :
-          normalizedStatus === "failure" ? "failed" :
+          verifiedSuccess || normalizedStatus === "success" || normalizedStatus === "captured" ? "paid" :
+          verifiedFailure ? "failed" :
           "attempted";
 
         const rawPayload: Record<string, string> = {};
@@ -145,9 +146,12 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           leadCode: get("udf3") || null,
           isBrowser,
           hashMatches,
+          expectedHashPrefix: expected.slice(0, 12),
+          receivedHashPrefix: receivedHash.slice(0, 12),
           postedStatus: fields.status,
           normalizedStatus,
           verifiedSuccess,
+          verifiedFailure,
           newStatus,
         });
 
@@ -167,14 +171,16 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         }
 
         if (newStatus === "paid") {
-          await supabaseAdmin.from("leads")
+          const { error: leadUpdateError } = await supabaseAdmin.from("leads")
             .update({ status: "payment_successful" })
             .eq("id", payment.lead_id);
+          if (leadUpdateError) console.error("[payu] lead update failed", { txnid: fields.txnid, leadId: payment.lead_id, error: leadUpdateError });
 
           if (payment.application_id) {
-            await supabaseAdmin.from("applications")
+            const { error: applicationUpdateError } = await supabaseAdmin.from("applications")
               .update({ application_status: "payment_received" })
               .eq("id", payment.application_id);
+            if (applicationUpdateError) console.error("[payu] application update failed", { txnid: fields.txnid, applicationId: payment.application_id, error: applicationUpdateError });
           }
 
           try { await generateInvoiceInternal(payment.id); }
@@ -221,7 +227,9 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             : new Response("OK", { status: 200 });
         }
 
-        return new Response("OK", { status: 200 });
+        return isBrowser
+          ? redirectToPending(get("udf3") || fields.txnid)
+          : new Response("OK", { status: 200 });
       },
     },
   },
@@ -254,6 +262,12 @@ function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
   const status = normalizePayUStatus(payment?.status);
   const unmapped = normalizePayUStatus(payment?.unmappedstatus);
   return status === "success" || unmapped === "captured";
+}
+
+function isPayUFailure(payment: Record<string, unknown> | null | undefined) {
+  const status = normalizePayUStatus(payment?.status);
+  const unmapped = normalizePayUStatus(payment?.unmappedstatus);
+  return status === "failure" || status === "failed" || ["bounced", "dropped", "failed", "usercancelled"].includes(unmapped);
 }
 
 function normalizePayUStatus(value: unknown) {
