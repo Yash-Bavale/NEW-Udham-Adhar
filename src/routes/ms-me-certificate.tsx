@@ -14,5 +14,5 @@ export const Route = createFileRoute("/ms-me-certificate")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/ms-me-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME Certificate" html={html} />,
+  component: () => <SeoLandingPage title="MSME Certificate Online | Get Udyam Registration Certificate" html={html} />,
 });

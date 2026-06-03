@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-download")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Download | Old UAN Certificate Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Download - Get Your Old MSME Certificate" html={html} />,
 });

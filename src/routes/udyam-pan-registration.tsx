@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-pan-registration")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-pan-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam PAN Registration | Link PAN With MSME Udyam Certificat" html={html} />,
+  component: () => <SeoLandingPage title="Udyam PAN Registration | Link PAN With MSME Udyam Certificate" html={html} />,
 });
