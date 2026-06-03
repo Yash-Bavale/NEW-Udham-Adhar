@@ -5,10 +5,10 @@ import html from "@/content/wp/grievance-redressal-policy.html?raw";
 export const Route = createFileRoute("/complaint-grievance-policy")({
   head: () => ({
     meta: [
-      { title: "Complaint & Grievance Policy — Udyam Aadhar Consultancy" },
-      { name: "description", content: "How to raise a complaint or grievance regarding our Udyam Aadhar consultancy services." },
+      { title: "Complaint & Grievance Policy — Business Help Services Consultancy" },
+      { name: "description", content: "How to raise a complaint or grievance regarding our Business Help Services consultancy services." },
       { property: "og:title", content: "Complaint & Grievance Policy" },
-      { property: "og:description", content: "Complaint and grievance redressal policy for Udyam Aadhar." },
+      { property: "og:description", content: "Complaint and grievance redressal policy for Business Help Services." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/complaint-grievance-policy" },
