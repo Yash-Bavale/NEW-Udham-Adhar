@@ -8,7 +8,7 @@ import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.fun
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 
-export const Route = createFileRoute("/onboarding/$leadCode")({
+export const Route = createFileRoute("/onboarding/$leadCode/")({
   head: () => ({
     meta: [
       { title: "Complete your application — Business Help Services" },
@@ -41,7 +41,7 @@ function OnboardingDetailsPage() {
 
   if (!data.lead.paid) {
     return (
-      <OnboardingShell leadCode={leadCode} step={1} title="Payment required">
+      <OnboardingShell leadCode={leadCode} step={1} totalSteps={2} title="Payment required">
         <p className="text-sm text-foreground">
           We haven't received your consultancy fee yet. Please complete the payment first.
         </p>
@@ -62,14 +62,17 @@ function OnboardingDetailsPage() {
     const v = existing[f.key];
     initial[f.key] = v === undefined || v === null ? "" : String(v);
   }
-  // Prefill from lead if blank
   initial.applicant_name ||= data.lead.name ?? "";
   initial.aadhaar_mobile ||= data.lead.mobile ?? "";
+
+  const hasRequiredDocs = (data.schema.documents ?? []).some((d) => d.required);
+  const totalSteps: 2 | 3 = hasRequiredDocs ? 3 : 2;
 
   return (
     <OnboardingShell
       leadCode={leadCode}
       step={1}
+      totalSteps={totalSteps}
       title={data.schema.title}
       subtitle={data.schema.description}
     >
@@ -77,6 +80,13 @@ function OnboardingDetailsPage() {
         schema={data.schema}
         initial={initial}
         busy={submitting}
+        submitLabel={hasRequiredDocs ? "Save & Continue" : "Submit Details"}
+        submittingLabel={hasRequiredDocs ? "Opening next step…" : "Submitting…"}
+        successMessage={
+          hasRequiredDocs
+            ? "Details submitted. Continue to document upload…"
+            : "Details submitted successfully. Finalising…"
+        }
         onSaveDraft={async (values) => {
           await submitFn({ data: { leadCode, data: values, draft: true } });
         }}
@@ -89,18 +99,22 @@ function OnboardingDetailsPage() {
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
             toast.error(msg);
+            setSubmitting(false);
             throw e;
+          }
+        }}
+        onSubmitted={async () => {
+          try {
+            await navigate({
+              to: hasRequiredDocs
+                ? "/onboarding/$leadCode/documents"
+                : "/onboarding/$leadCode/done",
+              params: { leadCode },
+              replace: true,
+            });
           } finally {
             setSubmitting(false);
           }
-        }}
-        onSubmitted={() => {
-          const hasDocs = (data.schema.documents?.length ?? 0) > 0;
-          return navigate({
-            to: hasDocs ? "/onboarding/$leadCode/documents" : "/onboarding/$leadCode/done",
-            params: { leadCode },
-            replace: true,
-          });
         }}
       />
     </OnboardingShell>

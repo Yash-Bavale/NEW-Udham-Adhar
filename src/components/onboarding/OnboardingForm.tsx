@@ -16,6 +16,9 @@ export function OnboardingForm({
   onSubmit,
   onSubmitted,
   onSaveDraft,
+  submitLabel = "Save & Continue",
+  submittingLabel = "Opening next step…",
+  successMessage = "Details submitted successfully. Opening next step…",
 }: {
   schema: OnboardingSchema;
   initial: Record<string, string>;
@@ -23,6 +26,9 @@ export function OnboardingForm({
   onSubmit: (data: Record<string, string>) => Promise<void> | void;
   onSubmitted?: () => Promise<void> | void;
   onSaveDraft?: (data: Record<string, string>) => Promise<void> | void;
+  submitLabel?: string;
+  submittingLabel?: string;
+  successMessage?: string;
 }) {
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [err, setErr] = useState<string | null>(null);
@@ -129,7 +135,7 @@ export function OnboardingForm({
 
       {submitSuccess && !err && (
         <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-sm px-3 py-2 flex items-center gap-2">
-          <Check className="w-4 h-4" /> Details submitted successfully. Opening next step…
+          <Check className="w-4 h-4" /> {successMessage}
         </div>
       )}
 
@@ -141,7 +147,7 @@ export function OnboardingForm({
           className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-8 py-2.5 transition-colors disabled:opacity-60"
         >
           {(busy || submitSuccess) && <Loader2 className="w-4 h-4 animate-spin" />}
-          {busy || submitSuccess ? "Opening next step…" : "Save & Continue"}
+          {busy || submitSuccess ? submittingLabel : submitLabel}
         </button>
       </div>
     </form>

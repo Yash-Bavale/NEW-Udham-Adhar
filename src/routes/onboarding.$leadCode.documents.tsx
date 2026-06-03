@@ -62,6 +62,7 @@ function DocsPage() {
     <OnboardingShell
       leadCode={leadCode}
       step={2}
+      totalSteps={3}
       title="Upload supporting documents"
       subtitle="Clear photos or scans only. Max 5 MB each. PDF, JPG, PNG or WEBP."
     >
