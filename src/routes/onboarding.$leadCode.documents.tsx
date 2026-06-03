@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { getOnboarding } from "@/lib/onboarding/onboarding.functions";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { DocumentUploader } from "@/components/onboarding/DocumentUploader";
@@ -26,6 +28,13 @@ function DocsPage() {
     queryFn: () => fetchFn({ data: { leadCode } }),
   });
 
+  const hasNoDocuments = data ? (data.schema.documents?.length ?? 0) === 0 : false;
+
+  useEffect(() => {
+    if (!hasNoDocuments) return;
+    navigate({ to: "/onboarding/$leadCode/done", params: { leadCode }, replace: true });
+  }, [hasNoDocuments, leadCode, navigate]);
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
@@ -36,9 +45,12 @@ function DocsPage() {
   if (!data) return null;
 
   // If this service requires no documents at all, skip straight to done.
-  if ((data.schema.documents?.length ?? 0) === 0) {
-    navigate({ to: "/onboarding/$leadCode/done", params: { leadCode }, replace: true });
-    return null;
+  if (hasNoDocuments) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+      </div>
+    );
   }
 
   const requiredDocs = data.schema.documents.filter((d) => d.required);
@@ -70,7 +82,10 @@ function DocsPage() {
         </Link>
         <button
           disabled={!allRequiredUploaded && requiredDocs.length > 0}
-          onClick={() => navigate({ to: "/onboarding/$leadCode/done", params: { leadCode } })}
+          onClick={() => {
+            toast.success("Documents step completed");
+            navigate({ to: "/onboarding/$leadCode/done", params: { leadCode }, replace: true });
+          }}
           className="rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold px-8 py-2.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {requiredDocs.length === 0 || allRequiredUploaded ? "Continue" : "Upload required documents to continue"}
