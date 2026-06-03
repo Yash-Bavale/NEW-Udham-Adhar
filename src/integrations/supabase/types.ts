@@ -98,6 +98,42 @@ export type Database = {
         }
         Relationships: []
       }
+      application_links: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          lead_id: string
+          purpose: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          lead_id: string
+          purpose: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          lead_id?: string
+          purpose?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       applications: {
         Row: {
           application_code: string | null
@@ -194,6 +230,96 @@ export type Database = {
         }
         Relationships: []
       }
+      certificates: {
+        Row: {
+          application_id: string
+          certificate_number: string | null
+          created_at: string
+          delivered_at: string | null
+          file_name: string | null
+          file_path: string | null
+          id: string
+          issued_at: string | null
+          lead_id: string
+          mime_type: string | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          application_id: string
+          certificate_number?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          issued_at?: string | null
+          lead_id: string
+          mime_type?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          application_id?: string
+          certificate_number?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          id?: string
+          issued_at?: string | null
+          lead_id?: string
+          mime_type?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      complaints: {
+        Row: {
+          application_id: string | null
+          complaint_number: string | null
+          created_at: string
+          id: string
+          last_reminded_at: string | null
+          lead_id: string
+          notes: string | null
+          reminder_count: number
+          resolved_at: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          complaint_number?: string | null
+          created_at?: string
+          id?: string
+          last_reminded_at?: string | null
+          lead_id: string
+          notes?: string | null
+          reminder_count?: number
+          resolved_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string | null
+          complaint_number?: string | null
+          created_at?: string
+          id?: string
+          last_reminded_at?: string | null
+          lead_id?: string
+          notes?: string | null
+          reminder_count?: number
+          resolved_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           application_id: string | null
@@ -204,13 +330,16 @@ export type Database = {
           id: string
           lead_id: string
           mime_type: string
+          parent_document_id: string | null
           remarks: string | null
           size_bytes: number
           status: string
           updated_at: string
           uploaded_at: string
+          verification_comment: string | null
           verified_at: string | null
           verified_by: string | null
+          version: number
         }
         Insert: {
           application_id?: string | null
@@ -221,13 +350,16 @@ export type Database = {
           id?: string
           lead_id: string
           mime_type: string
+          parent_document_id?: string | null
           remarks?: string | null
           size_bytes: number
           status?: string
           updated_at?: string
           uploaded_at?: string
+          verification_comment?: string | null
           verified_at?: string | null
           verified_by?: string | null
+          version?: number
         }
         Update: {
           application_id?: string | null
@@ -238,13 +370,16 @@ export type Database = {
           id?: string
           lead_id?: string
           mime_type?: string
+          parent_document_id?: string | null
           remarks?: string | null
           size_bytes?: number
           status?: string
           updated_at?: string
           uploaded_at?: string
+          verification_comment?: string | null
           verified_at?: string | null
           verified_by?: string | null
+          version?: number
         }
         Relationships: []
       }
@@ -725,6 +860,45 @@ export type Database = {
           },
         ]
       }
+      nic_codes: {
+        Row: {
+          activity_type: string | null
+          class_code: string | null
+          code: string
+          created_at: string
+          description: string
+          division: string | null
+          group_code: string | null
+          id: string
+          keywords: string[]
+          section: string | null
+        }
+        Insert: {
+          activity_type?: string | null
+          class_code?: string | null
+          code: string
+          created_at?: string
+          description: string
+          division?: string | null
+          group_code?: string | null
+          id?: string
+          keywords?: string[]
+          section?: string | null
+        }
+        Update: {
+          activity_type?: string | null
+          class_code?: string | null
+          code?: string
+          created_at?: string
+          description?: string
+          division?: string | null
+          group_code?: string | null
+          id?: string
+          keywords?: string[]
+          section?: string | null
+        }
+        Relationships: []
+      }
       onboarding_submissions: {
         Row: {
           application_id: string | null
@@ -909,6 +1083,42 @@ export type Database = {
           },
         ]
       }
+      pdf_templates: {
+        Row: {
+          code: string
+          created_at: string
+          html_template: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          variables: string[]
+          version: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          html_template: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          variables?: string[]
+          version?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          html_template?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          variables?: string[]
+          version?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -992,6 +1202,78 @@ export type Database = {
           label?: string
           slug?: string
           sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_form_schemas: {
+        Row: {
+          created_at: string
+          description: string | null
+          documents: Json
+          id: string
+          is_active: boolean
+          schema: Json
+          service_code: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          documents?: Json
+          id?: string
+          is_active?: boolean
+          schema?: Json
+          service_code: string
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          documents?: Json
+          id?: string
+          is_active?: boolean
+          schema?: Json
+          service_code?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      service_workflows: {
+        Row: {
+          application_statuses: Json
+          created_at: string
+          default_assignee_role: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          service_code: string
+          updated_at: string
+        }
+        Insert: {
+          application_statuses?: Json
+          created_at?: string
+          default_assignee_role?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          service_code: string
+          updated_at?: string
+        }
+        Update: {
+          application_statuses?: Json
+          created_at?: string
+          default_assignee_role?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          service_code?: string
           updated_at?: string
         }
         Relationships: []
@@ -1200,6 +1482,8 @@ export type Database = {
           read_ct: number
         }[]
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role:
