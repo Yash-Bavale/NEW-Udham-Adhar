@@ -14,5 +14,5 @@ export const Route = createFileRoute("/register-for-msme")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/register-for-msme" },
     ],
   }),
-  component: () => <SeoLandingPage title="Register for MSME - Free Online Business Help Services" html={html} />,
+  component: () => <SeoLandingPage title="Register for MSME" html={html} />,
 });

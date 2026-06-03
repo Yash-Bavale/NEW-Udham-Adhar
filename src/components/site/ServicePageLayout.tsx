@@ -10,7 +10,7 @@ const proseClasses =
   "[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-1 " +
   "[&_p]:my-3 [&_strong]:text-foreground";
 
-/** Two-column service page: lead form on the left, info content on the right. */
+/** Service page: lead form + Sample Certificate on top, info content below. */
 export function ServicePageLayout({
   title,
   children,
@@ -19,14 +19,36 @@ export function ServicePageLayout({
   children: ReactNode;
 }) {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
-      <LeadForm title={title} />
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="bg-form-header text-white text-center py-4">
-          <h2 className="text-xl font-bold font-display">{title}</h2>
+    <>
+      <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
+        <LeadForm title={title} />
+
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="bg-form-header text-white text-center py-4">
+            <h2 className="text-xl font-bold font-display">Sample Certificate</h2>
+          </div>
+          <div className="p-6">
+            <img
+              src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
+              alt="Sample Business Help Services Certificate"
+              className="w-full h-auto rounded-md border border-border"
+              loading="lazy"
+            />
+            <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
+              Note: Sample Business Help Services Certificate shown for reference purposes only.
+            </p>
+          </div>
         </div>
-        <div className={proseClasses}>{children}</div>
-      </div>
-    </section>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-4 pb-10">
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="bg-form-header text-white text-center py-4">
+            <h2 className="text-xl font-bold font-display">{title}</h2>
+          </div>
+          <div className={proseClasses}>{children}</div>
+        </div>
+      </section>
+    </>
   );
 }

@@ -1,38 +1,37 @@
-## What I found
+## 1. Add Sample Certificate to service pages
 
-The backend is healthy, but the latest lead `UA-2026-001024` has a PayU payment stuck as `created` with transaction ID `UA-2026-001024-MPWRPUO5-KGA2YJ`.
+Modify `src/components/site/ServicePageLayout.tsx` so the right column shows the same Sample Certificate card used on the homepage / SEO landing pages, and the page's info text moves into a second section below.
 
-The PayU screenshot says: “This txnid has been used previously or was successfully captured.” That matches the current code: it reuses the latest `created` PayU transaction on retry. PayU requires every payment attempt to use a fresh unique `txnid`, so retries can fail before payment completion.
+Pages affected automatically (all use `ServicePageLayout`):
+- `/new-udyam-registration` (New Udyam)
+- `/update-udyam-certificate` (Update Udyam)
+- `/download-udyam-certificate` (Download Udyam)
+- `/migrate-udyog-aadhaar-to-udyam` (Migrate Udyog Aadhar)
+- `/other-problem` (Other Problem)
 
-## Plan
+## 2. Fix headlines on SEO pages where "Business Help Services" replaced the real term
 
-1. **Stop reusing failed/stale PayU transaction IDs**
-   - Change PayU order creation so every new click creates a fresh `txnid`.
-   - Only block/reuse when there is already a successful paid payment for the lead.
-   - Mark older `created` / `attempted` PayU rows for the same lead as `failed` or superseded before creating the new attempt.
+Rewrite each visible `title` prop so it reads the slug words in plain English. No other text changes.
 
-2. **Make webhook completion more reliable**
-   - Keep verifying PayU response hash.
-   - Ensure successful PayU responses update:
-     - payment status to `paid`
-     - lead status to `payment_successful`
-     - application status to `payment_received`
-   - Store PayU response details for audit/debugging.
+Examples:
+- `/new-udyam-registration` → `New Udyam Registration`
+- `/udyam-registration-certificate-download` → `Udyam Registration Certificate Download`
+- `/udyam-registration-download` → `Udyam Registration Download`
+- `/udyam-registration-portal` → `Udyam Registration Portal`
+- …and the same fix on every other route where the `title=` string still contains "Business Help Services" (full list found via grep, ~19 routes including `msme-apply-online`, `ms-me-certificate`, `print-udyam-certificate`, `aadhar-udyam-registration`, `print-msme-certificate`, `msme-udyam-registration`, `register-for-msme`, `msme-online-registration`, `udyam-aadhaar-verify`, `udyam-registration-number`, `udyam-registration-online`, `udyam-registration-update`, `udyam-registration-check`, `udyam-registration-number-verify`, `msme-registration-free`).
 
-3. **Improve failed/pending return handling**
-   - If PayU returns duplicate-txn or failure, record that failure in the payment row instead of leaving it as `created`.
-   - Redirect customer to the app failure page with a clear retry path.
+`complaint-grievance-policy` already shows the correct visible title — no change needed there.
 
-4. **Add defensive database protection**
-   - Add/confirm a unique index on PayU `transaction_id` so duplicate transaction IDs cannot be inserted silently.
-   - Add a safe helper migration if needed for consistent retry cleanup.
+## 3. Homepage FAQ tweaks
 
-5. **Validate the flow**
-   - Check the latest payment rows for the affected lead after the fix.
-   - Confirm the next retry generates a different PayU `txnid` and no longer hits the “txnid used previously” issue.
+In `src/routes/index.tsx`:
+- Remove the paragraph "Browse 100+ detailed answers on Udyam, MSME & Udyog Aadhaar — registration, download, print, updates and more."
+- Change the button text from `View All FAQs` to `Read More`.
 
-## Files likely to change
+## 4. Footer cleanup
 
-- `src/lib/payments/payu.functions.ts`
-- `src/routes/api/public/webhooks/payu.ts`
-- One database migration if the unique transaction/index cleanup is missing
+In `src/components/site/Footer.tsx`:
+- Remove the social icons row (WhatsApp / YouTube / Instagram / Facebook) under the brand column.
+- Remove the `Complaint & Grievance Policy` entry from `FOOTER_LINKS` (it's already in the top nav via `NAV_LINKS`).
+
+Nothing else in the footer, header, or other pages is touched.
