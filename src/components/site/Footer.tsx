@@ -101,7 +101,7 @@ const CATEGORIES: Category[] = [
     key: "udyam-registration-online",
     label: "Udyam Registration Online",
     slug: "udyog-aadhar-registration-online",
-    childSlugs: ["udyam-apply","udyam-certificate-apply-online","msme-registration-login","udyam-registration-check","udyam-download-online","udyam-certificate-status","udyam-registration-update","udyam-certificate-reprint","udyam-msme-certificate-download"],
+    childSlugs: ["udyam-registration-form","udyam-apply","udyam-certificate-apply-online","msme-registration-login","udyam-registration-check","udyam-download-online","udyam-certificate-status","udyam-registration-update","udyam-certificate-reprint","udyam-msme-certificate-download"],
   },
 ];
 
