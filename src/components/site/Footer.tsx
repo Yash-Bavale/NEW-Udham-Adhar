@@ -9,10 +9,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Facebook,
-  Instagram,
-  Youtube,
-  MessageCircle,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
@@ -164,7 +160,7 @@ const FOOTER_LINKS = [
   { to: "/pricing-transparency", label: "Pricing Transparency" },
   { to: "/service-delivery-policy", label: "Service Delivery Policy" },
   { to: "/consent-acknowledgment", label: "Consent & Acknowledgment" },
-  { to: "/complaint-grievance-policy", label: "Complaint & Grievance Policy" },
+  
   { to: "/compliance-statement", label: "Compliance Statement" },
   { to: "/cookie-policy", label: "Cookie Policy" },
   { to: "/aml-anti-fraud-policy", label: "AML / Anti-Fraud Policy" },
@@ -203,26 +199,6 @@ export function Footer() {
           <h3 className="text-2xl font-bold font-display leading-tight">
             © Business Help Services
           </h3>
-          <div className="mt-6 flex items-center gap-3">
-            <a
-              href="https://wa.me/919767870331"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#25D366] text-white hover:opacity-90 transition"
-            >
-              <MessageCircle className="h-5 w-5" />
-            </a>
-            <a href="#" aria-label="YouTube" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#FF0000] text-white hover:opacity-90 transition">
-              <Youtube className="h-5 w-5" />
-            </a>
-            <a href="#" aria-label="Instagram" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1a1a1a] text-white hover:opacity-90 transition">
-              <Instagram className="h-5 w-5" />
-            </a>
-            <a href="#" aria-label="Facebook" className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-[#1877F2] text-white hover:opacity-90 transition">
-              <Facebook className="h-5 w-5" />
-            </a>
-          </div>
         </div>
 
         {/* Col 2: MSME / Udyog Aadhaar — full SEO tree inline (client review mode) */}
