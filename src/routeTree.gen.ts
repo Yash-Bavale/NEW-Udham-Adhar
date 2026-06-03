@@ -174,7 +174,6 @@ import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$lea
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
 import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
-import { Route as OnboardingLeadCodeRouteImport } from './routes/onboarding.$leadCode'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
@@ -187,6 +186,7 @@ import { Route as AdminCertificatesRouteImport } from './routes/admin.certificat
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
+import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
@@ -1063,11 +1063,6 @@ const PaymentFailedLeadCodeRoute = PaymentFailedLeadCodeRouteImport.update({
   path: '/payment-failed/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OnboardingLeadCodeRoute = OnboardingLeadCodeRouteImport.update({
-  id: '/onboarding/$leadCode',
-  path: '/onboarding/$leadCode',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
   id: '/email/unsubscribe',
   path: '/email/unsubscribe',
@@ -1128,6 +1123,11 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AdminRoute,
 } as any)
+const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
+  id: '/onboarding/$leadCode/',
+  path: '/onboarding/$leadCode/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
   id: '/done',
   path: '/done',
@@ -1135,9 +1135,9 @@ const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
 } as any)
 const OnboardingLeadCodeDocumentsRoute =
   OnboardingLeadCodeDocumentsRouteImport.update({
-    id: '/documents',
-    path: '/documents',
-    getParentRoute: () => OnboardingLeadCodeRoute,
+    id: '/onboarding/$leadCode/documents',
+    path: '/onboarding/$leadCode/documents',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
   id: '/lovable/email/suppression',
@@ -1400,7 +1400,6 @@ export interface FileRoutesByFullPath {
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
@@ -1418,6 +1417,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1597,7 +1597,6 @@ export interface FileRoutesByTo {
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
@@ -1615,6 +1614,7 @@ export interface FileRoutesByTo {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1796,7 +1796,6 @@ export interface FileRoutesById {
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
-  '/onboarding/$leadCode': typeof OnboardingLeadCodeRouteWithChildren
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
@@ -1814,6 +1813,7 @@ export interface FileRoutesById {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1996,7 +1996,6 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/users'
     | '/email/unsubscribe'
-    | '/onboarding/$leadCode'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
@@ -2014,6 +2013,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/onboarding/$leadCode/'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2193,7 +2193,6 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/users'
     | '/email/unsubscribe'
-    | '/onboarding/$leadCode'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
@@ -2211,6 +2210,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/onboarding/$leadCode'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2391,7 +2391,6 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/users'
     | '/email/unsubscribe'
-    | '/onboarding/$leadCode'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
@@ -2409,6 +2408,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/onboarding/$leadCode/'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2579,7 +2579,6 @@ export interface RootRouteChildren {
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
-  OnboardingLeadCodeRoute: typeof OnboardingLeadCodeRouteWithChildren
   PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
@@ -2589,6 +2588,8 @@ export interface RootRouteChildren {
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
+  OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
+  OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
@@ -3755,13 +3756,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentFailedLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/onboarding/$leadCode': {
-      id: '/onboarding/$leadCode'
-      path: '/onboarding/$leadCode'
-      fullPath: '/onboarding/$leadCode'
-      preLoaderRoute: typeof OnboardingLeadCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/email/unsubscribe': {
       id: '/email/unsubscribe'
       path: '/email/unsubscribe'
@@ -3846,6 +3840,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/onboarding/$leadCode/': {
+      id: '/onboarding/$leadCode/'
+      path: '/onboarding/$leadCode'
+      fullPath: '/onboarding/$leadCode/'
+      preLoaderRoute: typeof OnboardingLeadCodeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/$leadCode/done': {
       id: '/onboarding/$leadCode/done'
       path: '/done'
@@ -3855,10 +3856,10 @@ declare module '@tanstack/react-router' {
     }
     '/onboarding/$leadCode/documents': {
       id: '/onboarding/$leadCode/documents'
-      path: '/documents'
+      path: '/onboarding/$leadCode/documents'
       fullPath: '/onboarding/$leadCode/documents'
       preLoaderRoute: typeof OnboardingLeadCodeDocumentsRouteImport
-      parentRoute: typeof OnboardingLeadCodeRoute
+      parentRoute: typeof rootRouteImport
     }
     '/lovable/email/suppression': {
       id: '/lovable/email/suppression'
@@ -4046,19 +4047,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface OnboardingLeadCodeRouteChildren {
-  OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
-  OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
-}
-
-const OnboardingLeadCodeRouteChildren: OnboardingLeadCodeRouteChildren = {
-  OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
-  OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
-}
-
-const OnboardingLeadCodeRouteWithChildren =
-  OnboardingLeadCodeRoute._addFileChildren(OnboardingLeadCodeRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AadhaarUdyamRoute: AadhaarUdyamRoute,
@@ -4224,7 +4212,6 @@ const rootRouteChildren: RootRouteChildren = {
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
-  OnboardingLeadCodeRoute: OnboardingLeadCodeRouteWithChildren,
   PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
@@ -4234,6 +4221,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
+  OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
+  OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
@@ -4245,3 +4234,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

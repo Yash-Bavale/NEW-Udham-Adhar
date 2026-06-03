@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 
 type Step = 1 | 2 | 3;
 
-const STEPS: { n: Step; label: string }[] = [
+const ALL_STEPS: { n: Step; label: string }[] = [
   { n: 1, label: "Details" },
   { n: 2, label: "Documents" },
   { n: 3, label: "Done" },
@@ -13,6 +13,7 @@ const STEPS: { n: Step; label: string }[] = [
 export function OnboardingShell({
   leadCode,
   step,
+  totalSteps = 3,
   title,
   subtitle,
   children,
