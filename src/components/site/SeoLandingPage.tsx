@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
 
 const proseClasses =
@@ -14,17 +15,25 @@ const proseClasses =
   "[&_svg]:hidden " +
   "[&_p]:my-3 [&_strong]:text-foreground";
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /**
  * Strip duplicate content from imported WordPress HTML.
- * The React layout already renders its own LeadForm + Sample Certificate card,
- * and the source HTML contains oversized inline SVG icons we don't want.
+ * The React layout renders its own form header, content H1, descriptive link,
+ * and Sample Certificate card. The WP HTML must contribute only the body copy.
  */
-function sanitize(html: string): string {
+function sanitize(html: string, title: string): string {
   let out = html;
   // Remove all inline <style> and <script> blocks
   out = out.replace(/<style\b[\s\S]*?<\/style>/gi, "");
   out = out.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-  // Remove all inline <svg>...</svg> (huge whatsapp icons etc.)
+  // Remove all inline <svg>...</svg>
   out = out.replace(/<svg\b[\s\S]*?<\/svg>/gi, "");
   // Remove the duplicate "Sample Certificate" block (heading + lightbox anchor + caption)
   out = out.replace(
@@ -38,8 +47,7 @@ function sanitize(html: string): string {
   // Remove the "Click to Connect with Expert" leftover text label
   out = out.replace(/Click to Connect with Expert/gi, "");
 
-  // Remove inline duplicate certificate images that some WP pages embed in
-  // the body (we already render our own Sample Certificate card on the right).
+  // Remove inline duplicate certificate images
   const dupImagePattern =
     /(udyam-aadhar\.jpe?g|udyam-certificate-design|udyam-certificate\.(?:png|jpe?g|webp))/i;
   out = out.replace(
@@ -55,37 +63,61 @@ function sanitize(html: string): string {
     (m) => (dupImagePattern.test(m) ? "" : m),
   );
 
-  // Collapse any run of identical consecutive headings to a single one
+  // Strip EVERY <h1> — we render our own content header from {title}
+  out = out.replace(/<h1\b[^>]*>[\s\S]*?<\/h1\s*>/gi, "");
+
+  // Strip <a href="/">...</a> wrappers that contained the now-removed <h1>
+  out = out.replace(
+    /<a\b[^>]*href=["']\/["'][^>]*>\s*<\/a>/gi,
+    "",
+  );
+
+  // Strip the linked descriptive heading <h2><a href="/">...</a></h2> —
+  // we render that ourselves with the correct same-page href.
+  out = out.replace(
+    /<h2\b[^>]*>\s*<a\b[^>]*href=["']\/["'][^>]*>[\s\S]*?<\/a>\s*<\/h2\s*>/gi,
+    "",
+  );
+
+  // Strip the leading bare <h2>{title}</h2> the WP source put at the top
+  const titleNorm = title.trim().toLowerCase();
+  out = out.replace(/<h2\b[^>]*>\s*([\s\S]*?)\s*<\/h2\s*>/gi, (full, inner) => {
+    if (/<a\b/i.test(inner)) return full;
+    const txt = String(inner).replace(/<[^>]+>/g, "").trim().toLowerCase();
+    return txt === titleNorm ? "" : full;
+  });
+
+  // Collapse runs of identical consecutive headings
   out = out.replace(
     /(<h([1-3])[^>]*>\s*([\s\S]*?)\s*<\/h\2>)(\s*<h\2[^>]*>\s*\3\s*<\/h\2>)+/gi,
     "$1",
   );
 
-  // Remove the duplicate small bold heading that repeats the H1 text on
-  // every SEO page. Keeps the linked <h2><a href="/">...</a></h2> intact
-  // (those contain an <a> tag and are preserved for SEO).
-  const h1Match = out.match(/<h1\b[^>]*>\s*([\s\S]*?)\s*<\/h1>/i);
-  if (h1Match) {
-    const h1Text = h1Match[1].replace(/<[^>]+>/g, "").trim().toLowerCase();
-    out = out.replace(
-      /<h2\b[^>]*>\s*([\s\S]*?)\s*<\/h2>/gi,
-      (full, inner) => {
-        if (/<a\b/i.test(inner)) return full;
-        const text = String(inner).replace(/<[^>]+>/g, "").trim().toLowerCase();
-        return text === h1Text ? "" : full;
-      },
-    );
-  }
+  // Replace "Business Help Services" mentions inside SEO body
+  out = out.replace(/Business Help Services/gi, "Udyam Adhar");
+
   return out;
 }
 
 /**
  * SEO landing page layout: lead form + sample certificate on top, prose content below.
- * The XML content carries its own real <h1> (page name) and <h2><a href="/">descriptive</a></h2>
- * linked heading — both preserved so each page has one crawlable H1 and a clickable H2 link.
+ * - `title` is the short page name used for both the form header and content H1.
+ * - `linkTitle` is the descriptive heading rendered as an in-content link that
+ *   stays on the same route (so clicking it does NOT bounce to the home form).
  */
-export function SeoLandingPage({ title, html }: { title: string; html: string }) {
-  const cleanHtml = sanitize(html);
+export function SeoLandingPage({
+  title,
+  linkTitle,
+  html,
+}: {
+  title: string;
+  linkTitle?: string;
+  html: string;
+}) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const cleanHtml = sanitize(html, title);
+  const descriptive = linkTitle ?? title;
+
   return (
     <>
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
@@ -98,12 +130,12 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
           <div className="p-6">
             <img
               src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
-              alt="Sample Business Help Services Certificate"
+              alt="Sample Udyam Adhar Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
-              Note: Sample Business Help Services Certificate shown for reference purposes only.
+              Note: Sample Udyam Adhar Certificate shown for reference purposes only.
             </p>
           </div>
         </div>
@@ -111,7 +143,15 @@ export function SeoLandingPage({ title, html }: { title: string; html: string })
 
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className={proseClasses} dangerouslySetInnerHTML={{ __html: cleanHtml }} />
+          <div className={proseClasses}>
+            <h1>{title}</h1>
+            <h2
+              dangerouslySetInnerHTML={{
+                __html: `<a href="${escapeHtml(pathname)}">${escapeHtml(descriptive)}</a>`,
+              }}
+            />
+            <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />
+          </div>
         </div>
       </section>
     </>

@@ -59,7 +59,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="bg-form-header text-white text-center py-4 px-3">
-        <h2 className="text-xl font-bold font-display leading-tight">Udyog Aadhar Registration&nbsp;</h2>
+        <h2 className="text-xl font-bold font-display leading-tight">{title}</h2>
       </div>
 
 
