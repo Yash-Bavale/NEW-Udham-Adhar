@@ -237,13 +237,13 @@ function SeoTree({
     const map = new Map<string, SeoPageRow[]>();
     CATEGORIES.forEach((c) => map.set(c.key, []));
     if (!pages) return map;
-    const mainSlugs = new Set(
-      CATEGORIES.map((c) => c.slug).filter((s): s is string => !!s),
-    );
-    for (const p of pages) {
-      if (mainSlugs.has(p.slug)) continue;
-      const cat = CATEGORIES.find((c) => c.match?.(p.slug, p.label));
-      if (cat) map.get(cat.key)!.push(p);
+    const bySlug = new Map(pages.map((p) => [p.slug, p]));
+    for (const cat of CATEGORIES) {
+      const list = map.get(cat.key)!;
+      for (const slug of cat.childSlugs) {
+        const p = bySlug.get(slug);
+        if (p) list.push(p);
+      }
     }
     return map;
   }, [pages]);
