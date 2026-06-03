@@ -74,7 +74,7 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
       "Current Udyam registered mobile number/email ID and additional documents or information may be required depending upon processing requirements.",
     ],
   },
-  "Migrate Udyog Aadhaar to Udyam": {
+  "Udyog Aadhaar to Udyam Migration": {
     tagline: "Move your old Udyog Aadhaar details into the current Udyam process.",
     bullets: [
       "Migration support handled by certified consultants",
