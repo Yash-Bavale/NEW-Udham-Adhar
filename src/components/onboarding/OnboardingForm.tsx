@@ -2,7 +2,57 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker } from "./NicCodePicker";
+
+const UPPERCASE_FIELDS = new Set([
+  "bank_ifsc",
+  "udyam_number",
+  "uam_number",
+  "pan_number",
+  "pan_holder_pan",
+  "gstin",
+]);
+
+const TITLECASE_FIELDS = new Set([
+  "applicant_name",
+  "pan_holder_name",
+  "authorized_person_name",
+  "bank_name",
+  "branch_name",
+  "enterprise_name",
+  "organisation_name",
+  "address_flat",
+  "address_premises",
+  "address_village",
+  "address_block",
+  "address_road",
+  "city",
+]);
+
+const PRESERVE_UPPER = new Set([
+  "PVT","LTD","LLP","HUF","OPC","INC","CO","PLC","LLC","SSI","MSME","IT","BPO","KPO","HR","R&D","II","III","IV","VI","VII","VIII","IX","XI","XII",
+]);
+
+function toTitleCase(input: string): string {
+  if (!input) return input;
+  return input
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) =>
+      word
+        .split("-")
+        .map((seg) => {
+          const upper = seg.toUpperCase();
+          if (PRESERVE_UPPER.has(upper)) return upper;
+          if (!seg) return seg;
+          return seg.charAt(0).toUpperCase() + seg.slice(1);
+        })
+        .join("-"),
+    )
+    .join(" ");
+}
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
@@ -92,7 +142,12 @@ export function OnboardingForm({
   }, [values, busy]);
 
   function update(k: string, v: string) {
-    setValues((s) => ({ ...s, [k]: v }));
+    setValues((s) => {
+      const next = { ...s, [k]: v };
+      // When state changes, clear district so a stale value can't remain.
+      if (k === "state" && s.state !== v) next.district = "";
+      return next;
+    });
   }
 
   async function handle(e: React.FormEvent) {
@@ -228,10 +283,13 @@ function FieldRenderer({
   const colSpan = field.type === "textarea" || field.type === "nic" ? "md:col-span-2" : "";
   const id = `f-${field.key}`;
   const isState = field.key === "state";
+  const isDistrict = field.key === "district";
   const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
   const isMobile = field.type === "tel" && field.pattern === "^[6-9]\\d{9}$";
   const isAadhaar = field.pattern === "^\\d{12}$";
   const isPan = field.pattern === "^[A-Z]{5}\\d{4}[A-Z]$";
+  const isUpper = UPPERCASE_FIELDS.has(field.key);
+  const isTitle = TITLECASE_FIELDS.has(field.key);
 
   // Map (rawValue) -> (storedValue). Lets us auto-uppercase PAN / digits-only Aadhaar etc.
   const transform = (raw: string): string => {
@@ -239,7 +297,15 @@ function FieldRenderer({
     if (isMobile) return raw.replace(/\D/g, "").slice(0, 10);
     if (isAadhaar) return raw.replace(/\D/g, "").slice(0, 12);
     if (isPan) return raw.toUpperCase().replace(/\s/g, "").slice(0, 10);
+    if (isUpper) return raw.toUpperCase();
     return raw;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (isTitle) {
+      const titled = toTitleCase(e.target.value);
+      if (titled !== e.target.value) onChange(titled);
+    }
   };
 
   const common = {
@@ -269,9 +335,12 @@ function FieldRenderer({
     inputMode = "numeric";
   } else if (field.type === "number") {
     inputMode = "decimal";
-  } else if (isPan) {
+  } else if (isPan || isUpper) {
     htmlType = "text";
   }
+
+  const currentState = allValues.state ?? "";
+  const districtOptions = isDistrict ? INDIA_DISTRICTS[currentState] ?? [] : [];
 
   return (
     <div className={colSpan}>
@@ -280,7 +349,7 @@ function FieldRenderer({
         {field.required && <span className="text-destructive"> *</span>}
       </label>
       {field.type === "textarea" ? (
-        <textarea {...common} rows={3} />
+        <textarea {...common} onBlur={handleBlur} rows={3} />
       ) : isState ? (
         <select {...common}>
           <option value="" disabled>
@@ -289,6 +358,17 @@ function FieldRenderer({
           {INDIA_STATES.map((s) => (
             <option key={s} value={s}>
               {s}
+            </option>
+          ))}
+        </select>
+      ) : isDistrict ? (
+        <select {...common} disabled={!currentState}>
+          <option value="" disabled>
+            {currentState ? "Select district…" : "Select state first"}
+          </option>
+          {districtOptions.map((d) => (
+            <option key={d} value={d}>
+              {d}
             </option>
           ))}
         </select>
@@ -316,12 +396,14 @@ function FieldRenderer({
         <input
           type={htmlType}
           inputMode={inputMode}
-          autoCapitalize={isPan ? "characters" : undefined}
+          autoCapitalize={isPan || isUpper ? "characters" : isTitle ? "words" : undefined}
           autoComplete={isMobile ? "tel" : field.type === "email" ? "email" : undefined}
+          onBlur={handleBlur}
           {...common}
         />
       )}
       {field.help && <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>}
     </div>
+
   );
 }
