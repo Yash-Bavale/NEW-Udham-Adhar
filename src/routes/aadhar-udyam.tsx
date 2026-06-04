@@ -3,12 +3,12 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/aadhar-udyam.html?raw";
 
 export const Route = createFileRoute("/aadhar-udyam")({
-    head: () => ({
+  head: () => ({
     meta: [
       { title: "Aadhar Udyam - Aadhaar Linked MSME Registration" },
-      { name: "description", content: "Expert consultancy assistance for aadhar udyam - aadhaar linked msme registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { name: "description", content: "Aadhar Udyam refers to the Aadhaar-linked MSME registration process conducted through the official Udyam portal, designed to help business owners register quickly, securely, and without paperwork. By connecting the entrepreneur’s Aadhaar number directly with the registration application, the system enables instant..." },
       { property: "og:title", content: "Aadhar Udyam - Aadhaar Linked MSME Registration" },
-      { property: "og:description", content: "Expert consultancy assistance for aadhar udyam - aadhaar linked msme registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:description", content: "Aadhar Udyam refers to the Aadhaar-linked MSME registration process conducted through the official Udyam portal, designed to help business owners register quickly, securely, and without paperwork. By connecting the entrepreneur’s Aadhaar number directly with the registration application, the system enables instant..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aadhar-udyam" },

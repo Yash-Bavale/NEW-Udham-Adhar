@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/download-msme-certificate.html?raw";
 
 export const Route = createFileRoute("/download-msme-certificate")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Download MSME Certificate - Importance and Benefits for..." },
-      { name: "description", content: "Expert consultancy assistance for download msme certificate - importance and benefits for.... Get help with Udyam/MSME registration, updates and certificates..." },
-      { property: "og:title", content: "Download MSME Certificate - Importance and Benefits for..." },
-      { property: "og:description", content: "Expert consultancy assistance for download msme certificate - importance and benefits for.... Get help with Udyam/MSME registration, updates and certificates..." },
+      { title: "Download MSME Certificate - Importance and Benefits for Small Businesses" },
+      { name: "description", content: "Download MSME certificate is the process of obtaining the official document certifying your business as a micro, small, or medium enterprise under the Udyam registration system. This certificate is essential for accessing government schemes, financial assistance, priority lending, interest subsidies, procurement..." },
+      { property: "og:title", content: "Download MSME Certificate - Importance and Benefits for Small Businesses" },
+      { property: "og:description", content: "Download MSME certificate is the process of obtaining the official document certifying your business as a micro, small, or medium enterprise under the Udyam registration system. This certificate is essential for accessing government schemes, financial assistance, priority lending, interest subsidies, procurement..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-msme-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Download MSME Certificate" linkTitle="Download MSME Certificate - Importance and Benefits for Small Businesses" html={html} />,
+  component: () => <SeoLandingPage title="Download MSME certificate" linkTitle="Download MSME Certificate - Importance and Benefits for Small Businesses" html={html} />,
 });

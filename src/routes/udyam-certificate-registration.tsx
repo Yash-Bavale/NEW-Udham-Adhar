@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-certificate-registration.html?raw";
 
 export const Route = createFileRoute("/udyam-certificate-registration")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyam Certificate Registration - How to Register and Get..." },
-      { name: "description", content: "Expert consultancy assistance for udyam certificate registration - how to register and get.... Get help with Udyam/MSME registration, updates and certificate..." },
-      { property: "og:title", content: "Udyam Certificate Registration - How to Register and Get..." },
-      { property: "og:description", content: "Expert consultancy assistance for udyam certificate registration - how to register and get.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { title: "Udyam Certificate Registration - How to Register and Get MSME Certificate" },
+      { name: "description", content: "Udyam certificate registration is the process of formally registering your business on the official Udyam portal to obtain an MSME certificate. This registration process is completely free, fast, and paperless, requiring only Aadhaar-based verification and basic business details. Once completed, businesses receive..." },
+      { property: "og:title", content: "Udyam Certificate Registration - How to Register and Get MSME Certificate" },
+      { property: "og:description", content: "Udyam certificate registration is the process of formally registering your business on the official Udyam portal to obtain an MSME certificate. This registration process is completely free, fast, and paperless, requiring only Aadhaar-based verification and basic business details. Once completed, businesses receive..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Certificate Registration" linkTitle="Udyam Certificate Registration - How to Register and Get MSME Certificate" html={html} />,
+  component: () => <SeoLandingPage title="Udyam certificate registration" linkTitle="Udyam Certificate Registration - How to Register and Get MSME Certificate" html={html} />,
 });

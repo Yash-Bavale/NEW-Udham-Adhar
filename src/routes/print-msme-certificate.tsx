@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/print-msme-certificate.html?raw";
 
 export const Route = createFileRoute("/print-msme-certificate")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Print MSME Certificate" },
-      { name: "description", content: "Expert consultancy assistance for print msme certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Print MSME Certificate" },
-      { property: "og:description", content: "Expert consultancy assistance for print msme certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Print MSME Certificate — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Expert consultancy assistance for Print MSME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Print MSME Certificate — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Expert consultancy assistance for Print MSME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/print-msme-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Print MSME Certificate" linkTitle="Print MSME Certificate | Download Your Udyam Registration Certificate" html={html} />,
+  component: () => <SeoLandingPage title="Print MSME Certificate" linkTitle="Print MSME Certificate" html={html} />,
 });

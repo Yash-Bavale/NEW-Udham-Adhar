@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-government-in.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-government-in")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyog Aadhaar Government Portal – MSME Registration Details" },
-      { name: "description", content: "Expert consultancy assistance for udyog aadhaar government portal – msme registration details. Get help with Udyam/MSME registration, updates and certificate..." },
-      { property: "og:title", content: "Udyog Aadhaar Government Portal – MSME Registration Details" },
-      { property: "og:description", content: "Expert consultancy assistance for udyog aadhaar government portal – msme registration details. Get help with Udyam/MSME registration, updates and certificate..." },
+      { title: "Udyog Aadhaar Government In — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Expert consultancy assistance for Udyog Aadhaar Government In. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyog Aadhaar Government In — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Expert consultancy assistance for Udyog Aadhaar Government In. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-government-in" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Government IN" linkTitle="Udyog Aadhaar Government Portal – MSME Registration Details" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Government In" linkTitle="Udyog Aadhaar Government In" html={html} />,
 });

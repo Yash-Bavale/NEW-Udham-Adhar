@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/msme-udyam-registration.html?raw";
 
 export const Route = createFileRoute("/msme-udyam-registration")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "MSME Udyam Adhar - Quick and Free MSME Regist..." },
-      { name: "description", content: "Expert consultancy assistance for msme udyam/msme - quick and free msme regist.... Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "MSME Udyam Adhar - Quick and Free MSME Regist..." },
-      { property: "og:description", content: "Expert consultancy assistance for msme udyam/msme - quick and free msme regist.... Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "MSME Udyam Registration - Quick and Free MSME Registration" },
+      { name: "description", content: "MSME Udyam registration is the official online process that allows businesses to register as Micro, Small, or Medium Enterprises under the Government of India’s Udyam portal. The registration is free, paperless, and fast, designed to simplify formal recognition for small and medium businesses across India...." },
+      { property: "og:title", content: "MSME Udyam Registration - Quick and Free MSME Registration" },
+      { property: "og:description", content: "MSME Udyam registration is the official online process that allows businesses to register as Micro, Small, or Medium Enterprises under the Government of India’s Udyam portal. The registration is free, paperless, and fast, designed to simplify formal recognition for small and medium businesses across India...." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-udyam-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME Udyam Registration" linkTitle="MSME Udyam Registration - Quick and Free MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="MSME Udyam registration" linkTitle="MSME Udyam Registration - Quick and Free MSME Registration" html={html} />,
 });

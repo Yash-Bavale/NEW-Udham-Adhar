@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-number-verify.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-number-verify")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Number Verify | MSME Certificate Validati" },
-      { name: "description", content: "Expert consultancy assistance for number verify | msme certificate validati. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Number Verify | MSME Certificate Validati" },
-      { property: "og:description", content: "Expert consultancy assistance for number verify | msme certificate validati. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Registration Number Verify — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Expert consultancy assistance for Udyam Registration Number Verify. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyam Registration Number Verify — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Registration Number Verify. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-number-verify" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Registration Number Verify" linkTitle="Udyam Registration Number Verify | MSME Certificate Validation" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Number Verify" linkTitle="Udyam Registration Number Verify" html={html} />,
 });

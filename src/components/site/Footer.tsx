@@ -18,91 +18,41 @@ type SeoPageRow = { id: string; slug: string; label: string };
 type Category = {
   key: string;
   label: string;
-  slug: string | null; // null = Home
+  isHome?: boolean;
   childSlugs: string[];
 };
 
-// Explicit parent → children map matching the client's exact ordered list.
+// Parent labels render as plain text (no link). The parent's own page (when it
+// has one) appears as the first child link inside the section — matching the
+// master keyword sequence.
 const CATEGORIES: Category[] = [
-  { key: "home", label: "Home", slug: null, childSlugs: [] },
-  {
-    key: "udyamregistration",
-    label: "Udyamregistration",
-    slug: "udyamregistration",
-    childSlugs: ["udyam-regn","udyam","udyog-aadhar","udyam-certificate","register-for-msme","register-msme","udyam-aadhar","udyam-reg-certificate"],
-  },
-  {
-    key: "udyam-regn-certificate",
-    label: "Udyam Regn Certificate",
-    slug: "udyam-regn-certificate",
-    childSlugs: ["udyog-aadhar-registration","msme-certificate","msme-certificate-download","aadhar-udyog","udyam-certificate-download","msme-online-registration","aadhar-udyam","udyam-portal","udyog-aadhar-download","msme-udyam-download"],
-  },
-  {
-    key: "udyamregistration-gov-in",
-    label: "Udyamregistration Gov In",
-    slug: "udyamregistration-gov-in",
-    childSlugs: ["udyog-aadhar-registration-2","udyam-download","msme-udyam-registration","udyam-aadhar-registration","udyam-registration-certificate-download","udyam-registration-download","udyam-registration-form","udyam-registration-number","udyam-registration-online","udyam-registration-portal"],
-  },
-  {
-    key: "aadhar-udyog-registration",
-    label: "Aadhar Udyog Registration",
-    slug: "aadhar-udyog-registration",
-    childSlugs: ["udyog-aadhar-certificate","udyam-certificate-registration","msme-certificate-registration","udyog-aadhaar","udyog-aadhar-update","msme-udyog-aadhar","udyam-online-registration","msme-udyam-certificate-download","download-msme-certificate"],
-  },
-  {
-    key: "udyog-aadhar-certificate-download",
-    label: "Udyog Aadhar Certificate Download",
-    slug: "udyog-aadhar-certificate-download",
-    childSlugs: ["udyam-register","udyam-new-registration","udyam-update","udyam-certificate-update","udyam-msme-certificate","udyam-adhaar","udyam-number","aadhar-udyam-certificate","udyog-aadhaar-number"],
-  },
-  {
-    key: "official-msme-registration-website",
-    label: "Udyam Reg",
-    slug: "udyam-reg-certificate",
-    childSlugs: ["www-udyamregistration-gov-in","udyam-aadhaar-registration","udyog-aadhar-free-registration","udyam-certificate-apply","udyam-update-online","udyam-msme","msme-certificate-update","udyam-card","udyog-aadhar-card","msme-updation"],
-  },
-  {
-    key: "aadhaar-udyam",
-    label: "Aadhaar Udyam",
-    slug: "aadhaar-udyam",
-    childSlugs: ["udyam-register-certificate-download","udyam-download-certificate","aadhar-udyam-download","aadhar-udyam-registration","download-udyam","free-msme-registration-certificate-download","msme-registration-charges","msme-registration-fee","msme-registration-portal"],
-  },
-  {
-    key: "msme-registration-process",
-    label: "Udyog Aadhar Registration\u00A0",
-    slug: "msme-registration-process",
-    childSlugs: ["udyam-card-download","udyam-edit","udyam-msme-registration","udyog-aadhaar-government-in","udyog-aadhaar-no","udyog-aadhaar-register","udyog-aadhaar-update","udyog-aadhaar-govin","www-udyamregistration"],
-  },
-  {
-    key: "udyam-aadhaar-download-pdf",
-    label: "Udyam Aadhaar Download PDF",
-    slug: "udyam-aadhaar-download-pdf",
-    childSlugs: ["msme-registration-free","https-udyamregistration-gov-in","msme-registration-certificate-download","download-udyam-certificate","print-udyam-certificate","udyam-certificate-print","udyam-application","msme-certificate-print","print-msme-certificate"],
-  },
-  {
-    key: "udyog-aadhar-registration",
-    label: "Udyog Aadhar Registration",
-    slug: "udyam-aadhaar",
-    childSlugs: ["udhar-aadhar-registration","udyog-aadhaar-to-udyam-migration","download-udyam-certificate-online","udyam-adhar-2","msme-apply-online","udyam-certificate-download-pdf","ms-me-certificate","msme-cer","download-udyam-aadhar","udham-aadhar-download"],
-  },
-  {
-    key: "udhayam-aadhar-download",
-    label: "Udhayam Aadhar Download",
-    slug: "udhayam-aadhar-download",
-    childSlugs: ["udyam-print","print-udyam","udyam-register-print","udyam-print-download","udyam-reprint","udyam-print-certificate","msme-print-udyam-certificate","aadhar-udyam-print","msme-print-certificate"],
-  },
-  {
-    key: "print-msme-udyam-certificate",
-    label: "Print MSME Udyam Certificate",
-    slug: "print-msme-udyam-certificate",
-    childSlugs: ["print-udyam-certificate-download","udyam-print-with-annexure","udyam-adhar-download","udyog-aadhaar-download","udyam-aadhaar-verify","udyam-aadhaar-status","udyam-registration-number-verify","udyam-pan-registration","udyam-aadhaar-login"],
-  },
-  {
-    key: "udyam-registration-online",
-    label: "Udyam Registration Online",
-    slug: "udyog-aadhar-registration-online",
-    childSlugs: ["udyam-registration-form","udyam-apply","udyam-certificate-apply-online","msme-registration-login","udyam-registration-check","udyam-download-online","udyam-certificate-status","udyam-registration-update","udyam-certificate-reprint","udyam-msme-certificate-download"],
-  },
+  { key: "home", label: "Home", isHome: true, childSlugs: [] },
+  { key: "udyamregistration", label: "Udyamregistration",
+    childSlugs: ["udyamregistration","udyam-regn","udyam","udyog-aadhar","udyam-certificate","register-for-msme","register-msme","udyam-aadhar","udyam-reg-certificate","udyam-regn-certificate"] },
+  { key: "udyam-regn-certificate", label: "Udyam Regn Certificate",
+    childSlugs: ["udyog-aadhar-registration","msme-certificate","msme-certificate-download","aadhar-udyog","udyam-certificate-download","msme-online-registration","aadhar-udyam","udyam-portal","udyog-aadhar-download","msme-udyam-download"] },
+  { key: "udyamregistration-gov-in", label: "Udyamregistration gov in",
+    childSlugs: ["udyog-aadhar-registration-2","udyam-download","msme-udyam-registration","udyam-aadhar-registration","udyam-registration-certificate-download","udyam-registration-download","udyam-registration-form","udyam-registration-number","udyam-registration-online","udyam-registration-portal"] },
+  { key: "aadhar-udyog-registration", label: "Aadhar Udyog registration",
+    childSlugs: ["aadhar-udyog-registration","udyog-aadhar-certificate","udyam-certificate-registration","msme-certificate-registration","udyog-aadhaar","udyog-aadhar-update","msme-udyog-aadhar","udyam-online-registration","msme-udyam-certificate-download","download-msme-certificate"] },
+  { key: "udyog-aadhar-certificate-download", label: "Udyog Aadhar certificate download",
+    childSlugs: ["udyog-aadhar-certificate-download","udyam-register","udyam-new-registration","udyam-update","udyam-certificate-update","udyam-msme-certificate","udyam-adhaar","udyam-number","aadhar-udyam-certificate","udyog-aadhaar-number"] },
+  { key: "official-msme-registration-website", label: "Official MSME Registration Website",
+    childSlugs: ["www-udyamregistration-gov-in","udyam-aadhaar-registration","udyog-aadhar-free-registration","udyam-certificate-apply","udyam-update-online","udyam-msme","msme-certificate-update","udyam-card","udyog-aadhar-card","msme-updation"] },
+  { key: "aadhaar-udyam", label: "Aadhaar Udyam",
+    childSlugs: ["aadhaar-udyam","udyam-register-certificate-download","udyam-download-certificate","aadhar-udyam-download","aadhar-udyam-registration","download-udyam","free-msme-registration-certificate-download","msme-registration-charges","msme-registration-fee","msme-registration-portal"] },
+  { key: "msme-registration-process", label: "MSME Registration Process",
+    childSlugs: ["msme-registration-process","udyam-card-download","udyam-edit","udyam-msme-registration","udyog-aadhaar-government-in","udyog-aadhaar-no","udyog-aadhaar-register","udyog-aadhaar-update","udyog-aadhaar-govin","www-udyamregistration"] },
+  { key: "udyam-aadhaar-download-pdf", label: "Udyam Aadhaar Download PDF",
+    childSlugs: ["udyam-aadhaar-download-pdf","msme-registration-free","https-udyamregistration-gov-in","msme-registration-certificate-download","download-udyam-certificate","print-udyam-certificate","udyam-certificate-print","udyam-application","msme-certificate-print","print-msme-certificate"] },
+  { key: "udyog-aadhar-registration-section", label: "Udyog Aadhar Registration",
+    childSlugs: ["udhar-aadhar-registration","udyog-aadhaar-to-udyam-migration","download-udyam-certificate-online","udyam-adhar-2","msme-apply-online","udyam-certificate-download-pdf","ms-me-certificate","msme-cer","download-udyam-aadhar","udham-aadhar-download"] },
+  { key: "udhayam-aadhar-download", label: "Udhayam Aadhar Download",
+    childSlugs: ["udhayam-aadhar-download","udyam-print","print-udyam","udyam-register-print","udyam-print-download","udyam-reprint","udyam-print-certificate","msme-print-udyam-certificate","aadhar-udyam-print","msme-print-certificate"] },
+  { key: "print-msme-udyam-certificate", label: "Print MSME Udyam Certificate",
+    childSlugs: ["print-msme-udyam-certificate","print-udyam-certificate-download","udyam-print-with-annexure","udyam-adhar-download","udyog-aadhaar-download","udyam-aadhaar-verify","udyam-aadhaar-status","udyam-registration-number-verify","udyam-pan-registration","udyam-aadhaar-login"] },
+  { key: "udyam-registration-online-section", label: "Udyam Registration Online",
+    childSlugs: ["udyog-aadhar-registration-online","udyam-apply","udyam-certificate-apply-online","msme-registration-login","udyam-registration-check","udyam-download-online","udyam-certificate-status","udyam-registration-update","udyam-certificate-reprint","udyam-msme-certificate-download"] },
 ];
 
 const FOOTER_LINKS = [
@@ -281,21 +231,21 @@ function SeoTree({
                     </button>
                   ) : (
                     <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
-                      {cat.slug === null ? (
+                      {cat.isHome ? (
                         <HomeIcon className="h-3.5 w-3.5" />
                       ) : (
                         <ChevronRight className="h-3.5 w-3.5" />
                       )}
                     </span>
                   )}
-                  {cat.slug === null ? (
+                  {cat.isHome ? (
                     <Link to="/" className="flex-1 py-1.5 text-white hover:text-brand-gold">
                       {cat.label}
                     </Link>
                   ) : (
-                    <a href={`/${cat.slug}`} className="flex-1 py-1.5 text-white hover:text-brand-gold">
+                    <span className="flex-1 py-1.5 text-white font-semibold">
                       {cat.label}
-                    </a>
+                    </span>
                   )}
                 </div>
                 {hasChildren && isOpen && (

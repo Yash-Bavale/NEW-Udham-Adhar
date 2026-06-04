@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-certificate-update.html?raw";
 
 export const Route = createFileRoute("/udyam-certificate-update")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyam Certificate Update - Modify Your MSME Registration..." },
-      { name: "description", content: "Expert consultancy assistance for udyam certificate update - modify your msme registration.... Get help with Udyam/MSME registration, updates and certificate..." },
-      { property: "og:title", content: "Udyam Certificate Update - Modify Your MSME Registration..." },
-      { property: "og:description", content: "Expert consultancy assistance for udyam certificate update - modify your msme registration.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { title: "Udyam Certificate Update - Modify Your MSME Registration Details" },
+      { name: "description", content: "Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate information. Changes can include business address, nature of activity, ownership details, or contact information. Updating the certificate is essential to..." },
+      { property: "og:title", content: "Udyam Certificate Update - Modify Your MSME Registration Details" },
+      { property: "og:description", content: "Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate information. Changes can include business address, nature of activity, ownership details, or contact information. Updating the certificate is essential to..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-update" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Certificate Update" linkTitle="Udyam Certificate Update - Modify Your MSME Registration Details" html={html} />,
+  component: () => <SeoLandingPage title="Udyam certificate update" linkTitle="Udyam Certificate Update - Modify Your MSME Registration Details" html={html} />,
 });
