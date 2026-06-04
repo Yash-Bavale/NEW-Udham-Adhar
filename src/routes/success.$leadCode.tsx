@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -162,6 +163,19 @@ function SuccessPage() {
 
           {/* Center stage: ring + icon */}
           <div className="relative w-44 h-44 mb-6">
+            {/* Ambient radial pulse */}
+            <motion.div
+              aria-hidden
+              className={`absolute inset-0 rounded-full ${
+                phase === "confirming"
+                  ? "bg-blue-400/20"
+                  : phase === "confirmed"
+                    ? "bg-emerald-400/25"
+                    : "bg-brand-red/20"
+              } blur-xl`}
+              animate={{ scale: [1, 1.18, 1], opacity: [0.5, 0.85, 0.5] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            />
             <svg className="w-44 h-44 -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="44" fill="none" strokeWidth="6" className="stroke-slate-200" />
               <circle
