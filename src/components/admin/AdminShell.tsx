@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { to: "/admin/customers", label: "Customers", icon: Users, group: "Workspace" },
   { to: "/admin/leads", label: "Leads", icon: Sparkles, group: "Workspace" },
   { to: "/admin/applications", label: "Applications", icon: FileText, group: "Workspace" },
+  { to: "/admin/submissions", label: "Submissions", icon: FileText, group: "Workspace" },
   { to: "/admin/complaints", label: "Tasks & Complaints", icon: CheckSquare, group: "Workspace" },
   { to: "/admin/emails", label: "Communications", icon: MessageCircle, group: "Workspace" },
 
