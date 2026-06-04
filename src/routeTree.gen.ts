@@ -198,6 +198,7 @@ import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCo
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
+import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
 import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
@@ -1192,6 +1193,12 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSubmissionsSubmissionIdRoute =
+  AdminSubmissionsSubmissionIdRouteImport.update({
+    id: '/$submissionId',
+    path: '/$submissionId',
+    getParentRoute: () => AdminSubmissionsRoute,
+  } as any)
 const AdminServicesServiceCodeRoute =
   AdminServicesServiceCodeRouteImport.update({
     id: '/$serviceCode',
@@ -1451,7 +1458,7 @@ export interface FileRoutesByFullPath {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
-  '/admin/submissions': typeof AdminSubmissionsRoute
+  '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1468,6 +1475,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
+  '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1656,7 +1664,7 @@ export interface FileRoutesByTo {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
-  '/admin/submissions': typeof AdminSubmissionsRoute
+  '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1673,6 +1681,7 @@ export interface FileRoutesByTo {
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
+  '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1863,7 +1872,7 @@ export interface FileRoutesById {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
-  '/admin/submissions': typeof AdminSubmissionsRoute
+  '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1880,6 +1889,7 @@ export interface FileRoutesById {
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
+  '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -2088,6 +2098,7 @@ export interface FileRouteTypes {
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/admin/services/$serviceCode'
+    | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2293,6 +2304,7 @@ export interface FileRouteTypes {
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/admin/services/$serviceCode'
+    | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2499,6 +2511,7 @@ export interface FileRouteTypes {
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
     | '/admin/services/$serviceCode'
+    | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -4028,6 +4041,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/submissions/$submissionId': {
+      id: '/admin/submissions/$submissionId'
+      path: '/$submissionId'
+      fullPath: '/admin/submissions/$submissionId'
+      preLoaderRoute: typeof AdminSubmissionsSubmissionIdRouteImport
+      parentRoute: typeof AdminSubmissionsRoute
+    }
     '/admin/services/$serviceCode': {
       id: '/admin/services/$serviceCode'
       path: '/$serviceCode'
@@ -4195,6 +4215,17 @@ const AdminServicesRouteWithChildren = AdminServicesRoute._addFileChildren(
   AdminServicesRouteChildren,
 )
 
+interface AdminSubmissionsRouteChildren {
+  AdminSubmissionsSubmissionIdRoute: typeof AdminSubmissionsSubmissionIdRoute
+}
+
+const AdminSubmissionsRouteChildren: AdminSubmissionsRouteChildren = {
+  AdminSubmissionsSubmissionIdRoute: AdminSubmissionsSubmissionIdRoute,
+}
+
+const AdminSubmissionsRouteWithChildren =
+  AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
+
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
@@ -4207,7 +4238,7 @@ interface AdminRouteChildren {
   AdminGatewaysRoute: typeof AdminGatewaysRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
-  AdminSubmissionsRoute: typeof AdminSubmissionsRoute
+  AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFinanceGstRoute: typeof AdminFinanceGstRoute
@@ -4226,7 +4257,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminGatewaysRoute: AdminGatewaysRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminServicesRoute: AdminServicesRouteWithChildren,
-  AdminSubmissionsRoute: AdminSubmissionsRoute,
+  AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFinanceGstRoute: AdminFinanceGstRoute,
