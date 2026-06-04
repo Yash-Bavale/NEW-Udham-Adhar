@@ -247,5 +247,7 @@ function SuccessPage() {
         </div>
       </Card>
     </div>
+    <TrustBlock />
+    </>
   );
 }
