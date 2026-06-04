@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-number.html?raw";
 export const Route = createFileRoute("/udyam-number")({
   head: () => ({
     meta: [
-      { title: "Udyam number — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam number. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam number — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam number. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Number - Unique MSME Registration ID" },
+      { name: "description", content: "The Udyam number is a unique registration ID assigned to businesses upon successful MSME registration through the official Udyam portal. This number acts as permanent proof of the enterprise’s Micro, Small, or Medium status and is essential for accessing government benefits, including priority sector lending,..." },
+      { property: "og:title", content: "Udyam Number - Unique MSME Registration ID" },
+      { property: "og:description", content: "The Udyam number is a unique registration ID assigned to businesses upon successful MSME registration through the official Udyam portal. This number acts as permanent proof of the enterprise’s Micro, Small, or Medium status and is essential for accessing government benefits, including priority sector lending,..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-number" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam number" linkTitle="Udyam number" html={html} />,
+  component: () => <SeoLandingPage title="Udyam number" linkTitle="Udyam Number - Unique MSME Registration ID" html={html} />,
 });

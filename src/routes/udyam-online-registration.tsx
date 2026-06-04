@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-online-registration.html?raw";
 export const Route = createFileRoute("/udyam-online-registration")({
   head: () => ({
     meta: [
-      { title: "Udyam online registration — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam online registration. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam online registration — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam online registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Online Registration - Quick MSME Registration Process" },
+      { name: "description", content: "Udyam online registration is the official government platform for digitally registering your business as a micro, small, or medium enterprise. The process is fully paperless, free, and requires only basic business information along with Aadhaar verification. Upon completion, businesses receive a unique Udyam..." },
+      { property: "og:title", content: "Udyam Online Registration - Quick MSME Registration Process" },
+      { property: "og:description", content: "Udyam online registration is the official government platform for digitally registering your business as a micro, small, or medium enterprise. The process is fully paperless, free, and requires only basic business information along with Aadhaar verification. Upon completion, businesses receive a unique Udyam..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-online-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam online registration" linkTitle="Udyam online registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam online registration" linkTitle="Udyam Online Registration - Quick MSME Registration Process" html={html} />,
 });

@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-certificate-update.html?raw";
 export const Route = createFileRoute("/udyam-certificate-update")({
   head: () => ({
     meta: [
-      { title: "Udyam certificate update — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam certificate update. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam certificate update — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam certificate update. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Certificate Update - Modify Your MSME Registration Details" },
+      { name: "description", content: "Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate information. Changes can include business address, nature of activity, ownership details, or contact information. Updating the certificate is essential to..." },
+      { property: "og:title", content: "Udyam Certificate Update - Modify Your MSME Registration Details" },
+      { property: "og:description", content: "Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate information. Changes can include business address, nature of activity, ownership details, or contact information. Updating the certificate is essential to..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-update" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam certificate update" linkTitle="Udyam certificate update" html={html} />,
+  component: () => <SeoLandingPage title="Udyam certificate update" linkTitle="Udyam Certificate Update - Modify Your MSME Registration Details" html={html} />,
 });

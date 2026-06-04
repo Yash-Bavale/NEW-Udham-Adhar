@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-registration-online.html?raw";
 export const Route = createFileRoute("/udyam-registration-online")({
   head: () => ({
     meta: [
-      { title: "Udyam Registration Online — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam Registration Online. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam Registration Online — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam Registration Online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Registration Online - Digital MSME Registration Process" },
+      { name: "description", content: "Udyam registration online is the government’s official digital platform for registering your business as a Micro, Small, or Medium Enterprise. The process is completely paperless, free, and designed to be completed quickly using only Aadhaar and PAN details for verification. Online registration ensures that your..." },
+      { property: "og:title", content: "Udyam Registration Online - Digital MSME Registration Process" },
+      { property: "og:description", content: "Udyam registration online is the government’s official digital platform for registering your business as a Micro, Small, or Medium Enterprise. The process is completely paperless, free, and designed to be completed quickly using only Aadhaar and PAN details for verification. Online registration ensures that your..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-online" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Registration Online" linkTitle="Udyam Registration Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Online" linkTitle="Udyam Registration Online - Digital MSME Registration Process" html={html} />,
 });

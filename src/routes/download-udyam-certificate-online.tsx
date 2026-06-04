@@ -6,9 +6,9 @@ export const Route = createFileRoute("/download-udyam-certificate-online")({
   head: () => ({
     meta: [
       { title: "Download Udyam Certificate Online — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Download Udyam Certificate Online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { name: "description", content: "Downloading your Udyam Certificate is a fast, secure, and paperless process available through the official government portal. Entrepreneurs can enter their Udyam Registration Number, complete OTP verification, and instantly access a digitally signed PDF certificate. This official document serves as proof of MSME..." },
       { property: "og:title", content: "Download Udyam Certificate Online — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Download Udyam Certificate Online. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:description", content: "Downloading your Udyam Certificate is a fast, secure, and paperless process available through the official government portal. Entrepreneurs can enter their Udyam Registration Number, complete OTP verification, and instantly access a digitally signed PDF certificate. This official document serves as proof of MSME..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam-certificate-online" },

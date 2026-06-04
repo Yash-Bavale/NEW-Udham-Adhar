@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-aadhaar-registration.html?raw";
 export const Route = createFileRoute("/udyam-aadhaar-registration")({
   head: () => ({
     meta: [
-      { title: "Udyam Aadhaar registration — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam Aadhaar registration. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam Aadhaar registration — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam Aadhaar registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Aadhaar Registration - Link Aadhaar for MSME Registration" },
+      { name: "description", content: "Udyam Aadhaar registration is the official process of linking an entrepreneur’s Aadhaar number with their MSME registration on the Udyam portal. This Aadhaar linkage ensures secure, fast, and paperless registration, allowing businesses to complete the process without submitting physical documents. Once registration..." },
+      { property: "og:title", content: "Udyam Aadhaar Registration - Link Aadhaar for MSME Registration" },
+      { property: "og:description", content: "Udyam Aadhaar registration is the official process of linking an entrepreneur’s Aadhaar number with their MSME registration on the Udyam portal. This Aadhaar linkage ensures secure, fast, and paperless registration, allowing businesses to complete the process without submitting physical documents. Once registration..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhaar-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Aadhaar registration" linkTitle="Udyam Aadhaar registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Aadhaar registration" linkTitle="Udyam Aadhaar Registration - Link Aadhaar for MSME Registration" html={html} />,
 });

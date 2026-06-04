@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-adhaar.html?raw";
 export const Route = createFileRoute("/udyam-adhaar")({
   head: () => ({
     meta: [
-      { title: "Udyam Adhaar — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam Adhaar. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam Adhaar — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam Adhaar. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration" },
+      { name: "description", content: "Udyam Aadhaar links your personal Aadhaar number with your business to enable fast, secure, and paperless MSME registration on the government’s Udyam portal. This Aadhaar-based verification ensures authenticity and allows instant issuance of a digitally signed MSME certificate, serving as legal proof of enterprise..." },
+      { property: "og:title", content: "Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration" },
+      { property: "og:description", content: "Udyam Aadhaar links your personal Aadhaar number with your business to enable fast, secure, and paperless MSME registration on the government’s Udyam portal. This Aadhaar-based verification ensures authenticity and allows instant issuance of a digitally signed MSME certificate, serving as legal proof of enterprise..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhaar" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Adhaar" linkTitle="Udyam Adhaar" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Adhaar" linkTitle="Udyam Aadhaar - Aadhaar-Based Verification for MSME Registration" html={html} />,
 });

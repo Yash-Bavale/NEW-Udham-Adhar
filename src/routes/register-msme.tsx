@@ -5,14 +5,14 @@ import html from "@/content/wp/register-msme.html?raw";
 export const Route = createFileRoute("/register-msme")({
   head: () => ({
     meta: [
-      { title: "Register MSME — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Register MSME. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Register MSME — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Register MSME. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Register MSME - Online Process for Business Registration" },
+      { name: "description", content: "Register MSME online through the government’s official Udyam portal to obtain legitimate recognition as a micro, small, or medium enterprise in India. The online registration system is designed to be completely free, secure, and accessible to entrepreneurs from all sectors, ensuring that even small or emerging..." },
+      { property: "og:title", content: "Register MSME - Online Process for Business Registration" },
+      { property: "og:description", content: "Register MSME online through the government’s official Udyam portal to obtain legitimate recognition as a micro, small, or medium enterprise in India. The online registration system is designed to be completely free, secure, and accessible to entrepreneurs from all sectors, ensuring that even small or emerging..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/register-msme" },
     ],
   }),
-  component: () => <SeoLandingPage title="Register MSME" linkTitle="Register MSME" html={html} />,
+  component: () => <SeoLandingPage title="Register MSME" linkTitle="Register MSME - Online Process for Business Registration" html={html} />,
 });

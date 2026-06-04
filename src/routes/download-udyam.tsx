@@ -5,14 +5,14 @@ import html from "@/content/wp/download-udyam.html?raw";
 export const Route = createFileRoute("/download-udyam")({
   head: () => ({
     meta: [
-      { title: "Download Udyam — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Download Udyam. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Download Udyam — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Download Udyam. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Free Registration - No Charges for MSME Registration" },
+      { name: "description", content: "Download Udyam refers to accessing your official MSME registration certificate online through the government’s Udyam portal. The registration and certificate download are completely free, with no charges or hidden fees. Entrepreneurs and business owners can obtain a digitally signed certificate that serves as proof..." },
+      { property: "og:title", content: "Udyam Free Registration - No Charges for MSME Registration" },
+      { property: "og:description", content: "Download Udyam refers to accessing your official MSME registration certificate online through the government’s Udyam portal. The registration and certificate download are completely free, with no charges or hidden fees. Entrepreneurs and business owners can obtain a digitally signed certificate that serves as proof..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/download-udyam" },
     ],
   }),
-  component: () => <SeoLandingPage title="Download Udyam" linkTitle="Download Udyam" html={html} />,
+  component: () => <SeoLandingPage title="Download Udyam" linkTitle="Udyam Free Registration - No Charges for MSME Registration" html={html} />,
 });

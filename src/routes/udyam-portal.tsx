@@ -5,14 +5,14 @@ import html from "@/content/wp/udyam-portal.html?raw";
 export const Route = createFileRoute("/udyam-portal")({
   head: () => ({
     meta: [
-      { title: "Udyam portal — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for Udyam portal. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam portal — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for Udyam portal. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Portal - Official MSME Registration Website" },
+      { name: "description", content: "The Udyam portal is the Government of India’s official online platform dedicated to MSME registration, certificate downloads, and enterprise updates, offering a completely paperless and secure environment for business owners. This portal serves as the central hub for entrepreneurs seeking to register their..." },
+      { property: "og:title", content: "Udyam Portal - Official MSME Registration Website" },
+      { property: "og:description", content: "The Udyam portal is the Government of India’s official online platform dedicated to MSME registration, certificate downloads, and enterprise updates, offering a completely paperless and secure environment for business owners. This portal serves as the central hub for entrepreneurs seeking to register their..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-portal" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam portal" linkTitle="Udyam portal" html={html} />,
+  component: () => <SeoLandingPage title="Udyam portal" linkTitle="Udyam Portal - Official MSME Registration Website" html={html} />,
 });
