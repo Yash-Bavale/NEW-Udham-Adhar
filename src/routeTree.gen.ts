@@ -183,6 +183,7 @@ import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
 import { Route as AdminCertificatesRouteImport } from './routes/admin.certificates'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
@@ -1112,6 +1113,11 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCustomersRoute = AdminCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminComplaintsRoute = AdminComplaintsRouteImport.update({
   id: '/complaints',
   path: '/complaints',
@@ -1419,6 +1425,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1620,6 +1627,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1823,6 +1831,7 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -2027,6 +2036,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/certificates'
     | '/admin/complaints'
+    | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -2228,6 +2238,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/certificates'
     | '/admin/complaints'
+    | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -2430,6 +2441,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/certificates'
     | '/admin/complaints'
+    | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
     | '/admin/gateways'
@@ -3873,6 +3885,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDashboardRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/customers': {
+      id: '/admin/customers'
+      path: '/customers'
+      fullPath: '/admin/customers'
+      preLoaderRoute: typeof AdminCustomersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/complaints': {
       id: '/admin/complaints'
       path: '/complaints'
@@ -4099,6 +4118,7 @@ interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCertificatesRoute: typeof AdminCertificatesRoute
   AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
+  AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminGatewaysRoute: typeof AdminGatewaysRoute
@@ -4116,6 +4136,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminCertificatesRoute: AdminCertificatesRoute,
   AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
+  AdminCustomersRoute: AdminCustomersRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminGatewaysRoute: AdminGatewaysRoute,

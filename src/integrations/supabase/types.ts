@@ -181,6 +181,7 @@ export type Database = {
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_to: string | null
           created_at: string
+          customer_id: string | null
           document_status: string
           form_status: string
           id: string
@@ -193,6 +194,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           created_at?: string
+          customer_id?: string | null
           document_status?: string
           form_status?: string
           id?: string
@@ -205,6 +207,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           created_at?: string
+          customer_id?: string | null
           document_status?: string
           form_status?: string
           id?: string
@@ -213,6 +216,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "applications_lead_id_fkey"
             columns: ["lead_id"]
@@ -276,6 +286,7 @@ export type Database = {
           application_id: string
           certificate_number: string | null
           created_at: string
+          customer_id: string | null
           delivered_at: string | null
           file_name: string | null
           file_path: string | null
@@ -290,6 +301,7 @@ export type Database = {
           application_id: string
           certificate_number?: string | null
           created_at?: string
+          customer_id?: string | null
           delivered_at?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -304,6 +316,7 @@ export type Database = {
           application_id?: string
           certificate_number?: string | null
           created_at?: string
+          customer_id?: string | null
           delivered_at?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -314,7 +327,15 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "certificates_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       complaints: {
         Row: {
@@ -324,6 +345,7 @@ export type Database = {
           category: string | null
           complaint_number: string | null
           created_at: string
+          customer_id: string | null
           id: string
           last_reminded_at: string | null
           lead_id: string
@@ -343,6 +365,7 @@ export type Database = {
           category?: string | null
           complaint_number?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           last_reminded_at?: string | null
           lead_id: string
@@ -362,6 +385,7 @@ export type Database = {
           category?: string | null
           complaint_number?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           last_reminded_at?: string | null
           lead_id?: string
@@ -372,6 +396,112 @@ export type Database = {
           sla_due_at?: string | null
           status?: string
           submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complaints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_notes: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          note: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          note: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          note?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          completed_applications: number
+          created_at: string
+          customer_code: string | null
+          first_seen_at: string
+          id: string
+          language: string | null
+          last_seen_at: string
+          last_service_id: string | null
+          lifetime_value: number
+          metadata: Json
+          name: string
+          notes: string | null
+          pending_applications: number
+          primary_email: string | null
+          primary_mobile: string | null
+          state: string | null
+          status: string
+          total_applications: number
+          updated_at: string
+        }
+        Insert: {
+          completed_applications?: number
+          created_at?: string
+          customer_code?: string | null
+          first_seen_at?: string
+          id?: string
+          language?: string | null
+          last_seen_at?: string
+          last_service_id?: string | null
+          lifetime_value?: number
+          metadata?: Json
+          name: string
+          notes?: string | null
+          pending_applications?: number
+          primary_email?: string | null
+          primary_mobile?: string | null
+          state?: string | null
+          status?: string
+          total_applications?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_applications?: number
+          created_at?: string
+          customer_code?: string | null
+          first_seen_at?: string
+          id?: string
+          language?: string | null
+          last_seen_at?: string
+          last_service_id?: string | null
+          lifetime_value?: number
+          metadata?: Json
+          name?: string
+          notes?: string | null
+          pending_applications?: number
+          primary_email?: string | null
+          primary_mobile?: string | null
+          state?: string | null
+          status?: string
+          total_applications?: number
           updated_at?: string
         }
         Relationships: []
@@ -747,6 +877,7 @@ export type Database = {
           base_amount: number
           cgst_amount: number
           created_at: string
+          customer_id: string | null
           gst_amount: number
           id: string
           igst_amount: number
@@ -767,6 +898,7 @@ export type Database = {
           base_amount: number
           cgst_amount?: number
           created_at?: string
+          customer_id?: string | null
           gst_amount: number
           id?: string
           igst_amount?: number
@@ -787,6 +919,7 @@ export type Database = {
           base_amount?: number
           cgst_amount?: number
           created_at?: string
+          customer_id?: string | null
           gst_amount?: number
           id?: string
           igst_amount?: number
@@ -802,7 +935,15 @@ export type Database = {
           total_amount?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_notes: {
         Row: {
@@ -841,6 +982,7 @@ export type Database = {
           assigned_to: string | null
           base_amount: number
           created_at: string
+          customer_id: string | null
           email: string
           gst_amount: number
           id: string
@@ -864,6 +1006,7 @@ export type Database = {
           assigned_to?: string | null
           base_amount?: number
           created_at?: string
+          customer_id?: string | null
           email: string
           gst_amount?: number
           id?: string
@@ -887,6 +1030,7 @@ export type Database = {
           assigned_to?: string | null
           base_amount?: number
           created_at?: string
+          customer_id?: string | null
           email?: string
           gst_amount?: number
           id?: string
@@ -907,6 +1051,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_service_id_fkey"
             columns: ["service_id"]
@@ -1072,6 +1223,7 @@ export type Database = {
           base_amount: number
           created_at: string
           currency: string
+          customer_id: string | null
           gateway_name: string
           gst_amount: number
           id: string
@@ -1093,6 +1245,7 @@ export type Database = {
           base_amount?: number
           created_at?: string
           currency?: string
+          customer_id?: string | null
           gateway_name?: string
           gst_amount?: number
           id?: string
@@ -1114,6 +1267,7 @@ export type Database = {
           base_amount?: number
           created_at?: string
           currency?: string
+          customer_id?: string | null
           gateway_name?: string
           gst_amount?: number
           id?: string
@@ -1130,6 +1284,13 @@ export type Database = {
           webhook_response?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_lead_id_fkey"
             columns: ["lead_id"]
@@ -1510,6 +1671,16 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      find_or_create_customer: {
+        Args: {
+          p_email: string
+          p_language?: string
+          p_mobile: string
+          p_name: string
+          p_state?: string
+        }
+        Returns: string
       }
       has_any_staff_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
