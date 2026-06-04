@@ -372,3 +372,18 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** Public: customer pressed "Contact our team for help" on the onboarding shell.
+ *  Logs an activity so the CRM lead timeline shows the request. Best-effort. */
+export const requestFormHelp = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
+  .handler(async ({ data }) => {
+    const lead = await loadLeadByCode(data.leadCode);
+    await supabaseAdmin.from("activity_logs").insert({
+      lead_id: lead.id,
+      activity_type: "form_help_requested",
+      activity_description:
+        "Customer requested help submitting the onboarding form. Please contact them on the registered mobile number.",
+    });
+    return { ok: true };
+  });
