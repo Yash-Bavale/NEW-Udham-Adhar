@@ -73,7 +73,7 @@ export const uploadCertificate = createServerFn({ method: "POST" })
     if (!app) throw new Error("Application not found");
 
     const buffer = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
-    const path = `certificates/${data.applicationId}/${Date.now()}-${data.fileName}`;
+    const path = `certificates/${app.id}/${Date.now()}-${data.fileName}`;
     const { error: upErr } = await supabaseAdmin.storage
       .from("documents")
       .upload(path, buffer, { contentType: data.mimeType, upsert: false });
@@ -82,7 +82,7 @@ export const uploadCertificate = createServerFn({ method: "POST" })
     const { data: cert, error: insErr } = await supabaseAdmin
       .from("certificates")
       .insert({
-        application_id: data.applicationId,
+        application_id: app.id,
         lead_id: app.lead_id,
         certificate_number: data.certificateNumber ?? null,
         file_name: data.fileName,
