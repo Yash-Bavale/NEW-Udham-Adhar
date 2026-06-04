@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Lock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import { TrustBlock } from "@/components/site/TrustBlock";
 
 export const Route = createFileRoute("/processing/$leadCode")({
   head: () => ({
