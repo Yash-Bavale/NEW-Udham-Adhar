@@ -200,11 +200,7 @@ const MIGRATE: OnboardingSchema = {
     { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
   ],
-  documents: [
-    { key: "udyog_aadhaar_certificate", label: "Existing Udyog Aadhaar / UAM Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 const FORGOT_MOBILE: OnboardingSchema = {
