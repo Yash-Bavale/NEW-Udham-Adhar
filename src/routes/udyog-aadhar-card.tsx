@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhar-card")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhar-card" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhar card" linkTitle="Udyog Aadhar Card - Old MSME Registration Document" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar Card" linkTitle="Udyog Aadhar Card - Old MSME Registration Document" html={html} />,
 });

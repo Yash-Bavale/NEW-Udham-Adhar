@@ -14,5 +14,5 @@ export const Route = createFileRoute("/msme-registration-fee")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-registration-fee" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME registration fee" linkTitle="MSME Registration Fee - Free Online MSME Registration Process" html={html} />,
+  component: () => <SeoLandingPage title="MSME Registration Fee" linkTitle="MSME Registration Fee - Free Online MSME Registration Process" html={html} />,
 });

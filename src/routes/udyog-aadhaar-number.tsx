@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyog-aadhaar-number")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-number" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar number" linkTitle="Udyog Aadhaar Number - MSME Identifier Before Udyam Portal" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Number" linkTitle="Udyog Aadhaar Number - MSME Identifier Before Udyam Portal" html={html} />,
 });
