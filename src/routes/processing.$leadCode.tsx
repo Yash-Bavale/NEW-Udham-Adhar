@@ -188,5 +188,7 @@ function ProcessingPage() {
         </p>
       </motion.div>
     </section>
+    <TrustBlock />
+    </>
   );
 }
