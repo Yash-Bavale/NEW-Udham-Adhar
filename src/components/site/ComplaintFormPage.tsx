@@ -172,7 +172,7 @@ export function ComplaintFormPage() {
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider mb-3">
             <ShieldAlert className="size-3.5" /> Official Policy
           </div>
-          <h2 className="text-2xl md:text-3xl font-display font-bold">Complaint &amp; Grievance Policy</h2>
+          <h2 className="text-2xl md:text-3xl font-display font-bold">{"\n"}</h2>
           <p className="mt-2 text-sm md:text-base text-white/80 max-w-2xl">
             How Business Help Services receives, reviews, and resolves user complaints and grievances — fairly, transparently, and professionally.
           </p>
