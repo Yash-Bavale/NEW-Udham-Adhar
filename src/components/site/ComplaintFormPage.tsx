@@ -182,7 +182,7 @@ export function ComplaintFormPage() {
             prose-headings:font-display prose-headings:text-foreground
             prose-h2:hidden
             prose-h3:text-xl prose-h3:mt-0 prose-h3:mb-6 prose-h3:text-brand-navy
-            prose-h4:text-lg prose-h4:mt-8 prose-h4:mb-3 prose-h4:pl-4 prose-h4:border-l-4 prose-h4:border-brand-navy prose-h4:text-foreground
+            prose-h4:text-lg prose-h4:mt-8 prose-h4:mb-3 prose-h4:pl-4 prose-h4:border-l-4 prose-h4:border-brand-navy prose-h4:text-foreground prose-h4:font-bold
             prose-p:text-muted-foreground prose-p:leading-relaxed
             prose-li:text-muted-foreground prose-li:marker:text-brand-navy
             prose-strong:text-foreground
