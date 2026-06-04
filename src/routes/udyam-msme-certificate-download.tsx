@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-msme-certificate-download")({
   head: () => ({
     meta: [
       { title: "Udyam MSME Certificate Download — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam MSME Certificate Download allows entrepreneurs to instantly access and download their official MSME certificate in PDF format from the Udyam portal. By entering your Udyam Number and completing OTP verification, businesses can securely retrieve their certificate for printing and official use. The certificate..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam MSME Certificate Download. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam MSME Certificate Download — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam MSME Certificate Download allows entrepreneurs to instantly access and download their official MSME certificate in PDF format from the Udyam portal. By entering your Udyam Number and completing OTP verification, businesses can securely retrieve their certificate for printing and official use. The certificate..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam MSME Certificate Download. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-msme-certificate-download" },

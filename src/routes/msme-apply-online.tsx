@@ -6,9 +6,9 @@ export const Route = createFileRoute("/msme-apply-online")({
   head: () => ({
     meta: [
       { title: "MSME Apply Online — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "MSME Apply Online allows entrepreneurs to register their micro, small, or medium enterprises via the Udyam portal using Aadhaar authentication. The process is fast, paperless, and free, providing instant Udyam Registration Number and certificate. This certificate is essential for accessing government loans,..." },
+      { name: "description", content: "Expert consultancy assistance for MSME Apply Online. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "MSME Apply Online — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "MSME Apply Online allows entrepreneurs to register their micro, small, or medium enterprises via the Udyam portal using Aadhaar authentication. The process is fast, paperless, and free, providing instant Udyam Registration Number and certificate. This certificate is essential for accessing government loans,..." },
+      { property: "og:description", content: "Expert consultancy assistance for MSME Apply Online. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-apply-online" },

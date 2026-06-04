@@ -6,9 +6,9 @@ export const Route = createFileRoute("/www-udyamregistration")({
   head: () => ({
     meta: [
       { title: "www UdyamRegistration — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "www.UdyamRegistration.gov.in is the official government portal for MSME registration. It allows entrepreneurs to register their micro, small, or medium enterprises online using Aadhaar authentication. After registration, businesses can instantly download their Udyam Certificate, verify their Udyam Registration..." },
+      { name: "description", content: "Expert consultancy assistance for www UdyamRegistration. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "www UdyamRegistration — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "www.UdyamRegistration.gov.in is the official government portal for MSME registration. It allows entrepreneurs to register their micro, small, or medium enterprises online using Aadhaar authentication. After registration, businesses can instantly download their Udyam Certificate, verify their Udyam Registration..." },
+      { property: "og:description", content: "Expert consultancy assistance for www UdyamRegistration. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/www-udyamregistration" },

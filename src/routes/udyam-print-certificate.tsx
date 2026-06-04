@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-print-certificate")({
   head: () => ({
     meta: [
       { title: "Udyam Print Certificate — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Print Certificate provides a simple and secure way to print your MSME certificate directly from the official portal. By downloading the certificate PDF after OTP verification, entrepreneurs can access an official document containing all key business details. This certificate is essential for bank loans,..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Print Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Print Certificate — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Print Certificate provides a simple and secure way to print your MSME certificate directly from the official portal. By downloading the certificate PDF after OTP verification, entrepreneurs can access an official document containing all key business details. This certificate is essential for bank loans,..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Print Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-print-certificate" },

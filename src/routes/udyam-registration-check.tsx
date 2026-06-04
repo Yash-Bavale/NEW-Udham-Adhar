@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-registration-check")({
   head: () => ({
     meta: [
       { title: "Udyam Registration Check — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Registration Check allows businesses to verify the status of their MSME registration online. By entering your Udyam Number, PAN, or Aadhaar details, you can confirm whether your registration is active, pending, or requires updates. This verification ensures eligibility for bank loans, tenders, government..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Registration Check. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Registration Check — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Registration Check allows businesses to verify the status of their MSME registration online. By entering your Udyam Number, PAN, or Aadhaar details, you can confirm whether your registration is active, pending, or requires updates. This verification ensures eligibility for bank loans, tenders, government..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Registration Check. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-check" },

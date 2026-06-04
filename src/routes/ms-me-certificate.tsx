@@ -6,9 +6,9 @@ export const Route = createFileRoute("/ms-me-certificate")({
   head: () => ({
     meta: [
       { title: "MS ME Certificate — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "The MS ME Certificate is an official document issued under the Udyam Registration system, verifying the registration of micro, small, or medium enterprises. Entrepreneurs can download the certificate online using their Udyam Number and OTP verification. This certificate is essential for availing government loans,..." },
+      { name: "description", content: "Expert consultancy assistance for MS ME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "MS ME Certificate — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "The MS ME Certificate is an official document issued under the Udyam Registration system, verifying the registration of micro, small, or medium enterprises. Entrepreneurs can download the certificate online using their Udyam Number and OTP verification. This certificate is essential for availing government loans,..." },
+      { property: "og:description", content: "Expert consultancy assistance for MS ME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/ms-me-certificate" },

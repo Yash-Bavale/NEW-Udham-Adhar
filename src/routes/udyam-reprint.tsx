@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-reprint")({
   head: () => ({
     meta: [
       { title: "Udyam Reprint — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Reprint allows entrepreneurs to reprint their MSME certificate anytime by downloading it again from the official Udyam portal. The process only requires the Udyam Registration Number and OTP verification, ensuring secure access to business details. This feature is useful if the original certificate is lost,..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Reprint. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Reprint — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Reprint allows entrepreneurs to reprint their MSME certificate anytime by downloading it again from the official Udyam portal. The process only requires the Udyam Registration Number and OTP verification, ensuring secure access to business details. This feature is useful if the original certificate is lost,..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Reprint. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-reprint" },

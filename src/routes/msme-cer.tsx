@@ -6,9 +6,9 @@ export const Route = createFileRoute("/msme-cer")({
   head: () => ({
     meta: [
       { title: "MSME Cer — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "MSME Cer refers to the official MSME certificate obtained through Udyam Registration. Entrepreneurs can quickly download it online using Aadhaar-based OTP verification. This certificate confirms enterprise classification as micro, small, or medium and is required for government tenders, subsidies, and financial..." },
+      { name: "description", content: "Expert consultancy assistance for MSME Cer. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "MSME Cer — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "MSME Cer refers to the official MSME certificate obtained through Udyam Registration. Entrepreneurs can quickly download it online using Aadhaar-based OTP verification. This certificate confirms enterprise classification as micro, small, or medium and is required for government tenders, subsidies, and financial..." },
+      { property: "og:description", content: "Expert consultancy assistance for MSME Cer. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-cer" },

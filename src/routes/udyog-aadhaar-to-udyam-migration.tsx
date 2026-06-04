@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyog-aadhaar-to-udyam-migration")({
   head: () => ({
     meta: [
       { title: "Udyog Aadhaar to Udyam Migration — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyog Aadhaar to Udyam Migration is the process for transferring old MSME registration details to the new Udyam Registration system. This step is mandatory for micro, small, and medium enterprises to continue availing government benefits, subsidies, and loans. Businesses can verify their Aadhaar, enter their Udyog..." },
+      { name: "description", content: "Expert consultancy assistance for Udyog Aadhaar to Udyam Migration. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyog Aadhaar to Udyam Migration — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyog Aadhaar to Udyam Migration is the process for transferring old MSME registration details to the new Udyam Registration system. This step is mandatory for micro, small, and medium enterprises to continue availing government benefits, subsidies, and loans. Businesses can verify their Aadhaar, enter their Udyog..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyog Aadhaar to Udyam Migration. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-to-udyam-migration" },

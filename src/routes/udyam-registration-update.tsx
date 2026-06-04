@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-registration-update")({
   head: () => ({
     meta: [
       { title: "Udyam Registration Update — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Registration Update allows businesses to edit and update their MSME registration details online. Entrepreneurs can correct or change information such as business name, address, PAN, or Aadhaar-linked details through the secure Udyam portal. Keeping your registration information current ensures uninterrupted..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Registration Update. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Registration Update — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Registration Update allows businesses to edit and update their MSME registration details online. Entrepreneurs can correct or change information such as business name, address, PAN, or Aadhaar-linked details through the secure Udyam portal. Keeping your registration information current ensures uninterrupted..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Registration Update. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-update" },

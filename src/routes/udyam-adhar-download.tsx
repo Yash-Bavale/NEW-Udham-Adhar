@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-adhar-download")({
   head: () => ({
     meta: [
       { title: "Udyam Adhar Download — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Adhar Download enables entrepreneurs to access their official MSME Udyam certificate instantly using their registration number. After completing OTP verification, the certificate is available in PDF format for printing and official use. This document is essential for applying for bank loans, government..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Adhar Download. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Adhar Download — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Adhar Download enables entrepreneurs to access their official MSME Udyam certificate instantly using their registration number. After completing OTP verification, the certificate is available in PDF format for printing and official use. This document is essential for applying for bank loans, government..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Adhar Download. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhar-download" },

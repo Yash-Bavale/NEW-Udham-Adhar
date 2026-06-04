@@ -6,9 +6,9 @@ export const Route = createFileRoute("/msme-registration-login")({
   head: () => ({
     meta: [
       { title: "MSME Registration Login — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "MSME Registration Login enables businesses to securely access their Udyam certificate and registration details using Aadhaar-based OTP verification. The portal allows entrepreneurs to view, update, download, or print their certificate for official purposes such as bank loans, tenders, and government subsidies. The..." },
+      { name: "description", content: "Expert consultancy assistance for MSME Registration Login. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "MSME Registration Login — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "MSME Registration Login enables businesses to securely access their Udyam certificate and registration details using Aadhaar-based OTP verification. The portal allows entrepreneurs to view, update, download, or print their certificate for official purposes such as bank loans, tenders, and government subsidies. The..." },
+      { property: "og:description", content: "Expert consultancy assistance for MSME Registration Login. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-registration-login" },

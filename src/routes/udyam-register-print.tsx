@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-register-print")({
   head: () => ({
     meta: [
       { title: "Udyam Register Print — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Register Print allows businesses to access their Udyam registration details and print the official MSME certificate directly from the government portal. After OTP verification, the certificate is available in PDF format for printing and official use. The document is essential for bank loans, government..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Register Print. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Register Print — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Register Print allows businesses to access their Udyam registration details and print the official MSME certificate directly from the government portal. After OTP verification, the certificate is available in PDF format for printing and official use. The document is essential for bank loans, government..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Register Print. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-register-print" },

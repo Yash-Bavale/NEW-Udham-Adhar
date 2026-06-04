@@ -6,9 +6,9 @@ export const Route = createFileRoute("/msme-registration-free")({
   head: () => ({
     meta: [
       { title: "MSME Registration Free — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "MSME registration on the Udyam portal is completely free, with no fees or hidden charges. Entrepreneurs can register their micro, small, or medium enterprises online using Aadhaar authentication. Upon registration, businesses receive an instant, digitally signed Udyam Certificate, proving their MSME status. This..." },
+      { name: "description", content: "Expert consultancy assistance for MSME Registration Free. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "MSME Registration Free — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "MSME registration on the Udyam portal is completely free, with no fees or hidden charges. Entrepreneurs can register their micro, small, or medium enterprises online using Aadhaar authentication. Upon registration, businesses receive an instant, digitally signed Udyam Certificate, proving their MSME status. This..." },
+      { property: "og:description", content: "Expert consultancy assistance for MSME Registration Free. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-registration-free" },

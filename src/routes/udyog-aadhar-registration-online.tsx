@@ -6,15 +6,9 @@ export const Route = createFileRoute("/udyog-aadhar-registration-online")({
   head: () => ({
     meta: [
       { title: "Udyog Aadhar Registration Online — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Get complete guidance on Udyog Aadhar registration and how to apply online without confusion.
-Understand the step-by-step process to register your small business quickly and efficiently.
-Learn about eligibility criteria, required details, and important documents before applying.
-This guide explains how to complete..." },
+      { name: "description", content: "Get complete guidance on Udyog Aadhar registration and how to apply online without confusion." },
       { property: "og:title", content: "Udyog Aadhar Registration Online — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Get complete guidance on Udyog Aadhar registration and how to apply online without confusion.
-Understand the step-by-step process to register your small business quickly and efficiently.
-Learn about eligibility criteria, required details, and important documents before applying.
-This guide explains how to complete..." },
+      { property: "og:description", content: "Get complete guidance on Udyog Aadhar registration and how to apply online without confusion." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhar-registration-online" },

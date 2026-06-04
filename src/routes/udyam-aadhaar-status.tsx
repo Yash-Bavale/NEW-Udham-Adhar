@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-aadhaar-status")({
   head: () => ({
     meta: [
       { title: "Udyam Aadhaar Status — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam Aadhaar Status allows entrepreneurs to track the current status of their MSME registration online. By entering your Udyam Registration Number, PAN, or Aadhaar details, you can quickly see whether your certificate is active, pending, or requires updates. The portal provides a secure and paperless platform for..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam Aadhaar Status. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam Aadhaar Status — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam Aadhaar Status allows entrepreneurs to track the current status of their MSME registration online. By entering your Udyam Registration Number, PAN, or Aadhaar details, you can quickly see whether your certificate is active, pending, or requires updates. The portal provides a secure and paperless platform for..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Aadhaar Status. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-aadhaar-status" },

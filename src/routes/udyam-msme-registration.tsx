@@ -6,9 +6,9 @@ export const Route = createFileRoute("/udyam-msme-registration")({
   head: () => ({
     meta: [
       { title: "Udyam MSME Registration — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Udyam MSME Registration is the official online platform for registering micro, small, or medium enterprises in India. The process is fully digital, free, and Aadhaar-based, allowing businesses to obtain a unique Udyam Registration Number instantly. Upon registration, entrepreneurs receive a digitally signed MSME..." },
+      { name: "description", content: "Expert consultancy assistance for Udyam MSME Registration. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Udyam MSME Registration — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Udyam MSME Registration is the official online platform for registering micro, small, or medium enterprises in India. The process is fully digital, free, and Aadhaar-based, allowing businesses to obtain a unique Udyam Registration Number instantly. Upon registration, entrepreneurs receive a digitally signed MSME..." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam MSME Registration. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-msme-registration" },

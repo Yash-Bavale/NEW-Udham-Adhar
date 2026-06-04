@@ -6,9 +6,9 @@ export const Route = createFileRoute("/aadhar-udyam-print")({
   head: () => ({
     meta: [
       { title: "Aadhar Udyam Print — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Aadhar Udyam Print allows entrepreneurs to print their Udyam certificate using Aadhaar-based OTP verification from the official portal. After successful verification, the certificate PDF can be downloaded and printed for official use in banks, tenders, or subsidy applications. The process is fast, secure, and..." },
+      { name: "description", content: "Expert consultancy assistance for Aadhar Udyam Print. Get help with Udyam/MSME registration, updates and certificates across India." },
       { property: "og:title", content: "Aadhar Udyam Print — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Aadhar Udyam Print allows entrepreneurs to print their Udyam certificate using Aadhaar-based OTP verification from the official portal. After successful verification, the certificate PDF can be downloaded and printed for official use in banks, tenders, or subsidy applications. The process is fast, secure, and..." },
+      { property: "og:description", content: "Expert consultancy assistance for Aadhar Udyam Print. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aadhar-udyam-print" },
