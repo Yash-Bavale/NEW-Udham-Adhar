@@ -21,6 +21,9 @@ import {
 } from "@/lib/payments/gateways.functions";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
 import { trackEvent } from "@/lib/analytics/track";
+import payuLogo from "@/assets/gateways/payu.png";
+import razorpayLogo from "@/assets/gateways/razorpay.png";
+import cashfreeLogo from "@/assets/gateways/cashfree.png";
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
   head: () => ({
@@ -103,11 +106,11 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
 // Gateway brand colors — used to render a logo-style pill.
 const GATEWAY_BRAND: Record<
   string,
-  { bg: string; fg: string; label: string; tag?: string }
+  { bg: string; fg: string; label: string; tag?: string; logo?: string }
 > = {
-  payu:     { bg: "#1FB266", fg: "#ffffff", label: "PayU",     tag: "UPI · Cards · Net Banking · Wallets" },
-  razorpay: { bg: "#072654", fg: "#ffffff", label: "Razorpay", tag: "UPI · Cards · Net Banking" },
-  cashfree: { bg: "#6933FF", fg: "#ffffff", label: "Cashfree", tag: "UPI · Cards" },
+  payu:     { bg: "#1FB266", fg: "#ffffff", label: "PayU",     logo: payuLogo,     tag: "UPI · Cards · Net Banking · Wallets" },
+  razorpay: { bg: "#072654", fg: "#ffffff", label: "Razorpay", logo: razorpayLogo, tag: "UPI · Cards · Net Banking" },
+  cashfree: { bg: "#6933FF", fg: "#ffffff", label: "Cashfree", logo: cashfreeLogo, tag: "UPI · Cards" },
   phonepe:  { bg: "#5F259F", fg: "#ffffff", label: "PhonePe",  tag: "UPI · Wallet" },
   ccavenue: { bg: "#E11D48", fg: "#ffffff", label: "CCAvenue", tag: "Cards · Net Banking" },
 };
@@ -550,9 +553,24 @@ function Input2(props: React.InputHTMLAttributes<HTMLInputElement> & { label: st
 function GatewayLogo({
   brand,
 }: {
-  brand: { bg: string; fg: string; label: string };
+  brand: { bg: string; fg: string; label: string; logo?: string };
 }) {
+  if (brand.logo) {
+    return (
+      <div className="w-16 h-9 rounded-md bg-white border border-border flex items-center justify-center p-1 shadow-sm">
+        <img src={brand.logo} alt={`${brand.label} logo`} className="max-h-full max-w-full object-contain" loading="lazy" />
+      </div>
+    );
+  }
   return (
+    <div
+      className="w-16 h-9 rounded-md flex items-center justify-center text-[11px] font-extrabold tracking-tight shadow-sm"
+      style={{ backgroundColor: brand.bg, color: brand.fg }}
+    >
+      {brand.label}
+    </div>
+  );
+}
     <div
       className="w-12 h-8 rounded-md flex items-center justify-center text-[11px] font-extrabold tracking-tight shadow-sm"
       style={{ backgroundColor: brand.bg, color: brand.fg }}
