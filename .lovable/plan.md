@@ -73,3 +73,15 @@ WhatsApp/SMS, KYC/Aadhaar OTP, customer login portal, Razorpay/Cashfree activati
 ## Verification per turn
 
 After each turn I'll: run the new migration, hit one preview lead end-to-end through the new surface (link / PDF / complaint / email / PayU sandbox / admin view), and post a short pass/fail before starting the next turn.
+
+---
+
+## Turn 3 — DONE (Phase J + L partial)
+
+- New `/talk-to-expert` public route with paid consultation form (₹99 + 18% GST = ₹116.82).
+- New `POST /api/public/talk-to-expert` creates a `talk_to_expert` lead and forwards to `/apply/$leadCode/summary` for PayU checkout. Ops sees the lead in CRM, then later spawns the real child application from there.
+- New `src/lib/payments/initiate.functions.ts` exposes `initiatePayment({ leadCode, gatewayCode? })` — gateway-agnostic dispatcher; currently routes to PayU, with Razorpay/Cashfree slots reserved.
+- PayU webhook already routes through `transitionStatusSystem('payment_received')` (done in Turn 1).
+- Contact form bugfix deferred — current `/api/public/contact` flow passes manual sanity test; no reproducible bug surfaced.
+
+Next: Turn 4 — Phase K admin CRM overhaul.
