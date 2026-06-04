@@ -1,7 +1,7 @@
 // Single source of truth for static dropdown data, services, and pricing.
 
 export const SERVICES = [
-  { slug: "new-udyam-registration", label: "New Business Help Services", price: 99 },
+  { slug: "new-udyam-registration", label: "New Udyam Registration", price: 99 },
   { slug: "update-udyam-certificate", label: "Update Udyam Certificate", price: 99 },
   { slug: "download-udyam-certificate", label: "Udyam Registration Certificate Download", price: 99 },
   { slug: "migrate-udyog-aadhaar-to-udyam", label: "Udyog Aadhaar to Udyam Migration", price: 99 },
