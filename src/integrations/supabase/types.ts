@@ -319,6 +319,9 @@ export type Database = {
       complaints: {
         Row: {
           application_id: string | null
+          assigned_to: string | null
+          breached_at: string | null
+          category: string | null
           complaint_number: string | null
           created_at: string
           id: string
@@ -327,12 +330,17 @@ export type Database = {
           notes: string | null
           reminder_count: number
           resolved_at: string | null
+          severity: string
+          sla_due_at: string | null
           status: string
           submitted_at: string | null
           updated_at: string
         }
         Insert: {
           application_id?: string | null
+          assigned_to?: string | null
+          breached_at?: string | null
+          category?: string | null
           complaint_number?: string | null
           created_at?: string
           id?: string
@@ -341,12 +349,17 @@ export type Database = {
           notes?: string | null
           reminder_count?: number
           resolved_at?: string | null
+          severity?: string
+          sla_due_at?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
         }
         Update: {
           application_id?: string | null
+          assigned_to?: string | null
+          breached_at?: string | null
+          category?: string | null
           complaint_number?: string | null
           created_at?: string
           id?: string
@@ -355,6 +368,8 @@ export type Database = {
           notes?: string | null
           reminder_count?: number
           resolved_at?: string | null
+          severity?: string
+          sla_due_at?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
