@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-msme-certificate-download.html?raw";
 
 export const Route = createFileRoute("/udyam-msme-certificate-download")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyam MSME Certificate Download | Get Official PDF Online" },
-      { name: "description", content: "Expert consultancy assistance for udyam msme certificate download | get official pdf online. Get help with Udyam/MSME registration, updates and certificates ..." },
-      { property: "og:title", content: "Udyam MSME Certificate Download | Get Official PDF Online" },
-      { property: "og:description", content: "Expert consultancy assistance for udyam msme certificate download | get official pdf online. Get help with Udyam/MSME registration, updates and certificates ..." },
+      { title: "Udyam MSME Certificate Download — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Udyam MSME Certificate Download allows entrepreneurs to instantly access and download their official MSME certificate in PDF format from the Udyam portal. By entering your Udyam Number and completing OTP verification, businesses can securely retrieve their certificate for printing and official use. The certificate..." },
+      { property: "og:title", content: "Udyam MSME Certificate Download — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Udyam MSME Certificate Download allows entrepreneurs to instantly access and download their official MSME certificate in PDF format from the Udyam portal. By entering your Udyam Number and completing OTP verification, businesses can securely retrieve their certificate for printing and official use. The certificate..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-msme-certificate-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam MSME Certificate Download" linkTitle="Udyam MSME Certificate Download | Get Official PDF Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam MSME Certificate Download" linkTitle="Udyam MSME Certificate Download" html={html} />,
 });

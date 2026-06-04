@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/www-udyamregistration.html?raw";
 
 export const Route = createFileRoute("/www-udyamregistration")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "www UdyamRegistration" },
-      { name: "description", content: "Expert consultancy assistance for www udyamregistration. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "www UdyamRegistration" },
-      { property: "og:description", content: "Expert consultancy assistance for www udyamregistration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "www UdyamRegistration — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "www.UdyamRegistration.gov.in is the official government portal for MSME registration. It allows entrepreneurs to register their micro, small, or medium enterprises online using Aadhaar authentication. After registration, businesses can instantly download their Udyam Certificate, verify their Udyam Registration..." },
+      { property: "og:title", content: "www UdyamRegistration — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "www.UdyamRegistration.gov.in is the official government portal for MSME registration. It allows entrepreneurs to register their micro, small, or medium enterprises online using Aadhaar authentication. After registration, businesses can instantly download their Udyam Certificate, verify their Udyam Registration..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/www-udyamregistration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Www Udyamregistration" linkTitle="www UdyamRegistration – Official Portal for MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="www UdyamRegistration" linkTitle="www UdyamRegistration" html={html} />,
 });

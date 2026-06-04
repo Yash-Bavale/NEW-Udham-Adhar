@@ -3,16 +3,19 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-update.html?raw";
 
 export const Route = createFileRoute("/udyam-update")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Update Udyam" },
-      { name: "description", content: "Expert consultancy assistance for udyam update - how to update your msme details online. Get help with Udyam/MSME registration, updates and certificates acro..." },
-      { property: "og:title", content: "Update Udyam" },
-      { property: "og:description", content: "Expert consultancy assistance for udyam update - how to update your msme details online. Get help with Udyam/MSME registration, updates and certificates acro..." },
+      { title: "Udyam Update - How to Update Your MSME Details Online
+Meta Description: Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact details through the official Udyam portal. Keeping registration details current is crucial for uninterrupted access to government schemes, subsidies, loans, priority lending, and participation in procurement tenders. The update process is free, paperless, and secure, enabling businesses to reflect changes promptly and maintain compliance with regulatory requirements. Udyam update ensures that the unique Udyam Registration Number and digitally signed MSME certificate remain valid and reliable for verification by banks, clients, and government authorities. Regular updates also support eligibility for new schemes, grants, and financial assistance programs while enhancing credibility and trust in the marketplace. By using the Udyam update facility, businesses can focus on growth, expansion, and operational efficiency while leveraging all available government benefits designed to strengthen the MSME ecosystem in India.." },
+      { name: "description", content: "Expert consultancy assistance for Udyam update. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyam Update - How to Update Your MSME Details Online
+Meta Description: Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact details through the official Udyam portal. Keeping registration details current is crucial for uninterrupted access to government schemes, subsidies, loans, priority lending, and participation in procurement tenders. The update process is free, paperless, and secure, enabling businesses to reflect changes promptly and maintain compliance with regulatory requirements. Udyam update ensures that the unique Udyam Registration Number and digitally signed MSME certificate remain valid and reliable for verification by banks, clients, and government authorities. Regular updates also support eligibility for new schemes, grants, and financial assistance programs while enhancing credibility and trust in the marketplace. By using the Udyam update facility, businesses can focus on growth, expansion, and operational efficiency while leveraging all available government benefits designed to strengthen the MSME ecosystem in India.." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam update. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-update" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Update" linkTitle="Udyam Update - How to Update Your MSME Details Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam update" linkTitle="Udyam Update - How to Update Your MSME Details Online
+Meta Description: Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact details through the official Udyam portal. Keeping registration details current is crucial for uninterrupted access to government schemes, subsidies, loans, priority lending, and participation in procurement tenders. The update process is free, paperless, and secure, enabling businesses to reflect changes promptly and maintain compliance with regulatory requirements. Udyam update ensures that the unique Udyam Registration Number and digitally signed MSME certificate remain valid and reliable for verification by banks, clients, and government authorities. Regular updates also support eligibility for new schemes, grants, and financial assistance programs while enhancing credibility and trust in the marketplace. By using the Udyam update facility, businesses can focus on growth, expansion, and operational efficiency while leveraging all available government benefits designed to strengthen the MSME ecosystem in India.." html={html} />,
 });

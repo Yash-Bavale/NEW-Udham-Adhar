@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/print-udyam.html?raw";
 
 export const Route = createFileRoute("/print-udyam")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Print Udyam Certificate | MSME Certificate Print Online" },
-      { name: "description", content: "Expert consultancy assistance for print udyam certificate | msme certificate print online. Get help with Udyam/MSME registration, updates and certificates ac..." },
-      { property: "og:title", content: "Print Udyam Certificate | MSME Certificate Print Online" },
-      { property: "og:description", content: "Expert consultancy assistance for print udyam certificate | msme certificate print online. Get help with Udyam/MSME registration, updates and certificates ac..." },
+      { title: "Print Udyam — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Print Udyam provides a secure and user-friendly way to print your MSME certificate after downloading it from the official Udyam portal. By entering your Udyam Number and verifying via OTP, you can access the certificate in PDF format, ready for printing. The certificate is essential for government tenders, bank..." },
+      { property: "og:title", content: "Print Udyam — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Print Udyam provides a secure and user-friendly way to print your MSME certificate after downloading it from the official Udyam portal. By entering your Udyam Number and verifying via OTP, you can access the certificate in PDF format, ready for printing. The certificate is essential for government tenders, bank..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/print-udyam" },
     ],
   }),
-  component: () => <SeoLandingPage title="Print Udyam" linkTitle="Print Udyam Certificate | MSME Certificate Print Online" html={html} />,
+  component: () => <SeoLandingPage title="Print Udyam" linkTitle="Print Udyam" html={html} />,
 });

@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udhayam-aadhar-download.html?raw";
 
 export const Route = createFileRoute("/udhayam-aadhar-download")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udhayam Aadhar Download | MSME Udyam Certificate PDF" },
-      { name: "description", content: "Expert consultancy assistance for udhayam aadhar download | msme udyam certificate pdf. Get help with Udyam/MSME registration, updates and certificates acros..." },
-      { property: "og:title", content: "Udhayam Aadhar Download | MSME Udyam Certificate PDF" },
-      { property: "og:description", content: "Expert consultancy assistance for udhayam aadhar download | msme udyam certificate pdf. Get help with Udyam/MSME registration, updates and certificates acros..." },
+      { title: "Udhayam Aadhar Download — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Expert consultancy assistance for Udhayam Aadhar Download. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udhayam Aadhar Download — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Expert consultancy assistance for Udhayam Aadhar Download. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udhayam-aadhar-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udhayam Aadhar Download" linkTitle="Udhayam Aadhar Download | MSME Udyam Certificate PDF" html={html} />,
+  component: () => <SeoLandingPage title="Udhayam Aadhar Download" linkTitle="Udhayam Aadhar Download" html={html} />,
 });

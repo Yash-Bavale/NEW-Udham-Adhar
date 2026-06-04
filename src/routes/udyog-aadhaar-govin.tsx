@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhaar-govin.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhaar-govin")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyog Aadhaar Govin – Official MSME Registration Support" },
-      { name: "description", content: "Expert consultancy assistance for udyog aadhaar govin – official msme registration support. Get help with Udyam/MSME registration, updates and certificates a..." },
-      { property: "og:title", content: "Udyog Aadhaar Govin – Official MSME Registration Support" },
-      { property: "og:description", content: "Expert consultancy assistance for udyog aadhaar govin – official msme registration support. Get help with Udyam/MSME registration, updates and certificates a..." },
+      { title: "Udyog Aadhaar Govin — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Udyog Aadhaar gov.in was the official government portal for MSME registration, UAN issuance, and verification. It allowed entrepreneurs to register small and medium enterprises using Aadhaar authentication and obtain a unique Udyog Aadhaar Number. Though now replaced by the Udyam Registration system, the portal..." },
+      { property: "og:title", content: "Udyog Aadhaar Govin — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Udyog Aadhaar gov.in was the official government portal for MSME registration, UAN issuance, and verification. It allowed entrepreneurs to register small and medium enterprises using Aadhaar authentication and obtain a unique Udyog Aadhaar Number. Though now replaced by the Udyam Registration system, the portal..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-govin" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhaar Govin" linkTitle="Udyog Aadhaar Govin – Official MSME Registration Support" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhaar Govin" linkTitle="Udyog Aadhaar Govin" html={html} />,
 });

@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-adhar-download.html?raw";
 
 export const Route = createFileRoute("/udyam-adhar-download")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyam Adhar Download | Get MSME Udyam Certificate Online" },
-      { name: "description", content: "Expert consultancy assistance for udyam adhar download | get msme udyam certificate online. Get help with Udyam/MSME registration, updates and certificates a..." },
-      { property: "og:title", content: "Udyam Adhar Download | Get MSME Udyam Certificate Online" },
-      { property: "og:description", content: "Expert consultancy assistance for udyam adhar download | get msme udyam certificate online. Get help with Udyam/MSME registration, updates and certificates a..." },
+      { title: "Udyam Adhar Download — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Udyam Adhar Download enables entrepreneurs to access their official MSME Udyam certificate instantly using their registration number. After completing OTP verification, the certificate is available in PDF format for printing and official use. This document is essential for applying for bank loans, government..." },
+      { property: "og:title", content: "Udyam Adhar Download — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Udyam Adhar Download enables entrepreneurs to access their official MSME Udyam certificate instantly using their registration number. After completing OTP verification, the certificate is available in PDF format for printing and official use. This document is essential for applying for bank loans, government..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhar-download" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Adhar Download" linkTitle="Udyam Adhar Download | Get MSME Udyam Certificate Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Adhar Download" linkTitle="Udyam Adhar Download" html={html} />,
 });

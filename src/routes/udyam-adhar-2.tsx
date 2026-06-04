@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-adhar-2.html?raw";
 
 export const Route = createFileRoute("/udyam-adhar-2")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyam Adhar" },
-      { name: "description", content: "Expert consultancy assistance for udyam adhar. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Udyam Adhar" },
-      { property: "og:description", content: "Expert consultancy assistance for udyam adhar. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Adhar — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Expert consultancy assistance for Udyam Adhar. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyam Adhar — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Expert consultancy assistance for Udyam Adhar. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhar-2" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Adhar" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Adhar" linkTitle="Udyam Adhar" html={html} />,
 });

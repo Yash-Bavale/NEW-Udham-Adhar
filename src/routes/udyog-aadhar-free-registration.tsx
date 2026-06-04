@@ -3,16 +3,19 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyog-aadhar-free-registration.html?raw";
 
 export const Route = createFileRoute("/udyog-aadhar-free-registration")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Udyog Aadhar Free Registration - Old MSME Registration P..." },
-      { name: "description", content: "Expert consultancy assistance for udyog aadhar free registration - old msme registration p.... Get help with Udyam/MSME registration, updates and certificate..." },
-      { property: "og:title", content: "Udyog Aadhar Free Registration - Old MSME Registration P..." },
-      { property: "og:description", content: "Expert consultancy assistance for udyog aadhar free registration - old msme registration p.... Get help with Udyam/MSME registration, updates and certificate..." },
+      { title: "Udyog Aadhar Free Registration - Old MSME Registration Process
+Meta Description: Udyog Aadhar free registration was the government’s official system for registering MSMEs online without any fees. This older registration process allowed businesses to obtain a unique Udyog Aadhaar Number (UAN) to access loans, subsidies, and participation in government tenders. While still recognized, the Udyog Aadhaar system has been largely replaced by the Udyam portal, which offers faster, paperless, and digitally signed MSME certificates. Businesses using the free Udyog Aadhar registration could formalize their enterprise, enhance credibility with banks and financial institutions, and gain eligibility for various government schemes. Although valid, migrating to the Udyam portal is recommended for startups and existing businesses seeking instant online certificates, enhanced digital access, and broader eligibility for modern MSME benefits, including subsidies, loans, and priority sector opportunities." },
+      { name: "description", content: "Expert consultancy assistance for Udyog Aadhar free registration. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { property: "og:title", content: "Udyog Aadhar Free Registration - Old MSME Registration Process
+Meta Description: Udyog Aadhar free registration was the government’s official system for registering MSMEs online without any fees. This older registration process allowed businesses to obtain a unique Udyog Aadhaar Number (UAN) to access loans, subsidies, and participation in government tenders. While still recognized, the Udyog Aadhaar system has been largely replaced by the Udyam portal, which offers faster, paperless, and digitally signed MSME certificates. Businesses using the free Udyog Aadhar registration could formalize their enterprise, enhance credibility with banks and financial institutions, and gain eligibility for various government schemes. Although valid, migrating to the Udyam portal is recommended for startups and existing businesses seeking instant online certificates, enhanced digital access, and broader eligibility for modern MSME benefits, including subsidies, loans, and priority sector opportunities." },
+      { property: "og:description", content: "Expert consultancy assistance for Udyog Aadhar free registration. Get help with Udyam/MSME registration, updates and certificates across India." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhar-free-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyog Aadhar Free Registration" linkTitle="Udyog Aadhar Free Registration - Old MSME Registration Process" html={html} />,
+  component: () => <SeoLandingPage title="Udyog Aadhar free registration" linkTitle="Udyog Aadhar Free Registration - Old MSME Registration Process
+Meta Description: Udyog Aadhar free registration was the government’s official system for registering MSMEs online without any fees. This older registration process allowed businesses to obtain a unique Udyog Aadhaar Number (UAN) to access loans, subsidies, and participation in government tenders. While still recognized, the Udyog Aadhaar system has been largely replaced by the Udyam portal, which offers faster, paperless, and digitally signed MSME certificates. Businesses using the free Udyog Aadhar registration could formalize their enterprise, enhance credibility with banks and financial institutions, and gain eligibility for various government schemes. Although valid, migrating to the Udyam portal is recommended for startups and existing businesses seeking instant online certificates, enhanced digital access, and broader eligibility for modern MSME benefits, including subsidies, loans, and priority sector opportunities." html={html} />,
 });

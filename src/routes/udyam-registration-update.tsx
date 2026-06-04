@@ -3,16 +3,16 @@ import { SeoLandingPage } from "@/components/site/SeoLandingPage";
 import html from "@/content/wp/udyam-registration-update.html?raw";
 
 export const Route = createFileRoute("/udyam-registration-update")({
-    head: () => ({
+  head: () => ({
     meta: [
-      { title: "Update | Modify MSME Certificate Details" },
-      { name: "description", content: "Expert consultancy assistance for update | modify msme certificate details. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "Update | Modify MSME Certificate Details" },
-      { property: "og:description", content: "Expert consultancy assistance for update | modify msme certificate details. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "Udyam Registration Update — Udyam / MSME Consultancy Help" },
+      { name: "description", content: "Udyam Registration Update allows businesses to edit and update their MSME registration details online. Entrepreneurs can correct or change information such as business name, address, PAN, or Aadhaar-linked details through the secure Udyam portal. Keeping your registration information current ensures uninterrupted..." },
+      { property: "og:title", content: "Udyam Registration Update — Udyam / MSME Consultancy Help" },
+      { property: "og:description", content: "Udyam Registration Update allows businesses to edit and update their MSME registration details online. Entrepreneurs can correct or change information such as business name, address, PAN, or Aadhaar-linked details through the secure Udyam portal. Keeping your registration information current ensures uninterrupted..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-registration-update" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Registration Update" linkTitle="Udyam Registration Update | Modify MSME Certificate Details Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Registration Update" linkTitle="Udyam Registration Update" html={html} />,
 });
