@@ -95,6 +95,10 @@ async function generateAndStore(paymentId: string): Promise<string> {
     baseAmount: Number(payment.base_amount),
     gstAmount: Number(payment.gst_amount),
     totalAmount: Number(payment.amount),
+    cgstAmount: cgst,
+    sgstAmount: sgst,
+    igstAmount: igst,
+    placeOfSupply: customerState || null,
     paymentId: payment.transaction_id ?? null,
     gatewayName: payment.gateway_name,
   };
