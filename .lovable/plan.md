@@ -1,76 +1,59 @@
-# SEO Audit & Fix Plan — Udyamadhar.in
+## Goal
 
-## Source of truth
+1. Build one shared "trust block" — **FAQ + Udyam Assistance Process + India Map** (matching the screenshots).
+2. Render it below the existing content on:
+   - All 130 SEO landing pages
+   - `/processing/$leadCode` (30-sec post-form wait — already exists)
+   - `/success/$leadCode` (15-sec post-payment wait — already exists)
+3. Sweep all SEO pages against `Udyam website information.docx` sequence and fix mismatched page name / form header / linked heading / meta title / meta description (e.g. nav link "Udyam Adhar 2" → "Udyam Adhar", per the annotated screenshot).
 
-- **Keyword Sequence doc**: 13 parent sections × ~10 children = 131 numbered keywords + 13 parent labels.
-- **Udyam website information.docx**: Full `Title` + `Meta Description` for entries **1–70 only**. Entries **71–131** are listed by name with no copy supplied.
+The waiting countdowns (30s / 15s) already exist — only their layout needs the trust block appended.
 
-## Audit deliverable (Section 1–9 report)
+## Build steps
 
-I will run a script that joins three sources — master doc (#1–131), `seo_pages` DB rows (132 rows), and `src/routes/*.tsx` files — and produce a Markdown report covering:
+### 1. New shared component
+Create `src/components/site/TrustBlock.tsx` containing three sections, styled to match the screenshots:
 
-- **§1 Missing pages** — keyword numbers with no route file
-- **§2 Header mismatches** — Form Header (`LeadForm title`) vs Content Header (`<h1>`) vs expected keyword name
-- **§3 Linked SEO heading mismatches** — `linkTitle` vs source-doc title
-- **§4 Meta title issues** — current `head().meta[title]` vs source title
-- **§5 Meta description issues** — current meta description vs source
-- **§8 Extra pages** — routes/DB rows not in the 131 keywords
-- **§9 Final fix list** — consolidated change set
+- **FAQ section** — title "Frequently Asked Questions for MSME registration in India.", subtitle "MSME BUSINESS HELP SERVICES ONLINE, SSI – SMALL SCALE INDUSTRIES CERTIFICATE – UPDATE, EDIT, AND DOWNLOAD ACKNOWLEDGEMENT". 10 accordion items pulled from existing `src/lib/faqs-data.ts` (so we don't duplicate copy). Followed by a "Read More →" button linking to `/faqs`. Each accordion item is also emitted as `FAQPage` JSON-LD for SEO.
+- **Process section** — heading "Udyam Assistance Process – Fast & Simple", 4 steps with lucide icons + arrows between them: Fill Form & Make Payment → Submit Required Information → Expert Assistance & Verification → Updates Shared via Email. Light slate background panel.
+- **India Map section** — heading "We provide consultancy services across India." Render the political map of India as an inline static SVG (no external deps, no interactivity), with state labels matching the reference image. Bundled in `src/components/site/IndiaMap.tsx` and imported by `TrustBlock`.
 
-The report is written to `/mnt/documents/seo-audit.md` and surfaced as an artifact.
+Uses semantic tokens (`brand-navy`, `muted`, etc.) — no raw hex.
 
-## Implementation
+### 2. Wire into SEO pages
+Edit `src/components/site/SeoLandingPage.tsx` once — append `<TrustBlock />` after the existing content/form area. Because all 130 SEO routes render through this component, no per-route edits are needed.
 
-### A. Per-route fixes (131 SEO route files in `src/routes/`)
+### 3. Wire into waiting pages
+- `src/routes/processing.$leadCode.tsx` — append `<TrustBlock />` below the existing 30-sec animated card.
+- `src/routes/success.$leadCode.tsx` — append `<TrustBlock />` below the existing 15-sec countdown card.
 
-For every keyword #1–131:
+### 4. Title / sequence audit
+Parse `Udyam website information.docx` keyword sequence (entries 1–130) and compare against every `src/routes/*.tsx` SEO route. For each mismatch, fix one or more of:
+- **Form header / link title** passed to `<SeoLandingPage title=… linkTitle=… />` — fixes nav labels like "Udyam Adhar 2" → "Udyam Adhar".
+- `meta.title` / `og:title` in `head()`.
+- `meta.description` / `og:description` in `head()`.
 
-1. Ensure a route file exists at the expected slug (kebab-case of the keyword). Create the missing ones using `SeoLandingPage`. Where two keywords collide on the same slug (e.g. #21 and #11 both "Udyog Aadhar Registration", #46 and #56 both "Udyam MSME Certificate"), keep one canonical slug and add a numeric suffix (`-2`) for the duplicate, matching what already exists.
-2. Set `head().meta`:
-   - `title` and `og:title` = source-doc Title for #1–70; for #71–131 generate `"<Keyword> — Consultancy Assistance for MSME / Udyam Registration"` (≤60 chars where possible).
-   - `description` and `og:description` = source-doc Meta Description for #1–70; for #71–131 generate a 140–155-char keyword-led summary.
-   - `canonical` link kept at `https://udyamadhar.everythinghappens.in/<slug>`.
-3. Set `<SeoLandingPage title="<Keyword Name>" linkTitle="<Source Title or descriptive H2>" html={html} />` so:
-   - **Form Header** (rendered from `title`) = exact keyword name.
-   - **Content Header** (`<h1>` in prose) = exact keyword name.
-   - **Linked SEO Heading** (`<h2><a>`) = the source-doc Title (or the descriptive variant for #71–131).
+The route slug itself stays (changing it would break sitemap + indexed URLs) — only the displayed names/headers and meta are corrected. Where the doc provides full Meta Title / Meta Description copy (entries 1–70 and selected later entries), we use it verbatim; otherwise we keep the existing generated copy and only correct the visible name.
 
-### B. Nav, Sidebar, and Footer parent structure
+A short audit report is written to `/mnt/documents/seo-name-audit.md` listing each route changed and what was changed.
 
-**Behaviour change requested:** parents (Udyamregistration, Udyam Regn Certificate, Udyamregistration Gov In, Aadhar Udyog Registration, Udyog Aadhar Certificate Download, Official MSME Registration Website, Aadhaar Udyam, MSME Registration Process, Udyam Aadhaar Download PDF, Udyog Aadhar Registration, Udhayam Aadhar Download, Print MSME Udyam Certificate, Udyam Registration Online) become **plain text labels**, not links. The parent keyword is added as the **first child link** under itself (which matches the Keyword Sequence doc — e.g. parent "Udyamregistration" with child #1 "Udyamregistration" linking to `/udyamregistration`).
+### Out of scope
+- No changes to the 30s/15s countdown timings themselves — they already match the spec.
+- No URL/slug changes, no sitemap rebuild, no DB writes.
+- No new routes, no design system changes.
+- Map is static SVG only (no hover interactivity, no map library).
 
-Files touched:
-- `src/components/site/Footer.tsx` — `SeoTree`: render parent as `<span>` (no `<a href>`), prepend the parent's own slug as the first entry of `childSlugs` so it appears as a link inside.
-- `src/components/site/Nav.tsx` and `src/lib/constants.ts` (NAV_LINKS) — same treatment for the top nav dropdown if it surfaces SEO categories. If nav currently flat-links to SEO pages, leave nav as-is and apply the change only to the footer/sidebar tree that mirrors the screenshot.
-- Any sidebar component used by the SEO landing pages (search the codebase for the rendered `Udyamregistration / Udyam Regn / Udyam …` tree shown in the annotated screenshot) gets the same treatment.
+## Files
 
-### C. Database alignment (`seo_pages` table)
+**New**
+- `src/components/site/TrustBlock.tsx`
+- `src/components/site/IndiaMap.tsx`
 
-Migration to:
-- `UPDATE` each row's `label` and `sort_order` to match the keyword sequence (1–131).
-- `INSERT` any missing slugs, `DELETE` rows not present in the master list (after confirming no published external link to them).
-- Includes `GRANT` re-affirmation (no schema change).
+**Edited**
+- `src/components/site/SeoLandingPage.tsx` (append `<TrustBlock />`)
+- `src/routes/processing.$leadCode.tsx` (append `<TrustBlock />`)
+- `src/routes/success.$leadCode.tsx` (append `<TrustBlock />`)
+- A subset of `src/routes/*.tsx` SEO route files where name / header / meta mismatch the sequence doc (driven by audit script).
 
-### D. Sitemap & robots
-
-No changes needed — `sitemap.xml` already auto-discovers routes + `seo_pages`. It will pick up new/renamed routes automatically.
-
-## Technical notes
-
-- Source doc has empty Title/Description for #71–131; I will generate consistent copy using the existing pattern from `udyam-download-online.tsx` etc. (`"Expert consultancy assistance for <keyword>. …"`). If you'd prefer to author these manually, say so before implementation and I'll skip generated copy for that range and leave a `TODO` per route.
-- Slug collisions (#21 vs #11, #46 vs #56, #131 vs #27) are handled by reusing the existing `-2` slugs already present in the DB.
-- All new copies preserve the existing `SeoLandingPage` shape; no UI redesign.
-
-## Out of scope
-
-- Visual redesign of the landing pages, lead form, or sample certificate card.
-- Changes to non-SEO pages (admin, onboarding, policy pages).
-- Content rewrites inside the imported WordPress HTML body.
-
-## Estimated change footprint
-
-- ~30–60 new route files (for keywords currently missing).
-- ~70 existing route files edited (head meta + linkTitle).
-- 1 migration (`seo_pages` re-sync).
-- 1–3 component edits (Footer/Nav/Sidebar parent rendering).
-- 1 generated audit artifact at `/mnt/documents/seo-audit.md`.
+**Artifact**
+- `/mnt/documents/seo-name-audit.md`
