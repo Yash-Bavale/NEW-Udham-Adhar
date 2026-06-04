@@ -169,6 +169,11 @@
   font-size: 0;
   color: transparent;
 }
+
+.policy-prose h4,
+.policy-prose h4 * {
+  font-weight: 800 !important;
+}
 .gtranslate-host .goog-te-gadget .goog-te-combo {
   margin: 0;
   padding: 4px 8px;
