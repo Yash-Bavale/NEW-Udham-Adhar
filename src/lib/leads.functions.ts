@@ -44,45 +44,10 @@ export const createLead = createServerFn({ method: "POST" })
     const gstAmount = Number(service.gst_amount);
     const totalAmount = Number(service.total_amount);
 
-    // 2. Dedupe by email OR mobile in last 30 days
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: existing, error: dupErr } = await supabaseAdmin
-      .from("leads")
-      .select("id, lead_code, base_amount, gst_amount, total_amount")
-      .or(`email.eq.${data.email.toLowerCase()},mobile.eq.${data.mobile}`)
-      .gte("created_at", thirtyDaysAgo)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (dupErr) throw new Error(dupErr.message);
-
+    // 2. Always create a new lead row — treat every submission as a fresh application.
     let leadId: string;
     let leadCode: string;
-
-    if (existing) {
-      // Update existing lead with the latest submission details
-      const { data: updated, error: updErr } = await supabaseAdmin
-        .from("leads")
-        .update({
-          name: data.name,
-          state: data.state,
-          language: data.language,
-          service: data.service,
-          service_id: service.id,
-          base_amount: baseAmount,
-          gst_amount: gstAmount,
-          total_amount: totalAmount,
-          lead_source: "website",
-        })
-        .eq("id", existing.id)
-        .select("id, lead_code")
-        .single();
-      if (updErr || !updated) throw new Error(updErr?.message ?? "Could not update existing lead.");
-      leadId = updated.id;
-      leadCode = updated.lead_code as string;
-    } else {
-      // Create new lead
+    {
       const { data: row, error } = await supabaseAdmin
         .from("leads")
         .insert({
@@ -107,6 +72,7 @@ export const createLead = createServerFn({ method: "POST" })
       leadId = row.id;
       leadCode = row.lead_code as string;
     }
+
 
     // 3. Create application row (one per submission). Trigger writes activity log.
     const { error: appErr } = await supabaseAdmin
