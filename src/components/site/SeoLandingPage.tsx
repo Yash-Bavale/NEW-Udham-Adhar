@@ -114,17 +114,19 @@ export function SeoLandingPage({
   title,
   linkTitle,
   html,
+  content,
 }: {
   title: string;
   linkTitle?: string;
   html: string;
+  content?: string;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const cleanHtml = sanitize(html, title);
   const descriptive = linkTitle ?? title;
 
   return (
-    <>
+    <div>
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm title={title} />
 
@@ -155,12 +157,19 @@ export function SeoLandingPage({
                 __html: `<a href="${escapeHtml(pathname)}">${escapeHtml(descriptive)}</a>`,
               }}
             />
-            <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />
+            {content
+              ? content
+                  .split(/\n{2,}/)
+                  .map((p, i) => <p key={i}>{p.trim()}</p>)
+              : null}
+            {cleanHtml ? (
+              <div dangerouslySetInnerHTML={{ __html: cleanHtml }} />
+            ) : null}
           </div>
         </div>
       </section>
 
       <TrustBlock />
-    </>
+    </div>
   );
 }
