@@ -27,7 +27,7 @@ async function loadLeadByCode(leadCode: string) {
 }
 
 function serviceCodeFromLabel(serviceLabel: string | null): string {
-  if (!serviceLabel) return "talk-to-expert";
+  if (!serviceLabel) return "new-udyam-registration";
   const normalized = serviceLabel
     .trim()
     .toLowerCase()
@@ -47,12 +47,10 @@ function serviceCodeFromLabel(serviceLabel: string | null): string {
     "forgot registered mobile/email": "forgot-mobile-email",
     "correct pan / aadhaar name in udyam": "correct-pan-aadhaar",
     "correct pan / aadhar name in udyam": "correct-pan-aadhaar",
-    "talk to expert": "talk-to-expert",
-    "talk to expert - suitable service selection": "talk-to-expert",
   };
 
   const match = SERVICES.find((s) => s.label.trim().toLowerCase().replace(/[–—]/g, "-") === normalized);
-  return aliases[normalized] ?? match?.slug ?? "talk-to-expert";
+  return aliases[normalized] ?? match?.slug ?? "new-udyam-registration";
 }
 
 /** Public: read everything needed to render the onboarding form. */
