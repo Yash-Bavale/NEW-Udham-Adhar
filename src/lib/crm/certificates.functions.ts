@@ -57,7 +57,7 @@ export const listCertificates = createServerFn({ method: "GET" })
 export const uploadCertificate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
-    applicationId: z.string().uuid(),
+    applicationId: z.string().min(1),
     fileBase64: z.string(),
     fileName: z.string(),
     mimeType: z.string().default("application/pdf"),
@@ -65,15 +65,15 @@ export const uploadCertificate = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: app } = await supabaseAdmin
-      .from("applications")
-      .select("id, lead_id")
-      .eq("id", data.applicationId)
-      .single();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.applicationId);
+    const lookup = supabaseAdmin.from("applications").select("id, lead_id");
+    const { data: app } = isUuid
+      ? await lookup.eq("id", data.applicationId).single()
+      : await lookup.eq("application_code", data.applicationId).single();
     if (!app) throw new Error("Application not found");
 
     const buffer = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
-    const path = `certificates/${data.applicationId}/${Date.now()}-${data.fileName}`;
+    const path = `certificates/${app.id}/${Date.now()}-${data.fileName}`;
     const { error: upErr } = await supabaseAdmin.storage
       .from("documents")
       .upload(path, buffer, { contentType: data.mimeType, upsert: false });
@@ -82,7 +82,7 @@ export const uploadCertificate = createServerFn({ method: "POST" })
     const { data: cert, error: insErr } = await supabaseAdmin
       .from("certificates")
       .insert({
-        application_id: data.applicationId,
+        application_id: app.id,
         lead_id: app.lead_id,
         certificate_number: data.certificateNumber ?? null,
         file_name: data.fileName,
