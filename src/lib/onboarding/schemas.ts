@@ -255,6 +255,15 @@ const CORRECT_PAN_AADHAAR: OnboardingSchema = {
   ],
 };
 
+// Talk-to-Expert is a paid consultation. After payment we skip the intake form
+// and go straight to the thank-you page — but we still register a stub schema
+// so getSchema() and the onboarding pipeline have a known mapping.
+const TALK_TO_EXPERT: OnboardingSchema = {
+  title: "Talk to Expert — Consultation Booked",
+  description: "Your consultation request has been received. Our expert will contact you on your registered mobile.",
+  fields: [],
+};
+
 // Default fallback used when a lead's service can't be mapped to a known schema.
 const DEFAULT: OnboardingSchema = NEW_UDYAM;
 
@@ -265,6 +274,7 @@ export const ONBOARDING_SCHEMAS: Record<string, OnboardingSchema> = {
   "migrate-udyog-aadhaar-to-udyam": MIGRATE,
   "forgot-mobile-email": FORGOT_MOBILE,
   "correct-pan-aadhaar": CORRECT_PAN_AADHAAR,
+  "talk-to-expert": TALK_TO_EXPERT,
 };
 
 export function getSchema(serviceCode: string | null | undefined): OnboardingSchema {
