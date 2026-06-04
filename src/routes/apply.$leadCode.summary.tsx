@@ -571,11 +571,4 @@ function GatewayLogo({
     </div>
   );
 }
-    <div
-      className="w-12 h-8 rounded-md flex items-center justify-center text-[11px] font-extrabold tracking-tight shadow-sm"
-      style={{ backgroundColor: brand.bg, color: brand.fg }}
-    >
-      {brand.label}
-    </div>
-  );
-}
+
