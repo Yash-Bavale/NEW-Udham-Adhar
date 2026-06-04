@@ -78,8 +78,10 @@ export function OnboardingShell({
 
       <ol className="flex items-center justify-center gap-1.5 sm:gap-2 mb-8 text-xs flex-wrap">
         {STEPS.map((s, i) => {
-          const done = step > s.n;
-          const active = step === s.n;
+          const isLast = s.n === 3;
+          // Treat the final "Done" step as completed (not pending) once we land on it.
+          const done = step > s.n || (isLast && step === 3);
+          const active = step === s.n && !done;
           return (
             <li key={s.n} className="flex items-center gap-1.5 sm:gap-2">
               <motion.span
@@ -97,7 +99,7 @@ export function OnboardingShell({
               >
                 {done ? <Check className="w-3.5 h-3.5" /> : displayNumber(s)}
               </motion.span>
-              <span className={active ? "font-semibold text-foreground" : "text-muted-foreground"}>
+              <span className={done || active ? "font-semibold text-foreground" : "text-muted-foreground"}>
                 {s.label}
               </span>
               {i < STEPS.length - 1 && <span className="w-5 sm:w-8 h-px bg-border mx-0.5" />}
