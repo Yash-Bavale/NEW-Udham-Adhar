@@ -231,21 +231,21 @@ function SeoTree({
                     </button>
                   ) : (
                     <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
-                      {cat.slug === null ? (
+                      {cat.isHome ? (
                         <HomeIcon className="h-3.5 w-3.5" />
                       ) : (
                         <ChevronRight className="h-3.5 w-3.5" />
                       )}
                     </span>
                   )}
-                  {cat.slug === null ? (
+                  {cat.isHome ? (
                     <Link to="/" className="flex-1 py-1.5 text-white hover:text-brand-gold">
                       {cat.label}
                     </Link>
                   ) : (
-                    <a href={`/${cat.slug}`} className="flex-1 py-1.5 text-white hover:text-brand-gold">
+                    <span className="flex-1 py-1.5 text-white font-semibold">
                       {cat.label}
-                    </a>
+                    </span>
                   )}
                 </div>
                 {hasChildren && isOpen && (
