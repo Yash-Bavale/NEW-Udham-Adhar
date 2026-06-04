@@ -51,18 +51,18 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
             .single();
           if (!lead?.email) continue;
           await enqueueEmailInternal({
-            to: lead.email,
+            toEmail: lead.email,
             toName: lead.name,
             subject: `[Action Required] Update on grievance ${c.complaint_number ?? c.id.slice(0, 8)}`,
-            body_html: `<div style="font-family:Arial,sans-serif;padding:20px">
+            bodyHtml: `<div style="font-family:Arial,sans-serif;padding:20px">
               <p>Dear ${lead.name ?? "Customer"},</p>
               <p>Your grievance <b>${c.complaint_number ?? ""}</b> has crossed the expected resolution window.
               Our senior operations team has been alerted and will revert within 24 hours.</p>
               <p>Severity: <b>${(c.severity ?? "normal").toUpperCase()}</b></p>
               <p>Thank you for your patience.</p>
             </div>`,
-            template_code: "complaint_sla_breach",
-            lead_id: c.lead_id,
+            templateCode: "complaint_sla_breach",
+            leadId: c.lead_id,
           });
           await supabaseAdmin
             .from("complaints")
