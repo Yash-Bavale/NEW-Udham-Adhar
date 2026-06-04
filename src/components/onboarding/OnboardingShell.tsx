@@ -1,6 +1,9 @@
-import { Link } from "@tanstack/react-router";
-import { Check } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { Check, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
+import { requestFormHelp } from "@/lib/onboarding/onboarding.functions";
 
 type Step = 1 | 2 | 3;
 
@@ -25,14 +28,32 @@ export function OnboardingShell({
   subtitle?: string;
   children: React.ReactNode;
 }) {
-  // For 2-step flows (no documents), use Details + Done only.
   const STEPS = totalSteps === 2
     ? [ALL_STEPS[0], { n: 3 as Step, label: "Done" }]
     : ALL_STEPS;
   const activeIndex = STEPS.findIndex((s) => s.n === step);
   const progress = (Math.max(activeIndex, 0) / (STEPS.length - 1)) * 100;
-  // Display number is the 1-based position within the (possibly collapsed) STEPS list.
   const displayNumber = (s: { n: Step }) => STEPS.findIndex((x) => x.n === s.n) + 1;
+
+  const navigate = useNavigate();
+  const callHelp = useServerFn(requestFormHelp);
+  const [helpBusy, setHelpBusy] = useState(false);
+
+  async function onAskHelp() {
+    if (helpBusy) return;
+    setHelpBusy(true);
+    try {
+      await callHelp({ data: { leadCode } });
+    } catch {
+      // Even if logging fails, take the customer to the reassurance screen.
+    }
+    navigate({
+      to: "/onboarding/$leadCode/done",
+      params: { leadCode },
+      search: { help: 1 },
+    });
+  }
+
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 md:py-12">
       <div className="mb-6 text-center">
@@ -63,18 +84,15 @@ export function OnboardingShell({
             <li key={s.n} className="flex items-center gap-1.5 sm:gap-2">
               <motion.span
                 initial={false}
-                animate={{
-                  scale: active ? 1.08 : 1,
-                  backgroundColor: done ? "hsl(var(--primary))" : active ? "hsl(var(--background))" : "hsl(var(--background))",
-                }}
+                animate={{ scale: active ? 1.08 : 1 }}
                 transition={{ type: "spring", stiffness: 280, damping: 22 }}
                 className={
                   "inline-flex items-center justify-center w-7 h-7 rounded-full border text-[11px] font-semibold " +
                   (done
                     ? "bg-brand-navy text-white border-brand-navy"
                     : active
-                      ? "text-brand-navy border-brand-navy ring-4 ring-brand-navy/10"
-                      : "text-muted-foreground border-border")
+                      ? "bg-background text-brand-navy border-brand-navy ring-4 ring-brand-navy/10"
+                      : "bg-background text-muted-foreground border-border")
                 }
               >
                 {done ? <Check className="w-3.5 h-3.5" /> : displayNumber(s)}
@@ -98,9 +116,20 @@ export function OnboardingShell({
         {children}
       </motion.div>
 
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Need help? <Link to="/contact" className="text-brand-navy underline">Contact our team</Link>.
-      </p>
+      {step !== 3 && (
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Need help submitting the form?{" "}
+          <button
+            type="button"
+            onClick={onAskHelp}
+            disabled={helpBusy}
+            className="text-brand-navy underline font-medium inline-flex items-center gap-1 disabled:opacity-60"
+          >
+            {helpBusy && <Loader2 className="w-3 h-3 animate-spin" />}
+            Contact our team for help
+          </button>
+        </p>
+      )}
     </section>
   );
 }
