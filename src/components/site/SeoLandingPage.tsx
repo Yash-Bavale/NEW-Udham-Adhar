@@ -1,5 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
+import { TrustBlock } from "@/components/site/TrustBlock";
 
 const proseClasses =
   "p-6 md:p-8 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
@@ -158,6 +159,8 @@ export function SeoLandingPage({
           </div>
         </div>
       </section>
+
+      <TrustBlock />
     </>
   );
 }

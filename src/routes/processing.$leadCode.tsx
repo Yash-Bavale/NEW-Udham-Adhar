@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Lock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import { TrustBlock } from "@/components/site/TrustBlock";
 
 export const Route = createFileRoute("/processing/$leadCode")({
   head: () => ({
@@ -52,6 +53,7 @@ function ProcessingPage() {
   const active = STEPS[activeIdx];
 
   return (
+    <>
     <section className="relative mx-auto max-w-2xl px-4 py-12 md:py-20">
       {/* ambient background */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -186,5 +188,7 @@ function ProcessingPage() {
         </p>
       </motion.div>
     </section>
+    <TrustBlock />
+    </>
   );
 }

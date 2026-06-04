@@ -14,5 +14,5 @@ export const Route = createFileRoute("/udyam-regn")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-regn" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam regn" linkTitle="Udyam Regn - Quick MSME Registration Online" html={html} />,
+  component: () => <SeoLandingPage title="Udyam Regn" linkTitle="Udyam Regn - Quick MSME Registration Online" html={html} />,
 });

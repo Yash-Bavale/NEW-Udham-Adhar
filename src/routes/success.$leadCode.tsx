@@ -12,6 +12,7 @@ import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TrustBlock } from "@/components/site/TrustBlock";
 
 export const Route = createFileRoute("/success/$leadCode")({
   head: () => ({
@@ -149,6 +150,7 @@ function SuccessPage() {
   }[phase];
 
   return (
+    <>
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-10 bg-gradient-to-b from-slate-50 to-white">
       <Card
         className={`w-full max-w-lg border-2 ${palette.border} bg-gradient-to-br ${palette.bg} shadow-2xl overflow-hidden transition-colors duration-700`}
@@ -245,5 +247,7 @@ function SuccessPage() {
         </div>
       </Card>
     </div>
+    <TrustBlock />
+    </>
   );
 }
