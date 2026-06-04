@@ -39,6 +39,16 @@ function OnboardingDetailsPage() {
   }
   if (!data) return null;
 
+  // Talk-to-Expert is a paid consultation — no intake form after payment.
+  // Send the user straight to the thank-you screen.
+  const isTalkToExpert =
+    data.serviceCode === "talk-to-expert" ||
+    data.lead.service === "Expert Consultation" ||
+    data.lead.service === "Talk to Expert – Suitable Service Selection";
+  if (data.lead.paid && isTalkToExpert) {
+    return <TalkToExpertRedirect leadCode={leadCode} />;
+  }
+
   if (!data.lead.paid) {
     return (
       <OnboardingShell leadCode={leadCode} step={1} totalSteps={2} title="Payment required">
