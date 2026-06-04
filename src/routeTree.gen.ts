@@ -175,6 +175,7 @@ import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
 import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
+import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
@@ -1068,6 +1069,11 @@ const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
   path: '/email/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTokenRoute = AppTokenRouteImport.update({
+  id: '/app/$token',
+  path: '/app/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -1399,6 +1405,7 @@ export interface FileRoutesByFullPath {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -1596,6 +1603,7 @@ export interface FileRoutesByTo {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -1795,6 +1803,7 @@ export interface FileRoutesById {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRoute
   '/admin/users': typeof AdminUsersRoute
+  '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
@@ -1995,6 +2004,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
@@ -2192,6 +2202,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
@@ -2390,6 +2401,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/services'
     | '/admin/users'
+    | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
@@ -2578,6 +2590,7 @@ export interface RootRouteChildren {
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
+  AppTokenRoute: typeof AppTokenRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
@@ -3764,6 +3777,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmailUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/$token': {
+      id: '/app/$token'
+      path: '/app/$token'
+      fullPath: '/app/$token'
+      preLoaderRoute: typeof AppTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -4212,6 +4232,7 @@ const rootRouteChildren: RootRouteChildren = {
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
+  AppTokenRoute: AppTokenRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,

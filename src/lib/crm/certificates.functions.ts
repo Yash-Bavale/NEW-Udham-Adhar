@@ -135,10 +135,17 @@ export const deliverCertificate = createServerFn({ method: "POST" })
       .eq("id", data.certificateId);
 
     if (app?.id) {
-      await supabaseAdmin
-        .from("applications")
-        .update({ application_status: "completed" })
-        .eq("id", app.id);
+      const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
+      // Cascade: certificate delivered → certificate_uploaded → certificate_ready → completed
+      for (const next of ["certificate_uploaded", "certificate_ready", "completed"] as const) {
+        const tr = await transitionStatusSystem({
+          applicationId: app.id,
+          toStatus: next,
+          reason: `Certificate delivered (${next})`,
+          force: true,
+        });
+        if (!tr.ok) console.warn("[certificates] cascade step skipped:", next, tr.reason);
+      }
     }
 
     if (lead?.email && signed?.signedUrl) {

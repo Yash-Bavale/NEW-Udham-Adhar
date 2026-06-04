@@ -177,10 +177,14 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           if (leadUpdateError) console.error("[payu] lead update failed", { txnid: fields.txnid, leadId: payment.lead_id, error: leadUpdateError });
 
           if (payment.application_id) {
-            const { error: applicationUpdateError } = await supabaseAdmin.from("applications")
-              .update({ application_status: "payment_received" })
-              .eq("id", payment.application_id);
-            if (applicationUpdateError) console.error("[payu] application update failed", { txnid: fields.txnid, applicationId: payment.application_id, error: applicationUpdateError });
+            const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
+            const tr = await transitionStatusSystem({
+              applicationId: payment.application_id,
+              toStatus: "payment_received",
+              reason: "PayU webhook payment success",
+              metadata: { txnid: fields.txnid, mihpayid },
+            });
+            if (!tr.ok) console.error("[payu] transition failed", { txnid: fields.txnid, applicationId: payment.application_id, reason: tr.reason });
           }
 
           try { await generateInvoiceInternal(payment.id); }
