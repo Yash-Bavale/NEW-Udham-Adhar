@@ -40,7 +40,7 @@ export const listCustomers = createServerFn({ method: "POST" })
   });
 
 export type Customer360 = {
-  customer: CustomerRow & { language: string | null; notes: string | null; metadata: Record<string, unknown> };
+  customer: CustomerRow & { language: string | null; notes: string | null };
   leads: Array<{ id: string; lead_code: string | null; service: string; status: string; created_at: string; total_amount: number }>;
   applications: Array<{ id: string; application_code: string | null; application_status: string; form_status: string; document_status: string; created_at: string; updated_at: string; service_id: string | null }>;
   payments: Array<{ id: string; amount: number; status: string; gateway_name: string; created_at: string; payment_date: string | null; razorpay_payment_id: string | null }>;
