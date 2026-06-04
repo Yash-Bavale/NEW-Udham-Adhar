@@ -21,8 +21,8 @@ import {
 } from "@/lib/payments/gateways.functions";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
 import { trackEvent } from "@/lib/analytics/track";
-import payuLogo from "@/assets/gateways/payu.png";
-import razorpayLogo from "@/assets/gateways/razorpay.png";
+import payuLogo from "@/assets/gateways/payu.svg";
+import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
@@ -99,6 +99,22 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
       "Correction request reviewed by certified consultants",
       "Real-time Email updates on every step",
       "Current Udyam details, Aadhaar, PAN, business details, and additional documents or information may be required depending upon processing requirements.",
+    ],
+  },
+  "Talk to Expert – Suitable Service Selection": {
+    tagline: "Get guided consultation before choosing the right service.",
+    bullets: [
+      "Requirement reviewed by an expert consultant",
+      "Real-time Email updates on every step",
+      "Basic consultation service intended to help identify suitable service requirements.",
+    ],
+  },
+  "Expert Consultation": {
+    tagline: "Get guided consultation before choosing the right service.",
+    bullets: [
+      "Requirement reviewed by an expert consultant",
+      "Real-time Email updates on every step",
+      "Basic consultation service intended to help identify suitable service requirements.",
     ],
   },
 };

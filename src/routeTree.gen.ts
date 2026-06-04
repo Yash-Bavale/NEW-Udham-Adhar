@@ -98,6 +98,7 @@ import { Route as UdhayamAadharDownloadRouteImport } from './routes/udhayam-aadh
 import { Route as UdharAadharRegistrationRouteImport } from './routes/udhar-aadhar-registration'
 import { Route as UdhamAadharDownloadRouteImport } from './routes/udham-aadhar-download'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
+import { Route as TalkToExpertRouteImport } from './routes/talk-to-expert'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as SeoAdminRouteImport } from './routes/seo-admin'
@@ -194,6 +195,7 @@ import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCode.summary'
+import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
 import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
@@ -674,6 +676,11 @@ const UdhamAadharDownloadRoute = UdhamAadharDownloadRouteImport.update({
 const TermsConditionsRoute = TermsConditionsRouteImport.update({
   id: '/terms-conditions',
   path: '/terms-conditions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TalkToExpertRoute = TalkToExpertRouteImport.update({
+  id: '/talk-to-expert',
+  path: '/talk-to-expert',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -1171,6 +1178,11 @@ const ApplyLeadCodeSummaryRoute = ApplyLeadCodeSummaryRouteImport.update({
   path: '/apply/$leadCode/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTalkToExpertRoute = ApiPublicTalkToExpertRouteImport.update({
+  id: '/api/public/talk-to-expert',
+  path: '/api/public/talk-to-expert',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicContactRoute = ApiPublicContactRouteImport.update({
   id: '/api/public/contact',
   path: '/api/public/contact',
@@ -1345,6 +1357,7 @@ export interface FileRoutesByFullPath {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1465,6 +1478,7 @@ export interface FileRoutesByFullPath {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
+  '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
@@ -1549,6 +1563,7 @@ export interface FileRoutesByTo {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1669,6 +1684,7 @@ export interface FileRoutesByTo {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
+  '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
@@ -1755,6 +1771,7 @@ export interface FileRoutesById {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/udham-aadhar-download': typeof UdhamAadharDownloadRoute
   '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
@@ -1875,6 +1892,7 @@ export interface FileRoutesById {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
+  '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
   '/apply/$leadCode/summary': typeof ApplyLeadCodeSummaryRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
@@ -1962,6 +1980,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/talk-to-expert'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -2082,6 +2101,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
+    | '/api/public/talk-to-expert'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
@@ -2166,6 +2186,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/talk-to-expert'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -2286,6 +2307,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
+    | '/api/public/talk-to-expert'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
@@ -2371,6 +2393,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/talk-to-expert'
     | '/terms-conditions'
     | '/udham-aadhar-download'
     | '/udhar-aadhar-registration'
@@ -2491,6 +2514,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
     | '/api/public/contact'
+    | '/api/public/talk-to-expert'
     | '/apply/$leadCode/summary'
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
@@ -2577,6 +2601,7 @@ export interface RootRouteChildren {
   SeoAdminRoute: typeof SeoAdminRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TalkToExpertRoute: typeof TalkToExpertRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UdhamAadharDownloadRoute: typeof UdhamAadharDownloadRoute
   UdharAadharRegistrationRoute: typeof UdharAadharRegistrationRoute
@@ -2675,6 +2700,7 @@ export interface RootRouteChildren {
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
+  ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
   ApplyLeadCodeSummaryRoute: typeof ApplyLeadCodeSummaryRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
@@ -3313,6 +3339,13 @@ declare module '@tanstack/react-router' {
       path: '/terms-conditions'
       fullPath: '/terms-conditions'
       preLoaderRoute: typeof TermsConditionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/talk-to-expert': {
+      id: '/talk-to-expert'
+      path: '/talk-to-expert'
+      fullPath: '/talk-to-expert'
+      preLoaderRoute: typeof TalkToExpertRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -3987,6 +4020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApplyLeadCodeSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/talk-to-expert': {
+      id: '/api/public/talk-to-expert'
+      path: '/api/public/talk-to-expert'
+      fullPath: '/api/public/talk-to-expert'
+      preLoaderRoute: typeof ApiPublicTalkToExpertRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/contact': {
       id: '/api/public/contact'
       path: '/api/public/contact'
@@ -4300,6 +4340,7 @@ const rootRouteChildren: RootRouteChildren = {
   SeoAdminRoute: SeoAdminRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TalkToExpertRoute: TalkToExpertRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UdhamAadharDownloadRoute: UdhamAadharDownloadRoute,
   UdharAadharRegistrationRoute: UdharAadharRegistrationRoute,
@@ -4399,6 +4440,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
+  ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,
   ApplyLeadCodeSummaryRoute: ApplyLeadCodeSummaryRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
@@ -4416,13 +4458,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

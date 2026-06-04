@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -38,6 +38,16 @@ function OnboardingDetailsPage() {
     );
   }
   if (!data) return null;
+
+  // Talk-to-Expert is a paid consultation — no intake form after payment.
+  // Send the user straight to the thank-you screen.
+  const isTalkToExpert =
+    data.serviceCode === "talk-to-expert" ||
+    data.lead.service === "Expert Consultation" ||
+    data.lead.service === "Talk to Expert – Suitable Service Selection";
+  if (data.lead.paid && isTalkToExpert) {
+    return <TalkToExpertRedirect leadCode={leadCode} />;
+  }
 
   if (!data.lead.paid) {
     return (
@@ -118,5 +128,21 @@ function OnboardingDetailsPage() {
         }}
       />
     </OnboardingShell>
+  );
+}
+
+function TalkToExpertRedirect({ leadCode }: { leadCode: string }) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate({
+      to: "/onboarding/$leadCode/done",
+      params: { leadCode },
+      replace: true,
+    });
+  }, [leadCode, navigate]);
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+    </div>
   );
 }

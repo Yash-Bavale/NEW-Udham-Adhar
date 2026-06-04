@@ -7,6 +7,7 @@ export const SERVICES = [
   { slug: "migrate-udyog-aadhaar-to-udyam", label: "Udyog Aadhaar to Udyam Migration", price: 99 },
   { slug: "forgot-mobile-email", label: "Forgot Registered Mobile / Email", price: 99 },
   { slug: "correct-pan-aadhaar", label: "Correct PAN / Aadhaar Name in Udyam", price: 99 },
+  { slug: "talk-to-expert", label: "Talk to Expert – Suitable Service Selection", price: 99 },
   
 ] as const;
 

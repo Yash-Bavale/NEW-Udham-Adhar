@@ -47,6 +47,9 @@ function serviceCodeFromLabel(serviceLabel: string | null): string {
     "forgot registered mobile/email": "forgot-mobile-email",
     "correct pan / aadhaar name in udyam": "correct-pan-aadhaar",
     "correct pan / aadhar name in udyam": "correct-pan-aadhaar",
+    "talk to expert": "talk-to-expert",
+    "talk to expert - suitable service selection": "talk-to-expert",
+    "expert consultation": "talk-to-expert",
   };
 
   const match = SERVICES.find((s) => s.label.trim().toLowerCase().replace(/[–—]/g, "-") === normalized);
