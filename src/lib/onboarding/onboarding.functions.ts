@@ -170,10 +170,18 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (!data.draft && app?.id) {
+      // form_status is a free-text column managed alongside the audited status transition
       await supabaseAdmin
         .from("applications")
-        .update({ application_status: "details_pending", form_status: "submitted" })
+        .update({ form_status: "submitted" })
         .eq("id", app.id);
+      const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
+      const tr = await transitionStatusSystem({
+        applicationId: app.id,
+        toStatus: "details_pending",
+        reason: "Onboarding details submitted",
+      });
+      if (!tr.ok) console.warn("[onboarding] transition skipped:", tr.reason);
     }
 
     // Fire completion emails on final submit (best-effort, never blocks)
