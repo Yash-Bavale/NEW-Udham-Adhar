@@ -6,13 +6,13 @@ export const Route = createFileRoute("/aadhar-udyog-registration")({
   head: () => ({
     meta: [
       { title: "Aadhar Udyog Registration - Aadhaar-Based MSME Registration Process" },
-      { name: "description", content: "Aadhar Udyog registration is the process of registering your business as a Micro, Small, or Medium Enterprise using your Aadhaar number for identity verification. This system streamlines MSME registration by linking your personal Aadhaar with the enterprise details, making verification quick, secure, and completely..." },
+      { name: "description", content: "Aadhar Udyog registration is the process of registering your business as a Micro, Small, or Medium Enterprise using your Aadhaar number for identity..." },
       { property: "og:title", content: "Aadhar Udyog Registration - Aadhaar-Based MSME Registration Process" },
-      { property: "og:description", content: "Aadhar Udyog registration is the process of registering your business as a Micro, Small, or Medium Enterprise using your Aadhaar number for identity verification. This system streamlines MSME registration by linking your personal Aadhaar with the enterprise details, making verification quick, secure, and completely..." },
+      { property: "og:description", content: "Aadhar Udyog registration is the process of registering your business as a Micro, Small, or Medium Enterprise using your Aadhaar number for identity..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aadhar-udyog-registration" },
     ],
   }),
-  component: () => <SeoLandingPage title="Aadhar Udyog Registration" linkTitle="Aadhar Udyog Registration - Aadhaar-Based MSME Registration Process" html={html} />,
+  component: () => <SeoLandingPage title="Aadhar Udyog registration" linkTitle="Aadhar Udyog Registration - Aadhaar-Based MSME Registration Process" content={`Aadhar Udyog registration is the process of registering your business as a Micro, Small, or Medium Enterprise using your Aadhaar number for identity verification. This system streamlines MSME registration by linking your personal Aadhaar with the enterprise details, making verification quick, secure, and completely paperless. Although the older Udyog Aadhar system was previously used, the Aadhaar-based process remains widely relevant and facilitates easy access to government benefits, loans, subsidies, and participation in procurement tenders. By completing the Aadhar Udyog registration, businesses receive a unique Udyam Registration Number and an official MSME certificate, which can be downloaded instantly online. This digital certificate acts as legal proof of your business status, helps build credibility with banks and clients, and allows participation in multiple government schemes. The registration process is free, user-friendly, and designed for all types of enterprises, including startups, family-owned businesses, and growing SMEs. By linking Aadhaar to your MSME registration, the government ensures authenticity, simplifies future updates to business information, and enables seamless compliance with regulatory requirements. Overall, Aadhar Udyog registration is a convenient and secure method for formalizing your business, enhancing market trust, and unlocking financial and operational benefits provided to registered MSMEs.`} html={html} />,
 });

@@ -6,13 +6,13 @@ export const Route = createFileRoute("/msme-udyog-aadhar")({
   head: () => ({
     meta: [
       { title: "MSME Udyog Aadhar - Old MSME Registration Identification" },
-      { name: "description", content: "MSME Udyog Aadhar was the official identification system for small and medium enterprises registered under the older MSME scheme. It provided businesses with a unique Udyog Aadhaar Number (UAN) to access government benefits such as interest-free or collateral-free loans, tax subsidies, and participation in..." },
+      { name: "description", content: "MSME Udyog Aadhar was the official identification system for small and medium enterprises registered under the older MSME scheme. It provided businesses..." },
       { property: "og:title", content: "MSME Udyog Aadhar - Old MSME Registration Identification" },
-      { property: "og:description", content: "MSME Udyog Aadhar was the official identification system for small and medium enterprises registered under the older MSME scheme. It provided businesses with a unique Udyog Aadhaar Number (UAN) to access government benefits such as interest-free or collateral-free loans, tax subsidies, and participation in..." },
+      { property: "og:description", content: "MSME Udyog Aadhar was the official identification system for small and medium enterprises registered under the older MSME scheme. It provided businesses..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/msme-udyog-aadhar" },
     ],
   }),
-  component: () => <SeoLandingPage title="MSME Udyog Aadhar" linkTitle="MSME Udyog Aadhar - Old MSME Registration Identification" html={html} />,
+  component: () => <SeoLandingPage title="MSME Udyog Aadhar" linkTitle="MSME Udyog Aadhar - Old MSME Registration Identification" content={`MSME Udyog Aadhar was the official identification system for small and medium enterprises registered under the older MSME scheme. It provided businesses with a unique Udyog Aadhaar Number (UAN) to access government benefits such as interest-free or collateral-free loans, tax subsidies, and participation in procurement tenders. This identification system formalized business operations, enhanced credibility with banks, financial institutions, and government authorities, and enabled participation in multiple government schemes aimed at supporting enterprise growth. While the Udyog Aadhar system remains valid, the government now encourages all businesses to migrate to the Udyam registration portal for faster, paperless registration, instant digitally signed certificates, and broader access to MSME benefits. MSME Udyog Aadhar was essential for ensuring authenticity, maintaining accurate records, and formalizing business identity in India’s economic ecosystem. Transitioning to Udyam registration simplifies updates, ensures compliance with modern regulations, and provides businesses with enhanced digital access to government support schemes, subsidies, and financial incentives designed to boost growth, innovation, and competitiveness in the MSME sector.`} html={html} />,
 });

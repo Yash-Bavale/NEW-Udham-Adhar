@@ -6,13 +6,13 @@ export const Route = createFileRoute("/udyam-msme-certificate")({
   head: () => ({
     meta: [
       { title: "Udyam MSME - Government Portal for MSME Registration" },
-      { name: "description", content: "Udyam MSME is the official government platform for registering businesses as micro, small, or medium enterprises. Registration is entirely free, paperless, and requires Aadhaar verification for authentication. Once registered, businesses receive a unique Udyam Registration Number and a digitally signed MSME..." },
+      { name: "description", content: "Udyam MSME is the official government platform for registering businesses as micro, small, or medium enterprises. Registration is entirely free,..." },
       { property: "og:title", content: "Udyam MSME - Government Portal for MSME Registration" },
-      { property: "og:description", content: "Udyam MSME is the official government platform for registering businesses as micro, small, or medium enterprises. Registration is entirely free, paperless, and requires Aadhaar verification for authentication. Once registered, businesses receive a unique Udyam Registration Number and a digitally signed MSME..." },
+      { property: "og:description", content: "Udyam MSME is the official government platform for registering businesses as micro, small, or medium enterprises. Registration is entirely free,..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-msme-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam MSME Certificate" linkTitle="Udyam MSME - Government Portal for MSME Registration" html={html} />,
+  component: () => <SeoLandingPage title="Udyam MSME Certificate" linkTitle="Udyam MSME - Government Portal for MSME Registration" content={`Udyam MSME is the official government platform for registering businesses as micro, small, or medium enterprises. Registration is entirely free, paperless, and requires Aadhaar verification for authentication. Once registered, businesses receive a unique Udyam Registration Number and a digitally signed MSME certificate instantly, which serves as proof of their enterprise status. This registration enables access to government benefits, including priority sector lending, interest-free or collateral-free loans, subsidies, participation in procurement tenders, and eligibility for multiple MSME support schemes. Udyam MSME simplifies compliance, enhances credibility with banks, clients, and government authorities, and facilitates future updates to business information. By registering on the portal, entrepreneurs, startups, and existing businesses gain recognition, financial support, operational guidance, and opportunities for long-term growth and market expansion. The platform promotes a digitally empowered MSME ecosystem, supporting small and medium enterprises in achieving sustainability, competitiveness, and success in India’s business landscape.`} html={html} />,
 });
