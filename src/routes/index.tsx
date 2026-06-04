@@ -110,12 +110,12 @@ function HomePage() {
           <div className="p-6">
             <img
               src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
-              alt="Sample Business Help Services Certificate"
+              alt="Sample Udyam Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
-              Note: Sample Business Help Services Certificate shown for reference purposes only.
+              Note: Sample Udyam Certificate shown for reference purposes only.
             </p>
           </div>
         </div>
