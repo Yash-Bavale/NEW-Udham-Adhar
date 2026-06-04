@@ -262,6 +262,7 @@ const TALK_TO_EXPERT: OnboardingSchema = {
   title: "Talk to Expert — Consultation Booked",
   description: "Your consultation request has been received. Our expert will contact you on your registered mobile.",
   fields: [],
+  documents: [],
 };
 
 // Default fallback used when a lead's service can't be mapped to a known schema.
