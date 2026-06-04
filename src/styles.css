@@ -93,6 +93,12 @@
   --gradient-warn: linear-gradient(135deg, oklch(0.75 0.17 75), oklch(0.7 0.18 50));
   --gradient-danger: linear-gradient(135deg, oklch(0.62 0.22 27), oklch(0.58 0.22 5));
   --shadow-admin: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -12px oklch(0.4 0.08 260 / 0.18);
+
+  /* Glassmorphism */
+  --glass-bg: color-mix(in oklab, var(--admin-surface) 70%, transparent);
+  --glass-border: color-mix(in oklab, var(--admin-border) 60%, transparent);
+  --glass-blur: 16px;
+  --glass-shadow: 0 8px 32px -12px oklch(0.4 0.08 260 / 0.25);
 }
 
 .dark {
