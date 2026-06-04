@@ -167,10 +167,30 @@ export function ComplaintFormPage() {
         </div>
       </div>
 
-      <article
-        className="mt-10 prose prose-sm md:prose-base max-w-none prose-headings:font-display prose-headings:text-foreground prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-a:text-brand-navy"
-        dangerouslySetInnerHTML={{ __html: policyHtml }}
-      />
+      <div className="mt-12 rounded-3xl overflow-hidden border border-border bg-card shadow-sm">
+        <div className="bg-gradient-to-br from-brand-navy to-brand-navy-deep text-white px-6 md:px-10 py-8 md:py-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider mb-3">
+            <ShieldAlert className="size-3.5" /> Official Policy
+          </div>
+          <h2 className="text-2xl md:text-3xl font-display font-bold">Complaint &amp; Grievance Policy</h2>
+          <p className="mt-2 text-sm md:text-base text-white/80 max-w-2xl">
+            How Business Help Services receives, reviews, and resolves user complaints and grievances — fairly, transparently, and professionally.
+          </p>
+        </div>
+        <article
+          className="policy-prose px-6 md:px-10 py-8 md:py-10 prose prose-sm md:prose-base max-w-none
+            prose-headings:font-display prose-headings:text-foreground
+            prose-h2:hidden
+            prose-h3:text-xl prose-h3:mt-0 prose-h3:mb-6 prose-h3:text-brand-navy
+            prose-h4:text-lg prose-h4:mt-8 prose-h4:mb-3 prose-h4:pl-4 prose-h4:border-l-4 prose-h4:border-brand-navy prose-h4:text-foreground
+            prose-p:text-muted-foreground prose-p:leading-relaxed
+            prose-li:text-muted-foreground prose-li:marker:text-brand-navy
+            prose-strong:text-foreground
+            prose-a:text-brand-navy prose-a:no-underline hover:prose-a:underline
+            prose-ul:my-4 prose-ol:my-4"
+          dangerouslySetInnerHTML={{ __html: policyHtml }}
+        />
+      </div>
     </section>);
 }
 
