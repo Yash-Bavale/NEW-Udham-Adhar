@@ -2,7 +2,57 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker } from "./NicCodePicker";
+
+const UPPERCASE_FIELDS = new Set([
+  "bank_ifsc",
+  "udyam_number",
+  "uam_number",
+  "pan_number",
+  "pan_holder_pan",
+  "gstin",
+]);
+
+const TITLECASE_FIELDS = new Set([
+  "applicant_name",
+  "pan_holder_name",
+  "authorized_person_name",
+  "bank_name",
+  "branch_name",
+  "enterprise_name",
+  "organisation_name",
+  "address_flat",
+  "address_premises",
+  "address_village",
+  "address_block",
+  "address_road",
+  "city",
+]);
+
+const PRESERVE_UPPER = new Set([
+  "PVT","LTD","LLP","HUF","OPC","INC","CO","PLC","LLC","SSI","MSME","IT","BPO","KPO","HR","R&D","II","III","IV","VI","VII","VIII","IX","XI","XII",
+]);
+
+function toTitleCase(input: string): string {
+  if (!input) return input;
+  return input
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) =>
+      word
+        .split("-")
+        .map((seg) => {
+          const upper = seg.toUpperCase();
+          if (PRESERVE_UPPER.has(upper)) return upper;
+          if (!seg) return seg;
+          return seg.charAt(0).toUpperCase() + seg.slice(1);
+        })
+        .join("-"),
+    )
+    .join(" ");
+}
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
