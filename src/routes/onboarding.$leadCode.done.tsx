@@ -36,7 +36,7 @@ function DonePage() {
       leadCode={leadCode}
       step={3}
       totalSteps={totalSteps}
-      title={helpMode ? "Help is on the way" : "You're all set"}
+      title={helpMode ? "Help is on the way" : "Form Submitted Successfully"}
     >
       <div className="text-center space-y-4 py-4">
         {helpMode ? (
