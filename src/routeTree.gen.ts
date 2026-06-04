@@ -197,6 +197,7 @@ import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCo
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
+import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
@@ -1185,6 +1186,12 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminServicesServiceCodeRoute =
+  AdminServicesServiceCodeRouteImport.update({
+    id: '/$serviceCode',
+    path: '/$serviceCode',
+    getParentRoute: () => AdminServicesRoute,
+  } as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -1437,7 +1444,7 @@ export interface FileRoutesByFullPath {
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
-  '/admin/services': typeof AdminServicesRoute
+  '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1453,6 +1460,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1640,7 +1648,7 @@ export interface FileRoutesByTo {
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
-  '/admin/services': typeof AdminServicesRoute
+  '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1656,6 +1664,7 @@ export interface FileRoutesByTo {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1845,7 +1854,7 @@ export interface FileRoutesById {
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
-  '/admin/services': typeof AdminServicesRoute
+  '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1861,6 +1870,7 @@ export interface FileRoutesById {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -2067,6 +2077,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/services/$serviceCode'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2270,6 +2281,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/services/$serviceCode'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2474,6 +2486,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/services/$serviceCode'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -3996,6 +4009,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/services/$serviceCode': {
+      id: '/admin/services/$serviceCode'
+      path: '/$serviceCode'
+      fullPath: '/admin/services/$serviceCode'
+      preLoaderRoute: typeof AdminServicesServiceCodeRouteImport
+      parentRoute: typeof AdminServicesRoute
+    }
     '/admin/leads/$leadId': {
       id: '/admin/leads/$leadId'
       path: '/$leadId'
@@ -4144,6 +4164,18 @@ const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
   AdminLeadsRouteChildren,
 )
 
+interface AdminServicesRouteChildren {
+  AdminServicesServiceCodeRoute: typeof AdminServicesServiceCodeRoute
+}
+
+const AdminServicesRouteChildren: AdminServicesRouteChildren = {
+  AdminServicesServiceCodeRoute: AdminServicesServiceCodeRoute,
+}
+
+const AdminServicesRouteWithChildren = AdminServicesRoute._addFileChildren(
+  AdminServicesRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
@@ -4155,7 +4187,7 @@ interface AdminRouteChildren {
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminGatewaysRoute: typeof AdminGatewaysRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
-  AdminServicesRoute: typeof AdminServicesRoute
+  AdminServicesRoute: typeof AdminServicesRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFinanceGstRoute: typeof AdminFinanceGstRoute
@@ -4173,7 +4205,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmailsRoute: AdminEmailsRoute,
   AdminGatewaysRoute: AdminGatewaysRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
-  AdminServicesRoute: AdminServicesRoute,
+  AdminServicesRoute: AdminServicesRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFinanceGstRoute: AdminFinanceGstRoute,
