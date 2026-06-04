@@ -26,7 +26,7 @@ export const Route = createFileRoute("/success/$leadCode")({
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
-const REDIRECT_SECONDS = 15;
+const REDIRECT_SECONDS = 30;
 
 type Phase = "confirming" | "confirmed" | "action";
 
@@ -116,9 +116,9 @@ function SuccessPage() {
 
   if (!data) return null;
 
-  // Phase derived from countdown — confirming (15-11) → confirmed (10-6) → action (5-0)
+  // Phase derived from countdown — confirming (30-21) → confirmed (20-11) → action (10-0)
   const elapsed = REDIRECT_SECONDS - secondsLeft;
-  const phase: Phase = elapsed < 5 ? "confirming" : elapsed < 10 ? "confirmed" : "action";
+  const phase: Phase = elapsed < 10 ? "confirming" : elapsed < 20 ? "confirmed" : "action";
   const ringCirc = 2 * Math.PI * 44;
   const ringProgress = ringCirc * (1 - secondsLeft / REDIRECT_SECONDS);
 
@@ -201,7 +201,7 @@ function SuccessPage() {
                 Confirming your payment…
               </h1>
               <p className="text-sm text-slate-600 max-w-sm">
-                Please wait while we verify your transaction with the gateway. Do not close or refresh this page.
+                Securely verifying with the payment gateway. Please don't close or refresh this page.
               </p>
             </div>
           )}
@@ -211,20 +211,20 @@ function SuccessPage() {
                 Payment confirmed ✓
               </h1>
               <p className="text-sm text-slate-700 max-w-sm">
-                Thank you! Your application fee has been received. Preparing your onboarding form…
+                Thank you! Your application fee has been received. Setting up your secure onboarding workspace…
               </p>
             </div>
           )}
           {phase === "action" && (
             <div key="t-action" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-red text-white text-[11px] uppercase tracking-widest font-bold mb-3 motion-safe:animate-pulse">
-                <Sparkles className="w-3.5 h-3.5" /> Action Needed
+                <Sparkles className="w-3.5 h-3.5" /> Almost There
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold font-display text-brand-navy mb-2 leading-tight">
-                Fill incomplete information
+                One last step — open your form
               </h1>
               <p className="text-sm text-slate-700 max-w-sm">
-                Our experts need a few more details to file your application. Opening the form automatically — please don't leave this page.
+                Our experts need a few more details to file your application. Opening your form in a moment — please don't leave this page.
               </p>
             </div>
           )}
