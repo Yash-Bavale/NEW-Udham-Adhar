@@ -1,30 +1,21 @@
-Plan to fix the stuck after-payment onboarding flow:
+## Improve dynamic sitemap.xml
 
-1. Fix the real navigation bug
-- The URL changes to `/documents`, but the Details form keeps showing because the dynamic onboarding route is acting like a parent route without rendering the child route.
-- Refactor `/onboarding/$leadCode` into a proper layout route and move the current Details form into an index child route so `/documents` and `/done` actually render their own screens.
+The existing `/sitemap.xml` server route auto-discovers static routes from the route tree but misses two things:
 
-2. Make the stepper service-aware instead of always showing Details → Documents → Done
-- Services with required uploads: show `Details → Documents → Done`.
-- Services with no required uploads: show only `Details → Done`.
-- The submit button will not say “Opening next step…” when there is no required next step; it will say something like “Submit details” and then go straight to the success page.
+1. **Enabled SEO pages** in the `seo_pages` table aren't included if their slug isn't a hardcoded file route.
+2. **`public/robots.txt`** advertises the wrong sitemap host (`everythinghappensqindiaserver4cored.lovable.app` instead of the canonical `udyamadhar.everythinghappens.in`).
 
-3. Route each service correctly after submit
-- New Udyam Registration: Details → Documents → Done.
-- Forgot Registered Mobile / Email: Details → Documents → Done.
-- Update Udyam Certificate: Details → Done, with optional upload access only if needed.
-- Migrate: Details → Done, with optional upload access only if needed.
-- Correct PAN / Aadhaar Name: Details → Done, with optional upload access only if needed.
-- Udyam Certificate Download: Details → Done.
-- Talk to Expert: Details → Done, with optional upload access only if needed.
+Also exclude admin/auth/onboarding/payment/processing/success/email/lovable paths and `/seo-admin` which should not be indexed.
 
-4. Improve messages and button states
-- Remove stuck “Opening next step…” state.
-- Show clear messages:
-  - “Details submitted successfully.” when there is no required document step.
-  - “Details submitted. Continue to document upload.” when documents are required.
-- Add a fallback so if navigation takes too long, the button comes back and shows a retry/error message instead of staying disabled forever.
+### Changes
 
-5. Cross-check all 7 preview paid links
-- Test all 7 service onboarding links after implementation.
-- Confirm each one lands on the correct next page and no service shows an unnecessary Documents step.
+**1. `src/routes/sitemap[.]xml.ts`**
+- Keep auto-discovery from `routeTree.gen.ts`.
+- Add an exclusion list for non-indexable paths: `/admin`, `/admin-login`, `/seo-admin`, anything starting with `/onboarding`, `/payment`, `/payment-pending`, `/payment-failed`, `/processing`, `/success`, `/apply`, `/email`, `/lovable`, `/complaint` (form), and existing `/api`, `/sitemap.xml`, `$`-routes.
+- Fetch `slug` from `seo_pages` where `enabled = true` via `supabaseAdmin` and merge into the URL set (dedupe).
+- Use `udyamadhar.everythinghappens.in` as `BASE_URL` (already correct).
+
+**2. `public/robots.txt`**
+- Update the `Sitemap:` line to `https://udyamadhar.everythinghappens.in/sitemap.xml`.
+
+No DB migrations, no UI changes.
