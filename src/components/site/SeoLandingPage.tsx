@@ -159,6 +159,8 @@ export function SeoLandingPage({
           </div>
         </div>
       </section>
+
+      <TrustBlock />
     </>
   );
 }
