@@ -206,6 +206,7 @@ import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/w
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
+import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 
 const WwwUdyamregistrationGovInRoute =
   WwwUdyamregistrationGovInRouteImport.update({
@@ -1233,6 +1234,12 @@ const ApiPublicCronOnboardingRemindersRoute =
     path: '/api/public/cron/onboarding-reminders',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronComplaintsSlaRoute =
+  ApiPublicCronComplaintsSlaRouteImport.update({
+    id: '/api/public/cron/complaints-sla',
+    path: '/api/public/cron/complaints-sla',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1425,6 +1432,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1623,6 +1631,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
+  '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1823,6 +1832,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -2024,6 +2034,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/onboarding/$leadCode/'
+    | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2222,6 +2233,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/onboarding/$leadCode'
+    | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2421,6 +2433,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/onboarding/$leadCode/'
+    | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
     | '/api/public/invoice/$leadCode'
@@ -2604,6 +2617,7 @@ export interface RootRouteChildren {
   OnboardingLeadCodeDocumentsRoute: typeof OnboardingLeadCodeDocumentsRoute
   OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
   OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
+  ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
@@ -3994,6 +4008,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronOnboardingRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/complaints-sla': {
+      id: '/api/public/cron/complaints-sla'
+      path: '/api/public/cron/complaints-sla'
+      fullPath: '/api/public/cron/complaints-sla'
+      preLoaderRoute: typeof ApiPublicCronComplaintsSlaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -4246,6 +4267,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingLeadCodeDocumentsRoute: OnboardingLeadCodeDocumentsRoute,
   OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
   OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
+  ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
