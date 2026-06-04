@@ -150,7 +150,7 @@ function SuccessPage() {
   }[phase];
 
   return (
-    <>
+    <div>
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-10 bg-gradient-to-b from-slate-50 to-white">
       <Card
         className={`w-full max-w-lg border-2 ${palette.border} bg-gradient-to-br ${palette.bg} shadow-2xl overflow-hidden transition-colors duration-700`}
