@@ -130,3 +130,19 @@ function OnboardingDetailsPage() {
     </OnboardingShell>
   );
 }
+
+function TalkToExpertRedirect({ leadCode }: { leadCode: string }) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate({
+      to: "/onboarding/$leadCode/done",
+      params: { leadCode },
+      replace: true,
+    });
+  }, [leadCode, navigate]);
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+    </div>
+  );
+}
