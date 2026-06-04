@@ -178,6 +178,7 @@ import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-fail
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
@@ -1090,6 +1091,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSubmissionsRoute = AdminSubmissionsRouteImport.update({
+  id: '/submissions',
+  path: '/submissions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminServicesRoute = AdminServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -1445,6 +1451,7 @@ export interface FileRoutesByFullPath {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/submissions': typeof AdminSubmissionsRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1649,6 +1656,7 @@ export interface FileRoutesByTo {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/submissions': typeof AdminSubmissionsRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1855,6 +1863,7 @@ export interface FileRoutesById {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/submissions': typeof AdminSubmissionsRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -2062,6 +2071,7 @@ export interface FileRouteTypes {
     | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
+    | '/admin/submissions'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2266,6 +2276,7 @@ export interface FileRouteTypes {
     | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
+    | '/admin/submissions'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2471,6 +2482,7 @@ export interface FileRouteTypes {
     | '/admin/gateways'
     | '/admin/leads'
     | '/admin/services'
+    | '/admin/submissions'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -3876,6 +3888,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/submissions': {
+      id: '/admin/submissions'
+      path: '/submissions'
+      fullPath: '/admin/submissions'
+      preLoaderRoute: typeof AdminSubmissionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/services': {
       id: '/admin/services'
       path: '/services'
@@ -4188,6 +4207,7 @@ interface AdminRouteChildren {
   AdminGatewaysRoute: typeof AdminGatewaysRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
+  AdminSubmissionsRoute: typeof AdminSubmissionsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminFinanceGstRoute: typeof AdminFinanceGstRoute
@@ -4206,6 +4226,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminGatewaysRoute: AdminGatewaysRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminServicesRoute: AdminServicesRouteWithChildren,
+  AdminSubmissionsRoute: AdminSubmissionsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminFinanceGstRoute: AdminFinanceGstRoute,
