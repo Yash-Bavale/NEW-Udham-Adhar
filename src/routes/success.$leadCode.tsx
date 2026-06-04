@@ -12,6 +12,7 @@ import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TrustBlock } from "@/components/site/TrustBlock";
 
 export const Route = createFileRoute("/success/$leadCode")({
   head: () => ({
