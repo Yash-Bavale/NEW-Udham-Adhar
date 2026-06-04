@@ -176,11 +176,7 @@ const UDYAM_UPDATE: OnboardingSchema = {
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false, placeholder: "Registered email, if available" },
     { key: "fields_to_update", label: "What details need to be updated?", type: "textarea", required: false, maxLength: 1200, help: "Mention any details our team should update or verify." },
   ],
-  documents: [
-    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 const UDYAM_DOWNLOAD: OnboardingSchema = {
