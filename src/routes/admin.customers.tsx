@@ -48,7 +48,7 @@ function CustomersPage() {
         <StatCard index={3} label="Avg LTV" value={fmtINR(m?.avgLtv ?? 0)} icon={<TrendingUp className="size-4" />} gradient="warn" loading={!m} />
       </div>
 
-      <SectionCard title="All customers" actions={<div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>{rows.length} shown</div>}>
+      <SectionCard title="All customers" action={<div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>{rows.length} shown</div>}>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <div className="relative flex-1 min-w-[260px]">
             <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-muted)" }} />
