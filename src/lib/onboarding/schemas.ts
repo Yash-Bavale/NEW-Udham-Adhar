@@ -163,11 +163,7 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "nsic_b2b_registration", label: "25. Interested in NSIC B2B Portal?", type: "select", required: false, options: YES_NO },
     { key: "skill_india_registration", label: "26. Interested in Skill India Digital Portal?", type: "select", required: false, options: YES_NO },
   ],
-  documents: [
-    ...COMMON_DOCS,
-    { key: "bank_proof", label: "Bank Passbook / Cancelled Cheque", required: true },
-    { key: "business_proof", label: "Business Address Proof (rent / electricity)", required: false },
-  ],
+  documents: [],
 };
 
 const UDYAM_UPDATE: OnboardingSchema = {
