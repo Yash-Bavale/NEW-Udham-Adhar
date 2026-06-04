@@ -6,117 +6,188 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ChevronRight, IdCard, Fingerprint, Share2, Download } from "lucide-react";
-import { FAQS } from "@/lib/faqs-data";
-import { IndiaMap } from "@/components/site/IndiaMap";
+import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 
-const HOME_FAQS = FAQS.slice(0, 10);
+const FAQS = [
+  {
+    q: "1. What is Business Help Services?",
+    a: "Business Help Services is an online registration process for Micro, Small, and Medium Enterprises (MSMEs) in India, subject to applicable eligibility criteria and regulations.",
+  },
+  {
+    q: "2. Who can apply for Business Help Services?",
+    a: "Eligible proprietors, startups, traders, service providers, manufacturers, partnerships, companies, and other business entities operating as MSMEs may apply subject to applicable rules and eligibility conditions.",
+  },
+  {
+    q: "3. What is the use of Business Help Services for businesses?",
+    a: "Business Help Services may help businesses maintain MSME registration records and may be used wherever applicable for business-related documentation, compliance, financial, operational, or institutional purposes subject to applicable policies and eligibility conditions.",
+  },
+  {
+    q: "4. Can I update or modify my Business Help Services details?",
+    a: "Subject to applicable rules and portal functionality, certain business details such as address, mobile number, email, business activity, or other information may be updated through the relevant process and verification requirements.",
+  },
+  {
+    q: "5. What should I do if my registered mobile number or email is no longer accessible?",
+    a: "Depending upon applicable procedures and verification requirements, users may request assistance for updating or recovering registered contact details wherever permitted.",
+  },
+  {
+    q: "6. Can I download my Udyam Certificate online?",
+    a: "Subject to applicable verification procedures and portal availability, Udyam-related certificates or acknowledgments may be downloaded or retrieved through the relevant process wherever available.",
+  },
+  {
+    q: "7. What documents or information may be required for Udyam-related services?",
+    a: "Depending upon the requested service, users may be required to provide details such as Aadhaar information, PAN information, business details, OTP verification, contact details, or other supporting information wherever applicable.",
+  },
+  {
+    q: "8. Is OTP verification required for certain Udyam-related processes?",
+    a: "Yes. Certain services or updates may require OTP verification, authentication confirmation, or consent-based validation depending upon the applicable process and system requirements.",
+  },
+  {
+    q: "9. Can businesses update business activity or classification details in Udyam records?",
+    a: "Subject to applicable procedures and verification requirements, certain business-related details including activity classification or related information may be updated wherever permitted.",
+  },
+  {
+    q: "10. What happens if incorrect information is submitted during registration or update?",
+    a: "Incorrect, incomplete, inconsistent, or unverifiable information may affect processing, verification, communication, eligibility assessment, or successful completion of the requested service.",
+  },
+];
 
-const PROCESS_STEPS = [
-  { icon: IdCard, label: "Fill Form &\nMake Payment" },
-  { icon: Fingerprint, label: "Submit Required\nInformation" },
-  { icon: Share2, label: "Expert Assistance\n& Verification" },
-  { icon: Download, label: "Updates Shared\nvia Email" },
+const STEPS = [
+  { icon: UserSquare2, label: "Fill Form & Make Payment", color: "text-brand-navy" },
+  { icon: Fingerprint, label: "Submit Required Information", color: "text-brand-red" },
+  { icon: Share2, label: "Expert Assistance & Verification", color: "text-brand-navy" },
+  { icon: Download, label: "Updates Shared via Email", color: "text-green-600" },
+];
+
+const FACTS: [string, string][] = [
+  ["Country", "India"],
+  ["Area", "3,287,263 sq. km."],
+  ["States", "28"],
+  ["Population", "1,46,39,00,000"],
+  ["Literacy", "80.9%"],
 ];
 
 export function TrustBlock() {
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
-    mainEntity: HOME_FAQS.map((f) => ({
+    mainEntity: FAQS.map((f) => ({
       "@type": "Question",
-      name: f.q,
+      name: f.q.replace(/^\d+\.\s*/, ""),
       acceptedAnswer: { "@type": "Answer", text: f.a },
     })),
   };
 
   return (
-    <>
-      {/* FAQ */}
-      <section className="bg-white py-12 md:py-16">
-        <div className="mx-auto max-w-4xl px-4">
-          <header className="text-center mb-8">
-            <h2 className="font-display text-2xl md:text-4xl font-bold text-brand-navy-deep">
-              Frequently Asked Questions for MSME registration in India.
-            </h2>
-            <p className="mt-3 text-xs md:text-sm uppercase tracking-wider text-muted-foreground max-w-2xl mx-auto">
-              MSME Business Help Services Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
-            </p>
-          </header>
+    <div>
+      {/* FAQ Section */}
+      <section className="mx-auto max-w-4xl px-4 py-8 md:py-12">
+        <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground leading-tight">
+          Frequently Asked Questions for MSME registration in India.
+        </h2>
+        <p className="mt-4 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground">
+          MSME Business Help Services Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
+        </p>
 
-          <Accordion type="single" collapsible className="space-y-3">
-            {HOME_FAQS.map((f, i) => (
-              <AccordionItem
-                key={f.id}
-                value={`faq-${f.id}`}
-                className="border border-border rounded-lg bg-card px-4 data-[state=open]:shadow-sm"
-              >
-                <AccordionTrigger className="text-left font-semibold text-brand-navy-deep hover:no-underline">
-                  {i + 1}. {f.q}
-                </AccordionTrigger>
-                <AccordionContent className="text-foreground/80 leading-relaxed">
-                  {f.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+        <Accordion type="single" collapsible className="mt-8 md:mt-10 space-y-3">
+          {FAQS.map((f, i) => (
+            <AccordionItem
+              key={i}
+              value={`faq-${i}`}
+              className="border border-border rounded-lg px-4 bg-card"
+            >
+              <AccordionTrigger className="text-left text-base md:text-lg font-semibold font-display hover:no-underline">
+                {f.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground leading-relaxed">
+                {f.a}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
 
-          <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-col items-center gap-3 text-center">
+          <Button
+            asChild
+            size="lg"
+            className="bg-brand-navy text-white hover:bg-brand-navy-deep shadow-sm"
+          >
             <Link to="/faqs">
-              <Button className="bg-brand-navy hover:bg-brand-navy-deep text-white rounded-md px-6 h-11 gap-2">
-                Read More <ArrowRight className="w-4 h-4" />
-              </Button>
+              Read More <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-          </div>
+          </Button>
         </div>
 
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
         />
       </section>
 
-      {/* Process */}
-      <section className="bg-slate-100 py-12 md:py-16">
-        <div className="mx-auto max-w-5xl px-4">
-          <h2 className="text-center font-display text-2xl md:text-3xl font-bold text-brand-navy-deep mb-10">
+      {/* Process Steps */}
+      <section className="bg-brand-navy/10">
+        <div className="mx-auto max-w-6xl px-4 py-10 md:py-12">
+          <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
             Udyam Assistance Process – Fast &amp; Simple
           </h2>
-          <ol className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-2">
-            {PROCESS_STEPS.map((s, idx) => (
-              <li key={idx} className="flex items-center gap-2 sm:gap-3 flex-1">
-                <div className="flex flex-col items-center text-center flex-1">
-                  <div className="w-20 h-20 rounded-full bg-white shadow-sm flex items-center justify-center mb-3">
-                    <s.icon className="w-9 h-9 text-brand-navy-deep" strokeWidth={1.75} />
+
+          <div className="mt-8 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-4 items-start">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={i} className="relative flex flex-col items-center text-center">
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white shadow-md flex items-center justify-center">
+                    <Icon className={`w-9 h-9 md:w-11 md:h-11 ${s.color}`} strokeWidth={2} />
                   </div>
-                  <p className="text-sm font-semibold text-brand-navy-deep whitespace-pre-line leading-tight">
+                  <p className="mt-4 font-bold text-foreground text-sm md:text-base leading-snug max-w-[12ch]">
                     {s.label}
                   </p>
+                  {i < STEPS.length - 1 && (
+                    <ArrowRight
+                      className="hidden md:block absolute top-10 -right-3 w-6 h-6 text-foreground"
+                      strokeWidth={2.5}
+                      aria-hidden
+                    />
+                  )}
                 </div>
-                {idx < PROCESS_STEPS.length - 1 && (
-                  <ChevronRight className="hidden sm:block w-6 h-6 text-brand-navy-deep/60 shrink-0" />
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* India map */}
-      <section className="bg-slate-50 py-12 md:py-16">
-        <div className="mx-auto max-w-4xl px-4">
-          <h2 className="text-center font-display text-2xl md:text-3xl font-bold text-brand-navy-deep mb-8">
-            We provide consultancy services across India.
-          </h2>
-          <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-            <IndiaMap />
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              Serving entrepreneurs in every state and union territory of India.
-            </p>
+              );
+            })}
           </div>
         </div>
       </section>
-    </>
+
+      {/* India Coverage */}
+      <section className="mx-auto max-w-5xl px-4 py-10 md:py-12">
+        <div className="rounded-lg border border-border overflow-hidden bg-card">
+          <div className="bg-muted/40 px-6 py-5 border-b border-border">
+            <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
+              We provide consultancy services across India.
+            </h2>
+          </div>
+          <div className="p-4 md:p-6 flex justify-center">
+            <img
+              src="https://udyamadhar.in/wp-content/uploads/2025/11/India-map-en.svg.webp"
+              alt="Map of India showing all states where consultancy services are provided"
+              className="w-full max-w-xl h-auto"
+              loading="lazy"
+            />
+          </div>
+          <table className="w-full border-t border-border text-sm md:text-base">
+            <tbody>
+              {FACTS.map(([k, v]) => (
+                <tr key={k} className="border-b border-border last:border-b-0">
+                  <th
+                    scope="row"
+                    className="w-1/2 text-left font-normal text-foreground px-4 md:px-6 py-4 border-r border-border"
+                  >
+                    {k}
+                  </th>
+                  <td className="px-4 md:px-6 py-4 text-foreground">{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   );
 }

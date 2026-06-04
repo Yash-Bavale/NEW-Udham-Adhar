@@ -5,14 +5,14 @@ import html from "@/content/wp/ms-me-certificate.html?raw";
 export const Route = createFileRoute("/ms-me-certificate")({
   head: () => ({
     meta: [
-      { title: "MS ME Certificate — Udyam / MSME Consultancy Help" },
-      { name: "description", content: "Expert consultancy assistance for MS ME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
-      { property: "og:title", content: "MS ME Certificate — Udyam / MSME Consultancy Help" },
-      { property: "og:description", content: "Expert consultancy assistance for MS ME Certificate. Get help with Udyam/MSME registration, updates and certificates across India." },
+      { title: "MSME Certificate Online | Get Udyam Registration Certificate" },
+      { name: "description", content: "The MS ME Certificate is an official document issued under the Udyam Registration system, verifying the registration of micro, small, or medium..." },
+      { property: "og:title", content: "MSME Certificate Online | Get Udyam Registration Certificate" },
+      { property: "og:description", content: "The MS ME Certificate is an official document issued under the Udyam Registration system, verifying the registration of micro, small, or medium..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/ms-me-certificate" },
     ],
   }),
-  component: () => <SeoLandingPage title="MS ME Certificate" linkTitle="MS ME Certificate" html={html} />,
+  component: () => <SeoLandingPage title="MS ME Certificate" linkTitle="MSME Certificate Online | Get Udyam Registration Certificate" content={`The MS ME Certificate is an official document issued under the Udyam Registration system, verifying the registration of micro, small, or medium enterprises. Entrepreneurs can download the certificate online using their Udyam Number and OTP verification. This certificate is essential for availing government loans, subsidies, tenders, and other schemes. The online process is fast, secure, paperless, and convenient for businesses of all sizes. Maintaining a copy ensures compliance with MSME regulations, provides credibility with banks and government departments, and guarantees uninterrupted access to financial and operational benefits. The MS ME Certificate is central to formal recognition and growth of small enterprises across India.`} html={html} />,
 });
