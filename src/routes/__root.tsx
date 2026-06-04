@@ -94,6 +94,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://udyamadhar.everythinghappens.in/" },
+      { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:description", content: "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections." },
