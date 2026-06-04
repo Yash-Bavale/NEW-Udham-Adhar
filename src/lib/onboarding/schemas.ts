@@ -236,11 +236,7 @@ const CORRECT_PAN_AADHAAR: OnboardingSchema = {
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
     { key: "correction_needed", label: "Correction required", type: "textarea", required: false, maxLength: 800, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
   ],
-  documents: [
-    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 // Talk-to-Expert is a paid consultation. After payment we skip the intake form
