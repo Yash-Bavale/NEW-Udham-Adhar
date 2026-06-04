@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -90,6 +90,11 @@ function ServicesPage() {
                 <td className="px-3 py-2 text-right font-semibold">₹{Number(s.total_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-center">{s.is_active ? "✓" : "—"}</td>
                 <td className="px-3 py-2 text-right">
+                  <Link
+                    to="/admin/services/$serviceCode"
+                    params={{ serviceCode: s.service_code }}
+                    className="text-emerald-700 text-xs hover:underline mr-3"
+                  >Configure</Link>
                   <button onClick={() => setForm(s as ServiceForm)} className="text-blue-700 text-xs hover:underline mr-3">Edit</button>
                   <button
                     onClick={async () => {
