@@ -248,6 +248,6 @@ function SuccessPage() {
       </Card>
     </div>
     <TrustBlock />
-    </>
+    </div>
   );
 }
