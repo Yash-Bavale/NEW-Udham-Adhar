@@ -101,6 +101,22 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
       "Current Udyam details, Aadhaar, PAN, business details, and additional documents or information may be required depending upon processing requirements.",
     ],
   },
+  "Talk to Expert – Suitable Service Selection": {
+    tagline: "Get guided consultation before choosing the right service.",
+    bullets: [
+      "Requirement reviewed by an expert consultant",
+      "Real-time Email updates on every step",
+      "Basic consultation service intended to help identify suitable service requirements.",
+    ],
+  },
+  "Expert Consultation": {
+    tagline: "Get guided consultation before choosing the right service.",
+    bullets: [
+      "Requirement reviewed by an expert consultant",
+      "Real-time Email updates on every step",
+      "Basic consultation service intended to help identify suitable service requirements.",
+    ],
+  },
 };
 
 // Gateway brand colors — used to render a logo-style pill.
