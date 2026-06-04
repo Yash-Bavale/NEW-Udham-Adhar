@@ -200,6 +200,7 @@ import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/comp
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
+import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
 import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
 import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
@@ -1199,6 +1200,12 @@ const AdminFinanceGstRoute = AdminFinanceGstRouteImport.update({
   path: '/finance/gst',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCustomersCustomerIdRoute =
+  AdminCustomersCustomerIdRouteImport.update({
+    id: '/$customerId',
+    path: '/$customerId',
+    getParentRoute: () => AdminCustomersRoute,
+  } as any)
 const AdminComplaintsComplaintIdRoute =
   AdminComplaintsComplaintIdRouteImport.update({
     id: '/$complaintId',
@@ -1425,7 +1432,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
-  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1442,6 +1449,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
+  '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -1627,7 +1635,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
-  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1644,6 +1652,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
+  '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -1831,7 +1840,7 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
-  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/gateways': typeof AdminGatewaysRoute
@@ -1848,6 +1857,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
+  '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
@@ -2053,6 +2063,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
+    | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -2255,6 +2266,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
+    | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -2458,6 +2470,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
+    | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
@@ -4004,6 +4017,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinanceGstRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/customers/$customerId': {
+      id: '/admin/customers/$customerId'
+      path: '/$customerId'
+      fullPath: '/admin/customers/$customerId'
+      preLoaderRoute: typeof AdminCustomersCustomerIdRouteImport
+      parentRoute: typeof AdminCustomersRoute
+    }
     '/admin/complaints/$complaintId': {
       id: '/admin/complaints/$complaintId'
       path: '/$complaintId'
@@ -4100,6 +4120,18 @@ const AdminComplaintsRouteWithChildren = AdminComplaintsRoute._addFileChildren(
   AdminComplaintsRouteChildren,
 )
 
+interface AdminCustomersRouteChildren {
+  AdminCustomersCustomerIdRoute: typeof AdminCustomersCustomerIdRoute
+}
+
+const AdminCustomersRouteChildren: AdminCustomersRouteChildren = {
+  AdminCustomersCustomerIdRoute: AdminCustomersCustomerIdRoute,
+}
+
+const AdminCustomersRouteWithChildren = AdminCustomersRoute._addFileChildren(
+  AdminCustomersRouteChildren,
+)
+
 interface AdminLeadsRouteChildren {
   AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
 }
@@ -4118,7 +4150,7 @@ interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCertificatesRoute: typeof AdminCertificatesRoute
   AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
-  AdminCustomersRoute: typeof AdminCustomersRoute
+  AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminGatewaysRoute: typeof AdminGatewaysRoute
@@ -4136,7 +4168,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminCertificatesRoute: AdminCertificatesRoute,
   AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
-  AdminCustomersRoute: AdminCustomersRoute,
+  AdminCustomersRoute: AdminCustomersRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminGatewaysRoute: AdminGatewaysRoute,
