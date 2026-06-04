@@ -154,7 +154,10 @@ export const updateSubmissionStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const patch: Record<string, unknown> = { status: data.status, updated_at: new Date().toISOString() };
+    const patch: { status: string; updated_at: string; submitted_at?: string } = {
+      status: data.status,
+      updated_at: new Date().toISOString(),
+    };
     if (data.status === "submitted") patch.submitted_at = new Date().toISOString();
     const { error } = await supabase
       .from("onboarding_submissions")
