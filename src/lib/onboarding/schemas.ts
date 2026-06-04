@@ -66,13 +66,44 @@ const FORGOT_USER_TYPES = [
   "Individuals or Others",
   "Associations",
 ] as const;
-const TALK_TO_EXPERT_OPTIONS = [
-  "New Udyam Registration",
-  "Update Udyam Certificate",
-  "Udyam Registration Certificate Download",
-  "Migrate",
-  "Forgot Registered Mobile / Email",
-  "Correct PAN / Aadhaar Name in Udyam",
+
+export const INDIA_STATES = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry",
 ] as const;
 
 const COMMON_DOCS: DocDef[] = [
@@ -224,20 +255,8 @@ const CORRECT_PAN_AADHAAR: OnboardingSchema = {
   ],
 };
 
-const DEFAULT: OnboardingSchema = {
-  title: "Talk to Expert — Suitable Service Selection",
-  description: "Select the service you need help with and share any context so our expert can guide the next step.",
-  fields: [
-    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "selected_service", label: "Select Service", type: "select", required: true, options: TALK_TO_EXPERT_OPTIONS },
-    { key: "alt_mobile", label: "Alternate Mobile", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
-    { key: "details", label: "Describe your requirement", type: "textarea", required: false, maxLength: 1200 },
-  ],
-  documents: [
-    { key: "aadhaar_front", label: "Aadhaar Card (front)", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
-};
+// Default fallback used when a lead's service can't be mapped to a known schema.
+const DEFAULT: OnboardingSchema = NEW_UDYAM;
 
 export const ONBOARDING_SCHEMAS: Record<string, OnboardingSchema> = {
   "new-udyam-registration": NEW_UDYAM,
@@ -246,7 +265,6 @@ export const ONBOARDING_SCHEMAS: Record<string, OnboardingSchema> = {
   "migrate-udyog-aadhaar-to-udyam": MIGRATE,
   "forgot-mobile-email": FORGOT_MOBILE,
   "correct-pan-aadhaar": CORRECT_PAN_AADHAAR,
-  "talk-to-expert": DEFAULT,
 };
 
 export function getSchema(serviceCode: string | null | undefined): OnboardingSchema {

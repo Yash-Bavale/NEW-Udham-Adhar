@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import type { FieldDef, OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_STATES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { NicCodePicker } from "./NicCodePicker";
 
 const inputCls =
@@ -226,8 +226,24 @@ function FieldRenderer({
   onChange: (v: string) => void;
 }) {
   const colSpan = field.type === "textarea" || field.type === "nic" ? "md:col-span-2" : "";
+  const id = `f-${field.key}`;
+  const isState = field.key === "state";
+  const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
+  const isMobile = field.type === "tel" && field.pattern === "^[6-9]\\d{9}$";
+  const isAadhaar = field.pattern === "^\\d{12}$";
+  const isPan = field.pattern === "^[A-Z]{5}\\d{4}[A-Z]$";
+
+  // Map (rawValue) -> (storedValue). Lets us auto-uppercase PAN / digits-only Aadhaar etc.
+  const transform = (raw: string): string => {
+    if (isPincode) return raw.replace(/\D/g, "").slice(0, 6);
+    if (isMobile) return raw.replace(/\D/g, "").slice(0, 10);
+    if (isAadhaar) return raw.replace(/\D/g, "").slice(0, 12);
+    if (isPan) return raw.toUpperCase().replace(/\s/g, "").slice(0, 10);
+    return raw;
+  };
+
   const common = {
-    id: `f-${field.key}`,
+    id,
     name: field.key,
     required: field.required,
     placeholder: field.placeholder,
@@ -235,7 +251,7 @@ function FieldRenderer({
     pattern: field.pattern,
     value,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      onChange(e.target.value),
+      onChange(transform(e.target.value)),
     className: inputCls,
   };
 
@@ -245,16 +261,39 @@ function FieldRenderer({
       ? activityRaw
       : null;
 
+  // Decide input mode + html type so mobile keyboards match.
+  let htmlType: string = field.type;
+  let inputMode: React.HTMLAttributes<HTMLInputElement>["inputMode"] | undefined;
+  if (isPincode || isMobile || isAadhaar) {
+    htmlType = "tel";
+    inputMode = "numeric";
+  } else if (field.type === "number") {
+    inputMode = "decimal";
+  } else if (isPan) {
+    htmlType = "text";
+  }
+
   return (
     <div className={colSpan}>
-      <label htmlFor={common.id} className="block text-sm font-semibold text-foreground mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-foreground mb-1.5">
         {field.label}
         {field.required && <span className="text-destructive"> *</span>}
       </label>
       {field.type === "textarea" ? (
         <textarea {...common} rows={3} />
+      ) : isState ? (
+        <select {...common}>
+          <option value="" disabled>
+            Select state…
+          </option>
+          {INDIA_STATES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
       ) : field.type === "select" ? (
-        <select {...common} defaultValue={value || ""}>
+        <select {...common}>
           <option value="" disabled>
             Select…
           </option>
@@ -266,7 +305,7 @@ function FieldRenderer({
         </select>
       ) : field.type === "nic" ? (
         <NicCodePicker
-          id={common.id}
+          id={id}
           value={value}
           onChange={onChange}
           digits={field.nicDigits ?? 5}
@@ -274,7 +313,13 @@ function FieldRenderer({
           required={field.required}
         />
       ) : (
-        <input type={field.type} {...common} />
+        <input
+          type={htmlType}
+          inputMode={inputMode}
+          autoCapitalize={isPan ? "characters" : undefined}
+          autoComplete={isMobile ? "tel" : field.type === "email" ? "email" : undefined}
+          {...common}
+        />
       )}
       {field.help && <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>}
     </div>
