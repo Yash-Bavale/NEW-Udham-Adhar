@@ -283,10 +283,13 @@ function FieldRenderer({
   const colSpan = field.type === "textarea" || field.type === "nic" ? "md:col-span-2" : "";
   const id = `f-${field.key}`;
   const isState = field.key === "state";
+  const isDistrict = field.key === "district";
   const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
   const isMobile = field.type === "tel" && field.pattern === "^[6-9]\\d{9}$";
   const isAadhaar = field.pattern === "^\\d{12}$";
   const isPan = field.pattern === "^[A-Z]{5}\\d{4}[A-Z]$";
+  const isUpper = UPPERCASE_FIELDS.has(field.key);
+  const isTitle = TITLECASE_FIELDS.has(field.key);
 
   // Map (rawValue) -> (storedValue). Lets us auto-uppercase PAN / digits-only Aadhaar etc.
   const transform = (raw: string): string => {
@@ -294,7 +297,15 @@ function FieldRenderer({
     if (isMobile) return raw.replace(/\D/g, "").slice(0, 10);
     if (isAadhaar) return raw.replace(/\D/g, "").slice(0, 12);
     if (isPan) return raw.toUpperCase().replace(/\s/g, "").slice(0, 10);
+    if (isUpper) return raw.toUpperCase();
     return raw;
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (isTitle) {
+      const titled = toTitleCase(e.target.value);
+      if (titled !== e.target.value) onChange(titled);
+    }
   };
 
   const common = {
@@ -324,9 +335,12 @@ function FieldRenderer({
     inputMode = "numeric";
   } else if (field.type === "number") {
     inputMode = "decimal";
-  } else if (isPan) {
+  } else if (isPan || isUpper) {
     htmlType = "text";
   }
+
+  const currentState = allValues.state ?? "";
+  const districtOptions = isDistrict ? INDIA_DISTRICTS[currentState] ?? [] : [];
 
   return (
     <div className={colSpan}>
@@ -335,7 +349,7 @@ function FieldRenderer({
         {field.required && <span className="text-destructive"> *</span>}
       </label>
       {field.type === "textarea" ? (
-        <textarea {...common} rows={3} />
+        <textarea {...common} onBlur={handleBlur} rows={3} />
       ) : isState ? (
         <select {...common}>
           <option value="" disabled>
@@ -344,6 +358,17 @@ function FieldRenderer({
           {INDIA_STATES.map((s) => (
             <option key={s} value={s}>
               {s}
+            </option>
+          ))}
+        </select>
+      ) : isDistrict ? (
+        <select {...common} disabled={!currentState}>
+          <option value="" disabled>
+            {currentState ? "Select district…" : "Select state first"}
+          </option>
+          {districtOptions.map((d) => (
+            <option key={d} value={d}>
+              {d}
             </option>
           ))}
         </select>
@@ -371,12 +396,14 @@ function FieldRenderer({
         <input
           type={htmlType}
           inputMode={inputMode}
-          autoCapitalize={isPan ? "characters" : undefined}
+          autoCapitalize={isPan || isUpper ? "characters" : isTitle ? "words" : undefined}
           autoComplete={isMobile ? "tel" : field.type === "email" ? "email" : undefined}
+          onBlur={handleBlur}
           {...common}
         />
       )}
       {field.help && <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>}
     </div>
+
   );
 }
