@@ -142,7 +142,12 @@ export function OnboardingForm({
   }, [values, busy]);
 
   function update(k: string, v: string) {
-    setValues((s) => ({ ...s, [k]: v }));
+    setValues((s) => {
+      const next = { ...s, [k]: v };
+      // When state changes, clear district so a stale value can't remain.
+      if (k === "state" && s.state !== v) next.district = "";
+      return next;
+    });
   }
 
   async function handle(e: React.FormEvent) {
