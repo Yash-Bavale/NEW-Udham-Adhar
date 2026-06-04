@@ -163,11 +163,7 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "nsic_b2b_registration", label: "25. Interested in NSIC B2B Portal?", type: "select", required: false, options: YES_NO },
     { key: "skill_india_registration", label: "26. Interested in Skill India Digital Portal?", type: "select", required: false, options: YES_NO },
   ],
-  documents: [
-    ...COMMON_DOCS,
-    { key: "bank_proof", label: "Bank Passbook / Cancelled Cheque", required: true },
-    { key: "business_proof", label: "Business Address Proof (rent / electricity)", required: false },
-  ],
+  documents: [],
 };
 
 const UDYAM_UPDATE: OnboardingSchema = {
@@ -180,11 +176,7 @@ const UDYAM_UPDATE: OnboardingSchema = {
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false, placeholder: "Registered email, if available" },
     { key: "fields_to_update", label: "What details need to be updated?", type: "textarea", required: false, maxLength: 1200, help: "Mention any details our team should update or verify." },
   ],
-  documents: [
-    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 const UDYAM_DOWNLOAD: OnboardingSchema = {
@@ -208,11 +200,7 @@ const MIGRATE: OnboardingSchema = {
     { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
   ],
-  documents: [
-    { key: "udyog_aadhaar_certificate", label: "Existing Udyog Aadhaar / UAM Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 const FORGOT_MOBILE: OnboardingSchema = {
@@ -248,11 +236,7 @@ const CORRECT_PAN_AADHAAR: OnboardingSchema = {
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
     { key: "correction_needed", label: "Correction required", type: "textarea", required: false, maxLength: 800, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
   ],
-  documents: [
-    { key: "current_udyam_certificate", label: "Current Udyam Certificate", required: false },
-    { key: "aadhaar_card", label: "Aadhaar Card", required: false },
-    { key: "pan_card", label: "PAN Card", required: false },
-  ],
+  documents: [],
 };
 
 // Talk-to-Expert is a paid consultation. After payment we skip the intake form
