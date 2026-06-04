@@ -53,7 +53,7 @@ function ProcessingPage() {
   const active = STEPS[activeIdx];
 
   return (
-    <>
+    <div>
     <section className="relative mx-auto max-w-2xl px-4 py-12 md:py-20">
       {/* ambient background */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
