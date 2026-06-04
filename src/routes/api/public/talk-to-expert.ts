@@ -50,24 +50,10 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
           );
         }
 
-        // 60s dedup guard: same email + talk_to_expert
-        const since = new Date(Date.now() - 60_000).toISOString();
-        const { data: recent } = await supabaseAdmin
-          .from("leads")
-          .select("id, lead_code, status")
-          .eq("email", parsed.email)
-          .eq("lead_source", "talk_to_expert")
-          .gte("created_at", since)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
+        // Always create a fresh lead — treat every submission as a new application.
         let leadId: string;
         let leadCode: string | null;
-        if (recent?.id) {
-          leadId = recent.id;
-          leadCode = recent.lead_code ?? null;
-        } else {
+        {
           const { data: lead, error } = await supabaseAdmin
             .from("leads")
             .insert({
@@ -102,6 +88,7 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
             metadata: { source: "talk_to_expert", problem: parsed.problem } as never,
           });
         }
+
 
         // Notify admin (best-effort)
         const adminTo = process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
