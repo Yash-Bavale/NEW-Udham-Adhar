@@ -19,11 +19,12 @@ import {
   getApplicationSummary,
   updateLeadContact,
 } from "@/lib/payments/gateways.functions";
-import { createPayUOrder } from "@/lib/payments/payu.functions";
+import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import payuLogo from "@/assets/gateways/payu.svg";
 import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
+
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
   head: () => ({
