@@ -315,7 +315,7 @@ function CertificatesTable({ certificates }: { certificates: any[] }) {
           <th className="text-left">Delivered</th>
         </tr>
       </thead>
-      <tbody className="divide-y" style={{ borderColor: "var(--admin-border)" } as any}>
+      <tbody className="divide-y">
         {certificates.map((c: any) => (
           <tr key={c.id}>
             <td className="py-2 font-mono text-xs" style={{ color: "var(--admin-fg)" }}>{c.certificate_number || "—"}</td>
