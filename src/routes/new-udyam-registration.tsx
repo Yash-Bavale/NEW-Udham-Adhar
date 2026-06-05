@@ -8,9 +8,9 @@ export const Route = createFileRoute("/new-udyam-registration")({
   head: () => ({
     meta: [
       { title: TITLE },
-      { name: "description", content: "Udyam new registration is designed for businesses applying for MSME certification for the first time on the official government portal. The process is..." },
+      { name: "description", content: "Udyam New Registration is designed for businesses applying for MSME certification for the first time on the official government portal. The process is..." },
       { property: "og:title", content: TITLE },
-      { property: "og:description", content: "Udyam new registration is designed for businesses applying for MSME certification for the first time on the official government portal. The process is..." },
+      { property: "og:description", content: "Udyam New Registration is designed for businesses applying for MSME certification for the first time on the official government portal. The process is..." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/new-udyam-registration" },
