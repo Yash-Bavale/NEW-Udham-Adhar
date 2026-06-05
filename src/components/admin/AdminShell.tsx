@@ -111,7 +111,56 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {Object.entries(groups).map(([group, items]) => (
+          {GROUP_ORDER.filter((g) => groups[g]?.length).map((group) => (
+            <div key={group} className="space-y-0.5">{(() => {
+              const items = groups[group]!;
+              return (
+                <>
+                  {!collapsed && (
+                    <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--admin-sidebar-muted)" }}>
+                      {group}
+                    </div>
+                  )}
+                  {items.map((n) => {
+                    const active = path === n.to || (n.to !== "/admin/dashboard" && n.to !== "/admin/finance" && path.startsWith(n.to + "/")) || path === n.to;
+                    const Icon = n.icon;
+                    return (
+                      <Link
+                        key={n.to}
+                        to={n.to}
+                        className="relative flex items-center gap-3 rounded-md px-3 py-1.5 text-[13px] transition-colors"
+                        style={{
+                          background: active ? "var(--admin-accent-soft)" : "transparent",
+                          color: active ? "var(--admin-fg)" : "var(--admin-sidebar-muted)",
+                        }}
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="admin-nav-active"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-r"
+                            style={{ background: "var(--admin-accent)" }}
+                            transition={{ duration: 0.25 }}
+                          />
+                        )}
+                        <Icon className="size-4 shrink-0" />
+                        <AnimatePresence>
+                          {!collapsed && (
+                            <motion.span
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="truncate"
+                            >
+                              {n.label}
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </Link>
+                    );
+                  })}
+                </>
+              );
+            })()}
             <div key={group} className="space-y-0.5">
               {!collapsed && (
                 <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--admin-sidebar-muted)" }}>
