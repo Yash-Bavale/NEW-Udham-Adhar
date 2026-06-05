@@ -43,12 +43,12 @@ export type CcavCreds = {
 };
 
 export function getCcavCreds(): CcavCreds {
-  const merchantId = process.env.CCAV_MERCHANT_ID;
-  const accessCode = process.env.CCAV_ACCESS_CODE;
-  const workingKey = process.env.CCAV_WORKING_KEY;
+  const merchantId = (process.env.CCAV_MERCHANT_ID ?? "").trim();
+  const accessCode = (process.env.CCAV_ACCESS_CODE ?? "").trim();
+  const workingKey = (process.env.CCAV_WORKING_KEY ?? "").trim();
   if (!merchantId || !accessCode || !workingKey) {
     throw new Error(
-      "CCAvenue is not configured. Set CCAV_MERCHANT_ID, CCAV_ACCESS_CODE and CCAV_WORKING_KEY.",
+      "CCAvenue is not configured. Set CCAV_MERCHANT_ID, CCAV_ACCESS_CODE and CCAV_WORKING_KEY (no surrounding whitespace).",
     );
   }
   return { merchantId, accessCode, workingKey };
