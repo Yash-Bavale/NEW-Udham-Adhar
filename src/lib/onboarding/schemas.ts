@@ -9,7 +9,8 @@ export type FieldType =
   | "date"
   | "select"
   | "textarea"
-  | "nic";
+  | "nic"
+  | "section";
 
 export type FieldDef = {
   key: string;
@@ -33,11 +34,20 @@ export type DocDef = {
   help?: string;
 };
 
+export type DocumentsInstructions = {
+  /** Short red-highlighted instructions shown above the document uploader. */
+  lines: string[];
+  /** Optional downloadable standard form PDF. */
+  downloadUrl?: string;
+  downloadLabel?: string;
+};
+
 export type OnboardingSchema = {
   title: string;
   description: string;
   fields: FieldDef[];
   documents: DocDef[];
+  documentsInstructions?: DocumentsInstructions;
 };
 
 const BUSINESS_TYPES = [
