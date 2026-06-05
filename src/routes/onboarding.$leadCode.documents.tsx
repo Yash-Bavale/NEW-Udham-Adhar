@@ -58,6 +58,8 @@ function DocsPage() {
     data.documents.some((u) => u.doc_type === d.key),
   );
 
+  const instructions = data.schema.documentsInstructions;
+
   return (
     <OnboardingShell
       leadCode={leadCode}
@@ -66,6 +68,28 @@ function DocsPage() {
       title="Upload supporting documents"
       subtitle="Clear photos or scans only. Max 5 MB each. PDF, JPG, PNG or WEBP."
     >
+      {instructions && (
+        <div className="mb-5 rounded-xl border-2 border-red-300 bg-red-50 p-4 space-y-3">
+          <p className="text-sm font-bold text-red-700 uppercase tracking-wide">
+            Please read carefully
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-sm text-red-700 font-medium">
+            {instructions.lines.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+          {instructions.downloadUrl && (
+            <a
+              href={instructions.downloadUrl}
+              download
+              className="inline-flex items-center gap-2 rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2 text-sm transition-colors"
+            >
+              ⬇ {instructions.downloadLabel ?? "Download Standard Form"}
+            </a>
+          )}
+        </div>
+      )}
+
       <DocumentUploader
         leadCode={leadCode}
         docs={data.schema.documents}
