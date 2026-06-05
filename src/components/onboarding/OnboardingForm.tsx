@@ -171,15 +171,26 @@ export function OnboardingForm({
   return (
     <form onSubmit={handle} className="space-y-5">
       <div className="grid md:grid-cols-2 gap-4">
-        {schema.fields.map((f) => (
-          <FieldRenderer
-            key={f.key}
-            field={f}
-            value={values[f.key] ?? ""}
-            allValues={values}
-            onChange={(v) => update(f.key, v)}
-          />
-        ))}
+        {schema.fields.map((f) => {
+          if (f.type === "section") {
+            return (
+              <div key={f.key} className="md:col-span-2 pt-4 mt-2 border-t border-border">
+                <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">
+                  {f.label}
+                </h3>
+              </div>
+            );
+          }
+          return (
+            <FieldRenderer
+              key={f.key}
+              field={f}
+              value={values[f.key] ?? ""}
+              allValues={values}
+              onChange={(v) => update(f.key, v)}
+            />
+          );
+        })}
       </div>
 
       {err && (
