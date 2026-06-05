@@ -81,13 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Udyam Registration — Business Help Consultancy" },
+      { title: "Udyam Aadhar Registration Business Help Consultancy-" },
       {
         name: "description",
         content:
           "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance.",
       },
-      { property: "og:title", content: "Udyam Registration — Business Help Consultancy" },
+      { property: "og:title", content: "Udyam Aadhar Registration Business Help Consultancy-" },
       {
         property: "og:description",
         content:
@@ -97,12 +97,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:url", content: "https://udyamadhar.everythinghappens.in/" },
       { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Udyam Registration — Business Help Consultancy" },
-      { name: "twitter:description", content: "Udyam Dhar Rebuilt is a custom platform recreating udyamadhar.in with integrated lead, payment, and customer management." },
+      { name: "twitter:title", content: "Udyam Aadhar Registration Business Help Consultancy-" },
+      { name: "twitter:description", content: "Udyam Aadhar Registration, Udyam Aadhar Update, Download Udyam Aadhar, New Udyam Registration" },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
-      { name: "description", content: "Udyam Dhar Rebuilt is a custom platform recreating udyamadhar.in with integrated lead, payment, and customer management." },
-      { property: "og:description", content: "Udyam Dhar Rebuilt is a custom platform recreating udyamadhar.in with integrated lead, payment, and customer management." },
+      { name: "description", content: "Udyam Aadhar Registration, Udyam Aadhar Update, Download Udyam Aadhar, New Udyam Registration" },
+      { property: "og:description", content: "Udyam Aadhar Registration, Udyam Aadhar Update, Download Udyam Aadhar, New Udyam Registration" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
