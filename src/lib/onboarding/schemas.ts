@@ -70,12 +70,7 @@ const YES_NO = ["Yes", "No"] as const;
 const GST_OPTIONS = ["Yes", "No", "Exempted"] as const;
 const ACTIVITY_TYPES = ["Manufacturing", "Services", "Trading"] as const;
 const REGISTRATION_HISTORY = ["N/A", "EM-II", "Previous UAM"] as const;
-const FORGOT_USER_TYPES = [
-  "MSME unit with UAM or Udyam Registration",
-  "MSME unit without UAM or Udyam Registration",
-  "Individuals or Others",
-  "Associations",
-] as const;
+// FORGOT_USER_TYPES removed — service 5 now uses the New Udyam form.
 
 export const INDIA_STATES = [
   "Andhra Pradesh",
