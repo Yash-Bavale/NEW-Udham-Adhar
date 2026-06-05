@@ -347,3 +347,62 @@ function fmt(iso?: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 }
+
+function DocChecklistPanel({ applicationId }: { applicationId: string }) {
+  const fetchFn = useServerFn(getApplicationDocChecklist);
+  const { data } = useQuery({
+    queryKey: ["admin.application.doc-checklist", applicationId],
+    queryFn: () => fetchFn({ data: { applicationId } }),
+  });
+  const items = data?.items ?? [];
+  const stats = data?.stats;
+  return (
+    <Panel>
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+          Documents
+        </div>
+        {stats && (
+          <span className="text-[10px] font-mono" style={{ color: "var(--admin-fg-muted)" }}>
+            {stats.approved}/{stats.total} approved
+          </span>
+        )}
+      </div>
+      {stats && (
+        <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: "var(--admin-surface-2)" }}>
+          <div
+            className="h-full transition-all"
+            style={{ width: `${stats.completionPct}%`, background: "var(--admin-success)" }}
+          />
+        </div>
+      )}
+      <ul className="mt-2 space-y-1">
+        {items.length === 0 && (
+          <li className="text-[11px] italic" style={{ color: "var(--admin-fg-muted)" }}>
+            No documents required.
+          </li>
+        )}
+        {items.map((i: any) => {
+          const status = i.doc?.status ?? "missing";
+          const tone =
+            status === "approved"
+              ? "var(--admin-success)"
+              : status === "rejected"
+              ? "var(--admin-danger)"
+              : status === "re_upload_requested"
+              ? "var(--admin-warn)"
+              : "var(--admin-fg-subtle)";
+          return (
+            <li key={i.key} className="flex items-center gap-2 text-xs">
+              <span className="size-1.5 rounded-full" style={{ background: tone }} />
+              <span className="flex-1 truncate" style={{ color: "var(--admin-fg)" }}>{i.label}</span>
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+                {status.replace(/_/g, " ")}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
+  );
+}
