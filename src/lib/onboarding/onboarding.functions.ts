@@ -124,26 +124,48 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema = await loadServiceSchema(serviceCode);
 
+    // For correct-pan-aadhaar: Stage 2 submit only carries Stage 2 values; merge
+    // with the previously-saved Stage 1 draft and validate against both schemas.
+    let mergedData: Record<string, unknown> = { ...data.data };
+    let validationFields = schema.fields;
+    if (!data.draft && serviceCode === "correct-pan-aadhaar") {
+      const { data: prev } = await supabaseAdmin
+        .from("onboarding_submissions")
+        .select("form_data")
+        .eq("lead_id", lead.id)
+        .maybeSingle();
+      const prevData = (prev?.form_data ?? {}) as Record<string, unknown>;
+      mergedData = { ...prevData, ...mergedData };
+      const { CORRECT_PAN_AADHAAR_STAGE2 } = await import("./schemas");
+      const seen = new Set<string>();
+      validationFields = [...schema.fields, ...CORRECT_PAN_AADHAAR_STAGE2.fields].filter((f) => {
+        if (seen.has(f.key)) return false;
+        seen.add(f.key);
+        return true;
+      });
+    }
+
     // Validate required fields on submit
     if (!data.draft) {
       const missing: string[] = [];
-      for (const f of schema.fields) {
+      for (const f of validationFields) {
         if (!f.required) continue;
-        const v = data.data[f.key];
+        const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") missing.push(f.label);
       }
       if (missing.length) throw new Error("Please fill: " + missing.slice(0, 4).join(", ") + (missing.length > 4 ? "…" : ""));
 
       // Pattern validation
-      for (const f of schema.fields) {
+      for (const f of validationFields) {
         if (!f.pattern) continue;
-        const v = data.data[f.key];
+        const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") continue;
         if (!new RegExp(f.pattern).test(String(v))) {
           throw new Error(`Invalid format for ${f.label}.`);
         }
       }
     }
+
 
     // Find latest application (if any) to link
     const { data: app } = await supabaseAdmin
