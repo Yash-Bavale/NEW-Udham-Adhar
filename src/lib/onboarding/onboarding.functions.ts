@@ -184,7 +184,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           lead_id: lead.id,
           application_id: app?.id ?? null,
           service_code: serviceCode,
-          form_data: data.data,
+          form_data: mergedData,
           status: data.draft ? "draft" : "submitted",
           submitted_at: data.draft ? null : now,
         },
