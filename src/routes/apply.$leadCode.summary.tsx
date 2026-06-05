@@ -139,7 +139,7 @@ function SummaryPage() {
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const updateContact = useServerFn(updateLeadContact);
-  const createOrder = useServerFn(createPayUOrder);
+  const createOrder = useServerFn(initiatePayment);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["apply.summary", leadCode],
@@ -152,8 +152,9 @@ function SummaryPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [payBusy, setPayBusy] = useState(false);
-  const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
+  const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
 
   useEffect(() => {
     trackEvent("summary_viewed", { leadCode });
