@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
+import mapImg from "@/assets/india-map.svg.asset.json";
 
 const FAQS = [
   {
