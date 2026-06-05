@@ -218,6 +218,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                 ⌘K
               </kbd>
             </button>
+            <NotificationsBell />
             <button
               onClick={toggle}
               className="rounded-lg p-2 hover:bg-[var(--admin-surface-2)] transition-colors"
