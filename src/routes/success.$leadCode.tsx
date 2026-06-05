@@ -4,7 +4,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   CheckCircle2,
-  Loader2,
   AlertCircle,
   History,
   Sparkles,
