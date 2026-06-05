@@ -161,52 +161,10 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                 </>
               );
             })()}
-            <div key={group} className="space-y-0.5">
-              {!collapsed && (
-                <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--admin-sidebar-muted)" }}>
-                  {group}
-                </div>
-              )}
-              {items.map((n) => {
-                const active = path === n.to || (n.to !== "/admin/dashboard" && path.startsWith(n.to));
-                const Icon = n.icon;
-                return (
-                  <Link
-                    key={n.to}
-                    to={n.to}
-                    className="relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors group"
-                    style={{
-                      background: active ? "color-mix(in oklab, var(--admin-accent) 22%, transparent)" : "transparent",
-                      color: active ? "white" : "var(--admin-sidebar-muted)",
-                    }}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="admin-nav-active"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r"
-                        style={{ background: "var(--admin-accent)" }}
-                        transition={{ duration: 0.25 }}
-                      />
-                    )}
-                    <Icon className="size-4 shrink-0" />
-                    <AnimatePresence>
-                      {!collapsed && (
-                        <motion.span
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="truncate"
-                        >
-                          {n.label}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </Link>
-                );
-              })}
             </div>
           ))}
         </nav>
+
 
         <div className="p-3 border-t space-y-2 shrink-0" style={{ borderColor: "color-mix(in oklab, var(--admin-sidebar-fg) 10%, transparent)" }}>
           {!collapsed && email && (
