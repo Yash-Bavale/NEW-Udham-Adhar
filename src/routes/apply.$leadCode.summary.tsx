@@ -520,7 +520,7 @@ function SummaryPage() {
       {order && (
         <form ref={formRef} method="POST" action={order.actionUrl} className="hidden">
           {Object.entries(order.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
+            <input key={name} type="hidden" name={name} value={String(value ?? "")} />
           ))}
         </form>
       )}
