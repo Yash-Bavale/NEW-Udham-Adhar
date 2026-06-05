@@ -178,10 +178,17 @@ import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-fail
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminReviewRouteImport } from './routes/admin.review'
+import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
+import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
+import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
+import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
@@ -1092,6 +1099,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTasksRoute = AdminTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSubmissionsRoute = AdminSubmissionsRouteImport.update({
   id: '/submissions',
   path: '/submissions',
@@ -1102,6 +1114,26 @@ const AdminServicesRoute = AdminServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminReviewRoute = AdminReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPipelineRoute = AdminPipelineRouteImport.update({
+  id: '/pipeline',
+  path: '/pipeline',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMyWorkRoute = AdminMyWorkRouteImport.update({
+  id: '/my-work',
+  path: '/my-work',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -1110,6 +1142,16 @@ const AdminLeadsRoute = AdminLeadsRouteImport.update({
 const AdminGatewaysRoute = AdminGatewaysRouteImport.update({
   id: '/gateways',
   path: '/gateways',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminEmailsRoute = AdminEmailsRouteImport.update({
@@ -1211,14 +1253,14 @@ const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   getParentRoute: () => AdminLeadsRoute,
 } as any)
 const AdminFinanceSettlementsRoute = AdminFinanceSettlementsRouteImport.update({
-  id: '/finance/settlements',
-  path: '/finance/settlements',
-  getParentRoute: () => AdminRoute,
+  id: '/settlements',
+  path: '/settlements',
+  getParentRoute: () => AdminFinanceRoute,
 } as any)
 const AdminFinanceGstRoute = AdminFinanceGstRouteImport.update({
-  id: '/finance/gst',
-  path: '/finance/gst',
-  getParentRoute: () => AdminRoute,
+  id: '/gst',
+  path: '/gst',
+  getParentRoute: () => AdminFinanceRoute,
 } as any)
 const AdminCustomersCustomerIdRoute =
   AdminCustomersCustomerIdRouteImport.update({
@@ -1455,10 +1497,17 @@ export interface FileRoutesByFullPath {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/employees': typeof AdminEmployeesRoute
+  '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/my-work': typeof AdminMyWorkRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/review': typeof AdminReviewRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1661,10 +1710,17 @@ export interface FileRoutesByTo {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/employees': typeof AdminEmployeesRoute
+  '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/my-work': typeof AdminMyWorkRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/review': typeof AdminReviewRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1869,10 +1925,17 @@ export interface FileRoutesById {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/emails': typeof AdminEmailsRoute
+  '/admin/employees': typeof AdminEmployeesRoute
+  '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/my-work': typeof AdminMyWorkRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/review': typeof AdminReviewRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -2078,10 +2141,17 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/employees'
+    | '/admin/finance'
     | '/admin/gateways'
     | '/admin/leads'
+    | '/admin/my-work'
+    | '/admin/notifications'
+    | '/admin/pipeline'
+    | '/admin/review'
     | '/admin/services'
     | '/admin/submissions'
+    | '/admin/tasks'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2284,10 +2354,17 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/employees'
+    | '/admin/finance'
     | '/admin/gateways'
     | '/admin/leads'
+    | '/admin/my-work'
+    | '/admin/notifications'
+    | '/admin/pipeline'
+    | '/admin/review'
     | '/admin/services'
     | '/admin/submissions'
+    | '/admin/tasks'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2491,10 +2568,17 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/emails'
+    | '/admin/employees'
+    | '/admin/finance'
     | '/admin/gateways'
     | '/admin/leads'
+    | '/admin/my-work'
+    | '/admin/notifications'
+    | '/admin/pipeline'
+    | '/admin/review'
     | '/admin/services'
     | '/admin/submissions'
+    | '/admin/tasks'
     | '/admin/users'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -3901,6 +3985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/tasks': {
+      id: '/admin/tasks'
+      path: '/tasks'
+      fullPath: '/admin/tasks'
+      preLoaderRoute: typeof AdminTasksRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/submissions': {
       id: '/admin/submissions'
       path: '/submissions'
@@ -3915,6 +4006,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminServicesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/review': {
+      id: '/admin/review'
+      path: '/review'
+      fullPath: '/admin/review'
+      preLoaderRoute: typeof AdminReviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pipeline': {
+      id: '/admin/pipeline'
+      path: '/pipeline'
+      fullPath: '/admin/pipeline'
+      preLoaderRoute: typeof AdminPipelineRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications': {
+      id: '/admin/notifications'
+      path: '/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/my-work': {
+      id: '/admin/my-work'
+      path: '/my-work'
+      fullPath: '/admin/my-work'
+      preLoaderRoute: typeof AdminMyWorkRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/leads': {
       id: '/admin/leads'
       path: '/leads'
@@ -3927,6 +4046,20 @@ declare module '@tanstack/react-router' {
       path: '/gateways'
       fullPath: '/admin/gateways'
       preLoaderRoute: typeof AdminGatewaysRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/employees': {
+      id: '/admin/employees'
+      path: '/employees'
+      fullPath: '/admin/employees'
+      preLoaderRoute: typeof AdminEmployeesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/emails': {
@@ -4064,17 +4197,17 @@ declare module '@tanstack/react-router' {
     }
     '/admin/finance/settlements': {
       id: '/admin/finance/settlements'
-      path: '/finance/settlements'
+      path: '/settlements'
       fullPath: '/admin/finance/settlements'
       preLoaderRoute: typeof AdminFinanceSettlementsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof AdminFinanceRoute
     }
     '/admin/finance/gst': {
       id: '/admin/finance/gst'
-      path: '/finance/gst'
+      path: '/gst'
       fullPath: '/admin/finance/gst'
       preLoaderRoute: typeof AdminFinanceGstRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof AdminFinanceRoute
     }
     '/admin/customers/$customerId': {
       id: '/admin/customers/$customerId'
@@ -4191,6 +4324,20 @@ const AdminCustomersRouteWithChildren = AdminCustomersRoute._addFileChildren(
   AdminCustomersRouteChildren,
 )
 
+interface AdminFinanceRouteChildren {
+  AdminFinanceGstRoute: typeof AdminFinanceGstRoute
+  AdminFinanceSettlementsRoute: typeof AdminFinanceSettlementsRoute
+}
+
+const AdminFinanceRouteChildren: AdminFinanceRouteChildren = {
+  AdminFinanceGstRoute: AdminFinanceGstRoute,
+  AdminFinanceSettlementsRoute: AdminFinanceSettlementsRoute,
+}
+
+const AdminFinanceRouteWithChildren = AdminFinanceRoute._addFileChildren(
+  AdminFinanceRouteChildren,
+)
+
 interface AdminLeadsRouteChildren {
   AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
 }
@@ -4235,14 +4382,19 @@ interface AdminRouteChildren {
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
+  AdminEmployeesRoute: typeof AdminEmployeesRoute
+  AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
   AdminGatewaysRoute: typeof AdminGatewaysRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
+  AdminMyWorkRoute: typeof AdminMyWorkRoute
+  AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminPipelineRoute: typeof AdminPipelineRoute
+  AdminReviewRoute: typeof AdminReviewRoute
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
+  AdminTasksRoute: typeof AdminTasksRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  AdminFinanceGstRoute: typeof AdminFinanceGstRoute
-  AdminFinanceSettlementsRoute: typeof AdminFinanceSettlementsRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -4254,14 +4406,19 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCustomersRoute: AdminCustomersRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEmailsRoute: AdminEmailsRoute,
+  AdminEmployeesRoute: AdminEmployeesRoute,
+  AdminFinanceRoute: AdminFinanceRouteWithChildren,
   AdminGatewaysRoute: AdminGatewaysRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
+  AdminMyWorkRoute: AdminMyWorkRoute,
+  AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminPipelineRoute: AdminPipelineRoute,
+  AdminReviewRoute: AdminReviewRoute,
   AdminServicesRoute: AdminServicesRouteWithChildren,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
+  AdminTasksRoute: AdminTasksRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
-  AdminFinanceGstRoute: AdminFinanceGstRoute,
-  AdminFinanceSettlementsRoute: AdminFinanceSettlementsRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
