@@ -1,10 +1,10 @@
-// Lightweight India political map rendered via Wikimedia Commons SVG.
-// Using an <img> keeps the bundle small and avoids pulling a mapping library.
+// Lightweight India political map served from Lovable Assets CDN.
+import mapImg from "@/assets/india-map.svg.asset.json";
 
 export function IndiaMap({ className = "" }: { className?: string }) {
   return (
     <img
-      src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/India-locator-map-blank.svg/640px-India-locator-map-blank.svg.png"
+      src={mapImg.url}
       alt="Map of India showing states served by our Udyam Adhar consultancy"
       loading="lazy"
       decoding="async"

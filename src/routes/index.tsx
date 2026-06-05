@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
+import mapImg from "@/assets/india-map.svg.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -109,7 +111,7 @@ function HomePage() {
           </div>
           <div className="p-6">
             <img
-              src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
+              src={certImg.url}
               alt="Sample Udyam Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
@@ -202,7 +204,7 @@ function HomePage() {
           </div>
           <div className="p-4 md:p-6 flex justify-center">
             <img
-              src="https://udyamadhar.in/wp-content/uploads/2025/11/India-map-en.svg.webp"
+              src={mapImg.url}
               alt="Map of India showing all states where consultancy services are provided"
               className="w-full max-w-xl h-auto"
               loading="lazy"
