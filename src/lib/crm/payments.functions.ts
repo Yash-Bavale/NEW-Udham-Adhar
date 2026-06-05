@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertRole, writeAudit } from "@/lib/audit";
+import {
+  callOrderStatusApi,
+  callRefundApi,
+} from "@/lib/payments/ccavenue.server";
+
 
 /** Sanitized list for ops/support — no amounts. */
 export const listPaymentsSafe = createServerFn({ method: "GET" })
@@ -65,4 +72,167 @@ export const revenueStats = createServerFn({ method: "GET" })
       week: { count: since(weekAgo).length, revenue: sum(since(weekAgo), "amount") },
       month: { count: since(monthAgo).length, revenue: sum(since(monthAgo), "amount") },
     };
+  });
+
+// ── Refunds ───────────────────────────────────────────────────────────────
+
+const RefundInput = z.object({
+  paymentId: z.string().uuid(),
+  amount: z.number().positive(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+/**
+ * Issue a refund against a successful payment. Currently routes CCAvenue
+ * payments through CCAvenue's refundOrder API. PayU refunds are not wired
+ * yet and will throw a clear error. On success we insert a child payments
+ * row tagged 'refunded' and flip the parent to 'refunded' once cumulative
+ * refunds match the original amount.
+ */
+export const refundPayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => RefundInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "accounts"]);
+
+    const { data: payment, error } = await supabaseAdmin
+      .from("payments")
+      .select("id, lead_id, application_id, gateway_name, status, amount, transaction_id, razorpay_order_id, razorpay_payment_id, raw_response, base_amount, gst_amount, currency")
+      .eq("id", data.paymentId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!payment) throw new Error("Payment not found");
+    if (payment.status !== "paid") throw new Error("Only paid payments can be refunded");
+
+    // Cap the refund at the original amount minus existing refunds.
+    const { data: existingRefunds } = await supabaseAdmin
+      .from("payments")
+      .select("amount")
+      .eq("parent_payment_id", payment.id);
+    const refundedSoFar = (existingRefunds ?? []).reduce((s, r) => s + Math.abs(Number(r.amount ?? 0)), 0);
+    const remaining = Number(payment.amount) - refundedSoFar;
+    if (data.amount > remaining + 0.001) {
+      throw new Error(`Refund exceeds refundable balance (₹${remaining.toFixed(2)})`);
+    }
+
+    if (payment.gateway_name === "ccavenue") {
+      const refNo =
+        (payment.raw_response as any)?.tracking_id ||
+        payment.razorpay_payment_id ||
+        payment.transaction_id;
+      if (!refNo) throw new Error("CCAvenue tracking_id missing on payment");
+
+      const refundRef = `RF-${payment.id.slice(0, 8)}-${Date.now().toString(36)}`.toUpperCase();
+      const result = await callRefundApi({
+        refNo,
+        refundAmount: data.amount,
+        refundRef,
+      });
+      if (!result.ok) {
+        throw new Error(`CCAvenue refund failed: ${result.reason ?? result.refundStatus}`);
+      }
+
+      const { data: childRow, error: childErr } = await supabaseAdmin
+        .from("payments")
+        .insert({
+          lead_id: payment.lead_id,
+          application_id: payment.application_id,
+          gateway_name: payment.gateway_name,
+          parent_payment_id: payment.id,
+          transaction_id: refundRef,
+          razorpay_order_id: refundRef,
+          razorpay_payment_id: result.refundRef,
+          amount: -Math.abs(data.amount),
+          base_amount: 0,
+          gst_amount: 0,
+          currency: payment.currency ?? "INR",
+          status: "refunded",
+          refund_reason: data.reason,
+          payment_date: new Date().toISOString(),
+          raw_response: result.raw as any,
+        })
+        .select("id")
+        .single();
+      if (childErr) throw new Error(childErr.message);
+
+      const fullyRefunded = (refundedSoFar + data.amount) >= Number(payment.amount) - 0.001;
+      if (fullyRefunded) {
+        await supabaseAdmin.from("payments").update({ status: "refunded" }).eq("id", payment.id);
+      }
+
+      await writeAudit({
+        supabase: context.supabase,
+        entityType: "payment",
+        entityId: payment.id,
+        action: fullyRefunded ? "refund_full" : "refund_partial",
+        newValue: { amount: data.amount, reason: data.reason, refundRef, child: childRow?.id },
+      });
+
+      return { ok: true, fullyRefunded, childPaymentId: childRow?.id, refundRef };
+    }
+
+    if (payment.gateway_name === "payu") {
+      throw new Error("PayU refunds are not wired yet. Issue the refund from the PayU dashboard.");
+    }
+
+    throw new Error(`Refunds for gateway '${payment.gateway_name}' are not supported.`);
+  });
+
+// ── Status reconciliation ────────────────────────────────────────────────
+
+const ReconcileInput = z.object({ paymentId: z.string().uuid() });
+
+/**
+ * Re-query the gateway for a payment's authoritative status and update the
+ * local row. Today only CCAvenue is wired.
+ */
+export const reconcilePaymentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ReconcileInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "accounts", "finance"]);
+
+    const { data: payment, error } = await supabaseAdmin
+      .from("payments")
+      .select("id, gateway_name, status, transaction_id, razorpay_order_id")
+      .eq("id", data.paymentId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!payment) throw new Error("Payment not found");
+
+    if (payment.gateway_name !== "ccavenue") {
+      throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
+    }
+
+    const orderId = payment.transaction_id || payment.razorpay_order_id;
+    if (!orderId) throw new Error("Payment is missing an order id");
+
+    const result = await callOrderStatusApi(orderId);
+    const newStatus = result.status === "paid" ? "paid"
+      : result.status === "failed" ? "failed"
+      : result.status === "refunded" ? "refunded"
+      : result.status === "attempted" ? "attempted"
+      : payment.status;
+
+    if (newStatus !== payment.status) {
+      await supabaseAdmin
+        .from("payments")
+        .update({
+          status: newStatus,
+          payment_date: newStatus === "paid" ? new Date().toISOString() : undefined,
+          raw_response: result.raw as any,
+        })
+        .eq("id", payment.id);
+
+      await writeAudit({
+        supabase: context.supabase,
+        entityType: "payment",
+        entityId: payment.id,
+        action: "status_reconciled",
+        oldValue: { status: payment.status },
+        newValue: { status: newStatus, source: "ccavenue.orderStatusTracker" },
+      });
+    }
+
+    return { ok: true, status: newStatus, raw: result.raw };
   });

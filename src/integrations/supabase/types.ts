@@ -1268,11 +1268,13 @@ export type Database = {
           id: string
           idempotency_key: string | null
           lead_id: string
+          parent_payment_id: string | null
           payment_date: string | null
           raw_response: Json | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           razorpay_signature: string | null
+          refund_reason: string | null
           status: Database["public"]["Enums"]["payment_status"]
           transaction_id: string | null
           updated_at: string
@@ -1290,11 +1292,13 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           lead_id: string
+          parent_payment_id?: string | null
           payment_date?: string | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
+          refund_reason?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
@@ -1312,11 +1316,13 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           lead_id?: string
+          parent_payment_id?: string | null
           payment_date?: string | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
+          refund_reason?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
@@ -1335,6 +1341,20 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_parent_payment_id_fkey"
+            columns: ["parent_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_parent_payment_id_fkey"
+            columns: ["parent_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments_safe"
             referencedColumns: ["id"]
           },
         ]

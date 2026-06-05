@@ -19,11 +19,12 @@ import {
   getApplicationSummary,
   updateLeadContact,
 } from "@/lib/payments/gateways.functions";
-import { createPayUOrder } from "@/lib/payments/payu.functions";
+import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import payuLogo from "@/assets/gateways/payu.svg";
 import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
+
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
   head: () => ({
@@ -138,7 +139,7 @@ function SummaryPage() {
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const updateContact = useServerFn(updateLeadContact);
-  const createOrder = useServerFn(createPayUOrder);
+  const createOrder = useServerFn(initiatePayment);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["apply.summary", leadCode],
@@ -151,8 +152,9 @@ function SummaryPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [payBusy, setPayBusy] = useState(false);
-  const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
+  const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
 
   useEffect(() => {
     trackEvent("summary_viewed", { leadCode });
@@ -172,10 +174,13 @@ function SummaryPage() {
     }
   }, [lead?.payment, lead?.status, leadCode, navigate]);
 
+  const SUPPORTED_GATEWAYS = ["payu", "ccavenue"] as const;
+  const isSupportedGateway = (name: string) => (SUPPORTED_GATEWAYS as readonly string[]).includes(name);
+
   const activeGateway = useMemo(() => {
-    if (chosen) return chosen;
-    const payu = gateways.find((g) => g.name === "payu");
-    return payu?.name ?? gateways[0]?.name ?? null;
+    if (chosen && isSupportedGateway(chosen)) return chosen;
+    const first = gateways.find((g) => isSupportedGateway(g.name));
+    return first?.name ?? null;
   }, [chosen, gateways]);
 
   const info = lead
@@ -200,21 +205,22 @@ function SummaryPage() {
     );
   }
 
-  const canPay = activeGateway === "payu" && !payBusy && !order;
+  const canPay = !!activeGateway && !payBusy && !order;
 
   async function handlePay() {
-    if (!canPay) return;
+    if (!canPay || !activeGateway) return;
     setPayBusy(true);
     setPayError(null);
-    trackEvent("payment_initiated", { gateway: "payu", leadCode });
+    trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
-      const res = await createOrder({ data: { leadCode } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
       setOrder(res);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : "Could not start payment.");
       setPayBusy(false);
     }
   }
+
 
   return (
     <section className="mx-auto max-w-2xl px-4 py-6 md:py-10">
@@ -400,8 +406,9 @@ function SummaryPage() {
                   fg: "#fff",
                   label: g.display_name,
                 };
-                const supported = g.name === "payu";
+                const supported = isSupportedGateway(g.name);
                 const selected = activeGateway === g.name;
+
                 return (
                   <label
                     key={g.name}
@@ -513,7 +520,7 @@ function SummaryPage() {
       {order && (
         <form ref={formRef} method="POST" action={order.actionUrl} className="hidden">
           {Object.entries(order.fields).map(([name, value]) => (
-            <input key={name} type="hidden" name={name} value={value} />
+            <input key={name} type="hidden" name={name} value={String(value ?? "")} />
           ))}
         </form>
       )}
