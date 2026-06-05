@@ -39,14 +39,20 @@ export const listReviewDocuments = createServerFn({ method: "GET" })
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support"]);
     let q = supabaseAdmin
       .from("documents")
-      .select("*, lead:leads(id,name,email,lead_code,service)")
+      .select("*")
       .order("uploaded_at", { ascending: true })
       .limit(data?.limit ?? 100);
     if (data?.status) q = q.eq("status", data.status);
     else q = q.eq("status", "pending");
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return { rows: (rows ?? []) as ReviewDoc[] };
+    const leadIds = Array.from(new Set((rows ?? []).map((r) => r.lead_id).filter(Boolean)));
+    const { data: leads } = leadIds.length
+      ? await supabaseAdmin.from("leads").select("id,name,email,lead_code,service").in("id", leadIds)
+      : { data: [] as any[] };
+    const leadMap = new Map((leads ?? []).map((l: any) => [l.id, l]));
+    const enriched = (rows ?? []).map((r) => ({ ...r, lead: leadMap.get(r.lead_id) ?? null })) as ReviewDoc[];
+    return { rows: enriched };
   });
 
 export const getDocumentSignedUrl = createServerFn({ method: "GET" })
