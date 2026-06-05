@@ -1,103 +1,109 @@
-# Phase 5.5 — Udyam Operations OS (Master Plan)
 
-Eight sub-phases. We approve and ship them **one at a time**. Each sub-phase ends with a working preview before we start the next. No "big bang" rewrite.
+# CCAvenue Payment Gateway Integration
 
-## Locked decisions (from your answers)
+Pause Phase 5.5e. Add CCAvenue alongside PayU using the existing
+`payment_gateways` + `payments` schema and the gateway-agnostic
+initiator. PayU stays live; the customer picks gateway on the
+`/apply/:leadCode/summary` page. Live mode only (no test env).
 
-- **Landing**: role-based — Super Admin/Admin → Executive Dashboard, Operations/Support → My Work, Finance → Finance Dashboard.
-- **Form builder**: dual-read. Customer & CRM read `service_form_schemas` first, fall back to the hardcoded schemas in `src/lib/onboarding/schemas.ts`. Hardcoded file stays as the safety net until every service has a DB version that matches.
-- **Design system**: Linear-style — dark-first, dense, mono-accent (single hue), subtle glass, sharp typography. No prototype round. New tokens in `src/styles.css`, new shell wraps everything.
+## Secrets (added via secrets tool, not committed)
 
----
+- `CCAV_MERCHANT_ID`
+- `CCAV_ACCESS_CODE`
+- `CCAV_WORKING_KEY` — used as the AES-128-CBC key for request/response crypto
 
-## Sub-phase map
+## Database (single migration)
 
-```text
-5.5a  Foundation        IA + new AdminShell + design tokens + role-based landing
-5.5b  My Work           Next-Best-Action queue, sticky header, notifications
-5.5c  Command Center    Unified application workspace (replaces split screens)
-5.5d  Document Review   KYC-style 3-pane reviewer + checklist + completion score
-5.5e  Customer 360      Snapshot + lifecycle timeline + unified activity feed
-5.5f  Pipeline & Tasks  Kanban pipeline, real task engine, SLA visualization
-5.5g  Finance Center    Revenue dashboard, invoice builder, GST/settlement views
-5.5h  People & Polish   Employee lifecycle, performance, RBAC matrix, bug sweep
-```
+1. Seed `payment_gateways` with a `ccavenue` row (`display_name: "CCAvenue"`,
+   `is_enabled: false`, `priority: 20`, `webhook_secret_name: 'CCAV_WORKING_KEY'`).
+   Admin enables it from `/admin/gateways` once smoke-tested.
+2. No table shape changes — `payments` already stores `gateway_name`,
+   `transaction_id`, `gateway_order_id`, `gateway_response_json`, `status`,
+   `amount`, `paid_at`, `failure_reason`, etc.
 
-Bug fixes are folded into the relevant sub-phase (status bypass → 5.5c, form builder disconnect → 5.5a, invoice auto-email + cert resend → 5.5g, complaints/SLA → 5.5f, SEO admin in shell → 5.5a, etc.).
+## Files to add
 
----
+### Server-only crypto + REST helpers — `src/lib/payments/ccavenue.server.ts`
+- `getCcavCreds()` — reads the three env vars, throws if missing.
+- `encryptRequest(plaintext, workingKey)` / `decryptResponse(cipherHex, workingKey)` —
+  AES-128-CBC with MD5-derived key and the CCAvenue-standard fixed IV
+  (`0x00..0x0f`), using Node `crypto` (Worker-safe).
+- `buildOrderForm(params)` — builds the `merchant_id|order_id|amount|currency|...`
+  pipe-delimited string CCAvenue expects, returns
+  `{ encRequest, accessCode, redirectUrl: "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction" }`.
+- `callOrderStatusApi(orderNo)` — POSTs to
+  `https://api.ccavenue.com/apis/servlet/DoWebTrans` with `command=orderStatusTracker`,
+  decrypts the response, returns normalized
+  `{ status, amount, orderNo, trackingId, bankRefNo, raw }`.
+- `callRefundApi({ refNo, refundAmount, refundRef })` — same DoWebTrans envelope
+  with `command=refundOrder`; returns normalized refund result.
+- `normalizeCcavStatus(raw)` → `"paid" | "failed" | "pending" | "refunded"`.
 
-## 5.5a — Foundation (ship first)
+### Server function — `src/lib/payments/ccavenue.functions.ts`
+- `createCcavenueOrder({ leadCode })` — mirrors `createPayUOrder`:
+  - loads lead by code, computes amount from `total_amount`
+  - generates `order_id` (`CCAV-<leadCode>-<timestamp>`)
+  - inserts a `payments` row (`gateway_name: 'ccavenue'`, `status: 'initiated'`)
+  - builds redirect URL + encrypted payload
+  - returns `{ method: "POST", action, fields: { encRequest, access_code } }`
+    so the existing client form-poster can submit it.
 
-**Goal**: new IA + shell + tokens. No screen rewrites yet — every existing admin route renders inside the new shell so we can iterate safely.
+### Initiator wiring — `src/lib/payments/initiate.functions.ts`
+- Replace the `"ccavenue"` rejection branch with a real call to
+  `createCcavenueOrder`. Keep `payu` branch untouched. Update the
+  `InitiatePaymentResult` type to a union of both order shapes.
 
-- New design tokens in `src/styles.css` (Linear-inspired: near-black surfaces, single indigo accent, tight radii, refined shadows, dark+light parity).
-- New `src/components/admin/AppShell.tsx`:
-  - Collapsible sidebar with 9 groups: Home, Customers, Applications, Operations, Communications, Finance, Services, People, System.
-  - Sticky topbar: global search (⌘K), notifications bell, profile menu, breadcrumb.
-  - Command palette (extend existing `CommandPalette.tsx`) with deep-link results.
-- Re-map all existing `/admin/*` routes under the new sidebar groups (no URL changes, just nav grouping). Pull SEO admin inside the shell.
-- Role-based landing redirect in `_authenticated/admin/index.tsx`.
-- Form builder dual-read: new `src/lib/onboarding/schema-resolver.ts` checks `service_form_schemas` first, falls back to hardcoded. `OnboardingForm.tsx` and CRM submission viewers use the resolver. Seed empty DB rows kept unchanged → behavior identical.
-- Skeleton routes for new pages (`/admin/my-work`, `/admin/pipeline`, `/admin/tasks`, `/admin/finance/*`, `/admin/employees`) so 5.5b–h can fill them in.
+### Public webhook / return — `src/routes/api/public/webhooks/ccavenue.ts`
+- POST handler reads `encResp` from form data, decrypts with working key,
+  parses the `key=value&...` payload.
+- Match `order_id` → payments row; verify amount; map `order_status`
+  (`Success` / `Aborted` / `Failure` / `Invalid` / `Awaited`) to our enum.
+- On hash/amount mismatch or `Awaited`, call `callOrderStatusApi` to
+  reconcile (mirrors the PayU verify-after-mismatch behaviour).
+- Update `payments`, update `leads.status`, transition the application
+  (`payment_successful` reason), enqueue invoice + success email — reuse
+  the helpers already imported by the PayU webhook.
+- After processing, 302 redirect the browser to
+  `/apply/:leadCode/payment-status` (CCAvenue posts to a single URL for
+  both browser-return and S2S, like PayU).
 
-## 5.5b — My Work + Notifications
+### Admin refunds — extend `src/lib/crm/payments.functions.ts`
+- Add `refundPayment({ paymentId, amount, reason })` guarded by
+  `requireSupabaseAuth` + `assertRole(["super_admin","admin","accounts"])`.
+- Route by `gateway_name`: `ccavenue` → `callRefundApi`; `payu` → existing
+  refund or throw "not implemented" placeholder.
+- On success, insert a child `payments` row (`status: 'refunded'`, negative
+  amount, parent ref in metadata), write an audit log, mark the original
+  payment `refunded` / `partially_refunded`.
+- Surface a "Refund" button on the existing finance/payments admin row
+  (small UI add — confirm dialog + amount input).
 
-- `/admin/my-work` route. Greeting + counters (assigned, pending reviews, pending docs, certs pending, overdue, SLA warnings, follow-ups due).
-- Next-Best-Action queue: server fn that ranks user's open work by SLA + priority. "Complete & next" auto-opens next item.
-- Notification center: new `notifications` table (mig) + bell dropdown + realtime subscription. Event sources: lead created, payment success, doc uploaded, cert delivered, assignment, customer reply, SLA breach.
+### Optional reconciliation helper
+- `reconcileCcavenuePayment({ paymentId })` server fn that calls
+  `callOrderStatusApi` and updates the row. Wire to a "Sync status" button
+  on the admin payment row.
 
-## 5.5c — Application Command Center
+## Customer-facing checkout
 
-- New `/admin/applications/$id` workspace replacing current split screens.
-- Sticky header (IDs, status, SLA pill, assignee, quick actions).
-- Left rail: section nav (Customer, Application, Payment, Form, Documents, Certificate, Comms, Notes, Activity, Audit).
-- Right panel: activity timeline + notes + @mentions.
-- Service-specific layouts: New Udyam, Update, Download, Migration, Forgot Mobile/Email, PAN Correction — purpose-built sections per service code.
-- **Bug fix**: status transitions go through `transitions.functions.ts` only (close direct `applications.update` paths in UI), enforce workflow steps from `service_workflows`.
+`/apply/:leadCode/summary` already lists enabled gateways. Once the seed
+flips `is_enabled` to true, CCAvenue appears as a selectable option with
+the existing card layout. The current form-poster component handles
+`{ method, action, fields }` for both gateways without change.
 
-## 5.5d — Document Review Center
+## Verification steps after build
 
-- `/admin/review` queue + 3-pane reviewer (form left, doc viewer center, actions right).
-- Approve / Reject / Request reupload / Add remark / Escalate.
-- Doc checklist, completion %, missing docs list. Drives `documents.status` + emits timeline events.
+1. Smoke a low-value live order end-to-end (CCAvenue requires live for
+   real cards). Confirm webhook decrypts, `payments` row flips to `paid`,
+   lead → `payment_successful`, invoice + email trigger.
+2. Trigger the Status API from admin and confirm normalized fields.
+3. Issue a partial refund; confirm child row + parent status update.
+4. Confirm PayU flow is still intact (no regression in shared initiator).
 
-## 5.5e — Customer 360 redesign
+## Open items I'll need from you before/during build
 
-- Snapshot strip + Active Applications + Pending Tasks/Docs/Certs.
-- Visual lifecycle timeline (per-year service chronology).
-- Unified activity feed merging `activity_logs`, `application_status_history`, `email_logs`, `documents`, `payments`, `certificates` via a single `lead-timeline` server fn extension.
-
-## 5.5f — Pipeline + Task engine + SLA
-
-- Drag-drop Kanban at `/admin/pipeline` (columns = workflow statuses, drag triggers transition fn).
-- New `tasks` table (mig): types (verify_info, verify_docs, generate_cert, upload_cert, follow_up, custom), owner, priority, due, SLA, completion. Kanban + table + calendar views.
-- SLA pills (green/yellow/red) wired everywhere from `sla_due_at` and workflow `sla_hours`.
-- **Bug fixes**: complaints assignment, SLA tracking, activity filtering.
-
-## 5.5g — Finance Command Center
-
-- `/admin/finance` dashboard: today/MTD revenue, pending, failed, refunds, service revenue, gateway perf, GST, settlements (visual, not tables).
-- Invoice builder + detail view + resend + search. Company info / GST / bank / terms / prefix in `/admin/finance/settings` (new `invoice_settings` table, mig).
-- **Bug fixes**: invoice auto-email on payment success (queue in `payments` webhook), certificate resend wired to email queue, finance role gating verified.
-
-## 5.5h — People & Polish
-
-- Employee lifecycle: invite, deactivate, suspend, reset password, assign team/region/services.
-- Performance center: assigned/completed/avg time/SLA compliance/leaderboard.
-- RBAC matrix UI over `user_roles` + granular permission map (new `role_permissions` table, mig).
-- Final bug sweep, dark/light parity, motion polish (Framer Motion), empty/error/skeleton states everywhere, keyboard shortcuts doc.
-
----
-
-## What changes vs. what stays
-
-- **Stays**: all server fns under `src/lib/crm/*`, `src/lib/applications/*`, `src/lib/finance/*`, schema, RLS, status engine, payment gateways, email queue, onboarding schemas (as fallback). No business logic rewrites.
-- **Changes**: routes under `/admin/*` get a new shell + new pages; some are new files, some wrap existing components. URLs preserved where possible; new URLs added for new screens.
-- **New tables (each in its own sub-phase migration)**: `notifications`, `tasks`, `invoice_settings`, `role_permissions`. Each with GRANTs + RLS scoped to staff roles.
-
----
-
-## Approval flow
-
-After you approve this master plan, I'll start **5.5a only**. When 5.5a is shipped and you've sanity-checked the preview, say "next" and I'll write the detailed 5.5b plan, and so on. If you want to reorder, skip, or merge sub-phases, tell me before 5.5a starts.
+- The three CCAvenue secret values (entered via the secrets prompt).
+- CCAvenue's "Response URL" must be set in their dashboard to
+  `https://<your-domain>/api/public/webhooks/ccavenue` — I'll show you the
+  exact URL after wiring.
+- For Refunds API, CCAvenue requires the server's outbound IP to be
+  whitelisted in their dashboard.
