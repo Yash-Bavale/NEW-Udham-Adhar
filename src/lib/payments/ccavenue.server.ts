@@ -15,11 +15,20 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomUUID } from "crypto";
 
+function ccavEnv(): "live" | "test" {
+  const v = (process.env.CCAV_ENV ?? "live").trim().toLowerCase();
+  return v === "test" ? "test" : "live";
+}
+
 export const CCAV_REDIRECT_URL =
-  "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction";
+  ccavEnv() === "test"
+    ? "https://test.ccavenue.com/transaction/transaction.do?command=initiateTransaction"
+    : "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction";
 
 export const CCAV_API_URL =
-  "https://api.ccavenue.com/apis/servlet/DoWebTrans";
+  ccavEnv() === "test"
+    ? "https://apitest.ccavenue.com/apis/servlet/DoWebTrans"
+    : "https://api.ccavenue.com/apis/servlet/DoWebTrans";
 
 // CCAvenue ships a fixed IV in their reference kits:
 const CCAV_IV = Buffer.from([
@@ -34,12 +43,12 @@ export type CcavCreds = {
 };
 
 export function getCcavCreds(): CcavCreds {
-  const merchantId = process.env.CCAV_MERCHANT_ID;
-  const accessCode = process.env.CCAV_ACCESS_CODE;
-  const workingKey = process.env.CCAV_WORKING_KEY;
+  const merchantId = (process.env.CCAV_MERCHANT_ID ?? "").trim();
+  const accessCode = (process.env.CCAV_ACCESS_CODE ?? "").trim();
+  const workingKey = (process.env.CCAV_WORKING_KEY ?? "").trim();
   if (!merchantId || !accessCode || !workingKey) {
     throw new Error(
-      "CCAvenue is not configured. Set CCAV_MERCHANT_ID, CCAV_ACCESS_CODE and CCAV_WORKING_KEY.",
+      "CCAvenue is not configured. Set CCAV_MERCHANT_ID, CCAV_ACCESS_CODE and CCAV_WORKING_KEY (no surrounding whitespace).",
     );
   }
   return { merchantId, accessCode, workingKey };

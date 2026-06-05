@@ -119,6 +119,18 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
 
     const encRequest = encryptRequest(merchantParams, workingKey);
 
+    console.info("[ccavenue] initiate", {
+      env: (process.env.CCAV_ENV ?? "live").trim().toLowerCase(),
+      actionUrl: CCAV_REDIRECT_URL,
+      merchantId,
+      accessCodePrefix: accessCode.slice(0, 4),
+      accessCodeLen: accessCode.length,
+      workingKeyLen: workingKey.length,
+      orderId,
+      amount,
+      encRequestLen: encRequest.length,
+    });
+
     return {
       actionUrl: CCAV_REDIRECT_URL,
       fields: {

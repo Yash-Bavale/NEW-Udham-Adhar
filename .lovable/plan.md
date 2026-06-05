@@ -1,109 +1,34 @@
+## What the error means
 
-# CCAvenue Payment Gateway Integration
+CCAvenue's gateway page shows **"decryption of encRequest failed"** when *their* servers cannot decrypt the `encRequest` we POST to `secure.ccavenue.com/transaction/transaction.do`. Our encryption code itself is correct (AES‑128‑CBC, MD5(workingKey), fixed IV `00..0f` — that's the canonical kit). So the failure is almost always one of three credential/environment mismatches, not a code bug.
 
-Pause Phase 5.5e. Add CCAvenue alongside PayU using the existing
-`payment_gateways` + `payments` schema and the gateway-agnostic
-initiator. PayU stays live; the customer picks gateway on the
-`/apply/:leadCode/summary` page. Live mode only (no test env).
+## Most likely causes (in order)
 
-## Secrets (added via secrets tool, not committed)
+1. **Working key ↔ access code ↔ merchant id mismatch.** The three CCAV secrets must come from the *same* CCAvenue sub-account. If the working key was regenerated after the access code was issued, or copied from a different M-ID, decryption fails on their side.
+2. **Test credentials used against the live URL** (or vice versa). We hardcode `https://secure.ccavenue.com/...` (live). Test credentials only work against `https://test.ccavenue.com/...`.
+3. **Whitespace / stray characters** in `CCAV_WORKING_KEY` (a trailing newline or space changes the MD5 and breaks decryption). Same risk for `CCAV_ACCESS_CODE` / `CCAV_MERCHANT_ID`.
 
-- `CCAV_MERCHANT_ID`
-- `CCAV_ACCESS_CODE`
-- `CCAV_WORKING_KEY` — used as the AES-128-CBC key for request/response crypto
+Less likely but worth ruling out: the account hasn't been activated for the iFrame/Non-Seamless integration we're using.
 
-## Database (single migration)
+## Plan
 
-1. Seed `payment_gateways` with a `ccavenue` row (`display_name: "CCAvenue"`,
-   `is_enabled: false`, `priority: 20`, `webhook_secret_name: 'CCAV_WORKING_KEY'`).
-   Admin enables it from `/admin/gateways` once smoke-tested.
-2. No table shape changes — `payments` already stores `gateway_name`,
-   `transaction_id`, `gateway_order_id`, `gateway_response_json`, `status`,
-   `amount`, `paid_at`, `failure_reason`, etc.
+1. **Harden credential handling in `ccavenue.server.ts`**
+   - `.trim()` `CCAV_MERCHANT_ID`, `CCAV_ACCESS_CODE`, `CCAV_WORKING_KEY` in `getCcavCreds()` so an accidental trailing newline can never poison the MD5 key.
+   - Validate non-empty after trim with a clearer error.
 
-## Files to add
+2. **Add an environment toggle** (`CCAV_ENV` = `live` | `test`, defaulting to `live`) and derive `CCAV_REDIRECT_URL` / `CCAV_API_URL` from it. This lets us flip to `test.ccavenue.com` for sanity checks without code edits, and prevents the live/test URL trap.
 
-### Server-only crypto + REST helpers — `src/lib/payments/ccavenue.server.ts`
-- `getCcavCreds()` — reads the three env vars, throws if missing.
-- `encryptRequest(plaintext, workingKey)` / `decryptResponse(cipherHex, workingKey)` —
-  AES-128-CBC with MD5-derived key and the CCAvenue-standard fixed IV
-  (`0x00..0x0f`), using Node `crypto` (Worker-safe).
-- `buildOrderForm(params)` — builds the `merchant_id|order_id|amount|currency|...`
-  pipe-delimited string CCAvenue expects, returns
-  `{ encRequest, accessCode, redirectUrl: "https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction" }`.
-- `callOrderStatusApi(orderNo)` — POSTs to
-  `https://api.ccavenue.com/apis/servlet/DoWebTrans` with `command=orderStatusTracker`,
-  decrypts the response, returns normalized
-  `{ status, amount, orderNo, trackingId, bankRefNo, raw }`.
-- `callRefundApi({ refNo, refundAmount, refundRef })` — same DoWebTrans envelope
-  with `command=refundOrder`; returns normalized refund result.
-- `normalizeCcavStatus(raw)` → `"paid" | "failed" | "pending" | "refunded"`.
+3. **Add a one-shot diagnostic log on initiation** (no secrets printed) — just merchant_id, access_code prefix/length, working_key length, and which endpoint URL we POSTed to. This makes "wrong env" vs "wrong key" obvious from server logs on the next attempt.
 
-### Server function — `src/lib/payments/ccavenue.functions.ts`
-- `createCcavenueOrder({ leadCode })` — mirrors `createPayUOrder`:
-  - loads lead by code, computes amount from `total_amount`
-  - generates `order_id` (`CCAV-<leadCode>-<timestamp>`)
-  - inserts a `payments` row (`gateway_name: 'ccavenue'`, `status: 'initiated'`)
-  - builds redirect URL + encrypted payload
-  - returns `{ method: "POST", action, fields: { encRequest, access_code } }`
-    so the existing client form-poster can submit it.
+4. **Re-verify the three secrets with you.** After the code hardening, the fastest fix is to re-paste the three values directly from the CCAvenue dashboard (Settings → API Keys for the exact sub-account you want to charge through), in case the current values are from a different account or have whitespace. I'll prompt for an update via the secrets tool only after you confirm.
 
-### Initiator wiring — `src/lib/payments/initiate.functions.ts`
-- Replace the `"ccavenue"` rejection branch with a real call to
-  `createCcavenueOrder`. Keep `payu` branch untouched. Update the
-  `InitiatePaymentResult` type to a union of both order shapes.
+5. **Test again from `/apply/UA-2026-001067/summary`** and check the new diagnostic log line. If CCAvenue still rejects, the log will tell us whether to (a) request fresh keys from CCAvenue support, or (b) switch `CCAV_ENV=test` while they investigate.
 
-### Public webhook / return — `src/routes/api/public/webhooks/ccavenue.ts`
-- POST handler reads `encResp` from form data, decrypts with working key,
-  parses the `key=value&...` payload.
-- Match `order_id` → payments row; verify amount; map `order_status`
-  (`Success` / `Aborted` / `Failure` / `Invalid` / `Awaited`) to our enum.
-- On hash/amount mismatch or `Awaited`, call `callOrderStatusApi` to
-  reconcile (mirrors the PayU verify-after-mismatch behaviour).
-- Update `payments`, update `leads.status`, transition the application
-  (`payment_successful` reason), enqueue invoice + success email — reuse
-  the helpers already imported by the PayU webhook.
-- After processing, 302 redirect the browser to
-  `/apply/:leadCode/payment-status` (CCAvenue posts to a single URL for
-  both browser-return and S2S, like PayU).
+## Out of scope
 
-### Admin refunds — extend `src/lib/crm/payments.functions.ts`
-- Add `refundPayment({ paymentId, amount, reason })` guarded by
-  `requireSupabaseAuth` + `assertRole(["super_admin","admin","accounts"])`.
-- Route by `gateway_name`: `ccavenue` → `callRefundApi`; `payu` → existing
-  refund or throw "not implemented" placeholder.
-- On success, insert a child `payments` row (`status: 'refunded'`, negative
-  amount, parent ref in metadata), write an audit log, mark the original
-  payment `refunded` / `partially_refunded`.
-- Surface a "Refund" button on the existing finance/payments admin row
-  (small UI add — confirm dialog + amount input).
+No changes to the response/webhook handler, refunds, or DB schema — those are working, and this issue is strictly on the outbound request to CCAvenue.
 
-### Optional reconciliation helper
-- `reconcileCcavenuePayment({ paymentId })` server fn that calls
-  `callOrderStatusApi` and updates the row. Wire to a "Sync status" button
-  on the admin payment row.
+## Questions for you before I implement
 
-## Customer-facing checkout
-
-`/apply/:leadCode/summary` already lists enabled gateways. Once the seed
-flips `is_enabled` to true, CCAvenue appears as a selectable option with
-the existing card layout. The current form-poster component handles
-`{ method, action, fields }` for both gateways without change.
-
-## Verification steps after build
-
-1. Smoke a low-value live order end-to-end (CCAvenue requires live for
-   real cards). Confirm webhook decrypts, `payments` row flips to `paid`,
-   lead → `payment_successful`, invoice + email trigger.
-2. Trigger the Status API from admin and confirm normalized fields.
-3. Issue a partial refund; confirm child row + parent status update.
-4. Confirm PayU flow is still intact (no regression in shared initiator).
-
-## Open items I'll need from you before/during build
-
-- The three CCAvenue secret values (entered via the secrets prompt).
-- CCAvenue's "Response URL" must be set in their dashboard to
-  `https://<your-domain>/api/public/webhooks/ccavenue` — I'll show you the
-  exact URL after wiring.
-- For Refunds API, CCAvenue requires the server's outbound IP to be
-  whitelisted in their dashboard.
+- Are your CCAvenue keys **live** or **test**? (Live was the original scope, but want to confirm before I add the env switch default.)
+- Did you recently regenerate the working key in the CCAvenue dashboard after the access code was issued? If yes, that alone explains the error and we just need to update `CCAV_WORKING_KEY`.
