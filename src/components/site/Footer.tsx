@@ -182,6 +182,14 @@ function SeoTree({
   loadError: boolean;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [unlocked, setUnlocked] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.sessionStorage.getItem("udyam_footer_unlock") === "1";
+  });
+  const [clicks, setClicks] = useState(0);
+  const [showPwd, setShowPwd] = useState(false);
+  const [pwd, setPwd] = useState("");
+  const [pwdError, setPwdError] = useState(false);
 
   const grouped = useMemo(() => {
     const map = new Map<string, SeoPageRow[]>();
@@ -200,74 +208,140 @@ function SeoTree({
 
   const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
+  const homeCat = CATEGORIES.find((c) => c.isHome)!;
+  const restCats = CATEGORIES.filter((c) => !c.isHome);
+
+  function handleHomeRowClick() {
+    if (unlocked) return;
+    const next = clicks + 1;
+    setClicks(next);
+    if (next >= 3) {
+      setShowPwd(true);
+    }
+  }
+
+  function submitPwd(e: React.FormEvent) {
+    e.preventDefault();
+    if (pwd === "113355") {
+      try {
+        window.sessionStorage.setItem("udyam_footer_unlock", "1");
+      } catch { /* ignore */ }
+      setUnlocked(true);
+      setShowPwd(false);
+      setPwd("");
+      setPwdError(false);
+    } else {
+      setPwdError(true);
+      setPwd("");
+      setClicks(0);
+      setShowPwd(false);
+    }
+  }
+
   return (
     <nav className="mt-6" aria-label="SEO landing pages">
-      {loading && <p className="py-2 text-sm text-white/75">Loading pages…</p>}
-      {loadError && (
-        <p className="py-2 text-sm text-white/75">Could not load SEO pages.</p>
-      )}
-      {!loading && (
-        <ul className="space-y-1 text-[15px] font-semibold leading-snug">
-          {CATEGORIES.map((cat) => {
-            const children = grouped.get(cat.key) ?? [];
-            const isOpen = expanded[cat.key];
-            const hasChildren = children.length > 0;
-            return (
-              <li key={cat.key}>
-                <div className="flex items-center gap-1">
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      onClick={() => toggle(cat.key)}
-                      className="p-1 text-white/85 hover:text-brand-gold"
-                      aria-label={isOpen ? "Collapse" : "Expand"}
-                      aria-expanded={isOpen}
-                    >
-                      {isOpen ? (
-                        <ChevronDown className="h-4 w-4 stroke-[3]" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 stroke-[3]" />
-                      )}
-                    </button>
-                  ) : (
-                    <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
-                      {cat.isHome ? (
-                        <HomeIcon className="h-3.5 w-3.5" />
-                      ) : (
+      <ul className="space-y-1 text-[15px] font-semibold leading-snug">
+        {/* Home row — clicking the row 3× while locked reveals the password input */}
+        <li>
+          <div
+            className="flex items-center gap-1 cursor-default select-none"
+            onClick={handleHomeRowClick}
+          >
+            <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
+              <HomeIcon className="h-3.5 w-3.5" />
+            </span>
+            <Link
+              to="/"
+              className="flex-1 py-1.5 text-white hover:text-brand-gold"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {homeCat.label}
+            </Link>
+          </div>
+
+          {showPwd && !unlocked && (
+            <form
+              onSubmit={submitPwd}
+              className="ml-6 mt-2 mb-3 flex items-center gap-2"
+            >
+              <input
+                type="password"
+                value={pwd}
+                onChange={(e) => { setPwd(e.target.value); setPwdError(false); }}
+                autoFocus
+                className={`flex-1 rounded-md border bg-white/10 px-2 py-1.5 text-sm text-white outline-none focus:ring-2 ${
+                  pwdError ? "border-red-400 ring-red-400/40" : "border-white/30 focus:ring-brand-gold/40"
+                }`}
+              />
+              <button
+                type="submit"
+                className="rounded-md bg-brand-gold px-3 py-1.5 text-sm font-semibold text-brand-navy-deep hover:bg-brand-gold/90"
+              >
+                Open
+              </button>
+            </form>
+          )}
+        </li>
+
+        {/* Locked: nothing else is shown. Unlocked: render the full SEO tree. */}
+        {unlocked && (
+          <>
+            {loading && <li className="py-2 text-sm text-white/75">Loading pages…</li>}
+            {loadError && (
+              <li className="py-2 text-sm text-white/75">Could not load SEO pages.</li>
+            )}
+            {!loading && restCats.map((cat) => {
+              const children = grouped.get(cat.key) ?? [];
+              const isOpen = expanded[cat.key];
+              const hasChildren = children.length > 0;
+              return (
+                <li key={cat.key}>
+                  <div className="flex items-center gap-1">
+                    {hasChildren ? (
+                      <button
+                        type="button"
+                        onClick={() => toggle(cat.key)}
+                        className="p-1 text-white/85 hover:text-brand-gold"
+                        aria-label={isOpen ? "Collapse" : "Expand"}
+                        aria-expanded={isOpen}
+                      >
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4 stroke-[3]" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 stroke-[3]" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
                         <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                    </span>
-                  )}
-                  {cat.isHome ? (
-                    <Link to="/" className="flex-1 py-1.5 text-white hover:text-brand-gold">
-                      {cat.label}
-                    </Link>
-                  ) : (
+                      </span>
+                    )}
                     <span className="flex-1 py-1.5 text-white font-semibold">
                       {cat.label}
                     </span>
+                  </div>
+                  {hasChildren && isOpen && (
+                    <ul className="ml-6 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
+                      {children.map((p) => (
+                        <li key={p.id}>
+                          <a
+                            href={`/${p.slug}`}
+                            className="flex items-start gap-2 py-1 text-white/85 hover:text-brand-gold"
+                          >
+                            <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{p.label}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </div>
-                {hasChildren && isOpen && (
-                  <ul className="ml-6 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
-                    {children.map((p) => (
-                      <li key={p.id}>
-                        <a
-                          href={`/${p.slug}`}
-                          className="flex items-start gap-2 py-1 text-white/85 hover:text-brand-gold"
-                        >
-                          <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <span>{p.label}</span>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                </li>
+              );
+            })}
+          </>
+        )}
+      </ul>
     </nav>
   );
 }
+

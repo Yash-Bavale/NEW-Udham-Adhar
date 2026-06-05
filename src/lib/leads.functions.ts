@@ -44,7 +44,20 @@ export const createLead = createServerFn({ method: "POST" })
     const gstAmount = Number(service.gst_amount);
     const totalAmount = Number(service.total_amount);
 
-    // 2. Always create a new lead row — treat every submission as a fresh application.
+    // 2. Duplicate detection — match on mobile OR email (case-insensitive).
+    const normalizedEmail = data.email.toLowerCase();
+    const { data: existing } = await supabaseAdmin
+      .from("leads")
+      .select("id")
+      .or(`mobile.eq.${data.mobile},email.eq.${normalizedEmail}`)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const isDuplicate = !!existing?.id;
+    const duplicateOf = existing?.id ?? null;
+
+    // 3. Always create a new lead row — treat every submission as a fresh application.
     let leadId: string;
     let leadCode: string;
     {
@@ -52,7 +65,7 @@ export const createLead = createServerFn({ method: "POST" })
         .from("leads")
         .insert({
           name: data.name,
-          email: data.email.toLowerCase(),
+          email: normalizedEmail,
           mobile: data.mobile,
           state: data.state,
           language: data.language,
@@ -63,6 +76,8 @@ export const createLead = createServerFn({ method: "POST" })
           total_amount: totalAmount,
           status: "new_lead",
           lead_source: "website",
+          is_duplicate: isDuplicate,
+          duplicate_of: duplicateOf,
         })
         .select("id, lead_code")
         .single();
@@ -72,6 +87,20 @@ export const createLead = createServerFn({ method: "POST" })
       leadId = row.id;
       leadCode = row.lead_code as string;
     }
+
+    // If this was a duplicate, bump the original's counter.
+    if (duplicateOf) {
+      const { data: orig } = await supabaseAdmin
+        .from("leads")
+        .select("duplicate_count")
+        .eq("id", duplicateOf)
+        .maybeSingle();
+      await supabaseAdmin
+        .from("leads")
+        .update({ duplicate_count: (orig?.duplicate_count ?? 0) + 1 })
+        .eq("id", duplicateOf);
+    }
+
 
 
     // 3. Create application row (one per submission). Trigger writes activity log.
