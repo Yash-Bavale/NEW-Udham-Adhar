@@ -215,7 +215,7 @@ function Divider() {
 
 function Row({
   icon: Icon, label, value, mono, small,
-}: { icon: React.ComponentType<{ className?: string }>; label: string; value?: string | null; mono?: boolean; small?: boolean }) {
+}: { icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; label: string; value?: string | null; mono?: boolean; small?: boolean }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <Icon className="w-3 h-3 shrink-0" style={{ color: "var(--admin-fg-subtle)" }} />
@@ -254,7 +254,7 @@ function ProgressRow({ label, done, value }: { label: string; done: boolean; val
 
 function TabBtn({
   active, onClick, icon: Icon, label,
-}: { active: boolean; onClick: () => void; icon: React.ComponentType<{ className?: string }>; label: string }) {
+}: { active: boolean; onClick: () => void; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; label: string }) {
   return (
     <button
       onClick={onClick}
