@@ -71,7 +71,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .from("leads")
         .select("id, lead_code, name, email, mobile, service, status, created_at")
         .eq("assigned_to", userId)
-        .in("status", ["lead_created", "payment_successful", "details_pending", "awaiting_payment"])
+        .in("status", ["lead_created", "new_lead", "payment_successful", "details_pending", "payment_pending"])
         .order("created_at", { ascending: false })
         .limit(50),
       supabase
