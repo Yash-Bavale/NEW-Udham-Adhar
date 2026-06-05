@@ -1,34 +1,80 @@
-## What the error means
 
-CCAvenue's gateway page shows **"decryption of encRequest failed"** when *their* servers cannot decrypt the `encRequest` we POST to `secure.ccavenue.com/transaction/transaction.do`. Our encryption code itself is correct (AES‑128‑CBC, MD5(workingKey), fixed IV `00..0f` — that's the canonical kit). So the failure is almost always one of three credential/environment mismatches, not a code bug.
+## Scope
 
-## Most likely causes (in order)
+Update two onboarding schemas in `src/lib/onboarding/schemas.ts`:
 
-1. **Working key ↔ access code ↔ merchant id mismatch.** The three CCAV secrets must come from the *same* CCAvenue sub-account. If the working key was regenerated after the access code was issued, or copied from a different M-ID, decryption fails on their side.
-2. **Test credentials used against the live URL** (or vice versa). We hardcode `https://secure.ccavenue.com/...` (live). Test credentials only work against `https://test.ccavenue.com/...`.
-3. **Whitespace / stray characters** in `CCAV_WORKING_KEY` (a trailing newline or space changes the MD5 and breaks decryption). Same risk for `CCAV_ACCESS_CODE` / `CCAV_MERCHANT_ID`.
+1. **`NEW_UDYAM`** (1st service — also reused as Stage 2 of the 6th service)
+2. **`CORRECT_PAN_AADHAAR`** (6th service — Stage 1)
 
-Less likely but worth ruling out: the account hasn't been activated for the iFrame/Non-Seamless integration we're using.
+No UI/component changes — `OnboardingForm` already blocks submission when HTML5 `required` fields are empty, so just flipping `required: true` in the schema enforces the "don't take form till fields get submitted" behavior.
 
-## Plan
+## Changes to `NEW_UDYAM` (relabel + mark required)
 
-1. **Harden credential handling in `ccavenue.server.ts`**
-   - `.trim()` `CCAV_MERCHANT_ID`, `CCAV_ACCESS_CODE`, `CCAV_WORKING_KEY` in `getCcavCreds()` so an accidental trailing newline can never poison the MD5 key.
-   - Validate non-empty after trim with a clearer error.
+Renumber labels and flip `required` to match the spec. Items the user did **not** mark with `*` stay optional.
 
-2. **Add an environment toggle** (`CCAV_ENV` = `live` | `test`, defaulting to `live`) and derive `CCAV_REDIRECT_URL` / `CCAV_API_URL` from it. This lets us flip to `test.ccavenue.com` for sanity checks without code edits, and prevents the live/test URL trap.
+| Field key | New label | Required |
+|---|---|---|
+| aadhaar_number | `1. Aadhaar Number` | ✓ |
+| applicant_name | `2. Your Name (as per Aadhaar)` | ✓ |
+| business_type | `3. Type of Organisation / संगठन के प्रकार` | ✓ |
+| pan_number | `4.1 PAN Number` | ✓ |
+| pan_holder_name | `4.1.1 Name of PAN Card Holder` | ✓ |
+| pan_dob | `4.1.2 Date of Birth as per PAN Card` | ✓ |
+| itr_previous_year | `4.2 Have you filed ITR for PY 2024–25?` | ✓ |
+| gstin_status | `4.3 Do you have GSTIN?` | ✓ |
+| written_down_value | `Written Down Value (WDV) as on 31 March 2024–25 (A)` *(number removed)* | ✓ |
+| exclusion_cost | `Exclusion of cost — Pollution Control / R&D / Industrial Safety Devices 2024–25 (B)` *(number removed)* | ✓ (was optional) |
+| total_turnover | `Total Turnover during 2024–25` *(number removed)* | ✓ |
+| business_name | `8. Name of Enterprise` | ✓ |
+| aadhaar_mobile | `9. Mobile Number (+91)` | ✓ |
+| email | `10. Email` | ✓ |
+| social_category | `11. Social Category` | ✓ |
+| gender | `12. Gender` | ✓ |
+| specially_abled | `13. Specially Abled (Divyang)` | ✓ |
+| section_address | `14. Official Address of Enterprise` (section header) | — |
+| address_flat | `Flat / Door / Block No.` | ✓ |
+| address_premises | `Name of Premises / Building` | optional (no `*`) |
+| address_village | `Village / Town` | ✓ |
+| address_block | `Block` | optional (no `*`) |
+| address_road | `Road / Street / Lane` | ✓ |
+| city | `City` | ✓ |
+| pincode | `PIN Code` | ✓ |
+| state | `State` | ✓ |
+| district | `District` | ✓ |
+| previous_registration | `16. Previous EM-II / UAM Registration Number, if any` | ✓ |
+| section_status | `17. Status of Enterprise` (section header) | — |
+| incorporation_date | `a. Date of Incorporation / Registration` | ✓ |
+| business_commenced | `b. Whether production / business commenced` | ✓ |
+| commencement_date | `Date of Commencement` | ✓ (was optional) |
+| section_bank | `18. Bank Details` (section header) | — |
+| bank_name | `Bank Name` | ✓ |
+| bank_ifsc | `IFSC Code` | ✓ |
+| bank_account_no | `Bank Account Number` | ✓ |
+| major_activity | `19. Major Activity of Unit` | ✓ |
+| nic_2_digit | `20a. NIC 2 Digit Code` | ✓ (unchanged) |
+| nic_4_digit | `20b. NIC 4 Digit Code` | ✓ (unchanged) |
+| nic_5_digit | `20c. NIC 5 Digit Code` | ✓ (unchanged) |
+| **NEW** `section_employees` | `21. Number of persons employed` (section header) | — |
+| employees_male | `Male` | ✓ (was optional) |
+| employees_female | `Female` | ✓ (was optional) |
+| employees_others | `Others` | ✓ (was optional) |
+| gem_registration | `22. Interested in Government e-Marketplace (GeM) Portal?` | ✓ (was optional) |
+| treds_registration | `23. Interested in TReDS Portals?` | ✓ (was optional) |
+| ncs_registration | `24. Interested in National Career Service (NCS) Portal?` | ✓ (was optional) |
+| nsic_b2b_registration | `25. Interested in NSIC B2B Portal?` | ✓ (was optional) |
+| skill_india_registration | `27. Interested in Skill India Digital Portal?` | ✓ (was optional; user skipped 26 as written) |
 
-3. **Add a one-shot diagnostic log on initiation** (no secrets printed) — just merchant_id, access_code prefix/length, working_key length, and which endpoint URL we POSTed to. This makes "wrong env" vs "wrong key" obvious from server logs on the next attempt.
+Notes:
+- User explicitly skipped numbers 15 and 26 — labels match that.
+- WDV / Exclusion / Turnover have no number in the spec; numbers removed from labels.
+- NIC heading not numbered separately by user, but we keep `20a/b/c` since employees needs to move to 21.
+- `CORRECT_PAN_AADHAAR_STAGE2` automatically inherits all of these because it references `NEW_UDYAM.fields`.
 
-4. **Re-verify the three secrets with you.** After the code hardening, the fastest fix is to re-paste the three values directly from the CCAvenue dashboard (Settings → API Keys for the exact sub-account you want to charge through), in case the current values are from a different account or have whitespace. I'll prompt for an update via the secrets tool only after you confirm.
+## Changes to `CORRECT_PAN_AADHAAR` (Stage 1 of 6th service)
 
-5. **Test again from `/apply/UA-2026-001067/summary`** and check the new diagnostic log line. If CCAvenue still rejects, the log will tell us whether to (a) request fresh keys from CCAvenue support, or (b) switch `CCAV_ENV=test` while they investigate.
+- `registered_email`: `required: false` → `required: true` (placeholder updated to drop "if available").
 
 ## Out of scope
 
-No changes to the response/webhook handler, refunds, or DB schema — those are working, and this issue is strictly on the outbound request to CCAvenue.
-
-## Questions for you before I implement
-
-- Are your CCAvenue keys **live** or **test**? (Live was the original scope, but want to confirm before I add the env switch default.)
-- Did you recently regenerate the working key in the CCAvenue dashboard after the access code was issued? If yes, that alone explains the error and we just need to update `CCAV_WORKING_KEY`.
+- No changes to other schemas, components, or routes.
+- Existing in-flight drafts keep working — only labels/required flags change.
