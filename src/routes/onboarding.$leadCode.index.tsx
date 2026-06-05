@@ -82,7 +82,7 @@ function OnboardingDetailsPage() {
 
   const hasRequiredDocs = (data.schema.documents ?? []).some((d) => d.required);
   const hasStage2 = isCorrectPan;
-  const totalSteps: 2 | 3 = hasRequiredDocs || hasStage2 ? 3 : 2;
+  const totalSteps: 2 | 3 = hasRequiredDocs ? 3 : 2;
   const isFinalFormStage = !hasStage2 || stage === 2;
 
   return (
