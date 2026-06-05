@@ -1,5 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity, Mail, CreditCard,
@@ -11,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/theme";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
+import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
