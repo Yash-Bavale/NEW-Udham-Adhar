@@ -212,9 +212,16 @@ const MIGRATE: OnboardingSchema = {
 };
 
 const FORGOT_MOBILE: OnboardingSchema = {
-  title: "Forgot Registered Mobile / Email — Incomplete Information",
-  description: "Fill the same enterprise details as Udyam New Registration. After submitting, download the standard form, fill & sign it, and upload it along with your Aadhaar and PAN.",
-  fields: NEW_UDYAM.fields,
+  title: "Recover Registered Mobile / Email",
+  description: "Help us identify your record so we can reset the registered contact details.",
+  fields: [
+    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
+    { key: "udyam_number", label: "Udyam Number (if known)", type: "text", required: false, maxLength: 40 },
+    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
+    { key: "new_mobile", label: "New mobile to register", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
+    { key: "new_email", label: "New email to register", type: "email", required: true },
+    { key: "reason", label: "Reason / details", type: "textarea", required: false, maxLength: 600 },
+  ],
   documents: [
     { key: "aadhaar_card_pdf", label: "Aadhaar Card PDF", required: true },
     { key: "pan_card_pdf", label: "PAN Card PDF", required: true },
