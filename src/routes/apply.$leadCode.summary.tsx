@@ -174,10 +174,13 @@ function SummaryPage() {
     }
   }, [lead?.payment, lead?.status, leadCode, navigate]);
 
+  const SUPPORTED_GATEWAYS = ["payu", "ccavenue"] as const;
+  const isSupportedGateway = (name: string) => (SUPPORTED_GATEWAYS as readonly string[]).includes(name);
+
   const activeGateway = useMemo(() => {
-    if (chosen) return chosen;
-    const payu = gateways.find((g) => g.name === "payu");
-    return payu?.name ?? gateways[0]?.name ?? null;
+    if (chosen && isSupportedGateway(chosen)) return chosen;
+    const first = gateways.find((g) => isSupportedGateway(g.name));
+    return first?.name ?? null;
   }, [chosen, gateways]);
 
   const info = lead
@@ -202,21 +205,22 @@ function SummaryPage() {
     );
   }
 
-  const canPay = activeGateway === "payu" && !payBusy && !order;
+  const canPay = !!activeGateway && !payBusy && !order;
 
   async function handlePay() {
-    if (!canPay) return;
+    if (!canPay || !activeGateway) return;
     setPayBusy(true);
     setPayError(null);
-    trackEvent("payment_initiated", { gateway: "payu", leadCode });
+    trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
-      const res = await createOrder({ data: { leadCode } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
       setOrder(res);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : "Could not start payment.");
       setPayBusy(false);
     }
   }
+
 
   return (
     <section className="mx-auto max-w-2xl px-4 py-6 md:py-10">
