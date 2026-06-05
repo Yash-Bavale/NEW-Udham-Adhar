@@ -181,6 +181,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
@@ -1114,6 +1115,11 @@ const AdminServicesRoute = AdminServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSeoRoute = AdminSeoRouteImport.update({
+  id: '/seo',
+  path: '/seo',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminReviewRoute = AdminReviewRouteImport.update({
   id: '/review',
   path: '/review',
@@ -1505,6 +1511,7 @@ export interface FileRoutesByFullPath {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/review': typeof AdminReviewRoute
+  '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
@@ -1718,6 +1725,7 @@ export interface FileRoutesByTo {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/review': typeof AdminReviewRoute
+  '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
@@ -1933,6 +1941,7 @@ export interface FileRoutesById {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/review': typeof AdminReviewRoute
+  '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
@@ -2149,6 +2158,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/pipeline'
     | '/admin/review'
+    | '/admin/seo'
     | '/admin/services'
     | '/admin/submissions'
     | '/admin/tasks'
@@ -2362,6 +2372,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/pipeline'
     | '/admin/review'
+    | '/admin/seo'
     | '/admin/services'
     | '/admin/submissions'
     | '/admin/tasks'
@@ -2576,6 +2587,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/pipeline'
     | '/admin/review'
+    | '/admin/seo'
     | '/admin/services'
     | '/admin/submissions'
     | '/admin/tasks'
@@ -4006,6 +4018,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminServicesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/seo': {
+      id: '/admin/seo'
+      path: '/seo'
+      fullPath: '/admin/seo'
+      preLoaderRoute: typeof AdminSeoRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/review': {
       id: '/admin/review'
       path: '/review'
@@ -4390,6 +4409,7 @@ interface AdminRouteChildren {
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminReviewRoute: typeof AdminReviewRoute
+  AdminSeoRoute: typeof AdminSeoRoute
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminTasksRoute: typeof AdminTasksRoute
@@ -4414,6 +4434,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminReviewRoute: AdminReviewRoute,
+  AdminSeoRoute: AdminSeoRoute,
   AdminServicesRoute: AdminServicesRouteWithChildren,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminTasksRoute: AdminTasksRoute,
