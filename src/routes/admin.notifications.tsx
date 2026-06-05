@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
@@ -107,9 +107,9 @@ function NotificationsPage() {
                     <p className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>{n.body}</p>
                   )}
                   {n.href && (
-                    <Link to={n.href} className="text-xs mt-1 inline-block hover:underline" style={{ color: "var(--admin-accent)" }}>
+                    <a href={n.href} className="text-xs mt-1 inline-block hover:underline" style={{ color: "var(--admin-accent)" }}>
                       Open →
-                    </Link>
+                    </a>
                   )}
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

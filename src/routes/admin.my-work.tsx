@@ -75,8 +75,8 @@ function MyWorkPage() {
         {(data?.assignedApplications ?? []).slice(0, 8).map((a) => (
           <Link
             key={a.id}
-            to="/admin/applications/$id"
-            params={{ id: a.id }}
+            to="/admin/applications/$applicationId"
+            params={{ applicationId: a.id }}
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
           >
             <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
@@ -129,8 +129,8 @@ function MyWorkPage() {
         {(data?.assignedLeads ?? []).slice(0, 8).map((l) => (
           <Link
             key={l.id}
-            to="/admin/leads/$id"
-            params={{ id: l.id }}
+            to="/admin/leads/$leadId"
+            params={{ leadId: l.id }}
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
           >
             <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>

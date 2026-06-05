@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 
 export function ComingSoon({
@@ -48,13 +47,13 @@ export function ComingSoon({
           {fallbackHref && fallbackLabel && (
             <p className="pt-2">
               In the meantime, use{" "}
-              <Link
-                to={fallbackHref}
+              <a
+                href={fallbackHref}
                 className="underline underline-offset-4"
                 style={{ color: "var(--admin-accent)" }}
               >
                 {fallbackLabel}
-              </Link>
+              </a>
               .
             </p>
           )}
