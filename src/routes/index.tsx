@@ -202,7 +202,7 @@ function HomePage() {
           </div>
           <div className="p-4 md:p-6 flex justify-center">
             <img
-              src="https://udyamadhar.in/wp-content/uploads/2025/11/India-map-en.svg.webp"
+              src={mapImg.url}
               alt="Map of India showing all states where consultancy services are provided"
               className="w-full max-w-xl h-auto"
               loading="lazy"
