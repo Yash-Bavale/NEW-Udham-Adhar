@@ -27,9 +27,26 @@ export const Route = createFileRoute("/success/$leadCode")({
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
 const REDIRECT_SECONDS = 30;
-const ACTION_THRESHOLD = 15; // seconds remaining at which we switch from "confirmed" to "action"
 
-type Phase = "confirmed" | "action";
+type Phase = "processing" | "verifying" | "preparing" | "almost" | "confirmed" | "action";
+
+// Rotating messages every 5 seconds across the 30s timer.
+// Window = [maxSecondsLeft, minSecondsLeft) inclusive on max.
+const PHASE_STEPS: Array<{
+  phase: Phase;
+  max: number; // when secondsLeft <= max && > min, this phase shows
+  min: number;
+  title: string;
+  subtitle: string;
+  chip: string;
+}> = [
+  { phase: "processing", max: 30, min: 25, title: "Processing your payment…", subtitle: "Please wait while we securely confirm your transaction with the bank.", chip: "Step 1 of 6" },
+  { phase: "verifying", max: 25, min: 20, title: "Verifying transaction details", subtitle: "Matching your payment with our records. This only takes a moment.", chip: "Step 2 of 6" },
+  { phase: "preparing", max: 20, min: 15, title: "Preparing your application", subtitle: "Setting up your secure onboarding form with your details.", chip: "Step 3 of 6" },
+  { phase: "almost", max: 15, min: 10, title: "Almost ready…", subtitle: "Finalising everything so you can fill the remaining details smoothly.", chip: "Step 4 of 6" },
+  { phase: "confirmed", max: 10, min: 5, title: "Payment Successful ✓", subtitle: "Thank you! We have received your payment. Getting your form ready…", chip: "Step 5 of 6" },
+  { phase: "action", max: 5, min: -1, title: "Please fill the remaining details", subtitle: "Your form is still incomplete. We need a few more details to file your application. Opening your form in a moment — please don't leave this page.", chip: "Step 6 of 6" },
+];
 
 function SuccessPage() {
   const { leadCode } = Route.useParams();
