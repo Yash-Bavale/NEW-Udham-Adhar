@@ -158,11 +158,7 @@ function SuccessPage() {
             <motion.div
               aria-hidden
               className={`absolute inset-0 rounded-full ${
-                phase === "confirming"
-                  ? "bg-blue-400/20"
-                  : phase === "confirmed"
-                    ? "bg-emerald-400/25"
-                    : "bg-brand-red/20"
+                phase === "confirmed" ? "bg-emerald-400/25" : "bg-brand-red/20"
               } blur-xl`}
               animate={{ scale: [1, 1.18, 1], opacity: [0.5, 0.85, 0.5] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
@@ -183,9 +179,6 @@ function SuccessPage() {
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              {phase === "confirming" && (
-                <Loader2 className={`w-16 h-16 ${palette.accent} animate-spin`} key="confirming" />
-              )}
               {phase === "confirmed" && (
                 <div key="confirmed" className="animate-in zoom-in-50 fade-in duration-500">
                   <CheckCircle2 className={`w-20 h-20 ${palette.accent} drop-shadow`} />
@@ -200,36 +193,26 @@ function SuccessPage() {
           </div>
 
           {/* Phase-specific message */}
-          {phase === "confirming" && (
-            <div key="t-confirming" className="animate-in fade-in duration-500">
-              <h1 className="text-2xl sm:text-3xl font-bold font-display text-brand-navy mb-2">
-                Confirming your payment…
-              </h1>
-              <p className="text-sm text-slate-600 max-w-sm">
-                Securely verifying with the payment gateway. Please don't close or refresh this page.
-              </p>
-            </div>
-          )}
           {phase === "confirmed" && (
             <div key="t-confirmed" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
               <h1 className="text-2xl sm:text-3xl font-bold font-display text-emerald-700 mb-2">
-                Payment confirmed ✓
+                Payment Successful ✓
               </h1>
               <p className="text-sm text-slate-700 max-w-sm">
-                Thank you! Your application fee has been received. Setting up your secure onboarding workspace…
+                Thank you! We have received your payment. Getting your form ready…
               </p>
             </div>
           )}
           {phase === "action" && (
             <div key="t-action" className="animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-red text-white text-[11px] uppercase tracking-widest font-bold mb-3 motion-safe:animate-pulse">
-                <Sparkles className="w-3.5 h-3.5" /> Almost There
+                <Sparkles className="w-3.5 h-3.5" /> Your Form Is Incomplete
               </div>
               <h1 className="text-2xl sm:text-3xl font-bold font-display text-brand-navy mb-2 leading-tight">
-                One last step — open your form
+                Please fill the remaining details
               </h1>
               <p className="text-sm text-slate-700 max-w-sm">
-                Our experts need a few more details to file your application. Opening your form in a moment — please don't leave this page.
+                Your form is still incomplete. We need a few more details to file your application. Opening your form in a moment — please don't leave this page.
               </p>
             </div>
           )}
