@@ -140,7 +140,10 @@ function ApplicationCommandCenter() {
               />
             </div>
           </Panel>
+
+          <DocChecklistPanel applicationId={applicationId} />
         </aside>
+
 
         {/* MAIN PANEL */}
         <main className="space-y-3 min-w-0">
