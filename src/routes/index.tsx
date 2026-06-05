@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
+import mapImg from "@/assets/india-map.svg.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
