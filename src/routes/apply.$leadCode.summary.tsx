@@ -406,8 +406,9 @@ function SummaryPage() {
                   fg: "#fff",
                   label: g.display_name,
                 };
-                const supported = g.name === "payu";
+                const supported = isSupportedGateway(g.name);
                 const selected = activeGateway === g.name;
+
                 return (
                   <label
                     key={g.name}
