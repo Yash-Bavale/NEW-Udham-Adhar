@@ -27,9 +27,9 @@ export const Route = createFileRoute("/success/$leadCode")({
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
-const REDIRECT_SECONDS = 30;
+const REDIRECT_SECONDS = 10;
 
-type Phase = "confirming" | "confirmed" | "action";
+type Phase = "confirmed" | "action";
 
 function SuccessPage() {
   const { leadCode } = Route.useParams();
