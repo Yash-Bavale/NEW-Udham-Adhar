@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   LayoutDashboard, Users, FileText, Briefcase, UserCog, Activity, Mail, CreditCard,
   LogOut, Menu, Moon, Sun, ChevronRight, Receipt, MessageSquareWarning,
-  Award, ShieldCheck, Search, CheckSquare, MessageCircle, Settings as SettingsIcon,
-  Sparkles,
+  Award, ShieldCheck, Search, Settings as SettingsIcon,
+  Sparkles, Inbox, KanbanSquare, ListChecks, Bell, Wallet, FileCheck2, Building2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider, useAdminTheme } from "@/components/admin/theme";
@@ -18,25 +18,42 @@ import {
 type NavItem = { to: string; label: string; icon: typeof Users; group: string };
 
 const NAV: NavItem[] = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Workspace" },
-  { to: "/admin/customers", label: "Customers", icon: Users, group: "Workspace" },
-  { to: "/admin/leads", label: "Leads", icon: Sparkles, group: "Workspace" },
-  { to: "/admin/applications", label: "Applications", icon: FileText, group: "Workspace" },
-  { to: "/admin/submissions", label: "Submissions", icon: FileText, group: "Workspace" },
-  { to: "/admin/complaints", label: "Tasks & Complaints", icon: CheckSquare, group: "Workspace" },
-  { to: "/admin/emails", label: "Communications", icon: MessageCircle, group: "Workspace" },
-
-  { to: "/admin/finance/gst", label: "Finance · GST", icon: Receipt, group: "Finance" },
-  { to: "/admin/finance/settlements", label: "Finance · Settlements", icon: CreditCard, group: "Finance" },
-  { to: "/admin/certificates", label: "Certificates", icon: Award, group: "Finance" },
-
-  { to: "/admin/services", label: "Services", icon: Briefcase, group: "Admin" },
-  { to: "/admin/gateways", label: "Payment Gateways", icon: CreditCard, group: "Admin" },
-  { to: "/admin/users", label: "Employees", icon: UserCog, group: "Admin" },
-  { to: "/admin/activity", label: "Activity Log", icon: Activity, group: "Admin" },
-  { to: "/admin/audit", label: "Audit Log", icon: ShieldCheck, group: "Admin" },
-  { to: "/admin/seo-admin", label: "SEO Pages", icon: SettingsIcon, group: "Admin" },
+  // Home
+  { to: "/admin/my-work", label: "My Work", icon: Inbox, group: "Home" },
+  { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, group: "Home" },
+  { to: "/admin/notifications", label: "Notifications", icon: Bell, group: "Home" },
+  // Customers
+  { to: "/admin/customers", label: "Customer Directory", icon: Users, group: "Customers" },
+  { to: "/admin/leads", label: "Leads", icon: Sparkles, group: "Customers" },
+  // Applications
+  { to: "/admin/pipeline", label: "Application Pipeline", icon: KanbanSquare, group: "Applications" },
+  { to: "/admin/applications", label: "Application Queue", icon: FileText, group: "Applications" },
+  { to: "/admin/review", label: "Document Review", icon: FileCheck2, group: "Applications" },
+  { to: "/admin/submissions", label: "Submissions", icon: FileText, group: "Applications" },
+  // Operations
+  { to: "/admin/tasks", label: "Tasks", icon: ListChecks, group: "Operations" },
+  { to: "/admin/certificates", label: "Certificates", icon: Award, group: "Operations" },
+  { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, group: "Operations" },
+  // Communications
+  { to: "/admin/emails", label: "Email Center", icon: Mail, group: "Communications" },
+  // Finance
+  { to: "/admin/finance", label: "Revenue Dashboard", icon: Wallet, group: "Finance" },
+  { to: "/admin/finance/gst", label: "GST Reports", icon: Receipt, group: "Finance" },
+  { to: "/admin/finance/settlements", label: "Settlements", icon: CreditCard, group: "Finance" },
+  // Services
+  { to: "/admin/services", label: "Service Catalog", icon: Briefcase, group: "Services" },
+  // People
+  { to: "/admin/employees", label: "Employees", icon: UserCog, group: "People" },
+  // System
+  { to: "/admin/activity", label: "Activity Logs", icon: Activity, group: "System" },
+  { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, group: "System" },
+  { to: "/admin/gateways", label: "Payment Gateways", icon: Building2, group: "System" },
+  { to: "/admin/seo", label: "SEO Pages", icon: SettingsIcon, group: "System" },
 ];
+
+const GROUP_ORDER = [
+  "Home", "Customers", "Applications", "Operations", "Communications", "Finance", "Services", "People", "System",
+] as const;
 
 export function AdminShell({ children, email }: { children: ReactNode; email?: string }) {
   return (
