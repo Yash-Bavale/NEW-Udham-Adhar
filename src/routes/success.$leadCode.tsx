@@ -117,28 +117,19 @@ function SuccessPage() {
 
   if (!data) return null;
 
-  // Phase derived from countdown — confirming (30-21) → confirmed (20-11) → action (10-0)
-  const elapsed = REDIRECT_SECONDS - secondsLeft;
-  const phase: Phase = elapsed < 10 ? "confirming" : elapsed < 20 ? "confirmed" : "action";
+  // 10s timer: 10→6 (5 ticks) = payment confirmed, 5→0 = form incomplete action.
+  const phase: Phase = secondsLeft > 5 ? "confirmed" : "action";
   const ringCirc = 2 * Math.PI * 44;
   const ringProgress = ringCirc * (1 - secondsLeft / REDIRECT_SECONDS);
 
   const palette = {
-    confirming: {
-      bg: "from-slate-50 to-blue-50/60",
-      border: "border-slate-300",
-      accent: "text-blue-600",
-      ring: "stroke-blue-500",
-      chipBg: "bg-blue-100 text-blue-700",
-      chipLabel: "Step 1 of 3",
-    },
     confirmed: {
       bg: "from-emerald-50 to-green-50/60",
       border: "border-emerald-300",
       accent: "text-emerald-600",
       ring: "stroke-emerald-500",
       chipBg: "bg-emerald-100 text-emerald-700",
-      chipLabel: "Step 2 of 3",
+      chipLabel: "Step 1 of 2",
     },
     action: {
       bg: "from-amber-50 to-orange-50",
@@ -146,7 +137,7 @@ function SuccessPage() {
       accent: "text-brand-red",
       ring: "stroke-brand-red",
       chipBg: "bg-amber-100 text-amber-800",
-      chipLabel: "Step 3 of 3",
+      chipLabel: "Step 2 of 2",
     },
   }[phase];
 
