@@ -76,23 +76,31 @@
   --font-display: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Admin surfaces */
+  /* Admin surfaces — Linear-style, dark-first */
   --admin-bg: oklch(0.985 0.005 250);
   --admin-surface: oklch(1 0 0);
   --admin-surface-2: oklch(0.97 0.008 250);
+  --admin-surface-3: oklch(0.94 0.01 250);
   --admin-border: oklch(0.91 0.01 255);
+  --admin-border-strong: oklch(0.85 0.012 255);
   --admin-fg: oklch(0.18 0.02 260);
   --admin-fg-muted: oklch(0.5 0.03 257);
-  --admin-sidebar: oklch(0.18 0.03 260);
-  --admin-sidebar-fg: oklch(0.95 0.005 250);
-  --admin-sidebar-muted: oklch(0.7 0.02 255);
-  --admin-accent: var(--brand-navy);
+  --admin-fg-subtle: oklch(0.62 0.025 258);
+  --admin-sidebar: oklch(0.985 0.005 250);
+  --admin-sidebar-fg: oklch(0.22 0.02 260);
+  --admin-sidebar-muted: oklch(0.5 0.025 258);
+  --admin-accent: oklch(0.55 0.2 268);
   --admin-accent-fg: oklch(1 0 0);
-  --gradient-admin: linear-gradient(135deg, oklch(0.55 0.18 260), oklch(0.65 0.18 220));
+  --admin-accent-soft: color-mix(in oklab, oklch(0.55 0.2 268) 12%, transparent);
+  --admin-success: oklch(0.65 0.16 155);
+  --admin-warn: oklch(0.75 0.16 75);
+  --admin-danger: oklch(0.6 0.22 27);
+  --gradient-admin: linear-gradient(135deg, oklch(0.55 0.2 268), oklch(0.62 0.18 240));
   --gradient-success: linear-gradient(135deg, oklch(0.65 0.18 155), oklch(0.7 0.16 175));
   --gradient-warn: linear-gradient(135deg, oklch(0.75 0.17 75), oklch(0.7 0.18 50));
   --gradient-danger: linear-gradient(135deg, oklch(0.62 0.22 27), oklch(0.58 0.22 5));
   --shadow-admin: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -12px oklch(0.4 0.08 260 / 0.18);
+  --admin-radius: 0.5rem;
 
   /* Glassmorphism */
   --glass-bg: color-mix(in oklab, var(--admin-surface) 70%, transparent);
@@ -108,7 +116,7 @@
   --card-foreground: oklch(0.96 0.005 250);
   --popover: oklch(0.2 0.02 260);
   --popover-foreground: oklch(0.96 0.005 250);
-  --primary: oklch(0.7 0.16 240);
+  --primary: oklch(0.72 0.17 268);
   --primary-foreground: oklch(0.12 0.02 260);
   --secondary: oklch(0.25 0.02 260);
   --secondary-foreground: oklch(0.96 0.005 250);
@@ -118,18 +126,27 @@
   --accent-foreground: oklch(0.96 0.005 250);
   --border: oklch(0.3 0.02 260);
   --input: oklch(0.28 0.02 260);
-  --ring: oklch(0.7 0.16 240);
+  --ring: oklch(0.72 0.17 268);
 
-  --admin-bg: oklch(0.13 0.02 260);
-  --admin-surface: oklch(0.18 0.02 260);
-  --admin-surface-2: oklch(0.22 0.02 260);
-  --admin-border: oklch(0.3 0.02 260);
-  --admin-fg: oklch(0.96 0.005 250);
-  --admin-fg-muted: oklch(0.68 0.02 255);
-  --admin-sidebar: oklch(0.1 0.015 260);
-  --admin-sidebar-fg: oklch(0.96 0.005 250);
-  --admin-sidebar-muted: oklch(0.6 0.02 255);
-  --admin-accent: oklch(0.7 0.16 240);
+  /* Linear-style near-black surfaces */
+  --admin-bg: oklch(0.155 0.012 260);
+  --admin-surface: oklch(0.185 0.014 260);
+  --admin-surface-2: oklch(0.22 0.015 260);
+  --admin-surface-3: oklch(0.26 0.017 260);
+  --admin-border: oklch(0.27 0.014 260);
+  --admin-border-strong: oklch(0.34 0.016 260);
+  --admin-fg: oklch(0.97 0.005 250);
+  --admin-fg-muted: oklch(0.72 0.015 255);
+  --admin-fg-subtle: oklch(0.58 0.018 258);
+  --admin-sidebar: oklch(0.135 0.012 260);
+  --admin-sidebar-fg: oklch(0.95 0.005 250);
+  --admin-sidebar-muted: oklch(0.6 0.018 258);
+  --admin-accent: oklch(0.72 0.17 268);
+  --admin-accent-fg: oklch(0.12 0.02 260);
+  --admin-accent-soft: color-mix(in oklab, oklch(0.72 0.17 268) 18%, transparent);
+  --admin-success: oklch(0.72 0.16 155);
+  --admin-warn: oklch(0.8 0.16 75);
+  --admin-danger: oklch(0.7 0.2 27);
   --shadow-admin: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 8px 24px -12px oklch(0 0 0 / 0.5);
 
   --glass-bg: color-mix(in oklab, var(--admin-surface) 60%, transparent);
