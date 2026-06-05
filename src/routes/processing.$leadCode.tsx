@@ -153,8 +153,11 @@ function ProcessingPage() {
             />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Please don't close or refresh this window.
+            {cycles === 0
+              ? "Please don't close or refresh this window."
+              : "Our team will reach out shortly on your registered mobile and email."}
           </p>
+
         </div>
 
         {/* Step pips — labels only, no preview of payment */}
