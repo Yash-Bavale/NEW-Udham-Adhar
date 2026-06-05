@@ -109,7 +109,7 @@ function HomePage() {
           </div>
           <div className="p-6">
             <img
-              src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
+              src={certImg.url}
               alt="Sample Udyam Certificate"
               className="w-full h-auto rounded-md border border-border"
               loading="lazy"
