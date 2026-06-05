@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Lock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
