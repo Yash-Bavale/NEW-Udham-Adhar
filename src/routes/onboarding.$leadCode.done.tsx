@@ -60,12 +60,12 @@ function DonePage() {
 
           <div className="space-y-2">
             <h3 className="text-2xl md:text-3xl font-bold font-display text-brand-navy-deep">
-              {helpMode ? "We'll call you shortly" : "Thank you — your request is in!"}
+              {helpMode ? "We'll call you shortly" : "Your Information Is Submitted Successfully"}
             </h3>
             <p className="mx-auto max-w-md text-[15px] leading-relaxed text-foreground/80">
               {helpMode
                 ? "Our expert is reaching out to help you submit the form. We'll call you on your registered mobile number as soon as possible."
-                : "Your details have been submitted successfully. Our team will contact you on your registered mobile number shortly to take the next steps."}
+                : "We have received your details. Our team will call you on your registered mobile number shortly to take the next steps."}
             </p>
           </div>
 

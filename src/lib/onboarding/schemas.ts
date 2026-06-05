@@ -9,7 +9,8 @@ export type FieldType =
   | "date"
   | "select"
   | "textarea"
-  | "nic";
+  | "nic"
+  | "section";
 
 export type FieldDef = {
   key: string;
@@ -33,11 +34,20 @@ export type DocDef = {
   help?: string;
 };
 
+export type DocumentsInstructions = {
+  /** Short red-highlighted instructions shown above the document uploader. */
+  lines: string[];
+  /** Optional downloadable standard form PDF. */
+  downloadUrl?: string;
+  downloadLabel?: string;
+};
+
 export type OnboardingSchema = {
   title: string;
   description: string;
   fields: FieldDef[];
   documents: DocDef[];
+  documentsInstructions?: DocumentsInstructions;
 };
 
 const BUSINESS_TYPES = [
@@ -60,12 +70,7 @@ const YES_NO = ["Yes", "No"] as const;
 const GST_OPTIONS = ["Yes", "No", "Exempted"] as const;
 const ACTIVITY_TYPES = ["Manufacturing", "Services", "Trading"] as const;
 const REGISTRATION_HISTORY = ["N/A", "EM-II", "Previous UAM"] as const;
-const FORGOT_USER_TYPES = [
-  "MSME unit with UAM or Udyam Registration",
-  "MSME unit without UAM or Udyam Registration",
-  "Individuals or Others",
-  "Associations",
-] as const;
+// FORGOT_USER_TYPES removed — service 5 now uses the New Udyam form.
 
 export const INDIA_STATES = [
   "Andhra Pradesh",
@@ -134,19 +139,22 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "social_category", label: "11. Social Category", type: "select", required: true, options: SOCIAL_CATEGORY },
     { key: "gender", label: "12. Gender", type: "select", required: true, options: GENDER },
     { key: "specially_abled", label: "13. Specially Abled (Divyang)", type: "select", required: true, options: YES_NO },
-    { key: "address_flat", label: "14. Flat / Door / Block No.", type: "text", required: true, maxLength: 120 },
-    { key: "address_premises", label: "14a. Name of Premises / Building", type: "text", required: false, maxLength: 160 },
-    { key: "address_village", label: "14b. Village / Town", type: "text", required: true, maxLength: 120 },
-    { key: "address_block", label: "14c. Block", type: "text", required: false, maxLength: 120 },
-    { key: "address_road", label: "14d. Road / Street / Lane", type: "text", required: false, maxLength: 160 },
-    { key: "city", label: "14e. City", type: "text", required: true, maxLength: 80 },
-    { key: "pincode", label: "14f. PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
-    { key: "state", label: "14g. State", type: "text", required: true, maxLength: 80 },
-    { key: "district", label: "14h. District", type: "text", required: true, maxLength: 80 },
+    { key: "section_address", label: "14. Official Address of Enterprise", type: "section" },
+    { key: "address_flat", label: "14a. Flat / Door / Block No.", type: "text", required: true, maxLength: 120 },
+    { key: "address_premises", label: "14b. Name of Premises / Building", type: "text", required: false, maxLength: 160 },
+    { key: "address_village", label: "14c. Village / Town", type: "text", required: true, maxLength: 120 },
+    { key: "address_block", label: "14d. Block", type: "text", required: false, maxLength: 120 },
+    { key: "address_road", label: "14e. Road / Street / Lane", type: "text", required: false, maxLength: 160 },
+    { key: "city", label: "14f. City", type: "text", required: true, maxLength: 80 },
+    { key: "pincode", label: "14g. PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
+    { key: "state", label: "14h. State", type: "text", required: true, maxLength: 80 },
+    { key: "district", label: "14i. District", type: "text", required: true, maxLength: 80 },
     { key: "previous_registration", label: "16. Previous EM-II / UAM Registration Number, if any", type: "select", required: true, options: REGISTRATION_HISTORY },
+    { key: "section_status", label: "17. Status of Enterprise", type: "section" },
     { key: "incorporation_date", label: "17a. Date of Incorporation / Registration", type: "date", required: true },
     { key: "business_commenced", label: "17b. Whether production/business commenced", type: "select", required: true, options: YES_NO },
     { key: "commencement_date", label: "17c. Date of Commencement", type: "date", required: false },
+    { key: "section_bank", label: "18. Bank Details", type: "section" },
     { key: "bank_name", label: "18a. Bank Name", type: "text", required: true, maxLength: 120 },
     { key: "bank_ifsc", label: "18b. IFSC Code", type: "text", required: true, pattern: "^[A-Z]{4}0[A-Z0-9]{6}$", maxLength: 11 },
     { key: "bank_account_no", label: "18c. Bank Account Number", type: "text", required: true, maxLength: 30 },
@@ -205,37 +213,28 @@ const MIGRATE: OnboardingSchema = {
 
 const FORGOT_MOBILE: OnboardingSchema = {
   title: "Forgot Registered Mobile / Email — Incomplete Information",
-  description: "Fill the applicant contact and identity details required to prepare the update request and signed application.",
-  fields: [
-    { key: "user_type", label: "Select Type of User", type: "select", required: true, options: FORGOT_USER_TYPES },
-    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
-    { key: "applicant_name", label: "Name (as per Aadhaar)", type: "text", required: true, maxLength: 120 },
-    { key: "aadhaar_address", label: "Address (as per Aadhaar)", type: "textarea", required: true, maxLength: 600 },
-    { key: "pan_number", label: "PAN Card Number", type: "text", required: true, pattern: "^[A-Z]{5}\\d{4}[A-Z]$", maxLength: 10 },
-    { key: "pincode", label: "PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
-    { key: "state", label: "State", type: "text", required: true, maxLength: 80 },
-    { key: "district", label: "District", type: "text", required: true, maxLength: 80 },
-    { key: "new_email", label: "Email ID (please enter correct email)", type: "email", required: true },
-    { key: "new_mobile", label: "Mobile Number (+91)", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "udyam_or_uam_number", label: "UAM / Udyam Registration Number (if available)", type: "text", required: false, maxLength: 40 },
-  ],
+  description: "Fill the same enterprise details as Udyam New Registration. After submitting, download the standard form, fill & sign it, and upload it along with your Aadhaar and PAN.",
+  fields: NEW_UDYAM.fields,
   documents: [
     { key: "aadhaar_card_pdf", label: "Aadhaar Card PDF", required: true },
     { key: "pan_card_pdf", label: "PAN Card PDF", required: true },
-    { key: "signed_application_format", label: "Signed Application Format", required: false, help: "Download the generated application, sign it, then upload it here." },
+    { key: "signed_application_format", label: "Signed Standard Form (filled & signed)", required: true, help: "Download the standard form below, fill in your information, sign it, then upload it here." },
   ],
+  documentsInstructions: {
+    lines: [
+      "Download this form, fill your information, sign it and upload it here.",
+      "Also upload a clear copy of your Aadhaar card and PAN card.",
+      "Use PDF, JPG, PNG or WEBP files only. Max size 5 MB per file.",
+    ],
+    downloadUrl: "/forms/forgot-mobile-email-application.pdf",
+    downloadLabel: "Download Standard Form (PDF)",
+  },
 };
 
 const CORRECT_PAN_AADHAAR: OnboardingSchema = {
   title: "Correct PAN / Aadhaar Name in Udyam — Incomplete Information",
-  description: "Provide your Udyam number and registered contact details so our team can assist with correction requirements.",
-  fields: [
-    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, pattern: "^UDYAM-[A-Z]{2}-\\d{2}-\\d{7}$", maxLength: 19, placeholder: "UDYAM-MH-26-0276396", help: "Format: UDYAM-<State>-<Year>-<7 digits>, e.g. UDYAM-MH-26-0276396" },
-    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
-    { key: "correction_needed", label: "Correction required", type: "textarea", required: false, maxLength: 800, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
-  ],
+  description: "Fill the same enterprise details as Udyam New Registration so our team can prepare your correction request.",
+  fields: NEW_UDYAM.fields,
   documents: [],
 };
 
