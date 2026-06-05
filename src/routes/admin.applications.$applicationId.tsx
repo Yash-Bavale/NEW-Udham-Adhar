@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApplicationDetail } from "@/lib/crm/applications.functions";
+import { getApplicationDocChecklist } from "@/lib/crm/document-review.functions";
 import { StatusTransition } from "@/components/admin/StatusTransition";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
