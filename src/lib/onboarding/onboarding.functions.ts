@@ -126,7 +126,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
 
     // For correct-pan-aadhaar: Stage 2 submit only carries Stage 2 values; merge
     // with the previously-saved Stage 1 draft and validate against both schemas.
-    let mergedData: Record<string, unknown> = { ...data.data };
+    let mergedData: Record<string, any> = { ...data.data };
     let validationFields = schema.fields;
     if (!data.draft && serviceCode === "correct-pan-aadhaar") {
       const { data: prev } = await supabaseAdmin
