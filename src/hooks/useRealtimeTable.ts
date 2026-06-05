@@ -10,7 +10,7 @@ export function useRealtimeTable(
   useEffect(() => {
     const schema = opts?.schema ?? "public";
     const channel = supabase
-      .channel(`rt:${schema}:${table}:${opts?.filter ?? "all"}`)
+      .channel(`rt:${schema}:${table}:${opts?.filter ?? "all"}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes" as never,
         { event: "*", schema, table, ...(opts?.filter ? { filter: opts.filter } : {}) },
