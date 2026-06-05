@@ -248,7 +248,7 @@ const CORRECT_PAN_AADHAAR: OnboardingSchema = {
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
     { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, pattern: "^UDYAM-[A-Z]{2}-\\d{2}-\\d{7}$", maxLength: 19, placeholder: "UDYAM-MH-26-0276396", help: "Format: UDYAM-<State>-<Year>-<7 digits>, e.g. UDYAM-MH-26-0276396" },
     { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$", placeholder: "10 digit registered mobile" },
-    { key: "registered_email", label: "Registered Email ID", type: "email", required: false, placeholder: "Registered email, if available" },
+    { key: "registered_email", label: "Registered Email ID", type: "email", required: true, placeholder: "Registered email ID" },
     { key: "correction_required", label: "Correction required", type: "textarea", required: false, maxLength: 1200, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
   ],
   documents: [],
