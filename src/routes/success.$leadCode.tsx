@@ -117,8 +117,8 @@ function SuccessPage() {
 
   if (!data) return null;
 
-  // 10s timer: 10→6 (5 ticks) = payment confirmed, 5→0 = form incomplete action.
-  const phase: Phase = secondsLeft > 5 ? "confirmed" : "action";
+  // 30s timer: 30→16 = payment confirmed message, 15→0 = form incomplete action.
+  const phase: Phase = secondsLeft > ACTION_THRESHOLD ? "confirmed" : "action";
   const ringCirc = 2 * Math.PI * 44;
   const ringProgress = ringCirc * (1 - secondsLeft / REDIRECT_SECONDS);
 
