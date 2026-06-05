@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -7,6 +7,10 @@ import {
   AlertCircle,
   History,
   Sparkles,
+  Loader2,
+  ShieldCheck,
+  FileText,
+  Clock,
 } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
