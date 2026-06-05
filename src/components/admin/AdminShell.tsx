@@ -293,3 +293,34 @@ function KeyboardHelpDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     </Dialog>
   );
 }
+
+function NotificationsBell() {
+  const fetchCount = useServerFn(getUnreadNotificationCount);
+  const qc = useQueryClient();
+  const { data } = useQuery<{ count: number }>({
+    queryKey: ["notifications", "unread-count"],
+    queryFn: () => fetchCount(),
+    refetchInterval: 60_000,
+  });
+  useRealtimeTable("notifications", () => {
+    qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+  });
+  const count = data?.count ?? 0;
+  return (
+    <Link
+      to="/admin/notifications"
+      className="relative rounded-lg p-2 hover:bg-[var(--admin-surface-2)] transition-colors"
+      aria-label="Notifications"
+    >
+      <Bell className="size-4" />
+      {count > 0 && (
+        <span
+          className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+          style={{ background: "var(--admin-danger)", color: "white" }}
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
