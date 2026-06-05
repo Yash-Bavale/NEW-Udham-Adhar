@@ -134,7 +134,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         .select("form_data")
         .eq("lead_id", lead.id)
         .maybeSingle();
-      const prevData = (prev?.form_data ?? {}) as Record<string, unknown>;
+      const prevData = (prev?.form_data ?? {}) as Record<string, any>;
       mergedData = { ...prevData, ...mergedData };
       const { CORRECT_PAN_AADHAAR_STAGE2 } = await import("./schemas");
       const seen = new Set<string>();
