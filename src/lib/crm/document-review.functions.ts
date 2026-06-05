@@ -147,10 +147,13 @@ export const getApplicationDocChecklist = createServerFn({ method: "GET" })
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support"]);
     const { data: app } = await supabaseAdmin
       .from("applications")
-      .select("id, lead:leads(service)")
+      .select("id, lead_id")
       .eq("id", data.applicationId)
       .single();
-    const serviceCode = (app?.lead as any)?.service ?? null;
+    const { data: leadRow } = app?.lead_id
+      ? await supabaseAdmin.from("leads").select("service").eq("id", app.lead_id).maybeSingle()
+      : { data: null as any };
+    const serviceCode = leadRow?.service ?? null;
 
     const { data: schema } = serviceCode
       ? await supabaseAdmin
