@@ -26,7 +26,8 @@ export const Route = createFileRoute("/success/$leadCode")({
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
-const REDIRECT_SECONDS = 10;
+const REDIRECT_SECONDS = 30;
+const ACTION_THRESHOLD = 15; // seconds remaining at which we switch from "confirmed" to "action"
 
 type Phase = "confirmed" | "action";
 
