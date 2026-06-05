@@ -218,37 +218,28 @@ const MIGRATE: OnboardingSchema = {
 
 const FORGOT_MOBILE: OnboardingSchema = {
   title: "Forgot Registered Mobile / Email — Incomplete Information",
-  description: "Fill the applicant contact and identity details required to prepare the update request and signed application.",
-  fields: [
-    { key: "user_type", label: "Select Type of User", type: "select", required: true, options: FORGOT_USER_TYPES },
-    { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$" },
-    { key: "applicant_name", label: "Name (as per Aadhaar)", type: "text", required: true, maxLength: 120 },
-    { key: "aadhaar_address", label: "Address (as per Aadhaar)", type: "textarea", required: true, maxLength: 600 },
-    { key: "pan_number", label: "PAN Card Number", type: "text", required: true, pattern: "^[A-Z]{5}\\d{4}[A-Z]$", maxLength: 10 },
-    { key: "pincode", label: "PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
-    { key: "state", label: "State", type: "text", required: true, maxLength: 80 },
-    { key: "district", label: "District", type: "text", required: true, maxLength: 80 },
-    { key: "new_email", label: "Email ID (please enter correct email)", type: "email", required: true },
-    { key: "new_mobile", label: "Mobile Number (+91)", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "udyam_or_uam_number", label: "UAM / Udyam Registration Number (if available)", type: "text", required: false, maxLength: 40 },
-  ],
+  description: "Fill the same enterprise details as Udyam New Registration. After submitting, download the standard form, fill & sign it, and upload it along with your Aadhaar and PAN.",
+  fields: NEW_UDYAM.fields,
   documents: [
     { key: "aadhaar_card_pdf", label: "Aadhaar Card PDF", required: true },
     { key: "pan_card_pdf", label: "PAN Card PDF", required: true },
-    { key: "signed_application_format", label: "Signed Application Format", required: false, help: "Download the generated application, sign it, then upload it here." },
+    { key: "signed_application_format", label: "Signed Standard Form (filled & signed)", required: true, help: "Download the standard form below, fill in your information, sign it, then upload it here." },
   ],
+  documentsInstructions: {
+    lines: [
+      "Download this form, fill your information, sign it and upload it here.",
+      "Also upload a clear copy of your Aadhaar card and PAN card.",
+      "Use PDF, JPG, PNG or WEBP files only. Max size 5 MB per file.",
+    ],
+    downloadUrl: "/forms/forgot-mobile-email-application.pdf",
+    downloadLabel: "Download Standard Form (PDF)",
+  },
 };
 
 const CORRECT_PAN_AADHAAR: OnboardingSchema = {
   title: "Correct PAN / Aadhaar Name in Udyam — Incomplete Information",
-  description: "Provide your Udyam number and registered contact details so our team can assist with correction requirements.",
-  fields: [
-    { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
-    { key: "udyam_number", label: "Udyam Registration Number", type: "text", required: true, pattern: "^UDYAM-[A-Z]{2}-\\d{2}-\\d{7}$", maxLength: 19, placeholder: "UDYAM-MH-26-0276396", help: "Format: UDYAM-<State>-<Year>-<7 digits>, e.g. UDYAM-MH-26-0276396" },
-    { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: true, pattern: "^[6-9]\\d{9}$" },
-    { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
-    { key: "correction_needed", label: "Correction required", type: "textarea", required: false, maxLength: 800, help: "Mention whether PAN name, Aadhaar name, or both require correction." },
-  ],
+  description: "Fill the same enterprise details as Udyam New Registration so our team can prepare your correction request.",
+  fields: NEW_UDYAM.fields,
   documents: [],
 };
 
