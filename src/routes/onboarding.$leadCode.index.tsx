@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.functions";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
+import { CORRECT_PAN_AADHAAR_STAGE2 } from "@/lib/onboarding/schemas";
 
 export const Route = createFileRoute("/onboarding/$leadCode/")({
   head: () => ({
