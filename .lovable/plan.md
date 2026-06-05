@@ -1,80 +1,84 @@
+## 1. Disable payment flow — repeat the 30s countdown
 
-## Scope
+Currently the form journey is:
 
-Update two onboarding schemas in `src/lib/onboarding/schemas.ts`:
+```text
+LeadForm  →  /processing/$leadCode  (30s)  →  /apply/$leadCode/summary  (payment)
+```
 
-1. **`NEW_UDYAM`** (1st service — also reused as Stage 2 of the 6th service)
-2. **`CORRECT_PAN_AADHAAR`** (6th service — Stage 1)
+We will keep the lead saved in CRM and keep the same processing screen, but never advance to payment.
 
-No UI/component changes — `OnboardingForm` already blocks submission when HTML5 `required` fields are empty, so just flipping `required: true` in the schema enforces the "don't take form till fields get submitted" behavior.
+**File: `src/routes/processing.$leadCode.tsx`**
+- Remove the `navigate(...)` call when `elapsed >= TOTAL_SECONDS`. Instead, reset `elapsed` back to `0` so the timer loops forever (30 → 0 → 30 → 0 …).
+- After the first cycle completes once, replace the bottom helper line (currently "Please don't close or refresh this window.") with a friendlier message like "Our team will reach out shortly on your registered mobile and email." Step pips and ring animation keep running.
+- Keep the existing `trackEvent("processing_viewed")` call.
 
-## Changes to `NEW_UDYAM` (relabel + mark required)
+**Hide payment page links (defensive)**
 
-Renumber labels and flip `required` to match the spec. Items the user did **not** mark with `*` stay optional.
+- `src/routes/apply.$leadCode.summary.tsx` — leave the file in place (so it doesn't break the route tree), but no nav now points to it. Nothing else needs changing for this turn.
+- `src/routes/app.$token.tsx` — the `/app/$token` magic-link page redirects to processing already, that stays fine.
 
-| Field key | New label | Required |
-|---|---|---|
-| aadhaar_number | `1. Aadhaar Number` | ✓ |
-| applicant_name | `2. Your Name (as per Aadhaar)` | ✓ |
-| business_type | `3. Type of Organisation / संगठन के प्रकार` | ✓ |
-| pan_number | `4.1 PAN Number` | ✓ |
-| pan_holder_name | `4.1.1 Name of PAN Card Holder` | ✓ |
-| pan_dob | `4.1.2 Date of Birth as per PAN Card` | ✓ |
-| itr_previous_year | `4.2 Have you filed ITR for PY 2024–25?` | ✓ |
-| gstin_status | `4.3 Do you have GSTIN?` | ✓ |
-| written_down_value | `Written Down Value (WDV) as on 31 March 2024–25 (A)` *(number removed)* | ✓ |
-| exclusion_cost | `Exclusion of cost — Pollution Control / R&D / Industrial Safety Devices 2024–25 (B)` *(number removed)* | ✓ (was optional) |
-| total_turnover | `Total Turnover during 2024–25` *(number removed)* | ✓ |
-| business_name | `8. Name of Enterprise` | ✓ |
-| aadhaar_mobile | `9. Mobile Number (+91)` | ✓ |
-| email | `10. Email` | ✓ |
-| social_category | `11. Social Category` | ✓ |
-| gender | `12. Gender` | ✓ |
-| specially_abled | `13. Specially Abled (Divyang)` | ✓ |
-| section_address | `14. Official Address of Enterprise` (section header) | — |
-| address_flat | `Flat / Door / Block No.` | ✓ |
-| address_premises | `Name of Premises / Building` | optional (no `*`) |
-| address_village | `Village / Town` | ✓ |
-| address_block | `Block` | optional (no `*`) |
-| address_road | `Road / Street / Lane` | ✓ |
-| city | `City` | ✓ |
-| pincode | `PIN Code` | ✓ |
-| state | `State` | ✓ |
-| district | `District` | ✓ |
-| previous_registration | `16. Previous EM-II / UAM Registration Number, if any` | ✓ |
-| section_status | `17. Status of Enterprise` (section header) | — |
-| incorporation_date | `a. Date of Incorporation / Registration` | ✓ |
-| business_commenced | `b. Whether production / business commenced` | ✓ |
-| commencement_date | `Date of Commencement` | ✓ (was optional) |
-| section_bank | `18. Bank Details` (section header) | — |
-| bank_name | `Bank Name` | ✓ |
-| bank_ifsc | `IFSC Code` | ✓ |
-| bank_account_no | `Bank Account Number` | ✓ |
-| major_activity | `19. Major Activity of Unit` | ✓ |
-| nic_2_digit | `20a. NIC 2 Digit Code` | ✓ (unchanged) |
-| nic_4_digit | `20b. NIC 4 Digit Code` | ✓ (unchanged) |
-| nic_5_digit | `20c. NIC 5 Digit Code` | ✓ (unchanged) |
-| **NEW** `section_employees` | `21. Number of persons employed` (section header) | — |
-| employees_male | `Male` | ✓ (was optional) |
-| employees_female | `Female` | ✓ (was optional) |
-| employees_others | `Others` | ✓ (was optional) |
-| gem_registration | `22. Interested in Government e-Marketplace (GeM) Portal?` | ✓ (was optional) |
-| treds_registration | `23. Interested in TReDS Portals?` | ✓ (was optional) |
-| ncs_registration | `24. Interested in National Career Service (NCS) Portal?` | ✓ (was optional) |
-| nsic_b2b_registration | `25. Interested in NSIC B2B Portal?` | ✓ (was optional) |
-| skill_india_registration | `27. Interested in Skill India Digital Portal?` | ✓ (was optional; user skipped 26 as written) |
+## 2. CRM lead capture + duplicate counting
 
-Notes:
-- User explicitly skipped numbers 15 and 26 — labels match that.
-- WDV / Exclusion / Turnover have no number in the spec; numbers removed from labels.
-- NIC heading not numbered separately by user, but we keep `20a/b/c` since employees needs to move to 21.
-- `CORRECT_PAN_AADHAAR_STAGE2` automatically inherits all of these because it references `NEW_UDYAM.fields`.
+The existing `createLead` server function already inserts the lead and an application — that part stays. We add duplicate detection (match on mobile OR email).
 
-## Changes to `CORRECT_PAN_AADHAAR` (Stage 1 of 6th service)
+**Migration**
+Add two columns to `public.leads`:
+```sql
+ALTER TABLE public.leads
+  ADD COLUMN is_duplicate boolean NOT NULL DEFAULT false,
+  ADD COLUMN duplicate_of uuid NULL REFERENCES public.leads(id) ON DELETE SET NULL,
+  ADD COLUMN duplicate_count integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS leads_mobile_idx ON public.leads(mobile);
+CREATE INDEX IF NOT EXISTS leads_email_idx  ON public.leads(lower(email));
+```
+No grants/RLS changes needed (existing policies cover the new columns).
 
-- `registered_email`: `required: false` → `required: true` (placeholder updated to drop "if available").
+**File: `src/lib/leads.functions.ts`**
+- Before inserting the new lead, look up the earliest existing lead where `mobile = data.mobile OR lower(email) = lower(data.email)` (order by `created_at asc`, limit 1).
+- If found:
+  - Insert the new lead with `is_duplicate = true`, `duplicate_of = <original_id>`.
+  - In the same transaction-ish flow, `update leads set duplicate_count = duplicate_count + 1 where id = <original_id>`.
+- If not found: insert as today (defaults `is_duplicate = false`).
+- Everything else (service lookup, application insert, return shape) is unchanged.
 
-## Out of scope
+**File: `src/components/admin/LeadEditableCard.tsx`** (and/or `src/routes/admin.leads.tsx` list view — whichever already renders lead rows)
+- Show a small "Duplicate" badge when `is_duplicate` is true (with a link/tooltip to the original lead).
+- On the original lead, show `× N duplicates` when `duplicate_count > 0`.
 
-- No changes to other schemas, components, or routes.
-- Existing in-flight drafts keep working — only labels/required flags change.
+(I'll keep this scoped to the most visible CRM surfaces — full reporting can come later.)
+
+## 3. Footer SEO tree — hide behind 3-click + password unlock
+
+Right now `src/components/site/Footer.tsx` renders the full `SeoTree` under the "MSME / Udyog Aadhaar" column, with "Home" as the first item. We will hide the SEO categories by default and gate them behind a password.
+
+**File: `src/components/site/Footer.tsx` (and the inner `SeoTree` component)**
+
+- Default render: show only the "Home" row (the home icon + "Home" link). No categories below it.
+- Track click count locally on the Home row's container (per session, in component state — does not navigate yet on counting clicks; the Home link itself still navigates on plain click via a separate `<Link>` so users aren't blocked).
+  - Implementation detail: wrap the Home label in a clickable area that increments `clicks` state. Clicking the home icon still routes to `/`. The 3-click counter is on the *row* (not the link) so accidental nav is fine — we'll attach the counter to a small chevron/handle next to the label, OR use a `onClick` on the row that increments but doesn't preventDefault on the Link. Simplest: add an invisible button overlay on the row that increments and, on the 3rd click, reveals the password UI.
+- On the **3rd** click within a session, render directly below the Home row:
+  - A single password `<input type="password" />` (no placeholder text, no label like "insert password" — just a bare input styled to match the footer)
+  - An "Open" button to its right.
+- On submit, compare to the hardcoded string `113355`:
+  - **Match** → set `unlocked = true` in `sessionStorage` under a key like `udyam_footer_unlock`, render the full `SeoTree` (the existing categories + children) directly below the Home row. Hide the password input.
+  - **No match** → clear the input, shake/highlight red briefly, keep input visible. Click counter resets so the user has to click Home 3× again to retry (prevents brute force).
+- If `sessionStorage` already has `udyam_footer_unlock === "1"` on mount, render the unlocked tree from the start (no 3-click needed for the rest of that browser session).
+- This is footer-only — the underlying SEO landing pages remain reachable by direct URL (per the user's choice).
+
+Security note: the password lives in the client bundle. This is purely UX hiding for visitors browsing the site — it is not a real access control. We'll note this in @security-memory so the scanner doesn't flag the hardcoded password as a leaked secret (it isn't one).
+
+## 4. Files touched
+
+- `src/routes/processing.$leadCode.tsx` — loop countdown, no payment nav, friendly subline.
+- `src/lib/leads.functions.ts` — duplicate detection logic.
+- `supabase/migrations/<timestamp>_leads_duplicate_tracking.sql` — new columns + indexes.
+- `src/components/admin/LeadEditableCard.tsx` (and lead list) — duplicate badges.
+- `src/components/site/Footer.tsx` — hide SEO tree, 3-click + password unlock.
+- `@security-memory` — note that the footer password is intentional UX hiding, not a secret.
+
+## 5. Out of scope (this turn)
+
+- Removing/refactoring `/apply/$leadCode/summary`, `/payment/...`, webhook routes — leaving them dormant until payments are re-enabled.
+- Server-side rate-limiting on the lead intake (existing dedupe is acceptable).
+- Admin reporting/export for duplicate counts beyond the inline badge.

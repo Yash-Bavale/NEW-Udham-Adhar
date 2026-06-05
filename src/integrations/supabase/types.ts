@@ -983,9 +983,12 @@ export type Database = {
           base_amount: number
           created_at: string
           customer_id: string | null
+          duplicate_count: number
+          duplicate_of: string | null
           email: string
           gst_amount: number
           id: string
+          is_duplicate: boolean
           language: string
           lead_code: string | null
           lead_source: string
@@ -1007,9 +1010,12 @@ export type Database = {
           base_amount?: number
           created_at?: string
           customer_id?: string | null
+          duplicate_count?: number
+          duplicate_of?: string | null
           email: string
           gst_amount?: number
           id?: string
+          is_duplicate?: boolean
           language: string
           lead_code?: string | null
           lead_source?: string
@@ -1031,9 +1037,12 @@ export type Database = {
           base_amount?: number
           created_at?: string
           customer_id?: string | null
+          duplicate_count?: number
+          duplicate_of?: string | null
           email?: string
           gst_amount?: number
           id?: string
+          is_duplicate?: boolean
           language?: string
           lead_code?: string | null
           lead_source?: string
@@ -1056,6 +1065,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
           {
