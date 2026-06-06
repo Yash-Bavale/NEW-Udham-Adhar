@@ -173,6 +173,7 @@ import { Route as AadharUdyamDownloadRouteImport } from './routes/aadhar-udyam-d
 import { Route as AadharUdyamCertificateRouteImport } from './routes/aadhar-udyam-certificate'
 import { Route as AadharUdyamRouteImport } from './routes/aadhar-udyam'
 import { Route as AadhaarUdyamRouteImport } from './routes/aadhaar-udyam'
+import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
@@ -1082,6 +1083,11 @@ const AadhaarUdyamRoute = AadhaarUdyamRouteImport.update({
   path: '/aadhaar-udyam',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -1374,6 +1380,7 @@ const ApiPublicCronComplaintsSlaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/aadhaar-udyam': typeof AadhaarUdyamRoute
   '/aadhar-udyam': typeof AadharUdyamRoute
   '/aadhar-udyam-certificate': typeof AadharUdyamCertificateRoute
@@ -1595,6 +1602,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/aadhaar-udyam': typeof AadhaarUdyamRoute
   '/aadhar-udyam': typeof AadharUdyamRoute
   '/aadhar-udyam-certificate': typeof AadharUdyamCertificateRoute
@@ -1816,6 +1824,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/aadhaar-udyam': typeof AadhaarUdyamRoute
   '/aadhar-udyam': typeof AadharUdyamRoute
   '/aadhar-udyam-certificate': typeof AadharUdyamCertificateRoute
@@ -2039,6 +2048,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$'
     | '/aadhaar-udyam'
     | '/aadhar-udyam'
     | '/aadhar-udyam-certificate'
@@ -2260,6 +2270,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$'
     | '/aadhaar-udyam'
     | '/aadhar-udyam'
     | '/aadhar-udyam-certificate'
@@ -2480,6 +2491,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/$'
     | '/aadhaar-udyam'
     | '/aadhar-udyam'
     | '/aadhar-udyam-certificate'
@@ -2702,6 +2714,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SplatRoute: typeof SplatRoute
   AadhaarUdyamRoute: typeof AadhaarUdyamRoute
   AadharUdyamRoute: typeof AadharUdyamRoute
   AadharUdyamCertificateRoute: typeof AadharUdyamCertificateRoute
@@ -4042,6 +4055,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AadhaarUdyamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -4568,6 +4588,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SplatRoute: SplatRoute,
   AadhaarUdyamRoute: AadhaarUdyamRoute,
   AadharUdyamRoute: AadharUdyamRoute,
   AadharUdyamCertificateRoute: AadharUdyamCertificateRoute,
