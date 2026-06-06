@@ -181,10 +181,15 @@ function SeoTree({
   loading: boolean;
   loadError: boolean;
 }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const expandedAll = () =>
+    Object.fromEntries(CATEGORIES.filter((c) => !c.isHome).map((c) => [c.key, true]));
   const [unlocked, setUnlocked] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.sessionStorage.getItem("udyam_footer_unlock") === "1";
+  });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    return window.sessionStorage.getItem("udyam_footer_unlock") === "1" ? expandedAll() : {};
   });
   const [clicks, setClicks] = useState(0);
   const [showPwd, setShowPwd] = useState(false);
@@ -227,6 +232,7 @@ function SeoTree({
         window.sessionStorage.setItem("udyam_footer_unlock", "1");
       } catch { /* ignore */ }
       setUnlocked(true);
+      setExpanded(expandedAll());
       setShowPwd(false);
       setPwd("");
       setPwdError(false);
@@ -253,7 +259,13 @@ function SeoTree({
             <Link
               to="/"
               className="flex-1 py-1.5 text-white hover:text-brand-gold"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                if (!unlocked) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleHomeRowClick();
+                }
+              }}
             >
               {homeCat.label}
             </Link>
