@@ -114,7 +114,8 @@ function HomePage() {
               src={certImg.url}
               alt="Sample Udyam Certificate"
               className="w-full h-auto rounded-md border border-border"
-              loading="lazy"
+              loading="eager"
+              fetchPriority="high"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Note: Sample Udyam Certificate shown for reference purposes only.

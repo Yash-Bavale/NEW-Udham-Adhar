@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { LeadForm } from "./LeadForm";
+import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
 
 const proseClasses =
   "p-6 md:p-8 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
@@ -29,10 +30,11 @@ export function ServicePageLayout({
           </div>
           <div className="p-6">
             <img
-              src="https://www.udyamadhar.in/wp-content/uploads/2026/05/udyam-certificate-design-1.webp"
+              src={certImg.url}
               alt="Sample Udyam Certificate"
               className="w-full h-auto rounded-md border border-border"
-              loading="lazy"
+              loading="eager"
+              fetchPriority="high"
             />
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Note: Sample Udyam Certificate shown for reference purposes only.
