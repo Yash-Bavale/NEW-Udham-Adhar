@@ -151,6 +151,7 @@ import { Route as DownloadUdyamRouteImport } from './routes/download-udyam'
 import { Route as DownloadMsmeCertificateRouteImport } from './routes/download-msme-certificate'
 import { Route as DisclaimerRouteImport } from './routes/disclaimer'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
+import { Route as ContactUsRouteImport } from './routes/contact-us'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ConsentAcknowledgmentRouteImport } from './routes/consent-acknowledgment'
 import { Route as ComplianceStatementRouteImport } from './routes/compliance-statement'
@@ -966,6 +967,11 @@ const CookiePolicyRoute = CookiePolicyRouteImport.update({
   path: '/cookie-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactUsRoute = ContactUsRouteImport.update({
+  id: '/contact-us',
+  path: '/contact-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
@@ -1367,6 +1373,7 @@ export interface FileRoutesByFullPath {
   '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
@@ -1583,6 +1590,7 @@ export interface FileRoutesByTo {
   '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
@@ -1801,6 +1809,7 @@ export interface FileRoutesById {
   '/compliance-statement': typeof ComplianceStatementRoute
   '/consent-acknowledgment': typeof ConsentAcknowledgmentRoute
   '/contact': typeof ContactRoute
+  '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
@@ -2020,6 +2029,7 @@ export interface FileRouteTypes {
     | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
     | '/download-msme-certificate'
@@ -2236,6 +2246,7 @@ export interface FileRouteTypes {
     | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
     | '/download-msme-certificate'
@@ -2453,6 +2464,7 @@ export interface FileRouteTypes {
     | '/compliance-statement'
     | '/consent-acknowledgment'
     | '/contact'
+    | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
     | '/download-msme-certificate'
@@ -2671,6 +2683,7 @@ export interface RootRouteChildren {
   ComplianceStatementRoute: typeof ComplianceStatementRoute
   ConsentAcknowledgmentRoute: typeof ConsentAcknowledgmentRoute
   ContactRoute: typeof ContactRoute
+  ContactUsRoute: typeof ContactUsRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DisclaimerRoute: typeof DisclaimerRoute
   DownloadMsmeCertificateRoute: typeof DownloadMsmeCertificateRoute
@@ -3835,6 +3848,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CookiePolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contact-us': {
+      id: '/contact-us'
+      path: '/contact-us'
+      fullPath: '/contact-us'
+      preLoaderRoute: typeof ContactUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -4505,6 +4525,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComplianceStatementRoute: ComplianceStatementRoute,
   ConsentAcknowledgmentRoute: ConsentAcknowledgmentRoute,
   ContactRoute: ContactRoute,
+  ContactUsRoute: ContactUsRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DisclaimerRoute: DisclaimerRoute,
   DownloadMsmeCertificateRoute: DownloadMsmeCertificateRoute,
