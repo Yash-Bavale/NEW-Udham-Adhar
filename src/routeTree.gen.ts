@@ -143,6 +143,7 @@ import { Route as MsMeCertificateRouteImport } from './routes/ms-me-certificate'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as HttpsUdyamregistrationGovInRouteImport } from './routes/https-udyamregistration-gov-in'
+import { Route as GrievanceRedressalPolicyRouteImport } from './routes/grievance-redressal-policy'
 import { Route as FreeMsmeRegistrationCertificateDownloadRouteImport } from './routes/free-msme-registration-certificate-download'
 import { Route as FaqsRouteImport } from './routes/faqs'
 import { Route as DownloadUdyamCertificateOnlineRouteImport } from './routes/download-udyam-certificate-online'
@@ -925,6 +926,12 @@ const HttpsUdyamregistrationGovInRoute =
     path: '/https-udyamregistration-gov-in',
     getParentRoute: () => rootRouteImport,
   } as any)
+const GrievanceRedressalPolicyRoute =
+  GrievanceRedressalPolicyRouteImport.update({
+    id: '/grievance-redressal-policy',
+    path: '/grievance-redressal-policy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FreeMsmeRegistrationCertificateDownloadRoute =
   FreeMsmeRegistrationCertificateDownloadRouteImport.update({
     id: '/free-msme-registration-certificate-download',
@@ -1389,6 +1396,7 @@ export interface FileRoutesByFullPath {
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
   '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
+  '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -1607,6 +1615,7 @@ export interface FileRoutesByTo {
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
   '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
+  '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -1827,6 +1836,7 @@ export interface FileRoutesById {
   '/download-udyam-certificate-online': typeof DownloadUdyamCertificateOnlineRoute
   '/faqs': typeof FaqsRoute
   '/free-msme-registration-certificate-download': typeof FreeMsmeRegistrationCertificateDownloadRoute
+  '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -2048,6 +2058,7 @@ export interface FileRouteTypes {
     | '/download-udyam-certificate-online'
     | '/faqs'
     | '/free-msme-registration-certificate-download'
+    | '/grievance-redressal-policy'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2266,6 +2277,7 @@ export interface FileRouteTypes {
     | '/download-udyam-certificate-online'
     | '/faqs'
     | '/free-msme-registration-certificate-download'
+    | '/grievance-redressal-policy'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2485,6 +2497,7 @@ export interface FileRouteTypes {
     | '/download-udyam-certificate-online'
     | '/faqs'
     | '/free-msme-registration-certificate-download'
+    | '/grievance-redressal-policy'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2705,6 +2718,7 @@ export interface RootRouteChildren {
   DownloadUdyamCertificateOnlineRoute: typeof DownloadUdyamCertificateOnlineRoute
   FaqsRoute: typeof FaqsRoute
   FreeMsmeRegistrationCertificateDownloadRoute: typeof FreeMsmeRegistrationCertificateDownloadRoute
+  GrievanceRedressalPolicyRoute: typeof GrievanceRedressalPolicyRoute
   HttpsUdyamregistrationGovInRoute: typeof HttpsUdyamregistrationGovInRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
@@ -3805,6 +3819,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HttpsUdyamregistrationGovInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/grievance-redressal-policy': {
+      id: '/grievance-redressal-policy'
+      path: '/grievance-redressal-policy'
+      fullPath: '/grievance-redressal-policy'
+      preLoaderRoute: typeof GrievanceRedressalPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/free-msme-registration-certificate-download': {
       id: '/free-msme-registration-certificate-download'
       path: '/free-msme-registration-certificate-download'
@@ -4556,6 +4577,7 @@ const rootRouteChildren: RootRouteChildren = {
   FaqsRoute: FaqsRoute,
   FreeMsmeRegistrationCertificateDownloadRoute:
     FreeMsmeRegistrationCertificateDownloadRoute,
+  GrievanceRedressalPolicyRoute: GrievanceRedressalPolicyRoute,
   HttpsUdyamregistrationGovInRoute: HttpsUdyamregistrationGovInRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
