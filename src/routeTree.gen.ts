@@ -115,6 +115,7 @@ import { Route as PricingTransparencyRouteImport } from './routes/pricing-transp
 import { Route as PaymentNoticeServiceAcknowledgmentRouteImport } from './routes/payment-notice-service-acknowledgment'
 import { Route as PaymentNoticeRouteImport } from './routes/payment-notice'
 import { Route as OtherProblemRouteImport } from './routes/other-problem'
+import { Route as NoticeRouteImport } from './routes/notice'
 import { Route as NewUdyamRegistrationRouteImport } from './routes/new-udyam-registration'
 import { Route as MsmeUpdationRouteImport } from './routes/msme-updation'
 import { Route as MsmeUdyogAadharRouteImport } from './routes/msme-udyog-aadhar'
@@ -778,6 +779,11 @@ const OtherProblemRoute = OtherProblemRouteImport.update({
   path: '/other-problem',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NoticeRoute = NoticeRouteImport.update({
+  id: '/notice',
+  path: '/notice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewUdyamRegistrationRoute = NewUdyamRegistrationRouteImport.update({
   id: '/new-udyam-registration',
   path: '/new-udyam-registration',
@@ -1410,6 +1416,7 @@ export interface FileRoutesByFullPath {
   '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/msme-updation': typeof MsmeUpdationRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
+  '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
@@ -1627,6 +1634,7 @@ export interface FileRoutesByTo {
   '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/msme-updation': typeof MsmeUpdationRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
+  '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
@@ -1846,6 +1854,7 @@ export interface FileRoutesById {
   '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/msme-updation': typeof MsmeUpdationRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
+  '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
@@ -2066,6 +2075,7 @@ export interface FileRouteTypes {
     | '/msme-udyog-aadhar'
     | '/msme-updation'
     | '/new-udyam-registration'
+    | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
@@ -2283,6 +2293,7 @@ export interface FileRouteTypes {
     | '/msme-udyog-aadhar'
     | '/msme-updation'
     | '/new-udyam-registration'
+    | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
@@ -2501,6 +2512,7 @@ export interface FileRouteTypes {
     | '/msme-udyog-aadhar'
     | '/msme-updation'
     | '/new-udyam-registration'
+    | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
@@ -2720,6 +2732,7 @@ export interface RootRouteChildren {
   MsmeUdyogAadharRoute: typeof MsmeUdyogAadharRoute
   MsmeUpdationRoute: typeof MsmeUpdationRoute
   NewUdyamRegistrationRoute: typeof NewUdyamRegistrationRoute
+  NoticeRoute: typeof NoticeRoute
   OtherProblemRoute: typeof OtherProblemRoute
   PaymentNoticeRoute: typeof PaymentNoticeRoute
   PaymentNoticeServiceAcknowledgmentRoute: typeof PaymentNoticeServiceAcknowledgmentRoute
@@ -3594,6 +3607,13 @@ declare module '@tanstack/react-router' {
       path: '/other-problem'
       fullPath: '/other-problem'
       preLoaderRoute: typeof OtherProblemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notice': {
+      id: '/notice'
+      path: '/notice'
+      fullPath: '/notice'
+      preLoaderRoute: typeof NoticeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/new-udyam-registration': {
@@ -4564,6 +4584,7 @@ const rootRouteChildren: RootRouteChildren = {
   MsmeUdyogAadharRoute: MsmeUdyogAadharRoute,
   MsmeUpdationRoute: MsmeUpdationRoute,
   NewUdyamRegistrationRoute: NewUdyamRegistrationRoute,
+  NoticeRoute: NoticeRoute,
   OtherProblemRoute: OtherProblemRoute,
   PaymentNoticeRoute: PaymentNoticeRoute,
   PaymentNoticeServiceAcknowledgmentRoute:
