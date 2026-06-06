@@ -159,6 +159,7 @@ import { Route as ComplaintRouteImport } from './routes/complaint'
 import { Route as AmlAntiFraudPolicyRouteImport } from './routes/aml-anti-fraud-policy'
 import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AadharUdyogRegistrationRouteImport } from './routes/aadhar-udyog-registration'
 import { Route as AadharUdyogRouteImport } from './routes/aadhar-udyog'
@@ -1006,6 +1007,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutUsRoute = AboutUsRouteImport.update({
+  id: '/about-us',
+  path: '/about-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -1352,6 +1358,7 @@ export interface FileRoutesByFullPath {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/about-us': typeof AboutUsRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
@@ -1568,6 +1575,7 @@ export interface FileRoutesByTo {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/about-us': typeof AboutUsRoute
   '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
   '/complaint': typeof ComplaintRoute
@@ -1784,6 +1792,7 @@ export interface FileRoutesById {
   '/aadhar-udyog': typeof AadharUdyogRoute
   '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
+  '/about-us': typeof AboutUsRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin-login': typeof AdminLoginRoute
   '/aml-anti-fraud-policy': typeof AmlAntiFraudPolicyRoute
@@ -2002,6 +2011,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/about-us'
     | '/admin'
     | '/admin-login'
     | '/aml-anti-fraud-policy'
@@ -2218,6 +2228,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/about-us'
     | '/admin-login'
     | '/aml-anti-fraud-policy'
     | '/complaint'
@@ -2433,6 +2444,7 @@ export interface FileRouteTypes {
     | '/aadhar-udyog'
     | '/aadhar-udyog-registration'
     | '/about'
+    | '/about-us'
     | '/admin'
     | '/admin-login'
     | '/aml-anti-fraud-policy'
@@ -2650,6 +2662,7 @@ export interface RootRouteChildren {
   AadharUdyogRoute: typeof AadharUdyogRoute
   AadharUdyogRegistrationRoute: typeof AadharUdyogRegistrationRoute
   AboutRoute: typeof AboutRoute
+  AboutUsRoute: typeof AboutUsRoute
   AdminRoute: typeof AdminRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
   AmlAntiFraudPolicyRoute: typeof AmlAntiFraudPolicyRoute
@@ -3878,6 +3891,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about-us': {
+      id: '/about-us'
+      path: '/about-us'
+      fullPath: '/about-us'
+      preLoaderRoute: typeof AboutUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -4476,6 +4496,7 @@ const rootRouteChildren: RootRouteChildren = {
   AadharUdyogRoute: AadharUdyogRoute,
   AadharUdyogRegistrationRoute: AadharUdyogRegistrationRoute,
   AboutRoute: AboutRoute,
+  AboutUsRoute: AboutUsRoute,
   AdminRoute: AdminRouteWithChildren,
   AdminLoginRoute: AdminLoginRoute,
   AmlAntiFraudPolicyRoute: AmlAntiFraudPolicyRoute,
