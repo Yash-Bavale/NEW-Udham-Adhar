@@ -141,6 +141,7 @@ import { Route as MsmeCerRouteImport } from './routes/msme-cer'
 import { Route as MsmeApplyOnlineRouteImport } from './routes/msme-apply-online'
 import { Route as MsMeCertificateRouteImport } from './routes/ms-me-certificate'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as HttpsUdyamregistrationGovInRouteImport } from './routes/https-udyamregistration-gov-in'
 import { Route as HomeRouteImport } from './routes/home'
@@ -917,6 +918,11 @@ const MigrateUdyogAadhaarToUdyamRoute =
     path: '/migrate-udyog-aadhaar-to-udyam',
     getParentRoute: () => rootRouteImport,
   } as any)
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImportantNoticeRoute = ImportantNoticeRouteImport.update({
   id: '/important-notice',
   path: '/important-notice',
@@ -1413,6 +1419,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/ms-me-certificate': typeof MsMeCertificateRoute
   '/msme-apply-online': typeof MsmeApplyOnlineRoute
@@ -1634,6 +1641,7 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/ms-me-certificate': typeof MsMeCertificateRoute
   '/msme-apply-online': typeof MsmeApplyOnlineRoute
@@ -1857,6 +1865,7 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/ms-me-certificate': typeof MsMeCertificateRoute
   '/msme-apply-online': typeof MsmeApplyOnlineRoute
@@ -2081,6 +2090,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/ms-me-certificate'
     | '/msme-apply-online'
@@ -2302,6 +2312,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/ms-me-certificate'
     | '/msme-apply-online'
@@ -2524,6 +2535,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/ms-me-certificate'
     | '/msme-apply-online'
@@ -2747,6 +2759,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   HttpsUdyamregistrationGovInRoute: typeof HttpsUdyamregistrationGovInRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
+  LlmsDottxtRoute: typeof LlmsDottxtRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
   MsMeCertificateRoute: typeof MsMeCertificateRoute
   MsmeApplyOnlineRoute: typeof MsmeApplyOnlineRoute
@@ -3831,6 +3844,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MigrateUdyogAadhaarToUdyamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/important-notice': {
       id: '/important-notice'
       path: '/important-notice'
@@ -4622,6 +4642,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   HttpsUdyamregistrationGovInRoute: HttpsUdyamregistrationGovInRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
+  LlmsDottxtRoute: LlmsDottxtRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
   MsMeCertificateRoute: MsMeCertificateRoute,
   MsmeApplyOnlineRoute: MsmeApplyOnlineRoute,
