@@ -211,6 +211,39 @@ function SeoTree({
     return map;
   }, [pages]);
 
+  // Articles (blog-style SEO pages) grouped into themed parents.
+  const articleGroups = useMemo(() => {
+    const articles = (pages ?? []).filter((p) => p.page_type === "article");
+    const groups: { key: string; label: string; match: (s: string) => boolean }[] = [
+      { key: "art-registration", label: "Udyam Registration (Articles)",
+        match: (s) => s.startsWith("udyam-registration") && !s.includes("verify") && !s.includes("download") && !s.includes("print") && !s.includes("update") && !s.includes("change") && !s.includes("correction") && !s.includes("renewal") && !s.includes("status") && !s.includes("login") },
+      { key: "art-certificate", label: "Udyam Certificate (Articles)",
+        match: (s) => s.includes("certificate") || s.includes("aadhar-card") || s.includes("aadhaar-card") || s === "udyam-registration-download-guide" || s === "udyam-registration-print" },
+      { key: "art-verification", label: "Udyam Verification & Status (Articles)",
+        match: (s) => s.includes("verif") || s.includes("verify") || s.includes("status") || s === "udyam-registration-login" || s === "msme-login" },
+      { key: "art-update", label: "Udyam Updates & Changes (Articles)",
+        match: (s) => s.includes("update") || s.includes("change") || s.includes("correction") || s.includes("renewal") || s.includes("mobile-number") || s.includes("pan-card") || s.includes("name-change") },
+      { key: "art-forgot", label: "Forgot / Recovery (Articles)",
+        match: (s) => s.startsWith("forgot-") },
+      { key: "art-msme-other", label: "MSME & Other (Articles)",
+        match: () => true },
+    ];
+    const used = new Set<string>();
+    const result: { key: string; label: string; items: SeoPageRow[] }[] = [];
+    for (const g of groups) {
+      const items: SeoPageRow[] = [];
+      for (const a of articles) {
+        if (used.has(a.slug)) continue;
+        if (g.match(a.slug)) {
+          items.push(a);
+          used.add(a.slug);
+        }
+      }
+      if (items.length) result.push({ key: g.key, label: g.label, items });
+    }
+    return result;
+  }, [pages]);
+
   const toggle = (key: string) => setExpanded((e) => ({ ...e, [key]: !e[key] }));
 
   const homeCat = CATEGORIES.find((c) => c.isHome)!;
