@@ -9,6 +9,7 @@ export type SeoPage = {
   label: string;
   enabled: boolean;
   sort_order: number;
+  page_type?: string;
 };
 
 async function assertAdmin(userId: string) {
@@ -27,7 +28,7 @@ export const listPublicSeoPages = createServerFn({ method: "GET" }).handler(
   async (): Promise<SeoPage[]> => {
     const { data, error } = await supabaseAdmin
       .from("seo_pages")
-      .select("id, slug, label, enabled, sort_order")
+      .select("id, slug, label, enabled, sort_order, page_type")
       .eq("enabled", true)
       .order("sort_order", { ascending: true });
     if (error) throw new Error(error.message);
