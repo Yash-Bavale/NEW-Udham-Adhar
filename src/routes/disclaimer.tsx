@@ -14,5 +14,5 @@ export const Route = createFileRoute("/disclaimer")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/disclaimer" },
     ],
   }),
-  component: () => <WpPage title="Website Disclaimer" html={html} />,
+  component: () => <WpPage title="Website Disclaimer" html={html} legal />,
 });

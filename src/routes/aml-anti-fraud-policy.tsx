@@ -14,5 +14,5 @@ export const Route = createFileRoute("/aml-anti-fraud-policy")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/aml-anti-fraud-policy" },
     ],
   }),
-  component: () => <WpPage title="AML / Anti-Fraud Policy" html={html} />,
+  component: () => <WpPage title="AML / Anti-Fraud Policy" html={html} legal />,
 });

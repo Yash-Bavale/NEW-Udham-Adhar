@@ -12,5 +12,5 @@ export const Route = createFileRoute("/grievance-redressal-policy")({
     ],
     links: [{ rel: "canonical", href: "https://www.udyamadhar.in/grievance-redressal-policy" }],
   }),
-  component: () => <WpPage title="Grievance Redressal Policy" html={html} />,
+  component: () => <WpPage title="Grievance Redressal Policy" html={html} legal />,
 });
