@@ -1470,28 +1470,58 @@ export type Database = {
       }
       seo_pages: {
         Row: {
+          cover_image_url: string | null
           created_at: string
           enabled: boolean
+          faq: Json | null
+          h1: string | null
           id: string
+          intro: string | null
           label: string
+          meta_description: string | null
+          meta_title: string | null
+          page_type: string
+          published_at: string
+          related_slugs: string[] | null
+          sections: Json | null
           slug: string
           sort_order: number
           updated_at: string
         }
         Insert: {
+          cover_image_url?: string | null
           created_at?: string
           enabled?: boolean
+          faq?: Json | null
+          h1?: string | null
           id?: string
+          intro?: string | null
           label: string
+          meta_description?: string | null
+          meta_title?: string | null
+          page_type?: string
+          published_at?: string
+          related_slugs?: string[] | null
+          sections?: Json | null
           slug: string
           sort_order?: number
           updated_at?: string
         }
         Update: {
+          cover_image_url?: string | null
           created_at?: string
           enabled?: boolean
+          faq?: Json | null
+          h1?: string | null
           id?: string
+          intro?: string | null
           label?: string
+          meta_description?: string | null
+          meta_title?: string | null
+          page_type?: string
+          published_at?: string
+          related_slugs?: string[] | null
+          sections?: Json | null
           slug?: string
           sort_order?: number
           updated_at?: string
