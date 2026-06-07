@@ -128,7 +128,7 @@ export function ArticlePageLayout({
 
             {faq && faq.length ? (
               <div className="mt-10">
-                <h2>Frequently Asked Questions</h2>
+
                 <div className="space-y-3 not-prose">
                   {faq.map((f, i) => (
                     <div
