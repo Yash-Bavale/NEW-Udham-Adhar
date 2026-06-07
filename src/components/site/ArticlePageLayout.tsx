@@ -51,12 +51,13 @@ export function ArticlePageLayout({
   updatedAt,
 }: ArticlePageProps) {
   const dateLabel = updatedAt ?? publishedAt;
+  const keyword = (h1.split(/[:\u2014\u2013\-]/)[0] || h1).trim();
 
   return (
     <div>
       {/* Top: lead form + sample certificate — same as service pages */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
-        <LeadForm title={h1} />
+        <LeadForm title={keyword} />
 
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="bg-form-header text-white text-center py-4">
@@ -81,7 +82,14 @@ export function ArticlePageLayout({
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className={proseClasses}>
-            <h1>{h1}</h1>
+            <p className="!mt-0 !mb-1 text-xs md:text-sm font-semibold uppercase tracking-[0.18em] text-brand-navy not-prose">
+              {keyword}
+            </p>
+            <h1>
+              <a href="" className="!no-underline text-brand-navy-deep hover:underline">
+                {h1}
+              </a>
+            </h1>
 
             {dateLabel ? (
               <p className="text-sm text-muted-foreground !my-1">
