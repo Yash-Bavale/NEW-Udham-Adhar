@@ -29,13 +29,104 @@ export const Route = createFileRoute("/")({
         content:
           "Expert consultancy assistance for Udyam/MSME registration, certificate updates, downloads and migration.",
       },
+      { property: "og:url", content: "https://udyamadhar.in/" },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/" },
+      { rel: "canonical", href: "https://udyamadhar.in/" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": "https://udyamadhar.in/#organization",
+              name: "Business Help Services",
+              url: "https://udyamadhar.in/",
+              description:
+                "Private consultancy providing assistance with Udyam/MSME registration, certificate updates, downloads and Udyog Aadhaar migration across India.",
+              areaServed: "IN",
+              address: {
+                "@type": "PostalAddress",
+                addressLocality: "Pune",
+                addressRegion: "MH",
+                addressCountry: "IN",
+              },
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "customer support",
+                email: "helpudyamadhar@gmail.com",
+                areaServed: "IN",
+                availableLanguage: ["en", "hi"],
+              },
+            },
+            {
+              "@type": "LocalBusiness",
+              "@id": "https://udyamadhar.in/#localbusiness",
+              name: "Business Help Services",
+              url: "https://udyamadhar.in/",
+              image: "https://udyamadhar.in/",
+              priceRange: "₹₹",
+              address: {
+                "@type": "PostalAddress",
+                addressLocality: "Pune",
+                addressRegion: "MH",
+                addressCountry: "IN",
+              },
+              areaServed: "IN",
+              openingHoursSpecification: [
+                {
+                  "@type": "OpeningHoursSpecification",
+                  dayOfWeek: [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                  ],
+                  opens: "10:00",
+                  closes: "18:00",
+                },
+              ],
+            },
+            {
+              "@type": "Service",
+              name: "Udyam / MSME Registration Assistance",
+              serviceType: "Business registration consultancy",
+              provider: { "@id": "https://udyamadhar.in/#organization" },
+              areaServed: "IN",
+              description:
+                "Consultancy assistance for new Udyam registration, certificate updates, downloads, Udyog Aadhaar to Udyam migration and related corrections.",
+              hasOfferCatalog: {
+                "@type": "OfferCatalog",
+                name: "Udyam consultancy services",
+                itemListElement: [
+                  { "@type": "Offer", itemOffered: { "@type": "Service", name: "New Udyam Registration assistance" } },
+                  { "@type": "Offer", itemOffered: { "@type": "Service", name: "Update Udyam Certificate assistance" } },
+                  { "@type": "Offer", itemOffered: { "@type": "Service", name: "Download Udyam Certificate assistance" } },
+                  { "@type": "Offer", itemOffered: { "@type": "Service", name: "Udyog Aadhaar to Udyam migration assistance" } },
+                ],
+              },
+            },
+            {
+              "@type": "FAQPage",
+              mainEntity: FAQS.map((f) => ({
+                "@type": "Question",
+                name: f.q.replace(/^\d+\.\s*/, ""),
+                acceptedAnswer: { "@type": "Answer", text: f.a },
+              })),
+            },
+          ],
+        }),
+      },
     ],
   }),
   component: HomePage,
 });
+
 
 const FAQS = [
   {
