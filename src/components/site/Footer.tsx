@@ -383,6 +383,46 @@ function SeoTree({
                 </li>
               );
             })}
+            {!loading && articleGroups.map((cat) => {
+              const isOpen = expanded[cat.key];
+              return (
+                <li key={cat.key}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggle(cat.key)}
+                      className="p-1 text-white/85 hover:text-brand-gold"
+                      aria-label={isOpen ? "Collapse" : "Expand"}
+                      aria-expanded={isOpen}
+                    >
+                      {isOpen ? (
+                        <ChevronDown className="h-4 w-4 stroke-[3]" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 stroke-[3]" />
+                      )}
+                    </button>
+                    <span className="flex-1 py-1.5 text-white font-semibold">
+                      {cat.label}
+                    </span>
+                  </div>
+                  {isOpen && (
+                    <ul className="ml-6 mt-1 mb-2 space-y-1 border-l border-white/15 pl-3 text-sm font-normal">
+                      {cat.items.map((p) => (
+                        <li key={p.id}>
+                          <a
+                            href={`/${p.slug}`}
+                            className="flex items-start gap-2 py-1 text-white/85 hover:text-brand-gold"
+                          >
+                            <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>{p.label}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </>
         )}
       </ul>
