@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 
 Sitemap: https://udyamadhar.in/sitemap.xml
+# AI crawler index
+# https://udyamadhar.in/llms.txt
