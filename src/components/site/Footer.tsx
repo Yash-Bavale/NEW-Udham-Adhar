@@ -13,7 +13,7 @@ import {
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 
 
-type SeoPageRow = { id: string; slug: string; label: string };
+type SeoPageRow = { id: string; slug: string; label: string; page_type?: string };
 
 type Category = {
   key: string;
