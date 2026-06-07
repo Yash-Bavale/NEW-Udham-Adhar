@@ -14,5 +14,5 @@ export const Route = createFileRoute("/cookie-policy")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/cookie-policy" },
     ],
   }),
-  component: () => <WpPage title="Cookie Policy" html={html} />,
+  component: () => <WpPage title="Cookie Policy" html={html} legal />,
 });

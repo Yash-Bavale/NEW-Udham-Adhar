@@ -146,7 +146,7 @@ export const ClientInfoRequestTemplate = ({
           <Section style={footer}>
             <Text style={footerText}>Warm regards,</Text>
             <Text style={footerName}>Team {businessName}</Text>
-            <Text style={footerContact}>care@udyamadhar.in | udyamadhar.in</Text>
+            <Text style={footerContact}>help@businesshelpservices.com | udyamadhar.in</Text>
           </Section>
         </Container>
       </Body>

@@ -14,5 +14,5 @@ export const Route = createFileRoute("/compliance-statement")({
       { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/compliance-statement" },
     ],
   }),
-  component: () => <WpPage title="Compliance Statement" html={html} />,
+  component: () => <WpPage title="Compliance Statement" html={html} legal />,
 });
