@@ -81,6 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "google-site-verification", content: "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY" },
       { title: "Udyam Aadhar Registration" },
       {
         name: "description",
