@@ -81,15 +81,16 @@ export function ArticlePageLayout({
       {/* SEO article body */}
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="bg-form-header text-white text-center py-4">
+            <h2 className="text-xl font-bold font-display">{keyword}</h2>
+          </div>
           <div className={proseClasses}>
-            <p className="!mt-0 !mb-1 text-xs md:text-sm font-semibold uppercase tracking-[0.18em] text-brand-navy not-prose">
-              {keyword}
-            </p>
-            <h1>
-              <a href="" className="!no-underline text-brand-navy-deep hover:underline">
+            <h1 className="!text-center">
+              <a href="" className="text-brand-navy-deep underline">
                 {h1}
               </a>
             </h1>
+
 
             {dateLabel ? (
               <p className="text-sm text-muted-foreground !my-1">
