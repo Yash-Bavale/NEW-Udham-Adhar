@@ -57,7 +57,7 @@ export function ArticlePageLayout({
     <div>
       {/* Top: lead form + sample certificate — same as service pages */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
-        <LeadForm title={h1} />
+        <LeadForm title={keyword} />
 
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="bg-form-header text-white text-center py-4">
