@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const BASE_URL = "https://udyamadhar.in";
+import { BASE_URL } from "@/lib/brand";
 
 // Path prefixes that must never appear in the sitemap.
 const EXCLUDED_PREFIXES = [
@@ -22,10 +21,21 @@ const EXCLUDED_PREFIXES = [
   "/complaint",
 ];
 
+// Top-funnel high-priority paths.
+const HIGH_PRIORITY = new Set<string>([
+  "/",
+  "/udyam-registration",
+  "/udyam-aadhar-registration",
+  "/msme-registration",
+  "/download-udyam-certificate",
+  "/print-udyam-certificate",
+  "/update-udyam-certificate",
+]);
+
 function isExcluded(p: string): boolean {
-  if (p === "/sitemap.xml") return true;
+  if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (p.includes("$") || p.includes("*")) return true;
-  return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/") || p === pre);
+  return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
 }
 
 export const Route = createFileRoute("/sitemap.xml")({
@@ -52,31 +62,46 @@ export const Route = createFileRoute("/sitemap.xml")({
           .map((p) => (p.length > 1 ? p.replace(/\/$/, "") : p))
           .filter((p) => !isExcluded(p));
 
-        // 2. Pull enabled SEO pages from the DB and merge in.
-        const seoPaths: string[] = [];
+        const buildDate = new Date().toISOString();
+
+        type Entry = { path: string; lastmod: string };
+        const entries = new Map<string, Entry>();
+        for (const p of routePaths) entries.set(p, { path: p, lastmod: buildDate });
+
+        // 2. Pull enabled SEO pages from the DB and merge in (with lastmod).
         try {
           const { data } = await supabaseAdmin
             .from("seo_pages")
-            .select("slug")
+            .select("slug, updated_at")
             .eq("enabled", true);
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim();
             if (!slug) continue;
             const path = slug.startsWith("/") ? slug : `/${slug}`;
-            if (!isExcluded(path)) seoPaths.push(path);
+            if (isExcluded(path)) continue;
+            const lastmod =
+              (row as { updated_at?: string }).updated_at ?? buildDate;
+            entries.set(path, { path, lastmod });
           }
         } catch {
           // If DB is unreachable, still emit the static route list.
         }
 
-        const paths = Array.from(new Set([...routePaths, ...seoPaths])).sort();
+        const sorted = Array.from(entries.values()).sort((a, b) =>
+          a.path.localeCompare(b.path),
+        );
 
-        const urls = paths.map((p) => {
-          const priority = p === "/" ? "1.0" : p.length < 25 ? "0.8" : "0.6";
-          const changefreq = p === "/" ? "weekly" : "monthly";
+        const urls = sorted.map((e) => {
+          const priority = HIGH_PRIORITY.has(e.path)
+            ? "1.0"
+            : e.path.length < 25
+              ? "0.8"
+              : "0.6";
+          const changefreq = e.path === "/" ? "weekly" : "monthly";
           return [
             "  <url>",
-            `    <loc>${BASE_URL}${p}</loc>`,
+            `    <loc>${BASE_URL}${e.path}</loc>`,
+            `    <lastmod>${e.lastmod}</lastmod>`,
             `    <changefreq>${changefreq}</changefreq>`,
             `    <priority>${priority}</priority>`,
             "  </url>",
