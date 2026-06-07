@@ -1,92 +1,41 @@
-## Decisions locked in
-1. **One sitemap only** — keep `/sitemap.xml` as the single sitemap (no index split). Just upgrade the existing route with `<lastmod>` and better priorities.
-2. **Flat URLs** — new 56 SEO pages use `/{slug}` like the existing pages (no `/learn/` prefix).
-3. **Contact** — replace `helpudyamadhar@gmail.com` with `help@businesshelpservices.com` everywhere.
-4. **Legal entity wording** — add "operated by Business Help Services" only on legal/policy pages (Disclaimer, Privacy, T&C, Refund, Grievance, AML, Compliance, Cookie). Brand name "Udyam Aadhar" stays everywhere else.
+## Goal
 
----
+Import all 55 pages from `New_Blog_Style_udyam_seo_content.js` and serve them at `/{slug}` using the existing SEO landing layout — so every new page has the same look as your current pages: lead form + Sample Certificate on top → SEO content in the middle → TrustBlock at the bottom (which already contains "Udyam Assistance Process – Fast & Simple" + "We provide consultancy services across India").
 
-## Answers recap
+## Approach (no new route files — DB-driven)
 
-- **Nothing is fetched from the live WP site** — all content is local in `src/content/wp/*.html`. Rendered by TanStack routes.
-- **Sitemap is functional** — pulls static routes + enabled `seo_pages` rows from DB. We'll add `<lastmod>` + better priorities.
-- **No `llms.txt` / `llms-full.txt` yet** — we'll add both so ChatGPT / Perplexity / Claude can index the site.
-- **Indexing vs ranking** — we can guarantee indexing (sitemap + GSC + internal links); #1 ranking depends on Google but we'll maximize the signals.
+We already have an article infrastructure (`seo_pages.page_type='article'` + splat route `/$.tsx` + `ArticlePageLayout`). Instead of generating 55 route files, we:
 
----
+1. **Bulk-insert all 55 pages into `seo_pages`** as `page_type='article'`, with `h1`, `meta_title`, `meta_description`, and a `sections` JSONB built from `content[]`.
+2. **Group consecutive `content[]` items into sections** so the renderer can stream them:
+   - `h2` / `h3` → starts a new section with that heading
+   - `body` / `bullet` → appended into that section's `body_html` (bullets wrapped in a single `<ul>`)
+   - `faq_q` + `faq_a` pairs → collected into the row's `faq` JSONB array (powers FAQPage JSON-LD + accordion)
+3. **Switch the article layout to match service pages** so the user-visible structure is identical:
+   - Top: `<LeadForm>` + Sample Certificate card (same component fragment as `ServicePageLayout`)
+   - Middle: H1 + intro + looped sections (`h2`/`h3`/`<p>`/`<ul><li>`) + styled FAQ block
+   - Bottom: `<TrustBlock />` (already includes the two standard sections)
+4. **Resolve 8 slug collisions** with existing routes by appending `-guide` to the imported article's slug. The 8 collisions are:
+   `udyam-certificate-download`, `udyam-portal`, `udyam-registration-download`, `udyam-registration-form`, `udyam-registration-number`, `udyam-registration-online`, `udyam-registration-update`, `udyog-aadhaar`.
+   These will be imported as e.g. `/udyam-portal-guide`. (Existing file-based routes keep their current URLs unchanged.)
+5. **SEO admin**: the SEO admin list already reads from `seo_pages`. The 55 new rows will appear there automatically as a separate group ("Articles"). We'll add a small `page_type` badge + filter so you can manage them as a child group under your existing SEO pages list.
+6. **Sitemap + llms.txt**: both already pull from `seo_pages.enabled = true`, so all 55 new URLs (with proper `<lastmod>`) get picked up automatically — no extra work.
 
-## Plan
+## Files touched
 
-### A. Brand & contact unification
-1. Create `src/lib/brand.ts` with constants:
-   - `SITE_NAME = "Udyam Aadhar"`
-   - `LEGAL_ENTITY = "Business Help Services"`
-   - `CONTACT_EMAIL = "help@businesshelpservices.com"`
-   - `BASE_URL = "https://udyamadhar.in"`
-2. Global find/replace `helpudyamadhar@gmail.com` → `help@businesshelpservices.com` across components, email templates, policy HTML, JSON-LD.
-3. Add "Operated by Business Help Services" line **only** on legal/policy pages: Disclaimer, Cookie, AML, Compliance, Grievance, Complaint policy, Consent, Payment notice.
-4. Update Footer contact email + email-template footers (`care@udyamadhar.in` line in `client-info-request.tsx`).
-5. Update Organization/LocalBusiness JSON-LD in `src/routes/index.tsx` and `__root.tsx`: switch contact email, add `legalName: "Business Help Services"`, keep `name: "Udyam Aadhar"`.
+- `src/components/site/ArticlePageLayout.tsx` — restructure to: LeadForm + Sample Cert (top) → article content → TrustBlock. Keep Article + Breadcrumb + FAQPage JSON-LD.
+- `src/routes/$.tsx` — already routes article slugs; no change.
+- `scripts/import-seo-articles.ts` (one-shot import script) — parses the upload, transforms `content[]` → `{sections, faq}`, upserts to `seo_pages` via admin client.
+- `src/routes/seo-admin.tsx` (or current SEO admin component) — add `page_type` column + filter so articles show as a child group.
 
-### B. Sitemap upgrade (single file)
-Modify `src/routes/sitemap[.]xml.ts`:
-- Select `slug, updated_at` from `seo_pages` and emit `<lastmod>` from it.
-- Static routes get build-time date.
-- Bump priority for top routes (`/`, top 5 service slugs) to `0.9`.
-- Keep everything in one `/sitemap.xml`.
+## Open question
 
-`public/robots.txt` already references it — leave as-is, add `Sitemap:` line for `llms.txt`.
+The upload uses lots of em dashes, INR ₹, and quoted asides. Should I pass `body` text through as plain `<p>` (recommended, matches your blog feel) or do any light formatting like auto-linking the brand name "udyamadhar.in"? Default: plain `<p>`, no auto-linking.
 
-### C. AI-search files
-1. **`src/routes/llms[.]txt.ts`** → `/llms.txt`: curated markdown index (brand intro + service list + link list of every public + enabled SEO page).
-2. **`src/routes/llms-full[.]txt.ts`** → `/llms-full.txt`: concatenated plain-text content of every page (strip HTML from `src/content/wp/*.html` + DB-stored content).
+## What you'll see after this runs
 
-### D. Per-page SEO hardening
-1. Extend `ServicePageLayout` / `SeoLandingPage` to accept and emit per-page JSON-LD: `WebPage` + `BreadcrumbList`, plus `Service` schema where applicable.
-2. Audit every existing route's `head()` — guarantee unique `title`, `description`, `og:title`, `og:description`, and `canonical` (canonical only on leaves, never `__root.tsx`).
-3. Add "Related services" internal-link block at the bottom of every SEO page (3–5 links each), driven by a `related[]` field.
-
-### E. 56 new SEO pages — schema for blog-style content at flat `/{slug}`
-
-Since both existing service pages and new article pages will share the `/{slug}` namespace, we add a `type` discriminator on `seo_pages` and a router that picks the right layout.
-
-**DB migration:**
-```sql
-ALTER TABLE public.seo_pages
-  ADD COLUMN IF NOT EXISTS page_type text NOT NULL DEFAULT 'service'
-    CHECK (page_type IN ('service','article')),
-  ADD COLUMN IF NOT EXISTS h1 text,
-  ADD COLUMN IF NOT EXISTS meta_title text,
-  ADD COLUMN IF NOT EXISTS meta_description text,
-  ADD COLUMN IF NOT EXISTS intro text,
-  ADD COLUMN IF NOT EXISTS sections jsonb,        -- [{h2, h3?, body_html}]
-  ADD COLUMN IF NOT EXISTS faq jsonb,             -- [{q, a}]
-  ADD COLUMN IF NOT EXISTS cover_image_url text,
-  ADD COLUMN IF NOT EXISTS related_slugs text[],
-  ADD COLUMN IF NOT EXISTS published_at timestamptz DEFAULT now();
-```
-(Re-grant + RLS preserved.)
-
-**Routing:**
-- The existing `src/routes/$.tsx` splat already catches unknown slugs — extend its loader to:
-  1. Look up the slug in `seo_pages`.
-  2. If `page_type='service'` → render existing `SeoLandingPage`.
-  3. If `page_type='article'` → render new `ArticlePageLayout` (H1 → intro → sections → FAQ → related links).
-- Article pages emit JSON-LD: **Article + BreadcrumbList + FAQPage** (distinct `@id`s, no collision with homepage Organization graph).
-- `head()` populates `title`/`description` from `meta_title`/`meta_description`, canonical from slug.
-
-**Ingestion:**
-- When you send the PDF / DOC / JS file, parse it into rows and bulk-insert via a one-off script or admin bulk-import.
-- Existing slugs upgraded to articles by setting `page_type='article'` and filling the article fields (or kept as services if both intents apply).
-
-**Collision rule:** If a flat `/{slug}` exists as both a static route file AND a DB row, the static route wins (TanStack matches files before the splat). We'll list current static slugs so your 56 new ones don't collide.
-
-### F. Verify in Search Console
-After deploy: resubmit `/sitemap.xml`, request indexing for top 10 pages, monitor weekly.
-
----
-
-## What I need from you to start Phase E
-The PDF/DOC/JS file with the 56 pages — each page should include: `slug`, `h1`, `meta_title`, `meta_description`, `intro`, list of `sections` (h2/h3/body), optional `faq`, and `related_slugs`.
-
-Ready to switch to build mode and execute A → D now; I'll do E (article layout + bulk import) the moment you drop the file.
+- 55 new URLs live at `/{slug}` (e.g. `/udyam-registration`, `/msme-login`, `/udyog-aadhaar-guide`).
+- Each page: form + sample cert → H1 → structured H2/H3/paragraphs/bullets → FAQ accordion → TrustBlock with the two standard sections.
+- Each page emits unique `<title>`, `<meta description>`, canonical, Article + BreadcrumbList + FAQPage JSON-LD.
+- All 55 URLs appear in `/sitemap.xml`, `/llms.txt`, `/llms-full.txt`.
+- All 55 manageable from SEO admin (enable/disable, sort, edit).
