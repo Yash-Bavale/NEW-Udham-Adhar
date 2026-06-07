@@ -82,7 +82,14 @@ export function ArticlePageLayout({
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className={proseClasses}>
-            <h1>{h1}</h1>
+            <p className="!mt-0 !mb-1 text-xs md:text-sm font-semibold uppercase tracking-[0.18em] text-brand-navy not-prose">
+              {keyword}
+            </p>
+            <h1>
+              <a href="" className="!no-underline text-brand-navy-deep hover:underline">
+                {h1}
+              </a>
+            </h1>
 
             {dateLabel ? (
               <p className="text-sm text-muted-foreground !my-1">
