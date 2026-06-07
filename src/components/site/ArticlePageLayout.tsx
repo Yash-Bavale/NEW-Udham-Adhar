@@ -51,6 +51,7 @@ export function ArticlePageLayout({
   updatedAt,
 }: ArticlePageProps) {
   const dateLabel = updatedAt ?? publishedAt;
+  const keyword = (h1.split(/[:\u2014\u2013\-]/)[0] || h1).trim();
 
   return (
     <div>
