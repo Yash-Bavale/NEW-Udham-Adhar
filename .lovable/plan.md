@@ -1,39 +1,59 @@
-## Goal
-On all 55 article pages, adjust the form header and content-box H1 so they match the previous SEO pages style, and confirm the FAQ section heading is shown.
+# Why customers aren't growing while leads are
 
-## Changes (frontend only — `src/components/site/ArticlePageLayout.tsx`)
+**Diagnosis (confirmed from DB):**
+- `leads` table: **3,608 rows**
+- `customers` table: **38 rows**
+- `leads.customer_id` populated on only **2 rows**
 
-### 1. Form header (top blue box) — show short keyword only
-Currently the `LeadForm` title is passed the full `h1` (e.g. *"Udyam Registration: The Official MSME Registration System in India"*).
+The public lead-intake server function `src/lib/leads.functions.ts` (`createLead`) inserts into `leads` and `applications`, but **never touches the `customers` table** and never sets `leads.customer_id`. The DB already has a perfect helper for this — `public.find_or_create_customer(name, email, mobile, state, language)` — it just isn't being called from the website form. Nothing else in the onboarding / payment / application flow creates customers either, so the only customers in the system are the 38 created manually from the CRM. That's the break.
 
-Switch it to a short keyword derived from the article:
-- Prefer a new `keyword` field on the article (e.g. `"Udyam Registration"`).
-- Fallback: take the part of `h1` before the first `:` / `—` / `-`.
-- Pass that short string as `<LeadForm title={keyword} />`.
+## Fix
 
-### 2. Content box H1 — keyword on top, full extended line below as link
-Replace the single `<h1>{h1}</h1>` with:
+Update `src/lib/leads.functions.ts` so every website submission also resolves a customer record and links it to the lead.
 
+### Step 1 — Resolve/create customer before inserting the lead
+
+After the service lookup, call the existing RPC:
+
+```ts
+const { data: customerId, error: custErr } = await supabaseAdmin.rpc(
+  "find_or_create_customer",
+  {
+    p_name: data.name,
+    p_email: normalizedEmail,
+    p_mobile: data.mobile,
+    p_state: data.state,
+    p_language: data.language,
+  }
+);
+if (custErr) console.error("find_or_create_customer failed:", custErr.message);
 ```
-<p class="eyebrow">Udyam Registration</p>   ← short keyword, small uppercase
-<h1>
-  <a href="/{slug}">Udyam Registration: The Official MSME Registration System in India</a>
-</h1>
+
+The RPC already handles:
+- dedupe by mobile, then email
+- creates a `CU-YYYY-NNNNNN` code via existing trigger
+- updates `last_seen_at` + fills any missing fields on repeat submissions
+
+Customer creation is **non-fatal** — if it fails we still save the lead.
+
+### Step 2 — Link the customer to the new lead
+
+Add `customer_id: customerId ?? null` to the `leads` insert payload.
+
+### Step 3 — One-time backfill for existing 3,606 unlinked leads
+
+A second migration that, for every lead with `customer_id IS NULL`, calls `find_or_create_customer` using the lead's `name/email/mobile/state/language` and writes the returned id back into `leads.customer_id`. After this, the Customers page in the CRM will reflect the real population (expect a large jump — likely a few thousand unique customers once dedupe by mobile/email is applied).
+
+### Out of scope (not changing)
+- `customers` table schema, RLS, or grants — already correct
+- The `find_or_create_customer` function — already correct
+- Onboarding / payment / application flows — they don't need to create customers; the lead intake is the single entry point and is enough once fixed
+
+## Verification after build
+
+Run:
+```sql
+SELECT count(*) FROM customers;
+SELECT count(*) FROM leads WHERE customer_id IS NULL;
 ```
-
-- Eyebrow: small, uppercase, brand-navy, tracked — same treatment used on existing SEO service pages.
-- H1: full extended title, wrapped in an `<a href={slugPath}>` (self-link, same pattern as previous SEO pages).
-- Keep the "Updated <date>" line directly under H1.
-
-### 3. FAQ heading — confirm "Frequently Asked Questions"
-The layout already renders `<h2>Frequently Asked Questions</h2>` above the FAQ block. Verify it shows on every article that has FAQs and leave the wording exactly as-is. No code change needed unless the heading is missing on some pages (it isn't — it's unconditional inside the `faq && faq.length` block).
-
-## Data note
-No DB schema change required. The short keyword is derived client-side from `h1` (split on `:` / `—` / `-`). If you'd later prefer an explicit per-page keyword, we can add a `keyword` column to `seo_pages` and populate it — say the word and I'll do that in a follow-up.
-
-## Files touched
-- `src/components/site/ArticlePageLayout.tsx` (only file)
-
-## Out of scope
-- Service pages, footer, sitemap, llms.txt — unchanged.
-- DB content — unchanged.
+Expected: `customers` jumps from 38 → several thousand, and `leads WHERE customer_id IS NULL` drops to 0 (or near-0 for rows with invalid contact data).

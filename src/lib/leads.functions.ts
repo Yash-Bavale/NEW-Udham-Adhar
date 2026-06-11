@@ -57,6 +57,27 @@ export const createLead = createServerFn({ method: "POST" })
     const isDuplicate = !!existing?.id;
     const duplicateOf = existing?.id ?? null;
 
+    // 2b. Resolve or create the customer (dedupes by mobile, then email).
+    // Non-fatal: if this fails we still save the lead.
+    let customerId: string | null = null;
+    {
+      const { data: cid, error: custErr } = await supabaseAdmin.rpc(
+        "find_or_create_customer",
+        {
+          p_name: data.name,
+          p_email: normalizedEmail,
+          p_mobile: data.mobile,
+          p_state: data.state,
+          p_language: data.language,
+        },
+      );
+      if (custErr) {
+        console.error("find_or_create_customer failed:", custErr.message);
+      } else {
+        customerId = (cid as unknown as string) ?? null;
+      }
+    }
+
     // 3. Always create a new lead row — treat every submission as a fresh application.
     let leadId: string;
     let leadCode: string;
@@ -78,6 +99,7 @@ export const createLead = createServerFn({ method: "POST" })
           lead_source: "website",
           is_duplicate: isDuplicate,
           duplicate_of: duplicateOf,
+          customer_id: customerId,
         })
         .select("id, lead_code")
         .single();
