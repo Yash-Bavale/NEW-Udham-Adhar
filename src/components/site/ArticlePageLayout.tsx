@@ -159,8 +159,9 @@ export function ArticlePageLayout({
                       <p className="font-semibold text-brand-navy-deep">{f.q}</p>
                       <div
                         className="mt-2 text-foreground/85 text-[15px] leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: f.a }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(f.a) }}
                       />
+
                     </div>
                   ))}
                 </div>
