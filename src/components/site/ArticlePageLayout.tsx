@@ -141,8 +141,9 @@ export function ArticlePageLayout({
                 {s.h2 ? <h2>{s.h2}</h2> : null}
                 {s.h3 ? <h3>{s.h3}</h3> : null}
                 {s.body_html ? (
-                  <div dangerouslySetInnerHTML={{ __html: s.body_html }} />
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(s.body_html) }} />
                 ) : null}
+
               </div>
             ))}
 
