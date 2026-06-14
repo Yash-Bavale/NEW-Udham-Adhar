@@ -1,6 +1,6 @@
-// pg_cron calls this hourly with the anon apikey header. Sends an onboarding
-// reminder to customers who paid but never submitted onboarding. Max 3
-// reminders per lead, spaced at least 24h apart.
+// pg_cron calls this hourly with CRON_SECRET in the apikey header. Sends an
+// onboarding reminder to customers who paid but never submitted onboarding.
+// Max 3 reminders per lead, spaced at least 24h apart.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
@@ -15,8 +15,9 @@ export const Route = createFileRoute("/api/public/cron/onboarding-reminders")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Server-only CRON_SECRET — never VITE_-prefixed, never shipped to client.
         const apikey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const expected = process.env.CRON_SECRET;
         if (!apikey || !expected || apikey !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }

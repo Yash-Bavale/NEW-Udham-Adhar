@@ -7,8 +7,9 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Server-only CRON_SECRET — never VITE_-prefixed, never shipped to client.
         const apikey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const expected = process.env.CRON_SECRET;
         if (!apikey || !expected || apikey !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
