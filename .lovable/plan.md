@@ -1,59 +1,66 @@
-# Why customers aren't growing while leads are
+## Diagnosis
 
-**Diagnosis (confirmed from DB):**
-- `leads` table: **3,608 rows**
-- `customers` table: **38 rows**
-- `leads.customer_id` populated on only **2 rows**
+I read all 5 GSC export ZIPs and traced each issue to its source:
 
-The public lead-intake server function `src/lib/leads.functions.ts` (`createLead`) inserts into `leads` and `applications`, but **never touches the `customers` table** and never sets `leads.customer_id`. The DB already has a perfect helper for this — `public.find_or_create_customer(name, email, mobile, state, language)` — it just isn't being called from the website form. Nothing else in the onboarding / payment / application flow creates customers either, so the only customers in the system are the 38 created manually from the CRM. That's the break.
+| GSC issue | Rows | Root cause |
+|---|---|---|
+| Duplicate field "FAQPage" | 170 | `TrustBlock.tsx` emits its own `FAQPage` JSON-LD AND is mounted inside pages that already emit `FAQPage` (`index.tsx`, `SeoLandingPage.tsx`, every article via `ArticlePageLayout.tsx`) → 2 `FAQPage` blocks per page. |
+| Alternate page with proper canonical | 80 | Catch-all `/$.tsx` loader lowercases the slug for DB lookup, so `/Print-Udyam-Certificate`, `/Udyam-Card-Download/`, etc. all return **200** with same content as the canonical. Canonical tag is correct but Google still indexes the variant. |
+| Page with redirect | 144 | Mostly the same case/trailing-slash variants that get redirected elsewhere (some WP-era 301s). Need to stop linking them and let Google drop them. |
+| Not found (404) | 14 | Legacy WordPress paths: `/wp-admin/*`, `/wp-content/*`, `/wp-includes/*`, `/wp-*.php`, `/annasaheb-patil-*`, `/obc-mahamandal-loan-scheme/`, `/download-udyam-certificate-2`. We never offered those — Google is following stale external links. |
+| Crawled - currently not indexed | 18 | Mix of: (a) thin/duplicate variants → fixed by canonicalisation, (b) `/wp-json/*`, `/wp-includes/*` noise → block in robots, (c) `/pmfme-scheme/`, `/Udyog-Aadhar-download/` → 410. |
 
-## Fix
+DB check: no uppercase slugs exist in `seo_pages` — the variant URLs are external links Google discovered, not anything we publish.
 
-Update `src/lib/leads.functions.ts` so every website submission also resolves a customer record and links it to the lead.
+## Fixes
 
-### Step 1 — Resolve/create customer before inserting the lead
+### 1. Stop emitting duplicate `FAQPage` JSON-LD
+`src/components/site/TrustBlock.tsx` — remove the `faqJsonLd` constant and the `<script type="application/ld+json">` block. Keep the accordion UI. Every page that hosts `TrustBlock` already emits its own `FAQPage` schema, so the visible FAQ stays but only one `FAQPage` block per page reaches Google.
 
-After the service lookup, call the existing RPC:
+### 2. Canonicalise case/trailing-slash variants (301)
+`src/routes/$.tsx` loader — before DB lookup, if `_splat` contains an uppercase letter, has a trailing slash, or matches a known legacy/gone path, throw a `redirect({ to: '/...', statusCode: 301 })` to the lowercase canonical. This collapses ~220 duplicate/variant URLs into their canonical counterparts in a single deploy.
 
-```ts
-const { data: customerId, error: custErr } = await supabaseAdmin.rpc(
-  "find_or_create_customer",
-  {
-    p_name: data.name,
-    p_email: normalizedEmail,
-    p_mobile: data.mobile,
-    p_state: data.state,
-    p_language: data.language,
-  }
-);
-if (custErr) console.error("find_or_create_customer failed:", custErr.message);
+### 3. Permanent gone for retired WP schemes
+Same `$.tsx` loader — for an explicit deny-list (`annasaheb-patil-*`, `obc-mahamandal-loan-scheme`, `pmfme-scheme`, `download-udyam-certificate-2`), throw a `Response('Gone', { status: 410 })` so Google removes them quickly instead of re-crawling forever.
+
+### 4. Block WP noise via robots
+`public/robots.txt` — add:
+```
+Disallow: /wp-admin/
+Disallow: /wp-content/
+Disallow: /wp-includes/
+Disallow: /wp-json/
+Disallow: /wp-login.php
+Disallow: /xmlrpc.php
 ```
 
-The RPC already handles:
-- dedupe by mobile, then email
-- creates a `CU-YYYY-NNNNNN` code via existing trigger
-- updates `last_seen_at` + fills any missing fields on repeat submissions
+### 5. Sitemap hygiene
+`src/routes/sitemap[.]xml.ts` — normalise all paths to lowercase + strip trailing slash + dedupe (the static walk already does most of this; add an explicit `toLowerCase()` and a `Set` dedupe to be safe). Bump `lastmod` for re-crawl signal.
 
-Customer creation is **non-fatal** — if it fails we still save the lead.
+### 6. `llms.txt` / `llms-full.txt`
+Re-confirm everything is lowercase canonical; add a one-line note that `udyamadhar.in` is the canonical host and all paths are lowercase. No structural change needed.
 
-### Step 2 — Link the customer to the new lead
+### 7. Schema files — no enhancement needed
+`Organization`, `WebSite`, `Service`, `Article`, `BreadcrumbList`, `FAQPage` are all present and valid. The only schema bug is the duplicate `FAQPage` (fix #1).
 
-Add `customer_id: customerId ?? null` to the `leads` insert payload.
+### 8. Resubmit to Search Console
+After deploy, hit Search Console via the connector:
+- Re-ping the sitemap (`PUT /webmasters/v3/sites/.../sitemaps/...`).
+- Re-trigger each affected issue's **Validate fix** by re-inspecting one URL per category (`POST /v1/urlInspection/index:inspect` is read-only — actual "Validate fix" must be clicked by the user in GSC; I'll list the exact 5 buttons to click).
 
-### Step 3 — One-time backfill for existing 3,606 unlinked leads
+Then run an internal SEO scan (`seo_chat--trigger_scan`) to confirm no new regressions.
 
-A second migration that, for every lead with `customer_id IS NULL`, calls `find_or_create_customer` using the lead's `name/email/mobile/state/language` and writes the returned id back into `leads.customer_id`. After this, the Customers page in the CRM will reflect the real population (expect a large jump — likely a few thousand unique customers once dedupe by mobile/email is applied).
+### Technical notes (for developer reference)
+- Loader-thrown `redirect()` in TanStack Start returns the proper 301 on SSR and a client-side redirect on CSR.
+- `TrustBlock`'s removal of its JSON-LD is safe because it's now only mounted inside containers that own the page's `FAQPage` graph node.
+- 410 responses are returned via `throw new Response()` from the loader, which TanStack Start surfaces as the route's notFoundComponent with a 410 status — Google treats 410 stronger than 404 for de-indexing.
 
-### Out of scope (not changing)
-- `customers` table schema, RLS, or grants — already correct
-- The `find_or_create_customer` function — already correct
-- Onboarding / payment / application flows — they don't need to create customers; the lead intake is the single entry point and is enough once fixed
+## Out of scope
+- Editing individual article copy for "Crawled - not indexed" thin-content pages — most are duplicates that disappear once canonicalised. If any remain after the next crawl cycle, we can selectively rewrite then.
+- New custom OG images.
+- Touching the published `seo_pages` rows themselves (no schema/slug changes needed).
 
-## Verification after build
-
-Run:
-```sql
-SELECT count(*) FROM customers;
-SELECT count(*) FROM leads WHERE customer_id IS NULL;
-```
-Expected: `customers` jumps from 38 → several thousand, and `leads WHERE customer_id IS NULL` drops to 0 (or near-0 for rows with invalid contact data).
+## What you'll do after I implement
+1. Click **Publish → Update** so the redirects + robots changes go live.
+2. In Search Console, open each of the 5 affected reports and click **Validate Fix** (I'll tell you exactly where).
+3. Wait ~1–2 weeks for the recrawl; ranking lift follows naturally as duplicate signals collapse.
