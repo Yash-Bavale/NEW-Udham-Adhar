@@ -1,4 +1,4 @@
-// pg_cron calls this every minute with the anon apikey header.
+// pg_cron calls this every minute with the CRON_SECRET in the apikey header.
 import { createFileRoute } from "@tanstack/react-router";
 import { processQueueInternal } from "@/lib/emails/emails.server";
 
@@ -6,10 +6,9 @@ export const Route = createFileRoute("/api/public/cron/process-emails")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Anon apikey is acceptable — endpoint only drains the queue and writes
-        // to email_logs (admin-readable). No PII returned.
+        // Server-only CRON_SECRET — never VITE_-prefixed, never shipped to client.
         const apikey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const expected = process.env.CRON_SECRET;
         if (!apikey || !expected || apikey !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
