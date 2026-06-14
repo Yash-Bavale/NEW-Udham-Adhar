@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
 import { getArticleBySlug } from "@/lib/seo-articles.functions";
 import {
   ArticlePageLayout,
@@ -8,18 +8,63 @@ import {
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
 
+// Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
+// them quickly instead of re-crawling forever (faster than a soft 404).
+const GONE_EXACT = new Set<string>([
+  "obc-mahamandal-loan-scheme",
+  "pmfme-scheme",
+  "download-udyam-certificate-2",
+  "udyam-registration-form",
+  "annasaheb-patil-loan-scheme-documents",
+  "annasaheb-patil-mahamandal-loan-scheme-details",
+  "annasaheb-patil-customer-care",
+  "annasaheb-patil-business-loan",
+  "annasaheb-patil-loi",
+]);
+const GONE_PREFIXES = ["annasaheb-patil-", "wp-", "xmlrpc"];
+
+function isGone(slug: string) {
+  if (GONE_EXACT.has(slug)) return true;
+  return GONE_PREFIXES.some((p) => slug.startsWith(p));
+}
+
 export const Route = createFileRoute("/$")({
   loader: async ({ params }) => {
-    const splat = ((params as any)._splat ?? "").toString();
-    // Bail early for known internal/static paths — only match a single segment.
-    if (!splat || splat.includes("/") || splat.startsWith(".")) {
+    const raw = ((params as any)._splat ?? "").toString();
+
+    // Bail on internal/static/multi-segment paths.
+    if (!raw || raw.startsWith(".")) {
       throw redirect({ to: "/" });
     }
+
+    // Strip trailing slash. Lowercase for canonicalisation.
+    const stripped = raw.replace(/\/+$/, "");
+    const lower = stripped.toLowerCase();
+
+    // 410 Gone for retired legacy paths.
+    if (isGone(lower)) {
+      throw new Response("Gone", { status: 410 });
+    }
+
+    // Multi-segment splats: nothing to serve here, hand off.
+    if (stripped.includes("/")) {
+      throw redirect({ to: "/" });
+    }
+
+    // Canonicalise: trailing slash or uppercase → 301 to lowercase.
+    if (raw !== lower) {
+      throw redirect({
+        to: "/$",
+        params: { _splat: lower },
+        statusCode: 301,
+      });
+    }
+
     try {
-      const result = await getArticleBySlug({ data: { slug: splat } });
+      const result = await getArticleBySlug({ data: { slug: lower } });
       return result;
     } catch {
-      throw redirect({ to: "/" });
+      throw notFound();
     }
   },
   head: ({ loaderData }) => {
@@ -61,6 +106,26 @@ export const Route = createFileRoute("/$")({
       ],
     };
   },
+  notFoundComponent: () => (
+    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+      <h1 className="text-3xl font-bold">Page not found</h1>
+      <p className="mt-4 text-muted-foreground">
+        The page you are looking for does not exist or has been moved.
+      </p>
+      <a href="/" className="mt-6 inline-block text-primary underline">
+        Return to homepage
+      </a>
+    </div>
+  ),
+  errorComponent: ({ error }) => (
+    <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+      <h1 className="text-3xl font-bold">Something went wrong</h1>
+      <p className="mt-4 text-muted-foreground">{String(error)}</p>
+      <a href="/" className="mt-6 inline-block text-primary underline">
+        Return to homepage
+      </a>
+    </div>
+  ),
   component: ArticleRoute,
 });
 

@@ -1,6 +1,25 @@
 User-agent: *
 Allow: /
 
+# Block legacy WordPress paths that no longer exist on this site
+Disallow: /wp-admin/
+Disallow: /wp-content/
+Disallow: /wp-includes/
+Disallow: /wp-json/
+Disallow: /wp-login.php
+Disallow: /xmlrpc.php
+
+# Block internal app surfaces
+Disallow: /admin/
+Disallow: /admin-login
+Disallow: /seo-admin/
+Disallow: /onboarding/
+Disallow: /apply/
+Disallow: /payment
+Disallow: /processing/
+Disallow: /success/
+Disallow: /complaint
+
 Sitemap: https://udyamadhar.in/sitemap.xml
 # AI crawler index
 # https://udyamadhar.in/llms.txt
