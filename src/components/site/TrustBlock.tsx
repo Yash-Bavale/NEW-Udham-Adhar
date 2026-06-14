@@ -68,15 +68,11 @@ const FACTS: [string, string][] = [
 ];
 
 export function TrustBlock() {
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: FAQS.map((f) => ({
-      "@type": "Question",
-      name: f.q.replace(/^\d+\.\s*/, ""),
-      acceptedAnswer: { "@type": "Answer", text: f.a },
-    })),
-  };
+  // Note: FAQPage JSON-LD intentionally NOT emitted here — every page that
+  // mounts TrustBlock already declares its own FAQPage schema. Emitting a
+  // second one triggers Google's "Duplicate field FAQPage" warning.
+
+
 
   return (
     <div>
