@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 import { BASE_URL } from "@/lib/brand";
 
 // Path prefixes that must never appear in the sitemap.
@@ -71,6 +71,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         // 2. Pull enabled SEO pages from the DB and merge in (with lastmod).
         try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")

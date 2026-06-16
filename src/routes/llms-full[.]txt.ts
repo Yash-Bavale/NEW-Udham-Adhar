@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 import { BASE_URL, SITE_NAME, LEGAL_ENTITY, CONTACT_EMAIL } from "@/lib/brand";
 
 function stripHtml(s: string): string {
@@ -38,6 +38,7 @@ export const Route = createFileRoute("/llms-full.txt")({
         out.push("");
 
         try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select(
