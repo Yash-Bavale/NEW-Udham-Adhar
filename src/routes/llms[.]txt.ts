@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 import { BASE_URL, SITE_NAME, LEGAL_ENTITY, CONTACT_EMAIL } from "@/lib/brand";
 
 // llms.txt — a concise markdown index for AI crawlers
@@ -11,6 +11,7 @@ export const Route = createFileRoute("/llms.txt")({
       GET: async () => {
         let seoLinks: { slug: string; label: string; description?: string | null }[] = [];
         try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, label, meta_description")
