@@ -46,6 +46,11 @@ export const Route = createFileRoute("/$")({
       throw new Response("Gone", { status: 410 });
     }
 
+    // Well-known files served by dedicated routes — redirect bare slug to the file.
+    if (lower === "sitemap") throw redirect({ to: "/sitemap.xml" });
+    if (lower === "llms") throw redirect({ to: "/llms.txt" });
+    if (lower === "robots") throw redirect({ to: "/robots.txt" });
+
     // Multi-segment splats: nothing to serve here, hand off.
     if (stripped.includes("/")) {
       throw redirect({ to: "/" });
@@ -62,8 +67,12 @@ export const Route = createFileRoute("/$")({
 
     try {
       const result = await getArticleBySlug({ data: { slug: lower } });
+      if (!result || (result as any).isNotFound || !(result as any).article) {
+        throw notFound();
+      }
       return result;
-    } catch {
+    } catch (e) {
+      if (e && typeof e === "object" && "isNotFound" in (e as any)) throw e;
       throw notFound();
     }
   },
