@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type SeoPage = {
@@ -13,6 +12,7 @@ export type SeoPage = {
 };
 
 async function assertAdmin(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
@@ -26,6 +26,7 @@ async function assertAdmin(userId: string) {
 /** Public — used by footer triple-click to render the hidden link list. */
 export const listPublicSeoPages = createServerFn({ method: "GET" }).handler(
   async (): Promise<SeoPage[]> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("seo_pages")
       .select("id, slug, label, enabled, sort_order, page_type")
@@ -41,6 +42,7 @@ export const listAllSeoPages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<SeoPage[]> => {
     await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("seo_pages")
       .select("id, slug, label, enabled, sort_order")
@@ -67,6 +69,7 @@ export const upsertSeoPage = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => UpsertInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.id) {
       const { error } = await supabaseAdmin
         .from("seo_pages")
@@ -95,6 +98,7 @@ export const deleteSeoPage = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("seo_pages").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -103,6 +107,7 @@ export const deleteSeoPage = createServerFn({ method: "POST" })
 export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("user_roles")
       .select("role")

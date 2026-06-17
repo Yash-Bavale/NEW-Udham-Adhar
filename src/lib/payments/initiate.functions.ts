@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
 import { createCcavenueOrder } from "@/lib/payments/ccavenue.functions";
 
@@ -27,6 +26,7 @@ export type InitiatePaymentResult = {
 export const initiatePayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<InitiatePaymentResult> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let chosen = data.gatewayCode?.toLowerCase();
     if (!chosen) {
       const { data: gw } = await supabaseAdmin

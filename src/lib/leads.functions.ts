@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SERVICES, SERVICE_LABELS, INDIAN_STATES, LANGUAGES } from "./constants";
 
 const LeadInput = z.object({
@@ -23,6 +22,7 @@ const LeadInput = z.object({
 export const createLead = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LeadInput.parse(input))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // 1. Map form label -> internal slug -> DB service row
     const slug = SERVICES.find((s) => s.label === data.service)?.slug;
     if (!slug) {
