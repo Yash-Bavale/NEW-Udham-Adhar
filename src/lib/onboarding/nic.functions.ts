@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const Input = z.object({
   q: z.string().trim().max(120).default(""),
@@ -22,6 +21,7 @@ export type NicResult = {
 export const searchNicCodes = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ results: NicResult[]; error: string | null }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
       const { data: rows, error } = await supabaseAdmin.rpc("search_nic_codes", {
         q: data.q,

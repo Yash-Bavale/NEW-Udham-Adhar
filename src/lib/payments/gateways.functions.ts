@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
@@ -13,6 +12,7 @@ const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     console.log("[getApplicationSummary] code:", data.leadCode);
     const code = data.leadCode.trim();
     const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id";
@@ -95,6 +95,7 @@ const UpdateContact = z.object({
 export const updateLeadContact = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UpdateContact.parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Only allow edits before payment is captured
     const { data: lead } = await supabaseAdmin
       .from("leads")
@@ -123,6 +124,7 @@ export const updateLeadContact = createServerFn({ method: "POST" })
 export const listGateways = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
     const { data, error } = await supabase
       .from("payment_gateways")
@@ -142,6 +144,7 @@ export const updateGateway = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => GatewayUpdate.parse(i))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
     const { error } = await supabase
       .from("payment_gateways")

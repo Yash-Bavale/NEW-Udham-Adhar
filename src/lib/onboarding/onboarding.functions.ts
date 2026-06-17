@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   MAX_DOC_SIZE_BYTES,
@@ -60,6 +59,7 @@ function serviceCodeFromLabel(serviceLabel: string | null): string {
 export const getOnboarding = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
@@ -120,6 +120,7 @@ const SubmitInput = z.object({
 export const submitOnboarding = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SubmitInput.parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await loadLeadByCode(data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema = await loadServiceSchema(serviceCode);
@@ -261,6 +262,7 @@ const UploadReqInput = z.object({
 export const requestDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UploadReqInput.parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (!ALLOWED_DOC_MIME.includes(data.mimeType.toLowerCase())) {
       throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
     }
@@ -291,6 +293,7 @@ const ConfirmInput = z.object({
 export const confirmDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ConfirmInput.parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await loadLeadByCode(data.leadCode);
 
     // Find any existing doc of same type to replace (keeps storage tidy)
@@ -334,6 +337,7 @@ export const listOnboardingForLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
     const [subRes, docRes] = await Promise.all([
       supabase
@@ -356,6 +360,7 @@ export const getDocumentSignedUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
     const { data: doc, error } = await supabase
       .from("documents")
@@ -381,6 +386,7 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase, userId } = context;
     const verified = data.status === "verified";
     const { error } = await supabase
@@ -401,6 +407,7 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
 export const requestFormHelp = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await loadLeadByCode(data.leadCode);
     await supabaseAdmin.from("activity_logs").insert({
       lead_id: lead.id,
