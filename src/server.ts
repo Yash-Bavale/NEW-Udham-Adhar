@@ -42,8 +42,12 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const safeCtx =
+        ctx && typeof ctx === "object" && typeof (ctx as { waitUntil?: unknown }).waitUntil === "function"
+          ? ctx
+          : { ...(ctx && typeof ctx === "object" ? ctx : {}), waitUntil: () => undefined };
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch(request, env, safeCtx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
