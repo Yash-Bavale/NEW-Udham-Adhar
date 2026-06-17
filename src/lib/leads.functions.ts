@@ -22,6 +22,7 @@ const LeadInput = z.object({
 export const createLead = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LeadInput.parse(input))
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // 1. Map form label -> internal slug -> DB service row
     const slug = SERVICES.find((s) => s.label === data.service)?.slug;
     if (!slug) {
