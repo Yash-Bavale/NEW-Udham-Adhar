@@ -24,12 +24,7 @@ function createSupabaseAdminClient() {
       storage: undefined,
       persistSession: false,
       autoRefreshToken: false,
-    },
-    realtime: {
-      // Server-side code only uses Data/Auth APIs. The default realtime serializer
-      // can crash during live SSR in the worker runtime before any page renders.
-      vsn: "1.0.0",
-    },
+    }
   });
 }
 
