@@ -88,6 +88,7 @@ export const sendTestEmail = createServerFn({ method: "POST" })
     z.object({ toEmail: z.string().email(), subject: z.string().min(1).max(200).optional() }).parse(i),
   )
   .handler(async ({ data }) => {
+    const { enqueueEmailInternal, processQueueInternal } = await import("./emails.server");
     await enqueueEmailInternal({
       toEmail: data.toEmail,
       subject: data.subject ?? "SMTP test from Business Help Services",
