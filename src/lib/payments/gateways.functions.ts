@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertRole } from "@/lib/audit";
 
 const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
 
@@ -144,8 +145,8 @@ export const updateGateway = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => GatewayUpdate.parse(i))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin"]);
     const { error } = await supabase
       .from("payment_gateways")
       .update({ is_enabled: data.is_enabled, priority: data.priority })

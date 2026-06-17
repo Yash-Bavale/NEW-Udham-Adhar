@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  enqueueFromTemplateInternal,
-  enqueueEmailInternal,
-} from "@/lib/emails/emails.server";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
 // Internal admin notification target. Configured via env secret.
@@ -47,6 +42,8 @@ export const Route = createFileRoute("/api/public/contact")({
             { status: 400, headers: cors },
           );
         }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // De-dup guard: same email + contact_form within last 60s
         const since = new Date(Date.now() - 60_000).toISOString();
@@ -118,6 +115,9 @@ export const Route = createFileRoute("/api/public/contact")({
         };
 
         try {
+          const { enqueueFromTemplateInternal, enqueueEmailInternal } = await import(
+            "@/lib/emails/emails.server"
+          );
           await Promise.all([
             enqueueFromTemplateInternal("contact_acknowledgement", parsed.email, variables, {
               toName: parsed.name,

@@ -1,8 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { computeResponseHash, getPayUCreds, verifyPayUPayment } from "@/lib/payments/payu.server";
 import { generateInvoiceInternal } from "@/lib/crm/invoices.functions";
-import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
 /**
  * PayU return / S2S endpoint. PayU posts x-www-form-urlencoded with the
@@ -16,6 +13,9 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { computeResponseHash, getPayUCreds, verifyPayUPayment } = await import(
+          "@/lib/payments/payu.server"
+        );
         let creds: ReturnType<typeof getPayUCreds>;
         try {
           creds = getPayUCreds();
@@ -23,6 +23,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           console.error("[payu] not configured", e);
           return new Response("Gateway not configured", { status: 500 });
         }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const form = await request.formData();
         const get = (k: string) => (form.get(k)?.toString() ?? "");
@@ -198,6 +200,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
               .eq("id", payment.lead_id)
               .maybeSingle();
             if (leadRow?.email && leadRow.lead_code) {
+              const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
               await enqueueFromTemplateInternal(
                 "payment_success",

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertRole } from "@/lib/audit";
 
 export const listServices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -31,6 +32,7 @@ export const upsertService = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ServiceInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
     if (data.id) {
       const { id, ...patch } = data;
       const { error } = await supabase.from("services").update(patch).eq("id", id);
@@ -47,6 +49,7 @@ export const deleteService = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
     const { error } = await supabase.from("services").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

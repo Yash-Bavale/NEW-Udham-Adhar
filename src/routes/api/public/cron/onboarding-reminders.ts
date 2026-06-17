@@ -2,8 +2,6 @@
 // onboarding reminder to customers who paid but never submitted onboarding.
 // Max 3 reminders per lead, spaced at least 24h apart.
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
 const APP_ORIGIN =
   process.env.APP_BASE_URL ||
@@ -22,6 +20,8 @@ export const Route = createFileRoute("/api/public/cron/onboarding-reminders")({
           return new Response("Unauthorized", { status: 401 });
         }
 
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
         const cutoff = new Date(Date.now() - MIN_GAP_HOURS * 3600_000).toISOString();
 
         const { data: leads, error } = await supabaseAdmin

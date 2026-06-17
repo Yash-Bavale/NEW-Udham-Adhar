@@ -1,11 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  PAYU_BASE_URL,
-  buildTxnId,
-  computeRequestHash,
-  getPayUCreds,
-} from "@/lib/payments/payu.server";
 
 const Input = z.object({ leadCode: z.string().min(3).max(80) });
 
@@ -18,6 +12,9 @@ export const createPayUOrder = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { PAYU_BASE_URL, buildTxnId, computeRequestHash, getPayUCreds } = await import(
+      "@/lib/payments/payu.server"
+    );
     // 1. Make sure PayU is on & secrets exist (throws early with a clear msg)
     const { key, salt } = getPayUCreds();
 

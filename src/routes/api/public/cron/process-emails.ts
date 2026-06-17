@@ -1,6 +1,5 @@
 // pg_cron calls this every minute with the CRON_SECRET in the apikey header.
 import { createFileRoute } from "@tanstack/react-router";
-import { processQueueInternal } from "@/lib/emails/emails.server";
 
 export const Route = createFileRoute("/api/public/cron/process-emails")({
   server: {
@@ -13,6 +12,7 @@ export const Route = createFileRoute("/api/public/cron/process-emails")({
           return new Response("Unauthorized", { status: 401 });
         }
         try {
+          const { processQueueInternal } = await import("@/lib/emails/emails.server");
           const result = await processQueueInternal(50);
           return Response.json({ ok: true, ...result });
         } catch (e) {

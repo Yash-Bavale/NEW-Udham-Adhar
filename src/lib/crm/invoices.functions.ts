@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertRole } from "@/lib/audit";
 import type { InvoiceData } from "@/lib/invoices/pdf.server";
 
 async function getAdmin() {
@@ -126,8 +127,10 @@ async function generateAndStore(paymentId: string): Promise<string> {
 }
 
 export const generateInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "finance"]);
     const id = await generateAndStore(data.paymentId);
     return { ok: true, invoiceId: id };
   });

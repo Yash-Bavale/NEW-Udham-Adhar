@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  enqueueFromTemplateInternal,
-  enqueueEmailInternal,
-} from "@/lib/emails/emails.server";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
 const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
@@ -51,6 +46,7 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
         }
 
         // Always create a fresh lead — treat every submission as a new application.
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         let leadId: string;
         let leadCode: string | null;
         {
@@ -94,6 +90,9 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
         const adminTo = process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
         const origin = new URL(request.url).origin;
         try {
+          const { enqueueFromTemplateInternal, enqueueEmailInternal } = await import(
+            "@/lib/emails/emails.server"
+          );
           await enqueueEmailInternal({
             toEmail: adminTo,
             subject: `Talk-to-Expert request: ${parsed.name}`,

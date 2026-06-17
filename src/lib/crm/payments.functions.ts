@@ -8,12 +8,6 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-import {
-  callOrderStatusApi,
-  callRefundApi,
-} from "@/lib/payments/ccavenue.server";
-
-
 /** Sanitized list for ops/support — no amounts. */
 export const listPaymentsSafe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -121,6 +115,7 @@ export const refundPayment = createServerFn({ method: "POST" })
     }
 
     if (payment.gateway_name === "ccavenue") {
+      const { callRefundApi } = await import("@/lib/payments/ccavenue.server");
       const refNo =
         (payment.raw_response as any)?.tracking_id ||
         payment.razorpay_payment_id ||
@@ -209,6 +204,7 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
       throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
     }
 
+    const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
     const orderId = payment.transaction_id || payment.razorpay_order_id;
     if (!orderId) throw new Error("Payment is missing an order id");
 

@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const BUCKET = "invoices";
 
@@ -9,6 +8,8 @@ export const Route = createFileRoute("/api/public/invoice/$leadCode")({
       GET: async ({ params }) => {
         const leadCode = String(params.leadCode || "").trim();
         if (!leadCode) return new Response("Not found", { status: 404 });
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: lead } = await supabaseAdmin
           .from("leads")
