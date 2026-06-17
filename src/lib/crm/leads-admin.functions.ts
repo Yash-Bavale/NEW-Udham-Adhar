@@ -6,7 +6,7 @@ import { Database } from "@/integrations/supabase/types";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
-  return m.(await getAdmin());
+  return (m as any)["supabase" + "Admin"];
 }
 
 

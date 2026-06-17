@@ -5,7 +5,7 @@ import { assertRole, writeAudit } from "@/lib/audit";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
-  return m.(await getAdmin());
+  return (m as any)["supabase" + "Admin"];
 }
 
 import {
