@@ -145,6 +145,7 @@ export const bulkEmailLeads = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => BulkEmailInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertOps(context.userId);
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
 
     const { data: leads, error } = await (await getAdmin())
       .from("leads")
