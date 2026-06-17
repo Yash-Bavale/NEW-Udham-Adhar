@@ -1,14 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  callOrderStatusApi,
-  decryptResponse,
-  getCcavCreds,
-  normalizeCcavStatus,
-  parseCcavPayload,
-} from "@/lib/payments/ccavenue.server";
 import { generateInvoiceInternal } from "@/lib/crm/invoices.functions";
-import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
 /**
  * CCAvenue redirect/response endpoint. CCAvenue POSTs `encResp` containing
@@ -20,6 +11,8 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { callOrderStatusApi, decryptResponse, getCcavCreds, normalizeCcavStatus, parseCcavPayload } =
+          await import("@/lib/payments/ccavenue.server");
         let creds: ReturnType<typeof getCcavCreds>;
         try {
           creds = getCcavCreds();
@@ -42,6 +35,8 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           console.error("[ccavenue] decrypt failed", e);
           return new Response("Invalid payload", { status: 400 });
         }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const orderId = payload.order_id || payload.merchant_param0 || "";
         const trackingId = payload.tracking_id || payload.reference_no || "";
@@ -169,6 +164,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               .eq("id", payment.lead_id)
               .maybeSingle();
             if (leadRow?.email && leadRow.lead_code) {
+              const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
               await enqueueFromTemplateInternal(
                 "payment_success",

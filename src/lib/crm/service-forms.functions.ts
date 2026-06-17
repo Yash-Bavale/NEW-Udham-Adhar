@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertRole } from "@/lib/audit";
 
 // ───────────────────────── Schemas ─────────────────────────
 
@@ -113,6 +114,7 @@ export const saveFormSchema = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => FormSchemaInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
 
     // Find latest version for this service
     const { data: existing } = await supabase
@@ -151,6 +153,7 @@ export const listFormSchemaVersions = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
     const { data: rows, error } = await context.supabase
       .from("service_form_schemas")
       .select("id, version, title, is_active, created_at, updated_at")
@@ -167,6 +170,7 @@ export const saveWorkflow = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => WorkflowInput.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
 
     const { data: existing } = await supabase
       .from("service_workflows")

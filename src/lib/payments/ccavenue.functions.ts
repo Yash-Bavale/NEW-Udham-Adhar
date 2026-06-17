@@ -6,14 +6,6 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-import {
-  CCAV_REDIRECT_URL,
-  buildCcavOrderId,
-  buildCcavPayload,
-  encryptRequest,
-  getCcavCreds,
-} from "@/lib/payments/ccavenue.server";
-
 const Input = z.object({ leadCode: z.string().min(3).max(80) });
 
 /**
@@ -24,6 +16,8 @@ const Input = z.object({ leadCode: z.string().min(3).max(80) });
 export const createCcavenueOrder = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
+    const { CCAV_REDIRECT_URL, buildCcavOrderId, buildCcavPayload, encryptRequest, getCcavCreds } =
+      await import("@/lib/payments/ccavenue.server");
     const { merchantId, accessCode, workingKey } = getCcavCreds();
 
     const { data: gateway } = await (await getAdmin())

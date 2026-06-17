@@ -1,7 +1,5 @@
 // pg_cron calls this every 6h to flag SLA-breached complaints + enqueue reminder emails.
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { enqueueEmailInternal } from "@/lib/emails/emails.server";
 
 export const Route = createFileRoute("/api/public/cron/complaints-sla")({
   server: {
@@ -14,6 +12,8 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
           return new Response("Unauthorized", { status: 401 });
         }
 
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
         const now = new Date().toISOString();
         // 1) Mark newly-breached complaints
         const { data: breaching } = await supabaseAdmin

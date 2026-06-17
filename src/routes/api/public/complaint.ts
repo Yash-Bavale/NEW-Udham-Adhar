@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { enqueueEmailInternal } from "@/lib/emails/emails.server";
 
 const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
 
@@ -50,6 +48,7 @@ export const Route = createFileRoute("/api/public/complaint")({
         }
 
         // De-dup: same email + complaint_form within last 60s
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const since = new Date(Date.now() - 60_000).toISOString();
         const { data: recent } = await supabaseAdmin
           .from("leads")
@@ -131,6 +130,7 @@ export const Route = createFileRoute("/api/public/complaint")({
         const origin = new URL(request.url).origin;
 
         try {
+          const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
           // Admin/internal notification only — no customer acknowledgement
           await enqueueEmailInternal({
             toEmail: adminTo,
