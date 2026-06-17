@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SERVICES, SERVICE_LABELS, INDIAN_STATES, LANGUAGES } from "./constants";
 
 const LeadInput = z.object({
