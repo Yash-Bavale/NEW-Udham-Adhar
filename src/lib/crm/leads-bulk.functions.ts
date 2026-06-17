@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { LEAD_STATUSES, type LeadStatus } from "./types";
-import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
+
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
