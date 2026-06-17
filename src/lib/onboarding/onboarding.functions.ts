@@ -6,16 +6,14 @@ import {
   ALLOWED_DOC_MIME,
   type OnboardingSchema,
 } from "./schemas";
-import { loadServiceSchema } from "@/lib/forms/schema-loader.server";
 import { SERVICES } from "@/lib/constants";
-import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 
 const DEFAULT_ADMIN_EMAIL = "help@businesshelpservices.com";
 
 const LeadCode = z.string().trim().regex(/^[A-Z]{2}-\d{4}-\d{6}$/, "Invalid reference code");
 
-async function loadLeadByCode(leadCode: string) {
-  const { data, error } = await supabaseAdmin
+async function loadLeadByCode(admin: any, leadCode: string) {
+  const { data, error } = await admin
     .from("leads")
     .select("id, lead_code, name, email, mobile, service, status, total_amount")
     .eq("lead_code", leadCode)
@@ -24,6 +22,7 @@ async function loadLeadByCode(leadCode: string) {
   if (!data) throw new Error("We couldn't find that reference. Please double-check the link.");
   return data;
 }
+
 
 function serviceCodeFromLabel(serviceLabel: string | null): string {
   if (!serviceLabel) return "new-udyam-registration";
