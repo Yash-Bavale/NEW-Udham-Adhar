@@ -104,6 +104,7 @@ export const sendTestEmail = createServerFn({ method: "POST" })
 export const processEmailQueueNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    const { processQueueInternal } = await import("./emails.server");
     return await processQueueInternal(50);
   });
 
