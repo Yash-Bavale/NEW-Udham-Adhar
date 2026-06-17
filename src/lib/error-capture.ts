@@ -6,6 +6,10 @@ const TTL_MS = 5_000;
 
 function record(error: unknown) {
   lastCapturedError = { error, at: Date.now() };
+  try {
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("[ssr-capture]", stack ?? String(error));
+  } catch {}
 }
 
 if (typeof globalThis.addEventListener === "function") {
