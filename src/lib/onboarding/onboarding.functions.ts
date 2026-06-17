@@ -59,7 +59,9 @@ export const getOnboarding = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(data.leadCode);
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
 
@@ -120,7 +122,9 @@ export const submitOnboarding = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SubmitInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(data.leadCode);
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
     const serviceCode = serviceCodeFromLabel(lead.service);
     const schema = await loadServiceSchema(serviceCode);
 
@@ -262,10 +266,12 @@ export const requestDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UploadReqInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     if (!ALLOWED_DOC_MIME.includes(data.mimeType.toLowerCase())) {
       throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
     }
-    const lead = await loadLeadByCode(data.leadCode);
+    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
     const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin";
     const safeDocType = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
     const path = `${lead.id}/${safeDocType}-${Date.now()}.${ext}`;
@@ -293,7 +299,9 @@ export const confirmDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ConfirmInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(data.leadCode);
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
 
     // Find any existing doc of same type to replace (keeps storage tidy)
     const { data: existing } = await supabaseAdmin
@@ -337,6 +345,8 @@ export const listOnboardingForLead = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     const { supabase } = context;
     const [subRes, docRes] = await Promise.all([
       supabase
@@ -360,6 +370,8 @@ export const getDocumentSignedUrl = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     const { supabase } = context;
     const { data: doc, error } = await supabase
       .from("documents")
@@ -386,6 +398,8 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     const { supabase, userId } = context;
     const verified = data.status === "verified";
     const { error } = await supabase
@@ -407,7 +421,9 @@ export const requestFormHelp = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(data.leadCode);
+    const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
     await supabaseAdmin.from("activity_logs").insert({
       lead_id: lead.id,
       activity_type: "form_help_requested",
