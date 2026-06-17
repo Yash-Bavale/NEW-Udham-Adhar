@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtmlLib from "sanitize-html";
 import { LeadForm } from "@/components/site/LeadForm";
 import { TrustBlock } from "@/components/site/TrustBlock";
 import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
@@ -8,18 +8,20 @@ import { BASE_URL } from "@/lib/brand";
 // inline styles, etc. Admin-authored HTML in seo_pages.sections/faq is
 // sanitized before it reaches dangerouslySetInnerHTML so a compromised
 // admin account cannot inject stored XSS into public pages.
-const SANITIZE_CONFIG = {
-  ALLOWED_TAGS: [
+const SANITIZE_CONFIG: sanitizeHtmlLib.IOptions = {
+  allowedTags: [
     "p", "br", "strong", "em", "u", "s", "blockquote", "code", "pre",
     "ul", "ol", "li", "a", "h2", "h3", "h4", "h5", "h6",
     "table", "thead", "tbody", "tr", "th", "td", "hr", "span", "div",
   ],
-  ALLOWED_ATTR: ["href", "title", "target", "rel"],
-  ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|\/)/i,
+  allowedAttributes: { a: ["href", "title", "target", "rel"] },
+  allowedSchemes: ["http", "https", "mailto", "tel"],
+  allowedSchemesAppliedToAttributes: ["href"],
+  allowProtocolRelative: false,
 };
 
 function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, SANITIZE_CONFIG);
+  return sanitizeHtmlLib(html, SANITIZE_CONFIG);
 }
 
 
