@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 import {
   CCAV_REDIRECT_URL,
   buildCcavOrderId,
@@ -21,7 +26,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { merchantId, accessCode, workingKey } = getCcavCreds();
 
-    const { data: gateway } = await supabaseAdmin
+    const { data: gateway } = await (await getAdmin())
       .from("payment_gateways")
       .select("is_enabled")
       .eq("name", "ccavenue")
@@ -30,7 +35,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
       throw new Error("CCAvenue is currently disabled. Please try another option.");
     }
 
-    const { data: lead, error: leadErr } = await supabaseAdmin
+    const { data: lead, error: leadErr } = await (await getAdmin())
       .from("leads")
       .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state")
       .eq("lead_code", data.leadCode)
@@ -39,7 +44,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
     if (!lead) throw new Error("Lead not found");
     if (!lead.lead_code) throw new Error("Lead is missing a lead code");
 
-    const { data: application } = await supabaseAdmin
+    const { data: application } = await (await getAdmin())
       .from("applications")
       .select("id, application_code")
       .eq("lead_id", lead.id)
@@ -47,7 +52,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
-    const { data: paidAlready } = await supabaseAdmin
+    const { data: paidAlready } = await (await getAdmin())
       .from("payments")
       .select("id")
       .eq("lead_id", lead.id)
@@ -59,7 +64,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
     }
 
     // Mark stale CCAvenue attempts as failed so we never reuse order_id.
-    await supabaseAdmin
+    await (await getAdmin())
       .from("payments")
       .update({ status: "failed" })
       .eq("lead_id", lead.id)
@@ -69,7 +74,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
     const orderId = buildCcavOrderId(lead.lead_code);
     const amount = Number(lead.total_amount).toFixed(2);
 
-    const { data: inserted, error: insErr } = await supabaseAdmin
+    const { data: inserted, error: insErr } = await (await getAdmin())
       .from("payments")
       .insert({
         lead_id: lead.id,

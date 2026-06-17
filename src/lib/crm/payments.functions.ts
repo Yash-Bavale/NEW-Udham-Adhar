@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 import {
   callOrderStatusApi,
   callRefundApi,
@@ -31,7 +36,7 @@ export const listPaymentsFull = createServerFn({ method: "GET" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("payments")
       .select("*")
       .order("created_at", { ascending: false })
@@ -54,7 +59,7 @@ export const revenueStats = createServerFn({ method: "GET" })
     const weekAgo = new Date(Date.now() - 7 * 86400_000);
     const monthAgo = new Date(Date.now() - 30 * 86400_000);
 
-    const { data: paid } = await supabaseAdmin
+    const { data: paid } = await (await getAdmin())
       .from("payments")
       .select("amount, gst_amount, base_amount, payment_date, created_at, status")
       .eq("status", "paid");
@@ -95,7 +100,7 @@ export const refundPayment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "accounts"]);
 
-    const { data: payment, error } = await supabaseAdmin
+    const { data: payment, error } = await (await getAdmin())
       .from("payments")
       .select("id, lead_id, application_id, gateway_name, status, amount, transaction_id, razorpay_order_id, razorpay_payment_id, raw_response, base_amount, gst_amount, currency")
       .eq("id", data.paymentId)
@@ -105,7 +110,7 @@ export const refundPayment = createServerFn({ method: "POST" })
     if (payment.status !== "paid") throw new Error("Only paid payments can be refunded");
 
     // Cap the refund at the original amount minus existing refunds.
-    const { data: existingRefunds } = await supabaseAdmin
+    const { data: existingRefunds } = await (await getAdmin())
       .from("payments")
       .select("amount")
       .eq("parent_payment_id", payment.id);
@@ -132,7 +137,7 @@ export const refundPayment = createServerFn({ method: "POST" })
         throw new Error(`CCAvenue refund failed: ${result.reason ?? result.refundStatus}`);
       }
 
-      const { data: childRow, error: childErr } = await supabaseAdmin
+      const { data: childRow, error: childErr } = await (await getAdmin())
         .from("payments")
         .insert({
           lead_id: payment.lead_id,
@@ -157,7 +162,7 @@ export const refundPayment = createServerFn({ method: "POST" })
 
       const fullyRefunded = (refundedSoFar + data.amount) >= Number(payment.amount) - 0.001;
       if (fullyRefunded) {
-        await supabaseAdmin.from("payments").update({ status: "refunded" }).eq("id", payment.id);
+        await (await getAdmin()).from("payments").update({ status: "refunded" }).eq("id", payment.id);
       }
 
       await writeAudit({
@@ -192,7 +197,7 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "accounts", "finance"]);
 
-    const { data: payment, error } = await supabaseAdmin
+    const { data: payment, error } = await (await getAdmin())
       .from("payments")
       .select("id, gateway_name, status, transaction_id, razorpay_order_id")
       .eq("id", data.paymentId)
@@ -215,7 +220,7 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
       : payment.status;
 
     if (newStatus !== payment.status) {
-      await supabaseAdmin
+      await (await getAdmin())
         .from("payments")
         .update({
           status: newStatus,

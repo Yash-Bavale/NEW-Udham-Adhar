@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 
 async function assertFinance(supabase: any, userId: string) {
   const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
@@ -118,7 +123,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
 
     for (const g of groups.values()) {
       // Upsert settlement
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await (await getAdmin())
         .from("gateway_settlements")
         .select("id")
         .eq("gateway", data.gateway)
@@ -128,7 +133,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
       let settlementUuid: string;
       if (existing?.id) {
         settlementUuid = existing.id;
-        await supabaseAdmin.from("gateway_settlements").update({
+        await (await getAdmin()).from("gateway_settlements").update({
           settled_at: new Date(g.settledAt).toISOString(),
           gross: g.gross,
           fees: g.fees,
@@ -137,7 +142,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
           raw: { rows: g.raw },
         }).eq("id", settlementUuid);
       } else {
-        const { data: ins, error: insErr } = await supabaseAdmin
+        const { data: ins, error: insErr } = await (await getAdmin())
           .from("gateway_settlements")
           .insert({
             gateway: data.gateway,
@@ -159,7 +164,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
       // Link payments by txn
       if (g.txns.length > 0) {
         const txnIds = g.txns.map((t) => t.txn);
-        const { data: matched } = await supabaseAdmin
+        const { data: matched } = await (await getAdmin())
           .from("payments")
           .select("id, transaction_id, razorpay_payment_id, razorpay_order_id")
           .or(
@@ -174,7 +179,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
         for (const t of g.txns) {
           const p = byTxn.get(t.txn);
           if (!p) { unmatched += 1; continue; }
-          const { error } = await supabaseAdmin.from("payment_settlements").upsert(
+          const { error } = await (await getAdmin()).from("payment_settlements").upsert(
             {
               payment_id: p.id,
               settlement_id: settlementUuid,
@@ -190,7 +195,7 @@ export const importSettlementCsv = createServerFn({ method: "POST" })
     }
 
     // Audit log
-    await supabaseAdmin.from("audit_logs").insert({
+    await (await getAdmin()).from("audit_logs").insert({
       action: "settlement_import",
       entity_type: "gateway_settlement",
       actor_id: context.userId,
@@ -211,7 +216,7 @@ export const listSettlements = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinance(context.supabase, context.userId);
 
-    let q = supabaseAdmin
+    let q = (await getAdmin())
       .from("gateway_settlements")
       .select("id, gateway, settlement_id, settled_at, gross, fees, tax_on_fees, net, currency")
       .order("settled_at", { ascending: false })
@@ -223,7 +228,7 @@ export const listSettlements = createServerFn({ method: "POST" })
     const ids = (rows ?? []).map((r) => r.id);
     const counts = new Map<string, number>();
     if (ids.length > 0) {
-      const { data: links } = await supabaseAdmin
+      const { data: links } = await (await getAdmin())
         .from("payment_settlements")
         .select("settlement_id")
         .in("settlement_id", ids);
@@ -239,7 +244,7 @@ export const getUnreconciledPayments = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertFinance(context.supabase, context.userId);
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: pays, error } = await supabaseAdmin
+    const { data: pays, error } = await (await getAdmin())
       .from("payments")
       .select("id, transaction_id, gateway_name, amount, payment_date, lead_id")
       .eq("status", "paid")
@@ -250,7 +255,7 @@ export const getUnreconciledPayments = createServerFn({ method: "GET" })
 
     const ids = (pays ?? []).map((p) => p.id);
     if (ids.length === 0) return { rows: [] };
-    const { data: links } = await supabaseAdmin
+    const { data: links } = await (await getAdmin())
       .from("payment_settlements")
       .select("payment_id")
       .in("payment_id", ids);
@@ -264,13 +269,13 @@ export const getLeadFinance = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinance(context.supabase, context.userId);
     const [{ data: pays }, { data: invs }] = await Promise.all([
-      supabaseAdmin.from("payments").select("*").eq("lead_id", data.leadId).order("created_at", { ascending: false }),
-      supabaseAdmin.from("invoices").select("*").eq("lead_id", data.leadId).order("issued_at", { ascending: false }),
+      (await getAdmin()).from("payments").select("*").eq("lead_id", data.leadId).order("created_at", { ascending: false }),
+      (await getAdmin()).from("invoices").select("*").eq("lead_id", data.leadId).order("issued_at", { ascending: false }),
     ]);
     const payIds = (pays ?? []).map((p: any) => p.id);
     let settlements: any[] = [];
     if (payIds.length > 0) {
-      const { data: links } = await supabaseAdmin
+      const { data: links } = await (await getAdmin())
         .from("payment_settlements")
         .select("payment_id, settled_amount, fee, net, gateway_settlements(settlement_id, settled_at, gateway)")
         .in("payment_id", payIds);

@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 
 // Place of supply for the seller. Change here if your registered office moves.
 const COMPANY_STATE = (process.env.COMPANY_STATE ?? "Delhi").trim().toLowerCase();
@@ -11,14 +16,14 @@ const BUCKET = "invoices";
 
 async function generateAndStore(paymentId: string): Promise<string> {
   // Load payment + lead + application
-  const { data: payment, error: pErr } = await supabaseAdmin
+  const { data: payment, error: pErr } = await (await getAdmin())
     .from("payments")
     .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, transaction_id, payment_date, created_at")
     .eq("id", paymentId)
     .single();
   if (pErr || !payment) throw new Error(pErr?.message ?? "Payment not found");
 
-  const { data: lead } = await supabaseAdmin
+  const { data: lead } = await (await getAdmin())
     .from("leads")
     .select("id, lead_code, name, email, mobile, state, service")
     .eq("id", payment.lead_id)
@@ -27,7 +32,7 @@ async function generateAndStore(paymentId: string): Promise<string> {
 
   let applicationCode: string | null = null;
   if (payment.application_id) {
-    const { data: app } = await supabaseAdmin
+    const { data: app } = await (await getAdmin())
       .from("applications")
       .select("application_code")
       .eq("id", payment.application_id)
@@ -36,7 +41,7 @@ async function generateAndStore(paymentId: string): Promise<string> {
   }
 
   // Upsert invoice row first (so invoice_number trigger fires)
-  const { data: existing } = await supabaseAdmin
+  const { data: existing } = await (await getAdmin())
     .from("invoices")
     .select("id, invoice_number, pdf_path")
     .eq("payment_id", paymentId)
@@ -55,12 +60,12 @@ async function generateAndStore(paymentId: string): Promise<string> {
   if (existing) {
     invoiceId = existing.id;
     invoiceNumber = existing.invoice_number!;
-    await supabaseAdmin.from("invoices").update({
+    await (await getAdmin()).from("invoices").update({
       cgst_amount: cgst, sgst_amount: sgst, igst_amount: igst,
       place_of_supply: customerState || null,
     }).eq("id", invoiceId);
   } else {
-    const { data: row, error: invErr } = await supabaseAdmin
+    const { data: row, error: invErr } = await (await getAdmin())
       .from("invoices")
       .insert({
         lead_id: payment.lead_id,
@@ -106,12 +111,12 @@ async function generateAndStore(paymentId: string): Promise<string> {
   const pdfBytes = await renderInvoicePdf(data);
   const path = `${new Date().getFullYear()}/${invoiceNumber}.pdf`;
 
-  const { error: upErr } = await supabaseAdmin.storage
+  const { error: upErr } = await (await getAdmin()).storage
     .from(BUCKET)
     .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
   if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
-  await supabaseAdmin.from("invoices").update({
+  await (await getAdmin()).from("invoices").update({
     pdf_path: path,
     pdf_generated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
@@ -144,7 +149,7 @@ export const regenerateInvoice = createServerFn({ method: "POST" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data: inv } = await supabaseAdmin
+    const { data: inv } = await (await getAdmin())
       .from("invoices")
       .select("payment_id")
       .eq("id", data.invoiceId)
@@ -166,14 +171,14 @@ export const getInvoiceSignedUrl = createServerFn({ method: "POST" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data: inv } = await supabaseAdmin
+    const { data: inv } = await (await getAdmin())
       .from("invoices")
       .select("pdf_path, invoice_number")
       .eq("id", data.invoiceId)
       .single();
     if (!inv?.pdf_path) throw new Error("Invoice PDF not generated yet");
 
-    const { data: signed, error } = await supabaseAdmin.storage
+    const { data: signed, error } = await (await getAdmin()).storage
       .from(BUCKET)
       .createSignedUrl(inv.pdf_path, 60 * 5); // 5 min
     if (error) throw new Error(error.message);
@@ -190,7 +195,7 @@ export const listInvoices = createServerFn({ method: "GET" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("invoices")
       .select("id, invoice_number, lead_id, payment_id, total_amount, base_amount, gst_amount, issued_at, pdf_path")
       .order("issued_at", { ascending: false })
@@ -203,10 +208,10 @@ export const listInvoices = createServerFn({ method: "GET" })
 export const getCustomerInvoiceUrl = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: z.string().min(3).max(50) }).parse(i))
   .handler(async ({ data }) => {
-    const { data: lead } = await supabaseAdmin
+    const { data: lead } = await (await getAdmin())
       .from("leads").select("id").eq("lead_code", data.leadCode).maybeSingle();
     if (!lead) throw new Error("Lead not found");
-    const { data: inv } = await supabaseAdmin
+    const { data: inv } = await (await getAdmin())
       .from("invoices")
       .select("pdf_path, invoice_number")
       .eq("lead_id", lead.id)
@@ -214,7 +219,7 @@ export const getCustomerInvoiceUrl = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (!inv?.pdf_path) throw new Error("Invoice not ready yet");
-    const { data: signed, error } = await supabaseAdmin.storage
+    const { data: signed, error } = await (await getAdmin()).storage
       .from(BUCKET).createSignedUrl(inv.pdf_path, 60 * 10);
     if (error) throw new Error(error.message);
     return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };

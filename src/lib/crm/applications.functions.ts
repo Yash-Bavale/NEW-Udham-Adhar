@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 
 const APPLICATION_STATUS_ENUM = [
   "awaiting_payment",
@@ -20,7 +25,7 @@ export const getApplicationDetail = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
     
-    const { data: app, error } = await supabaseAdmin
+    const { data: app, error } = await (await getAdmin())
       .from("applications")
       .select("*, lead:leads(*), certificates(*)")
       .eq("id", data.applicationId)
@@ -45,7 +50,7 @@ export const listApplications = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
 
-    let query = supabaseAdmin
+    let query = (await getAdmin())
       .from("applications")
       .select("*, leads(*)", { count: "exact" });
 
@@ -73,13 +78,13 @@ export const updateApplication = createServerFn({ method: "POST" })
     await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
     const { id, ...patch } = data;
 
-    const { data: prev } = await supabaseAdmin
+    const { data: prev } = await (await getAdmin())
       .from("applications")
       .select("*")
       .eq("id", id)
       .single();
 
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("applications")
       .update(patch)
       .eq("id", id);
