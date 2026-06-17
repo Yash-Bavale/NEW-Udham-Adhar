@@ -6,7 +6,7 @@ import { LEAD_STATUSES, type LeadStatus } from "./types";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
-  return (m as any)["supabase" + "Admin"];
+  return m.supabaseAdmin;
 }
 
 

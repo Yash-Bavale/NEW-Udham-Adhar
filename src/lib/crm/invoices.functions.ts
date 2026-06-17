@@ -5,7 +5,7 @@ import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
-  return (m as any)["supabase" + "Admin"];
+  return m.supabaseAdmin;
 }
 
 
