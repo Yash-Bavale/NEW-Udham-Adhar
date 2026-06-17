@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 async function assertFinance(supabase: any, userId: string) {
   const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
@@ -32,7 +37,7 @@ async function fetchRows(month: string, state?: string, gateway?: string) {
   const d = new Date(from);
   const to = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
 
-  let q = supabaseAdmin
+  let q = (await getAdmin())
     .from("invoices")
     .select(
       "id, invoice_number, issued_at, base_amount, gst_amount, cgst_amount, sgst_amount, igst_amount, total_amount, place_of_supply, sac_code, lead_id, payment_id",
@@ -49,8 +54,8 @@ async function fetchRows(month: string, state?: string, gateway?: string) {
   const leadIds = [...new Set(rows.map((r) => r.lead_id))];
   const payIds = [...new Set(rows.map((r) => r.payment_id))];
   const [{ data: leads }, { data: pays }] = await Promise.all([
-    supabaseAdmin.from("leads").select("id, name, state, lead_code, service").in("id", leadIds),
-    supabaseAdmin.from("payments").select("id, gateway_name, transaction_id").in("id", payIds),
+    (await getAdmin()).from("leads").select("id, name, state, lead_code, service").in("id", leadIds),
+    (await getAdmin()).from("payments").select("id, gateway_name, transaction_id").in("id", payIds),
   ]);
   const leadMap = new Map((leads ?? []).map((l: any) => [l.id, l]));
   const payMap = new Map((pays ?? []).map((p: any) => [p.id, p]));

@@ -1,15 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export const getComplaintDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
-    const { data: complaint, error } = await supabaseAdmin
+    const { data: complaint, error } = await (await getAdmin())
       .from("complaints")
       .select("*")
       .eq("id", data.id)
@@ -18,12 +23,12 @@ export const getComplaintDetail = createServerFn({ method: "GET" })
 
     const [{ data: lead }, { data: app }, { data: audits }] = await Promise.all([
       complaint.lead_id
-        ? supabaseAdmin.from("leads").select("*").eq("id", complaint.lead_id).single()
+        ? (await getAdmin()).from("leads").select("*").eq("id", complaint.lead_id).single()
         : Promise.resolve({ data: null as any }),
       complaint.application_id
-        ? supabaseAdmin.from("applications").select("id, application_code, application_status").eq("id", complaint.application_id).single()
+        ? (await getAdmin()).from("applications").select("id, application_code, application_status").eq("id", complaint.application_id).single()
         : Promise.resolve({ data: null as any }),
-      supabaseAdmin.from("audit_logs").select("*").eq("entity_type", "complaint").eq("entity_id", data.id).order("created_at", { ascending: false }),
+      (await getAdmin()).from("audit_logs").select("*").eq("entity_type", "complaint").eq("entity_id", data.id).order("created_at", { ascending: false }),
     ]);
 
     return { complaint: { ...complaint, lead, application: app }, audits: audits ?? [] };
@@ -34,8 +39,8 @@ export const updateComplaintNotes = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().uuid(), notes: z.string() }))
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: prev } = await supabaseAdmin.from("complaints").select("notes").eq("id", data.id).single();
-    const { error } = await supabaseAdmin.from("complaints").update({ notes: data.notes }).eq("id", data.id);
+    const { data: prev } = await (await getAdmin()).from("complaints").select("notes").eq("id", data.id).single();
+    const { error } = await (await getAdmin()).from("complaints").update({ notes: data.notes }).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit({
       supabase: context.supabase, entityType: "complaint", entityId: data.id,

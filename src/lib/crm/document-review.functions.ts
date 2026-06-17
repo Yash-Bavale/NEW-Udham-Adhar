@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export type ReviewDoc = {
   id: string;
@@ -37,7 +42,7 @@ export const listReviewDocuments = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support"]);
-    let q = supabaseAdmin
+    let q = (await getAdmin())
       .from("documents")
       .select("*")
       .order("uploaded_at", { ascending: true })
@@ -48,7 +53,7 @@ export const listReviewDocuments = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const leadIds = Array.from(new Set((rows ?? []).map((r) => r.lead_id).filter(Boolean)));
     const { data: leads } = leadIds.length
-      ? await supabaseAdmin.from("leads").select("id,name,email,lead_code,service").in("id", leadIds)
+      ? await (await getAdmin()).from("leads").select("id,name,email,lead_code,service").in("id", leadIds)
       : { data: [] as any[] };
     const leadMap = new Map((leads ?? []).map((l: any) => [l.id, l]));
     const enriched = (rows ?? []).map((r) => ({ ...r, lead: leadMap.get(r.lead_id) ?? null })) as ReviewDoc[];
@@ -62,13 +67,13 @@ export const getDocumentSignedUrl = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support"]);
-    const { data: doc } = await supabaseAdmin
+    const { data: doc } = await (await getAdmin())
       .from("documents")
       .select("file_path,mime_type,file_name")
       .eq("id", data.documentId)
       .single();
     if (!doc) throw new Error("Document not found");
-    const { data: signed, error } = await supabaseAdmin.storage
+    const { data: signed, error } = await (await getAdmin()).storage
       .from("documents")
       .createSignedUrl(doc.file_path, 60 * 10);
     if (error) throw new Error(error.message);
@@ -82,12 +87,12 @@ export const approveDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: prev } = await supabaseAdmin
+    const { data: prev } = await (await getAdmin())
       .from("documents")
       .select("status")
       .eq("id", data.documentId)
       .single();
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("documents")
       .update({
         status: "approved",
@@ -116,7 +121,7 @@ export const rejectDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("documents")
       .update({
         status: "rejected",
@@ -145,18 +150,18 @@ export const getApplicationDocChecklist = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support"]);
-    const { data: app } = await supabaseAdmin
+    const { data: app } = await (await getAdmin())
       .from("applications")
       .select("id, lead_id")
       .eq("id", data.applicationId)
       .single();
     const { data: leadRow } = app?.lead_id
-      ? await supabaseAdmin.from("leads").select("service").eq("id", app.lead_id).maybeSingle()
+      ? await (await getAdmin()).from("leads").select("service").eq("id", app.lead_id).maybeSingle()
       : { data: null as any };
     const serviceCode = leadRow?.service ?? null;
 
     const { data: schema } = serviceCode
-      ? await supabaseAdmin
+      ? await (await getAdmin())
           .from("service_form_schemas")
           .select("documents")
           .eq("service_code", serviceCode)
@@ -171,7 +176,7 @@ export const getApplicationDocChecklist = createServerFn({ method: "GET" })
         }))
       : [];
 
-    const { data: docs } = await supabaseAdmin
+    const { data: docs } = await (await getAdmin())
       .from("documents")
       .select("id, doc_type, status, uploaded_at, verified_at")
       .eq("application_id", data.applicationId)

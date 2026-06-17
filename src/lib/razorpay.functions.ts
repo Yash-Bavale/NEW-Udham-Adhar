@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 const OrderInput = z.object({
   leadId: z.string().uuid(),
@@ -17,7 +22,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-    const { data: lead, error: leadErr } = await supabaseAdmin
+    const { data: lead, error: leadErr } = await (await getAdmin())
       .from("leads")
       .select("id, lead_code, total_amount, email, name, mobile")
       .eq("id", data.leadId)
@@ -54,7 +59,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
 
     const order = (await resp.json()) as { id: string; amount: number; currency: string };
 
-    await supabaseAdmin.from("payments").insert({
+    await (await getAdmin()).from("payments").insert({
       lead_id: lead.id,
       razorpay_order_id: order.id,
       amount: Number(lead.total_amount),

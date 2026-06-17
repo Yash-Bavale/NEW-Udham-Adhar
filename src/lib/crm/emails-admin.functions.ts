@@ -1,11 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole } from "@/lib/audit";
 import { render } from "@react-email/components";
 import { TEMPLATES } from "../email-templates/registry";
 import React from "react";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export const listLeadEmails = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -13,7 +18,7 @@ export const listLeadEmails = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
 
-    const { data: logs, error: logErr } = await supabaseAdmin
+    const { data: logs, error: logErr } = await (await getAdmin())
       .from("email_logs")
       .select("*")
       .eq("lead_id", data.leadId)
@@ -21,7 +26,7 @@ export const listLeadEmails = createServerFn({ method: "GET" })
 
     if (logErr) throw new Error(logErr.message);
 
-    const { data: queue, error: queueErr } = await supabaseAdmin
+    const { data: queue, error: queueErr } = await (await getAdmin())
       .from("email_queue")
       .select("*")
       .eq("lead_id", data.leadId)
@@ -50,7 +55,7 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
     if (!entry) throw new Error("Invalid template code");
 
     // Fetch lead details for defaults
-    const { data: lead } = await supabaseAdmin
+    const { data: lead } = await (await getAdmin())
       .from("leads")
       .select("*")
       .eq("id", leadId)
@@ -72,7 +77,7 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
 
     const html = await render(React.createElement(entry.component, finalVars));
 
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("email_queue")
       .insert({
         lead_id: leadId,

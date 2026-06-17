@@ -1,12 +1,17 @@
-// Admin-only user/role management. Uses supabaseAdmin to read auth.users.
+// Admin-only user/role management. Uses (await getAdmin()) to read auth.users.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STAFF_ROLES, type StaffRole } from "./types";
 
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
+
 async function assertAdmin(userId: string) {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (await getAdmin())
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -20,13 +25,13 @@ export const listStaffUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
 
-    const { data: usersRes, error: uErr } = await supabaseAdmin.auth.admin.listUsers({
+    const { data: usersRes, error: uErr } = await (await getAdmin()).auth.admin.listUsers({
       page: 1,
       perPage: 200,
     });
     if (uErr) throw new Error(uErr.message);
 
-    const { data: roles, error: rErr } = await supabaseAdmin
+    const { data: roles, error: rErr } = await (await getAdmin())
       .from("user_roles")
       .select("user_id, role");
     if (rErr) throw new Error(rErr.message);
@@ -59,7 +64,7 @@ export const grantRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => RoleInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("user_roles")
       .upsert(
         { user_id: data.user_id, role: data.role as StaffRole },
@@ -74,7 +79,7 @@ export const revokeRole = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => RoleInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("user_roles")
       .delete()
       .eq("user_id", data.user_id)

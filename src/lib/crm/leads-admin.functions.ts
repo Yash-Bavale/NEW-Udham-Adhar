@@ -1,9 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { writeAudit, assertRole } from "@/lib/audit";
 import { Database } from "@/integrations/supabase/types";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 const LEAD_STATUS_ENUM = [
   "new_lead",
@@ -53,7 +58,7 @@ export const updateLead = createServerFn({ method: "POST" })
       await assertRole(supabase, ["super_admin", "finance"]);
     }
 
-    const { data: prev, error: fetchErr } = await supabaseAdmin
+    const { data: prev, error: fetchErr } = await (await getAdmin())
       .from("leads")
       .select("*")
       .eq("id", leadId)
@@ -61,7 +66,7 @@ export const updateLead = createServerFn({ method: "POST" })
     
     if (fetchErr || !prev) throw new Error("Lead not found");
 
-    const { error: updateErr } = await supabaseAdmin
+    const { error: updateErr } = await (await getAdmin())
       .from("leads")
       .update(patch)
       .eq("id", leadId);
@@ -92,7 +97,7 @@ export const listLeads = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
     
-    let query = supabaseAdmin
+    let query = (await getAdmin())
       .from("leads")
       .select("*", { count: "exact" });
 
@@ -118,7 +123,7 @@ export const getLead = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
     
-    const { data: lead, error } = await supabaseAdmin
+    const { data: lead, error } = await (await getAdmin())
       .from("leads")
       .select("*, applications(*), lead_notes(*)")
       .eq("id", data.id)
@@ -139,7 +144,7 @@ export const addLeadNote = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
     
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("lead_notes")
       .insert({
         lead_id: data.lead_id,
@@ -156,7 +161,7 @@ export const listStaff = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
     
-    const { data: staffRoles, error: rolesErr } = await supabaseAdmin
+    const { data: staffRoles, error: rolesErr } = await (await getAdmin())
       .from("user_roles")
       .select("user_id, role")
       .in("role", ["super_admin", "admin", "operations", "support", "finance", "accounts"]);
@@ -164,7 +169,7 @@ export const listStaff = createServerFn({ method: "GET" })
     if (rolesErr) throw new Error(rolesErr.message);
     const userIds = Array.from(new Set(staffRoles.map(r => r.user_id)));
 
-    const { data: profiles, error: profilesErr } = await supabaseAdmin
+    const { data: profiles, error: profilesErr } = await (await getAdmin())
       .from("profiles")
       .select("id, display_name, email")
       .in("id", userIds);

@@ -1,14 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { LEAD_STATUSES, type LeadStatus } from "./types";
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 // ─────────────────────── helpers ───────────────────────
 
 async function assertOps(userId: string) {
-  const { data } = await supabaseAdmin
+  const { data } = await (await getAdmin())
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -17,7 +22,7 @@ async function assertOps(userId: string) {
 }
 
 async function assertAdmin(userId: string) {
-  const { data } = await supabaseAdmin
+  const { data } = await (await getAdmin())
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -26,7 +31,7 @@ async function assertAdmin(userId: string) {
 }
 
 async function logAudit(actorId: string, action: string, entityIds: string[], extra: Record<string, unknown> = {}) {
-  await supabaseAdmin.from("audit_logs").insert({
+  await (await getAdmin()).from("audit_logs").insert({
     actor_id: actorId,
     entity_type: "lead",
     entity_id: entityIds.length === 1 ? entityIds[0] : `${entityIds.length} leads`,
@@ -55,7 +60,7 @@ export const bulkUpdateLeadStatus = createServerFn({ method: "POST" })
     await assertOps(context.userId);
     let updated = 0;
     for (const batch of chunk(data.ids, 200)) {
-      const { error, count } = await supabaseAdmin
+      const { error, count } = await (await getAdmin())
         .from("leads")
         .update({ status: data.status as LeadStatus }, { count: "exact" })
         .in("id", batch);
@@ -78,7 +83,7 @@ export const bulkAssignLeads = createServerFn({ method: "POST" })
     await assertOps(context.userId);
     let updated = 0;
     for (const batch of chunk(data.ids, 200)) {
-      const { error, count } = await supabaseAdmin
+      const { error, count } = await (await getAdmin())
         .from("leads")
         .update({ assigned_to: data.assignee }, { count: "exact" })
         .in("id", batch);
@@ -98,7 +103,7 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
 
     // Block delete if any selected lead has a payment row (financial record).
-    const { data: paid } = await supabaseAdmin
+    const { data: paid } = await (await getAdmin())
       .from("payments")
       .select("lead_id")
       .in("lead_id", data.ids);
@@ -108,12 +113,12 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
     let deleted = 0;
     for (const batch of chunk(safe, 200)) {
       // Best-effort related rows first (no FK cascades exist).
-      await supabaseAdmin.from("documents").delete().in("lead_id", batch);
-      await supabaseAdmin.from("onboarding_submissions").delete().in("lead_id", batch);
-      await supabaseAdmin.from("applications").delete().in("lead_id", batch);
-      await supabaseAdmin.from("activity_logs").delete().in("lead_id", batch);
-      await supabaseAdmin.from("lead_notes").delete().in("lead_id", batch);
-      const { error, count } = await supabaseAdmin
+      await (await getAdmin()).from("documents").delete().in("lead_id", batch);
+      await (await getAdmin()).from("onboarding_submissions").delete().in("lead_id", batch);
+      await (await getAdmin()).from("applications").delete().in("lead_id", batch);
+      await (await getAdmin()).from("activity_logs").delete().in("lead_id", batch);
+      await (await getAdmin()).from("lead_notes").delete().in("lead_id", batch);
+      const { error, count } = await (await getAdmin())
         .from("leads")
         .delete({ count: "exact" })
         .in("id", batch);
@@ -141,13 +146,13 @@ export const bulkEmailLeads = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertOps(context.userId);
 
-    const { data: leads, error } = await supabaseAdmin
+    const { data: leads, error } = await (await getAdmin())
       .from("leads")
       .select("id, name, email, lead_code, mobile, service, total_amount")
       .in("id", data.ids);
     if (error) throw new Error(error.message);
 
-    const { data: suppressed } = await supabaseAdmin.from("suppressed_emails").select("email");
+    const { data: suppressed } = await (await getAdmin()).from("suppressed_emails").select("email");
     const suppressedSet = new Set((suppressed ?? []).map((s) => (s.email as string).toLowerCase()));
 
     let queued = 0;
@@ -205,7 +210,7 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertOps(context.userId);
 
-    let q = supabaseAdmin
+    let q = (await getAdmin())
       .from("leads")
       .select(
         "id, lead_code, created_at, name, email, mobile, state, language, service, status, base_amount, gst_amount, total_amount, assigned_to, lead_source",
@@ -229,7 +234,7 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
     const assigneeIds = Array.from(new Set((rows ?? []).map((r) => r.assigned_to).filter(Boolean) as string[]));
     const nameMap = new Map<string, string>();
     if (assigneeIds.length) {
-      const { data: profs } = await supabaseAdmin
+      const { data: profs } = await (await getAdmin())
         .from("profiles")
         .select("id, display_name, email")
         .in("id", assigneeIds);
@@ -280,13 +285,13 @@ export const listAssignableStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertOps(context.userId);
-    const { data: roles } = await supabaseAdmin
+    const { data: roles } = await (await getAdmin())
       .from("user_roles")
       .select("user_id")
       .in("role", ["admin", "super_admin", "operations", "support"]);
     const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id as string)));
     if (ids.length === 0) return { rows: [] };
-    const { data: profs } = await supabaseAdmin
+    const { data: profs } = await (await getAdmin())
       .from("profiles")
       .select("id, display_name, email")
       .in("id", ids)

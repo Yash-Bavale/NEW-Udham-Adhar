@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 // We do NOT use PostgREST nested selects because the DB has no FK constraints.
 // Fetch certificates, then hydrate leads/applications manually.
@@ -13,10 +18,10 @@ async function hydrate(rows: any[]) {
   const appIds = Array.from(new Set(rows.map((r) => r.application_id).filter(Boolean)));
   const [leadsRes, appsRes] = await Promise.all([
     leadIds.length
-      ? supabaseAdmin.from("leads").select("id, name, email, mobile, lead_code, service").in("id", leadIds)
+      ? (await getAdmin()).from("leads").select("id, name, email, mobile, lead_code, service").in("id", leadIds)
       : Promise.resolve({ data: [] as any[] }),
     appIds.length
-      ? supabaseAdmin.from("applications").select("id, application_code, application_status").in("id", appIds)
+      ? (await getAdmin()).from("applications").select("id, application_code, application_status").in("id", appIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
   const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
@@ -36,7 +41,7 @@ export const listCertificates = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
-    let q = supabaseAdmin.from("certificates").select("*").order("created_at", { ascending: false });
+    let q = (await getAdmin()).from("certificates").select("*").order("created_at", { ascending: false });
     if (data.delivered === "yes") q = q.not("delivered_at", "is", null);
     if (data.delivered === "no") q = q.is("delivered_at", null);
     const { data: rows, error } = await q.limit(500);
@@ -66,7 +71,7 @@ export const uploadCertificate = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.applicationId);
-    const lookup = supabaseAdmin.from("applications").select("id, lead_id");
+    const lookup = (await getAdmin()).from("applications").select("id, lead_id");
     const { data: app } = isUuid
       ? await lookup.eq("id", data.applicationId).single()
       : await lookup.eq("application_code", data.applicationId).single();
@@ -74,12 +79,12 @@ export const uploadCertificate = createServerFn({ method: "POST" })
 
     const buffer = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
     const path = `certificates/${app.id}/${Date.now()}-${data.fileName}`;
-    const { error: upErr } = await supabaseAdmin.storage
+    const { error: upErr } = await (await getAdmin()).storage
       .from("documents")
       .upload(path, buffer, { contentType: data.mimeType, upsert: false });
     if (upErr) throw new Error(upErr.message);
 
-    const { data: cert, error: insErr } = await supabaseAdmin
+    const { data: cert, error: insErr } = await (await getAdmin())
       .from("certificates")
       .insert({
         application_id: app.id,
@@ -107,7 +112,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
   .inputValidator(z.object({ certificateId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: cert } = await supabaseAdmin
+    const { data: cert } = await (await getAdmin())
       .from("certificates")
       .select("*")
       .eq("id", data.certificateId)
@@ -118,18 +123,18 @@ export const deliverCertificate = createServerFn({ method: "POST" })
 
     const [{ data: lead }, { data: app }] = await Promise.all([
       cert.lead_id
-        ? supabaseAdmin.from("leads").select("id, name, email").eq("id", cert.lead_id).single()
+        ? (await getAdmin()).from("leads").select("id, name, email").eq("id", cert.lead_id).single()
         : Promise.resolve({ data: null as any }),
       cert.application_id
-        ? supabaseAdmin.from("applications").select("id, application_code").eq("id", cert.application_id).single()
+        ? (await getAdmin()).from("applications").select("id, application_code").eq("id", cert.application_id).single()
         : Promise.resolve({ data: null as any }),
     ]);
 
-    const { data: signed } = await supabaseAdmin.storage
+    const { data: signed } = await (await getAdmin()).storage
       .from("documents")
       .createSignedUrl(cert.file_path, 60 * 60 * 24 * 7);
 
-    await supabaseAdmin
+    await (await getAdmin())
       .from("certificates")
       .update({ delivered_at: new Date().toISOString() })
       .eq("id", data.certificateId);
@@ -164,7 +169,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
           <p style="font-size:12px;color:#999">Order: ${app?.application_code ?? "—"}</p>
         </div>`;
-      await supabaseAdmin.from("email_queue").insert({
+      await (await getAdmin()).from("email_queue").insert({
         to_email: lead.email,
         to_name: lead.name,
         subject,
@@ -189,13 +194,13 @@ export const getCertificateUrl = createServerFn({ method: "GET" })
   .inputValidator(z.object({ certificateId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
-    const { data: cert } = await supabaseAdmin
+    const { data: cert } = await (await getAdmin())
       .from("certificates")
       .select("file_path")
       .eq("id", data.certificateId)
       .single();
     if (!cert || !cert.file_path) throw new Error("Not found");
-    const { data: signed } = await supabaseAdmin.storage
+    const { data: signed } = await (await getAdmin()).storage
       .from("documents")
       .createSignedUrl(cert.file_path, 60 * 10);
     return { url: signed?.signedUrl };

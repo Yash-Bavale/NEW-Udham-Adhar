@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole, writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export const adminUpdateOnboardingField = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -13,14 +18,14 @@ export const adminUpdateOnboardingField = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: sub } = await supabaseAdmin
+    const { data: sub } = await (await getAdmin())
       .from("onboarding_submissions")
       .select("*")
       .eq("id", data.submissionId)
       .single();
     if (!sub) throw new Error("Submission not found");
     const newFormData = { ...(sub.form_data as any), [data.fieldKey]: data.value };
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("onboarding_submissions")
       .update({ form_data: newFormData })
       .eq("id", data.submissionId);
@@ -40,7 +45,7 @@ export const requestDocumentReupload = createServerFn({ method: "POST" })
   .inputValidator(z.object({ documentId: z.string().uuid(), reason: z.string().optional() }))
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
-    const { data: doc } = await supabaseAdmin
+    const { data: doc } = await (await getAdmin())
       .from("documents")
       .select("*")
       .eq("id", data.documentId)
@@ -48,16 +53,16 @@ export const requestDocumentReupload = createServerFn({ method: "POST" })
     if (!doc) throw new Error("Document not found");
 
     const { data: lead } = doc.lead_id
-      ? await supabaseAdmin.from("leads").select("id, name, email").eq("id", doc.lead_id).single()
+      ? await (await getAdmin()).from("leads").select("id, name, email").eq("id", doc.lead_id).single()
       : { data: null as any };
 
-    await supabaseAdmin
+    await (await getAdmin())
       .from("documents")
       .update({ status: "re_upload_requested", remarks: data.reason ?? null })
       .eq("id", data.documentId);
 
     if (lead?.email) {
-      await supabaseAdmin.from("email_queue").insert({
+      await (await getAdmin()).from("email_queue").insert({
         to_email: lead.email,
         to_name: lead.name,
         subject: `Action Needed: Please re-upload your ${doc.doc_type}`,

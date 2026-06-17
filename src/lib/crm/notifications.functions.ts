@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export type Notification = {
   id: string;
@@ -98,7 +103,7 @@ export async function createNotification(input: {
   entity_kind?: string;
   entity_id?: string;
 }) {
-  const { error } = await supabaseAdmin.from("notifications").insert({
+  const { error } = await (await getAdmin()).from("notifications").insert({
     user_id: input.user_id,
     kind: input.kind,
     title: input.title,

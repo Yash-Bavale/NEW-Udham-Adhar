@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { assertRole } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 export const listAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -14,7 +19,7 @@ export const listAuditLogs = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
-    let q = supabaseAdmin.from("audit_logs").select("*").order("created_at", { ascending: false });
+    let q = (await getAdmin()).from("audit_logs").select("*").order("created_at", { ascending: false });
     if (data.entityType) q = q.eq("entity_type", data.entityType);
     if (data.entityId) q = q.eq("entity_id", data.entityId);
     if (data.actorEmail) q = q.ilike("actor_email", `%${data.actorEmail}%`);

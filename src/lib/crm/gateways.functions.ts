@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { writeAudit } from "@/lib/audit";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.(await getAdmin());
+}
+
 
 async function requireSuperAdmin(supabase: any, userId: string) {
   const { data } = await supabase
@@ -17,7 +22,7 @@ export const listGateways = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await requireSuperAdmin(context.supabase, context.userId);
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (await getAdmin())
       .from("payment_gateways")
       .select("*")
       .order("priority", { ascending: true });
@@ -38,9 +43,9 @@ export const updateGateway = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context.supabase, context.userId);
     const { id, ...patch } = data;
-    const { data: prev } = await supabaseAdmin
+    const { data: prev } = await (await getAdmin())
       .from("payment_gateways").select("*").eq("id", id).single();
-    const { error } = await supabaseAdmin
+    const { error } = await (await getAdmin())
       .from("payment_gateways").update(patch).eq("id", id);
     if (error) throw new Error(error.message);
     await writeAudit({
