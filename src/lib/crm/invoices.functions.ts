@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
+import type { InvoiceData } from "@/lib/invoices/pdf.server";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -108,6 +108,7 @@ async function generateAndStore(paymentId: string): Promise<string> {
     gatewayName: payment.gateway_name,
   };
 
+  const { renderInvoicePdf } = await import("@/lib/invoices/pdf.server");
   const pdfBytes = await renderInvoicePdf(data);
   const path = `${new Date().getFullYear()}/${invoiceNumber}.pdf`;
 

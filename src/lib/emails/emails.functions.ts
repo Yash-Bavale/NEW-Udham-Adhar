@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  enqueueEmailInternal,
-  processQueueInternal,
-} from "./emails.server";
 
 // ─────────────────────────── Admin server fns ───────────────────────────
 
@@ -92,6 +88,7 @@ export const sendTestEmail = createServerFn({ method: "POST" })
     z.object({ toEmail: z.string().email(), subject: z.string().min(1).max(200).optional() }).parse(i),
   )
   .handler(async ({ data }) => {
+    const { enqueueEmailInternal, processQueueInternal } = await import("./emails.server");
     await enqueueEmailInternal({
       toEmail: data.toEmail,
       subject: data.subject ?? "SMTP test from Business Help Services",
@@ -107,6 +104,7 @@ export const sendTestEmail = createServerFn({ method: "POST" })
 export const processEmailQueueNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    const { processQueueInternal } = await import("./emails.server");
     return await processQueueInternal(50);
   });
 
