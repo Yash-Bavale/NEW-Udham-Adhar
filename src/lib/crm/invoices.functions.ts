@@ -108,6 +108,7 @@ async function generateAndStore(paymentId: string): Promise<string> {
     gatewayName: payment.gateway_name,
   };
 
+  const { renderInvoicePdf } = await import("@/lib/invoices/pdf.server");
   const pdfBytes = await renderInvoicePdf(data);
   const path = `${new Date().getFullYear()}/${invoiceNumber}.pdf`;
 
