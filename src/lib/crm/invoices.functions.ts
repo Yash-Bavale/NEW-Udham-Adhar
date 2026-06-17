@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { renderInvoicePdf, type InvoiceData } from "@/lib/invoices/pdf.server";
+import type { InvoiceData } from "@/lib/invoices/pdf.server";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
