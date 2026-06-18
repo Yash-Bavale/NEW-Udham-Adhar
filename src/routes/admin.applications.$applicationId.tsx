@@ -26,6 +26,7 @@ import { StatusTransition } from "@/components/admin/StatusTransition";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
+import { JourneyTimeline } from "@/components/admin/JourneyTimeline";
 
 export const Route = createFileRoute("/admin/applications/$applicationId")({
   head: () => ({ meta: [{ title: "Application — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -135,6 +136,9 @@ function ApplicationCommandCenter() {
           onChanged={refetch}
         />
       </div>
+
+      {/* Journey stepper */}
+      <JourneyTimeline current={application.application_status} />
 
       {/* 3-column command center */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_320px] gap-4">

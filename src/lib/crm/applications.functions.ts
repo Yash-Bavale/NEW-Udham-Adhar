@@ -103,3 +103,15 @@ export const updateApplication = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const getApplicationCounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    const admin = await getAdmin();
+    const { data, error } = await admin.from("applications").select("application_status");
+    if (error) throw new Error(error.message);
+    const counts: Record<string, number> = { all: data.length };
+    for (const r of data) counts[r.application_status] = (counts[r.application_status] ?? 0) + 1;
+    return { counts };
+  });
