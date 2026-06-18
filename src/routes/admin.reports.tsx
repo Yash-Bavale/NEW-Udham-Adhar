@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  LineChart, Line,
 } from "recharts";
 import { getOpsDashboard, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
