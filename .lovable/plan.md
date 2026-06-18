@@ -1,78 +1,90 @@
-## Problem
 
-Executive Dashboard shows **750 unique customers** and **3,540 repeat leads** against 4,290 total leads. Reality (verified via SQL): there are **3,119 unique emails** and **3,073 rows in the `customers` table**.
+# Phase 1: Design System + New Admin Shell
 
-Root cause is in `src/lib/crm/dashboard.functions.ts`:
+Scope is intentionally narrow. No backend changes. No page rebuilds. We replace the chrome (sidebar, top bar, container, tokens) so every existing `/admin/*` page renders inside the new shell. The Dashboard, Leads, Orders, etc. screens keep their current content and will be rebuilt in later phases.
 
-```ts
-supabase.from("leads").select("email, mobile").limit(10000)
-```
+## What gets built
 
-is then deduplicated in JS. PostgREST enforces a server-side `max-rows` cap (1000 on this project), so only the first ~1000 lead rows come back regardless of the `.limit(10000)` hint. Those 1000 rows happen to contain ~750 distinct emails → the bogus "750" figure. Same bug silently caps `uniqueMobiles`, `byStatus`, `byService`, and `trendRows` (all use `.limit(5000)`), so the status/service donuts and 30-day trend are also under-counted on any account with >1000 leads.
+### 1. Design tokens (`src/styles.css`)
+Add a dedicated admin token block — does not touch the public site theme:
+- `--admin-primary: #1F4E79`
+- `--admin-accent: #2E75B6`
+- `--admin-surface: #FFFFFF`
+- `--admin-surface-2: #EFF6FC` (light surface / row tint / hover)
+- `--admin-border: #E2E8F0`
+- `--admin-fg: #0F172A`
+- `--admin-fg-muted: #64748B`
+- Status pill colors (success / warn / danger / info / neutral) as flat solids (no gradients, no shadows).
+- Body 14px, headings weight 500, system/Inter font stack.
+- Remove existing admin gradient tokens (`--gradient-admin`, elevated shadows) from admin scope so the new look stays flat.
 
-## Fix
+### 2. New `AdminShell` (`src/components/admin/AdminShell.tsx`)
+Replace in place. Structure:
+- **Fixed left sidebar, 220px**, always visible on desktop, collapses to bottom nav with icons on mobile (`md:` breakpoint).
+- **Top bar**: global search input (always visible, full-width center), notifications bell, user avatar with dropdown (sign out).
+- **Main**: 24px padding, full-width content area where current route children render via `<Outlet />`.
+- Active route highlight via `useRouterState` pathname match.
+- Visual grouping with thin dividers between the 6 groups listed in the spec.
 
-Stop pulling raw rows to the server function just to dedupe / tally them. Push the aggregation into Postgres via a single `SECURITY DEFINER` RPC that returns exact counts and distributions. Keep the existing "recent leads / recent activity" queries as-is (they're already bounded by `.limit(...)` and small).
+### 3. Sidebar items (exact order + grouping from spec)
+Each linked to a route. Routes that don't yet exist get created as **stub pages** with a `ComingSoon`-style empty state (reusing `src/components/admin/ComingSoon.tsx`). No backend, no mock data.
 
-### 1. New migration — `get_dashboard_metrics()` RPC
+| Group | Item | Route | Status |
+|---|---|---|---|
+| 1 | Dashboard | `/admin/dashboard` | exists |
+| 2 | Leads | `/admin/leads` | exists |
+| 2 | Customers | `/admin/customers` | exists |
+| 2 | Orders | `/admin/applications` (relabel "Orders") | exists |
+| 2 | Documents | `/admin/documents` | **new stub** |
+| 3 | Complaints | `/admin/complaints` | exists |
+| 3 | Services | `/admin/services` | exists |
+| 3 | Invoices | `/admin/invoices` | exists |
+| 3 | Payments | `/admin/payments` | exists |
+| 4 | Support Tickets | `/admin/tickets` | **new stub** |
+| 4 | Tasks | `/admin/tasks` | **new stub** |
+| 4 | Reports | `/admin/reports` | exists or stub |
+| 5 | Employees | `/admin/users` (relabel "Employees") | exists |
+| 5 | Email Templates | `/admin/emails/templates` | exists or stub |
+| 5 | WhatsApp Templates | `/admin/whatsapp-templates` | **new stub** |
+| 5 | Settings | `/admin/settings` | exists or stub |
+| 6 | Logout | action (sign out) | wired to existing auth |
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_dashboard_metrics()
-RETURNS jsonb
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE result jsonb;
-BEGIN
-  -- Caller must be staff (any role in user_roles)
-  IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid()) THEN
-    RAISE EXCEPTION 'forbidden';
-  END IF;
+### 4. Global search (top bar)
+Wire to the existing `src/lib/crm/global-search.functions.ts` server function (already covers leads/customers/orders). Debounced input, dropdown results, click navigates to detail. No new backend.
 
-  SELECT jsonb_build_object(
-    'totalLeads',       (SELECT count(*) FROM leads),
-    'todayLeads',       (SELECT count(*) FROM leads WHERE created_at >= date_trunc('day', now())),
-    'weekLeads',        (SELECT count(*) FROM leads WHERE created_at >= now() - interval '7 days'),
-    'inProgress',       (SELECT count(*) FROM applications WHERE application_status IN ('details_pending','documents_pending','under_review','under_process')),
-    'completed',        (SELECT count(*) FROM applications WHERE application_status = 'completed'),
-    'pending',          (SELECT count(*) FROM applications WHERE application_status = 'awaiting_payment'),
-    'uniqueCustomers',  (SELECT count(*) FROM customers),
-    'uniqueEmails',     (SELECT count(DISTINCT lower(email))             FROM leads WHERE email  IS NOT NULL),
-    'uniqueMobiles',    (SELECT count(DISTINCT regexp_replace(mobile,'\D','','g')) FROM leads WHERE mobile IS NOT NULL),
-    'statusDistribution',  (SELECT coalesce(jsonb_agg(jsonb_build_object('label', status,  'value', c) ORDER BY c DESC), '[]'::jsonb)
-                            FROM (SELECT coalesce(status,'unknown')  AS status,  count(*) c FROM leads GROUP BY 1) s),
-    'serviceDistribution', (SELECT coalesce(jsonb_agg(jsonb_build_object('label', service, 'value', c) ORDER BY c DESC), '[]'::jsonb)
-                            FROM (SELECT coalesce(service,'unknown') AS service, count(*) c FROM leads GROUP BY 1) s),
-    'trend',               (SELECT coalesce(jsonb_agg(jsonb_build_object('date', to_char(d,'MM-DD'), 'count', coalesce(c,0)) ORDER BY d), '[]'::jsonb)
-                            FROM generate_series(date_trunc('day', now()) - interval '29 days', date_trunc('day', now()), interval '1 day') d
-                            LEFT JOIN (SELECT date_trunc('day', created_at) day, count(*) c
-                                       FROM leads
-                                       WHERE created_at >= now() - interval '30 days'
-                                       GROUP BY 1) x ON x.day = d)
-  ) INTO result;
-  RETURN result;
-END $$;
+### 5. Shared UI primitives (admin scope only)
+Light refresh of `src/components/admin/ui.tsx`:
+- `StatusBadge` → flat pill with colored dot + label (remove gradient).
+- `SectionCard` → flat, 1px border, no shadow.
+- `StatCard` → flat surface, large number, no gradient backgrounds.
+- Table base classes: alternating row tint (`--admin-surface-2`), sticky header, sortable column affordance.
+- Form base classes: label-above-input, helper text, inline error styles.
 
-GRANT EXECUTE ON FUNCTION public.get_dashboard_metrics() TO authenticated;
-```
+Existing pages will pick up the new look automatically because they already consume these primitives and CSS variables.
 
-Uses `customers` row count as the canonical "Unique Customers" number (it's the deduplicated Customer 360 table already). Keeps `uniqueEmails` / `uniqueMobiles` as raw distinct-on-leads counts for the secondary stat.
+## What is explicitly NOT in this phase
+- No Dashboard rebuild (12 sections come later).
+- No Leads/Orders/Customers/etc. UI rebuilds.
+- No new tables, RLS, or backend functions.
+- No Audit Trail, Cancellation Workflow automation, Aadhaar masking sweep, Legal consent capture, WhatsApp send logic — these come with their respective module rebuilds.
+- The 4 new stub routes show "Coming soon" only.
 
-### 2. Update `src/lib/crm/dashboard.functions.ts`
+## Files touched
+- `src/styles.css` — admin token block (additive + flatten admin gradients)
+- `src/components/admin/AdminShell.tsx` — rewrite
+- `src/components/admin/ui.tsx` — flatten primitives
+- `src/components/admin/CommandPalette.tsx` — keep (Ctrl-K), unchanged
+- `src/routes/admin.documents.tsx` — new stub
+- `src/routes/admin.tickets.tsx` — new stub
+- `src/routes/admin.tasks.tsx` — new stub
+- `src/routes/admin.whatsapp-templates.tsx` — new stub
+- (verify existing routes for reports/email-templates/settings; add stubs only if missing)
 
-Replace the 6 client-side aggregate queries with a single `supabase.rpc('get_dashboard_metrics')` call. Keep the existing `recentLeads`, `recentActivity`, and `myRoles` queries — they're already correctly bounded. Return the same shape the dashboard component already consumes, so no UI changes needed.
+## Acceptance check after build
+- Every existing `/admin/*` page still renders with real backend data, just inside the new shell.
+- Sidebar shows all 16 items in the spec order and grouping.
+- Top bar search returns existing global search results.
+- Mobile (<768px) collapses sidebar to bottom icon nav.
+- No gradients or drop shadows anywhere in `/admin/*`.
 
-### 3. No frontend changes
-
-`src/routes/admin.dashboard.tsx` already computes `repeatCount = totalLeads - uniqueCustomers`. With `uniqueCustomers` now correct (~3,073), the "repeat leads" hint will read ~1,217 instead of 3,540.
-
-## Files
-
-- new migration: `get_dashboard_metrics()` SECURITY DEFINER function + grant
-- edited: `src/lib/crm/dashboard.functions.ts` (swap inline aggregation for RPC)
-
-## Verification
-
-After deploy, dashboard should show: Total 4,290 · Unique Customers ~3,073 · repeat hint ~1,217. Status/service donuts and 30-day trend will also reflect all rows, not just the first 1,000.
+Approve to proceed, or tell me which item to adjust (e.g. keep gradients, rename "Orders" back to "Applications", skip stubs).
