@@ -21,12 +21,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApplicationDetail } from "@/lib/crm/applications.functions";
+import { getOrderDetail } from "@/lib/crm/orders.functions";
 import { getApplicationDocChecklist } from "@/lib/crm/document-review.functions";
 import { StatusTransition } from "@/components/admin/StatusTransition";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
-import { JourneyTimeline } from "@/components/admin/JourneyTimeline";
+import { OrderJourney } from "@/components/admin/OrderJourney";
+import { InternalNotesTimeline } from "@/components/admin/InternalNotesTimeline";
 import { CancellationPanel } from "@/components/admin/CancellationPanel";
 
 export const Route = createFileRoute("/admin/applications/$applicationId")({
@@ -102,9 +104,14 @@ function DocChecklistPanel({ applicationId }: { applicationId: string }) {
 function ApplicationCommandCenter() {
   const { applicationId } = Route.useParams();
   const fetchFn = useServerFn(getApplicationDetail);
+  const orderFn = useServerFn(getOrderDetail);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin.application", applicationId],
     queryFn: () => fetchFn({ data: { applicationId } }),
+  });
+  const { data: orderData } = useQuery({
+    queryKey: ["admin.order", applicationId],
+    queryFn: () => orderFn({ data: { applicationId } }),
   });
 
   const [tab, setTab] = useState<Tab>("onboarding");
@@ -118,6 +125,18 @@ function ApplicationCommandCenter() {
   }
   if (!data) return null;
   const { application, lead, certificates } = data as any;
+  const journey = orderData?.journey;
+  const payments = orderData?.payments ?? [];
+  const complaints = orderData?.complaints ?? [];
+  const paymentStatus = orderData?.paymentStatus ?? "Pending";
+  const total = orderData?.total ?? 0;
+  const assignedStaff = orderData?.assignedStaff;
+  const paidSum = payments
+    .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)))
+    .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+  const gstSum = payments.reduce((s: number, p: any) => s + Number(p.gst_amount || 0), 0);
+  const baseSum = payments.reduce((s: number, p: any) => s + Number(p.base_amount || 0), 0);
+  const lastPayment = payments[0];
 
   return (
     <div className="space-y-4">
@@ -128,7 +147,7 @@ function ApplicationCommandCenter() {
           className="inline-flex items-center gap-1 text-xs hover:underline"
           style={{ color: "var(--admin-fg-muted)" }}
         >
-          <ChevronLeft className="w-3.5 h-3.5" /> Applications
+          <ChevronLeft className="w-3.5 h-3.5" /> Orders
         </Link>
         <StatusTransition
           kind="application"
@@ -138,8 +157,19 @@ function ApplicationCommandCenter() {
         />
       </div>
 
+      {/* Order header strip */}
+      <div
+        className="rounded-xl border p-4 grid grid-cols-2 md:grid-cols-4 gap-4"
+        style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}
+      >
+        <HeaderField label="Order No." value={application.application_code ?? application.id.slice(0, 8)} mono />
+        <HeaderField label="Date" value={fmt(application.created_at)} />
+        <HeaderField label="Service" value={(lead?.service ?? "—").toUpperCase()} mono />
+        <HeaderField label="Assigned Executive" value={assignedStaff?.display_name ?? assignedStaff?.email ?? "Unassigned"} />
+      </div>
+
       {/* Journey stepper */}
-      <JourneyTimeline current={application.application_status} />
+      {journey && <OrderJourney journey={journey} />}
 
       {/* 3-column command center */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_320px] gap-4">
@@ -244,6 +274,95 @@ function ApplicationCommandCenter() {
               {tab === "timeline" && lead && <LeadTimeline leadId={lead.id} />}
             </div>
           </div>
+
+          {/* Payment Details */}
+          <Panel>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+                Payment Details
+              </div>
+              <span
+                className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-medium"
+                style={{
+                  background:
+                    paymentStatus === "Paid"
+                      ? "var(--admin-success)"
+                      : paymentStatus === "Pending"
+                      ? "var(--admin-warn)"
+                      : paymentStatus === "Refunded"
+                      ? "var(--admin-fg-subtle)"
+                      : paymentStatus === "Cancelled"
+                      ? "var(--admin-danger)"
+                      : "var(--admin-accent)",
+                  color: "#fff",
+                }}
+              >
+                {paymentStatus}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <Stat label="Fee" value={`₹${baseSum.toLocaleString("en-IN")}`} />
+              <Stat label="GST" value={`₹${gstSum.toLocaleString("en-IN")}`} />
+              <Stat label="Total" value={`₹${(total || baseSum + gstSum).toLocaleString("en-IN")}`} bold />
+              <Stat label="Paid" value={`₹${paidSum.toLocaleString("en-IN")}`} />
+            </div>
+            {lastPayment && (
+              <div className="mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
+                Reference:{" "}
+                <span className="font-mono" style={{ color: "var(--admin-fg)" }}>
+                  {lastPayment.transaction_id ?? lastPayment.id.slice(0, 12)}
+                </span>{" "}
+                · {lastPayment.gateway_name ?? "—"} · {fmt(lastPayment.payment_date ?? lastPayment.created_at)}
+              </div>
+            )}
+            {payments.length === 0 && (
+              <div className="mt-3 text-[11px] italic" style={{ color: "var(--admin-fg-muted)" }}>
+                No payment records yet.
+              </div>
+            )}
+          </Panel>
+
+          {/* Linked Complaints */}
+          <Panel>
+            <div className="text-[10px] uppercase tracking-wider mb-3" style={{ color: "var(--admin-fg-muted)" }}>
+              Linked Complaints ({complaints.length})
+            </div>
+            {complaints.length === 0 ? (
+              <div className="text-[11px] italic" style={{ color: "var(--admin-fg-muted)" }}>
+                No complaints linked to this order.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {complaints.map((c: any) => (
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded border text-xs"
+                    style={{ borderColor: "var(--admin-border)" }}
+                  >
+                    <Link
+                      to="/admin/complaints/$complaintId"
+                      params={{ complaintId: c.id }}
+                      className="font-mono font-medium hover:underline"
+                      style={{ color: "var(--admin-accent)" }}
+                    >
+                      {c.complaint_number}
+                    </Link>
+                    <span style={{ color: "var(--admin-fg-muted)" }}>{c.category ?? "—"}</span>
+                    <span
+                      className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded"
+                      style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
+                    >
+                      {c.status}
+                    </span>
+                    <span style={{ color: "var(--admin-fg-muted)" }}>{fmt(c.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          {/* Internal Notes Timeline */}
+          <InternalNotesTimeline applicationId={applicationId} />
         </main>
 
         {/* RIGHT ACTIVITY RAIL */}
@@ -373,6 +492,30 @@ function QuickLink({ to, params, label }: { to: any; params?: any; label: string
     >
       {label}
     </Link>
+  );
+}
+
+function HeaderField({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+        {label}
+      </div>
+      <div className={`text-sm font-semibold mt-0.5 truncate ${mono ? "font-mono" : ""}`} style={{ color: "var(--admin-fg)" }} title={value ?? ""}>
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="rounded-lg p-2.5" style={{ background: "var(--admin-surface-2)" }}>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>
+      <div className={`mt-0.5 font-mono ${bold ? "text-base font-bold" : "text-sm"}`} style={{ color: "var(--admin-fg)" }}>
+        {value}
+      </div>
+    </div>
   );
 }
 

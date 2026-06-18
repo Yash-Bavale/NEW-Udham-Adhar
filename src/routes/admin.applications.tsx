@@ -1,26 +1,56 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { listApplications, getApplicationCounts } from "@/lib/crm/applications.functions";
+import { useState } from "react";
+import { Search, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { listOrders } from "@/lib/crm/orders.functions";
+import { getApplicationCounts } from "@/lib/crm/applications.functions";
 import { APPLICATION_STATUSES } from "@/lib/crm/types";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/applications")({ component: OrdersPage });
 
+const PAYMENT_STATUSES = ["Pending", "Paid", "Partially Paid", "Refunded", "Cancelled"] as const;
+
+function paymentTone(s: string) {
+  switch (s) {
+    case "Paid":
+      return { bg: "var(--admin-success)", fg: "#fff" };
+    case "Pending":
+      return { bg: "var(--admin-warn)", fg: "#fff" };
+    case "Partially Paid":
+      return { bg: "var(--admin-accent)", fg: "#fff" };
+    case "Refunded":
+      return { bg: "var(--admin-fg-subtle)", fg: "#fff" };
+    case "Cancelled":
+      return { bg: "var(--admin-danger)", fg: "#fff" };
+    default:
+      return { bg: "var(--admin-surface-2)", fg: "var(--admin-fg)" };
+  }
+}
+
 function OrdersPage() {
   const navigate = useNavigate();
-  const listFn = useServerFn(listApplications);
+  const listFn = useServerFn(listOrders);
   const countsFn = useServerFn(getApplicationCounts);
 
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
   const [search, setSearch] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.applications", page, status],
-    queryFn: () => listFn({ data: { page, pageSize: 25, status: (status || undefined) as never } }),
+    queryKey: ["admin.orders", page, status, paymentStatus, search],
+    queryFn: () =>
+      listFn({
+        data: {
+          page,
+          pageSize: 25,
+          status: status || undefined,
+          paymentStatus: paymentStatus || undefined,
+          search: search || undefined,
+        },
+      }),
   });
 
   const { data: countsData } = useQuery({
@@ -28,22 +58,7 @@ function OrdersPage() {
     queryFn: () => countsFn(),
   });
   const counts = countsData?.counts ?? {};
-
-  const rows = useMemo(() => {
-    const all = data?.rows ?? [];
-    if (!search) return all;
-    const q = search.toLowerCase();
-    return all.filter((r: any) => {
-      const lead = r.leads as any;
-      return (
-        r.application_code?.toLowerCase().includes(q) ||
-        lead?.lead_code?.toLowerCase().includes(q) ||
-        lead?.name?.toLowerCase().includes(q) ||
-        lead?.email?.toLowerCase().includes(q) ||
-        lead?.mobile?.toLowerCase().includes(q)
-      );
-    });
-  }, [data, search]);
+  const rows = data?.rows ?? [];
 
   return (
     <div className="space-y-5">
@@ -70,31 +85,45 @@ function OrdersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: "var(--admin-fg-muted)" }} />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search order/lead code, name, email, mobile…"
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search order no., customer, email, mobile…"
             className="rounded-lg border pl-9 pr-3 py-2 text-sm w-96 outline-none focus:ring-2"
             style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
           />
         </div>
+        <select
+          value={paymentStatus}
+          onChange={(e) => { setPaymentStatus(e.target.value); setPage(1); }}
+          className="rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <option value="">All payments</option>
+          {PAYMENT_STATUSES.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
       </div>
 
       <SectionCard>
         <div className="overflow-x-auto">
-          {isLoading ? <TableSkeleton rows={8} cols={6} /> : (
+          {isLoading ? <TableSkeleton rows={8} cols={9} /> : (
             <table className="w-full text-sm">
               <thead style={{ background: "var(--admin-surface-2)" }}>
                 <tr className="text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                  <th className="px-4 py-2.5 text-left font-medium">Order ID</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Lead</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Order No.</th>
                   <th className="px-4 py-2.5 text-left font-medium">Customer</th>
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Created</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Assigned Executive</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Total (₹)</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Payment</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Order Status</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r: any) => {
-                  const lead = r.leads as { lead_code?: string; name?: string; email?: string; service?: string } | null;
+                  const tone = paymentTone(r.payment_status);
                   return (
                     <tr
                       key={r.id}
@@ -105,20 +134,44 @@ function OrdersPage() {
                       <td className="px-4 py-2.5 font-mono text-xs font-medium" style={{ color: "var(--admin-accent)" }}>
                         {r.application_code}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs" onClick={(e) => e.stopPropagation()}>
-                        <Link to="/admin/leads/$leadId" params={{ leadId: r.lead_id }} className="hover:underline" style={{ color: "var(--admin-accent)" }}>
-                          {lead?.lead_code ?? r.lead_id.slice(0, 8)}
+                      <td className="px-4 py-2.5 text-xs font-medium">
+                        <div>{r.customer_name}</div>
+                        <div className="text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>{r.customer_mobile}</div>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{r.service ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                        {new Date(r.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs" style={{ color: r.assigned_name ? "var(--admin-fg)" : "var(--admin-fg-muted)" }}>
+                        {r.assigned_name ?? "Unassigned"}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-right font-mono" style={{ color: "var(--admin-fg)" }}>
+                        {r.total ? `₹${Number(r.total).toLocaleString("en-IN")}` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-medium"
+                          style={{ background: tone.bg, color: tone.fg }}
+                        >
+                          {r.payment_status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5"><StatusBadge status={r.application_status} /></td>
+                      <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <Link
+                          to="/admin/applications/$applicationId"
+                          params={{ applicationId: r.id }}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--admin-surface-2)]"
+                          style={{ color: "var(--admin-accent)" }}
+                        >
+                          <Eye className="w-3 h-3" /> View
                         </Link>
                       </td>
-                      <td className="px-4 py-2.5 text-xs font-medium">{lead?.name}</td>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{lead?.service}</td>
-                      <td className="px-4 py-2.5"><StatusBadge status={r.application_status} /></td>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{new Date(r.created_at).toLocaleString("en-IN")}</td>
                     </tr>
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No orders found.</td></tr>
+                  <tr><td colSpan={9} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No orders found.</td></tr>
                 )}
               </tbody>
             </table>
