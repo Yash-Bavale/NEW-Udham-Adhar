@@ -1,83 +1,66 @@
 
-# CRM UI Rebuild — Coverage Check & Remaining Execution Plan
+# Audit + Gap-Close Plan (Parts 1–12)
 
-## Coverage vs. uploaded spec (Parts 1–12)
+## What's already in the repo
 
-The uploaded `CRM_Internal_Requirements.docx` maps 1:1 to the 12 parts in your message. Every module is already in `.lovable/plan.md`. Status:
+A repo scan shows the bulk of Parts 1–12 is built. I will NOT rebuild these — only fix defects found during verification.
 
-| Part | Module | Status |
+| Part | Surface | Built? |
 |---|---|---|
-| 1 | Context & constraints (no backend regressions) | Enforced — all new server fns additive |
-| 2 | Design system (#1F4E79 / #2E75B6 / #EFF6FC, Inter, pills, tables, forms) | **Phase 0 — not yet built** |
-| 3 | Sidebar (6 visual groups, 17 items) | **Phase 0 — not yet built** |
-| 4 | Main Dashboard (12 sections + global search) | **Phase 1 — not yet built** |
-| 5 | Leads (pills, filters, side panel, Add Lead) | Done (earlier turn) |
-| 6 | Orders + Journey Timeline + Internal Notes | Done |
-| 7 | Customer Profile (6 tabs, Aadhaar masking) | Done |
-| 8 | Document Management (global) | Done (Phase 5) |
-| 9 | Complaints (list + add + stepper) | Done list/add (Phase 6); **detail page stepper pending** |
-| 10 | Services / Invoices / Payments / Tickets / Tasks / Employees / Email & WhatsApp Templates / Reports / Settings | **Phase 7 — not yet built** |
-| 11 | Audit Trail page + Legal Compliance block + system-wide Aadhaar sweep | **Phase 8 — not yet built** |
-| 12 | Cancellation Workflow (3 steps, 7+7 days, configurable in Settings) | **Phase 9 — not yet built** |
+| 2 Design system | `src/styles.css` with `--admin-primary #1F4E79`, `--admin-accent #2E75B6`, `--admin-surface-2 #EFF6FC`; Inter via `<link>`; pill + table + form primitives in `components/admin/ui.tsx` | Yes |
+| 3 Sidebar | `AdminShell.tsx` — fixed 220px, 6 visual groups, all 16 items + Logout, Lucide icons, active state, mobile bottom nav | Yes |
+| 4 Dashboard 12 sections | `admin.dashboard.tsx` (634 lines): KPI cards, Action Required, Service Pipeline, Document Pending, Complaint Tracker, Payment Summary, Revenue chart, Top Services, Staff Performance, Follow-ups, Tickets, Recent Activity + global search top bar | Yes (gaps in §10/§11 noted in code) |
+| 5 Leads | `admin.leads.tsx` + `admin.leads.$leadId.tsx` + pills/filters/side panel/bulk bar | Yes |
+| 6 Orders + Journey + Notes | `admin.applications.$applicationId.tsx` + `JourneyTimeline.tsx` | Yes |
+| 7 Customer Profile (6 tabs, Aadhaar mask) | `admin.customers.$customerId.tsx` + `mask.ts` | Yes |
+| 8 Document Management | `admin.documents.tsx` + `documents-admin.functions.ts` | Yes |
+| 9 Complaints (list + detail stepper) | `admin.complaints.tsx` + `admin.complaints.$complaintId.tsx` | Yes |
+| 10 Services/Invoices/Payments/Tickets/Tasks/Employees/Email/WhatsApp/Reports/Settings | All routes present (`admin.services.tsx`, `admin.finance.gst.tsx`, `admin.finance.tsx`, `admin.tickets.tsx`, `admin.tasks.tsx`, `admin.employees.tsx`, `admin.emails.tsx`, `admin.whatsapp-templates.tsx`, `admin.reports.tsx`, `admin.settings.tsx`) | Yes |
+| 11 Audit + Legal Compliance + Aadhaar sweep | `admin.audit.tsx` + `audit.functions.ts`; mask util applied | Partial — legal compliance block in customer profile to verify |
+| 12 Cancellation workflow (3-step, 7+7d, configurable) | `applications.closure_stage` columns, `workflow_settings` row, 3 email templates seeded, `CancellationPanel`, cron route `/api/public/cron/closure-workflow`, `pg_cron` `closure-workflow-hourly` scheduled | Yes |
 
-Coverage is complete — no gaps vs. the document. Remaining work = Phases 0, 1, 7, 8, 9 + complaint detail page.
+Saying "nothing is completed" doesn't match the file tree. Before any code change, I will produce evidence — screenshots + console + network — for every screen, then fix only what's actually broken.
 
----
+## Phase A — Live verification (read-only)
 
-## Execution order (remaining phases)
+Drive Playwright against `http://localhost:8080` with the signed-in session and walk every Part:
 
-I will pause for approval after each phase before starting the next.
+1. `/admin/dashboard` — capture all 12 sections; confirm each pulls live data (no zeros from missing wiring); confirm global search returns results for order #, mobile, complaint #, customer, email, Udyam.
+2. Sidebar — confirm 6 groups, 16 items + Logout, active highlight, mobile bottom nav at 390px viewport.
+3. Each module page in order: Leads, Customers, Customer detail (6 tabs + Aadhaar mask), Orders, Order detail (Journey + Notes + CancellationPanel), Documents, Complaints + detail stepper, Services, Invoices, Payments, Tickets, Tasks, Employees, Email Templates, WhatsApp Templates, Reports, Settings (incl. Workflow Automation), Audit.
+4. Cancellation workflow — record a request on a test order, verify Step 1 email enqueued and `closure_next_at` set; simulate cron via direct POST to confirm advance logic.
 
-### Phase 0 — Design System & Shell (Part 2 + 3)
-- Add tokens to `src/styles.css` (`--color-primary #1F4E79`, `--color-accent #2E75B6`, `--color-surface #EFF6FC`, semantic status colors, no gradients/shadows).
-- Load Inter via `<link>` in `__root.tsx`. Body 14px; headings weight 500.
-- Build shared primitives in `src/components/admin/ui/`: `StatusPill`, `DataTable`, `FormField`, `SectionCard`, `KpiCard`, `EmptyState`, `SidePanel`.
-- Rebuild `AdminShell` sidebar: fixed 220px, 6 visual groups per spec, Lucide icons, active highlight, mobile bottom nav, top bar (global search + bell + avatar), 24px main padding.
+Output of Phase A: a numbered defect list with screenshot + page + exact failure (e.g. "Dashboard §10 Follow-ups: shows placeholder text instead of today's items", "Settings → Workflow Automation: save button no-op", etc.).
 
-### Phase 1 — Main Dashboard (Part 4)
-- New aggregation server fns (read-only, additive) in `src/lib/crm/dashboard-v2.functions.ts`: `getDashboardKpis(range)`, `getActionRequired`, `getPipelineCounts`, `getDocumentPending`, `getComplaintTracker`, `getPaymentSummary`, `getRevenueSeries(range)`, `getTopServices`, `getStaffPerformance`, `getTodayFollowups`, `getTicketSummary`, `getRecentActivities`.
-- Global search server fn already exists (`global-search.functions.ts`) — wire to top bar.
-- Build 12 sections per spec on `/admin/dashboard` using `recharts` (already used elsewhere; install if missing).
-- Send Reminder button → existing email queue using `document-pending-reminder` template.
+## Phase B — Gap closure (only against the Phase A list)
 
-### Phase 7 — Remaining modules (Part 10)
-Sub-batches, each shippable:
-- **7a Services** — Kanban-style per-service pipeline board (read-only counts; cards link to order detail).
-- **7b Invoices** — table + filters + PDF download (existing `invoices` bucket).
-- **7c Payments** — UI rebuild only (existing backend), summary pills + filterable table.
-- **7d Support Tickets** — table + detail (verify schema; use `complaints` if no dedicated table, with `category='ticket'` filter, else flag).
-- **7e Tasks** — table with overdue/today highlights + Assign Task modal (flag if no `tasks` table; propose additive migration).
-- **7f Employees** — staff list from `profiles`+`user_roles` with role badges and per-staff performance summary.
-- **7g Email Templates** — list + editor (subject/body + merge tags) bound to `email_templates`.
-- **7h WhatsApp Templates** — same shape; new table only if absent (flag before migration).
-- **7i Reports** — date range, daily KPI cards, monthly service-wise revenue bar, lead conversion funnel, employee performance table.
-- **7j Settings** — Company Info, Status Master, Notifications, Gateway status. Workflow Automation tab implemented in Phase 9.
-- **Complaints detail page** — status stepper, linked order, notes timeline, attachments (completes Part 9).
+Each defect becomes one focused commit. No file is rewritten if its current behavior already matches the spec. Likely fix candidates already visible in code:
+- Dashboard §10 Follow-ups currently shows a placeholder ("lands with the Tasks module") — wire to existing tasks/notifications data.
+- Dashboard §11 Support Tickets currently shows "module ships next" copy — wire to existing complaints/ticket counts.
+- Confirm KPI cards expose Today/Weekly/Monthly toggle and reason-wise/service-wise expand drawers per spec (Part 4 §1).
+- Confirm KPI #4 Pending Orders, #5/#6 Complaints, #7/#8 Orders/Sale expand to breakdowns.
+- Legal Compliance block on Customer Overview tab — add if missing.
+- Aadhaar sweep — grep for any unmasked render path and route through `maskAadhaar`.
 
-### Phase 8 — Audit Trail & Compliance (Part 11)
-- `/admin/audit` page (Super Admin + Manager via `has_role`) over existing `audit_logs` (search, filter by entity_type / actor / date).
-- Legal Compliance block on Customer Overview tab (terms/privacy timestamps, IP, gateway timestamp, consent). If `customers` lacks these columns → flag additive migration.
-- System-wide Aadhaar masking sweep (exports, invoice PDF, document table) via existing `maskAadhaar` util.
+Migrations only if a defect strictly requires schema change; each migration will include GRANTs + RLS per project rules and will be flagged before running.
 
-### Phase 9 — Cancellation Workflow Automation (Part 12)
-- Migration (with GRANTs): add `applications.cancellation_requested_at`, `closure_stage` enum, `closure_next_at`.
-- 3 new email templates seeded: `cancellation-request-received`, `final-notice-before-closure`, `order-closed-notice`.
-- Server route `/api/public/hooks/run-closure-workflow` advances Step 1→2→3 (7+7 days configurable) and enqueues emails via existing queue.
-- `pg_cron` daily job hitting the route with `apikey` header.
-- Settings → Workflow Automation page: timer config (default 7/7) and per-step template selection; bound to a new `workflow_settings` row (or `settings` JSON) — flagged before migration.
+## Phase C — Final pass
 
----
+- Re-run Phase A walk to confirm every defect is closed.
+- `bun run lint` / typecheck via the build harness — no new errors.
+- Summarize: per-Part status table with a screenshot reference.
 
-## Cross-cutting guarantees
+## Cross-cutting guarantees (unchanged)
 
-- **No backend regressions** for leads/payments — only additive server fns.
+- No backend regressions for leads or payments — additive server fns only.
 - All admin reads via `createServerFn` + `requireSupabaseAuth`.
-- Realtime channels keep `user:<uid>:...` prefix.
-- Aadhaar never rendered in full (existing `maskAadhaar` util).
-- Migrations only when strictly required (Phase 9; possibly Phase 7e tasks, 7h WhatsApp templates, Phase 8 compliance columns) — each flagged for your approval before running, with GRANTs + RLS + `service_role` per project security rules.
+- Aadhaar never rendered in full.
+- Realtime channels keep `user:<uid>:…` prefix.
 
----
+## What I will deliver per phase
 
-## What I'll start on approval
+- Phase A: defect list + screenshots, no code changes.
+- Phase B: one commit per defect, each verified with a follow-up screenshot.
+- Phase C: final status table.
 
-**Phase 0 — Design System & Shell.** Visual reskin only, no behavior changes; safe checkpoint to review before the dashboard build.
+Approve to start Phase A.

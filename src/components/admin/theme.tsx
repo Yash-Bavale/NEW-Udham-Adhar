@@ -1,17 +1,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
-const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({ theme: "dark", toggle: () => {} });
+const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({ theme: "light", toggle: () => {} });
 
 const KEY = "admin-theme";
 
 export function AdminThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
     const stored = (typeof window !== "undefined" && localStorage.getItem(KEY)) as Theme | null;
-    // Default to dark (Linear-style) when nothing stored.
-    const initial: Theme = stored ?? "dark";
+    // Spec is a clean, minimal light admin (#1F4E79 / #EFF6FC). Default to light.
+    const initial: Theme = stored ?? "light";
     setTheme(initial);
   }, []);
 
