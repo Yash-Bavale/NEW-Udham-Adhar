@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Plus, Search, X, Loader2 } from "lucide-react";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import {
@@ -365,6 +365,3 @@ function AddComplaintModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-
-// Keep imported but unused warning happy in strict TS:
-useEffect; useMemo;
