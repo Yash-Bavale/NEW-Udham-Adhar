@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead,
@@ -40,11 +40,16 @@ function LeadsPage() {
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
   const [assignee, setAssignee] = useState<string>("");
+  const [service, setService] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [defaultApplied, setDefaultApplied] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const servicesFn = useServerFn(listServices);
+  const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
 
   const { data: savedData } = useQuery({ queryKey: ["admin.savedFilters"], queryFn: () => savedFn() });
   useEffect(() => {
@@ -77,17 +82,26 @@ function LeadsPage() {
     queryFn: () => listFn({ data: { page, pageSize: 25, search: search || undefined, status: (status || undefined) as never } }),
   });
 
-  // Client-side source/assignee filter on top of paginated rows
+  // Client-side filters layered on paginated rows
   const rows = useMemo(() => {
     let r = data?.rows ?? [];
     if (source) r = r.filter((l: any) => (l.lead_source || "").toLowerCase() === source.toLowerCase());
+    if (service) r = r.filter((l: any) => (l.service || "") === service);
     if (assignee) {
       r = assignee === "__unassigned"
         ? r.filter((l: any) => !l.assigned_to)
         : r.filter((l: any) => l.assigned_to === assignee);
     }
+    if (dateFrom) {
+      const from = new Date(dateFrom).getTime();
+      r = r.filter((l: any) => new Date(l.created_at).getTime() >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo).getTime() + 24 * 60 * 60 * 1000;
+      r = r.filter((l: any) => new Date(l.created_at).getTime() < to);
+    }
     return r;
-  }, [data, source, assignee]);
+  }, [data, source, service, assignee, dateFrom, dateTo]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });
@@ -214,6 +228,17 @@ function LeadsPage() {
           <option value="whatsapp">WhatsApp</option>
         </select>
         <select
+          value={service}
+          onChange={(e) => setService(e.target.value)}
+          className="rounded-lg border px-3 py-2 text-sm max-w-[220px]"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <option value="">All services</option>
+          {servicesData?.rows.map((s: any) => (
+            <option key={s.id} value={s.service_name}>{s.service_name}</option>
+          ))}
+        </select>
+        <select
           value={assignee}
           onChange={(e) => setAssignee(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm"
@@ -225,9 +250,27 @@ function LeadsPage() {
             <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
           ))}
         </select>
-        {(source || assignee) && (
+        <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}>
+          <Calendar className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-transparent outline-none text-xs"
+            style={{ color: "var(--admin-fg)" }}
+          />
+          <span style={{ color: "var(--admin-fg-muted)" }}>→</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-transparent outline-none text-xs"
+            style={{ color: "var(--admin-fg)" }}
+          />
+        </div>
+        {(source || service || assignee || dateFrom || dateTo) && (
           <button
-            onClick={() => { setSource(""); setAssignee(""); }}
+            onClick={() => { setSource(""); setService(""); setAssignee(""); setDateFrom(""); setDateTo(""); }}
             className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)]"
             style={{ color: "var(--admin-fg-muted)" }}
           >
@@ -256,10 +299,13 @@ function LeadsPage() {
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Lead ID</th>
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Email / Mobile</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Email</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Source</th>
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Created</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,18 +338,27 @@ function LeadsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 font-medium">{l.name}</td>
-                      <td className="px-4 py-2.5 text-xs">
-                        <div>{l.email}</div>
-                        <div style={{ color: "var(--admin-fg-muted)" }}>{l.mobile}</div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs max-w-[220px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</td>
+                      <td className="px-4 py-2.5 text-xs">{l.mobile || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs max-w-[200px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenId(l.id); }}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--admin-surface)] border"
+                          style={{ borderColor: "var(--admin-border)", color: "var(--admin-accent)" }}
+                          title="View details"
+                        >
+                          <Eye className="size-3.5" /> View
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -369,12 +424,25 @@ function LeadDetailSheet({ leadId, onClose }: { leadId: string | null; onClose: 
             <Field label="Mobile" value={data.lead.mobile} />
             <Field label="State" value={data.lead.state} />
             <Field label="Language" value={data.lead.language} />
-            <Field label="Service" value={data.lead.service} />
             <Field label="Source" value={data.lead.lead_source} />
+            <Field label="Interested Service" value={data.lead.service} />
             <Field label="Total Amount" value={`₹${Number(data.lead.total_amount || 0).toLocaleString("en-IN")}`} />
-            <Field label="Applications" value={String(data.applications.length)} />
-            <Field label="Notes" value={String(data.notes.length)} />
+            <Field label="Assigned To" value={data.lead.assigned_to ? data.lead.assigned_to.slice(0, 8) + "…" : "Unassigned"} />
             <Field label="Created" value={new Date(data.lead.created_at).toLocaleString("en-IN")} />
+
+            {data.lead.notes && (
+              <div className="pt-2">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Notes</div>
+                <div className="text-sm rounded-md border p-2 whitespace-pre-wrap" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}>
+                  {data.lead.notes}
+                </div>
+              </div>
+            )}
+            {data.notes.length > 0 && (
+              <div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                {data.notes.length} internal note(s) · {data.applications.length} application(s)
+              </div>
+            )}
 
             <div className="pt-3 border-t">
               <Link
