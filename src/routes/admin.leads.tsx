@@ -407,7 +407,7 @@ function AddLeadDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  staff: { id: string; display_name: string | null; email: string }[];
+  staff: { id: string; display_name: string | null; email: string | null }[];
   onCreated: () => void;
 }) {
   const addFn = useServerFn(addLead);
