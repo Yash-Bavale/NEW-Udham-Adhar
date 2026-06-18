@@ -185,12 +185,16 @@ import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pen
 import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
+import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
@@ -199,6 +203,7 @@ import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
+import { Route as AdminDocumentsRouteImport } from './routes/admin.documents'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
@@ -1145,9 +1150,19 @@ const AppTokenRoute = AppTokenRouteImport.update({
   path: '/app/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminWhatsappTemplatesRoute = AdminWhatsappTemplatesRouteImport.update({
+  id: '/whatsapp-templates',
+  path: '/whatsapp-templates',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTicketsRoute = AdminTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminTasksRoute = AdminTasksRouteImport.update({
@@ -1158,6 +1173,11 @@ const AdminTasksRoute = AdminTasksRouteImport.update({
 const AdminSubmissionsRoute = AdminSubmissionsRouteImport.update({
   id: '/submissions',
   path: '/submissions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminServicesRoute = AdminServicesRouteImport.update({
@@ -1173,6 +1193,11 @@ const AdminSeoRoute = AdminSeoRouteImport.update({
 const AdminReviewRoute = AdminReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPipelineRoute = AdminPipelineRouteImport.update({
@@ -1213,6 +1238,11 @@ const AdminEmployeesRoute = AdminEmployeesRouteImport.update({
 const AdminEmailsRoute = AdminEmailsRouteImport.update({
   id: '/emails',
   path: '/emails',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -1566,6 +1596,7 @@ export interface FileRoutesByFullPath {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/documents': typeof AdminDocumentsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -1574,12 +1605,16 @@ export interface FileRoutesByFullPath {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -1789,6 +1824,7 @@ export interface FileRoutesByTo {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/documents': typeof AdminDocumentsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -1797,12 +1833,16 @@ export interface FileRoutesByTo {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -2014,6 +2054,7 @@ export interface FileRoutesById {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/documents': typeof AdminDocumentsRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -2022,12 +2063,16 @@ export interface FileRoutesById {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -2240,6 +2285,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/documents'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -2248,12 +2294,16 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
+    | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
     | '/admin/services'
+    | '/admin/settings'
     | '/admin/submissions'
     | '/admin/tasks'
+    | '/admin/tickets'
     | '/admin/users'
+    | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -2463,6 +2513,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/documents'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -2471,12 +2522,16 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
+    | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
     | '/admin/services'
+    | '/admin/settings'
     | '/admin/submissions'
     | '/admin/tasks'
+    | '/admin/tickets'
     | '/admin/users'
+    | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -2687,6 +2742,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/documents'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -2695,12 +2751,16 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
+    | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
     | '/admin/services'
+    | '/admin/settings'
     | '/admin/submissions'
     | '/admin/tasks'
+    | '/admin/tickets'
     | '/admin/users'
+    | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -4165,11 +4225,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/whatsapp-templates': {
+      id: '/admin/whatsapp-templates'
+      path: '/whatsapp-templates'
+      fullPath: '/admin/whatsapp-templates'
+      preLoaderRoute: typeof AdminWhatsappTemplatesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tickets': {
+      id: '/admin/tickets'
+      path: '/tickets'
+      fullPath: '/admin/tickets'
+      preLoaderRoute: typeof AdminTicketsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/tasks': {
@@ -4184,6 +4258,13 @@ declare module '@tanstack/react-router' {
       path: '/submissions'
       fullPath: '/admin/submissions'
       preLoaderRoute: typeof AdminSubmissionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/services': {
@@ -4205,6 +4286,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/admin/review'
       preLoaderRoute: typeof AdminReviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/pipeline': {
@@ -4261,6 +4349,13 @@ declare module '@tanstack/react-router' {
       path: '/emails'
       fullPath: '/admin/emails'
       preLoaderRoute: typeof AdminEmailsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/documents': {
+      id: '/admin/documents'
+      path: '/documents'
+      fullPath: '/admin/documents'
+      preLoaderRoute: typeof AdminDocumentsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/dashboard': {
@@ -4582,6 +4677,7 @@ interface AdminRouteChildren {
   AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminDocumentsRoute: typeof AdminDocumentsRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminEmployeesRoute: typeof AdminEmployeesRoute
   AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
@@ -4590,12 +4686,16 @@ interface AdminRouteChildren {
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
   AdminSeoRoute: typeof AdminSeoRoute
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminTasksRoute: typeof AdminTasksRoute
+  AdminTicketsRoute: typeof AdminTicketsRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -4607,6 +4707,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
   AdminCustomersRoute: AdminCustomersRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminDocumentsRoute: AdminDocumentsRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminEmployeesRoute: AdminEmployeesRoute,
   AdminFinanceRoute: AdminFinanceRouteWithChildren,
@@ -4615,12 +4716,16 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,
   AdminSeoRoute: AdminSeoRoute,
   AdminServicesRoute: AdminServicesRouteWithChildren,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminTasksRoute: AdminTasksRoute,
+  AdminTicketsRoute: AdminTicketsRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
@@ -4827,13 +4932,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
