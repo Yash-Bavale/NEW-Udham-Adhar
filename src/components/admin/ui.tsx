@@ -20,26 +20,25 @@ export function StatCard({
   loading?: boolean;
   hint?: string;
 }) {
-  const grad =
-    gradient === "success" ? "var(--gradient-success)" :
-    gradient === "warn" ? "var(--gradient-warn)" :
-    gradient === "danger" ? "var(--gradient-danger)" :
-    "var(--gradient-admin)";
+  const tone =
+    gradient === "success" ? "var(--admin-success)" :
+    gradient === "warn" ? "var(--admin-warn)" :
+    gradient === "danger" ? "var(--admin-danger)" :
+    "var(--admin-primary)";
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-xl border p-4"
-      style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", boxShadow: "var(--shadow-admin)" }}
+      transition={{ duration: 0.3, delay: index * 0.04, ease: "easeOut" }}
+      className="relative rounded-lg border p-4"
+      style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
     >
-      <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: grad }} />
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="text-[11px] uppercase tracking-wide font-medium" style={{ color: "var(--admin-fg-muted)" }}>
           {label}
         </div>
         {icon && (
-          <div className="rounded-lg p-2" style={{ background: grad, color: "white" }}>
+          <div className="rounded-md p-1.5" style={{ background: "var(--admin-surface-2)", color: tone }}>
             {icon}
           </div>
         )}
@@ -47,7 +46,7 @@ export function StatCard({
       {loading ? (
         <div className="mt-3 h-7 w-20 animate-pulse rounded" style={{ background: "var(--admin-surface-2)" }} />
       ) : (
-        <div className="mt-2 text-2xl font-semibold tabular-nums" style={{ color: "var(--admin-fg)" }}>
+        <div className="mt-2 text-2xl font-medium tabular-nums" style={{ color: "var(--admin-fg)" }}>
           {typeof value === "number" ? value.toLocaleString("en-IN") : value}
         </div>
       )}
@@ -55,7 +54,7 @@ export function StatCard({
         <div className="mt-1 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{hint}</div>
       )}
       {delta && !loading && (
-        <div className={`mt-1 text-xs font-medium ${delta.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+        <div className="mt-1 text-xs font-medium" style={{ color: delta.positive ? "var(--admin-success)" : "var(--admin-danger)" }}>
           {delta.positive ? "▲" : "▼"} {Math.abs(delta.value)}%
         </div>
       )}
@@ -66,15 +65,15 @@ export function StatCard({
 export function SectionCard({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <motion.section
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className={`rounded-xl border ${className}`}
-      style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", boxShadow: "var(--shadow-admin)" }}
+      transition={{ duration: 0.3 }}
+      className={`rounded-lg border ${className}`}
+      style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
     >
       {(title || action) && (
         <header className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--admin-border)" }}>
-          {title && <h3 className="text-sm font-semibold" style={{ color: "var(--admin-fg)" }}>{title}</h3>}
+          {title && <h3 className="text-sm font-medium" style={{ color: "var(--admin-fg)" }}>{title}</h3>}
           {action}
         </header>
       )}
