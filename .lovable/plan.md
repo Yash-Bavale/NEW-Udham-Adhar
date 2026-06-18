@@ -1,90 +1,168 @@
 
-# Phase 1: Design System + New Admin Shell
+# CRM UI Rebuild — Phased Plan
 
-Scope is intentionally narrow. No backend changes. No page rebuilds. We replace the chrome (sidebar, top bar, container, tokens) so every existing `/admin/*` page renders inside the new shell. The Dashboard, Leads, Orders, etc. screens keep their current content and will be rebuilt in later phases.
+This plan rebuilds **only the frontend UI** of the existing Udyam Ops admin panel. All existing backend (DB schema, server functions, RLS, auth, leads/payments logic) stays intact. Routes are preserved; pages are re-skinned and missing screens are added. Every page binds to existing server functions — no mocks.
 
-## What gets built
+Phases are sequenced so each phase is shippable on its own.
 
-### 1. Design tokens (`src/styles.css`)
-Add a dedicated admin token block — does not touch the public site theme:
-- `--admin-primary: #1F4E79`
-- `--admin-accent: #2E75B6`
-- `--admin-surface: #FFFFFF`
-- `--admin-surface-2: #EFF6FC` (light surface / row tint / hover)
-- `--admin-border: #E2E8F0`
-- `--admin-fg: #0F172A`
-- `--admin-fg-muted: #64748B`
-- Status pill colors (success / warn / danger / info / neutral) as flat solids (no gradients, no shadows).
-- Body 14px, headings weight 500, system/Inter font stack.
-- Remove existing admin gradient tokens (`--gradient-admin`, elevated shadows) from admin scope so the new look stays flat.
+---
 
-### 2. New `AdminShell` (`src/components/admin/AdminShell.tsx`)
-Replace in place. Structure:
-- **Fixed left sidebar, 220px**, always visible on desktop, collapses to bottom nav with icons on mobile (`md:` breakpoint).
-- **Top bar**: global search input (always visible, full-width center), notifications bell, user avatar with dropdown (sign out).
-- **Main**: 24px padding, full-width content area where current route children render via `<Outlet />`.
-- Active route highlight via `useRouterState` pathname match.
-- Visual grouping with thin dividers between the 6 groups listed in the spec.
+## Phase 0 — Design System & Shell (foundation)
 
-### 3. Sidebar items (exact order + grouping from spec)
-Each linked to a route. Routes that don't yet exist get created as **stub pages** with a `ComingSoon`-style empty state (reusing `src/components/admin/ComingSoon.tsx`). No backend, no mock data.
+Goal: lock visual language and chrome before touching pages.
 
-| Group | Item | Route | Status |
-|---|---|---|---|
-| 1 | Dashboard | `/admin/dashboard` | exists |
-| 2 | Leads | `/admin/leads` | exists |
-| 2 | Customers | `/admin/customers` | exists |
-| 2 | Orders | `/admin/applications` (relabel "Orders") | exists |
-| 2 | Documents | `/admin/documents` | **new stub** |
-| 3 | Complaints | `/admin/complaints` | exists |
-| 3 | Services | `/admin/services` | exists |
-| 3 | Invoices | `/admin/invoices` | exists |
-| 3 | Payments | `/admin/payments` | exists |
-| 4 | Support Tickets | `/admin/tickets` | **new stub** |
-| 4 | Tasks | `/admin/tasks` | **new stub** |
-| 4 | Reports | `/admin/reports` | exists or stub |
-| 5 | Employees | `/admin/users` (relabel "Employees") | exists |
-| 5 | Email Templates | `/admin/emails/templates` | exists or stub |
-| 5 | WhatsApp Templates | `/admin/whatsapp-templates` | **new stub** |
-| 5 | Settings | `/admin/settings` | exists or stub |
-| 6 | Logout | action (sign out) | wired to existing auth |
+- Tokens in `src/styles.css` (Tailwind v4 `@theme`):
+  - `--color-primary: #1F4E79`, `--color-accent: #2E75B6`, `--color-surface: #EFF6FC`
+  - Neutral grays, semantic status colors (success/warn/error/info), no gradients/shadows.
+  - Inter via `<link>` in `__root.tsx`; body 14px; headings weight 500 only.
+- Shared primitives:
+  - `StatusPill` (dot + label, color by status key)
+  - `DataTable` (alt-row tint, sticky header, sortable cols, pagination)
+  - `FormField` (label-above, helper-below, inline error)
+  - `SectionCard`, `KpiCard`, `EmptyState`, `SidePanel` wrapper
+- App shell:
+  - Fixed 220px left sidebar (grouped per spec, Lucide icons, active highlight, collapsible to icons on small screens; mobile bottom nav)
+  - Top bar: global search, notifications bell, user avatar menu
+  - 24px main padding
+- Replace current `AppSidebar` groupings to match the 6 visual groups in Part 3.
 
-### 4. Global search (top bar)
-Wire to the existing `src/lib/crm/global-search.functions.ts` server function (already covers leads/customers/orders). Debounced input, dropdown results, click navigates to detail. No new backend.
+Deliverable: re-themed shell visible on every `/admin/*` route, no functional regressions.
 
-### 5. Shared UI primitives (admin scope only)
-Light refresh of `src/components/admin/ui.tsx`:
-- `StatusBadge` → flat pill with colored dot + label (remove gradient).
-- `SectionCard` → flat, 1px border, no shadow.
-- `StatCard` → flat surface, large number, no gradient backgrounds.
-- Table base classes: alternating row tint (`--admin-surface-2`), sticky header, sortable column affordance.
-- Form base classes: label-above-input, helper text, inline error styles.
+---
 
-Existing pages will pick up the new look automatically because they already consume these primitives and CSS variables.
+## Phase 1 — Main Dashboard (Part 4, 12 sections)
 
-## What is explicitly NOT in this phase
-- No Dashboard rebuild (12 sections come later).
-- No Leads/Orders/Customers/etc. UI rebuilds.
-- No new tables, RLS, or backend functions.
-- No Audit Trail, Cancellation Workflow automation, Aadhaar masking sweep, Legal consent capture, WhatsApp send logic — these come with their respective module rebuilds.
-- The 4 new stub routes show "Coming soon" only.
+Rebuild `/admin/dashboard` using existing `ops-dashboard.functions.ts` plus new aggregation server fns where missing.
 
-## Files touched
-- `src/styles.css` — admin token block (additive + flatten admin gradients)
-- `src/components/admin/AdminShell.tsx` — rewrite
-- `src/components/admin/ui.tsx` — flatten primitives
-- `src/components/admin/CommandPalette.tsx` — keep (Ctrl-K), unchanged
-- `src/routes/admin.documents.tsx` — new stub
-- `src/routes/admin.tickets.tsx` — new stub
-- `src/routes/admin.tasks.tsx` — new stub
-- `src/routes/admin.whatsapp-templates.tsx` — new stub
-- (verify existing routes for reports/email-templates/settings; add stubs only if missing)
+Sections wired to backend:
+1. 8 KPI cards with Today/Week/Month toggle (+ expandable reason/service breakdowns)
+2. Action Required panel (red border) — docs pending, complaint follow-ups, awaiting reply
+3. Service Pipeline stage counts (applications grouped by status)
+4. Document Pending cards with "Send Reminder" (uses existing email queue)
+5. Complaint Tracker widget (counts + table)
+6. Payment Summary pills (today collection, pending, refunds, chargebacks)
+7. Revenue bar chart 7-day with weekly/monthly toggle (recharts)
+8. Top Selling Services list
+9. Staff Performance table
+10. Today's Follow-up Calendar list
+11. Support Ticket pills
+12. Recent Activities feed (live, from `activity_logs`)
+- Global search bar in top bar querying orders/mobile/complaint/customer/email/udyam via a new `globalSearch` server fn.
 
-## Acceptance check after build
-- Every existing `/admin/*` page still renders with real backend data, just inside the new shell.
-- Sidebar shows all 16 items in the spec order and grouping.
-- Top bar search returns existing global search results.
-- Mobile (<768px) collapses sidebar to bottom icon nav.
-- No gradients or drop shadows anywhere in `/admin/*`.
+New server fns (read-only aggregations, no schema change):
+`getDashboardKpis(range)`, `getActionRequired()`, `getPipelineCounts()`, `getDocumentPending()`, `getComplaintTracker()`, `getPaymentSummary()`, `getRevenueSeries(range)`, `getTopServices()`, `getStaffPerformance()`, `getTodayFollowups()`, `getTicketSummary()`, `getRecentActivities()`, `globalSearch(q)`.
 
-Approve to proceed, or tell me which item to adjust (e.g. keep gradients, rename "Orders" back to "Applications", skip stubs).
+---
+
+## Phase 2 — Leads (Part 5)
+
+Already partially done in earlier turn. Confirm:
+- Status pills with live counts (all spec statuses)
+- Filter bar (Status, Source, Date Range, Assigned, Service)
+- Table cols per spec, row → side panel (not new page)
+- Add Lead modal with all spec fields
+- Bulk actions: assign, status, export CSV
+
+---
+
+## Phase 3 — Orders / Applications (Part 6)
+
+- List page already rebuilt; verify columns + status pills match Part 6 master list.
+- Detail page: ensure all 7 sections present (header, Journey Timeline, payment, customer card, documents checklist with upload slots, Internal Notes Timeline with auto + manual entries, linked complaint).
+- Internal Notes: auto entries read-only, manual entry via `addApplicationNote`. Auto entries already produced by DB triggers (`log_application_activity`).
+
+---
+
+## Phase 4 — Customer Profile (Part 7)
+
+Already rebuilt with 6 tabs and Aadhaar masking. Polish only:
+- Tab 5 Documents → grid view with type icon, expiry badge, download, version history modal.
+- Tab 6 Communication → include WhatsApp logs alongside email_logs (if table exists; else email only with note).
+
+---
+
+## Phase 5 — Document Management (Part 8)
+
+New global page `/admin/documents`:
+- Server fn `listAllDocuments(filters)` joining `documents` → leads → customers
+- Table per spec, inline preview modal (PDF/image), download via signed URL from `documents` bucket
+- Expiry badges (amber <30d, red expired)
+- Version history modal: group by (customer_id, document_type)
+- Filters: type, customer search, expiry status, date range
+
+---
+
+## Phase 6 — Complaints (Part 9)
+
+- Rebuild list page columns per spec
+- Detail page with status stepper, linked order, notes timeline (reuse component), attachments
+- Add Complaint modal with searchable customer picker
+- Status pills aligned to spec values
+
+---
+
+## Phase 7 — Remaining Modules (Part 10)
+
+Each is a focused page bound to existing tables:
+- **Services** → pipeline Kanban per service (drag disabled — read-only counts; click card → order detail)
+- **Invoices** → table + PDF download (uses existing `invoices` table + `invoices` bucket)
+- **Payments** → UI rebuild only, existing backend; summary + filterable table
+- **Support Tickets** → table + detail (uses `complaints` or dedicated tickets table — verify during build)
+- **Tasks** → table with overdue/today highlighting + Assign Task modal
+- **Employees** → staff list from `profiles` + `user_roles`, role badges, performance summary
+- **Email Templates** → list + editor (subject/body, merge tags) bound to `email_templates`
+- **WhatsApp Templates** → mirrors email templates (new table if absent — flagged before creation)
+- **Reports** → date range + daily KPIs + monthly charts (revenue bar, conversion funnel, employee table)
+- **Settings** → Company Info, Status Master, Notification prefs, Gateway status, Workflow Automation (Phase 9)
+
+---
+
+## Phase 8 — Audit Trail & Compliance (Part 11)
+
+- New `/admin/audit` page (Super Admin + Manager only via `has_role`)
+- Searchable/filterable table over existing `audit_logs` (who/what/old→new/when)
+- Customer profile Overview: add Legal Compliance block (terms/privacy timestamps, IP, gateway timestamp, consent) — read from existing customer fields; if missing columns, flag during build.
+- System-wide Aadhaar masking via existing `maskAadhaar` util — sweep remaining surfaces (exports, invoice PDF, document table).
+
+---
+
+## Phase 9 — Cancellation Workflow Automation (Part 12)
+
+- Settings → Workflow Automation page with configurable timers (default 7/7 days) and template selection per step.
+- Implementation:
+  - DB columns on `applications`: `cancellation_requested_at`, `closure_stage` (enum), `closure_next_at` — added via migration with GRANTs.
+  - pg_cron job (daily) calls `/api/public/hooks/run-closure-workflow` which advances orders through Step 1→2→3 and enqueues the 3 emails via existing email queue + templates.
+  - New email templates: `cancellation-request-received`, `final-notice-before-closure`, `order-closed-notice`.
+  - Status transitions use existing application_status enum values (extend if missing).
+
+---
+
+## Cross-cutting rules
+
+- No backend regressions: every new server fn is additive; no edits to existing leads/payments handlers.
+- All reads via `createServerFn` (`requireSupabaseAuth`); no direct client → DB for admin pages except realtime subs (already in place).
+- Realtime channels keep `user:<uid>:...` prefix per project memory.
+- Aadhaar never rendered in full anywhere.
+
+---
+
+## Technical notes
+
+- Charts: `recharts` (already in deps if present; otherwise `bun add recharts` in Phase 1).
+- PDF preview: native `<iframe src=signedUrl>` for PDFs; `<img>` for images. No new heavy deps.
+- CSV export: client-side from current filtered result set.
+- New tables only if strictly required (Phase 7 WhatsApp templates, Phase 9 closure columns) — each gated by a migration step with GRANTs + RLS per security memory.
+
+---
+
+## Suggested execution order & checkpoints
+
+1. Phase 0 (shell + tokens) — visible reskin, no behavior change.
+2. Phase 1 (dashboard) — biggest user value.
+3. Phase 2 → 4 verification passes (already largely done).
+4. Phase 5, 6 — net-new pages.
+5. Phase 7 — remaining modules in parallel sub-batches.
+6. Phase 8 — audit + compliance sweep.
+7. Phase 9 — cancellation automation (last; touches DB + cron).
+
+I'll pause for approval after each phase so you can review before the next one starts.
