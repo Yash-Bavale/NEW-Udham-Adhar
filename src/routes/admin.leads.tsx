@@ -299,10 +299,13 @@ function LeadsPage() {
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Lead ID</th>
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Email / Mobile</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Email</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Source</th>
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Created</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,18 +338,27 @@ function LeadsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 font-medium">{l.name}</td>
-                      <td className="px-4 py-2.5 text-xs">
-                        <div>{l.email}</div>
-                        <div style={{ color: "var(--admin-fg-muted)" }}>{l.mobile}</div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs max-w-[220px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</td>
+                      <td className="px-4 py-2.5 text-xs">{l.mobile || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs max-w-[200px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenId(l.id); }}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--admin-surface)] border"
+                          style={{ borderColor: "var(--admin-border)", color: "var(--admin-accent)" }}
+                          title="View details"
+                        >
+                          <Eye className="size-3.5" /> View
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
