@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { LifeBuoy, ArrowRight } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 
