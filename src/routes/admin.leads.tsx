@@ -40,11 +40,16 @@ function LeadsPage() {
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
   const [assignee, setAssignee] = useState<string>("");
+  const [service, setService] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [defaultApplied, setDefaultApplied] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const servicesFn = useServerFn(listServices);
+  const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
 
   const { data: savedData } = useQuery({ queryKey: ["admin.savedFilters"], queryFn: () => savedFn() });
   useEffect(() => {
