@@ -103,7 +103,7 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
                 .update({
                   closure_stage: "closed",
                   closure_next_at: null,
-                  application_status: "closed" as never,
+                  application_status: "cancelled",
                 })
                 .eq("id", app.id);
               advanced++;
