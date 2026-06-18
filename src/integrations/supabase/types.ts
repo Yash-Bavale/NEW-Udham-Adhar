@@ -180,6 +180,9 @@ export type Database = {
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_to: string | null
+          cancellation_requested_at: string | null
+          closure_next_at: string | null
+          closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
           customer_id: string | null
           document_status: string
@@ -193,6 +196,9 @@ export type Database = {
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
+          cancellation_requested_at?: string | null
+          closure_next_at?: string | null
+          closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
           document_status?: string
@@ -206,6 +212,9 @@ export type Database = {
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
+          cancellation_requested_at?: string | null
+          closure_next_at?: string | null
+          closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
           document_status?: string
@@ -1726,6 +1735,42 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          step1_template_code: string
+          step2_days: number
+          step2_template_code: string
+          step3_days: number
+          step3_template_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          step1_template_code?: string
+          step2_days?: number
+          step2_template_code?: string
+          step3_days?: number
+          step3_template_code?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          step1_template_code?: string
+          step2_days?: number
+          step2_template_code?: string
+          step3_days?: number
+          step3_template_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       payments_safe: {
@@ -1858,6 +1903,12 @@ export type Database = {
         | "consultation_pending"
         | "consultation_scheduled"
         | "rejected"
+      closure_stage:
+        | "none"
+        | "request_received"
+        | "closure_pending"
+        | "notice_sent"
+        | "closed"
       email_log_status: "sent" | "failed" | "bounced"
       email_queue_status: "queued" | "sending" | "sent" | "failed" | "dlq"
       lead_status:
@@ -2028,6 +2079,13 @@ export const Constants = {
         "consultation_pending",
         "consultation_scheduled",
         "rejected",
+      ],
+      closure_stage: [
+        "none",
+        "request_received",
+        "closure_pending",
+        "notice_sent",
+        "closed",
       ],
       email_log_status: ["sent", "failed", "bounced"],
       email_queue_status: ["queued", "sending", "sent", "failed", "dlq"],
