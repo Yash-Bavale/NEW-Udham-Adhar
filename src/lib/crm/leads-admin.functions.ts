@@ -178,3 +178,56 @@ export const listStaff = createServerFn({ method: "GET" })
 
     return { profiles };
   });
+
+export const getLeadCounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    const admin = await getAdmin();
+    const { data, error } = await admin.from("leads").select("status");
+    if (error) throw new Error(error.message);
+    const counts: Record<string, number> = { all: data.length };
+    for (const r of data) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    return { counts };
+  });
+
+const AddLeadSchema = z.object({
+  name: z.string().trim().min(2),
+  email: z.string().trim().email(),
+  mobile: z.string().trim().min(7),
+  state: z.string().trim().min(2),
+  language: z.string().trim().min(2).default("en"),
+  service: z.string().trim().min(2),
+  lead_source: z.string().trim().default("manual"),
+  base_amount: z.number().nonnegative().default(0),
+  gst_amount: z.number().nonnegative().default(0),
+  total_amount: z.number().nonnegative().default(0),
+  notes: z.string().optional(),
+  assigned_to: z.string().uuid().nullable().optional(),
+});
+
+export const addLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => AddLeadSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    const admin = await getAdmin();
+    const { data: inserted, error } = await admin
+      .from("leads")
+      .insert({ ...data, status: "new_lead" })
+      .select("id, lead_code")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "lead",
+      entityId: inserted.id,
+      action: "create_lead",
+      oldValue: null,
+      newValue: data,
+      actorId: context.userId,
+    });
+
+    return { id: inserted.id, lead_code: inserted.lead_code };
+  });
