@@ -50,6 +50,7 @@ export type Customer360 = {
   emails: Array<{ id: string; to_email: string; subject: string; template_code: string | null; status: string; sent_at: string }>;
   notes: Array<{ id: string; note: string; created_at: string; user_id: string | null }>;
   activity: Array<{ id: string; activity_type: string; activity_description: string; created_at: string }>;
+  documents: Array<{ id: string; doc_type: string; file_name: string; status: string; uploaded_at: string; verified_at: string | null; lead_id: string; application_id: string | null }>;
 };
 
 export const getCustomer360 = createServerFn({ method: "POST" })
