@@ -104,9 +104,14 @@ function DocChecklistPanel({ applicationId }: { applicationId: string }) {
 function ApplicationCommandCenter() {
   const { applicationId } = Route.useParams();
   const fetchFn = useServerFn(getApplicationDetail);
+  const orderFn = useServerFn(getOrderDetail);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin.application", applicationId],
     queryFn: () => fetchFn({ data: { applicationId } }),
+  });
+  const { data: orderData } = useQuery({
+    queryKey: ["admin.order", applicationId],
+    queryFn: () => orderFn({ data: { applicationId } }),
   });
 
   const [tab, setTab] = useState<Tab>("onboarding");
@@ -120,6 +125,18 @@ function ApplicationCommandCenter() {
   }
   if (!data) return null;
   const { application, lead, certificates } = data as any;
+  const journey = orderData?.journey;
+  const payments = orderData?.payments ?? [];
+  const complaints = orderData?.complaints ?? [];
+  const paymentStatus = orderData?.paymentStatus ?? "Pending";
+  const total = orderData?.total ?? 0;
+  const assignedStaff = orderData?.assignedStaff;
+  const paidSum = payments
+    .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)))
+    .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+  const gstSum = payments.reduce((s: number, p: any) => s + Number(p.gst_amount || 0), 0);
+  const baseSum = payments.reduce((s: number, p: any) => s + Number(p.base_amount || 0), 0);
+  const lastPayment = payments[0];
 
   return (
     <div className="space-y-4">
@@ -130,7 +147,7 @@ function ApplicationCommandCenter() {
           className="inline-flex items-center gap-1 text-xs hover:underline"
           style={{ color: "var(--admin-fg-muted)" }}
         >
-          <ChevronLeft className="w-3.5 h-3.5" /> Applications
+          <ChevronLeft className="w-3.5 h-3.5" /> Orders
         </Link>
         <StatusTransition
           kind="application"
@@ -140,8 +157,19 @@ function ApplicationCommandCenter() {
         />
       </div>
 
+      {/* Order header strip */}
+      <div
+        className="rounded-xl border p-4 grid grid-cols-2 md:grid-cols-4 gap-4"
+        style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}
+      >
+        <HeaderField label="Order No." value={application.application_code ?? application.id.slice(0, 8)} mono />
+        <HeaderField label="Date" value={fmt(application.created_at)} />
+        <HeaderField label="Service" value={(lead?.service ?? "—").toUpperCase()} mono />
+        <HeaderField label="Assigned Executive" value={assignedStaff?.display_name ?? assignedStaff?.email ?? "Unassigned"} />
+      </div>
+
       {/* Journey stepper */}
-      <JourneyTimeline current={application.application_status} />
+      {journey && <OrderJourney journey={journey} />}
 
       {/* 3-column command center */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_320px] gap-4">
