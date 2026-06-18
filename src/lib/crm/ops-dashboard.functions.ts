@@ -82,8 +82,8 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason").order("created_at", { ascending: false }).limit(5000),
       supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false }).limit(5000),
       supabase.from("activity_logs").select("id, activity_type, activity_description, created_at, lead_id").order("created_at", { ascending: false }).limit(40),
-      supabase.from("services").select("id, name, code, status"),
-      supabase.from("profiles").select("id, full_name, email"),
+      supabase.from("services").select("id, service_name, service_code, is_active"),
+      supabase.from("profiles").select("id, display_name, email"),
     ]);
 
     const leads = leadsRes.data ?? [];
@@ -95,8 +95,8 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     const services = servicesRes.data ?? [];
     const profiles = profilesRes.data ?? [];
 
-    const serviceById = new Map(services.map((s: any) => [s.id, s.name as string]));
-    const profileById = new Map(profiles.map((p: any) => [p.id, (p.full_name as string) || (p.email as string) || "—"]));
+    const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
+    const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
     const leadById = new Map(leads.map((l: any) => [l.id, l]));
 
     const inWindow = (createdAt: string, sinceISO: string) => createdAt >= sinceISO;
