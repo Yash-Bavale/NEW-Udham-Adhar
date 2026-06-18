@@ -27,6 +27,7 @@ import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
 import { JourneyTimeline } from "@/components/admin/JourneyTimeline";
+import { CancellationPanel } from "@/components/admin/CancellationPanel";
 
 export const Route = createFileRoute("/admin/applications/$applicationId")({
   head: () => ({ meta: [{ title: "Application — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
