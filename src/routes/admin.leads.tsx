@@ -228,6 +228,17 @@ function LeadsPage() {
           <option value="whatsapp">WhatsApp</option>
         </select>
         <select
+          value={service}
+          onChange={(e) => setService(e.target.value)}
+          className="rounded-lg border px-3 py-2 text-sm max-w-[220px]"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <option value="">All services</option>
+          {servicesData?.rows.map((s: any) => (
+            <option key={s.id} value={s.service_name}>{s.service_name}</option>
+          ))}
+        </select>
+        <select
           value={assignee}
           onChange={(e) => setAssignee(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm"
@@ -239,9 +250,27 @@ function LeadsPage() {
             <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
           ))}
         </select>
-        {(source || assignee) && (
+        <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}>
+          <Calendar className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-transparent outline-none text-xs"
+            style={{ color: "var(--admin-fg)" }}
+          />
+          <span style={{ color: "var(--admin-fg-muted)" }}>→</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-transparent outline-none text-xs"
+            style={{ color: "var(--admin-fg)" }}
+          />
+        </div>
+        {(source || service || assignee || dateFrom || dateTo) && (
           <button
-            onClick={() => { setSource(""); setAssignee(""); }}
+            onClick={() => { setSource(""); setService(""); setAssignee(""); setDateFrom(""); setDateTo(""); }}
             className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)]"
             style={{ color: "var(--admin-fg-muted)" }}
           >
