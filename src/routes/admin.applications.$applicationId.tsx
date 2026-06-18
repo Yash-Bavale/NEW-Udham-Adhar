@@ -21,12 +21,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApplicationDetail } from "@/lib/crm/applications.functions";
+import { getOrderDetail } from "@/lib/crm/orders.functions";
 import { getApplicationDocChecklist } from "@/lib/crm/document-review.functions";
 import { StatusTransition } from "@/components/admin/StatusTransition";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
-import { JourneyTimeline } from "@/components/admin/JourneyTimeline";
+import { OrderJourney } from "@/components/admin/OrderJourney";
+import { InternalNotesTimeline } from "@/components/admin/InternalNotesTimeline";
 import { CancellationPanel } from "@/components/admin/CancellationPanel";
 
 export const Route = createFileRoute("/admin/applications/$applicationId")({
