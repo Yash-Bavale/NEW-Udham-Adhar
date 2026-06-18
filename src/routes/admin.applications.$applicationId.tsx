@@ -495,6 +495,30 @@ function QuickLink({ to, params, label }: { to: any; params?: any; label: string
   );
 }
 
+function HeaderField({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+        {label}
+      </div>
+      <div className={`text-sm font-semibold mt-0.5 truncate ${mono ? "font-mono" : ""}`} style={{ color: "var(--admin-fg)" }} title={value ?? ""}>
+        {value || "—"}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="rounded-lg p-2.5" style={{ background: "var(--admin-surface-2)" }}>
+      <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>
+      <div className={`mt-0.5 font-mono ${bold ? "text-base font-bold" : "text-sm"}`} style={{ color: "var(--admin-fg)" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function CertificatesTable({ certificates }: { certificates: any[] }) {
   if (certificates.length === 0) {
     return (
