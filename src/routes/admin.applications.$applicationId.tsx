@@ -274,6 +274,95 @@ function ApplicationCommandCenter() {
               {tab === "timeline" && lead && <LeadTimeline leadId={lead.id} />}
             </div>
           </div>
+
+          {/* Payment Details */}
+          <Panel>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>
+                Payment Details
+              </div>
+              <span
+                className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-medium"
+                style={{
+                  background:
+                    paymentStatus === "Paid"
+                      ? "var(--admin-success)"
+                      : paymentStatus === "Pending"
+                      ? "var(--admin-warn)"
+                      : paymentStatus === "Refunded"
+                      ? "var(--admin-fg-subtle)"
+                      : paymentStatus === "Cancelled"
+                      ? "var(--admin-danger)"
+                      : "var(--admin-accent)",
+                  color: "#fff",
+                }}
+              >
+                {paymentStatus}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <Stat label="Fee" value={`₹${baseSum.toLocaleString("en-IN")}`} />
+              <Stat label="GST" value={`₹${gstSum.toLocaleString("en-IN")}`} />
+              <Stat label="Total" value={`₹${(total || baseSum + gstSum).toLocaleString("en-IN")}`} bold />
+              <Stat label="Paid" value={`₹${paidSum.toLocaleString("en-IN")}`} />
+            </div>
+            {lastPayment && (
+              <div className="mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
+                Reference:{" "}
+                <span className="font-mono" style={{ color: "var(--admin-fg)" }}>
+                  {lastPayment.transaction_id ?? lastPayment.id.slice(0, 12)}
+                </span>{" "}
+                · {lastPayment.gateway_name ?? "—"} · {fmt(lastPayment.payment_date ?? lastPayment.created_at)}
+              </div>
+            )}
+            {payments.length === 0 && (
+              <div className="mt-3 text-[11px] italic" style={{ color: "var(--admin-fg-muted)" }}>
+                No payment records yet.
+              </div>
+            )}
+          </Panel>
+
+          {/* Linked Complaints */}
+          <Panel>
+            <div className="text-[10px] uppercase tracking-wider mb-3" style={{ color: "var(--admin-fg-muted)" }}>
+              Linked Complaints ({complaints.length})
+            </div>
+            {complaints.length === 0 ? (
+              <div className="text-[11px] italic" style={{ color: "var(--admin-fg-muted)" }}>
+                No complaints linked to this order.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {complaints.map((c: any) => (
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between gap-2 p-2 rounded border text-xs"
+                    style={{ borderColor: "var(--admin-border)" }}
+                  >
+                    <Link
+                      to="/admin/complaints/$complaintId"
+                      params={{ complaintId: c.id }}
+                      className="font-mono font-medium hover:underline"
+                      style={{ color: "var(--admin-accent)" }}
+                    >
+                      {c.complaint_number}
+                    </Link>
+                    <span style={{ color: "var(--admin-fg-muted)" }}>{c.category ?? "—"}</span>
+                    <span
+                      className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded"
+                      style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
+                    >
+                      {c.status}
+                    </span>
+                    <span style={{ color: "var(--admin-fg-muted)" }}>{fmt(c.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          {/* Internal Notes Timeline */}
+          <InternalNotesTimeline applicationId={applicationId} />
         </main>
 
         {/* RIGHT ACTIVITY RAIL */}
