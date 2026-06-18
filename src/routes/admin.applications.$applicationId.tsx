@@ -211,6 +211,13 @@ function ApplicationCommandCenter() {
           </Panel>
 
           <DocChecklistPanel applicationId={applicationId} />
+
+          <CancellationPanel
+            applicationId={applicationId}
+            closureStage={application.closure_stage}
+            closureNextAt={application.closure_next_at}
+            cancellationRequestedAt={application.cancellation_requested_at}
+          />
         </aside>
 
 
