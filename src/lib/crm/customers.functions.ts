@@ -68,7 +68,6 @@ export const getCustomer360 = createServerFn({ method: "POST" })
       s.from("invoices").select("id, invoice_number, total_amount, issued_at, pdf_path, payment_id").eq("customer_id", id).order("issued_at", { ascending: false }),
       s.from("certificates").select("id, certificate_number, file_name, file_path, issued_at, delivered_at").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("complaints").select("id, complaint_number, status, severity, category, sla_due_at, created_at").eq("customer_id", id).order("created_at", { ascending: false }),
-      // Emails: by lead_id link
       s.from("email_logs").select("id, to_email, subject, template_code, status, sent_at, lead_id").order("sent_at", { ascending: false }).limit(50),
       s.from("customer_notes").select("id, note, created_at, user_id").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("activity_logs").select("id, activity_type, activity_description, created_at, lead_id").order("created_at", { ascending: false }).limit(80),
@@ -76,9 +75,20 @@ export const getCustomer360 = createServerFn({ method: "POST" })
 
     if (cust.error || !cust.data) throw new Error(cust.error?.message ?? "Customer not found");
 
-    const leadIds = new Set((leads.data ?? []).map((l: any) => l.id));
-    const emailsFiltered = (emails.data ?? []).filter((e: any) => !e.lead_id || leadIds.has(e.lead_id));
-    const actsFiltered = (acts.data ?? []).filter((a: any) => !a.lead_id || leadIds.has(a.lead_id));
+    const leadIds = (leads.data ?? []).map((l: any) => l.id);
+    const leadIdSet = new Set(leadIds);
+    const emailsFiltered = (emails.data ?? []).filter((e: any) => !e.lead_id || leadIdSet.has(e.lead_id));
+    const actsFiltered = (acts.data ?? []).filter((a: any) => !a.lead_id || leadIdSet.has(a.lead_id));
+
+    let docs: any[] = [];
+    if (leadIds.length > 0) {
+      const { data: dData } = await s
+        .from("documents")
+        .select("id, doc_type, file_name, status, uploaded_at, verified_at, lead_id, application_id")
+        .in("lead_id", leadIds)
+        .order("uploaded_at", { ascending: false });
+      docs = dData ?? [];
+    }
 
     return {
       customer: cust.data as any,
@@ -91,6 +101,7 @@ export const getCustomer360 = createServerFn({ method: "POST" })
       emails: emailsFiltered as any,
       notes: (notes.data ?? []) as any,
       activity: actsFiltered as any,
+      documents: docs as any,
     };
   });
 
