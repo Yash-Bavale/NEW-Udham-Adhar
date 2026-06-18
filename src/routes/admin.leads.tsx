@@ -424,12 +424,25 @@ function LeadDetailSheet({ leadId, onClose }: { leadId: string | null; onClose: 
             <Field label="Mobile" value={data.lead.mobile} />
             <Field label="State" value={data.lead.state} />
             <Field label="Language" value={data.lead.language} />
-            <Field label="Service" value={data.lead.service} />
             <Field label="Source" value={data.lead.lead_source} />
+            <Field label="Interested Service" value={data.lead.service} />
             <Field label="Total Amount" value={`₹${Number(data.lead.total_amount || 0).toLocaleString("en-IN")}`} />
-            <Field label="Applications" value={String(data.applications.length)} />
-            <Field label="Notes" value={String(data.notes.length)} />
+            <Field label="Assigned To" value={data.lead.assigned_to ? data.lead.assigned_to.slice(0, 8) + "…" : "Unassigned"} />
             <Field label="Created" value={new Date(data.lead.created_at).toLocaleString("en-IN")} />
+
+            {data.lead.notes && (
+              <div className="pt-2">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Notes</div>
+                <div className="text-sm rounded-md border p-2 whitespace-pre-wrap" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}>
+                  {data.lead.notes}
+                </div>
+              </div>
+            )}
+            {data.notes.length > 0 && (
+              <div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                {data.notes.length} internal note(s) · {data.applications.length} application(s)
+              </div>
+            )}
 
             <div className="pt-3 border-t">
               <Link
