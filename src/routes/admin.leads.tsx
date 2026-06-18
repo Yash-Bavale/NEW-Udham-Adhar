@@ -82,17 +82,26 @@ function LeadsPage() {
     queryFn: () => listFn({ data: { page, pageSize: 25, search: search || undefined, status: (status || undefined) as never } }),
   });
 
-  // Client-side source/assignee filter on top of paginated rows
+  // Client-side filters layered on paginated rows
   const rows = useMemo(() => {
     let r = data?.rows ?? [];
     if (source) r = r.filter((l: any) => (l.lead_source || "").toLowerCase() === source.toLowerCase());
+    if (service) r = r.filter((l: any) => (l.service || "") === service);
     if (assignee) {
       r = assignee === "__unassigned"
         ? r.filter((l: any) => !l.assigned_to)
         : r.filter((l: any) => l.assigned_to === assignee);
     }
+    if (dateFrom) {
+      const from = new Date(dateFrom).getTime();
+      r = r.filter((l: any) => new Date(l.created_at).getTime() >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo).getTime() + 24 * 60 * 60 * 1000;
+      r = r.filter((l: any) => new Date(l.created_at).getTime() < to);
+    }
     return r;
-  }, [data, source, assignee]);
+  }, [data, source, service, assignee, dateFrom, dateTo]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });
