@@ -96,30 +96,21 @@ function LeadsPage() {
   }), [search, status]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.leads", page, search, status, source, assignee],
-    queryFn: () => listFn({ data: { page, pageSize: 25, search: search || undefined, status: (status || undefined) as never } }),
+    queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
+    queryFn: () => listFn({ data: {
+      page, pageSize: 25,
+      search: search || undefined,
+      status: (status || undefined) as never,
+      source: source || undefined,
+      service: service || undefined,
+      assignee: assignee || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    } }),
   });
 
-  // Client-side filters layered on paginated rows
-  const rows = useMemo(() => {
-    let r = data?.rows ?? [];
-    if (source) r = r.filter((l: any) => (l.lead_source || "").toLowerCase() === source.toLowerCase());
-    if (service) r = r.filter((l: any) => (l.service || "") === service);
-    if (assignee) {
-      r = assignee === "__unassigned"
-        ? r.filter((l: any) => !l.assigned_to)
-        : r.filter((l: any) => l.assigned_to === assignee);
-    }
-    if (dateFrom) {
-      const from = new Date(dateFrom).getTime();
-      r = r.filter((l: any) => new Date(l.created_at).getTime() >= from);
-    }
-    if (dateTo) {
-      const to = new Date(dateTo).getTime() + 24 * 60 * 60 * 1000;
-      r = r.filter((l: any) => new Date(l.created_at).getTime() < to);
-    }
-    return r;
-  }, [data, source, service, assignee, dateFrom, dateTo]);
+  // All filtering happens server-side now (C3).
+  const rows = data?.rows ?? [];
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });
