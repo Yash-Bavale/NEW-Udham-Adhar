@@ -239,9 +239,10 @@ function KpiCard({
 function ActionRequired({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
   const a = data?.actionRequired;
   const items = [
-    { n: a?.ordersWaitingDocs ?? 0, label: "Orders waiting for documents", href: "/admin/review" },
-    { n: a?.complaintsFollowup ?? 0, label: "Complaints need follow-up", href: "/admin/complaints" },
-    { n: a?.customersAwaitingReply ?? 0, label: "Customers awaiting reply", href: "/admin/leads" },
+    { n: a?.refundDecisionPending ?? 0, label: "Refund requests awaiting decision", href: "/admin/leads?status=refund_requested" },
+    { n: a?.docsPendingOver2d ?? 0, label: "Orders waiting for documents > 2 days", href: "/admin/orders?fulfillment=order_received" },
+    { n: a?.tasksOverdue ?? 0, label: "Tasks overdue", href: "/admin/tasks" },
+    { n: a?.followupsTodayOpen ?? 0, label: "Follow-ups today still open", href: "/admin/tasks" },
   ];
   return (
     <div
