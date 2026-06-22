@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
@@ -10,7 +10,7 @@ import {
   PackageCheck, Wallet, AlertTriangle, ChevronDown, ChevronRight, FileText,
   Send, Calendar, LifeBuoy, Activity as ActivityIcon, Bell,
 } from "lucide-react";
-import { getOpsDashboard, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
+import { getOpsDashboard, markFollowUpComplete, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({
@@ -67,10 +67,11 @@ function DashboardPage() {
         <TopServices data={data} loading={isLoading} />
       </div>
 
-      {/* 4. Document pending + 5. Complaint tracker */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      {/* 4. Document pending + 5. Complaint tracker + Refund Tracker */}
+      <div className="grid lg:grid-cols-3 gap-4">
         <DocumentsPending data={data} loading={isLoading} />
         <ComplaintTracker data={data} loading={isLoading} />
+        <RefundTracker data={data} loading={isLoading} />
       </div>
 
       {/* 9 Staff + 10 Follow-ups + 11 Tickets */}
@@ -239,9 +240,10 @@ function KpiCard({
 function ActionRequired({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
   const a = data?.actionRequired;
   const items = [
-    { n: a?.ordersWaitingDocs ?? 0, label: "Orders waiting for documents", href: "/admin/review" },
-    { n: a?.complaintsFollowup ?? 0, label: "Complaints need follow-up", href: "/admin/complaints" },
-    { n: a?.customersAwaitingReply ?? 0, label: "Customers awaiting reply", href: "/admin/leads" },
+    { n: a?.refundDecisionPending ?? 0, label: "Refund requests awaiting decision", href: "/admin/leads?status=refund_requested" },
+    { n: a?.docsPendingOver2d ?? 0, label: "Orders waiting for documents > 2 days", href: "/admin/orders?fulfillment=order_received" },
+    { n: a?.tasksOverdue ?? 0, label: "Tasks overdue", href: "/admin/tasks" },
+    { n: a?.followupsTodayOpen ?? 0, label: "Follow-ups today still open", href: "/admin/tasks" },
   ];
   return (
     <div
@@ -539,22 +541,60 @@ function StaffPerformance({ data, loading }: { data?: OpsDashboardData; loading:
 /* ---------------- 10. Follow-ups ---------------- */
 
 function FollowUps({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
+  const qc = useQueryClient();
+  const mark = useServerFn(markFollowUpComplete);
+  const m = useMutation({
+    mutationFn: (id: string) => mark({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ops-dashboard"] }),
+  });
   return (
     <SectionCard title="Today's Follow-ups" action={<span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}><Calendar className="inline size-3 mr-1" />{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</span>}>
       <div className="p-4">
         {loading ? <TableSkeleton rows={4} cols={2} /> : (data?.followUps.length ?? 0) === 0 ? (
-          <EmptyHint text="Follow-up calendar lands with the Tasks module." />
+          <EmptyHint text="No follow-ups scheduled for today." />
         ) : (
           <ul className="space-y-1.5">
             {data!.followUps.map((f) => (
-              <li key={f.id} className="flex items-center gap-3 text-xs">
-                <span className="font-mono" style={{ color: "var(--admin-fg-muted)" }}>{f.time}</span>
+              <li key={f.id} className="flex items-center gap-2 text-xs">
+                <span className="font-mono shrink-0" style={{ color: "var(--admin-fg-muted)" }}>{f.time}</span>
                 <span className="font-medium truncate" style={{ color: "var(--admin-fg)" }}>{f.customer}</span>
-                <span className="truncate" style={{ color: "var(--admin-fg-muted)" }}>· {f.reason}</span>
+                <span className="truncate flex-1" style={{ color: "var(--admin-fg-muted)" }}>· {f.reason}{f.assignedTo ? ` · ${f.assignedTo}` : ""}</span>
+                <button
+                  onClick={() => m.mutate(f.id)}
+                  disabled={m.isPending}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] hover:bg-[var(--admin-surface-2)] disabled:opacity-50"
+                  style={{ borderColor: "var(--admin-border)" }}
+                  title="Mark complete"
+                >
+                  <CheckCircle2 className="size-3" /> Done
+                </button>
               </li>
             ))}
           </ul>
         )}
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ---------------- Refund Tracker ---------------- */
+
+function RefundTracker({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
+  const r = data?.refundTracker;
+  const pills = [
+    { label: "Requested", value: r?.requested ?? 0, color: "var(--admin-warn)" },
+    { label: "Approved", value: r?.approved ?? 0, color: "var(--admin-info)" },
+    { label: "Refunded", value: r?.refunded ?? 0, color: "var(--admin-success)" },
+  ];
+  return (
+    <SectionCard title="Refund Tracker" action={<span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>Last 30 days</span>}>
+      <div className="p-4 grid grid-cols-3 gap-2">
+        {(loading ? Array.from({ length: 3 }).map(() => null) : pills).map((x, i) => x ? (
+          <div key={x.label} className="rounded-md border p-2.5 text-center" style={{ borderColor: "var(--admin-border)" }}>
+            <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>{x.label}</div>
+            <div className="text-lg font-medium tabular-nums" style={{ color: x.color }}>{fmtN(x.value)}</div>
+          </div>
+        ) : <div key={i} className="h-14 rounded-md animate-pulse" style={{ background: "var(--admin-surface-2)" }} />)}
       </div>
     </SectionCard>
   );
@@ -603,17 +643,21 @@ function RecentActivity({ data, loading }: { data?: OpsDashboardData; loading: b
           <EmptyHint text="No activity yet." />
         ) : (
           <ul className="space-y-1.5 text-xs">
-            {data!.recentActivity.map((a) => (
-              <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
-                <time className="font-mono shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                  {new Date(a.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                </time>
-                <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                  {a.activity_type}
-                </span>
-                <span className="truncate" style={{ color: "var(--admin-fg)" }}>{a.activity_description}</span>
-              </li>
-            ))}
+            {data!.recentActivity.map((a) => {
+              const ts = new Date(a.created_at).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+              const desc = describeEvent(a);
+              return (
+                <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
+                  <time className="font-mono shrink-0 text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>{ts}</time>
+                  <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
+                    {a.event_type.replace(/_/g, " ")}
+                  </span>
+                  <span className="truncate" style={{ color: "var(--admin-fg)" }}>
+                    {a.staff_name ? <span className="font-medium">{a.staff_name}</span> : <span style={{ color: "var(--admin-fg-muted)" }}>System</span>} — {desc}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -628,6 +672,12 @@ function EmptyHint({ text }: { text: string }) {
       {text}
     </div>
   );
+}
+
+function describeEvent(a: { event_type: string; old_value: string | null; new_value: string | null }): string {
+  const arrow = a.old_value && a.new_value ? `${a.old_value} → ${a.new_value}` : (a.new_value ?? a.old_value ?? "");
+  const label = a.event_type.replace(/_/g, " ");
+  return arrow ? `${label}: ${arrow}` : label;
 }
 
 // suppress unused-import warnings for icons referenced only conditionally

@@ -21,8 +21,8 @@ export const globalSearch = createServerFn({ method: "POST" })
 
     const [c, l, a, inv, cert, comp] = await Promise.all([
       s.from("customers")
-        .select("id, customer_code, name, primary_email, primary_mobile")
-        .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like}`)
+        .select("id, customer_code, name, primary_email, primary_mobile, udyam_number, gst_number, pan_number")
+        .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like},udyam_number.ilike.${like},gst_number.ilike.${like},pan_number.ilike.${like}`)
         .limit(6),
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service")
@@ -42,7 +42,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         kind: "customer",
         id: r.id,
         title: r.name || r.customer_code,
-        subtitle: [r.customer_code, r.primary_email, r.primary_mobile].filter(Boolean).join(" · "),
+        subtitle: [r.customer_code, r.primary_email, r.primary_mobile, r.udyam_number].filter(Boolean).join(" · "),
         href: `/admin/customers/${r.id}`,
       })
     );

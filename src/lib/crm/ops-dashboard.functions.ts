@@ -17,10 +17,12 @@ export type OpsDashboardData = {
     totalSale: { today: number; week: number; month: number; total: number; byService: Metric[] };
   };
   actionRequired: {
-    ordersWaitingDocs: number;
-    complaintsFollowup: number;
-    customersAwaitingReply: number;
+    refundDecisionPending: number;
+    docsPendingOver2d: number;
+    tasksOverdue: number;
+    followupsTodayOpen: number;
   };
+  refundTracker: { requested: number; approved: number; refunded: number };
   servicePipeline: { stage: string; count: number }[];
   documentsPending: {
     id: string;
@@ -42,9 +44,9 @@ export type OpsDashboardData = {
   revenue: { weekly: RevenuePoint[]; monthly: RevenuePoint[] };
   topServices: Metric[];
   staffPerformance: StaffRow[];
-  followUps: { id: string; time: string; customer: string; reason: string }[];
+  followUps: { id: string; time: string; customer: string; reason: string; assignedTo: string | null; customerId: string | null }[];
   supportTickets: { open: number; in_progress: number; resolved: number; closed: number };
-  recentActivity: { id: string; created_at: string; activity_type: string; activity_description: string }[];
+  recentActivity: { id: string; created_at: string; event_type: string; new_value: string | null; old_value: string | null; staff_name: string | null; application_id: string | null }[];
 };
 
 function startOfDay(d = new Date()) {
@@ -75,15 +77,21 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       activityRes,
       servicesRes,
       profilesRes,
+      followupsRes,
+      tasksRes,
+      customersLookupRes,
     ] = await Promise.all([
       supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("applications").select("id, application_code, application_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at").order("created_at", { ascending: false }).limit(2000),
-      supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at, updated_at").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason, application_id, lead_id, parent_payment_id").order("created_at", { ascending: false }).limit(5000),
       supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("activity_logs").select("id, activity_type, activity_description, created_at, lead_id").order("created_at", { ascending: false }).limit(40),
+      supabase.from("application_events").select("id, event_type, old_value, new_value, staff_name, created_at, application_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("services").select("id, service_name, service_code, is_active"),
       supabase.from("profiles").select("id, display_name, email"),
+      supabase.from("follow_ups").select("id, customer_id, lead_id, application_id, scheduled_at, reason, assigned_to, is_completed").eq("is_completed", false).gte("scheduled_at", startOfDay().toISOString()).lt("scheduled_at", daysAgo(-1).toISOString()).order("scheduled_at", { ascending: true }).limit(50),
+      supabase.from("tasks").select("id, due_date, is_completed, assigned_to").eq("is_completed", false).lt("due_date", new Date().toISOString()).limit(500),
+      supabase.from("customers").select("id, name").limit(5000),
     ]);
 
     const leads = leadsRes.data ?? [];
@@ -94,6 +102,9 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     const activity = activityRes.data ?? [];
     const services = servicesRes.data ?? [];
     const profiles = profilesRes.data ?? [];
+    const followups = followupsRes.data ?? [];
+    const overdueTasks = tasksRes.data ?? [];
+    const customerNameById = new Map<string, string>(((customersLookupRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
 
     const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
     const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
@@ -187,28 +198,36 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       byService: Array.from(saleByService.entries()).map(([label, value]) => ({ label, value: Math.round(value) })).sort((a, b) => b.value - a.value),
     };
 
-    // Action required
-    const ordersWaitingDocs = apps.filter((a: any) => a.document_status && a.document_status !== "verified" && a.application_status !== "completed").length;
-    const complaintsFollowup = openComplaints.filter((c: any) => {
-      const last = c.last_reminded_at ?? c.created_at;
-      const ageDays = (Date.now() - new Date(last).getTime()) / 86_400_000;
-      return ageDays >= 2;
-    }).length;
-    const customersAwaitingReply = leads.filter((l: any) => ["contacted", "follow_up_required", "details_pending"].includes(l.status)).length;
+    // Action required (per Phase 6 spec)
+    const refundDecisionPending = leads.filter((l: any) => l.status === "refund_requested").length;
+    const twoDaysAgoISO = daysAgo(2).toISOString();
+    const docsPendingOver2d = apps.filter((a: any) =>
+      a.fulfillment_status === "order_received" &&
+      a.created_at <= twoDaysAgoISO,
+    ).length;
+    const tasksOverdue = overdueTasks.length;
+    const followupsTodayOpen = followups.length;
 
-    // Service pipeline (applications by status, in the canonical 6 stages)
-    const pipelineStages: Array<[string, string[]]> = [
-      ["Order Received", ["awaiting_payment", "payment_received"]],
-      ["Documents Received", ["documents_pending", "details_pending"]],
-      ["Verification Pending", ["under_review"]],
-      ["Application Submitted", ["under_process"]],
-      ["Processing", ["under_process"]],
-      ["Completed", ["completed"]],
+    // Service pipeline — by fulfillment_status (canonical 6 stages)
+    const pipelineStages: Array<[string, string]> = [
+      ["Order Received", "order_received"],
+      ["Documents Received", "documents_received"],
+      ["Verification Pending", "verification_pending"],
+      ["Application Submitted", "application_submitted"],
+      ["Under Processing", "under_processing"],
+      ["Completed", "completed"],
     ];
-    const servicePipeline = pipelineStages.map(([stage, statuses]) => ({
+    const servicePipeline = pipelineStages.map(([stage, fs]) => ({
       stage,
-      count: apps.filter((a: any) => statuses.includes(a.application_status)).length,
+      count: apps.filter((a: any) => a.fulfillment_status === fs).length,
     }));
+
+    // Refund tracker — last 30 days
+    const refundTracker = {
+      requested: leads.filter((l: any) => l.status === "refund_requested" && l.created_at >= month).length,
+      approved: apps.filter((a: any) => a.application_status === "refund_pending" && (a.updated_at ?? a.created_at) >= month).length,
+      refunded: apps.filter((a: any) => a.application_status === "refunded" && (a.updated_at ?? a.created_at) >= month).length,
+    };
 
     // Documents pending list (latest 8)
     const pendingDocApps = apps
@@ -301,13 +320,34 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       ...v,
     })).sort((a, b) => b.handled - a.handled).slice(0, 8);
 
-    // Recent activity
+    // Recent activity — from application_events
     const recentActivity = activity.map((a: any) => ({
       id: a.id,
       created_at: a.created_at,
-      activity_type: a.activity_type,
-      activity_description: a.activity_description,
+      event_type: a.event_type,
+      new_value: a.new_value ?? null,
+      old_value: a.old_value ?? null,
+      staff_name: a.staff_name ?? null,
+      application_id: a.application_id ?? null,
     }));
+
+    // Today's follow-ups (open)
+    const followUpsOut = followups.map((f: any) => {
+      const lead = leadById.get(f.lead_id);
+      const customerName =
+        (f.customer_id && customerNameById.get(f.customer_id)) ||
+        lead?.name ||
+        "—";
+      const t = new Date(f.scheduled_at);
+      return {
+        id: f.id,
+        time: t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }),
+        customer: customerName,
+        reason: f.reason ?? "Follow-up",
+        assignedTo: f.assigned_to ? (profileById.get(f.assigned_to) ?? null) : null,
+        customerId: f.customer_id ?? null,
+      };
+    });
 
     return {
       kpis: {
@@ -320,7 +360,8 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
         ordersCompleted,
         totalSale,
       },
-      actionRequired: { ordersWaitingDocs, complaintsFollowup, customersAwaitingReply },
+      actionRequired: { refundDecisionPending, docsPendingOver2d, tasksOverdue, followupsTodayOpen },
+      refundTracker,
       servicePipeline,
       documentsPending,
       complaintTracker,
@@ -328,8 +369,19 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       revenue,
       topServices,
       staffPerformance,
-      followUps: [], // backend coming later
-      supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 }, // backend coming later
+      followUps: followUpsOut,
+      supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 },
       recentActivity,
     };
+  });
+
+export const markFollowUpComplete = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase.from("follow_ups") as any)
+      .update({ is_completed: true, completed_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
