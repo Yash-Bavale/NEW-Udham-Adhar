@@ -196,10 +196,12 @@ import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
+import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
@@ -1210,6 +1212,11 @@ const AdminPipelineRoute = AdminPipelineRouteImport.update({
   path: '/pipeline',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -1228,6 +1235,11 @@ const AdminMyWorkRoute = AdminMyWorkRouteImport.update({
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminGatewaysRoute = AdminGatewaysRouteImport.update({
@@ -1632,10 +1644,12 @@ export interface FileRoutesByFullPath {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -1865,8 +1879,10 @@ export interface FileRoutesByTo {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -2098,10 +2114,12 @@ export interface FileRoutesById {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
+  '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -2334,10 +2352,12 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/invoices'
     | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
+    | '/admin/payments'
     | '/admin/pipeline'
     | '/admin/reports'
     | '/admin/review'
@@ -2567,8 +2587,10 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/invoices'
     | '/admin/my-work'
     | '/admin/notifications'
+    | '/admin/payments'
     | '/admin/pipeline'
     | '/admin/reports'
     | '/admin/review'
@@ -2799,10 +2821,12 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/invoices'
     | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
+    | '/admin/payments'
     | '/admin/pipeline'
     | '/admin/reports'
     | '/admin/review'
@@ -4360,6 +4384,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPipelineRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders': {
       id: '/admin/orders'
       path: '/orders'
@@ -4386,6 +4417,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/admin/leads'
       preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/invoices': {
+      id: '/admin/invoices'
+      path: '/invoices'
+      fullPath: '/admin/invoices'
+      preLoaderRoute: typeof AdminInvoicesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/gateways': {
@@ -4791,10 +4829,12 @@ interface AdminRouteChildren {
   AdminEmployeesRoute: typeof AdminEmployeesRoute
   AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
   AdminGatewaysRoute: typeof AdminGatewaysRoute
+  AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
@@ -4822,10 +4862,12 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmployeesRoute: AdminEmployeesRoute,
   AdminFinanceRoute: AdminFinanceRouteWithChildren,
   AdminGatewaysRoute: AdminGatewaysRoute,
+  AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
+  AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,

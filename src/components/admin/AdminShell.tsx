@@ -37,8 +37,8 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning },
       { to: "/admin/services", label: "Services", icon: Briefcase },
-      { to: "/admin/finance/gst", label: "Invoices", icon: Receipt },
-      { to: "/admin/finance", label: "Payments", icon: CreditCard },
+      { to: "/admin/invoices", label: "Invoices", icon: Receipt },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard },
     ],
   },
   {

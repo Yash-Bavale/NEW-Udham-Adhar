@@ -1184,11 +1184,17 @@ export type Database = {
           application_id: string | null
           base_amount: number
           cgst_amount: number
+          cgst_rate: number
+          company_gstin_snapshot: string | null
+          company_state_snapshot: string | null
           created_at: string
+          customer_gstin_snapshot: string | null
           customer_id: string | null
+          customer_state_snapshot: string | null
           gst_amount: number
           id: string
           igst_amount: number
+          igst_rate: number
           invoice_number: string | null
           issued_at: string
           lead_id: string
@@ -1198,6 +1204,7 @@ export type Database = {
           place_of_supply: string | null
           sac_code: string
           sgst_amount: number
+          sgst_rate: number
           total_amount: number
           updated_at: string
         }
@@ -1205,11 +1212,17 @@ export type Database = {
           application_id?: string | null
           base_amount: number
           cgst_amount?: number
+          cgst_rate?: number
+          company_gstin_snapshot?: string | null
+          company_state_snapshot?: string | null
           created_at?: string
+          customer_gstin_snapshot?: string | null
           customer_id?: string | null
+          customer_state_snapshot?: string | null
           gst_amount: number
           id?: string
           igst_amount?: number
+          igst_rate?: number
           invoice_number?: string | null
           issued_at?: string
           lead_id: string
@@ -1219,6 +1232,7 @@ export type Database = {
           place_of_supply?: string | null
           sac_code?: string
           sgst_amount?: number
+          sgst_rate?: number
           total_amount: number
           updated_at?: string
         }
@@ -1226,11 +1240,17 @@ export type Database = {
           application_id?: string | null
           base_amount?: number
           cgst_amount?: number
+          cgst_rate?: number
+          company_gstin_snapshot?: string | null
+          company_state_snapshot?: string | null
           created_at?: string
+          customer_gstin_snapshot?: string | null
           customer_id?: string | null
+          customer_state_snapshot?: string | null
           gst_amount?: number
           id?: string
           igst_amount?: number
+          igst_rate?: number
           invoice_number?: string | null
           issued_at?: string
           lead_id?: string
@@ -1240,6 +1260,7 @@ export type Database = {
           place_of_supply?: string | null
           sac_code?: string
           sgst_amount?: number
+          sgst_rate?: number
           total_amount?: number
           updated_at?: string
         }
@@ -1325,6 +1346,7 @@ export type Database = {
           email: string
           followup_note: string | null
           gst_amount: number
+          gstin: string | null
           id: string
           is_deleted: boolean | null
           is_duplicate: boolean
@@ -1357,6 +1379,7 @@ export type Database = {
           email: string
           followup_note?: string | null
           gst_amount?: number
+          gstin?: string | null
           id?: string
           is_deleted?: boolean | null
           is_duplicate?: boolean
@@ -1391,6 +1414,7 @@ export type Database = {
           email?: string
           followup_note?: string | null
           gst_amount?: number
+          gstin?: string | null
           id?: string
           is_deleted?: boolean | null
           is_duplicate?: boolean
@@ -1998,6 +2022,7 @@ export type Database = {
           gst_amount: number
           id: string
           is_active: boolean
+          sac_code: string
           service_code: string
           service_name: string
           sort_order: number
@@ -2011,6 +2036,7 @@ export type Database = {
           gst_amount?: number
           id?: string
           is_active?: boolean
+          sac_code?: string
           service_code: string
           service_name: string
           sort_order?: number
@@ -2024,6 +2050,7 @@ export type Database = {
           gst_amount?: number
           id?: string
           is_active?: boolean
+          sac_code?: string
           service_code?: string
           service_name?: string
           sort_order?: number

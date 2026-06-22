@@ -1,0 +1,205 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  listPaymentsAdmin,
+  generateInvoice,
+  getInvoiceSignedUrl,
+  getPaymentsFilterMeta,
+} from "@/lib/crm/invoices.functions";
+
+export const Route = createFileRoute("/admin/payments")({
+  head: () => ({ meta: [{ title: "Payments — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
+  component: PaymentsPage,
+});
+
+const fmtINR = (n: number) =>
+  `₹${Math.abs(Number(n || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtDate = (s?: string | null) =>
+  s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
+
+function PaymentsPage() {
+  const listFn = useServerFn(listPaymentsAdmin);
+  const metaFn = useServerFn(getPaymentsFilterMeta);
+  const genFn = useServerFn(generateInvoice);
+  const urlFn = useServerFn(getInvoiceSignedUrl);
+  const qc = useQueryClient();
+
+  const [filters, setFilters] = useState({
+    q: "", status: "", gateway: "", serviceId: "", from: "", to: "", page: 1,
+  });
+
+  const meta = useQuery({ queryKey: ["payments.meta"], queryFn: () => metaFn() });
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.payments", filters],
+    queryFn: () =>
+      listFn({
+        data: {
+          q: filters.q || undefined,
+          status: filters.status || undefined,
+          gateway: filters.gateway || undefined,
+          serviceId: filters.serviceId || undefined,
+          from: filters.from || undefined,
+          to: filters.to || undefined,
+          page: filters.page,
+          pageSize: 25,
+        } as any,
+      }),
+  });
+
+  const gen = useMutation({
+    mutationFn: (paymentId: string) => genFn({ data: { paymentId } }),
+    onSuccess: () => {
+      toast.success("Invoice generated");
+      qc.invalidateQueries({ queryKey: ["admin.payments"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Could not generate invoice"),
+  });
+
+  const openInvoice = async (invoiceId: string) => {
+    try {
+      const r = await urlFn({ data: { invoiceId } });
+      window.open(r.url, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not open invoice");
+    }
+  };
+
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
+      paid: "bg-emerald-100 text-emerald-700",
+      failed: "bg-rose-100 text-rose-700",
+      refunded: "bg-amber-100 text-amber-700",
+      attempted: "bg-sky-100 text-sky-700",
+      created: "bg-slate-100 text-slate-600",
+    };
+    return <Badge variant="secondary" className={`text-[10px] ${map[s] ?? ""}`}>{s.replace(/_/g, " ")}</Badge>;
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-semibold">Payments</h1>
+        <div className="text-xs text-slate-500">{data ? `${data.total} payments` : ""}</div>
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-lg border bg-white p-3" style={{ borderColor: "var(--admin-border)" }}>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+          <Input
+            placeholder="Search name, email, mobile, ref…"
+            value={filters.q}
+            onChange={(e) => setFilters({ ...filters, q: e.target.value, page: 1 })}
+            className="md:col-span-2"
+          />
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
+            className="rounded border px-2 py-1.5 text-sm">
+            <option value="">All status</option>
+            {meta.data?.statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select
+            value={filters.gateway}
+            onChange={(e) => setFilters({ ...filters, gateway: e.target.value, page: 1 })}
+            className="rounded border px-2 py-1.5 text-sm">
+            <option value="">All gateways</option>
+            {meta.data?.gateways.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <select
+            value={filters.serviceId}
+            onChange={(e) => setFilters({ ...filters, serviceId: e.target.value, page: 1 })}
+            className="rounded border px-2 py-1.5 text-sm">
+            <option value="">All services</option>
+            {meta.data?.services.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
+          </select>
+          <div className="flex gap-1">
+            <Input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value, page: 1 })} className="text-xs" />
+            <Input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value, page: 1 })} className="text-xs" />
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-lg border bg-white overflow-x-auto" style={{ borderColor: "var(--admin-border)" }}>
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider">
+            <tr className="text-left">
+              <th className="px-3 py-2">Payment Ref</th>
+              <th className="px-3 py-2">Order No</th>
+              <th className="px-3 py-2">Customer</th>
+              <th className="px-3 py-2">Service</th>
+              <th className="px-3 py-2 text-right">Amount</th>
+              <th className="px-3 py-2 text-right">GST</th>
+              <th className="px-3 py-2 text-right">Total</th>
+              <th className="px-3 py-2">Gateway</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Invoice</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
+            )}
+            {!isLoading && data?.rows.length === 0 && (
+              <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">No payments match these filters.</td></tr>
+            )}
+            {data?.rows.map((r) => (
+              <tr key={r.id} className="border-t hover:bg-slate-50/50">
+                <td className="px-3 py-2 font-mono text-[10px]">{r.transaction_id ?? r.id.slice(0, 8)}</td>
+                <td className="px-3 py-2">
+                  {r.application_id ? (
+                    <Link to="/admin/orders/$orderId" params={{ orderId: r.application_id }}
+                      className="text-sky-700 hover:underline font-mono">{r.application_code ?? "view"}</Link>
+                  ) : "—"}
+                </td>
+                <td className="px-3 py-2">
+                  <div className="font-medium">{r.customer_name || "—"}</div>
+                  <div className="text-[10px] text-slate-500">{r.lead_code}</div>
+                </td>
+                <td className="px-3 py-2">{r.service}</td>
+                <td className="px-3 py-2 text-right">{fmtINR(r.base_amount)}</td>
+                <td className="px-3 py-2 text-right">{fmtINR(r.gst_amount)}</td>
+                <td className="px-3 py-2 text-right font-semibold">{fmtINR(r.amount)}</td>
+                <td className="px-3 py-2 capitalize">{r.gateway_name}</td>
+                <td className="px-3 py-2">{statusBadge(r.status)}</td>
+                <td className="px-3 py-2 text-slate-600">{fmtDate(r.payment_date ?? r.created_at)}</td>
+                <td className="px-3 py-2">
+                  {r.invoice_id && r.has_pdf ? (
+                    <button onClick={() => openInvoice(r.invoice_id!)}
+                      className="text-sky-700 hover:underline text-[11px]">{r.invoice_number ?? "View PDF"}</button>
+                  ) : r.status === "paid" ? (
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]"
+                      disabled={gen.isPending}
+                      onClick={() => gen.mutate(r.id)}>
+                      {gen.isPending && gen.variables === r.id ? "Generating…" : "Generate"}
+                    </Button>
+                  ) : <span className="text-slate-400">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {data && data.total > 25 && (
+        <div className="flex items-center justify-between text-xs">
+          <div className="text-slate-500">Page {filters.page} of {Math.max(1, Math.ceil(data.total / 25))}</div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={filters.page <= 1}
+              onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>Previous</Button>
+            <Button size="sm" variant="outline" disabled={filters.page * 25 >= data.total}
+              onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>Next</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
