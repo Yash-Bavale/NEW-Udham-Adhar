@@ -160,7 +160,7 @@ export async function processQueueInternal(limit = 20) {
     }
 
     if (ok) {
-      await Promise.all([
+      const writes: Promise<unknown>[] = [
         supabaseAdmin
           .from("email_queue")
           .update({ status: "sent", attempts: attempt, sent_at: new Date().toISOString(), last_error: null })
@@ -176,7 +176,20 @@ export async function processQueueInternal(limit = 20) {
           lead_id: row.lead_id,
           application_id: row.application_id,
         }),
-      ]);
+      ];
+      if (row.application_id) {
+        writes.push(
+          supabaseAdmin.from("application_events").insert({
+            application_id: row.application_id,
+            lead_id: row.lead_id,
+            event_type: "email_sent",
+            new_value: row.template_code ?? row.subject,
+            staff_name: "System",
+            staff_role: "system",
+          }) as unknown as Promise<unknown>,
+        );
+      }
+      await Promise.all(writes);
       sent++;
     } else {
       const errMsg = (lastError ?? "Unknown error").slice(0, 1000);
