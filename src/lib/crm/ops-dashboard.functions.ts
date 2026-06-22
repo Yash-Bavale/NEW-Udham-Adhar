@@ -47,6 +47,7 @@ export type OpsDashboardData = {
   followUps: { id: string; time: string; customer: string; reason: string; assignedTo: string | null; customerId: string | null }[];
   supportTickets: { open: number; in_progress: number; resolved: number; closed: number };
   recentActivity: { id: string; created_at: string; event_type: string; new_value: string | null; old_value: string | null; staff_name: string | null; application_id: string | null }[];
+  viewer: { isPrivileged: boolean; canViewFinance: boolean };
 };
 
 function startOfDay(d = new Date()) {
