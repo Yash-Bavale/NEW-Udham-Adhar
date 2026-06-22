@@ -221,16 +221,29 @@ export const addLeadNote = createServerFn({ method: "POST" })
   .inputValidator(z.object({ lead_id: z.string().uuid(), note: z.string().min(1) }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
-    
-    const { error } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { error } = await admin
       .from("lead_notes")
-      .insert({
-        lead_id: data.lead_id,
-        note: data.note,
-        user_id: context.userId,
-      });
-
+      .insert({ lead_id: data.lead_id, note: data.note, user_id: context.userId });
     if (error) throw new Error(error.message);
+
+    // C2 — also record to canonical timeline so the Timeline tab shows notes.
+    const { data: lead } = await admin
+      .from("leads").select("customer_id").eq("id", data.lead_id).maybeSingle();
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    await admin.from("application_events").insert({
+      lead_id: data.lead_id,
+      customer_id: lead?.customer_id ?? null,
+      event_type: "note_added",
+      note: data.note,
+      created_by: context.userId,
+      staff_name: profile?.display_name || profile?.email || "Staff",
+      staff_role: roleRows?.[0]?.role ?? "staff",
+    } as never);
+
     return { ok: true };
   });
 
