@@ -55,17 +55,38 @@ type Tpl = {
   is_enabled: boolean;
   is_system: boolean;
   updated_at: string;
+  last_sent_at: string | null;
+  total_sent: number;
 };
 
+function formatIST(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    const fmt = new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+      timeZone: "Asia/Kolkata",
+    }).formatToParts(d);
+    const get = (t: string) => fmt.find((p) => p.type === t)?.value ?? "";
+    return `${get("day")}-${get("month")}-${get("year")} ${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`;
+  } catch { return "—"; }
+}
+
 function EmailTemplatesPage() {
+  const role = useRole();
+  const qc = useQueryClient();
   const list = useServerFn(listEmailTemplates);
+  const toggleFn = useServerFn(toggleEmailTemplate);
   const { data, isLoading } = useQuery({
     queryKey: ["admin.email-templates"],
     queryFn: () => list({ data: {} as never }),
   });
   const [editing, setEditing] = useState<Tpl | null>(null);
   const [previewing, setPreviewing] = useState<Tpl | null>(null);
+  const [disableTarget, setDisableTarget] = useState<Tpl | null>(null);
 
+  const canToggle = role.has("admin") || role.has("super_admin");
   const rows: Tpl[] = (data?.rows as Tpl[] | undefined) ?? [];
 
   return (
