@@ -1,69 +1,46 @@
-## Order Management Module
+## Phase 4 — Email Automation
 
-Existing assets:
-- `src/routes/admin.applications.tsx` — orders list (193 lines)
-- `src/routes/admin.applications.$applicationId.tsx` — order detail (568 lines)
-- `src/lib/crm/applications.functions.ts`, `orders.functions.ts`
-- `src/components/admin/OrderJourney.tsx`
+### 1. Seed 10 new templates (migration via insert tool)
+INSERT the 10 codes from the prompt into `email_templates` with `ON CONFLICT (code) DO UPDATE` so existing rows refresh. Set `is_enabled = true`, `is_system = true`, `variables` array populated from each template's placeholders, `body_text` derived from `body_html` plain text.
 
-Decision: **Rebuild as `/admin/orders` and `/admin/orders/$orderId`**, matching the Lead Management visual + interaction pattern. Keep `/admin/applications/*` as redirects so existing links don't break.
+Codes: `order_confirmation`, `welcome_and_form_link`, `docs_required_reminder`, `service_started_notification`, `order_completed`, `customer_uninterested_reason_request`, `refund_processed_confirmation`, `refund_rejected_notice`, `complaint_filed`, `ticket_created`.
 
-### 1) Routes
+### 2. New page `/admin/email-templates`
+Dedicated route (separate from the combined `/admin/emails` tabs). Columns: Code | Name | Subject | Last Updated | Preview | Edit.
 
-- **New `src/routes/admin.orders.tsx`** — thin `<Outlet/>` layout (same pattern as `admin.leads.tsx`).
-- **New `src/routes/admin.orders.index.tsx`** — list page.
-- **New `src/routes/admin.orders.$orderId.tsx`** — detail page.
-- **Edit `admin.applications.tsx` + `admin.applications.$applicationId.tsx`** → `beforeLoad` redirect to `/admin/orders[...]`.
-- **Sidebar** (`AdminSidebar`): point "Orders" item to `/admin/orders`.
+- **Preview** opens a dialog rendering `body_html` with `previewData` substituted via existing `renderTemplate`.
+- **Edit** opens drawer/dialog:
+  - Code (read-only)
+  - Name (editable)
+  - Subject (editable)
+  - Body HTML textarea (monospace, full height)
+  - **Variable reference sidebar**: chip-list of `{{customer_name}}`, `{{order_number}}`, `{{service_name}}`, `{{invoice_url}}`, `{{document_checklist}}`, `{{complaint_number}}`, `{{refund_amount}}`, `{{refund_reason}}`, `{{rejection_reason}}`, `{{executive_name}}`, `{{followup_date}}` — click-to-insert at caret.
+- Save calls existing `saveEmailTemplate` server fn.
+- Add sidebar nav link "Email Templates" in `AdminShell`.
 
-### 2) Server functions — `src/lib/crm/orders.functions.ts` (extend)
+### 3. Queue worker — log to `application_events`
+Extend `processQueueInternal` in `src/lib/emails/emails.server.ts`: on successful send, when `row.application_id` is set, also INSERT into `application_events`:
+```
+event_type = 'email_sent'
+new_value  = row.template_code
+staff_name = 'System', staff_role = 'system'
+```
+(No new edge function — existing pg_cron `/api/public/cron/process-emails` already runs the worker every minute. Mention this to user in summary so they don't expect a new edge function.)
 
-- `listOrders` — server-paginated (25/page), AND-combined filters: `fulfillmentStatus`, `serviceId`, `assignedTo`, `paymentStatus`, `dateFrom`, `dateTo`, `search` (order code/customer name/mobile). Returns rows joined to `customers`, `services`, latest `payments`, and `leads.lead_status_v2`.
-- `getOrderDetail` — returns `application` + `customer` + `service` + `lead` + `payments[]` + `documents[]` (excluding deleted) + `events[]` (from `application_events`) + `workflow_stages` (from `service_workflows`).
-- `updateOrderAssignee` — writes `applications.assigned_to`, logs `assignment_change` event (existing trigger already does this; just update).
-- `updateFulfillmentStatus` — validates allowed transition, writes `fulfillment_status` (trigger logs `status_change` event automatically). Refuses `completed` unless caller passes `certificateDocumentId`. On completion:
-  1. Insert `documents` row already done client-side (upload first, then call this fn with id).
-  2. Invoke existing `delete-order-documents` edge fn (`{ application_id, reason: 'completed' }`).
-  3. Insert `application_events`: `certificate_delivered`.
-  4. Enqueue `order_completed` email via existing `email_queue`.
-  5. Update parent `leads.lead_status_v2 = 'closed'` + log `lead_status_change` (trigger does it).
-- `uploadOrderDocument` — server fn that takes signed-upload params or accepts already-uploaded storage path; inserts `documents` row (`document_type`, `file_path`, `uploaded_by`). For client-side direct uploads, use existing `documents` bucket signed URL helper if present, else add a tiny `createOrderDocumentSignedUrl` fn.
+### 4. Out of scope (already exists)
+- Variable substitution (`renderTemplate`) — already implemented.
+- `email_logs` writes with template_code/recipient/status/error — already done.
+- SMTP/Lovable email sender — already wired via `@lovable.dev/email-js`.
+- Triggering enqueue from order/payment/refund/complaint events — wired in Phases 1-3 via `enqueueFromTemplateInternal`. Phase 4 only ensures the templates exist by those codes.
 
-### 3) UI Components — `src/components/admin/`
-
-- **`OrderListTable`** — columns per spec: Order No · Customer · Service · Fulfillment Status (badge) · Lead Status (smaller badge) · Assigned · Amount · Payment Status · Created · View. Filter bar above. URL-synced via search params (zod).
-- **`OrderJourneyStepper`** (rewrite) — full-width horizontal stepper, stages pulled from `service_workflows.stages` for the order's service (fallback to default 6-stage list if missing). Each node shows label, ISO timestamp formatted `dd MMM yyyy, HH:mm`, and `staff_name` from matching `application_events`. Completed = filled navy + check, Current = filled amber + animate-pulse ring, Pending = empty grey ring.
-- **`FulfillmentStatusUpdater`** — dropdown + "Update" button. When target = `completed`, opens `CertificateUploadDialog` (file input → upload to `documents` bucket at `orders/<order_id>/certificate-<ts>.<ext>` → call `updateFulfillmentStatus` with `certificateDocumentId`).
-- **`OrderDocumentsPanel`** — list non-deleted docs; banner if `documents_deleted_at`; "Upload Document" opens a small dialog (internal-only).
-- **`OrderPaymentsPanel`** — table of `payments`. Refund rows (`parent_payment_id IS NOT NULL` AND `amount < 0`) get a red "Refund — ₹X" pill.
-- **`OrderSummaryBar`** — top strip in detail: Order No · Customer (link to `/admin/customers/$id` if it exists, else lead) · Service · Created · Assignee (inline editable select) · Total · Payment Status chip · "Linked Lead" button → `/admin/leads/$leadId`.
-- Reuse existing `InternalNotesTimeline` filtered by `application_id`.
-
-### 4) Data assumptions (verified against current schema)
-
-- `applications` has `fulfillment_status`, `assigned_to`, `documents_deleted_at`, `application_code`.
-- `leads.lead_status_v2` already joined.
-- `application_events` has `event_type`, `old_value`, `new_value`, `staff_name`, `staff_role`, `created_at`.
-- `service_workflows.stages` (jsonb) used for stepper labels per service.
-- `documents` bucket exists (private). Signed-URL download for cert preview.
-
-### 5) Order codes
-
-Display `application_code` as-is. Spec mentions `SMV+digits`; current data uses `AP-YYYY-NNNNNN`. **Question to user:** keep existing prefix or change generator to `SMV` going forward? (Answer not needed to start; default = keep `AP-` and just display.)
-
-### 6) Out of scope (this phase)
-
-- Bulk actions on orders (deferred).
-- Workflow editor UI for `service_workflows`.
-- New email templates — uses existing `order_completed` template name (already in registry per Phase 1 map).
-- Reworking `/admin/customers` linking if route absent.
+### 5. Files
+- **New**: `src/routes/admin.email-templates.tsx`, `src/components/admin/EmailTemplateEditor.tsx`, `src/components/admin/EmailTemplatePreviewDialog.tsx`
+- **Edit**: `src/lib/emails/emails.server.ts` (add application_events insert), `src/components/admin/AdminShell.tsx` (nav link), `src/routeTree.gen.ts`
+- **Data**: one `supabase--insert` call seeding the 10 templates
 
 ### Order of work
-
-1. `orders.functions.ts` (list/detail/update fns + workflow stage helper).
-2. `OrderJourneyStepper`, `FulfillmentStatusUpdater`, `CertificateUploadDialog`.
-3. `admin.orders.tsx` layout + `admin.orders.index.tsx` list.
-4. `admin.orders.$orderId.tsx` detail page wiring all panels.
-5. Redirect old `/admin/applications/*` routes.
-6. Sidebar nav update.
-7. Playwright smoke: list filters, open detail, change fulfillment, upload certificate, verify documents-deleted banner + lead closed.
+1. Seed templates (insert tool)
+2. Build editor + preview components
+3. Build `/admin/email-templates` route
+4. Patch worker to log `email_sent` event
+5. Add nav link
