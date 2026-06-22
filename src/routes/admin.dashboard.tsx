@@ -67,10 +67,11 @@ function DashboardPage() {
         <TopServices data={data} loading={isLoading} />
       </div>
 
-      {/* 4. Document pending + 5. Complaint tracker */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      {/* 4. Document pending + 5. Complaint tracker + Refund Tracker */}
+      <div className="grid lg:grid-cols-3 gap-4">
         <DocumentsPending data={data} loading={isLoading} />
         <ComplaintTracker data={data} loading={isLoading} />
+        <RefundTracker data={data} loading={isLoading} />
       </div>
 
       {/* 9 Staff + 10 Follow-ups + 11 Tickets */}
