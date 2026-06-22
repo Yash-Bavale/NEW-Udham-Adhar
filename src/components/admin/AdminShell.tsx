@@ -53,7 +53,8 @@ const NAV: NavGroup[] = [
     id: "g5",
     items: [
       { to: "/admin/employees", label: "Employees", icon: UserCog },
-      { to: "/admin/emails", label: "Email Templates", icon: Mail },
+      { to: "/admin/emails", label: "Email System", icon: Mail },
+      { to: "/admin/email-templates", label: "Email Templates", icon: Mail },
       { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle },
       { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
     ],
