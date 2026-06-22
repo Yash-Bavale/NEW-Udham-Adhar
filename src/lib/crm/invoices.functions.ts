@@ -86,10 +86,10 @@ async function generateAndStore(paymentId: string): Promise<string> {
     invoiceId = existing.id;
     invoiceNumber = existing.invoice_number!;
     if (!existing.pdf_path) {
-      await admin.from("invoices").update(snapshotFields).eq("id", invoiceId);
+      await admin.from("invoices").update(snapshotFields as any).eq("id", invoiceId);
     }
   } else {
-    const { data: row, error: invErr } = await admin
+    const { data: row, error: invErr } = await (admin as any)
       .from("invoices")
       .insert({
         lead_id: payment.lead_id,
@@ -264,7 +264,7 @@ export const listPaymentsAdmin = createServerFn({ method: "POST" })
       )
       .order("created_at", { ascending: false });
 
-    if (data.status) q = q.eq("status", data.status);
+    if (data.status) q = q.eq("status", data.status as any);
     if (data.gateway) q = q.eq("gateway_name", data.gateway);
     if (data.from) q = q.gte("created_at", new Date(data.from).toISOString());
     if (data.to) q = q.lte("created_at", new Date(data.to).toISOString());
