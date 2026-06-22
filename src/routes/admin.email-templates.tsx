@@ -105,25 +105,45 @@ function EmailTemplatesPage() {
               <th className="text-left px-3 py-2 font-medium">Code</th>
               <th className="text-left px-3 py-2 font-medium">Name</th>
               <th className="text-left px-3 py-2 font-medium">Subject</th>
-              <th className="text-left px-3 py-2 font-medium">Last Updated</th>
+              <th className="text-left px-3 py-2 font-medium">Status</th>
+              <th className="text-left px-3 py-2 font-medium">Last Sent</th>
+              <th className="text-right px-3 py-2 font-medium">Sent</th>
               <th className="text-right px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {isLoading && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
             )}
             {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">No templates yet.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">No templates yet.</td></tr>
             )}
             {rows.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50">
                 <td className="px-3 py-2 font-mono text-xs">{t.code}</td>
                 <td className="px-3 py-2">{t.name}</td>
-                <td className="px-3 py-2 text-slate-600 truncate max-w-[28rem]">{t.subject}</td>
-                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">
-                  {new Date(t.updated_at).toLocaleString()}
+                <td className="px-3 py-2 text-slate-600 truncate max-w-[24rem]">{t.subject}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={t.is_enabled}
+                      disabled={!canToggle}
+                      onCheckedChange={async (v) => {
+                        if (!v) { setDisableTarget(t); return; }
+                        try {
+                          await toggleFn({ data: { code: t.code, enabled: true } });
+                          toast.success(`Enabled ${t.name}`);
+                          qc.invalidateQueries({ queryKey: ["admin.email-templates"] });
+                        } catch (e) { toast.error((e as Error).message); }
+                      }}
+                    />
+                    <span className="text-[11px]" style={{ color: t.is_enabled ? "#047857" : "#94a3b8" }}>
+                      {t.is_enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
                 </td>
+                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
+                <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button
                     onClick={() => setPreviewing(t)}
@@ -146,7 +166,52 @@ function EmailTemplatesPage() {
 
       {editing && <EditorDrawer tpl={editing} onClose={() => setEditing(null)} />}
       {previewing && <PreviewDialog tpl={previewing} onClose={() => setPreviewing(null)} />}
+      {disableTarget && (
+        <DisableConfirmDialog
+          tpl={disableTarget}
+          onClose={() => setDisableTarget(null)}
+          onConfirmed={() => { setDisableTarget(null); qc.invalidateQueries({ queryKey: ["admin.email-templates"] }); }}
+        />
+      )}
     </div>
+  );
+}
+
+function DisableConfirmDialog({ tpl, onClose, onConfirmed }: { tpl: Tpl; onClose: () => void; onConfirmed: () => void }) {
+  const toggleFn = useServerFn(toggleEmailTemplate);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function confirm() {
+    setBusy(true);
+    try {
+      await toggleFn({ data: { code: tpl.code, enabled: false, reason: reason || undefined } });
+      toast.success(`Disabled ${tpl.name}`);
+      onConfirmed();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Disable template?</DialogTitle></DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p>
+            Disabling <b>{tpl.name}</b> means <span className="font-mono text-xs">{tpl.code}</span> emails will <b>not</b> be sent.
+            Queued items will be skipped silently. Are you sure?
+          </p>
+          <div className="space-y-1">
+            <Label className="text-xs">Reason (optional)</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Pausing during MSME portal downtime" rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={confirm} disabled={busy} style={{ background: "#b91c1c" }}>
+            {busy ? "Disabling…" : "Disable Template"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
