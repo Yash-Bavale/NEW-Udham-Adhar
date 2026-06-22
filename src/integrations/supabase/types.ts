@@ -1854,24 +1854,30 @@ export type Database = {
           created_at: string
           display_name: string | null
           email: string | null
+          full_name: string | null
           id: string
           is_active: boolean
+          mobile: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          full_name?: string | null
           id: string
           is_active?: boolean
+          mobile?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
           email?: string | null
+          full_name?: string | null
           id?: string
           is_active?: boolean
+          mobile?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2532,6 +2538,8 @@ export type Database = {
         | "support"
         | "accounts"
         | "finance"
+        | "manager"
+        | "executive"
       application_status:
         | "awaiting_payment"
         | "payment_received"
@@ -2752,6 +2760,8 @@ export const Constants = {
         "support",
         "accounts",
         "finance",
+        "manager",
+        "executive",
       ],
       application_status: [
         "awaiting_payment",
