@@ -160,7 +160,7 @@ export async function processQueueInternal(limit = 20) {
     }
 
     if (ok) {
-      const writes: Promise<unknown>[] = [
+      const writes: Array<PromiseLike<unknown>> = [
         supabaseAdmin
           .from("email_queue")
           .update({ status: "sent", attempts: attempt, sent_at: new Date().toISOString(), last_error: null })
