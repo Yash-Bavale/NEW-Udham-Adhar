@@ -98,6 +98,80 @@ export type Database = {
         }
         Relationships: []
       }
+      application_events: {
+        Row: {
+          application_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          event_type: string
+          id: string
+          lead_id: string | null
+          new_value: string | null
+          note: string | null
+          old_value: string | null
+          staff_name: string
+          staff_role: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          event_type: string
+          id?: string
+          lead_id?: string | null
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          staff_name: string
+          staff_role: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          event_type?: string
+          id?: string
+          lead_id?: string | null
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          staff_name?: string
+          staff_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "application_events_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_links: {
         Row: {
           application_id: string | null
@@ -185,10 +259,23 @@ export type Database = {
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
           customer_id: string | null
+          deleted_at: string | null
           document_status: string
+          documents_deleted_at: string | null
+          documents_deleted_reason: string | null
           form_status: string
+          fulfillment_status:
+            | Database["public"]["Enums"]["fulfillment_status_enum"]
+            | null
           id: string
+          is_deleted: boolean | null
           lead_id: string
+          refund_approved_at: string | null
+          refund_approved_by: string | null
+          refund_gateway_ref: string | null
+          refund_processed_at: string | null
+          refund_reason: string | null
+          refund_requested_at: string | null
           service_id: string | null
           updated_at: string
         }
@@ -201,10 +288,23 @@ export type Database = {
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
           document_status?: string
+          documents_deleted_at?: string | null
+          documents_deleted_reason?: string | null
           form_status?: string
+          fulfillment_status?:
+            | Database["public"]["Enums"]["fulfillment_status_enum"]
+            | null
           id?: string
+          is_deleted?: boolean | null
           lead_id: string
+          refund_approved_at?: string | null
+          refund_approved_by?: string | null
+          refund_gateway_ref?: string | null
+          refund_processed_at?: string | null
+          refund_reason?: string | null
+          refund_requested_at?: string | null
           service_id?: string | null
           updated_at?: string
         }
@@ -217,14 +317,34 @@ export type Database = {
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
           document_status?: string
+          documents_deleted_at?: string | null
+          documents_deleted_reason?: string | null
           form_status?: string
+          fulfillment_status?:
+            | Database["public"]["Enums"]["fulfillment_status_enum"]
+            | null
           id?: string
+          is_deleted?: boolean | null
           lead_id?: string
+          refund_approved_at?: string | null
+          refund_approved_by?: string | null
+          refund_gateway_ref?: string | null
+          refund_processed_at?: string | null
+          refund_reason?: string | null
+          refund_requested_at?: string | null
           service_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "applications_customer_id_fkey"
             columns: ["customer_id"]
@@ -246,7 +366,70 @@ export type Database = {
             referencedRelation: "services"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_applications_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_applications_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_applications_lead"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          changed_by: string | null
+          changed_by_name: string | null
+          changed_by_role: string | null
+          changed_fields: Json | null
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          changed_by_role?: string | null
+          changed_fields?: Json | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          changed_by_name?: string | null
+          changed_by_role?: string | null
+          changed_fields?: Json | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -341,6 +524,13 @@ export type Database = {
             foreignKeyName: "certificates_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "certificates_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -412,7 +602,21 @@ export type Database = {
             foreignKeyName: "complaints_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "complaints_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_complaints_application"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
             referencedColumns: ["id"]
           },
         ]
@@ -444,6 +648,13 @@ export type Database = {
             foreignKeyName: "customer_notes_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -454,8 +665,10 @@ export type Database = {
           completed_applications: number
           created_at: string
           customer_code: string | null
+          deleted_at: string | null
           first_seen_at: string
           id: string
+          is_deleted: boolean | null
           language: string | null
           last_seen_at: string
           last_service_id: string | null
@@ -475,8 +688,10 @@ export type Database = {
           completed_applications?: number
           created_at?: string
           customer_code?: string | null
+          deleted_at?: string | null
           first_seen_at?: string
           id?: string
+          is_deleted?: boolean | null
           language?: string | null
           last_seen_at?: string
           last_service_id?: string | null
@@ -496,8 +711,10 @@ export type Database = {
           completed_applications?: number
           created_at?: string
           customer_code?: string | null
+          deleted_at?: string | null
           first_seen_at?: string
           id?: string
+          is_deleted?: boolean | null
           language?: string | null
           last_seen_at?: string
           last_service_id?: string | null
@@ -576,7 +793,15 @@ export type Database = {
           verified_by?: string | null
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_documents_application"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_logs: {
         Row: {
@@ -838,6 +1063,80 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_ups: {
+        Row: {
+          application_id: string | null
+          assigned_to: string | null
+          completed_at: string | null
+          completion_note: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          is_completed: boolean | null
+          lead_id: string | null
+          reason: string
+          scheduled_at: string
+        }
+        Insert: {
+          application_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completion_note?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          lead_id?: string | null
+          reason: string
+          scheduled_at: string
+        }
+        Update: {
+          application_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completion_note?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          lead_id?: string | null
+          reason?: string
+          scheduled_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_ups_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_ups_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "follow_ups_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_ups_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gateway_settlements: {
         Row: {
           created_at: string
@@ -946,6 +1245,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_invoices_application"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_invoices_payment"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_invoices_payment"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
             foreignKeyName: "invoices_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -992,17 +1319,22 @@ export type Database = {
           base_amount: number
           created_at: string
           customer_id: string | null
+          deleted_at: string | null
           duplicate_count: number
           duplicate_of: string | null
           email: string
+          followup_note: string | null
           gst_amount: number
           id: string
+          is_deleted: boolean | null
           is_duplicate: boolean
           language: string
           lead_code: string | null
           lead_source: string
+          lead_status_v2: Database["public"]["Enums"]["lead_status_enum"] | null
           mobile: string
           name: string
+          next_followup_at: string | null
           notes: string | null
           onboarding_reminded_at: string | null
           onboarding_reminder_count: number
@@ -1019,17 +1351,24 @@ export type Database = {
           base_amount?: number
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
           duplicate_count?: number
           duplicate_of?: string | null
           email: string
+          followup_note?: string | null
           gst_amount?: number
           id?: string
+          is_deleted?: boolean | null
           is_duplicate?: boolean
           language: string
           lead_code?: string | null
           lead_source?: string
+          lead_status_v2?:
+            | Database["public"]["Enums"]["lead_status_enum"]
+            | null
           mobile: string
           name: string
+          next_followup_at?: string | null
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
@@ -1046,17 +1385,24 @@ export type Database = {
           base_amount?: number
           created_at?: string
           customer_id?: string | null
+          deleted_at?: string | null
           duplicate_count?: number
           duplicate_of?: string | null
           email?: string
+          followup_note?: string | null
           gst_amount?: number
           id?: string
+          is_deleted?: boolean | null
           is_duplicate?: boolean
           language?: string
           lead_code?: string | null
           lead_source?: string
+          lead_status_v2?:
+            | Database["public"]["Enums"]["lead_status_enum"]
+            | null
           mobile?: string
           name?: string
+          next_followup_at?: string | null
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
@@ -1069,6 +1415,27 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_leads_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "fk_leads_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "leads_customer_id_fkey"
             columns: ["customer_id"]
@@ -1354,6 +1721,20 @@ export type Database = {
           webhook_response?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_payments_application"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "payments_customer_id_fkey"
             columns: ["customer_id"]
@@ -1690,6 +2071,86 @@ export type Database = {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          application_id: string | null
+          assigned_to: string | null
+          created_at: string | null
+          customer_id: string | null
+          description: string | null
+          id: string
+          priority: Database["public"]["Enums"]["priority_enum"] | null
+          resolved_at: string | null
+          resolved_by: string | null
+          service_id: string | null
+          status: Database["public"]["Enums"]["ticket_status_enum"] | null
+          subject: string
+          ticket_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_enum"] | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["ticket_status_enum"] | null
+          subject: string
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          assigned_to?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_enum"] | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          service_id?: string | null
+          status?: Database["public"]["Enums"]["ticket_status_enum"] | null
+          subject?: string
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1713,6 +2174,124 @@ export type Database = {
           reason?: string
         }
         Relationships: []
+      }
+      tasks: {
+        Row: {
+          application_id: string | null
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          is_completed: boolean | null
+          lead_id: string | null
+          priority: Database["public"]["Enums"]["priority_enum"] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          application_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_enum"] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          application_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          lead_id?: string | null
+          priority?: Database["public"]["Enums"]["priority_enum"] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "tasks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_replies: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_internal: boolean | null
+          reply_text: string
+          ticket_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_internal?: boolean | null
+          reply_text: string
+          ticket_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_internal?: boolean | null
+          reply_text?: string
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_replies_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1773,6 +2352,17 @@ export type Database = {
       }
     }
     Views: {
+      customer_stats: {
+        Row: {
+          completed_applications: number | null
+          customer_id: string | null
+          last_order_at: string | null
+          lifetime_value: number | null
+          pending_applications: number | null
+          total_applications: number | null
+        }
+        Relationships: []
+      }
       payments_safe: {
         Row: {
           application_id: string | null
@@ -1802,6 +2392,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_payments_application"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payments_lead_id_fkey"
             columns: ["lead_id"]
@@ -1909,8 +2506,23 @@ export type Database = {
         | "closure_pending"
         | "notice_sent"
         | "closed"
+      complaint_status_enum:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "awaiting_response"
+        | "resolved"
+        | "closed"
       email_log_status: "sent" | "failed" | "bounced"
       email_queue_status: "queued" | "sending" | "sent" | "failed" | "dlq"
+      fulfillment_status_enum:
+        | "order_received"
+        | "documents_received"
+        | "verification_pending"
+        | "application_submitted"
+        | "under_processing"
+        | "completed"
+        | "cancelled"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -1924,7 +2536,37 @@ export type Database = {
         | "new_lead"
         | "contacted"
         | "refund_requested"
+      lead_status_enum:
+        | "new_lead"
+        | "contacted"
+        | "follow_up_required"
+        | "payment_pending"
+        | "payment_failed"
+        | "payment_successful"
+        | "welcome_mail_sent"
+        | "documents_pending"
+        | "under_process"
+        | "uninterested"
+        | "refund_requested"
+        | "refund_approved"
+        | "refunded"
+        | "closed"
+        | "closed_refunded"
       payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
+      payment_status_enum:
+        | "pending"
+        | "paid"
+        | "partially_paid"
+        | "refunded"
+        | "cancelled"
+        | "failed"
+      priority_enum: "high" | "medium" | "low"
+      ticket_status_enum:
+        | "open"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2087,8 +2729,25 @@ export const Constants = {
         "notice_sent",
         "closed",
       ],
+      complaint_status_enum: [
+        "draft",
+        "submitted",
+        "under_review",
+        "awaiting_response",
+        "resolved",
+        "closed",
+      ],
       email_log_status: ["sent", "failed", "bounced"],
       email_queue_status: ["queued", "sending", "sent", "failed", "dlq"],
+      fulfillment_status_enum: [
+        "order_received",
+        "documents_received",
+        "verification_pending",
+        "application_submitted",
+        "under_processing",
+        "completed",
+        "cancelled",
+      ],
       lead_status: [
         "lead_created",
         "payment_pending",
@@ -2103,7 +2762,40 @@ export const Constants = {
         "contacted",
         "refund_requested",
       ],
+      lead_status_enum: [
+        "new_lead",
+        "contacted",
+        "follow_up_required",
+        "payment_pending",
+        "payment_failed",
+        "payment_successful",
+        "welcome_mail_sent",
+        "documents_pending",
+        "under_process",
+        "uninterested",
+        "refund_requested",
+        "refund_approved",
+        "refunded",
+        "closed",
+        "closed_refunded",
+      ],
       payment_status: ["created", "attempted", "paid", "failed", "refunded"],
+      payment_status_enum: [
+        "pending",
+        "paid",
+        "partially_paid",
+        "refunded",
+        "cancelled",
+        "failed",
+      ],
+      priority_enum: ["high", "medium", "low"],
+      ticket_status_enum: [
+        "open",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
+      ],
     },
   },
 } as const
