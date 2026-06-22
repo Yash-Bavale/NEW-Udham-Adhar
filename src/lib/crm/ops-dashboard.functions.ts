@@ -339,7 +339,10 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       }
       return out;
     }
-    const revenue = { weekly: bucket(7), monthly: bucket(30) };
+    const revenue = canViewFinance
+      ? { weekly: bucket(7), monthly: bucket(30) }
+      : { weekly: [] as RevenuePoint[], monthly: [] as RevenuePoint[] };
+
 
     // Top services
     const topServicesMap = new Map<string, number>();
