@@ -137,17 +137,19 @@ function KpiGrid({ data, loading }: { data?: OpsDashboardData; loading: boolean 
         breakdown={k?.ordersCompleted.byService}
         breakdownTitle="By service"
       />
-      <KpiCard
-        label="Total Sale"
-        icon={<Wallet className="size-4" />}
-        loading={loading}
-        timed
-        money
-        buckets={k?.totalSale}
-        breakdown={k?.totalSale.byService}
-        breakdownTitle="By service"
-        breakdownMoney
-      />
+      {canViewFinance && (
+        <KpiCard
+          label="Total Sale"
+          icon={<Wallet className="size-4" />}
+          loading={loading}
+          timed
+          money
+          buckets={k?.totalSale}
+          breakdown={k?.totalSale.byService}
+          breakdownTitle="By service"
+          breakdownMoney
+        />
+      )}
     </div>
   );
 }
