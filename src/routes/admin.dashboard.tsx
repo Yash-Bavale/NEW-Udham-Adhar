@@ -604,17 +604,21 @@ function RecentActivity({ data, loading }: { data?: OpsDashboardData; loading: b
           <EmptyHint text="No activity yet." />
         ) : (
           <ul className="space-y-1.5 text-xs">
-            {data!.recentActivity.map((a) => (
-              <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
-                <time className="font-mono shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                  {new Date(a.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                </time>
-                <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                  {a.activity_type}
-                </span>
-                <span className="truncate" style={{ color: "var(--admin-fg)" }}>{a.activity_description}</span>
-              </li>
-            ))}
+            {data!.recentActivity.map((a) => {
+              const ts = new Date(a.created_at).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+              const desc = describeEvent(a);
+              return (
+                <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
+                  <time className="font-mono shrink-0 text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>{ts}</time>
+                  <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
+                    {a.event_type.replace(/_/g, " ")}
+                  </span>
+                  <span className="truncate" style={{ color: "var(--admin-fg)" }}>
+                    {a.staff_name ? <span className="font-medium">{a.staff_name}</span> : <span style={{ color: "var(--admin-fg-muted)" }}>System</span>} — {desc}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
