@@ -14,47 +14,49 @@ import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
 import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { useRole } from "@/hooks/useRole";
+import type { Module } from "@/lib/roles";
 
-type NavItem = { to: string; label: string; icon: typeof Users };
+type NavItem = { to: string; label: string; icon: typeof Users; module?: Module };
 type NavGroup = { id: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
   {
     id: "g1",
-    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" }],
   },
   {
     id: "g2",
     items: [
-      { to: "/admin/leads", label: "Leads", icon: Users },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2 },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
-      { to: "/admin/documents", label: "Documents", icon: FileText },
+      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads" },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents" },
     ],
   },
   {
     id: "g3",
     items: [
-      { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning },
+      { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints" },
       { to: "/admin/services", label: "Services", icon: Briefcase },
-      { to: "/admin/invoices", label: "Invoices", icon: Receipt },
-      { to: "/admin/payments", label: "Payments", icon: CreditCard },
+      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments" },
     ],
   },
   {
     id: "g4",
     items: [
-      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks },
-      { to: "/admin/reports", label: "Reports", icon: BarChart3 },
+      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets" },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
+      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
     ],
   },
   {
     id: "g5",
     items: [
-      { to: "/admin/employees", label: "Employees", icon: UserCog },
+      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees" },
       { to: "/admin/emails", label: "Email System", icon: Mail },
-      { to: "/admin/email-templates", label: "Email Templates", icon: Mail },
+      { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates" },
       { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle },
       { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
     ],
@@ -74,6 +76,11 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
 function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const role = useRole();
+  const visibleNav: NavGroup[] = NAV
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.module || role.can(it.module)) }))
+    .filter((g) => g.items.length > 0);
+  const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
@@ -112,7 +119,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {NAV.map((group, gi) => (
+          {visibleNav.map((group, gi) => (
             <div key={group.id}>
               {gi > 0 && (
                 <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
@@ -186,7 +193,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t flex items-stretch justify-around"
         style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
       >
-        {FLAT_NAV.slice(0, 6).map((n) => {
+        {flatVisible.slice(0, 6).map((n) => {
           const active = isActive(n.to);
           const Icon = n.icon;
           return (
