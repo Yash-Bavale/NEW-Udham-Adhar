@@ -157,7 +157,7 @@ export const updateEmployee = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const admin = await getAdmin();
-    const patch: Record<string, unknown> = {};
+    const patch: { full_name?: string; display_name?: string; mobile?: string | null } = {};
     if (data.full_name !== undefined) {
       patch.full_name = data.full_name;
       patch.display_name = data.full_name;
