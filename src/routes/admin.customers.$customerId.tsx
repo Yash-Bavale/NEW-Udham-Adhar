@@ -429,37 +429,52 @@ function PaymentsTab({ data }: { data: any }) {
 }
 
 function DocumentsTab({ data }: { data: any }) {
+  const deletedOrders = (data.applications ?? []).filter((a: any) => a.documents_deleted_at);
   return (
-    <SectionCard title={`Documents (${data.documents.length})`}>
-      {data.documents.length === 0 ? (
-        <Empty label="No documents uploaded" />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                <th className="py-2 pr-3">Type</th>
-                <th className="py-2 pr-3">File</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Uploaded</th>
-                <th className="py-2 pr-3">Verified</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.documents.map((d: any) => (
-                <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
-                  <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
-                  <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
-                  <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
-                  <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="space-y-3">
+      {deletedOrders.length > 0 && (
+        <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}>
+          <div className="font-medium mb-1">Documents deleted (privacy policy)</div>
+          <ul className="space-y-0.5">
+            {deletedOrders.map((a: any) => (
+              <li key={a.id} style={{ color: "var(--admin-fg-muted)" }}>
+                Order <span className="font-mono">{a.application_code ?? a.id.slice(0, 8)}</span> — documents deleted on {fmtD(a.documents_deleted_at)}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </SectionCard>
+      <SectionCard title={`Documents (${data.documents.length})`}>
+        {data.documents.length === 0 ? (
+          <Empty label="No documents uploaded" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                  <th className="py-2 pr-3">Type</th>
+                  <th className="py-2 pr-3">File</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">Uploaded</th>
+                  <th className="py-2 pr-3">Verified</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.documents.map((d: any) => (
+                  <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
+                    <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
+                    <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
+                    <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 
