@@ -198,6 +198,7 @@ import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
+import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
@@ -1216,6 +1217,11 @@ const AdminMyWorkRoute = AdminMyWorkRouteImport.update({
   path: '/my-work',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLeadsRoute = AdminLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGatewaysRoute = AdminGatewaysRouteImport.update({
   id: '/gateways',
   path: '/gateways',
@@ -1282,9 +1288,9 @@ const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLeadsIndexRoute = AdminLeadsIndexRouteImport.update({
-  id: '/leads/',
-  path: '/leads/',
-  getParentRoute: () => AdminRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminLeadsRoute,
 } as any)
 const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
   id: '/onboarding/$leadCode/done',
@@ -1335,9 +1341,9 @@ const AdminServicesServiceCodeRoute =
     getParentRoute: () => AdminServicesRoute,
   } as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
-  id: '/leads/$leadId',
-  path: '/leads/$leadId',
-  getParentRoute: () => AdminRoute,
+  id: '/$leadId',
+  path: '/$leadId',
+  getParentRoute: () => AdminLeadsRoute,
 } as any)
 const AdminFinanceSettlementsRoute = AdminFinanceSettlementsRouteImport.update({
   id: '/settlements',
@@ -1608,6 +1614,7 @@ export interface FileRoutesByFullPath {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
@@ -2068,6 +2075,7 @@ export interface FileRoutesById {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
@@ -2300,6 +2308,7 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
@@ -2759,6 +2768,7 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
@@ -4330,6 +4340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMyWorkRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/leads': {
+      id: '/admin/leads'
+      path: '/leads'
+      fullPath: '/admin/leads'
+      preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gateways': {
       id: '/admin/gateways'
       path: '/gateways'
@@ -4423,10 +4440,10 @@ declare module '@tanstack/react-router' {
     }
     '/admin/leads/': {
       id: '/admin/leads/'
-      path: '/leads'
+      path: '/'
       fullPath: '/admin/leads/'
       preLoaderRoute: typeof AdminLeadsIndexRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof AdminLeadsRoute
     }
     '/onboarding/$leadCode/done': {
       id: '/onboarding/$leadCode/done'
@@ -4493,10 +4510,10 @@ declare module '@tanstack/react-router' {
     }
     '/admin/leads/$leadId': {
       id: '/admin/leads/$leadId'
-      path: '/leads/$leadId'
+      path: '/$leadId'
       fullPath: '/admin/leads/$leadId'
       preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof AdminLeadsRoute
     }
     '/admin/finance/settlements': {
       id: '/admin/finance/settlements'
@@ -4655,6 +4672,20 @@ const AdminFinanceRouteWithChildren = AdminFinanceRoute._addFileChildren(
   AdminFinanceRouteChildren,
 )
 
+interface AdminLeadsRouteChildren {
+  AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
+  AdminLeadsIndexRoute: typeof AdminLeadsIndexRoute
+}
+
+const AdminLeadsRouteChildren: AdminLeadsRouteChildren = {
+  AdminLeadsLeadIdRoute: AdminLeadsLeadIdRoute,
+  AdminLeadsIndexRoute: AdminLeadsIndexRoute,
+}
+
+const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
+  AdminLeadsRouteChildren,
+)
+
 interface AdminServicesRouteChildren {
   AdminServicesServiceCodeRoute: typeof AdminServicesServiceCodeRoute
 }
@@ -4691,6 +4722,7 @@ interface AdminRouteChildren {
   AdminEmployeesRoute: typeof AdminEmployeesRoute
   AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
   AdminGatewaysRoute: typeof AdminGatewaysRoute
+  AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
@@ -4705,8 +4737,6 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
-  AdminLeadsIndexRoute: typeof AdminLeadsIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -4722,6 +4752,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmployeesRoute: AdminEmployeesRoute,
   AdminFinanceRoute: AdminFinanceRouteWithChildren,
   AdminGatewaysRoute: AdminGatewaysRoute,
+  AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
@@ -4736,8 +4767,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
-  AdminLeadsLeadIdRoute: AdminLeadsLeadIdRoute,
-  AdminLeadsIndexRoute: AdminLeadsIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
