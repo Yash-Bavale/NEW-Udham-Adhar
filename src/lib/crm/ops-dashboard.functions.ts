@@ -205,8 +205,22 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       byService: compByService(completedApps),
     };
 
-    // KPI: total sale
-    const successPayments = payments.filter((p: any) => ["success", "captured", "paid", "settled"].includes(String(p.status)));
+    // KPI: total sale — exclude test/sandbox gateways
+    const testGatewayNames = new Set<string>(
+      ((gatewaysRes.data ?? []) as any[])
+        .filter((g) => String(g.mode ?? "").toLowerCase() === "test")
+        .map((g) => String(g.name).toLowerCase())
+    );
+    const isLivePayment = (p: any) => {
+      const gw = String(p.gateway_name ?? "").toLowerCase();
+      if (!gw) return true;
+      if (testGatewayNames.has(gw)) return false;
+      // Common naming patterns for test-mode rows
+      return !gw.includes("test") && !gw.includes("sandbox");
+    };
+    const successPayments = payments.filter((p: any) =>
+      ["success", "captured", "paid", "settled"].includes(String(p.status)) && isLivePayment(p)
+    );
     const sumAmt = (rows: any[]) => rows.reduce((s, p) => s + Number(p.amount || 0), 0);
     const saleByService = new Map<string, number>();
     // payments don't include service; map via lead/application
@@ -216,13 +230,17 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       const serviceName = app ? serviceById.get(app.service_id) || "—" : (leadById.get(p.lead_id)?.service || "—");
       saleByService.set(serviceName, (saleByService.get(serviceName) ?? 0) + Number(p.amount || 0));
     });
-    const totalSale = {
+    const totalSaleRaw = {
       total: sumAmt(successPayments),
       today: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= today)),
       week: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= week)),
       month: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= month)),
       byService: Array.from(saleByService.entries()).map(([label, value]) => ({ label, value: Math.round(value) })).sort((a, b) => b.value - a.value),
     };
+    const totalSale = canViewFinance
+      ? totalSaleRaw
+      : { total: 0, today: 0, week: 0, month: 0, byService: [] as Metric[] };
+
 
     // Action required (per Phase 6 spec)
     const refundDecisionPending = leads.filter((l: any) => l.status === "refund_requested").length;
