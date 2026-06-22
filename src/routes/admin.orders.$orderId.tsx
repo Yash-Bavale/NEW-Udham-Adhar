@@ -53,9 +53,12 @@ function OrderDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link to="/admin/orders" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
-        <ChevronLeft className="w-4 h-4" /> Back to orders
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link to="/admin/orders" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+          <ChevronLeft className="w-4 h-4" /> Back to orders
+        </Link>
+        <AddTaskDialog defaultApplicationId={orderId} defaultLeadId={application.lead_id ?? null} />
+      </div>
 
       {/* Summary bar */}
       <div className="rounded-lg border bg-white p-4 grid md:grid-cols-7 gap-4 items-center" style={{ borderColor: "var(--admin-border)" }}>
