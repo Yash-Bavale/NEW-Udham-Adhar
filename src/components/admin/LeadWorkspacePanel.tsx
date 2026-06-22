@@ -34,6 +34,7 @@ import {
 import {
   createFollowUp, listFollowUpsForLead,
 } from "@/lib/crm/follow-ups.functions";
+import { useRole } from "@/hooks/useRole";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
