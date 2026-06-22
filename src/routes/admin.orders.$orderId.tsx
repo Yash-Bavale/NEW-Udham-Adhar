@@ -5,8 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ChevronLeft, ExternalLink, MessageSquare } from "lucide-react";
 
-import { getOrderDetailV2, updateOrderAssignee } from "@/lib/crm/orders-v2.functions";
-import { listStaff, addLeadNote } from "@/lib/crm/leads-admin.functions";
+import { getOrderDetailV2, updateOrderAssignee, addOrderNoteV2 } from "@/lib/crm/orders-v2.functions";
+import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,15 +132,15 @@ function InternalActivity({
   orderId, leadId, events,
 }: { orderId: string; leadId: string | null; events: any[] }) {
   const qc = useQueryClient();
-  const noteFn = useServerFn(addLeadNote);
+  const noteFn = useServerFn(addOrderNoteV2);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!note.trim() || !leadId) return;
+    if (!note.trim()) return;
     setBusy(true);
     try {
-      await noteFn({ data: { lead_id: leadId, note: note.trim() } });
+      await noteFn({ data: { orderId, note: note.trim() } });
       setNote("");
       qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
       toast.success("Note added");
