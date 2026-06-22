@@ -540,11 +540,15 @@ export type Database = {
         Row: {
           application_id: string | null
           assigned_to: string | null
+          authority_name: string | null
+          authority_ref_number: string | null
           breached_at: string | null
           category: string | null
           complaint_number: string | null
           created_at: string
           customer_id: string | null
+          description: string | null
+          expected_update_at: string | null
           id: string
           last_reminded_at: string | null
           lead_id: string
@@ -560,11 +564,15 @@ export type Database = {
         Insert: {
           application_id?: string | null
           assigned_to?: string | null
+          authority_name?: string | null
+          authority_ref_number?: string | null
           breached_at?: string | null
           category?: string | null
           complaint_number?: string | null
           created_at?: string
           customer_id?: string | null
+          description?: string | null
+          expected_update_at?: string | null
           id?: string
           last_reminded_at?: string | null
           lead_id: string
@@ -580,11 +588,15 @@ export type Database = {
         Update: {
           application_id?: string | null
           assigned_to?: string | null
+          authority_name?: string | null
+          authority_ref_number?: string | null
           breached_at?: string | null
           category?: string | null
           complaint_number?: string | null
           created_at?: string
           customer_id?: string | null
+          description?: string | null
+          expected_update_at?: string | null
           id?: string
           last_reminded_at?: string | null
           lead_id?: string

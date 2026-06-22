@@ -225,6 +225,7 @@ import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCo
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
+import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin.tickets.$ticketId'
 import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
 import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
 import { Route as AdminOrdersOrderIdRouteImport } from './routes/admin.orders.$orderId'
@@ -1359,6 +1360,11 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminTicketsTicketIdRoute = AdminTicketsTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => AdminTicketsRoute,
+} as any)
 const AdminSubmissionsSubmissionIdRoute =
   AdminSubmissionsSubmissionIdRouteImport.update({
     id: '/$submissionId',
@@ -1665,7 +1671,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -1685,6 +1691,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
+  '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1899,7 +1906,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -1919,6 +1926,7 @@ export interface FileRoutesByTo {
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
+  '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -2137,7 +2145,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -2157,6 +2165,7 @@ export interface FileRoutesById {
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
+  '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -2396,6 +2405,7 @@ export interface FileRouteTypes {
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
+    | '/admin/tickets/$ticketId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2630,6 +2640,7 @@ export interface FileRouteTypes {
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
+    | '/admin/tickets/$ticketId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2867,6 +2878,7 @@ export interface FileRouteTypes {
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
+    | '/admin/tickets/$ticketId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -4599,6 +4611,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/tickets/$ticketId': {
+      id: '/admin/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/admin/tickets/$ticketId'
+      preLoaderRoute: typeof AdminTicketsTicketIdRouteImport
+      parentRoute: typeof AdminTicketsRoute
+    }
     '/admin/submissions/$submissionId': {
       id: '/admin/submissions/$submissionId'
       path: '/$submissionId'
@@ -4835,6 +4854,18 @@ const AdminSubmissionsRouteChildren: AdminSubmissionsRouteChildren = {
 const AdminSubmissionsRouteWithChildren =
   AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
 
+interface AdminTicketsRouteChildren {
+  AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
+}
+
+const AdminTicketsRouteChildren: AdminTicketsRouteChildren = {
+  AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
+}
+
+const AdminTicketsRouteWithChildren = AdminTicketsRoute._addFileChildren(
+  AdminTicketsRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
@@ -4863,7 +4894,7 @@ interface AdminRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminTasksRoute: typeof AdminTasksRoute
-  AdminTicketsRoute: typeof AdminTicketsRoute
+  AdminTicketsRoute: typeof AdminTicketsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -4897,7 +4928,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminTasksRoute: AdminTasksRoute,
-  AdminTicketsRoute: AdminTicketsRoute,
+  AdminTicketsRoute: AdminTicketsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
