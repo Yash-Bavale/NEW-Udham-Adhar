@@ -21,6 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { INDIAN_STATES } from "@/lib/constants";
 
 export const Route = createFileRoute("/admin/leads")({ component: LeadsPage });
 
@@ -487,9 +489,10 @@ function AddLeadDialog({
   });
 
   const [form, setForm] = useState({
-    name: "", email: "", mobile: "", state: "", language: "en",
-    service: "", lead_source: "manual",
+    name: "", email: "", mobile: "", state: "", district: "", language: "en",
+    service: "", lead_source: "Website",
     base_amount: 0, gst_amount: 0, total_amount: 0,
+    notes: "",
     assigned_to: "" as string,
   });
   const [busy, setBusy] = useState(false);
@@ -513,16 +516,22 @@ function AddLeadDialog({
       const res = await addFn({
         data: {
           ...form,
+          district: form.district || undefined,
+          notes: form.notes || undefined,
           assigned_to: form.assigned_to || undefined,
         },
       });
-      toast.success(`Lead created: ${res.lead_code ?? res.id.slice(0, 8)}`);
+      if (res.isReturningCustomer) {
+        toast.success(`Returning customer — lead ${res.lead_code} added to existing profile`);
+      } else {
+        toast.success(`Lead created: ${res.lead_code ?? res.id.slice(0, 8)}`);
+      }
       onCreated();
       onOpenChange(false);
       setForm({
-        name: "", email: "", mobile: "", state: "", language: "en",
-        service: "", lead_source: "manual",
-        base_amount: 0, gst_amount: 0, total_amount: 0, assigned_to: "",
+        name: "", email: "", mobile: "", state: "", district: "", language: "en",
+        service: "", lead_source: "Website",
+        base_amount: 0, gst_amount: 0, total_amount: 0, notes: "", assigned_to: "",
       });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to create lead");
@@ -548,12 +557,35 @@ function AddLeadDialog({
             <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
           </Row>
           <Row label="State" required>
-            <Input value={form.state} onChange={(e) => setField("state", e.target.value)} />
+            <select
+              value={form.state}
+              onChange={(e) => setField("state", e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+            >
+              <option value="">Select state…</option>
+              {INDIAN_STATES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </Row>
-          <Row label="Language">
-            <Input value={form.language} onChange={(e) => setField("language", e.target.value)} />
+          <Row label="District">
+            <Input value={form.district} onChange={(e) => setField("district", e.target.value)} placeholder="(optional)" />
           </Row>
-          <Row label="Service" required full>
+          <Row label="Source" required>
+            <select
+              value={form.lead_source}
+              onChange={(e) => setField("lead_source", e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+            >
+              <option value="Website">Website</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Google Ads">Google Ads</option>
+              <option value="Instagram">Instagram</option>
+              <option value="Referral">Referral</option>
+              <option value="Other">Other</option>
+            </select>
+          </Row>
+          <Row label="Interested Service" required full>
             <select
               value={form.service}
               onChange={(e) => onServiceChange(e.target.value)}
@@ -574,20 +606,7 @@ function AddLeadDialog({
           <Row label="Total ₹" full>
             <Input type="number" value={form.total_amount} onChange={(e) => setField("total_amount", Number(e.target.value))} />
           </Row>
-          <Row label="Source">
-            <select
-              value={form.lead_source}
-              onChange={(e) => setField("lead_source", e.target.value)}
-              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-            >
-              <option value="manual">Manual</option>
-              <option value="website">Website</option>
-              <option value="campaign">Campaign</option>
-              <option value="referral">Referral</option>
-              <option value="whatsapp">WhatsApp</option>
-            </select>
-          </Row>
-          <Row label="Assign to">
+          <Row label="Assign to" full>
             <select
               value={form.assigned_to}
               onChange={(e) => setField("assigned_to", e.target.value)}
@@ -598,6 +617,9 @@ function AddLeadDialog({
                 <option key={s.id} value={s.id}>{s.display_name || s.email}</option>
               ))}
             </select>
+          </Row>
+          <Row label="Notes" full>
+            <Textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} placeholder="Any initial notes about this lead…" />
           </Row>
         </div>
         <DialogFooter>
