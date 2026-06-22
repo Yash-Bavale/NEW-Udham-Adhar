@@ -100,6 +100,35 @@ export async function processQueueInternal(limit = 20) {
   let failed = 0;
 
   for (const row of rows) {
+    // Per-template enable/disable check (skips silently, logs as skipped_disabled)
+    if (row.template_code) {
+      const { data: tpl } = await supabaseAdmin
+        .from("email_templates")
+        .select("is_enabled")
+        .eq("code", row.template_code)
+        .maybeSingle();
+      if (tpl && tpl.is_enabled === false) {
+        await Promise.all([
+          supabaseAdmin
+            .from("email_queue")
+            .update({ status: "sent", sent_at: new Date().toISOString(), last_error: "skipped: template disabled" } as never)
+            .eq("id", row.id),
+          supabaseAdmin.from("email_logs").insert({
+            queue_id: row.id,
+            template_code: row.template_code,
+            to_email: row.to_email,
+            subject: row.subject,
+            status: "skipped_disabled",
+            smtp_response: "[skipped] template disabled",
+            attempt: (row.attempts ?? 0) + 1,
+            lead_id: row.lead_id,
+            application_id: row.application_id,
+          } as never),
+        ]);
+        continue;
+      }
+    }
+
     await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
 
     const attempt = (row.attempts ?? 0) + 1;
