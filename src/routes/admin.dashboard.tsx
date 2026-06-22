@@ -10,7 +10,7 @@ import {
   PackageCheck, Wallet, AlertTriangle, ChevronDown, ChevronRight, FileText,
   Send, Calendar, LifeBuoy, Activity as ActivityIcon, Bell,
 } from "lucide-react";
-import { getOpsDashboard, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
+import { getOpsDashboard, markFollowUpComplete, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({
