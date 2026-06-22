@@ -218,6 +218,22 @@ export async function processQueueInternal(limit = 20) {
           }),
         );
       }
+      if (row.template_code) {
+        const { data: cur } = await supabaseAdmin
+          .from("email_templates")
+          .select("total_sent")
+          .eq("code", row.template_code)
+          .maybeSingle();
+        writes.push(
+          supabaseAdmin
+            .from("email_templates")
+            .update({
+              last_sent_at: new Date().toISOString(),
+              total_sent: ((cur?.total_sent as number | undefined) ?? 0) + 1,
+            } as never)
+            .eq("code", row.template_code),
+        );
+      }
       await Promise.all(writes);
       sent++;
     } else {
