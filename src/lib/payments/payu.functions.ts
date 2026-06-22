@@ -99,7 +99,7 @@ export const createPayUOrder = createServerFn({ method: "POST" })
     const email = lead.email;
 
     const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
-      "https://udyamadhar.everythinghappens.in";
+      "https://udyamadhar.in";
     const surl = `${origin}/api/public/webhooks/payu`;
     const furl = `${origin}/api/public/webhooks/payu`;
 
