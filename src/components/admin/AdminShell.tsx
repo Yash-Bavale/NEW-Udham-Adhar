@@ -76,6 +76,11 @@ export function AdminShell({ children, email }: { children: ReactNode; email?: s
 function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const role = useRole();
+  const visibleNav: NavGroup[] = NAV
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.module || role.can(it.module)) }))
+    .filter((g) => g.items.length > 0);
+  const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
