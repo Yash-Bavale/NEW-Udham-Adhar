@@ -52,10 +52,10 @@ function DashboardPage() {
 
       {/* 2. Action Required + 6. Payment Summary side-by-side on wide screens */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+        <div className={data?.viewer?.canViewFinance === false ? "lg:col-span-3" : "lg:col-span-2"}>
           <ActionRequired data={data} loading={isLoading} />
         </div>
-        <PaymentSummary data={data} loading={isLoading} />
+        {data?.viewer?.canViewFinance !== false && <PaymentSummary data={data} loading={isLoading} />}
       </div>
 
       {/* 3. Service Pipeline */}
@@ -63,9 +63,12 @@ function DashboardPage() {
 
       {/* 7. Revenue chart + 8. Top services */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2"><RevenueChart data={data} loading={isLoading} /></div>
+        {data?.viewer?.canViewFinance !== false && (
+          <div className="lg:col-span-2"><RevenueChart data={data} loading={isLoading} /></div>
+        )}
         <TopServices data={data} loading={isLoading} />
       </div>
+
 
       {/* 4. Document pending + 5. Complaint tracker + Refund Tracker */}
       <div className="grid lg:grid-cols-3 gap-4">
