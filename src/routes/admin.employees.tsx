@@ -126,21 +126,30 @@ function EmployeesPage() {
         <div>
           <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>Employees</h1>
           <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-            Staff directory. Invite new members, assign a role, deactivate access.
+            Staff directory and lead-assignment pool.
           </p>
         </div>
-        <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-          <UserPlus className="size-4" /> Add Employee
-        </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-subtle)" }} />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, email, mobile, role…" className="pl-9" />
-      </div>
+      <Tabs defaultValue="directory">
+        <TabsList>
+          <TabsTrigger value="directory">Directory</TabsTrigger>
+          <TabsTrigger value="assignment">Lead Assignment</TabsTrigger>
+        </TabsList>
 
-      <SectionCard>
+        <TabsContent value="directory" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="relative max-w-md flex-1">
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-subtle)" }} />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, email, mobile, role…" className="pl-9" />
+            </div>
+            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+              <UserPlus className="size-4" /> Add Employee
+            </Button>
+          </div>
+
+          <SectionCard>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
