@@ -454,11 +454,25 @@ function Field({
 }
 
 function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // Lazy import to avoid pulling tasks function into bundle if not needed elsewhere
-  const fn = useServerFn(
-    (async () => (await import("@/lib/crm/tasks.functions")).listStaffForAssignment)() as any,
+  const fn = useServerFn(listStaffForAssignment);
+  const { data } = useQuery({
+    queryKey: ["staff-assign"],
+    queryFn: () => fn(),
+    staleTime: 60_000,
+  });
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-md border px-3 py-2 text-sm bg-transparent"
+      style={{ borderColor: "var(--admin-border)" }}
+    >
+      <option value="">Unassigned</option>
+      {(data?.staff ?? []).map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
+        </option>
+      ))}
+    </select>
   );
-  // The lazy approach above won't actually work because useServerFn expects a server function ref synchronously.
-  // Replace with synchronous import:
-  return null as any;
 }
