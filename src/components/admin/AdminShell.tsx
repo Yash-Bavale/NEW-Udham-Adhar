@@ -193,7 +193,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t flex items-stretch justify-around"
         style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
       >
-        {FLAT_NAV.slice(0, 6).map((n) => {
+        {flatVisible.slice(0, 6).map((n) => {
           const active = isActive(n.to);
           const Icon = n.icon;
           return (
