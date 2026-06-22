@@ -3,7 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Pencil, Eye, X } from "lucide-react";
-import { listEmailTemplates, saveEmailTemplate } from "@/lib/emails/emails.functions";
+import { listEmailTemplates, saveEmailTemplate, toggleEmailTemplate } from "@/lib/emails/emails.functions";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/email-templates")({
