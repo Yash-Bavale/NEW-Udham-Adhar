@@ -650,7 +650,7 @@ function RecentActivity({ data, loading }: { data?: OpsDashboardData; loading: b
                 <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
                   <time className="font-mono shrink-0 text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>{ts}</time>
                   <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                    {a.event_type.replace(/_/g, " ")}
+                    {eventLabel(a.event_type)}
                   </span>
                   <span className="truncate" style={{ color: "var(--admin-fg)" }}>
                     {a.staff_name ? <span className="font-medium">{a.staff_name}</span> : <span style={{ color: "var(--admin-fg-muted)" }}>System</span>} — {desc}
