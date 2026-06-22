@@ -16,6 +16,7 @@ import { OrderJourneyStepper } from "@/components/admin/OrderJourneyStepper";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
+import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
 export const Route = createFileRoute("/admin/orders/$orderId")({ component: OrderDetailPage });
