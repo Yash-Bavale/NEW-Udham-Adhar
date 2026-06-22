@@ -244,7 +244,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
 
 const APP_ORIGIN = process.env.APP_BASE_URL ||
   process.env.PUBLIC_SITE_URL ||
-  "https://udyamadhar.everythinghappens.in";
+  "https://udyamadhar.in";
 
 function redirectToSuccess(leadCode: string) {
   return new Response(null, {
