@@ -294,8 +294,8 @@ function RefundDecisionPanel({
                 <Trash2 className="size-4 mr-1" /> Mark Processed
               </Button>
             </div>
-            <div className="text-[11px] text-slate-500">
-              Documents will be permanently deleted from storage after this action.
+            <div className="text-[11px] rounded-md border border-rose-200 bg-rose-50 text-rose-800 px-2 py-1.5 font-medium">
+              ⚠ Marking processed will PERMANENTLY DELETE all customer documents from storage (certificates excluded). This cannot be undone.
             </div>
           </div>
         )}
