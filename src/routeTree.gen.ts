@@ -196,6 +196,7 @@ import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
+import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
@@ -212,6 +213,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
+import { Route as AdminOrdersIndexRouteImport } from './routes/admin.orders.index'
 import { Route as AdminLeadsIndexRouteImport } from './routes/admin.leads.index'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
@@ -222,6 +224,7 @@ import { Route as ApiPublicContactRouteImport } from './routes/api/public/contac
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
 import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
 import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
+import { Route as AdminOrdersOrderIdRouteImport } from './routes/admin.orders.$orderId'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
@@ -1207,6 +1210,11 @@ const AdminPipelineRoute = AdminPipelineRouteImport.update({
   path: '/pipeline',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminOrdersRoute = AdminOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -1287,6 +1295,11 @@ const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   path: '/onboarding/$leadCode/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminOrdersRoute,
+} as any)
 const AdminLeadsIndexRoute = AdminLeadsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -1340,6 +1353,11 @@ const AdminServicesServiceCodeRoute =
     path: '/$serviceCode',
     getParentRoute: () => AdminServicesRoute,
   } as any)
+const AdminOrdersOrderIdRoute = AdminOrdersOrderIdRouteImport.update({
+  id: '/$orderId',
+  path: '/$orderId',
+  getParentRoute: () => AdminOrdersRoute,
+} as any)
 const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -1617,6 +1635,7 @@ export interface FileRoutesByFullPath {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -1642,6 +1661,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
@@ -1652,6 +1672,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
+  '/admin/orders/': typeof AdminOrdersIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -1871,6 +1892,7 @@ export interface FileRoutesByTo {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
@@ -1881,6 +1903,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads': typeof AdminLeadsIndexRoute
+  '/admin/orders': typeof AdminOrdersIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -2078,6 +2101,7 @@ export interface FileRoutesById {
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -2103,6 +2127,7 @@ export interface FileRoutesById {
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
+  '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
@@ -2113,6 +2138,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
+  '/admin/orders/': typeof AdminOrdersIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -2311,6 +2337,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
+    | '/admin/orders'
     | '/admin/pipeline'
     | '/admin/reports'
     | '/admin/review'
@@ -2336,6 +2363,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
@@ -2346,6 +2374,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
+    | '/admin/orders/'
     | '/onboarding/$leadCode/'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -2565,6 +2594,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
@@ -2575,6 +2605,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/admin/leads'
+    | '/admin/orders'
     | '/onboarding/$leadCode'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -2771,6 +2802,7 @@ export interface FileRouteTypes {
     | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
+    | '/admin/orders'
     | '/admin/pipeline'
     | '/admin/reports'
     | '/admin/review'
@@ -2796,6 +2828,7 @@ export interface FileRouteTypes {
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
     | '/admin/leads/$leadId'
+    | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
     | '/api/public/complaint'
@@ -2806,6 +2839,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
+    | '/admin/orders/'
     | '/onboarding/$leadCode/'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -4326,6 +4360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPipelineRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/orders': {
+      id: '/admin/orders'
+      path: '/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminOrdersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/notifications': {
       id: '/admin/notifications'
       path: '/notifications'
@@ -4438,6 +4479,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingLeadCodeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/orders/': {
+      id: '/admin/orders/'
+      path: '/'
+      fullPath: '/admin/orders/'
+      preLoaderRoute: typeof AdminOrdersIndexRouteImport
+      parentRoute: typeof AdminOrdersRoute
+    }
     '/admin/leads/': {
       id: '/admin/leads/'
       path: '/'
@@ -4507,6 +4555,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/services/$serviceCode'
       preLoaderRoute: typeof AdminServicesServiceCodeRouteImport
       parentRoute: typeof AdminServicesRoute
+    }
+    '/admin/orders/$orderId': {
+      id: '/admin/orders/$orderId'
+      path: '/$orderId'
+      fullPath: '/admin/orders/$orderId'
+      preLoaderRoute: typeof AdminOrdersOrderIdRouteImport
+      parentRoute: typeof AdminOrdersRoute
     }
     '/admin/leads/$leadId': {
       id: '/admin/leads/$leadId'
@@ -4686,6 +4741,20 @@ const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
   AdminLeadsRouteChildren,
 )
 
+interface AdminOrdersRouteChildren {
+  AdminOrdersOrderIdRoute: typeof AdminOrdersOrderIdRoute
+  AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
+}
+
+const AdminOrdersRouteChildren: AdminOrdersRouteChildren = {
+  AdminOrdersOrderIdRoute: AdminOrdersOrderIdRoute,
+  AdminOrdersIndexRoute: AdminOrdersIndexRoute,
+}
+
+const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(
+  AdminOrdersRouteChildren,
+)
+
 interface AdminServicesRouteChildren {
   AdminServicesServiceCodeRoute: typeof AdminServicesServiceCodeRoute
 }
@@ -4725,6 +4794,7 @@ interface AdminRouteChildren {
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
@@ -4755,6 +4825,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,
