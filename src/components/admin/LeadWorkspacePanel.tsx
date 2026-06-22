@@ -185,9 +185,11 @@ function RefundDecisionPanel({
   lead, currentStatus,
 }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
+  const role = useRole();
   const approveFn = useServerFn(approveRefund);
   const processedFn = useServerFn(markRefundProcessed);
   const rejectFn = useServerFn(rejectRefund);
+  const mayApprove = role.canApproveRefund();
 
   const [policyNote, setPolicyNote] = useState("");
   const [eligible, setEligible] = useState(false);
