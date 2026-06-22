@@ -122,32 +122,6 @@ export const updateLead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const listLeads = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(z.object({
-    page: z.number().default(1),
-    pageSize: z.number().default(25),
-    search: z.string().optional(),
-    status: z.enum(LEAD_STATUS_ENUM).optional(),
-  }))
-  .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
-    
-    let query = (await getAdmin())
-      .from("leads")
-      .select("*", { count: "exact" });
-
-    if (data.status) {
-      query = query.eq("status", data.status);
-    }
-
-    if (data.search) {
-      query = query.or(`name.ilike.%${data.search}%,email.ilike.%${data.search}%,mobile.ilike.%${data.search}%,lead_code.ilike.%${data.search}%`);
-    }
-
-    const { data: rows, count, error } = await query
-      .order("created_at", { ascending: false })
-      .range((data.page - 1) * data.pageSize, data.page * data.pageSize - 1);
 
 export const listLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
