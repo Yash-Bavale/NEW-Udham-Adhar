@@ -311,13 +311,17 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       }),
     };
 
-    // Payment summary
-    const paymentSummary = {
+    // Payment summary — hidden from non-finance staff
+    const paymentSummaryRaw = {
       todayCollection: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= today)),
       pendingPayments: sumAmt(payments.filter((p: any) => ["pending", "initiated", "created"].includes(String(p.status)))),
       refundRequests: payments.filter((p: any) => ["refund_requested", "refund_pending"].includes(String(p.status))).length,
       chargebacks: payments.filter((p: any) => ["chargeback", "disputed"].includes(String(p.status))).length,
     };
+    const paymentSummary = canViewFinance
+      ? paymentSummaryRaw
+      : { todayCollection: 0, pendingPayments: 0, refundRequests: 0, chargebacks: 0 };
+
 
     // Revenue — weekly (7 days) and monthly (30 days)
     function bucket(daysWindow: number) {
