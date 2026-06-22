@@ -96,30 +96,21 @@ function LeadsPage() {
   }), [search, status]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.leads", page, search, status, source, assignee],
-    queryFn: () => listFn({ data: { page, pageSize: 25, search: search || undefined, status: (status || undefined) as never } }),
+    queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
+    queryFn: () => listFn({ data: {
+      page, pageSize: 25,
+      search: search || undefined,
+      status: (status || undefined) as never,
+      source: source || undefined,
+      service: service || undefined,
+      assignee: assignee || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    } }),
   });
 
-  // Client-side filters layered on paginated rows
-  const rows = useMemo(() => {
-    let r = data?.rows ?? [];
-    if (source) r = r.filter((l: any) => (l.lead_source || "").toLowerCase() === source.toLowerCase());
-    if (service) r = r.filter((l: any) => (l.service || "") === service);
-    if (assignee) {
-      r = assignee === "__unassigned"
-        ? r.filter((l: any) => !l.assigned_to)
-        : r.filter((l: any) => l.assigned_to === assignee);
-    }
-    if (dateFrom) {
-      const from = new Date(dateFrom).getTime();
-      r = r.filter((l: any) => new Date(l.created_at).getTime() >= from);
-    }
-    if (dateTo) {
-      const to = new Date(dateTo).getTime() + 24 * 60 * 60 * 1000;
-      r = r.filter((l: any) => new Date(l.created_at).getTime() < to);
-    }
-    return r;
-  }, [data, source, service, assignee, dateFrom, dateTo]);
+  // All filtering happens server-side now (C3).
+  const rows = data?.rows ?? [];
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });
@@ -329,6 +320,7 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Email</th>
                   <th className="px-4 py-2.5 text-left font-medium">Source</th>
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
                   <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-right font-medium">Action</th>
@@ -368,6 +360,7 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
                       <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
                       <td className="px-4 py-2.5 text-xs max-w-[200px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                       <td className="px-4 py-2.5 text-right">
@@ -384,7 +377,7 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -396,8 +389,10 @@ function LeadsPage() {
         <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
           <ChevronLeft className="size-4" /> Prev
         </button>
-        <div style={{ color: "var(--admin-fg-muted)" }}>Page {page}</div>
-        <button disabled={!data || data.rows.length < 25} onClick={() => setPage(page + 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
+        <div style={{ color: "var(--admin-fg-muted)" }}>
+          Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / 25))}
+        </div>
+        <button disabled={!data || page * 25 >= (data.total ?? 0)} onClick={() => setPage(page + 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
           Next <ChevronRight className="size-4" />
         </button>
       </div>
@@ -453,7 +448,7 @@ function LeadDetailSheet({ leadId, onClose }: { leadId: string | null; onClose: 
             <Field label="Source" value={data.lead.lead_source} />
             <Field label="Interested Service" value={data.lead.service} />
             <Field label="Total Amount" value={`₹${Number(data.lead.total_amount || 0).toLocaleString("en-IN")}`} />
-            <Field label="Assigned To" value={data.lead.assigned_to ? data.lead.assigned_to.slice(0, 8) + "…" : "Unassigned"} />
+            <Field label="Assigned To" value={(data.lead as any).assignee_name || (data.lead.assigned_to ? "—" : "Unassigned")} />
             <Field label="Created" value={new Date(data.lead.created_at).toLocaleString("en-IN")} />
 
             {data.lead.notes && (

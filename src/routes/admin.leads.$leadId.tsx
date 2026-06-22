@@ -157,9 +157,9 @@ function LeadDetailPage() {
             <LeadEditableCard
               title="Assignment & Source"
               leadId={leadId}
-              data={lead}
+              data={{ ...lead, assigned_to: (lead as any).assignee_name || (lead.assigned_to ? lead.assigned_to.slice(0,8)+"…" : "Unassigned") }}
               fields={[
-                { key: "assigned_to", label: "Assigned To" },
+                { key: "assigned_to", label: "Assigned To", readOnly: true },
                 { key: "lead_source", label: "Lead Source" },
                 { key: "created_at", label: "Lead Created", readOnly: true },
                 { key: "updated_at", label: "Last Updated", readOnly: true },

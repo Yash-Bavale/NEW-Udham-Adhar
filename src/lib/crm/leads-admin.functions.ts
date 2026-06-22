@@ -58,20 +58,56 @@ export const updateLead = createServerFn({ method: "POST" })
       await assertRole(supabase, ["super_admin", "finance"]);
     }
 
-    const { data: prev, error: fetchErr } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { data: prev, error: fetchErr } = await admin
       .from("leads")
       .select("*")
       .eq("id", leadId)
       .single();
-    
+
     if (fetchErr || !prev) throw new Error("Lead not found");
 
-    const { error: updateErr } = await (await getAdmin())
+    const { error: updateErr } = await admin
       .from("leads")
       .update(patch)
       .eq("id", leadId);
 
     if (updateErr) throw new Error(updateErr.message);
+
+    // C1 — log status / assignee changes to the canonical timeline.
+    const needStaff =
+      (patch.status && patch.status !== prev.status) ||
+      (patch.assigned_to !== undefined && patch.assigned_to !== prev.assigned_to);
+    if (needStaff) {
+      const [{ data: profile }, { data: roleRows }] = await Promise.all([
+        admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+        admin.from("user_roles").select("role").eq("user_id", context.userId),
+      ]);
+      const staff_name = profile?.display_name || profile?.email || "Staff";
+      const staff_role = roleRows?.[0]?.role ?? "staff";
+      if (patch.status && patch.status !== prev.status) {
+        await admin.from("application_events").insert({
+          lead_id: leadId,
+          customer_id: prev.customer_id ?? null,
+          event_type: "lead_status_change",
+          old_value: prev.status,
+          new_value: patch.status,
+          created_by: context.userId,
+          staff_name, staff_role,
+        } as never);
+      }
+      if (patch.assigned_to !== undefined && patch.assigned_to !== prev.assigned_to) {
+        await admin.from("application_events").insert({
+          lead_id: leadId,
+          customer_id: prev.customer_id ?? null,
+          event_type: "assignment_change",
+          old_value: prev.assigned_to ?? null,
+          new_value: patch.assigned_to ?? null,
+          created_by: context.userId,
+          staff_name, staff_role,
+        } as never);
+      }
+    }
 
     await writeAudit({
       supabase,
@@ -86,6 +122,7 @@ export const updateLead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
 export const listLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({
@@ -93,20 +130,33 @@ export const listLeads = createServerFn({ method: "GET" })
     pageSize: z.number().default(25),
     search: z.string().optional(),
     status: z.enum(LEAD_STATUS_ENUM).optional(),
+    source: z.string().optional(),
+    service: z.string().optional(),
+    assignee: z.string().optional(), // uuid | "__unassigned" | "__me"
+    dateFrom: z.string().optional(),
+    dateTo: z.string().optional(),
   }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
-    
-    let query = (await getAdmin())
-      .from("leads")
-      .select("*", { count: "exact" });
+    const admin = await getAdmin();
 
-    if (data.status) {
-      query = query.eq("status", data.status);
+    let query = admin.from("leads").select("*", { count: "exact" });
+
+    if (data.status) query = query.eq("status", data.status);
+    if (data.source) query = query.ilike("lead_source", data.source);
+    if (data.service) query = query.eq("service", data.service);
+    if (data.assignee === "__unassigned") query = query.is("assigned_to", null);
+    else if (data.assignee === "__me") query = query.eq("assigned_to", context.userId);
+    else if (data.assignee) query = query.eq("assigned_to", data.assignee);
+    if (data.dateFrom) query = query.gte("created_at", new Date(data.dateFrom).toISOString());
+    if (data.dateTo) {
+      const to = new Date(data.dateTo); to.setDate(to.getDate() + 1);
+      query = query.lt("created_at", to.toISOString());
     }
-
     if (data.search) {
-      query = query.or(`name.ilike.%${data.search}%,email.ilike.%${data.search}%,mobile.ilike.%${data.search}%,lead_code.ilike.%${data.search}%`);
+      query = query.or(
+        `name.ilike.%${data.search}%,email.ilike.%${data.search}%,mobile.ilike.%${data.search}%,lead_code.ilike.%${data.search}%`
+      );
     }
 
     const { data: rows, count, error } = await query
@@ -114,7 +164,25 @@ export const listLeads = createServerFn({ method: "GET" })
       .range((data.page - 1) * data.pageSize, data.page * data.pageSize - 1);
 
     if (error) throw new Error(error.message);
-    return { rows: rows || [], total: count || 0 };
+
+    // C6 — attach assignee profile so the table can show a name, not a UUID.
+    const assigneeIds = Array.from(new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean)));
+    let profilesById: Record<string, { display_name: string | null; email: string | null }> = {};
+    if (assigneeIds.length) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, display_name, email")
+        .in("id", assigneeIds as string[]);
+      profilesById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
+    }
+    const enriched = (rows ?? []).map((r: any) => ({
+      ...r,
+      assignee_name: r.assigned_to
+        ? (profilesById[r.assigned_to]?.display_name || profilesById[r.assigned_to]?.email || null)
+        : null,
+    }));
+
+    return { rows: enriched, total: count || 0 };
   });
 
 export const getLead = createServerFn({ method: "GET" })
@@ -122,8 +190,8 @@ export const getLead = createServerFn({ method: "GET" })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
-    
-    const { data: lead, error } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { data: lead, error } = await admin
       .from("leads")
       .select("*, applications!fk_applications_lead(*), lead_notes(*)")
       .eq("id", data.id)
@@ -131,10 +199,20 @@ export const getLead = createServerFn({ method: "GET" })
 
     if (error || !lead) throw new Error("Lead not found");
 
-    return { 
-      lead, 
-      applications: lead.applications ?? [], 
-      notes: lead.lead_notes ?? [] 
+    let assignee_name: string | null = null;
+    if ((lead as any).assigned_to) {
+      const { data: p } = await admin
+        .from("profiles")
+        .select("display_name, email")
+        .eq("id", (lead as any).assigned_to)
+        .maybeSingle();
+      assignee_name = p?.display_name || p?.email || null;
+    }
+
+    return {
+      lead: { ...lead, assignee_name },
+      applications: (lead as any).applications ?? [],
+      notes: (lead as any).lead_notes ?? [],
     };
   });
 
@@ -143,16 +221,29 @@ export const addLeadNote = createServerFn({ method: "POST" })
   .inputValidator(z.object({ lead_id: z.string().uuid(), note: z.string().min(1) }))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
-    
-    const { error } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { error } = await admin
       .from("lead_notes")
-      .insert({
-        lead_id: data.lead_id,
-        note: data.note,
-        user_id: context.userId,
-      });
-
+      .insert({ lead_id: data.lead_id, note: data.note, user_id: context.userId });
     if (error) throw new Error(error.message);
+
+    // C2 — also record to canonical timeline so the Timeline tab shows notes.
+    const { data: lead } = await admin
+      .from("leads").select("customer_id").eq("id", data.lead_id).maybeSingle();
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    await admin.from("application_events").insert({
+      lead_id: data.lead_id,
+      customer_id: lead?.customer_id ?? null,
+      event_type: "note_added",
+      note: data.note,
+      created_by: context.userId,
+      staff_name: profile?.display_name || profile?.email || "Staff",
+      staff_role: roleRows?.[0]?.role ?? "staff",
+    } as never);
+
     return { ok: true };
   });
 
