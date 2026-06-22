@@ -17,10 +17,12 @@ export type OpsDashboardData = {
     totalSale: { today: number; week: number; month: number; total: number; byService: Metric[] };
   };
   actionRequired: {
-    ordersWaitingDocs: number;
-    complaintsFollowup: number;
-    customersAwaitingReply: number;
+    refundDecisionPending: number;
+    docsPendingOver2d: number;
+    tasksOverdue: number;
+    followupsTodayOpen: number;
   };
+  refundTracker: { requested: number; approved: number; refunded: number };
   servicePipeline: { stage: string; count: number }[];
   documentsPending: {
     id: string;
