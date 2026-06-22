@@ -115,10 +115,39 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at")
+      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
+  });
+
+export const toggleEmailTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        code: z.string().min(1),
+        enabled: z.boolean(),
+        reason: z.string().trim().max(500).optional(),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "super_admin" }),
+    ]);
+    if (!isAdmin && !isSuper) throw new Error("Forbidden");
+    const patch: Record<string, unknown> = {
+      is_enabled: data.enabled,
+      disabled_reason: data.enabled ? null : data.reason ?? null,
+      last_toggled_by: userId,
+      last_toggled_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("email_templates").update(patch).eq("code", data.code);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 const TemplateInput = z.object({
