@@ -44,9 +44,9 @@ export type OpsDashboardData = {
   revenue: { weekly: RevenuePoint[]; monthly: RevenuePoint[] };
   topServices: Metric[];
   staffPerformance: StaffRow[];
-  followUps: { id: string; time: string; customer: string; reason: string }[];
+  followUps: { id: string; time: string; customer: string; reason: string; assignedTo: string | null; customerId: string | null }[];
   supportTickets: { open: number; in_progress: number; resolved: number; closed: number };
-  recentActivity: { id: string; created_at: string; activity_type: string; activity_description: string }[];
+  recentActivity: { id: string; created_at: string; event_type: string; new_value: string | null; old_value: string | null; staff_name: string | null; application_id: string | null }[];
 };
 
 function startOfDay(d = new Date()) {
