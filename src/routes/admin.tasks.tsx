@@ -1,140 +1,342 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ListChecks, AlertCircle, Calendar } from "lucide-react";
-import { getOpsDashboard, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
-import { SectionCard, FilterChip, TableSkeleton } from "@/components/admin/ui";
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  CircleDashed,
+  Inbox,
+  ListChecks,
+  User,
+} from "lucide-react";
+import { listTasks, completeTask } from "@/lib/crm/tasks.functions";
+import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
 
 export const Route = createFileRoute("/admin/tasks")({
-  head: () => ({ meta: [{ title: "Tasks — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
+  head: () => ({
+    meta: [
+      { title: "Tasks — Udyam Ops OS" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+  }),
   component: TasksPage,
 });
 
-type TaskRow = {
-  id: string;
-  task: string;
-  service: string | null;
-  ref: string | null;
-  priority: "high" | "medium" | "low";
-  status: "overdue" | "today" | "upcoming";
-  due: string;
-  href: string;
-};
-
-type Filter = "all" | "overdue" | "today" | "upcoming";
+type ScopeFilter = "mine" | "all";
 
 function TasksPage() {
-  const [filter, setFilter] = useState<Filter>("all");
-  const fn = useServerFn(getOpsDashboard);
-  const { data, isLoading } = useQuery<OpsDashboardData>({
-    queryKey: ["ops-dashboard"],
-    queryFn: () => fn(),
+  const [scope, setScope] = useState<ScopeFilter>("all");
+  const fn = useServerFn(listTasks);
+  const completeFn = useServerFn(completeTask);
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["tasks-board", scope],
+    queryFn: () => fn({ data: { scope, includeCompleted: false } }),
     refetchInterval: 60_000,
   });
 
-  const tasks = useMemo<TaskRow[]>(() => {
-    if (!data) return [];
-    const out: TaskRow[] = [];
-    data.documentsPending.forEach((d) => {
-      out.push({
-        id: `doc-${d.id}`,
-        task: `Collect missing documents (${d.missing_docs.length || "review"})`,
-        service: d.service,
-        ref: d.application_code,
-        priority: d.missing_docs.length >= 3 ? "high" : "medium",
-        status: "today",
-        due: "Today",
-        href: `/admin/applications/${d.id}`,
-      });
-    });
-    data.complaintTracker.rows.forEach((c) => {
-      const overdue = c.days_open >= 3;
-      out.push({
-        id: `cmp-${c.id}`,
-        task: `Follow up on complaint (${c.days_open}d open)`,
-        service: c.service,
-        ref: c.complaint_number,
-        priority: c.days_open >= 5 ? "high" : c.days_open >= 2 ? "medium" : "low",
-        status: overdue ? "overdue" : "today",
-        due: overdue ? `${c.days_open}d overdue` : "Today",
-        href: `/admin/complaints/${c.id}`,
-      });
-    });
-    return out;
-  }, [data]);
+  const buckets = useMemo(() => bucketize(data?.tasks ?? []), [data]);
 
-  const filtered = tasks.filter((t) => filter === "all" || t.status === filter);
-
-  const counts = {
-    all: tasks.length,
-    overdue: tasks.filter((t) => t.status === "overdue").length,
-    today: tasks.filter((t) => t.status === "today").length,
-    upcoming: tasks.filter((t) => t.status === "upcoming").length,
-  };
+  const completeMut = useMutation({
+    mutationFn: (id: string) => completeFn({ data: { id, completed: true } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks-board"] }),
+  });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>Tasks</h1>
-        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>Auto-derived from open complaints and pending documents.</p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>All ({counts.all})</FilterChip>
-        <FilterChip active={filter === "overdue"} onClick={() => setFilter("overdue")}>Overdue ({counts.overdue})</FilterChip>
-        <FilterChip active={filter === "today"} onClick={() => setFilter("today")}>Due Today ({counts.today})</FilterChip>
-        <FilterChip active={filter === "upcoming"} onClick={() => setFilter("upcoming")}>Upcoming ({counts.upcoming})</FilterChip>
-      </div>
-
-      <SectionCard>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                <th className="px-4 py-2">Task</th>
-                <th className="px-4 py-2">Service</th>
-                <th className="px-4 py-2">Reference</th>
-                <th className="px-4 py-2">Priority</th>
-                <th className="px-4 py-2">Due</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && <tr><td colSpan={6}><TableSkeleton rows={5} cols={6} /></td></tr>}
-              {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-xs" style={{ color: "var(--admin-fg-muted)" }}>No tasks match this filter.</td></tr>
-              )}
-              {filtered.map((t, i) => {
-                const rowBg = t.status === "overdue" ? "rgba(220, 38, 38, 0.06)" : t.status === "today" ? "rgba(217, 119, 6, 0.06)" : i % 2 ? "var(--admin-surface-2)" : "transparent";
-                const pColor = t.priority === "high" ? "var(--admin-danger)" : t.priority === "medium" ? "var(--admin-warn)" : "var(--admin-fg-muted)";
-                return (
-                  <tr key={t.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: rowBg }}>
-                    <td className="px-4 py-2.5 flex items-center gap-2" style={{ color: "var(--admin-fg)" }}>
-                      {t.status === "overdue" ? <AlertCircle className="size-3.5" style={{ color: "var(--admin-danger)" }} /> : <ListChecks className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />}
-                      {t.task}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{t.service ?? "—"}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{t.ref ?? "—"}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: pColor }}>
-                        <span className="size-1.5 rounded-full" style={{ background: pColor }} />
-                        {t.priority}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs" style={{ color: t.status === "overdue" ? "var(--admin-danger)" : "var(--admin-fg)" }}>
-                      <span className="inline-flex items-center gap-1"><Calendar className="size-3" />{t.due}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Link to={t.href} className="text-xs" style={{ color: "var(--admin-accent)" }}>Open →</Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>
+            Tasks
+          </h1>
+          <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+            Manual to-do items linked to leads, orders, and customers.
+          </p>
         </div>
-      </SectionCard>
+        <div className="flex items-center gap-2">
+          <div
+            className="inline-flex overflow-hidden rounded-md border text-xs font-medium"
+            style={{ borderColor: "var(--admin-border)" }}
+          >
+            <button
+              onClick={() => setScope("mine")}
+              className="px-3 py-1.5"
+              style={{
+                background: scope === "mine" ? "var(--admin-accent)" : "var(--admin-surface)",
+                color: scope === "mine" ? "var(--admin-accent-fg)" : "var(--admin-fg)",
+              }}
+            >
+              My Tasks
+            </button>
+            <button
+              onClick={() => setScope("all")}
+              className="px-3 py-1.5"
+              style={{
+                background: scope === "all" ? "var(--admin-accent)" : "var(--admin-surface)",
+                color: scope === "all" ? "var(--admin-accent-fg)" : "var(--admin-fg)",
+              }}
+            >
+              All Tasks
+            </button>
+          </div>
+          <AddTaskDialog />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Column
+          title="Overdue"
+          count={buckets.overdue.length}
+          tone="danger"
+          icon={<AlertCircle className="size-4" />}
+          loading={isLoading}
+          tasks={buckets.overdue}
+          onComplete={(id) => completeMut.mutate(id)}
+        />
+        <Column
+          title="Due Today"
+          count={buckets.today.length}
+          tone="warn"
+          icon={<CircleDashed className="size-4" />}
+          loading={isLoading}
+          tasks={buckets.today}
+          onComplete={(id) => completeMut.mutate(id)}
+        />
+        <Column
+          title="Upcoming (7 days)"
+          count={buckets.upcoming.length}
+          tone="info"
+          icon={<Calendar className="size-4" />}
+          loading={isLoading}
+          tasks={buckets.upcoming}
+          onComplete={(id) => completeMut.mutate(id)}
+        />
+      </div>
     </div>
   );
+}
+
+type Task = Awaited<ReturnType<typeof listTasks>>["tasks"][number];
+
+function bucketize(tasks: Task[]) {
+  const now = new Date();
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const endToday = new Date(startToday);
+  endToday.setDate(endToday.getDate() + 1);
+  const in7 = new Date(startToday);
+  in7.setDate(in7.getDate() + 8);
+
+  const overdue: Task[] = [];
+  const today: Task[] = [];
+  const upcoming: Task[] = [];
+  tasks.forEach((t) => {
+    if (!t.due_date) {
+      upcoming.push(t);
+      return;
+    }
+    const d = new Date(t.due_date);
+    if (d < startToday) overdue.push(t);
+    else if (d < endToday) today.push(t);
+    else if (d < in7) upcoming.push(t);
+  });
+  return { overdue, today, upcoming };
+}
+
+function Column({
+  title,
+  count,
+  tone,
+  icon,
+  loading,
+  tasks,
+  onComplete,
+}: {
+  title: string;
+  count: number;
+  tone: "danger" | "warn" | "info";
+  icon: React.ReactNode;
+  loading: boolean;
+  tasks: Task[];
+  onComplete: (id: string) => void;
+}) {
+  const color =
+    tone === "danger"
+      ? "var(--admin-danger)"
+      : tone === "warn"
+        ? "var(--admin-warn)"
+        : "#0284c7";
+  const bg =
+    tone === "danger"
+      ? "rgba(220,38,38,0.08)"
+      : tone === "warn"
+        ? "rgba(217,119,6,0.08)"
+        : "rgba(2,132,199,0.08)";
+  return (
+    <section
+      className="flex flex-col rounded-lg border"
+      style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}
+    >
+      <header
+        className="flex items-center justify-between rounded-t-lg border-b px-3 py-2"
+        style={{ borderColor: "var(--admin-border)", background: bg }}
+      >
+        <div className="flex items-center gap-2 text-sm font-medium" style={{ color }}>
+          {icon}
+          {title}
+        </div>
+        <span
+          className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+          style={{ background: "var(--admin-surface)", color }}
+        >
+          {count}
+        </span>
+      </header>
+      <div className="flex flex-col gap-2 p-2">
+        {loading && <ColumnSkeleton />}
+        {!loading && tasks.length === 0 && <Empty />}
+        {!loading && tasks.map((t) => <TaskCard key={t.id} task={t} onComplete={onComplete} />)}
+      </div>
+    </section>
+  );
+}
+
+function ColumnSkeleton() {
+  return (
+    <>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="h-20 animate-pulse rounded border"
+          style={{ background: "var(--admin-surface-2)", borderColor: "var(--admin-border)" }}
+        />
+      ))}
+    </>
+  );
+}
+
+function Empty() {
+  return (
+    <div
+      className="flex flex-col items-center gap-2 rounded border border-dashed py-8 text-center"
+      style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}
+    >
+      <Inbox className="size-5" />
+      <div className="text-xs">No tasks here.</div>
+    </div>
+  );
+}
+
+const PRIORITY_STYLE: Record<string, { color: string; bg: string; label: string }> = {
+  high: { color: "#b91c1c", bg: "rgba(220,38,38,0.12)", label: "High" },
+  medium: { color: "#b45309", bg: "rgba(217,119,6,0.12)", label: "Medium" },
+  low: { color: "#475569", bg: "rgba(100,116,139,0.12)", label: "Low" },
+};
+
+function TaskCard({ task, onComplete }: { task: Task; onComplete: (id: string) => void }) {
+  const p = PRIORITY_STYLE[task.priority ?? "medium"];
+  return (
+    <article
+      className="group rounded-md border p-3"
+      style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+    >
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={() => onComplete(task.id)}
+          className="mt-0.5 rounded-full p-0.5 hover:bg-[var(--admin-surface-2)]"
+          title="Mark complete"
+        >
+          <CheckCircle2 className="size-4" style={{ color: "var(--admin-fg-muted)" }} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div
+            className="text-sm font-medium leading-snug"
+            style={{ color: "var(--admin-fg)" }}
+          >
+            {task.title}
+          </div>
+          {task.description && (
+            <div
+              className="mt-0.5 line-clamp-2 text-xs"
+              style={{ color: "var(--admin-fg-muted)" }}
+            >
+              {task.description}
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ background: p.bg, color: p.color }}
+            >
+              <span className="size-1.5 rounded-full" style={{ background: p.color }} />
+              {p.label}
+            </span>
+            {task.lead_code && (
+              <Link
+                to="/admin/leads/$leadId"
+                params={{ leadId: task.lead_id! }}
+                className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]"
+                style={{
+                  borderColor: "var(--admin-border)",
+                  color: "var(--admin-accent)",
+                }}
+              >
+                <ListChecks className="size-3" />
+                {task.lead_code}
+              </Link>
+            )}
+            {task.application_code && (
+              <Link
+                to="/admin/applications/$applicationId"
+                params={{ applicationId: task.application_id! }}
+                className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]"
+                style={{
+                  borderColor: "var(--admin-border)",
+                  color: "var(--admin-accent)",
+                }}
+              >
+                {task.application_code}
+              </Link>
+            )}
+            {task.assigned_name && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px]"
+                style={{ color: "var(--admin-fg-muted)" }}
+              >
+                <User className="size-3" />
+                {task.assigned_name}
+              </span>
+            )}
+            {task.due_date && (
+              <span
+                className="ml-auto inline-flex items-center gap-1 text-[10px]"
+                style={{ color: "var(--admin-fg-muted)" }}
+              >
+                <Calendar className="size-3" />
+                {formatIST(task.due_date)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function formatIST(iso: string): string {
+  const d = new Date(iso);
+  const fmt = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return fmt.format(d).replace(",", "");
 }
