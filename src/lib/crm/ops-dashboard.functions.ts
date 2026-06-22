@@ -320,13 +320,34 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       ...v,
     })).sort((a, b) => b.handled - a.handled).slice(0, 8);
 
-    // Recent activity
+    // Recent activity — from application_events
     const recentActivity = activity.map((a: any) => ({
       id: a.id,
       created_at: a.created_at,
-      activity_type: a.activity_type,
-      activity_description: a.activity_description,
+      event_type: a.event_type,
+      new_value: a.new_value ?? null,
+      old_value: a.old_value ?? null,
+      staff_name: a.staff_name ?? null,
+      application_id: a.application_id ?? null,
     }));
+
+    // Today's follow-ups (open)
+    const followUpsOut = followups.map((f: any) => {
+      const lead = leadById.get(f.lead_id);
+      const customerName =
+        (f.customer_id && customerNameById.get(f.customer_id)) ||
+        lead?.name ||
+        "—";
+      const t = new Date(f.scheduled_at);
+      return {
+        id: f.id,
+        time: t.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }),
+        customer: customerName,
+        reason: f.reason ?? "Follow-up",
+        assignedTo: f.assigned_to ? (profileById.get(f.assigned_to) ?? null) : null,
+        customerId: f.customer_id ?? null,
+      };
+    });
 
     return {
       kpis: {
@@ -339,7 +360,8 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
         ordersCompleted,
         totalSale,
       },
-      actionRequired: { ordersWaitingDocs, complaintsFollowup, customersAwaitingReply },
+      actionRequired: { refundDecisionPending, docsPendingOver2d, tasksOverdue, followupsTodayOpen },
+      refundTracker,
       servicePipeline,
       documentsPending,
       complaintTracker,
@@ -347,8 +369,20 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       revenue,
       topServices,
       staffPerformance,
-      followUps: [], // backend coming later
-      supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 }, // backend coming later
+      followUps: followUpsOut,
+      supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 },
       recentActivity,
     };
+  });
+
+export const markFollowUpComplete = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase.from("follow_ups") as any)
+      .update({ is_completed: true, completed_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
   });
