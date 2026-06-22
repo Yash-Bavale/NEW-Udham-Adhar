@@ -125,7 +125,7 @@ export const getLead = createServerFn({ method: "GET" })
     
     const { data: lead, error } = await (await getAdmin())
       .from("leads")
-      .select("*, applications(*), lead_notes(*)")
+      .select("*, applications!fk_applications_lead(*), lead_notes(*)")
       .eq("id", data.id)
       .single();
 
