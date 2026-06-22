@@ -448,7 +448,7 @@ function LeadDetailSheet({ leadId, onClose }: { leadId: string | null; onClose: 
             <Field label="Source" value={data.lead.lead_source} />
             <Field label="Interested Service" value={data.lead.service} />
             <Field label="Total Amount" value={`₹${Number(data.lead.total_amount || 0).toLocaleString("en-IN")}`} />
-            <Field label="Assigned To" value={data.lead.assigned_to ? data.lead.assigned_to.slice(0, 8) + "…" : "Unassigned"} />
+            <Field label="Assigned To" value={(data.lead as any).assignee_name || (data.lead.assigned_to ? "—" : "Unassigned")} />
             <Field label="Created" value={new Date(data.lead.created_at).toLocaleString("en-IN")} />
 
             {data.lead.notes && (
