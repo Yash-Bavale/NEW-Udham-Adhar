@@ -389,6 +389,44 @@ export type Database = {
           },
         ]
       }
+      assignment_pool: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_assigned_at: string | null
+          service_id: string | null
+          total_assigned: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          service_id?: string | null
+          total_assigned?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          service_id?: string | null
+          total_assigned?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_pool_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -1035,11 +1073,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          disabled_reason: string | null
           id: string
           is_enabled: boolean
           is_system: boolean
+          last_sent_at: string | null
+          last_toggled_at: string | null
+          last_toggled_by: string | null
           name: string
           subject: string
+          total_sent: number
           updated_at: string
           variables: string[]
         }
@@ -1050,11 +1093,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          disabled_reason?: string | null
           id?: string
           is_enabled?: boolean
           is_system?: boolean
+          last_sent_at?: string | null
+          last_toggled_at?: string | null
+          last_toggled_by?: string | null
           name: string
           subject: string
+          total_sent?: number
           updated_at?: string
           variables?: string[]
         }
@@ -1065,11 +1113,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          disabled_reason?: string | null
           id?: string
           is_enabled?: boolean
           is_system?: boolean
+          last_sent_at?: string | null
+          last_toggled_at?: string | null
+          last_toggled_by?: string | null
           name?: string
           subject?: string
+          total_sent?: number
           updated_at?: string
           variables?: string[]
         }
@@ -1338,6 +1391,41 @@ export type Database = {
           },
         ]
       }
+      lead_assignment_config: {
+        Row: {
+          assignment_mode: string
+          created_at: string
+          id: string
+          is_active: boolean
+          service_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assignment_mode?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          service_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assignment_mode?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          service_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_assignment_config_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_notes: {
         Row: {
           created_at: string
@@ -1372,7 +1460,9 @@ export type Database = {
       }
       leads: {
         Row: {
+          assigned_at: string | null
           assigned_to: string | null
+          auto_assigned: boolean
           base_amount: number
           created_at: string
           customer_id: string | null
@@ -1405,7 +1495,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_at?: string | null
           assigned_to?: string | null
+          auto_assigned?: boolean
           base_amount?: number
           created_at?: string
           customer_id?: string | null
@@ -1440,7 +1532,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_at?: string | null
           assigned_to?: string | null
+          auto_assigned?: boolean
           base_amount?: number
           created_at?: string
           customer_id?: string | null

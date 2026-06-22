@@ -19,6 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LeadAssignmentTab } from "@/components/admin/LeadAssignmentTab";
 
 export const Route = createFileRoute("/admin/employees")({
   head: () => ({ meta: [{ title: "Employees — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -124,21 +126,30 @@ function EmployeesPage() {
         <div>
           <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>Employees</h1>
           <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-            Staff directory. Invite new members, assign a role, deactivate access.
+            Staff directory and lead-assignment pool.
           </p>
         </div>
-        <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-          <UserPlus className="size-4" /> Add Employee
-        </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-subtle)" }} />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, email, mobile, role…" className="pl-9" />
-      </div>
+      <Tabs defaultValue="directory">
+        <TabsList>
+          <TabsTrigger value="directory">Directory</TabsTrigger>
+          <TabsTrigger value="assignment">Lead Assignment</TabsTrigger>
+        </TabsList>
 
-      <SectionCard>
+        <TabsContent value="directory" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="relative max-w-md flex-1">
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-subtle)" }} />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, email, mobile, role…" className="pl-9" />
+            </div>
+            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+              <UserPlus className="size-4" /> Add Employee
+            </Button>
+          </div>
+
+          <SectionCard>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -203,16 +214,22 @@ function EmployeesPage() {
             </tbody>
           </table>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
-        onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
+            onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
-      <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
-      <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
-        onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
+            onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+        </TabsContent>
+
+        <TabsContent value="assignment" className="mt-4">
+          <LeadAssignmentTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

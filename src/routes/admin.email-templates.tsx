@@ -3,7 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Pencil, Eye, X } from "lucide-react";
-import { listEmailTemplates, saveEmailTemplate } from "@/lib/emails/emails.functions";
+import { listEmailTemplates, saveEmailTemplate, toggleEmailTemplate } from "@/lib/emails/emails.functions";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/email-templates")({
@@ -49,17 +55,38 @@ type Tpl = {
   is_enabled: boolean;
   is_system: boolean;
   updated_at: string;
+  last_sent_at: string | null;
+  total_sent: number;
 };
 
+function formatIST(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    const fmt = new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+      timeZone: "Asia/Kolkata",
+    }).formatToParts(d);
+    const get = (t: string) => fmt.find((p) => p.type === t)?.value ?? "";
+    return `${get("day")}-${get("month")}-${get("year")} ${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`;
+  } catch { return "—"; }
+}
+
 function EmailTemplatesPage() {
+  const role = useRole();
+  const qc = useQueryClient();
   const list = useServerFn(listEmailTemplates);
+  const toggleFn = useServerFn(toggleEmailTemplate);
   const { data, isLoading } = useQuery({
     queryKey: ["admin.email-templates"],
     queryFn: () => list({ data: {} as never }),
   });
   const [editing, setEditing] = useState<Tpl | null>(null);
   const [previewing, setPreviewing] = useState<Tpl | null>(null);
+  const [disableTarget, setDisableTarget] = useState<Tpl | null>(null);
 
+  const canToggle = role.has("admin") || role.has("super_admin");
   const rows: Tpl[] = (data?.rows as Tpl[] | undefined) ?? [];
 
   return (
@@ -78,25 +105,45 @@ function EmailTemplatesPage() {
               <th className="text-left px-3 py-2 font-medium">Code</th>
               <th className="text-left px-3 py-2 font-medium">Name</th>
               <th className="text-left px-3 py-2 font-medium">Subject</th>
-              <th className="text-left px-3 py-2 font-medium">Last Updated</th>
+              <th className="text-left px-3 py-2 font-medium">Status</th>
+              <th className="text-left px-3 py-2 font-medium">Last Sent</th>
+              <th className="text-right px-3 py-2 font-medium">Sent</th>
               <th className="text-right px-3 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {isLoading && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
             )}
             {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">No templates yet.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">No templates yet.</td></tr>
             )}
             {rows.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50">
                 <td className="px-3 py-2 font-mono text-xs">{t.code}</td>
                 <td className="px-3 py-2">{t.name}</td>
-                <td className="px-3 py-2 text-slate-600 truncate max-w-[28rem]">{t.subject}</td>
-                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">
-                  {new Date(t.updated_at).toLocaleString()}
+                <td className="px-3 py-2 text-slate-600 truncate max-w-[24rem]">{t.subject}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={t.is_enabled}
+                      disabled={!canToggle}
+                      onCheckedChange={async (v) => {
+                        if (!v) { setDisableTarget(t); return; }
+                        try {
+                          await toggleFn({ data: { code: t.code, enabled: true } });
+                          toast.success(`Enabled ${t.name}`);
+                          qc.invalidateQueries({ queryKey: ["admin.email-templates"] });
+                        } catch (e) { toast.error((e as Error).message); }
+                      }}
+                    />
+                    <span className="text-[11px]" style={{ color: t.is_enabled ? "#047857" : "#94a3b8" }}>
+                      {t.is_enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
                 </td>
+                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
+                <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button
                     onClick={() => setPreviewing(t)}
@@ -119,7 +166,52 @@ function EmailTemplatesPage() {
 
       {editing && <EditorDrawer tpl={editing} onClose={() => setEditing(null)} />}
       {previewing && <PreviewDialog tpl={previewing} onClose={() => setPreviewing(null)} />}
+      {disableTarget && (
+        <DisableConfirmDialog
+          tpl={disableTarget}
+          onClose={() => setDisableTarget(null)}
+          onConfirmed={() => { setDisableTarget(null); qc.invalidateQueries({ queryKey: ["admin.email-templates"] }); }}
+        />
+      )}
     </div>
+  );
+}
+
+function DisableConfirmDialog({ tpl, onClose, onConfirmed }: { tpl: Tpl; onClose: () => void; onConfirmed: () => void }) {
+  const toggleFn = useServerFn(toggleEmailTemplate);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function confirm() {
+    setBusy(true);
+    try {
+      await toggleFn({ data: { code: tpl.code, enabled: false, reason: reason || undefined } });
+      toast.success(`Disabled ${tpl.name}`);
+      onConfirmed();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Disable template?</DialogTitle></DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p>
+            Disabling <b>{tpl.name}</b> means <span className="font-mono text-xs">{tpl.code}</span> emails will <b>not</b> be sent.
+            Queued items will be skipped silently. Are you sure?
+          </p>
+          <div className="space-y-1">
+            <Label className="text-xs">Reason (optional)</Label>
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Pausing during MSME portal downtime" rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={confirm} disabled={busy} style={{ background: "#b91c1c" }}>
+            {busy ? "Disabling…" : "Disable Template"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
