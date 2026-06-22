@@ -206,6 +206,7 @@ import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
+import { Route as AdminEmailTemplatesRouteImport } from './routes/admin.email-templates'
 import { Route as AdminDocumentsRouteImport } from './routes/admin.documents'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
@@ -1262,6 +1263,11 @@ const AdminEmailsRoute = AdminEmailsRouteImport.update({
   path: '/emails',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEmailTemplatesRoute = AdminEmailTemplatesRouteImport.update({
+  id: '/email-templates',
+  path: '/email-templates',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
@@ -1640,6 +1646,7 @@ export interface FileRoutesByFullPath {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -1875,6 +1882,7 @@ export interface FileRoutesByTo {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -2110,6 +2118,7 @@ export interface FileRoutesById {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/documents': typeof AdminDocumentsRoute
+  '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
@@ -2348,6 +2357,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/documents'
+    | '/admin/email-templates'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -2583,6 +2593,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/documents'
+    | '/admin/email-templates'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -2817,6 +2828,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/dashboard'
     | '/admin/documents'
+    | '/admin/email-templates'
     | '/admin/emails'
     | '/admin/employees'
     | '/admin/finance'
@@ -4454,6 +4466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEmailsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/email-templates': {
+      id: '/admin/email-templates'
+      path: '/email-templates'
+      fullPath: '/admin/email-templates'
+      preLoaderRoute: typeof AdminEmailTemplatesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/documents': {
       id: '/admin/documents'
       path: '/documents'
@@ -4825,6 +4844,7 @@ interface AdminRouteChildren {
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
+  AdminEmailTemplatesRoute: typeof AdminEmailTemplatesRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
   AdminEmployeesRoute: typeof AdminEmployeesRoute
   AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
@@ -4858,6 +4878,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCustomersRoute: AdminCustomersRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
+  AdminEmailTemplatesRoute: AdminEmailTemplatesRoute,
   AdminEmailsRoute: AdminEmailsRoute,
   AdminEmployeesRoute: AdminEmployeesRoute,
   AdminFinanceRoute: AdminFinanceRouteWithChildren,
