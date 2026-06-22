@@ -129,8 +129,8 @@ function OrderDetailPage() {
 }
 
 function InternalActivity({
-  orderId, leadId, events,
-}: { orderId: string; leadId: string | null; events: any[] }) {
+  orderId, events,
+}: { orderId: string; leadId?: string | null; events: any[] }) {
   const qc = useQueryClient();
   const noteFn = useServerFn(addOrderNoteV2);
   const [note, setNote] = useState("");
