@@ -9,20 +9,22 @@ import { LeadTimeline } from "@/components/admin/LeadTimeline";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { LeadEditableCard } from "@/components/admin/LeadEditableCard";
+import { LeadWorkspacePanel } from "@/components/admin/LeadWorkspacePanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  ChevronLeft, 
-  User, 
-  FileText, 
-  Mail, 
-  IndianRupee, 
-  Activity, 
-  History, 
+import {
+  ChevronLeft,
+  User,
+  FileText,
+  Mail,
+  IndianRupee,
+  Activity,
+  History,
   MessageSquare,
-  ClipboardList
+  ClipboardList,
+  LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -102,8 +104,9 @@ function LeadDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="workspace" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-slate-100/50 border mb-6">
+          <TabsTrigger value="workspace" className="gap-2 py-2 px-4"><LayoutGrid className="w-4 h-4" /> Workspace</TabsTrigger>
           <TabsTrigger value="overview" className="gap-2 py-2 px-4"><User className="w-4 h-4" /> Overview</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2 py-2 px-4"><ClipboardList className="w-4 h-4" /> Onboarding</TabsTrigger>
           <TabsTrigger value="emails" className="gap-2 py-2 px-4"><Mail className="w-4 h-4" /> Emails</TabsTrigger>
@@ -111,6 +114,16 @@ function LeadDetailPage() {
           <TabsTrigger value="timeline" className="gap-2 py-2 px-4"><History className="w-4 h-4" /> Timeline</TabsTrigger>
           <TabsTrigger value="notes" className="gap-2 py-2 px-4"><MessageSquare className="w-4 h-4" /> Notes</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workspace">
+          <LeadWorkspacePanel
+            lead={lead as any}
+            applications={applications}
+            staff={staffData?.profiles ?? []}
+          />
+        </TabsContent>
+
+
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

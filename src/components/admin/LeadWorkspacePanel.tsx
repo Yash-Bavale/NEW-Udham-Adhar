@@ -1,0 +1,558 @@
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  AlertTriangle, CheckCircle2, XCircle, Loader2,
+  Calendar as CalendarIcon, FileText, Receipt, Trash2,
+  Phone, FileWarning, Repeat2, Sparkles,
+} from "lucide-react";
+
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+
+import {
+  LEAD_STATUS_BADGE,
+  LEAD_STATUS_LABEL,
+  getAllowedLeadTransitions,
+  type LeadStatusV2,
+} from "@/lib/crm/lead-transitions";
+import {
+  transitionLeadStatus,
+  addManualNote,
+  listLeadEvents,
+} from "@/lib/crm/lead-status.functions";
+import {
+  approveRefund, markRefundProcessed, rejectRefund,
+} from "@/lib/crm/refunds.functions";
+import {
+  createFollowUp, listFollowUpsForLead,
+} from "@/lib/crm/follow-ups.functions";
+
+type Staff = { id: string; display_name: string | null; email: string | null };
+
+type LeadShape = {
+  id: string;
+  lead_code: string;
+  name: string;
+  email?: string | null;
+  mobile?: string | null;
+  status: string;
+  lead_status_v2?: LeadStatusV2 | null;
+  customer_id?: string | null;
+};
+
+export function LeadWorkspacePanel({
+  lead, applications, staff,
+}: {
+  lead: LeadShape;
+  applications: any[];
+  staff: Staff[];
+}) {
+  const currentStatus: LeadStatusV2 = (lead.lead_status_v2 ?? "new_lead") as LeadStatusV2;
+  return (
+    <div className="grid lg:grid-cols-3 gap-5">
+      <div className="lg:col-span-2 space-y-5">
+        <StatusControlPanel lead={lead} currentStatus={currentStatus} />
+        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
+          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
+        )}
+        <EventsTimeline leadId={lead.id} />
+      </div>
+      <div className="space-y-5">
+        <FollowUpScheduler leadId={lead.id} staff={staff} />
+        <LinkedOrderPanel applications={applications} />
+        <DocumentsPanel applications={applications} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------- Status Control Panel ------------------- */
+
+function StatusControlPanel({
+  lead, currentStatus,
+}: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+  const qc = useQueryClient();
+  const transitionFn = useServerFn(transitionLeadStatus);
+  const allowed = getAllowedLeadTransitions(currentStatus);
+  const [busy, setBusy] = useState(false);
+  const [uninterestedOpen, setUninterestedOpen] = useState(false);
+  const [reason, setReason] = useState("");
+
+  const doTransition = async (to: LeadStatusV2, r?: string) => {
+    setBusy(true);
+    try {
+      await transitionFn({ data: { leadId: lead.id, toStatus: to, reason: r } });
+      toast.success(`Status → ${LEAD_STATUS_LABEL[to]}`);
+      qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Transition failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-white p-5 space-y-4" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Current Status</div>
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-semibold ${LEAD_STATUS_BADGE[currentStatus]}`}>
+            {LEAD_STATUS_LABEL[currentStatus]}
+          </span>
+        </div>
+        <div className="text-xs text-slate-500">
+          Lead {lead.lead_code} · {lead.name}
+        </div>
+      </div>
+
+      {allowed.length === 0 ? (
+        <div className="text-sm text-slate-500 italic">Terminal status — no further transitions.</div>
+      ) : (
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-slate-500">Change Status</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {allowed.map((s) => (
+              <Button
+                key={s}
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  if (s === "uninterested") setUninterestedOpen(true);
+                  else doTransition(s);
+                }}
+                className="text-xs"
+              >
+                {busy && <Loader2 className="size-3 animate-spin mr-1" />}
+                → {LEAD_STATUS_LABEL[s]}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Dialog open={uninterestedOpen} onOpenChange={(o) => { setUninterestedOpen(o); if (!o) setReason(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-amber-600" />
+              Mark as Uninterested
+            </DialogTitle>
+            <DialogDescription>
+              The customer will be emailed asking for a reason. Lead will auto-move to <b>Refund Requested</b>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Why is the customer uninterested? <span className="text-red-500">*</span></Label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Customer said the service is no longer needed because…"
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUninterestedOpen(false)} disabled={busy}>Cancel</Button>
+            <Button
+              disabled={busy || reason.trim().length < 3}
+              onClick={async () => {
+                await doTransition("uninterested", reason.trim());
+                setUninterestedOpen(false);
+                setReason("");
+              }}
+            >
+              {busy ? "Saving…" : "Confirm Uninterested"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ------------------- Refund Decision Panel ------------------- */
+
+function RefundDecisionPanel({
+  lead, currentStatus,
+}: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+  const qc = useQueryClient();
+  const approveFn = useServerFn(approveRefund);
+  const processedFn = useServerFn(markRefundProcessed);
+  const rejectFn = useServerFn(rejectRefund);
+
+  const [policyNote, setPolicyNote] = useState("");
+  const [eligible, setEligible] = useState(false);
+  const [gatewayRef, setGatewayRef] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
+    qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+  };
+
+  const onApprove = async () => {
+    if (!confirm(`Approve refund for ${lead.name}?`)) return;
+    setBusy(true);
+    try {
+      await approveFn({ data: { leadId: lead.id, policyNote: policyNote || undefined } });
+      toast.success("Refund approved");
+      refresh();
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+
+  const onProcessed = async () => {
+    if (!gatewayRef.trim()) { toast.error("Gateway reference required"); return; }
+    if (!confirm("Confirm refund has been processed at the payment gateway?")) return;
+    setBusy(true);
+    try {
+      await processedFn({ data: { leadId: lead.id, gatewayRef: gatewayRef.trim() } });
+      toast.success("Refund processed. Documents will be deleted.");
+      refresh();
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+
+  const onReject = async () => {
+    if (rejectReason.trim().length < 3) { toast.error("Reason required"); return; }
+    setBusy(true);
+    try {
+      await rejectFn({ data: { leadId: lead.id, reason: rejectReason.trim() } });
+      toast.success("Refund rejected");
+      setRejectOpen(false);
+      refresh();
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rounded-lg border bg-amber-50/50 p-5 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <Receipt className="size-4 text-amber-700" />
+        <h3 className="text-sm font-semibold text-amber-900">Refund Decision</h3>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">Customer's stated reason / staff policy note</Label>
+        <Textarea
+          value={policyNote}
+          onChange={(e) => setPolicyNote(e.target.value)}
+          placeholder="Refund policy note: e.g. eligible per 7-day window, customer never accessed onboarding…"
+          rows={3}
+          disabled={currentStatus === "refund_approved"}
+        />
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={eligible} onChange={(e) => setEligible(e.target.checked)} disabled={currentStatus === "refund_approved"} />
+        Customer is refund-eligible per policy
+      </label>
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        {currentStatus === "refund_requested" && (
+          <>
+            <Button onClick={onApprove} disabled={busy || !eligible} className="bg-emerald-600 hover:bg-emerald-700">
+              <CheckCircle2 className="size-4 mr-1" /> Approve Refund
+            </Button>
+            <Button variant="outline" onClick={() => setRejectOpen(true)} disabled={busy}>
+              <XCircle className="size-4 mr-1" /> Reject Refund
+            </Button>
+          </>
+        )}
+        {currentStatus === "refund_approved" && (
+          <div className="w-full space-y-2">
+            <div className="rounded-md bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-800">
+              ✓ Refund approved. Process via the payment gateway, then enter the gateway reference below.
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={gatewayRef}
+                onChange={(e) => setGatewayRef(e.target.value)}
+                placeholder="Gateway reference number (e.g. PAYU_REF_XXXX)"
+                className="flex-1"
+              />
+              <Button onClick={onProcessed} disabled={busy || gatewayRef.trim().length < 2}>
+                <Trash2 className="size-4 mr-1" /> Mark Processed
+              </Button>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Documents will be permanently deleted from storage after this action.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Reject Refund</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label className="text-xs">Reason for rejection <span className="text-red-500">*</span></Label>
+            <Textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="destructive" onClick={onReject} disabled={busy}>Reject</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ------------------- Events Timeline ------------------- */
+
+const eventBorder: Record<string, string> = {
+  lead_status_change: "border-l-blue-400",
+  payment_received:   "border-l-emerald-400",
+  refund_approved:    "border-l-rose-400",
+  refund_processed:   "border-l-rose-400",
+  refund_rejected:    "border-l-rose-400",
+  document_uploaded:  "border-l-orange-400",
+  documents_deleted:  "border-l-orange-400",
+  note_added:         "border-l-slate-300",
+  assignment_change:  "border-l-violet-400",
+  lead_created:       "border-l-blue-300",
+};
+
+function EventsTimeline({ leadId }: { leadId: string }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listLeadEvents);
+  const noteFn = useServerFn(addManualNote);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.lead-events", leadId],
+    queryFn: () => listFn({ data: { leadId } }),
+  });
+
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      await noteFn({ data: { leadId, note: note.trim() } });
+      setNote("");
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] });
+      toast.success("Note added");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally { setBusy(false); }
+  };
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString("en-IN", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+
+  return (
+    <div className="rounded-lg border bg-white p-5 space-y-4" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Internal Notes & Activity</h3>
+        <span className="text-xs text-slate-500">{data?.events.length ?? 0} events</span>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-slate-500">Loading…</div>
+      ) : (data?.events ?? []).length === 0 ? (
+        <div className="text-sm text-slate-500 italic">No activity yet.</div>
+      ) : (
+        <ul className="space-y-2.5 max-h-[440px] overflow-y-auto pr-1">
+          {data!.events.map((e: any) => (
+            <li
+              key={e.id}
+              className={`border border-l-4 rounded-md p-3 ${eventBorder[e.event_type] ?? "border-l-slate-300"} bg-slate-50`}
+            >
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <div>
+                  <span className="font-semibold text-slate-700">{e.staff_name}</span>
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] uppercase">{e.staff_role}</span>
+                </div>
+                <div>{fmt(e.created_at)}</div>
+              </div>
+              <div className="text-sm text-slate-800 mt-1">
+                {e.event_type === "lead_status_change" && (
+                  <>Status: <b>{e.old_value ?? "—"}</b> → <b>{e.new_value}</b></>
+                )}
+                {e.event_type === "assignment_change" && (
+                  <>Assignee changed</>
+                )}
+                {e.event_type === "note_added" && <i>Internal note</i>}
+                {!["lead_status_change", "assignment_change", "note_added"].includes(e.event_type) && (
+                  <span className="capitalize">{e.event_type.replace(/_/g, " ")}</span>
+                )}
+              </div>
+              {e.note && <div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{e.note}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="pt-3 border-t space-y-2" style={{ borderColor: "var(--admin-border)" }}>
+        <Label className="text-xs uppercase tracking-wider text-slate-500">Add Note</Label>
+        <Textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Add internal note for staff (e.g., 'Called customer, will call back tomorrow')"
+          rows={2}
+        />
+        <div className="flex justify-end">
+          <Button size="sm" disabled={busy || !note.trim()} onClick={submit}>
+            {busy ? "Saving…" : "Add Note"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------- Follow-up Scheduler ------------------- */
+
+function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }) {
+  const qc = useQueryClient();
+  const createFn = useServerFn(createFollowUp);
+  const listFn = useServerFn(listFollowUpsForLead);
+  const { data } = useQuery({
+    queryKey: ["admin.followups", leadId],
+    queryFn: () => listFn({ data: { leadId } }),
+  });
+
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
+  const [assignedTo, setAssignedTo] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!scheduledAt) { toast.error("Pick a date & time"); return; }
+    setBusy(true);
+    try {
+      await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
+      setScheduledAt(""); setReason("call_back"); setAssignedTo("");
+      qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
+      qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
+      toast.success("Follow-up scheduled");
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  };
+
+  const upcoming = (data?.rows ?? []).filter((r: any) => !r.is_completed);
+
+  return (
+    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <CalendarIcon className="size-4 text-slate-600" />
+        <h3 className="text-sm font-semibold">Schedule Follow-up</h3>
+      </div>
+      <div className="space-y-2">
+        <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="text-xs" />
+        <select value={reason} onChange={(e) => setReason(e.target.value as any)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
+          <option value="call_back">Call Back</option>
+          <option value="documents_pending">Documents Pending</option>
+          <option value="refund_followup">Refund Follow-up</option>
+          <option value="general">General</option>
+        </select>
+        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
+          <option value="">Assign to…</option>
+          {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+        </select>
+        <Button size="sm" className="w-full" disabled={busy} onClick={submit}>
+          {busy ? "Saving…" : "Schedule"}
+        </Button>
+      </div>
+      {upcoming.length > 0 && (
+        <div className="pt-2 border-t" style={{ borderColor: "var(--admin-border)" }}>
+          <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Upcoming</div>
+          <ul className="space-y-1">
+            {upcoming.slice(0, 5).map((f: any) => (
+              <li key={f.id} className="text-xs flex items-start gap-1.5">
+                <Phone className="size-3 mt-0.5 text-slate-400" />
+                <div>
+                  <div className="font-medium">{new Date(f.scheduled_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</div>
+                  <div className="text-slate-500 capitalize">{f.reason.replace(/_/g, " ")}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------- Linked Order Panel ------------------- */
+
+function LinkedOrderPanel({ applications }: { applications: any[] }) {
+  if (!applications || applications.length === 0) {
+    return (
+      <div className="rounded-lg border bg-white p-4" style={{ borderColor: "var(--admin-border)" }}>
+        <div className="text-sm font-semibold mb-1">Linked Order</div>
+        <div className="text-xs text-slate-500 italic">No order linked yet.</div>
+      </div>
+    );
+  }
+  const app = applications[0];
+  return (
+    <div className="rounded-lg border bg-white p-4 space-y-2" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <FileText className="size-4 text-slate-600" />
+        <h3 className="text-sm font-semibold">Linked Order</h3>
+      </div>
+      <div className="text-xs space-y-1.5">
+        <Row k="Order #" v={<span className="font-mono">{app.application_code}</span>} />
+        <Row k="Fulfillment" v={<Badge variant="secondary" className="text-[10px]">{(app.fulfillment_status ?? app.application_status ?? "—").replace(/_/g, " ")}</Badge>} />
+        <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />
+        <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline pt-1">
+          Open order →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-slate-500">{k}</span>
+      <span className="text-slate-800 text-right">{v}</span>
+    </div>
+  );
+}
+
+/* ------------------- Documents Panel ------------------- */
+
+function DocumentsPanel({ applications }: { applications: any[] }) {
+  const app = applications?.[0];
+  const deleted = app?.documents_deleted_at;
+  return (
+    <div className="rounded-lg border bg-white p-4 space-y-2" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <FileWarning className="size-4 text-slate-600" />
+        <h3 className="text-sm font-semibold">Documents</h3>
+      </div>
+      {!app ? (
+        <div className="text-xs text-slate-500 italic">No order yet.</div>
+      ) : deleted ? (
+        <div className="rounded-md bg-rose-50 border border-rose-200 p-2 text-xs text-rose-800">
+          Documents deleted on{" "}
+          <b>{new Date(deleted).toLocaleString("en-IN")}</b>
+          {app.documents_deleted_reason ? <> — reason: <b>{app.documents_deleted_reason}</b></> : null}.
+        </div>
+      ) : (
+        <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline">
+          View documents in order →
+        </a>
+      )}
+    </div>
+  );
+}

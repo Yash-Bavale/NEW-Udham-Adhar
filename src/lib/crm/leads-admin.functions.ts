@@ -194,8 +194,9 @@ export const getLeadCounts = createServerFn({ method: "GET" })
 const AddLeadSchema = z.object({
   name: z.string().trim().min(2),
   email: z.string().trim().email(),
-  mobile: z.string().trim().min(7),
+  mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Mobile must be a 10-digit Indian number"),
   state: z.string().trim().min(2),
+  district: z.string().trim().optional(),
   language: z.string().trim().min(2).default("en"),
   service: z.string().trim().min(2),
   lead_source: z.string().trim().default("manual"),
@@ -212,12 +213,57 @@ export const addLead = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
     const admin = await getAdmin();
+
+    // Match existing customer by mobile, then email.
+    const { data: existing } = await admin
+      .from("customers")
+      .select("id")
+      .or(`primary_mobile.eq.${data.mobile},primary_email.eq.${data.email.toLowerCase()}`)
+      .maybeSingle();
+    const isReturningCustomer = !!existing?.id;
+
+    // Find or create customer via RPC (handles dedupe + bookkeeping).
+    const { data: customerId, error: rpcErr } = await admin.rpc("find_or_create_customer", {
+      p_name: data.name,
+      p_email: data.email,
+      p_mobile: data.mobile,
+      p_state: data.state,
+      p_language: data.language,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
+
+    const { notes, district, ...rest } = data;
+    const composedNotes = [notes, district ? `District: ${district}` : null].filter(Boolean).join("\n") || null;
     const { data: inserted, error } = await admin
       .from("leads")
-      .insert({ ...data, status: "new_lead" })
+      .insert({
+        ...rest,
+        customer_id: customerId as string,
+        notes: composedNotes,
+        status: "new_lead",
+        lead_status_v2: "new_lead",
+      } as never)
       .select("id, lead_code")
       .single();
     if (error) throw new Error(error.message);
+
+    // Log lead_created to application_events (canonical Phase 1 timeline).
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    const staff_name = profile?.display_name || profile?.email || "Staff";
+    const staff_role = roleRows?.[0]?.role ?? "staff";
+    await admin.from("application_events").insert({
+      lead_id: inserted.id,
+      customer_id: customerId as string,
+      event_type: "lead_created",
+      note: notes ?? null,
+      new_value: "new_lead",
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
 
     await writeAudit({
       supabase: context.supabase,
@@ -229,5 +275,50 @@ export const addLead = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
 
-    return { id: inserted.id, lead_code: inserted.lead_code };
+    return {
+      id: inserted.id,
+      lead_code: inserted.lead_code,
+      isReturningCustomer,
+    };
+  });
+
+const UpdateAssigneeSchema = z.object({
+  leadId: z.string().uuid(),
+  assignedTo: z.string().uuid().nullable(),
+});
+
+export const updateLeadAssignee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => UpdateAssigneeSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    const admin = await getAdmin();
+    const { data: prev } = await admin
+      .from("leads")
+      .select("assigned_to, customer_id")
+      .eq("id", data.leadId)
+      .single();
+    if (!prev) throw new Error("Lead not found");
+    const { error } = await admin
+      .from("leads")
+      .update({ assigned_to: data.assignedTo } as never)
+      .eq("id", data.leadId);
+    if (error) throw new Error(error.message);
+
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    await admin.from("application_events").insert({
+      lead_id: data.leadId,
+      customer_id: prev.customer_id ?? null,
+      event_type: "assignment_change",
+      old_value: prev.assigned_to ?? null,
+      new_value: data.assignedTo ?? null,
+      created_by: context.userId,
+      staff_name: profile?.display_name || profile?.email || "Staff",
+      staff_role: roleRows?.[0]?.role ?? "staff",
+    } as never);
+
+    return { ok: true };
   });
