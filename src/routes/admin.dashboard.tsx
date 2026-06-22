@@ -52,10 +52,10 @@ function DashboardPage() {
 
       {/* 2. Action Required + 6. Payment Summary side-by-side on wide screens */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+        <div className={data?.viewer?.canViewFinance === false ? "lg:col-span-3" : "lg:col-span-2"}>
           <ActionRequired data={data} loading={isLoading} />
         </div>
-        <PaymentSummary data={data} loading={isLoading} />
+        {data?.viewer?.canViewFinance !== false && <PaymentSummary data={data} loading={isLoading} />}
       </div>
 
       {/* 3. Service Pipeline */}
@@ -63,9 +63,12 @@ function DashboardPage() {
 
       {/* 7. Revenue chart + 8. Top services */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2"><RevenueChart data={data} loading={isLoading} /></div>
+        {data?.viewer?.canViewFinance !== false && (
+          <div className="lg:col-span-2"><RevenueChart data={data} loading={isLoading} /></div>
+        )}
         <TopServices data={data} loading={isLoading} />
       </div>
+
 
       {/* 4. Document pending + 5. Complaint tracker + Refund Tracker */}
       <div className="grid lg:grid-cols-3 gap-4">
@@ -91,6 +94,7 @@ function DashboardPage() {
 
 function KpiGrid({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
   const k = data?.kpis;
+  const canViewFinance = data?.viewer?.canViewFinance !== false;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <KpiCard label="All Leads" icon={<Users className="size-4" />} timed loading={loading} buckets={k?.allLeads} />
@@ -133,17 +137,19 @@ function KpiGrid({ data, loading }: { data?: OpsDashboardData; loading: boolean 
         breakdown={k?.ordersCompleted.byService}
         breakdownTitle="By service"
       />
-      <KpiCard
-        label="Total Sale"
-        icon={<Wallet className="size-4" />}
-        loading={loading}
-        timed
-        money
-        buckets={k?.totalSale}
-        breakdown={k?.totalSale.byService}
-        breakdownTitle="By service"
-        breakdownMoney
-      />
+      {canViewFinance && (
+        <KpiCard
+          label="Total Sale"
+          icon={<Wallet className="size-4" />}
+          loading={loading}
+          timed
+          money
+          buckets={k?.totalSale}
+          breakdown={k?.totalSale.byService}
+          breakdownTitle="By service"
+          breakdownMoney
+        />
+      )}
     </div>
   );
 }
@@ -650,7 +656,7 @@ function RecentActivity({ data, loading }: { data?: OpsDashboardData; loading: b
                 <li key={a.id} className="flex items-baseline gap-3 border-b py-1.5" style={{ borderColor: "var(--admin-border)" }}>
                   <time className="font-mono shrink-0 text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>{ts}</time>
                   <span className="rounded bg-[var(--admin-surface-2)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide shrink-0" style={{ color: "var(--admin-fg-muted)" }}>
-                    {a.event_type.replace(/_/g, " ")}
+                    {eventLabel(a.event_type)}
                   </span>
                   <span className="truncate" style={{ color: "var(--admin-fg)" }}>
                     {a.staff_name ? <span className="font-medium">{a.staff_name}</span> : <span style={{ color: "var(--admin-fg-muted)" }}>System</span>} — {desc}
@@ -674,10 +680,29 @@ function EmptyHint({ text }: { text: string }) {
   );
 }
 
+const EVENT_LABELS: Record<string, string> = {
+  status_change: "Status",
+  lead_status_change: "Lead status",
+  assignment_change: "Assigned",
+  note_added: "Note added",
+  payment_received: "Payment",
+  document_uploaded: "Document",
+  document_verified: "Doc verified",
+  document_rejected: "Doc rejected",
+  refund_requested: "Refund requested",
+  refund_processed: "Refund processed",
+  application_created: "Application",
+  email_sent: "Email",
+};
+
+function eventLabel(t: string) {
+  return EVENT_LABELS[t] ?? t.replace(/_/g, " ");
+}
+
 function describeEvent(a: { event_type: string; old_value: string | null; new_value: string | null }): string {
   const arrow = a.old_value && a.new_value ? `${a.old_value} → ${a.new_value}` : (a.new_value ?? a.old_value ?? "");
-  const label = a.event_type.replace(/_/g, " ");
-  return arrow ? `${label}: ${arrow}` : label;
+  const label = eventLabel(a.event_type);
+  return arrow ? `${label}: ${arrow.replace(/_/g, " ")}` : label;
 }
 
 // suppress unused-import warnings for icons referenced only conditionally

@@ -47,6 +47,7 @@ export type OpsDashboardData = {
   followUps: { id: string; time: string; customer: string; reason: string; assignedTo: string | null; customerId: string | null }[];
   supportTickets: { open: number; in_progress: number; resolved: number; closed: number };
   recentActivity: { id: string; created_at: string; event_type: string; new_value: string | null; old_value: string | null; staff_name: string | null; application_id: string | null }[];
+  viewer: { isPrivileged: boolean; canViewFinance: boolean };
 };
 
 function startOfDay(d = new Date()) {
@@ -63,10 +64,33 @@ function daysAgo(n: number) {
 export const getOpsDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OpsDashboardData> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const today = startOfDay().toISOString();
     const week = daysAgo(7).toISOString();
     const month = daysAgo(30).toISOString();
+
+    // Role scoping: admins / super_admins / managers see everything;
+    // anyone else only sees rows assigned to them and has revenue hidden.
+    const { data: rolesRows } = await (supabase as any)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const roles = new Set<string>(((rolesRows ?? []) as any[]).map((r) => String(r.role)));
+    const isPrivileged =
+      roles.has("admin") || roles.has("super_admin") || roles.has("manager");
+    const canViewFinance = isPrivileged || roles.has("finance") || roles.has("accounts");
+
+    const leadsQ = supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id, assigned_to").order("created_at", { ascending: false }).limit(5000);
+    const appsQ = supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false }).limit(5000);
+    const followupsQ = supabase.from("follow_ups").select("id, customer_id, lead_id, application_id, scheduled_at, reason, assigned_to, is_completed").eq("is_completed", false).gte("scheduled_at", startOfDay().toISOString()).lt("scheduled_at", daysAgo(-1).toISOString()).order("scheduled_at", { ascending: true }).limit(50);
+    const tasksQ = supabase.from("tasks").select("id, due_date, is_completed, assigned_to").eq("is_completed", false).lt("due_date", new Date().toISOString()).limit(500);
+
+    if (!isPrivileged) {
+      (leadsQ as any).eq("assigned_to", userId);
+      (appsQ as any).eq("assigned_to", userId);
+      (followupsQ as any).eq("assigned_to", userId);
+      (tasksQ as any).eq("assigned_to", userId);
+    }
 
     const [
       leadsRes,
@@ -80,19 +104,22 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       followupsRes,
       tasksRes,
       customersLookupRes,
+      gatewaysRes,
     ] = await Promise.all([
-      supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false }).limit(5000),
+      leadsQ,
+      appsQ,
       supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at, updated_at").order("created_at", { ascending: false }).limit(2000),
       supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason, application_id, lead_id, parent_payment_id").order("created_at", { ascending: false }).limit(5000),
       supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false }).limit(5000),
       supabase.from("application_events").select("id, event_type, old_value, new_value, staff_name, created_at, application_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("services").select("id, service_name, service_code, is_active"),
       supabase.from("profiles").select("id, display_name, email"),
-      supabase.from("follow_ups").select("id, customer_id, lead_id, application_id, scheduled_at, reason, assigned_to, is_completed").eq("is_completed", false).gte("scheduled_at", startOfDay().toISOString()).lt("scheduled_at", daysAgo(-1).toISOString()).order("scheduled_at", { ascending: true }).limit(50),
-      supabase.from("tasks").select("id, due_date, is_completed, assigned_to").eq("is_completed", false).lt("due_date", new Date().toISOString()).limit(500),
+      followupsQ,
+      tasksQ,
       supabase.from("customers").select("id, name").limit(5000),
+      supabase.from("payment_gateways").select("name, mode"),
     ]);
+
 
     const leads = leadsRes.data ?? [];
     const apps = applicationsRes.data ?? [];
@@ -179,8 +206,22 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       byService: compByService(completedApps),
     };
 
-    // KPI: total sale
-    const successPayments = payments.filter((p: any) => ["success", "captured", "paid", "settled"].includes(String(p.status)));
+    // KPI: total sale — exclude test/sandbox gateways
+    const testGatewayNames = new Set<string>(
+      ((gatewaysRes.data ?? []) as any[])
+        .filter((g) => String(g.mode ?? "").toLowerCase() === "test")
+        .map((g) => String(g.name).toLowerCase())
+    );
+    const isLivePayment = (p: any) => {
+      const gw = String(p.gateway_name ?? "").toLowerCase();
+      if (!gw) return true;
+      if (testGatewayNames.has(gw)) return false;
+      // Common naming patterns for test-mode rows
+      return !gw.includes("test") && !gw.includes("sandbox");
+    };
+    const successPayments = payments.filter((p: any) =>
+      ["success", "captured", "paid", "settled"].includes(String(p.status)) && isLivePayment(p)
+    );
     const sumAmt = (rows: any[]) => rows.reduce((s, p) => s + Number(p.amount || 0), 0);
     const saleByService = new Map<string, number>();
     // payments don't include service; map via lead/application
@@ -190,13 +231,17 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       const serviceName = app ? serviceById.get(app.service_id) || "—" : (leadById.get(p.lead_id)?.service || "—");
       saleByService.set(serviceName, (saleByService.get(serviceName) ?? 0) + Number(p.amount || 0));
     });
-    const totalSale = {
+    const totalSaleRaw = {
       total: sumAmt(successPayments),
       today: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= today)),
       week: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= week)),
       month: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= month)),
       byService: Array.from(saleByService.entries()).map(([label, value]) => ({ label, value: Math.round(value) })).sort((a, b) => b.value - a.value),
     };
+    const totalSale = canViewFinance
+      ? totalSaleRaw
+      : { total: 0, today: 0, week: 0, month: 0, byService: [] as Metric[] };
+
 
     // Action required (per Phase 6 spec)
     const refundDecisionPending = leads.filter((l: any) => l.status === "refund_requested").length;
@@ -267,13 +312,17 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       }),
     };
 
-    // Payment summary
-    const paymentSummary = {
+    // Payment summary — hidden from non-finance staff
+    const paymentSummaryRaw = {
       todayCollection: sumAmt(successPayments.filter((p: any) => (p.payment_date ?? p.created_at) >= today)),
       pendingPayments: sumAmt(payments.filter((p: any) => ["pending", "initiated", "created"].includes(String(p.status)))),
       refundRequests: payments.filter((p: any) => ["refund_requested", "refund_pending"].includes(String(p.status))).length,
       chargebacks: payments.filter((p: any) => ["chargeback", "disputed"].includes(String(p.status))).length,
     };
+    const paymentSummary = canViewFinance
+      ? paymentSummaryRaw
+      : { todayCollection: 0, pendingPayments: 0, refundRequests: 0, chargebacks: 0 };
+
 
     // Revenue — weekly (7 days) and monthly (30 days)
     function bucket(daysWindow: number) {
@@ -291,7 +340,10 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       }
       return out;
     }
-    const revenue = { weekly: bucket(7), monthly: bucket(30) };
+    const revenue = canViewFinance
+      ? { weekly: bucket(7), monthly: bucket(30) }
+      : { weekly: [] as RevenuePoint[], monthly: [] as RevenuePoint[] };
+
 
     // Top services
     const topServicesMap = new Map<string, number>();
@@ -372,8 +424,10 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       followUps: followUpsOut,
       supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 },
       recentActivity,
+      viewer: { isPrivileged, canViewFinance },
     };
   });
+
 
 export const markFollowUpComplete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
