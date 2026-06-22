@@ -76,7 +76,7 @@ function formatIST(iso: string | null | undefined): string {
 
 type Row = {
   id: string; email: string; full_name: string | null; mobile: string | null;
-  is_active: boolean; created_at: string; last_sign_in_at: string | null; roles: string[];
+  is_active: boolean; created_at: string; last_sign_in_at: string | null | undefined; roles: string[];
 };
 
 function EmployeesPage() {
