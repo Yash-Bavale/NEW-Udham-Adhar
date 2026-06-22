@@ -94,6 +94,7 @@ function DashboardPage() {
 
 function KpiGrid({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
   const k = data?.kpis;
+  const canViewFinance = data?.viewer?.canViewFinance !== false;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <KpiCard label="All Leads" icon={<Users className="size-4" />} timed loading={loading} buckets={k?.allLeads} />
