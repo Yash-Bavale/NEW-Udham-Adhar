@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/constants";
 
-export const Route = createFileRoute("/admin/leads")({ component: LeadsPage });
+export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
 function LeadsPage() {
   const qc = useQueryClient();
