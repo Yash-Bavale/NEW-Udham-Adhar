@@ -58,20 +58,56 @@ export const updateLead = createServerFn({ method: "POST" })
       await assertRole(supabase, ["super_admin", "finance"]);
     }
 
-    const { data: prev, error: fetchErr } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { data: prev, error: fetchErr } = await admin
       .from("leads")
       .select("*")
       .eq("id", leadId)
       .single();
-    
+
     if (fetchErr || !prev) throw new Error("Lead not found");
 
-    const { error: updateErr } = await (await getAdmin())
+    const { error: updateErr } = await admin
       .from("leads")
       .update(patch)
       .eq("id", leadId);
 
     if (updateErr) throw new Error(updateErr.message);
+
+    // C1 — log status / assignee changes to the canonical timeline.
+    const needStaff =
+      (patch.status && patch.status !== prev.status) ||
+      (patch.assigned_to !== undefined && patch.assigned_to !== prev.assigned_to);
+    if (needStaff) {
+      const [{ data: profile }, { data: roleRows }] = await Promise.all([
+        admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+        admin.from("user_roles").select("role").eq("user_id", context.userId),
+      ]);
+      const staff_name = profile?.display_name || profile?.email || "Staff";
+      const staff_role = roleRows?.[0]?.role ?? "staff";
+      if (patch.status && patch.status !== prev.status) {
+        await admin.from("application_events").insert({
+          lead_id: leadId,
+          customer_id: prev.customer_id ?? null,
+          event_type: "lead_status_change",
+          old_value: prev.status,
+          new_value: patch.status,
+          created_by: context.userId,
+          staff_name, staff_role,
+        } as never);
+      }
+      if (patch.assigned_to !== undefined && patch.assigned_to !== prev.assigned_to) {
+        await admin.from("application_events").insert({
+          lead_id: leadId,
+          customer_id: prev.customer_id ?? null,
+          event_type: "assignment_change",
+          old_value: prev.assigned_to ?? null,
+          new_value: patch.assigned_to ?? null,
+          created_by: context.userId,
+          staff_name, staff_role,
+        } as never);
+      }
+    }
 
     await writeAudit({
       supabase,
