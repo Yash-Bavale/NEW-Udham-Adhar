@@ -31,8 +31,21 @@ export const listCustomers = createServerFn({ method: "POST" })
 
     if (data.status && data.status !== "all") q = q.eq("status", data.status);
     if (data.q && data.q.trim().length >= 2) {
-      const like = `%${data.q.trim()}%`;
-      q = q.or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like}`);
+      const raw = data.q.trim();
+      const like = `%${raw}%`;
+      q = q.or(
+        [
+          `name.ilike.${like}`,
+          `primary_email.ilike.${like}`,
+          `primary_mobile.ilike.${like}`,
+          `customer_code.ilike.${like}`,
+          `pan_number.ilike.${like}`,
+          `aadhaar_number.ilike.${like}`,
+          `gst_number.ilike.${like}`,
+          `udyam_number.ilike.${like}`,
+          `business_name.ilike.${like}`,
+        ].join(","),
+      );
     }
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -51,6 +64,7 @@ export type Customer360 = {
   notes: Array<{ id: string; note: string; created_at: string; user_id: string | null }>;
   activity: Array<{ id: string; activity_type: string; activity_description: string; created_at: string }>;
   documents: Array<{ id: string; doc_type: string; file_name: string; status: string; uploaded_at: string; verified_at: string | null; lead_id: string; application_id: string | null }>;
+  events: Array<{ id: string; event_type: string; old_value: string | null; new_value: string | null; staff_name: string | null; staff_role: string | null; created_at: string; application_id: string | null; lead_id: string | null }>;
 };
 
 export const getCustomer360 = createServerFn({ method: "POST" })
@@ -63,7 +77,7 @@ export const getCustomer360 = createServerFn({ method: "POST" })
     const [cust, leads, apps, pays, invs, certs, comps, emails, notes, acts] = await Promise.all([
       s.from("customers").select("*").eq("id", id).maybeSingle(),
       s.from("leads").select("id, lead_code, service, status, created_at, total_amount").eq("customer_id", id).order("created_at", { ascending: false }),
-      s.from("applications").select("id, application_code, application_status, form_status, document_status, created_at, updated_at, service_id").eq("customer_id", id).order("created_at", { ascending: false }),
+      s.from("applications").select("id, application_code, application_status, fulfillment_status, form_status, document_status, total_amount, created_at, updated_at, service_id, lead_id, documents_deleted_at").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("payments").select("id, amount, status, gateway_name, created_at, payment_date, razorpay_payment_id").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("invoices").select("id, invoice_number, total_amount, issued_at, pdf_path, payment_id").eq("customer_id", id).order("issued_at", { ascending: false }),
       s.from("certificates").select("id, certificate_number, file_name, file_path, issued_at, delivered_at").eq("customer_id", id).order("created_at", { ascending: false }),
@@ -90,6 +104,13 @@ export const getCustomer360 = createServerFn({ method: "POST" })
       docs = dData ?? [];
     }
 
+    const { data: eventsData } = await s
+      .from("application_events")
+      .select("id, event_type, old_value, new_value, staff_name, staff_role, created_at, application_id, lead_id")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
     return {
       customer: cust.data as any,
       leads: (leads.data ?? []) as any,
@@ -101,6 +122,7 @@ export const getCustomer360 = createServerFn({ method: "POST" })
       emails: emailsFiltered as any,
       notes: (notes.data ?? []) as any,
       activity: actsFiltered as any,
+      events: (eventsData ?? []) as any,
       documents: docs as any,
     };
   });
@@ -121,13 +143,73 @@ export const addCustomerNote = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+type CustomerPatch = {
+  name?: string;
+  primary_email?: string | null;
+  primary_mobile?: string | null;
+  state?: string | null;
+  status?: string;
+  notes?: string | null;
+  address?: string | null;
+  pan_number?: string | null;
+  pan_doc_path?: string | null;
+  aadhaar_number?: string | null;
+  aadhaar_doc_path?: string | null;
+  business_name?: string | null;
+  gst_number?: string | null;
+  udyam_number?: string | null;
+};
+
 export const updateCustomer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { customerId: string; patch: { name?: string; primary_email?: string | null; primary_mobile?: string | null; state?: string | null; status?: string; notes?: string | null } }) => d)
+  .inputValidator((d: { customerId: string; patch: CustomerPatch }) => d)
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("customers").update(data.patch).eq("id", data.customerId);
+    const patch: Record<string, unknown> = { ...data.patch };
+    // Normalize PAN/GST/Udyam to uppercase
+    for (const k of ["pan_number", "gst_number", "udyam_number"] as const) {
+      if (typeof patch[k] === "string") patch[k] = (patch[k] as string).trim().toUpperCase() || null;
+    }
+    if (typeof patch.aadhaar_number === "string") {
+      patch.aadhaar_number = (patch.aadhaar_number as string).replace(/\D/g, "") || null;
+    }
+    const { error } = await (context.supabase.from("customers") as any).update(patch).eq("id", data.customerId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const uploadCustomerKyc = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { customerId: string; docType: "pan" | "aadhaar"; fileName: string; contentType: string; base64: string }) => d)
+  .handler(async ({ data, context }) => {
+    // Authorize: any signed-in staff already filtered by RLS in other fns, but this is a privileged storage write.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
+    const ts = Date.now();
+    const path = `customers/${data.customerId}/${data.docType}-${ts}.${ext}`;
+    const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("documents")
+      .upload(path, bytes, { contentType: data.contentType, upsert: true });
+    if (upErr) throw new Error(upErr.message);
+    const col = data.docType === "pan" ? "pan_doc_path" : "aadhaar_doc_path";
+    const { error: updErr } = await (context.supabase
+      .from("customers") as any)
+      .update({ [col]: path })
+      .eq("id", data.customerId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true, path };
+  });
+
+export const getCustomerKycSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { path: string }) => d)
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("documents")
+      .createSignedUrl(data.path, 60 * 10);
+    if (error || !signed?.signedUrl) throw new Error(error?.message ?? "Could not sign URL");
+    return { url: signed.signedUrl };
   });
 
 export const getRepeatPurchaseMetrics = createServerFn({ method: "GET" })
