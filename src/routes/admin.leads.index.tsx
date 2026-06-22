@@ -377,7 +377,7 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -389,8 +389,10 @@ function LeadsPage() {
         <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
           <ChevronLeft className="size-4" /> Prev
         </button>
-        <div style={{ color: "var(--admin-fg-muted)" }}>Page {page}</div>
-        <button disabled={!data || data.rows.length < 25} onClick={() => setPage(page + 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
+        <div style={{ color: "var(--admin-fg-muted)" }}>
+          Page {page} of {Math.max(1, Math.ceil((data?.total ?? 0) / 25))}
+        </div>
+        <button disabled={!data || page * 25 >= (data.total ?? 0)} onClick={() => setPage(page + 1)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 disabled:opacity-40 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
           Next <ChevronRight className="size-4" />
         </button>
       </div>
