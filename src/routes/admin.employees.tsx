@@ -214,16 +214,22 @@ function EmployeesPage() {
             </tbody>
           </table>
         </div>
-      </SectionCard>
+          </SectionCard>
 
-      <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
-        onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
+            onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
-      <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
-      <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
-        onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
+            onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+        </TabsContent>
+
+        <TabsContent value="assignment" className="mt-4">
+          <LeadAssignmentTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
