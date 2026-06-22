@@ -674,10 +674,29 @@ function EmptyHint({ text }: { text: string }) {
   );
 }
 
+const EVENT_LABELS: Record<string, string> = {
+  status_change: "Status",
+  lead_status_change: "Lead status",
+  assignment_change: "Assigned",
+  note_added: "Note added",
+  payment_received: "Payment",
+  document_uploaded: "Document",
+  document_verified: "Doc verified",
+  document_rejected: "Doc rejected",
+  refund_requested: "Refund requested",
+  refund_processed: "Refund processed",
+  application_created: "Application",
+  email_sent: "Email",
+};
+
+function eventLabel(t: string) {
+  return EVENT_LABELS[t] ?? t.replace(/_/g, " ");
+}
+
 function describeEvent(a: { event_type: string; old_value: string | null; new_value: string | null }): string {
   const arrow = a.old_value && a.new_value ? `${a.old_value} → ${a.new_value}` : (a.new_value ?? a.old_value ?? "");
-  const label = a.event_type.replace(/_/g, " ");
-  return arrow ? `${label}: ${arrow}` : label;
+  const label = eventLabel(a.event_type);
+  return arrow ? `${label}: ${arrow.replace(/_/g, " ")}` : label;
 }
 
 // suppress unused-import warnings for icons referenced only conditionally
