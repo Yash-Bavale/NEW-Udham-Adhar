@@ -192,7 +192,7 @@ function InternalActivity({
         <Label className="text-xs uppercase tracking-wider text-slate-500">Add Note</Label>
         <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Internal note (visible to staff only)" rows={2} />
         <div className="flex justify-end">
-          <Button size="sm" disabled={busy || !note.trim() || !leadId} onClick={submit}>
+          <Button size="sm" disabled={busy || !note.trim()} onClick={submit}>
             {busy ? "Saving…" : "Add Note"}
           </Button>
         </div>
