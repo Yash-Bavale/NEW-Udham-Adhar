@@ -119,7 +119,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {NAV.map((group, gi) => (
+          {visibleNav.map((group, gi) => (
             <div key={group.id}>
               {gi > 0 && (
                 <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
