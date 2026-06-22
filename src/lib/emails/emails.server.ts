@@ -186,7 +186,7 @@ export async function processQueueInternal(limit = 20) {
             new_value: row.template_code ?? row.subject,
             staff_name: "System",
             staff_role: "system",
-          }) as unknown as Promise<unknown>,
+          }),
         );
       }
       await Promise.all(writes);
