@@ -21,7 +21,7 @@ export const listComplaints = createServerFn({ method: "GET" })
     let q = supabase
       .from("complaints")
       .select(
-        "id, complaint_number, status, severity, category, notes, submitted_at, created_at, updated_at, sla_due_at, lead_id, application_id, reminder_count",
+        "id, complaint_number, status, severity, category, notes, description, authority_name, authority_ref_number, expected_update_at, submitted_at, created_at, updated_at, sla_due_at, lead_id, application_id, customer_id, assigned_to, reminder_count",
       )
       .order("created_at", { ascending: false })
       .limit(500);
@@ -34,31 +34,49 @@ export const listComplaints = createServerFn({ method: "GET" })
 
     const leadIds = Array.from(new Set((rows ?? []).map((r) => r.lead_id).filter(Boolean)));
     const appIds = Array.from(new Set((rows ?? []).map((r) => r.application_id).filter(Boolean)));
-    const [leadsRes, appsRes] = await Promise.all([
+    const custIds = Array.from(new Set((rows ?? []).map((r: any) => r.customer_id).filter(Boolean)));
+    const assigneeIds = Array.from(new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean)));
+    const [leadsRes, appsRes, custsRes, profilesRes] = await Promise.all([
       leadIds.length
         ? supabase.from("leads").select("id, name, email, mobile, service").in("id", leadIds as string[])
         : Promise.resolve({ data: [] as any[] }),
       appIds.length
         ? supabase
             .from("applications")
-            .select("id, application_code, application_status")
+            .select("id, application_code, application_status, service_id, services(service_name)")
             .in("id", appIds as string[])
+        : Promise.resolve({ data: [] as any[] }),
+      custIds.length
+        ? supabase.from("customers").select("id, name, primary_email, primary_mobile").in("id", custIds as string[])
+        : Promise.resolve({ data: [] as any[] }),
+      assigneeIds.length
+        ? supabase.from("profiles").select("id, full_name, display_name, email").in("id", assigneeIds as string[])
         : Promise.resolve({ data: [] as any[] }),
     ]);
     const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
     const appMap = new Map((appsRes.data ?? []).map((a: any) => [a.id, a]));
+    const custMap = new Map((custsRes.data ?? []).map((c: any) => [c.id, c]));
+    const profMap = new Map((profilesRes.data ?? []).map((p: any) => [p.id, p.full_name ?? p.display_name ?? p.email]));
 
     const enriched = (rows ?? []).map((r: any) => {
       const lead = leadMap.get(r.lead_id);
       const app = r.application_id ? appMap.get(r.application_id) : null;
+      const customer = r.customer_id ? custMap.get(r.customer_id) : null;
       const created = new Date(r.created_at).getTime();
       const daysOpen = Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
       return {
         ...r,
-        lead: lead
-          ? { id: lead.id, name: lead.name, email: lead.email, mobile: lead.mobile, service: lead.service }
+        lead: lead ? { id: lead.id, name: lead.name, email: lead.email, mobile: lead.mobile, service: lead.service } : null,
+        customer: customer ? { id: customer.id, name: customer.name, email: customer.primary_email, mobile: customer.primary_mobile } : null,
+        application: app
+          ? {
+              id: app.id,
+              application_code: app.application_code,
+              application_status: app.application_status,
+              service_name: (app as any).services?.service_name ?? null,
+            }
           : null,
-        application: app ? { id: app.id, application_code: app.application_code, application_status: app.application_status } : null,
+        assigned_name: r.assigned_to ? profMap.get(r.assigned_to) ?? null : null,
         days_open: daysOpen,
       };
     });
@@ -120,38 +138,122 @@ export const searchLeadsForComplaint = createServerFn({ method: "GET" })
 
 export const createComplaint = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: {
-    lead_id: string;
-    category?: string;
-    severity?: (typeof SEVERITIES)[number];
-    notes: string;
-    application_id?: string | null;
-  }) =>
+  .inputValidator((i: unknown) =>
     z
       .object({
         lead_id: z.string().uuid(),
+        application_id: z.string().uuid().nullish(),
         category: z.string().max(120).optional(),
         severity: z.enum(SEVERITIES).optional(),
-        notes: z.string().min(1).max(4000),
-        application_id: z.string().uuid().nullish(),
+        notes: z.string().max(4000).optional(),
+        description: z.string().max(5000).optional(),
+        authority_name: z.string().trim().min(1).max(200),
+        authority_ref_number: z.string().trim().max(200).optional(),
+        expected_update_at: z.string().optional(), // ISO from datetime-local
+        assigned_to: z.string().uuid().nullish(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+
+    // Resolve customer_id from the lead
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("customer_id, name")
+      .eq("id", data.lead_id)
+      .maybeSingle();
+
     const { data: inserted, error } = await supabase
       .from("complaints")
       .insert({
         lead_id: data.lead_id,
         application_id: data.application_id ?? null,
+        customer_id: (lead as any)?.customer_id ?? null,
         category: data.category ?? null,
         severity: data.severity ?? "normal",
-        notes: data.notes,
+        notes: data.notes ?? null,
+        description: data.description ?? null,
+        authority_name: data.authority_name,
+        authority_ref_number: data.authority_ref_number ?? null,
+        expected_update_at: data.expected_update_at ? new Date(data.expected_update_at).toISOString() : null,
+        assigned_to: data.assigned_to ?? null,
         status: "submitted",
         submitted_at: new Date().toISOString(),
-      })
+      } as never)
       .select("id, complaint_number")
       .single();
     if (error) throw new Error(error.message);
+
+    // application_events: complaint_raised
+    if (data.application_id) {
+      await supabase.from("application_events").insert({
+        application_id: data.application_id,
+        lead_id: data.lead_id,
+        customer_id: (lead as any)?.customer_id ?? null,
+        event_type: "complaint_raised",
+        new_value: inserted!.complaint_number,
+        note: `Authority: ${data.authority_name}`,
+        created_by: context.userId,
+      } as never);
+    }
+
+    // Best-effort email enqueue (template optional)
+    try {
+      if ((lead as any)?.customer_id) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("primary_email, name")
+          .eq("id", (lead as any).customer_id)
+          .maybeSingle();
+        if ((cust as any)?.primary_email) {
+          const m = await import("@/lib/emails/emails.server");
+          await m.enqueueFromTemplateInternal(
+            "complaint_filed",
+            (cust as any).primary_email,
+            {
+              customer_name: (cust as any).name ?? "",
+              complaint_number: inserted!.complaint_number,
+              authority_name: data.authority_name,
+            },
+            { toName: (cust as any).name ?? undefined, applicationId: data.application_id ?? undefined },
+          );
+        }
+      }
+    } catch {
+      // template missing — non-fatal
+    }
+
     return inserted;
+  });
+
+export const updateComplaint = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        patch: z
+          .object({
+            authority_name: z.string().trim().min(1).max(200).optional(),
+            authority_ref_number: z.string().trim().max(200).nullable().optional(),
+            description: z.string().max(5000).nullable().optional(),
+            expected_update_at: z.string().nullable().optional(),
+            category: z.string().max(120).nullable().optional(),
+            severity: z.enum(SEVERITIES).optional(),
+            assigned_to: z.string().uuid().nullable().optional(),
+          })
+          .partial(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const p: Record<string, unknown> = { ...data.patch };
+    if (p.expected_update_at && typeof p.expected_update_at === "string") {
+      p.expected_update_at = new Date(p.expected_update_at).toISOString();
+    }
+    const { error } = await supabase.from("complaints").update(p as never).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
