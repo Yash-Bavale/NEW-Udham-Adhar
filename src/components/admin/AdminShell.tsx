@@ -14,8 +14,10 @@ import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
 import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { useRole } from "@/hooks/useRole";
+import type { Module } from "@/lib/roles";
 
-type NavItem = { to: string; label: string; icon: typeof Users };
+type NavItem = { to: string; label: string; icon: typeof Users; module?: Module };
 type NavGroup = { id: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
