@@ -77,15 +77,21 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       activityRes,
       servicesRes,
       profilesRes,
+      followupsRes,
+      tasksRes,
+      customersLookupRes,
     ] = await Promise.all([
       supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("applications").select("id, application_code, application_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at").order("created_at", { ascending: false }).limit(2000),
-      supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at, updated_at").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason, application_id, lead_id, parent_payment_id").order("created_at", { ascending: false }).limit(5000),
       supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("activity_logs").select("id, activity_type, activity_description, created_at, lead_id").order("created_at", { ascending: false }).limit(40),
+      supabase.from("application_events").select("id, event_type, old_value, new_value, staff_name, created_at, application_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("services").select("id, service_name, service_code, is_active"),
       supabase.from("profiles").select("id, display_name, email"),
+      supabase.from("follow_ups").select("id, customer_id, lead_id, application_id, scheduled_at, reason, assigned_to, is_completed").eq("is_completed", false).gte("scheduled_at", startOfDay().toISOString()).lt("scheduled_at", daysAgo(-1).toISOString()).order("scheduled_at", { ascending: true }).limit(50),
+      supabase.from("tasks").select("id, due_date, is_completed, assigned_to").eq("is_completed", false).lt("due_date", new Date().toISOString()).limit(500),
+      supabase.from("customers").select("id, name").limit(5000),
     ]);
 
     const leads = leadsRes.data ?? [];
@@ -96,6 +102,9 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     const activity = activityRes.data ?? [];
     const services = servicesRes.data ?? [];
     const profiles = profilesRes.data ?? [];
+    const followups = followupsRes.data ?? [];
+    const overdueTasks = tasksRes.data ?? [];
+    const customerNameById = new Map<string, string>(((customersLookupRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
 
     const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
     const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
