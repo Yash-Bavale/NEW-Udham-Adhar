@@ -145,7 +145,7 @@ export const toggleEmailTemplate = createServerFn({ method: "POST" })
       last_toggled_by: userId,
       last_toggled_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("email_templates").update(patch).eq("code", data.code);
+    const { error } = await supabase.from("email_templates").update(patch as never).eq("code", data.code);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
