@@ -1,0 +1,541 @@
+// Order Management server functions (Phase 2).
+// Built fresh alongside legacy orders.functions.ts. Once /admin/applications
+// is fully retired the legacy file can be removed.
+
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  FULFILLMENT_STAGES,
+  type FulfillmentStatus,
+  getAllowedFulfillmentTransitions,
+} from "./fulfillment-transitions";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
+async function assertStaff(supabase: any) {
+  const { data } = await supabase.from("user_roles").select("role").limit(50);
+  const roles = new Set((data ?? []).map((r: any) => r.role));
+  const allowed = ["admin", "super_admin", "operations", "support", "accounts", "finance"];
+  if (!allowed.some((r) => roles.has(r))) throw new Error("Forbidden");
+}
+
+async function getStaff(userId: string) {
+  const admin = await getAdmin();
+  const [{ data: p }, { data: rr }] = await Promise.all([
+    admin.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
+    admin.from("user_roles").select("role").eq("user_id", userId).limit(1).maybeSingle(),
+  ]);
+  return {
+    staff_name: (p?.display_name as string) || (p?.email as string) || "Staff",
+    staff_role: (rr?.role as string) || "staff",
+  };
+}
+
+export type OrderPaymentRollup = "Pending" | "Paid" | "Partially Paid" | "Refunded" | "Failed";
+
+function rollupPaymentStatus(payments: Array<{ status: string; amount: number }>, total: number): OrderPaymentRollup {
+  if (!payments.length) return "Pending";
+  const positives = payments.filter((p) => Number(p.amount || 0) >= 0);
+  const refunds = payments.filter((p) => Number(p.amount || 0) < 0 || p.status === "refunded");
+  if (refunds.length && positives.every((p) => p.status === "refunded")) return "Refunded";
+  const paidSum = positives
+    .filter((p) => ["paid", "success", "successful"].includes(p.status))
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  if (paidSum <= 0) {
+    if (positives.some((p) => ["failed", "cancelled"].includes(p.status))) return "Failed";
+    return "Pending";
+  }
+  if (total > 0 && paidSum < total - 0.01) return "Partially Paid";
+  return "Paid";
+}
+
+/* ----------------------------- listOrders ------------------------------- */
+
+export const listOrdersV2 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+        fulfillmentStatus: z.string().optional(),
+        serviceId: z.string().uuid().optional(),
+        assignedTo: z.string().uuid().optional(),
+        paymentStatus: z.string().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+        search: z.string().max(120).optional(),
+      })
+      .parse(i ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    let q = admin
+      .from("applications")
+      .select(
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id",
+        { count: "exact" },
+      )
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false });
+
+    if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
+    if (data.serviceId) q = q.eq("service_id", data.serviceId);
+    if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+
+    const { data: apps, count, error } = await q.range(
+      (data.page - 1) * data.pageSize,
+      data.page * data.pageSize - 1,
+    );
+    if (error) throw new Error(error.message);
+    const appList = apps ?? [];
+
+    const ids = appList.map((a) => a.id);
+    const leadIds = Array.from(new Set(appList.map((a) => a.lead_id).filter(Boolean))) as string[];
+    const customerIds = Array.from(new Set(appList.map((a) => a.customer_id).filter(Boolean))) as string[];
+    const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
+    const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
+
+    const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
+      leadIds.length
+        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code").in("id", leadIds)
+        : Promise.resolve({ data: [] as any[] }),
+      customerIds.length
+        ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
+        : Promise.resolve({ data: [] as any[] }),
+      serviceIds.length
+        ? admin.from("services").select("id, service_name").in("id", serviceIds)
+        : Promise.resolve({ data: [] as any[] }),
+      ids.length
+        ? admin.from("payments").select("application_id, status, amount").in("application_id", ids)
+        : Promise.resolve({ data: [] as any[] }),
+      staffIds.length
+        ? admin.from("profiles").select("id, display_name, email").in("id", staffIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
+    const custMap = new Map((custsRes.data ?? []).map((c: any) => [c.id, c]));
+    const svcMap  = new Map((svcsRes.data  ?? []).map((s: any) => [s.id, s]));
+    const staffMap = new Map((staffRes.data ?? []).map((s: any) => [s.id, s]));
+    const payByApp = new Map<string, Array<{ status: string; amount: number }>>();
+    for (const p of paysRes.data ?? []) {
+      const arr = payByApp.get(p.application_id) ?? [];
+      arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
+      payByApp.set(p.application_id, arr);
+    }
+
+    let rows = appList.map((a) => {
+      const lead = leadMap.get(a.lead_id);
+      const cust = a.customer_id ? custMap.get(a.customer_id) : null;
+      const svc = a.service_id ? svcMap.get(a.service_id) : null;
+      const staff = a.assigned_to ? staffMap.get(a.assigned_to) : null;
+      const total = Number(lead?.total_amount || 0);
+      const payments = payByApp.get(a.id) ?? [];
+      return {
+        id: a.id,
+        application_code: a.application_code,
+        fulfillment_status: (a.fulfillment_status ?? "order_received") as FulfillmentStatus,
+        lead_status_v2: lead?.lead_status_v2 ?? null,
+        created_at: a.created_at,
+        lead_id: a.lead_id,
+        lead_code: lead?.lead_code ?? null,
+        customer_id: a.customer_id,
+        customer_name: cust?.name ?? lead?.name ?? "—",
+        customer_mobile: cust?.primary_mobile ?? null,
+        service_id: a.service_id,
+        service_name: svc?.service_name ?? null,
+        total_amount: total,
+        payment_status: rollupPaymentStatus(payments, total),
+        assigned_to: a.assigned_to,
+        assigned_name: staff?.display_name ?? staff?.email ?? null,
+      };
+    });
+
+    if (data.paymentStatus) rows = rows.filter((r) => r.payment_status === data.paymentStatus);
+    if (data.search) {
+      const s = data.search.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          (r.application_code ?? "").toLowerCase().includes(s) ||
+          (r.customer_name ?? "").toLowerCase().includes(s) ||
+          (r.customer_mobile ?? "").includes(s) ||
+          (r.lead_code ?? "").toLowerCase().includes(s),
+      );
+    }
+
+    return { rows, total: count ?? 0 };
+  });
+
+/* ----------------------------- getOrderDetail --------------------------- */
+
+export const getOrderDetailV2 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    const { data: app, error } = await admin
+      .from("applications")
+      .select("*")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (error || !app) throw new Error("Order not found");
+
+    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes] = await Promise.all([
+      app.lead_id
+        ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, service").eq("id", app.lead_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      app.customer_id
+        ? admin.from("customers").select("id, customer_code, name, primary_email, primary_mobile").eq("id", app.customer_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      app.service_id
+        ? admin.from("services").select("id, service_code, service_name").eq("id", app.service_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      admin
+        .from("payments")
+        .select("id, status, amount, gateway_name, transaction_id, payment_date, created_at, parent_payment_id, refund_reason, currency")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("documents")
+        .select("id, doc_type, file_path, file_name, mime_type, size_bytes, status, uploaded_at, created_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("application_events")
+        .select("id, event_type, old_value, new_value, note, staff_name, staff_role, created_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      app.assigned_to
+        ? admin.from("profiles").select("id, display_name, email").eq("id", app.assigned_to).maybeSingle()
+        : Promise.resolve({ data: null }),
+      app.service_id
+        ? admin.from("services").select("service_code").eq("id", app.service_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    // Look up service_workflows by service_code if present
+    let workflowStages: string[] = FULFILLMENT_STAGES;
+    if ((wfRes as any).data?.service_code) {
+      const { data: wf } = await admin
+        .from("service_workflows")
+        .select("application_statuses")
+        .eq("service_code", (wfRes as any).data.service_code)
+        .maybeSingle();
+      const arr = (wf?.application_statuses as any[] | null) ?? null;
+      if (Array.isArray(arr) && arr.length) {
+        workflowStages = arr.map((s) => (typeof s === "string" ? s : s?.code ?? s?.id ?? "")).filter(Boolean);
+      }
+    }
+
+    const lead = (leadRes as any).data;
+    const total = Number(lead?.total_amount || 0);
+    const payments = (paysRes.data ?? []) as any[];
+    const paymentStatus = rollupPaymentStatus(
+      payments.map((p) => ({ status: String(p.status), amount: Number(p.amount || 0) })),
+      total,
+    );
+
+    // Build per-stage timestamps + actor from application_events
+    const stageEvents = (evRes.data ?? []).filter((e: any) => e.event_type === "status_change");
+    const stageMeta: Record<string, { at: string; staff_name: string | null }> = {};
+    for (const ev of stageEvents) {
+      const key = ev.new_value as string;
+      if (key && !stageMeta[key]) stageMeta[key] = { at: (ev.created_at as string) ?? "", staff_name: ev.staff_name ?? null };
+    }
+    // Seed `order_received` from the application's own created_at when missing
+    if (!stageMeta["order_received"]) {
+      stageMeta["order_received"] = { at: app.created_at as string, staff_name: null };
+    }
+
+    return {
+      application: app,
+      lead,
+      customer: (custRes as any).data,
+      service: (svcRes as any).data,
+      payments,
+      paymentStatus,
+      total,
+      documents: docsRes.data ?? [],
+      events: evRes.data ?? [],
+      assignedStaff: (staffRes as any).data ?? null,
+      workflowStages,
+      stageMeta,
+    };
+  });
+
+/* ----------------------------- updateOrderAssignee ---------------------- */
+
+export const updateOrderAssignee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ orderId: z.string().uuid(), assignedTo: z.string().uuid().nullable() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { error } = await admin
+      .from("applications")
+      .update({ assigned_to: data.assignedTo } as never)
+      .eq("id", data.orderId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/* ----------------------------- updateFulfillmentStatus ------------------ */
+
+export const updateFulfillmentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        toStatus: z.string(),
+        note: z.string().max(2000).optional(),
+        // Required when transitioning to `completed`
+        certificateDocumentId: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    const { data: app } = await admin
+      .from("applications")
+      .select("id, fulfillment_status, lead_id, customer_id, service_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!app) throw new Error("Order not found");
+
+    const current = (app.fulfillment_status ?? "order_received") as FulfillmentStatus;
+    const target = data.toStatus as FulfillmentStatus;
+    if (current === target) return { ok: true, noop: true };
+
+    const allowed = getAllowedFulfillmentTransitions(current);
+    if (!allowed.includes(target)) {
+      throw new Error(`Invalid transition: ${current} → ${target}`);
+    }
+
+    if (target === "completed" && !data.certificateDocumentId) {
+      throw new Error("Certificate upload required before marking complete.");
+    }
+
+    // Update fulfillment status (trigger logs `status_change` event).
+    const upd: Record<string, unknown> = { fulfillment_status: target };
+    const { error: upErr } = await admin.from("applications").update(upd as never).eq("id", data.orderId);
+    if (upErr) throw new Error(upErr.message);
+
+    const { staff_name, staff_role } = await getStaff(context.userId);
+
+    if (data.note) {
+      await admin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: app.lead_id,
+        customer_id: app.customer_id ?? null,
+        event_type: "note_added",
+        note: data.note,
+        created_by: context.userId,
+        staff_name,
+        staff_role,
+      } as never);
+    }
+
+    if (target === "completed") {
+      // Mark application_status completed too (for legacy consumers)
+      await admin
+        .from("applications")
+        .update({ application_status: "completed", documents_deleted_reason: "completed" } as never)
+        .eq("id", data.orderId);
+
+      await admin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: app.lead_id,
+        customer_id: app.customer_id ?? null,
+        event_type: "certificate_delivered",
+        note: `Certificate uploaded (doc id ${data.certificateDocumentId}).`,
+        created_by: context.userId,
+        staff_name,
+        staff_role,
+      } as never);
+
+      // Wipe other docs via the existing edge function.
+      try {
+        await admin.functions.invoke("delete-order-documents", {
+          body: {
+            application_id: data.orderId,
+            reason: "completed",
+            keep_document_id: data.certificateDocumentId,
+          },
+        });
+      } catch (e) {
+        console.error("delete-order-documents invocation failed:", e);
+      }
+
+      // Close the parent lead (trigger logs lead_status_change automatically).
+      if (app.lead_id) {
+        await admin
+          .from("leads")
+          .update({ lead_status_v2: "closed" } as never)
+          .eq("id", app.lead_id);
+      }
+
+      // Enqueue completion email.
+      const { data: lead } = app.lead_id
+        ? await admin.from("leads").select("name, email").eq("id", app.lead_id).maybeSingle()
+        : { data: null as any };
+      if (lead?.email) {
+        await admin.from("email_queue").insert({
+          template_code: "order_completed",
+          to_email: lead.email,
+          to_name: lead.name ?? null,
+          subject: "Your application is complete",
+          lead_id: app.lead_id,
+          application_id: data.orderId,
+          variables: { application_id: data.orderId, certificate_document_id: data.certificateDocumentId },
+          created_by: context.userId,
+        } as never);
+      }
+    }
+
+    return { ok: true };
+  });
+
+/* ----------------------------- Document upload (cert + internal) -------- */
+
+const MAX_DOC_BYTES = 15 * 1024 * 1024;
+const ALLOWED_MIME = [
+  "application/pdf",
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
+];
+
+export const requestOrderDocumentUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        docType: z.string().trim().min(1).max(60),
+        fileName: z.string().trim().min(1).max(200),
+        mimeType: z.string().trim().min(1).max(120),
+        sizeBytes: z.number().int().min(1).max(MAX_DOC_BYTES),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    if (!ALLOWED_MIME.includes(data.mimeType.toLowerCase())) {
+      throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
+    }
+    const admin = await getAdmin();
+    const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin";
+    const safe = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
+    const path = `orders/${data.orderId}/${safe}-${Date.now()}.${ext}`;
+    const { data: signed, error } = await admin.storage.from("documents").createSignedUploadUrl(path);
+    if (error || !signed) throw new Error(error?.message ?? "Could not start upload.");
+    return { path, token: signed.token, signedUrl: signed.signedUrl };
+  });
+
+export const confirmOrderDocumentUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        orderId: z.string().uuid(),
+        docType: z.string().trim().min(1).max(60),
+        filePath: z.string().min(1).max(400),
+        fileName: z.string().min(1).max(200),
+        mimeType: z.string().min(1).max(120),
+        sizeBytes: z.number().int().min(1).max(MAX_DOC_BYTES),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { data: app } = await admin
+      .from("applications")
+      .select("lead_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+
+    const { data: row, error } = await admin
+      .from("documents")
+      .insert({
+        application_id: data.orderId,
+        lead_id: app?.lead_id ?? null,
+        doc_type: data.docType,
+        file_path: data.filePath,
+        file_name: data.fileName,
+        mime_type: data.mimeType,
+        size_bytes: data.sizeBytes,
+        status: "uploaded",
+        uploaded_at: new Date().toISOString(),
+      } as never)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    const { staff_name, staff_role } = await getStaff(context.userId);
+    await admin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: app?.lead_id ?? null,
+      event_type: "document_uploaded",
+      note: `${data.docType}: ${data.fileName}`,
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
+
+    return { documentId: (row as any).id as string };
+  });
+
+export const getOrderDocumentSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ path: z.string().min(1) }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { data: signed, error } = await admin.storage.from("documents").createSignedUrl(data.path, 600);
+    if (error) throw new Error(error.message);
+    return { url: signed.signedUrl };
+  });
+
+export const addOrderNoteV2 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ orderId: z.string().uuid(), note: z.string().trim().min(1).max(2000) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { data: app } = await admin
+      .from("applications")
+      .select("lead_id, customer_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    const { staff_name, staff_role } = await getStaff(context.userId);
+    const { error } = await admin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: app?.lead_id ?? null,
+      customer_id: app?.customer_id ?? null,
+      event_type: "note_added",
+      note: data.note,
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

@@ -28,7 +28,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2 },
-      { to: "/admin/applications", label: "Orders", icon: ShoppingBag },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
       { to: "/admin/documents", label: "Documents", icon: FileText },
     ],
   },
