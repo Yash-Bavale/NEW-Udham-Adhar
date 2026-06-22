@@ -662,11 +662,16 @@ export type Database = {
       }
       customers: {
         Row: {
+          aadhaar_doc_path: string | null
+          aadhaar_number: string | null
+          address: string | null
+          business_name: string | null
           completed_applications: number
           created_at: string
           customer_code: string | null
           deleted_at: string | null
           first_seen_at: string
+          gst_number: string | null
           id: string
           is_deleted: boolean | null
           language: string | null
@@ -676,20 +681,28 @@ export type Database = {
           metadata: Json
           name: string
           notes: string | null
+          pan_doc_path: string | null
+          pan_number: string | null
           pending_applications: number
           primary_email: string | null
           primary_mobile: string | null
           state: string | null
           status: string
           total_applications: number
+          udyam_number: string | null
           updated_at: string
         }
         Insert: {
+          aadhaar_doc_path?: string | null
+          aadhaar_number?: string | null
+          address?: string | null
+          business_name?: string | null
           completed_applications?: number
           created_at?: string
           customer_code?: string | null
           deleted_at?: string | null
           first_seen_at?: string
+          gst_number?: string | null
           id?: string
           is_deleted?: boolean | null
           language?: string | null
@@ -699,20 +712,28 @@ export type Database = {
           metadata?: Json
           name: string
           notes?: string | null
+          pan_doc_path?: string | null
+          pan_number?: string | null
           pending_applications?: number
           primary_email?: string | null
           primary_mobile?: string | null
           state?: string | null
           status?: string
           total_applications?: number
+          udyam_number?: string | null
           updated_at?: string
         }
         Update: {
+          aadhaar_doc_path?: string | null
+          aadhaar_number?: string | null
+          address?: string | null
+          business_name?: string | null
           completed_applications?: number
           created_at?: string
           customer_code?: string | null
           deleted_at?: string | null
           first_seen_at?: string
+          gst_number?: string | null
           id?: string
           is_deleted?: boolean | null
           language?: string | null
@@ -722,12 +743,15 @@ export type Database = {
           metadata?: Json
           name?: string
           notes?: string | null
+          pan_doc_path?: string | null
+          pan_number?: string | null
           pending_applications?: number
           primary_email?: string | null
           primary_mobile?: string | null
           state?: string | null
           status?: string
           total_applications?: number
+          udyam_number?: string | null
           updated_at?: string
         }
         Relationships: []

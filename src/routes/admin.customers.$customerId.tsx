@@ -1,14 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Mail, Phone, MapPin, Copy, FileText, Award, Receipt, Wallet,
   MessageSquareWarning, MessageCircle, StickyNote, Activity as ActivityIcon,
   Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCustomer360, addCustomerNote } from "@/lib/crm/customers.functions";
+import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
 import { maskAadhaar } from "@/lib/crm/mask";
 
@@ -24,14 +24,15 @@ const fmtDT = (s?: string | null) =>
 const fmtD = (s?: string | null) =>
   s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-type TabKey = "overview" | "orders" | "complaints" | "payments" | "documents" | "communication";
+type TabKey = "overview" | "orders" | "complaints" | "payments" | "documents" | "activity" | "communication";
 
 const TABS: { key: TabKey; label: string; icon: any }[] = [
   { key: "overview", label: "Overview", icon: User },
   { key: "orders", label: "Orders", icon: ShoppingBag },
-  { key: "complaints", label: "Complaints", icon: MessageSquareWarning },
   { key: "payments", label: "Payments", icon: IndianRupee },
   { key: "documents", label: "Documents", icon: FolderOpen },
+  { key: "activity", label: "Activity", icon: ActivityIcon },
+  { key: "complaints", label: "Complaints", icon: MessageSquareWarning },
   { key: "communication", label: "Communication", icon: Send },
 ];
 
@@ -154,6 +155,7 @@ function CustomerProfilePage() {
       {tab === "complaints" && <ComplaintsTab data={data} />}
       {tab === "payments" && <PaymentsTab data={data} />}
       {tab === "documents" && <DocumentsTab data={data} />}
+      {tab === "activity" && <ActivityTab data={data} />}
       {tab === "communication" && <CommunicationTab data={data} />}
     </div>
   );
@@ -193,23 +195,16 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
       <div className="xl:col-span-2 space-y-4">
-        <SectionCard title="Profile">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <Field label="Name" value={c.name} />
-            <Field label="Status" value={c.status} />
-            <Field label="Email" value={c.primary_email} />
-            <Field label="Mobile" value={c.primary_mobile} />
-            <Field label="State" value={c.state} />
-            <Field label="Language" value={c.language?.toUpperCase()} />
-            <Field label="First seen" value={fmtD(c.first_seen_at)} />
-            <Field label="Last seen" value={fmtD(c.last_seen_at)} />
+        <EditableProfileCard customer={c} customerId={customerId} />
+
+        <SectionCard title="Stats">
+          <dl className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-3 text-sm">
+            <Field label="Total Orders" value={String(c.total_applications ?? 0)} />
+            <Field label="Completed" value={String(c.completed_applications ?? 0)} />
+            <Field label="Pending" value={String(c.pending_applications ?? 0)} />
+            <Field label="Lifetime Value" value={fmtINR(Number(c.lifetime_value ?? 0))} />
+            <Field label="Last Order" value={fmtD(c.last_seen_at)} />
           </dl>
-          {c.notes && (
-            <div className="mt-4 pt-3 border-t" style={{ borderColor: "var(--admin-border)" }}>
-              <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: "var(--admin-fg-muted)" }}>Profile notes</div>
-              <div className="text-sm whitespace-pre-wrap">{maskAadhaar(c.notes)}</div>
-            </div>
-          )}
         </SectionCard>
 
         <SectionCard title="Linked leads">
@@ -285,32 +280,51 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
 }
 
 function OrdersTab({ data }: { data: any }) {
+  const leadById = new Map<string, any>();
+  for (const l of data.leads ?? []) leadById.set(l.id, l);
   return (
     <SectionCard title={`Orders (${data.applications.length})`}>
       {data.applications.length === 0 ? (
         <Empty label="No orders yet" />
       ) : (
-        <div className="space-y-1.5">
-          {data.applications.map((a: any) => (
-            <Link
-              key={a.id}
-              to="/admin/applications/$applicationId"
-              params={{ applicationId: a.id }}
-              className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 hover:bg-[var(--admin-surface-2)]"
-              style={{ borderColor: "var(--admin-border)" }}
-            >
-              <div className="min-w-0">
-                <div className="font-medium text-sm font-mono">{a.application_code ?? a.id.slice(0, 8)}</div>
-                <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                  Form {a.form_status} · Docs {a.document_status} · Updated {fmtD(a.updated_at)}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <StatusBadge status={a.application_status} />
-                <ExternalLink className="size-3.5 opacity-60" />
-              </div>
-            </Link>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                <th className="py-2 pr-3">Order No</th>
+                <th className="py-2 pr-3">Service</th>
+                <th className="py-2 pr-3">Fulfillment</th>
+                <th className="py-2 pr-3">Lead Status</th>
+                <th className="py-2 pr-3 text-right">Amount</th>
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.applications.map((a: any) => {
+                const lead = a.lead_id ? leadById.get(a.lead_id) : null;
+                return (
+                  <tr key={a.id} className="border-t hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
+                    <td className="py-2 pr-3">
+                      <Link to="/admin/orders/$orderId" params={{ orderId: a.id }} className="font-mono text-xs hover:underline">
+                        {a.application_code ?? a.id.slice(0, 8)}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-3 text-xs">{lead?.service ?? "—"}</td>
+                    <td className="py-2 pr-3"><StatusBadge status={a.fulfillment_status ?? a.application_status} /></td>
+                    <td className="py-2 pr-3">{lead ? <StatusBadge status={lead.status} /> : <span className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>—</span>}</td>
+                    <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtD(a.created_at)}</td>
+                    <td className="py-2 pr-3 text-right">
+                      <Link to="/admin/orders/$orderId" params={{ orderId: a.id }} className="inline-flex">
+                        <ExternalLink className="size-3.5 opacity-60" />
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </SectionCard>
@@ -415,37 +429,52 @@ function PaymentsTab({ data }: { data: any }) {
 }
 
 function DocumentsTab({ data }: { data: any }) {
+  const deletedOrders = (data.applications ?? []).filter((a: any) => a.documents_deleted_at);
   return (
-    <SectionCard title={`Documents (${data.documents.length})`}>
-      {data.documents.length === 0 ? (
-        <Empty label="No documents uploaded" />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                <th className="py-2 pr-3">Type</th>
-                <th className="py-2 pr-3">File</th>
-                <th className="py-2 pr-3">Status</th>
-                <th className="py-2 pr-3">Uploaded</th>
-                <th className="py-2 pr-3">Verified</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.documents.map((d: any) => (
-                <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
-                  <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
-                  <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
-                  <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
-                  <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="space-y-3">
+      {deletedOrders.length > 0 && (
+        <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}>
+          <div className="font-medium mb-1">Documents deleted (privacy policy)</div>
+          <ul className="space-y-0.5">
+            {deletedOrders.map((a: any) => (
+              <li key={a.id} style={{ color: "var(--admin-fg-muted)" }}>
+                Order <span className="font-mono">{a.application_code ?? a.id.slice(0, 8)}</span> — documents deleted on {fmtD(a.documents_deleted_at)}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </SectionCard>
+      <SectionCard title={`Documents (${data.documents.length})`}>
+        {data.documents.length === 0 ? (
+          <Empty label="No documents uploaded" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                  <th className="py-2 pr-3">Type</th>
+                  <th className="py-2 pr-3">File</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">Uploaded</th>
+                  <th className="py-2 pr-3">Verified</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.documents.map((d: any) => (
+                  <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
+                    <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
+                    <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
+                    <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
+                    <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 
@@ -497,5 +526,247 @@ function CopyBtn({ value }: { value: string }) {
     >
       <Copy className="size-3" style={{ color: "var(--admin-fg-muted)" }} />
     </button>
+  );
+}
+
+/* ---------- Activity Tab ---------- */
+
+function ActivityTab({ data }: { data: any }) {
+  const events = (data.events ?? []) as any[];
+  return (
+    <SectionCard title={`Activity (${events.length})`}>
+      {events.length === 0 ? (
+        <Empty label="No activity recorded" />
+      ) : (
+        <ol className="space-y-2">
+          {events.map((e) => (
+            <li
+              key={e.id}
+              className="rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--admin-border)" }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-medium capitalize">{e.event_type.replace(/_/g, " ")}</div>
+                <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(e.created_at)}</div>
+              </div>
+              {(e.old_value || e.new_value) && (
+                <div className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>
+                  {e.old_value ? <><span className="line-through">{e.old_value}</span> → </> : null}
+                  <span className="font-medium" style={{ color: "var(--admin-fg)" }}>{e.new_value ?? "—"}</span>
+                </div>
+              )}
+              <div className="text-[11px] mt-1" style={{ color: "var(--admin-fg-muted)" }}>
+                by {e.staff_name ?? "System"}{e.staff_role ? ` · ${e.staff_role}` : ""}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </SectionCard>
+  );
+}
+
+/* ---------- Editable Profile Card ---------- */
+
+function EditableProfileCard({ customer, customerId }: { customer: any; customerId: string }) {
+  const qc = useQueryClient();
+  const update = useServerFn(updateCustomer);
+  const upload = useServerFn(uploadCustomerKyc);
+  const sign = useServerFn(getCustomerKycSignedUrl);
+
+  const save = async (patch: Record<string, any>) => {
+    try {
+      await update({ data: { customerId, patch } });
+      await qc.invalidateQueries({ queryKey: ["admin.customer360", customerId] });
+      toast.success("Saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+  };
+
+  const openDoc = async (path: string) => {
+    try {
+      const { url } = await sign({ data: { path } });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open document");
+    }
+  };
+
+  const handleUpload = async (docType: "pan" | "aadhaar", file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large (max 10 MB)");
+      return;
+    }
+    const buf = await file.arrayBuffer();
+    let bin = "";
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    const base64 = btoa(bin);
+    try {
+      await upload({
+        data: {
+          customerId,
+          docType,
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          base64,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: ["admin.customer360", customerId] });
+      toast.success(`${docType.toUpperCase()} document uploaded`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    }
+  };
+
+  return (
+    <SectionCard title="Profile">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+        <EditField label="Full Name" value={customer.name ?? ""} onSave={(v) => save({ name: v })} />
+        <EditField label="Mobile" value={customer.primary_mobile ?? ""} onSave={(v) => save({ primary_mobile: v || null })} />
+        <EditField label="Email" type="email" value={customer.primary_email ?? ""} onSave={(v) => save({ primary_email: v || null })} />
+        <EditField label="State" value={customer.state ?? ""} onSave={(v) => save({ state: v || null })} />
+        <EditField label="Address" textarea value={customer.address ?? ""} onSave={(v) => save({ address: v || null })} className="md:col-span-2" />
+
+        <KycField
+          label="PAN Number"
+          number={customer.pan_number ?? ""}
+          docPath={customer.pan_doc_path}
+          onSaveNumber={(v) => save({ pan_number: v || null })}
+          onUpload={(f) => handleUpload("pan", f)}
+          onOpen={openDoc}
+        />
+        <KycField
+          label="Aadhaar Number"
+          number={customer.aadhaar_number ?? ""}
+          docPath={customer.aadhaar_doc_path}
+          onSaveNumber={(v) => save({ aadhaar_number: v || null })}
+          onUpload={(f) => handleUpload("aadhaar", f)}
+          onOpen={openDoc}
+        />
+
+        <EditField label="Business Name" value={customer.business_name ?? ""} onSave={(v) => save({ business_name: v || null })} />
+        <EditField label="GST Number" value={customer.gst_number ?? ""} onSave={(v) => save({ gst_number: v || null })} />
+        <EditField label="Udyam Number" value={customer.udyam_number ?? ""} onSave={(v) => save({ udyam_number: v || null })} />
+      </div>
+
+      <div className="mt-4 pt-3 border-t" style={{ borderColor: "var(--admin-border)" }}>
+        <EditField
+          label="Notes"
+          textarea
+          value={customer.notes ?? ""}
+          onSave={(v) => save({ notes: v || null })}
+          placeholder="Free-form notes about this customer…"
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onSave,
+  type = "text",
+  textarea = false,
+  className = "",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onSave: (v: string) => void | Promise<void>;
+  type?: string;
+  textarea?: boolean;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [local, setLocal] = useState(value);
+  // Sync external updates
+  useEffect(() => { setLocal(value); }, [value]);
+
+  const commit = () => {
+    const trimmed = local.trim();
+    if (trimmed === (value ?? "").trim()) return;
+    onSave(trimmed);
+  };
+
+  const inputClass = "w-full rounded-md border px-2 py-1.5 text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--admin-primary)]/30";
+
+  return (
+    <label className={`block ${className}`}>
+      <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>
+      {textarea ? (
+        <textarea
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={commit}
+          rows={3}
+          placeholder={placeholder}
+          className={`${inputClass} resize-none`}
+          style={{ borderColor: "var(--admin-border)" }}
+        />
+      ) : (
+        <input
+          type={type}
+          value={local}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={commit}
+          placeholder={placeholder}
+          className={inputClass}
+          style={{ borderColor: "var(--admin-border)" }}
+        />
+      )}
+    </label>
+  );
+}
+
+function KycField({
+  label,
+  number,
+  docPath,
+  onSaveNumber,
+  onUpload,
+  onOpen,
+}: {
+  label: string;
+  number: string;
+  docPath: string | null | undefined;
+  onSaveNumber: (v: string) => void | Promise<void>;
+  onUpload: (f: File) => void | Promise<void>;
+  onOpen: (path: string) => void;
+}) {
+  return (
+    <div>
+      <EditField label={label} value={number} onSave={onSaveNumber} />
+      <div className="flex items-center gap-2 mt-1.5">
+        {docPath ? (
+          <button
+            onClick={() => onOpen(docPath)}
+            className="text-[11px] inline-flex items-center gap-1 rounded border px-2 py-1 hover:bg-[var(--admin-surface-2)]"
+            style={{ borderColor: "var(--admin-border)" }}
+          >
+            <FileText className="size-3" /> View document
+          </button>
+        ) : (
+          <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>No document uploaded</span>
+        )}
+        <label className="text-[11px] inline-flex items-center gap-1 rounded border px-2 py-1 cursor-pointer hover:bg-[var(--admin-surface-2)]"
+          style={{ borderColor: "var(--admin-border)" }}
+        >
+          {docPath ? "Replace" : "Upload"}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+    </div>
   );
 }
