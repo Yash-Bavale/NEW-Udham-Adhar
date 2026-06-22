@@ -23,40 +23,40 @@ type NavGroup = { id: string; items: NavItem[] };
 const NAV: NavGroup[] = [
   {
     id: "g1",
-    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" }],
   },
   {
     id: "g2",
     items: [
-      { to: "/admin/leads", label: "Leads", icon: Users },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2 },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
-      { to: "/admin/documents", label: "Documents", icon: FileText },
+      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads" },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents" },
     ],
   },
   {
     id: "g3",
     items: [
-      { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning },
+      { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints" },
       { to: "/admin/services", label: "Services", icon: Briefcase },
-      { to: "/admin/invoices", label: "Invoices", icon: Receipt },
-      { to: "/admin/payments", label: "Payments", icon: CreditCard },
+      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments" },
     ],
   },
   {
     id: "g4",
     items: [
-      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks },
-      { to: "/admin/reports", label: "Reports", icon: BarChart3 },
+      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets" },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
+      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
     ],
   },
   {
     id: "g5",
     items: [
-      { to: "/admin/employees", label: "Employees", icon: UserCog },
+      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees" },
       { to: "/admin/emails", label: "Email System", icon: Mail },
-      { to: "/admin/email-templates", label: "Email Templates", icon: Mail },
+      { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates" },
       { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle },
       { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
     ],
