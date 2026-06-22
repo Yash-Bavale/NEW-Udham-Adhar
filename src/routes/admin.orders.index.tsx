@@ -92,7 +92,7 @@ function OrdersListPage() {
           </select>
           <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setPage(1); }} className="rounded-md border px-2 py-1.5 text-sm bg-white max-w-[200px]">
             <option value="">All services</option>
-            {(svcData?.services ?? svcData ?? []).map((s: any) => (
+            {(svcData?.rows ?? []).map((s: any) => (
               <option key={s.id} value={s.id}>{s.service_name}</option>
             ))}
           </select>

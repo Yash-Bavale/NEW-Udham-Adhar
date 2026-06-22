@@ -252,7 +252,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     const stageMeta: Record<string, { at: string; staff_name: string | null }> = {};
     for (const ev of stageEvents) {
       const key = ev.new_value as string;
-      if (key && !stageMeta[key]) stageMeta[key] = { at: ev.created_at, staff_name: ev.staff_name ?? null };
+      if (key && !stageMeta[key]) stageMeta[key] = { at: (ev.created_at as string) ?? "", staff_name: ev.staff_name ?? null };
     }
     // Seed `order_received` from the application's own created_at when missing
     if (!stageMeta["order_received"]) {

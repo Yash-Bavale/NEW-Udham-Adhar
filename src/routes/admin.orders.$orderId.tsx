@@ -140,7 +140,7 @@ function InternalActivity({
     if (!note.trim() || !leadId) return;
     setBusy(true);
     try {
-      await noteFn({ data: { leadId, note: note.trim() } });
+      await noteFn({ data: { lead_id: leadId, note: note.trim() } });
       setNote("");
       qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
       toast.success("Note added");
