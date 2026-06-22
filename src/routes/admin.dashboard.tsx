@@ -674,5 +674,11 @@ function EmptyHint({ text }: { text: string }) {
   );
 }
 
+function describeEvent(a: { event_type: string; old_value: string | null; new_value: string | null }): string {
+  const arrow = a.old_value && a.new_value ? `${a.old_value} → ${a.new_value}` : (a.new_value ?? a.old_value ?? "");
+  const label = a.event_type.replace(/_/g, " ");
+  return arrow ? `${label}: ${arrow}` : label;
+}
+
 // suppress unused-import warnings for icons referenced only conditionally
 void FileText; void ActivityIcon;
