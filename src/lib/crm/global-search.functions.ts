@@ -42,7 +42,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         kind: "customer",
         id: r.id,
         title: r.name || r.customer_code,
-        subtitle: [r.customer_code, r.primary_email, r.primary_mobile].filter(Boolean).join(" · "),
+        subtitle: [r.customer_code, r.primary_email, r.primary_mobile, r.udyam_number].filter(Boolean).join(" · "),
         href: `/admin/customers/${r.id}`,
       })
     );
