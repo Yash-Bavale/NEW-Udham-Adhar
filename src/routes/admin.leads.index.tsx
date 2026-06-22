@@ -52,6 +52,20 @@ function LeadsPage() {
   const [defaultApplied, setDefaultApplied] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const role = useRole();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id ?? "";
+      setCurrentUserId(uid);
+      // Executives default to "My Leads" view
+      if (uid && !defaultApplied && role.roles.length > 0 && role.roles[0] === "executive" && !assignee) {
+        setAssignee(uid);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role.roles.join(",")]);
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
 
