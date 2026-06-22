@@ -540,22 +540,60 @@ function StaffPerformance({ data, loading }: { data?: OpsDashboardData; loading:
 /* ---------------- 10. Follow-ups ---------------- */
 
 function FollowUps({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
+  const qc = useQueryClient();
+  const mark = useServerFn(markFollowUpComplete);
+  const m = useMutation({
+    mutationFn: (id: string) => mark({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ops-dashboard"] }),
+  });
   return (
     <SectionCard title="Today's Follow-ups" action={<span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}><Calendar className="inline size-3 mr-1" />{new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</span>}>
       <div className="p-4">
         {loading ? <TableSkeleton rows={4} cols={2} /> : (data?.followUps.length ?? 0) === 0 ? (
-          <EmptyHint text="Follow-up calendar lands with the Tasks module." />
+          <EmptyHint text="No follow-ups scheduled for today." />
         ) : (
           <ul className="space-y-1.5">
             {data!.followUps.map((f) => (
-              <li key={f.id} className="flex items-center gap-3 text-xs">
-                <span className="font-mono" style={{ color: "var(--admin-fg-muted)" }}>{f.time}</span>
+              <li key={f.id} className="flex items-center gap-2 text-xs">
+                <span className="font-mono shrink-0" style={{ color: "var(--admin-fg-muted)" }}>{f.time}</span>
                 <span className="font-medium truncate" style={{ color: "var(--admin-fg)" }}>{f.customer}</span>
-                <span className="truncate" style={{ color: "var(--admin-fg-muted)" }}>· {f.reason}</span>
+                <span className="truncate flex-1" style={{ color: "var(--admin-fg-muted)" }}>· {f.reason}{f.assignedTo ? ` · ${f.assignedTo}` : ""}</span>
+                <button
+                  onClick={() => m.mutate(f.id)}
+                  disabled={m.isPending}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] hover:bg-[var(--admin-surface-2)] disabled:opacity-50"
+                  style={{ borderColor: "var(--admin-border)" }}
+                  title="Mark complete"
+                >
+                  <CheckCircle2 className="size-3" /> Done
+                </button>
               </li>
             ))}
           </ul>
         )}
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ---------------- Refund Tracker ---------------- */
+
+function RefundTracker({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
+  const r = data?.refundTracker;
+  const pills = [
+    { label: "Requested", value: r?.requested ?? 0, color: "var(--admin-warn)" },
+    { label: "Approved", value: r?.approved ?? 0, color: "var(--admin-info)" },
+    { label: "Refunded", value: r?.refunded ?? 0, color: "var(--admin-success)" },
+  ];
+  return (
+    <SectionCard title="Refund Tracker" action={<span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>Last 30 days</span>}>
+      <div className="p-4 grid grid-cols-3 gap-2">
+        {(loading ? Array.from({ length: 3 }).map(() => null) : pills).map((x, i) => x ? (
+          <div key={x.label} className="rounded-md border p-2.5 text-center" style={{ borderColor: "var(--admin-border)" }}>
+            <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>{x.label}</div>
+            <div className="text-lg font-medium tabular-nums" style={{ color: x.color }}>{fmtN(x.value)}</div>
+          </div>
+        ) : <div key={i} className="h-14 rounded-md animate-pulse" style={{ background: "var(--admin-surface-2)" }} />)}
       </div>
     </SectionCard>
   );
