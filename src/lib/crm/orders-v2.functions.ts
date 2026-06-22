@@ -511,3 +511,31 @@ export const getOrderDocumentSignedUrl = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { url: signed.signedUrl };
   });
+
+export const addOrderNoteV2 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ orderId: z.string().uuid(), note: z.string().trim().min(1).max(2000) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { data: app } = await admin
+      .from("applications")
+      .select("lead_id, customer_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    const { staff_name, staff_role } = await getStaff(context.userId);
+    const { error } = await admin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: app?.lead_id ?? null,
+      customer_id: app?.customer_id ?? null,
+      event_type: "note_added",
+      note: data.note,
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
