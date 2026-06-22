@@ -101,6 +101,7 @@ function LeadDetailPage() {
             >
               {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
             </select>
+            <AddTaskDialog defaultLeadId={leadId} />
           </div>
         </div>
       </div>
