@@ -186,20 +186,6 @@ function formatIST(iso: string) {
   }).format(new Date(iso));
 }
 
-function SeverityPill({ severity }: { severity: string }) {
-  const map: Record<string, string> = {
-    critical: "bg-rose-100 text-rose-800",
-    high: "bg-amber-100 text-amber-800",
-    normal: "bg-sky-100 text-sky-800",
-    low: "bg-slate-100 text-slate-700",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${map[severity] ?? map.normal}`}>
-      <span className="size-1.5 rounded-full bg-current opacity-70" />
-      {severity}
-    </span>
-  );
-}
 
 function AddComplaintModal({
   onClose,
