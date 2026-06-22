@@ -263,7 +263,7 @@ function RefundDecisionPanel({
       </label>
 
       <div className="flex flex-wrap gap-2 pt-1">
-        {currentStatus === "refund_requested" && (
+        {currentStatus === "refund_requested" && mayApprove && (
           <>
             <Button onClick={onApprove} disabled={busy || !eligible} className="bg-emerald-600 hover:bg-emerald-700">
               <CheckCircle2 className="size-4 mr-1" /> Approve Refund
@@ -272,6 +272,11 @@ function RefundDecisionPanel({
               <XCircle className="size-4 mr-1" /> Reject Refund
             </Button>
           </>
+        )}
+        {currentStatus === "refund_requested" && !mayApprove && (
+          <div className="text-xs rounded-md bg-amber-100/70 border border-amber-200 text-amber-900 px-3 py-2">
+            Only Manager, Admin, or Super Admin can approve or reject refunds.
+          </div>
         )}
         {currentStatus === "refund_approved" && (
           <div className="w-full space-y-2">
