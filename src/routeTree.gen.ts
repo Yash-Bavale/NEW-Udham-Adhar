@@ -212,6 +212,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
+import { Route as AdminLeadsIndexRouteImport } from './routes/admin.leads.index'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
 import { Route as OnboardingLeadCodeDocumentsRouteImport } from './routes/onboarding.$leadCode.documents'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
@@ -1286,6 +1287,11 @@ const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   path: '/onboarding/$leadCode/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLeadsIndexRoute = AdminLeadsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminLeadsRoute,
+} as any)
 const OnboardingLeadCodeDoneRoute = OnboardingLeadCodeDoneRouteImport.update({
   id: '/onboarding/$leadCode/done',
   path: '/onboarding/$leadCode/done',
@@ -1645,6 +1651,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/admin/leads/': typeof AdminLeadsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -1837,7 +1844,6 @@ export interface FileRoutesByTo {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
-  '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
@@ -1874,6 +1880,7 @@ export interface FileRoutesByTo {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/admin/leads': typeof AdminLeadsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -2105,6 +2112,7 @@ export interface FileRoutesById {
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/onboarding/$leadCode/documents': typeof OnboardingLeadCodeDocumentsRoute
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
+  '/admin/leads/': typeof AdminLeadsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -2337,6 +2345,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/admin/leads/'
     | '/onboarding/$leadCode/'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -2529,7 +2538,6 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
-    | '/admin/leads'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/pipeline'
@@ -2566,6 +2574,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/admin/leads'
     | '/onboarding/$leadCode'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -2796,6 +2805,7 @@ export interface FileRouteTypes {
     | '/lovable/email/suppression'
     | '/onboarding/$leadCode/documents'
     | '/onboarding/$leadCode/done'
+    | '/admin/leads/'
     | '/onboarding/$leadCode/'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
@@ -4428,6 +4438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingLeadCodeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/leads/': {
+      id: '/admin/leads/'
+      path: '/'
+      fullPath: '/admin/leads/'
+      preLoaderRoute: typeof AdminLeadsIndexRouteImport
+      parentRoute: typeof AdminLeadsRoute
+    }
     '/onboarding/$leadCode/done': {
       id: '/onboarding/$leadCode/done'
       path: '/onboarding/$leadCode/done'
@@ -4657,10 +4674,12 @@ const AdminFinanceRouteWithChildren = AdminFinanceRoute._addFileChildren(
 
 interface AdminLeadsRouteChildren {
   AdminLeadsLeadIdRoute: typeof AdminLeadsLeadIdRoute
+  AdminLeadsIndexRoute: typeof AdminLeadsIndexRoute
 }
 
 const AdminLeadsRouteChildren: AdminLeadsRouteChildren = {
   AdminLeadsLeadIdRoute: AdminLeadsLeadIdRoute,
+  AdminLeadsIndexRoute: AdminLeadsIndexRoute,
 }
 
 const AdminLeadsRouteWithChildren = AdminLeadsRoute._addFileChildren(
