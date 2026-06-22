@@ -360,6 +360,7 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
                       <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
                       <td className="px-4 py-2.5 text-xs max-w-[200px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                       <td className="px-4 py-2.5 text-right">
