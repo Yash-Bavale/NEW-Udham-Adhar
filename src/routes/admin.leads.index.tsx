@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/constants";
+import { supabase } from "@/integrations/supabase/client";
+import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
