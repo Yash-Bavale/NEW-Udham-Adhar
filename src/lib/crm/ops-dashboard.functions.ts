@@ -198,28 +198,36 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       byService: Array.from(saleByService.entries()).map(([label, value]) => ({ label, value: Math.round(value) })).sort((a, b) => b.value - a.value),
     };
 
-    // Action required
-    const ordersWaitingDocs = apps.filter((a: any) => a.document_status && a.document_status !== "verified" && a.application_status !== "completed").length;
-    const complaintsFollowup = openComplaints.filter((c: any) => {
-      const last = c.last_reminded_at ?? c.created_at;
-      const ageDays = (Date.now() - new Date(last).getTime()) / 86_400_000;
-      return ageDays >= 2;
-    }).length;
-    const customersAwaitingReply = leads.filter((l: any) => ["contacted", "follow_up_required", "details_pending"].includes(l.status)).length;
+    // Action required (per Phase 6 spec)
+    const refundDecisionPending = leads.filter((l: any) => l.status === "refund_requested").length;
+    const twoDaysAgoISO = daysAgo(2).toISOString();
+    const docsPendingOver2d = apps.filter((a: any) =>
+      a.fulfillment_status === "order_received" &&
+      a.created_at <= twoDaysAgoISO,
+    ).length;
+    const tasksOverdue = overdueTasks.length;
+    const followupsTodayOpen = followups.length;
 
-    // Service pipeline (applications by status, in the canonical 6 stages)
-    const pipelineStages: Array<[string, string[]]> = [
-      ["Order Received", ["awaiting_payment", "payment_received"]],
-      ["Documents Received", ["documents_pending", "details_pending"]],
-      ["Verification Pending", ["under_review"]],
-      ["Application Submitted", ["under_process"]],
-      ["Processing", ["under_process"]],
-      ["Completed", ["completed"]],
+    // Service pipeline — by fulfillment_status (canonical 6 stages)
+    const pipelineStages: Array<[string, string]> = [
+      ["Order Received", "order_received"],
+      ["Documents Received", "documents_received"],
+      ["Verification Pending", "verification_pending"],
+      ["Application Submitted", "application_submitted"],
+      ["Under Processing", "under_processing"],
+      ["Completed", "completed"],
     ];
-    const servicePipeline = pipelineStages.map(([stage, statuses]) => ({
+    const servicePipeline = pipelineStages.map(([stage, fs]) => ({
       stage,
-      count: apps.filter((a: any) => statuses.includes(a.application_status)).length,
+      count: apps.filter((a: any) => a.fulfillment_status === fs).length,
     }));
+
+    // Refund tracker — last 30 days
+    const refundTracker = {
+      requested: leads.filter((l: any) => l.status === "refund_requested" && l.created_at >= month).length,
+      approved: apps.filter((a: any) => a.application_status === "refund_pending" && (a.updated_at ?? a.created_at) >= month).length,
+      refunded: apps.filter((a: any) => a.application_status === "refunded" && (a.updated_at ?? a.created_at) >= month).length,
+    };
 
     // Documents pending list (latest 8)
     const pendingDocApps = apps
