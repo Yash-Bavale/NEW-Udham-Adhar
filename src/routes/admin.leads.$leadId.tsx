@@ -10,6 +10,7 @@ import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { LeadEditableCard } from "@/components/admin/LeadEditableCard";
 import { LeadWorkspacePanel } from "@/components/admin/LeadWorkspacePanel";
+import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
