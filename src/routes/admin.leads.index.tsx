@@ -210,9 +210,17 @@ function LeadsPage() {
 
       {/* Status pills with counts */}
       <div className="flex gap-2 flex-wrap">
-        <FilterChip active={status === ""} onClick={() => { setStatus(""); setPage(1); }}>
+        <FilterChip active={status === "" && !assignee} onClick={() => { setStatus(""); setAssignee(""); setPage(1); }}>
           All <span className="ml-1 opacity-60">({counts.all ?? 0})</span>
         </FilterChip>
+        {currentUserId && (
+          <FilterChip
+            active={assignee === currentUserId}
+            onClick={() => { setAssignee(assignee === currentUserId ? "" : currentUserId); setPage(1); }}
+          >
+            My Leads
+          </FilterChip>
+        )}
         {LEAD_STATUSES.map((s) => (
           <FilterChip key={s} active={status === s} onClick={() => { setStatus(s); setPage(1); }}>
             {s.replace(/_/g, " ")} <span className="ml-1 opacity-60">({counts[s] ?? 0})</span>
