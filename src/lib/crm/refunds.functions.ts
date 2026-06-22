@@ -43,7 +43,7 @@ export const approveRefund = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, customer_id, total_amount")
+      .select("id, lead_id, customer_id")
       .eq("lead_id", data.leadId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -98,7 +98,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, customer_id, total_amount")
+      .select("id, lead_id, customer_id")
       .eq("lead_id", data.leadId)
       .order("created_at", { ascending: false })
       .limit(1)
