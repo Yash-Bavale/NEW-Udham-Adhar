@@ -423,8 +423,10 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       followUps: followUpsOut,
       supportTickets: { open: 0, in_progress: 0, resolved: 0, closed: 0 },
       recentActivity,
+      viewer: { isPrivileged, canViewFinance },
     };
   });
+
 
 export const markFollowUpComplete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
