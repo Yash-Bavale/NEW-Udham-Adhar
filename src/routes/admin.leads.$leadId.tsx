@@ -100,7 +100,15 @@ function LeadDetailPage() {
               }}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             >
-              {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+              {LEAD_STATUSES.map((s) => (
+                <option
+                  key={s}
+                  value={s}
+                  disabled={s === "completed" && lead.status !== "completed"}
+                >
+                  {s.replace(/_/g, " ")}{s === "completed" && lead.status !== "completed" ? " (via fulfillment)" : ""}
+                </option>
+              ))}
             </select>
             <AddTaskDialog defaultLeadId={leadId} />
           </div>
