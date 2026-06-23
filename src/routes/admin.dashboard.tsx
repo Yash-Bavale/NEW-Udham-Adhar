@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -10,14 +10,31 @@ import {
   PackageCheck, Wallet, AlertTriangle, ChevronDown, ChevronRight, FileText,
   Send, Calendar, LifeBuoy, Activity as ActivityIcon, Bell,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { getOpsDashboard, markFollowUpComplete, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
 import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
+  // The executive dashboard is for admin / super_admin only. Other staff roles
+  // (executive, manager, support, operations, finance, accounts) get bounced
+  // to their dedicated employee workspace at /admin/my-work.
+  beforeLoad: async () => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { data: rows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    const roles = (rows ?? []).map((r) => r.role as string);
+    if (!roles.includes("admin") && !roles.includes("super_admin")) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   component: DashboardPage,
 });
+
 
 type TimeWindow = "today" | "week" | "month";
 const W_LABEL: Record<TimeWindow, string> = { today: "Today", week: "Weekly", month: "Monthly" };
