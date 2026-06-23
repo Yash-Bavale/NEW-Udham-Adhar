@@ -196,6 +196,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </header>
 
         <div className="flex-1 p-6 pb-24 md:pb-6 w-full max-w-[1400px] mx-auto">
+          <NotificationsOptIn />
           {children}
         </div>
       </main>
