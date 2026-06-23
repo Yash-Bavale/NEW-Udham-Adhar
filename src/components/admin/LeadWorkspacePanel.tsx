@@ -6,7 +6,10 @@ import {
   AlertTriangle, CheckCircle2, XCircle, Loader2,
   Calendar as CalendarIcon, FileText, Receipt, Trash2,
   Phone, FileWarning, Repeat2, Sparkles,
+  Copy, Mail, MessageCircle, BellRing, User as UserIcon,
 } from "lucide-react";
+import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
+import { CopyButton } from "@/components/admin/primitives/CopyButton";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
