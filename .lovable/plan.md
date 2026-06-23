@@ -1,83 +1,35 @@
-## Execution plan — Final_CRM.md by Parts A→P
+## Goal
 
-Priority: **A + B first, then D (employee dashboards), then C, then E…P serially.** Each phase ends with a build + smoke check before the next begins.
+After a successful payment or any payment status (pending, failed), the user should land on a 1-minute (60s) countdown screen that visually matches the 30s "processing" screen shown after the lead form is submitted (`src/routes/processing.$leadCode.tsx`).
 
----
+## Current state
 
-### Phase 1 — Part A · Design System & Visual Language
+- `src/routes/success.$leadCode.tsx` already has:
+  - `TOTAL_SECONDS = 60`
+  - The same concentric-ring loader, step pips, animated progress bar, and trust footer as `processing.$leadCode.tsx` (only color accent differs: emerald vs amber, which is intentional for the "payment successful" context).
+- **Problem:** the redesigned countdown only renders **after** `confirmed === true`. Until the polling loop confirms the webhook landed (can be 2–10+ seconds, up to 30s), the user sees a small plain spinner with "Confirming payment…". That gap is the part that doesn't match the post-lead experience, which jumps straight into the rich countdown.
 
-Tokens in `src/styles.css` (navy/gold/cream palette, status colors, typography scale, card/button/sidebar/table/badge/modal classes). Shared primitives: `StatusBadge`, `ConfirmModal`, `CopyButton`. No business-logic changes.
-*Verify:* build passes, badges render with new tokens on existing pages.
+## Change
 
-### Phase 2 — Part B · Layout & Role-Based Access Gate (P0 SECURITY)
+Render the redesigned 60s countdown UI **immediately** on mount, while the confirmation poll runs in the background. The auto-redirect to `/onboarding/$leadCode` waits for **both** conditions: countdown finished **and** payment confirmed.
 
-- `beforeLoad` role gate on `src/routes/admin.tsx` using `has_any_staff_role` + role lookup.
-- `/unauthorized` route.
-- Confirm every `*.functions.ts` already calls `assertRole`; add where missing.
-- Sidebar/route map matches spec list.
-*Verify:* signed-in non-staff redirected; staff admin loads; build passes.
+### Behavior rules
 
-### Phase 3 — Part D · Admin / support / manager Dashboard `/admin/dashboard`
+1. On mount: start the 60s countdown immediately and start polling `getApplicationSummary` in parallel 
+2. Step labels stay as today; the first step subtitle changes from "Confirming transaction with bank" to a wording that works both before and after confirmation (e.g. keep "Confirming transaction with bank" — it already reads correctly during the wait).
+3. When countdown hits 0:
+  - If `confirmed === true` → redirect to `/onboarding/$leadCode` (current behavior).
+  - If still not confirmed → hold on the final step ("Almost ready") with a subtle "Finalising confirmation…" sub-label and keep polling; redirect as soon as confirmed.
+4. If the 15-attempt poll exhausts without confirmation → redirect to `/payment-pending/$leadCode` (current behavior, unchanged).
+5. Error state (server fn throws) → same red error card as today.
 
-"My Work" queue, 4 stat cards (scoped), Pending Leads panel with **wired** Send-Reminder (Part J #1), recent activity feed. Real DB data only.
-*Verify:* reminder queues email row; pending highlight rules apply.
+### Files
 
-### Phase 4 — Part C · SuperAdmin Dashboard `/admin`
+- `src/routes/success.$leadCode.tsx` — restructure the render so the countdown card is the default view; remove the standalone "Confirming payment…" spinner block; gate the final navigation on `confirmed && elapsed >= TOTAL_SECONDS`.
 
-6 KPI strip, System Health panel (queue depths, last cron, PayU mode, failed webhooks), Security Alerts, Employee Activity Feed, Assignment Overview, Revenue chart, SuperAdmin-only actions (**Seed Templates** runs Part I migration RPC, **Process Queue Now** calls `processQueueInternal`).
-*Verify:* super_admin sees it, others 403; seed + process buttons work.
+No other files change. No new components, no design-token changes, no schema or server-fn changes.
 
-### Phase 5 — Part E · Browser Push Notifications
+## Verification
 
-`public/sw.js`, `useNotifications` hook, opt-in banner, sidebar live-count badge via realtime `user:<uid>:leads` channel.
-*Verify:* permission flow + test notification.
-
-### Phase 6 — Part F · Leads List
-
-Filters, debounced search, row highlight rules, inline hover actions, bulk actions through `ConfirmModal` (replaces alert/prompt/confirm), empty state.
-
-### Phase 7 — Part G · Lead Detail + Workspace
-
-Two-column layout, FormSubmission "Copy All Details", Documents panel with `**approved**` enum fix (Part J #7 + #6) + reject-reason email, valid-transition status buttons, Notes, Send Reminder/Form-Link/WhatsApp, follow-up scheduler, customer quick card.
-
-### Phase 8 — Part H · Completion Gate (CRITICAL)
-
-`completeApplication` server fn (upload → certificate row → 7-day signed URL → queue `certificate_delivery` → engine transition → sync `lead_status_v2` → set `fulfilled_at` → event log). Resend unblocked. `CompletionGateModal` + `ApplicationSearchCombobox`. Wired into Lead Detail, Order Detail, `/admin/certificates`.
-
-### Phase 9 — Part I · Email Templates Seed
-
-Migration inserting all 12 templates with `ON CONFLICT DO NOTHING`. Triggerable from SuperAdmin button.
-
-### Phase 10 — Part J · Broken/Dead Button Sweep
-
-Items 1-9 (Send Reminder, missing-doc checkboxes, bulk delete modal, role-change save flow, delete-service live-order warning, submission emails, document emails, certificate picker, PayU refund clean-return).
-
-### Phase 11 — Part K · Security Hardening (remaining P0/P1)
-
-Rate limiter, hardcoded Gmail removal (`ADMIN_NOTIFICATION_EMAIL`), `bulkExportLeads` role check, `payments.idempotency_key` UNIQUE, missing indexes, Customer 360 server-side filter, closure cron Bearer auth.
-
-### Phase 12 — Part L · Employee Management
-
-Cards grid, add-employee drawer, reset-password button.
-
-### Phase 13 — Part M · Customer 360 fixes
-
-Certificates tab, merged activity timeline, onboarding submissions tab, invoice PDF download.
-
-### Phase 14 — Part N · Certificates page redesign
-
-Application picker, list with resend, filters.
-
-### Phase 15 — Part O · Reusable Component Audit
-
-Ensure all 10 catalog components exist and are used.
-
-### Phase 16 — Part P · Final wiring checklist verification
-
-Walk the 20-blocker table; each row marked DONE / DEFERRED with evidence.
-
----
-
-**Deferred (Part P explicitly):** onboarding token auth (#2), ops dashboard DB aggregation (#6), CCAvenue HMAC (#4 — warning banner only).
-
-Approve and I start Phase 1 (Part A) immediately.
+- Typecheck clean (`tsc --noEmit` via build).
+- Manual: hit `/success/<leadCode>` for a paid lead → rich 60s countdown shows from t=0, redirects to onboarding at t=60. For a not-yet-confirmed lead → countdown shows from t=0, last step holds until webhook lands or until pending-redirect fires.
