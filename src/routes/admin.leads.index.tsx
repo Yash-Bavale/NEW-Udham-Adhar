@@ -441,6 +441,23 @@ function LeadsPage() {
         staff={staffData?.profiles ?? []}
         onCreated={refresh}
       />
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={`Delete ${selected.size} lead${selected.size === 1 ? "" : "s"}?`}
+        description={
+          <div className="space-y-2">
+            <p>This permanently removes the selected lead{selected.size === 1 ? "" : "s"} and all associated notes.</p>
+            <p className="text-xs text-amber-700">Leads with linked payments will be skipped automatically.</p>
+          </div>
+        }
+        confirmWord="DELETE"
+        confirmLabel="Delete leads"
+        danger
+        loading={busy}
+        onConfirm={performBulkDelete}
+      />
     </div>
   );
 }
