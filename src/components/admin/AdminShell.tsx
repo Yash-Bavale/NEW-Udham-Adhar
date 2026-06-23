@@ -123,7 +123,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       ...g,
       items: g.items.filter((it) =>
         (!it.module || role.can(it.module)) &&
-        (!it.requireRole || role.has(it.requireRole)),
+        (!it.requireRole || role.has(it.requireRole)) &&
+        (!it.requireAnyRole || it.requireAnyRole.some((r) => role.has(r))),
       ),
     }))
     .filter((g) => g.items.length > 0);
