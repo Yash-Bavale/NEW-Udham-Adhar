@@ -214,3 +214,40 @@ export const getMyStaffRoles = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { userId, roles: (data ?? []).map((r) => r.role as string) };
   });
+
+const ResetPasswordInput = z.object({
+  user_id: z.string().uuid(),
+  new_password: z.string().min(8, "Password must be at least 8 characters").max(72),
+});
+
+/** Super-admin only: set an employee's password directly. */
+export const resetEmployeePassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ResetPasswordInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const { data: roles, error: rErr } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "super_admin");
+    if (rErr) throw new Error(rErr.message);
+    if (!roles || roles.length === 0) throw new Error("Forbidden: super_admin only.");
+
+    const { error: uErr } = await admin.auth.admin.updateUserById(data.user_id, {
+      password: data.new_password,
+    });
+    if (uErr) throw new Error(uErr.message);
+
+    try {
+      await admin.from("audit_logs").insert({
+        entity_type: "user",
+        entity_id: data.user_id,
+        action: "password_reset",
+        actor_id: context.userId,
+        new_value: { method: "super_admin_direct_set" },
+      } as never);
+    } catch { /* audit best-effort */ }
+
+    return { ok: true };
+  });
