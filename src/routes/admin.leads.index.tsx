@@ -202,6 +202,7 @@ function LeadsPage() {
           <SavedFiltersMenu
             currentFilter={filter}
             onApply={(f) => {
+              setSearchInput(f.search ?? "");
               setSearch(f.search ?? "");
               setStatus(f.status ?? "");
               setPage(1);
