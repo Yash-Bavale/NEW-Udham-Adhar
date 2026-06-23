@@ -1,35 +1,61 @@
-## Goal
+## 1. Super-admin password reset for employees
 
-After a successful payment or any payment status (pending, failed), the user should land on a 1-minute (60s) countdown screen that visually matches the 30s "processing" screen shown after the lead form is submitted (`src/routes/processing.$leadCode.tsx`).
+**New server fn** `resetEmployeePassword` in `src/lib/crm/users-admin.functions.ts`:
+- Middleware: `requireSupabaseAuth`.
+- Input: `{ user_id: uuid, new_password: string (min 8, max 72) }`.
+- Guard: caller must hold `super_admin` (tighter than the existing `assertAdmin` which also lets `admin` through — password reset is super-only).
+- Calls `supabaseAdmin.auth.admin.updateUserById(user_id, { password })`.
+- Writes an `audit_logs` row: `entity_type='user', action='password_reset', actor_id=caller`. Never logs the password itself.
 
-## Current state
+**UI in `src/routes/admin.employees.tsx`:**
+- Add a "Reset password" item in the per-row action menu (next to Edit / Activate-Deactivate), visible only when `useRole().has('super_admin')`.
+- Opens a dialog: new password + confirm password fields, show/hide toggle, client-side validation (min 8, must match). Submit calls the new server fn, toasts success, closes.
+- No email is sent — super-admin tells the employee out-of-band.
 
-- `src/routes/success.$leadCode.tsx` already has:
-  - `TOTAL_SECONDS = 60`
-  - The same concentric-ring loader, step pips, animated progress bar, and trust footer as `processing.$leadCode.tsx` (only color accent differs: emerald vs amber, which is intentional for the "payment successful" context).
-- **Problem:** the redesigned countdown only renders **after** `confirmed === true`. Until the polling loop confirms the webhook landed (can be 2–10+ seconds, up to 30s), the user sees a small plain spinner with "Confirming payment…". That gap is the part that doesn't match the post-lead experience, which jumps straight into the rich countdown.
+## 2. Surface every built admin page in the sidebar
 
-## Change
+**`src/components/admin/AdminShell.tsx` — rewrite `NAV`** into clearer groups so every existing route appears:
 
-Render the redesigned 60s countdown UI **immediately** on mount, while the confirmation poll runs in the background. The auto-redirect to `/onboarding/$leadCode` waits for **both** conditions: countdown finished **and** payment confirmed.
+```text
+Overview      Dashboard, My Dashboard, Pipeline, Activity, Notifications
+Sales         Leads, Customers, Orders, Applications, Documents, Submissions, Review
+Service       Complaints, Support Tickets, Tasks, Services
+Finance       Invoices, Payments, Gateways, Finance (GST / Settlements)
+Insights      Reports, Audit Log, SEO
+Admin         Employees, Users & Roles, Certificates, Email System,
+              Email Templates, WhatsApp Templates, Super Admin, Settings
+```
 
-### Behavior rules
+All entries are plain `Link`s — no new routes, just nav items pointing at routes that already exist (`/admin/my-work`, `/admin/pipeline`, `/admin/activity`, `/admin/notifications`, `/admin/applications`, `/admin/submissions`, `/admin/review`, `/admin/certificates`, `/admin/gateways`, `/admin/finance`, `/admin/audit`, `/admin/seo`, `/admin/users`, `/admin/super`).
 
-1. On mount: start the 60s countdown immediately and start polling `getApplicationSummary` in parallel 
-2. Step labels stay as today; the first step subtitle changes from "Confirming transaction with bank" to a wording that works both before and after confirmation (e.g. keep "Confirming transaction with bank" — it already reads correctly during the wait).
-3. When countdown hits 0:
-  - If `confirmed === true` → redirect to `/onboarding/$leadCode` (current behavior).
-  - If still not confirmed → hold on the final step ("Almost ready") with a subtle "Finalising confirmation…" sub-label and keep polling; redirect as soon as confirmed.
-4. If the 15-attempt poll exhausts without confirmation → redirect to `/payment-pending/$leadCode` (current behavior, unchanged).
-5. Error state (server fn throws) → same red error card as today.
+The Super Admin entry is rendered only when `useRole().has('super_admin')`; everything else is unconditional.
 
-### Files
+## 3. Open module access to all staff roles
 
-- `src/routes/success.$leadCode.tsx` — restructure the render so the countdown card is the default view; remove the standalone "Confirming payment…" spinner block; gate the final navigation on `confirmed && elapsed >= TOTAL_SECONDS`.
+**`src/lib/roles.ts` — broaden `ACCESS_MATRIX`** so every role in `ASSIGNABLE_ROLES` gets at least `read` (or `full` where it already had `full`) on every module: dashboard, leads, orders, payments, invoices, customers, documents, complaints, tickets, tasks, reports, employees, email_templates, audit_log.
 
-No other files change. No new components, no design-token changes, no schema or server-fn changes.
+- `super_admin`, `admin`, `manager`: keep `full` everywhere.
+- `executive`, `support`, `accounts`, `finance`, `operations`: upgrade `none` cells to `read` so the sidebar shows the link and the page renders, while `full` cells stay `full`.
+
+Pages that already perform their own per-action authorisation (refunds, role grants, password reset, super-admin overview) keep those checks — broadening the matrix only opens visibility, not destructive actions.
+
+## 4. Out of scope
+
+- No new pages or routes.
+- No schema migration.
+- No nav copy/icon overhaul beyond regrouping; same lucide icons reused.
+- Password reset email flow not added (per choice "Set a new password directly").
+
+## Files touched
+
+- `src/lib/crm/users-admin.functions.ts` — add `resetEmployeePassword`.
+- `src/routes/admin.employees.tsx` — row action + dialog.
+- `src/components/admin/AdminShell.tsx` — expanded `NAV` groups.
+- `src/lib/roles.ts` — widened `ACCESS_MATRIX`.
 
 ## Verification
 
-- Typecheck clean (`tsc --noEmit` via build).
-- Manual: hit `/success/<leadCode>` for a paid lead → rich 60s countdown shows from t=0, redirects to onboarding at t=60. For a not-yet-confirmed lead → countdown shows from t=0, last step holds until webhook lands or until pending-redirect fires.
+- Sign in as super-admin → /admin/employees → reset a test employee's password → sign in as that employee with new password.
+- Sign in as `executive` (or `support`) → confirm every sidebar group is visible and every linked page loads without an "unauthorized" flash.
+- Sign in as `admin` (non-super) → "Reset password" action is hidden.
+- Typecheck/build clean.

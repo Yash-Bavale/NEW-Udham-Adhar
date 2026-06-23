@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { UserCog, UserPlus, Pencil, Power, Search } from "lucide-react";
+import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
-  listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive,
+  listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
 } from "@/lib/crm/users-admin.functions";
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 import { useRole } from "@/hooks/useRole";
@@ -104,16 +104,19 @@ function EmployeesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
+  const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
 
   const canManage = role.access("employees") === "full";
-  if (!role.loading && !canManage) {
+  const canSee = role.access("employees") !== "none";
+  const isSuper = role.has("super_admin");
+  if (!role.loading && !canSee) {
     return (
       <SectionCard>
         <div className="p-8 text-center">
           <UserCog className="size-10 mx-auto mb-3" style={{ color: "var(--admin-fg-subtle)" }} />
           <div className="text-sm font-medium">You don't have access to Employees.</div>
           <div className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>
-            Ask a super admin to grant you the admin role.
+            Ask a super admin to grant you access.
           </div>
         </div>
       </SectionCard>
@@ -144,9 +147,11 @@ function EmployeesPage() {
               <Input value={query} onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, email, mobile, role…" className="pl-9" />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-              <UserPlus className="size-4" /> Add Employee
-            </Button>
+            {canManage && (
+              <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+                <UserPlus className="size-4" /> Add Employee
+              </Button>
+            )}
           </div>
 
           <SectionCard>
@@ -199,14 +204,28 @@ function EmployeesPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="inline-flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setEditRow(u)}>
-                        <Pencil className="size-3.5" /> Edit
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 gap-1"
-                        style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
-                        onClick={() => setDeactivateRow(u)}>
-                        <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
-                      </Button>
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setEditRow(u)}>
+                          <Pencil className="size-3.5" /> Edit
+                        </Button>
+                      )}
+                      {isSuper && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: "#1d4ed8" }}
+                          onClick={() => setResetPwRow(u)}>
+                          <KeyRound className="size-3.5" /> Reset Password
+                        </Button>
+                      )}
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
+                          onClick={() => setDeactivateRow(u)}>
+                          <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                      )}
+                      {!canManage && !isSuper && (
+                        <span className="text-xs" style={{ color: "var(--admin-fg-subtle)" }}>—</span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -224,6 +243,8 @@ function EmployeesPage() {
 
           <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
             onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+
+          <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
         </TabsContent>
 
         <TabsContent value="assignment" className="mt-4">
@@ -416,4 +437,82 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 import { useEffect } from "react";
 function useMemoOnRow(row: Row | null, cb: (r: Row) => void) {
   useEffect(() => { if (row) cb(row); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [row?.id]);
+}
+
+function ResetPasswordDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const fn = useServerFn(resetEmployeePassword);
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!row) return null;
+
+  function reset() { setPw(""); setConfirm(""); setShow(false); setErr(null); }
+
+  async function submit() {
+    if (!row) return;
+    setErr(null);
+    if (pw.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    if (pw !== confirm) { setErr("Passwords do not match."); return; }
+    setBusy(true);
+    try {
+      await fn({ data: { user_id: row.id, new_password: pw } });
+      toast.success(`Password reset for ${row.email}. Share it with the employee securely.`);
+      reset();
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password — {row.full_name ?? row.email}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Field label="Email"><Input value={row.email} disabled /></Field>
+          <Field label="New password">
+            <div className="relative">
+              <Input
+                type={show ? "text" : "password"}
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                aria-label={show ? "Hide password" : "Show password"}
+              >
+                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </Field>
+          <Field label="Confirm new password">
+            <Input
+              type={show ? "text" : "password"}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+            />
+          </Field>
+          {err && <div className="text-[12px]" style={{ color: "#b91c1c" }}>{err}</div>}
+          <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+            The employee will be able to sign in immediately with the new password. No email is sent — share it through a secure channel.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { reset(); onClose(); }} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy}>{busy ? "Resetting…" : "Set Password"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

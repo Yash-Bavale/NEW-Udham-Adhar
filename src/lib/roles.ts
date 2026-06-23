@@ -43,42 +43,51 @@ export type Module =
   | "documents" | "complaints" | "tickets" | "tasks" | "reports"
   | "employees" | "email_templates" | "audit_log";
 
-// Per-spec matrix. Cells default to "none".
+const ALL_MODULES: Module[] = [
+  "dashboard", "leads", "orders", "payments", "invoices", "customers",
+  "documents", "complaints", "tickets", "tasks", "reports",
+  "employees", "email_templates", "audit_log",
+];
+
+function fullAll(): Partial<Record<Module, Access>> {
+  return Object.fromEntries(ALL_MODULES.map((m) => [m, "full" as Access])) as Partial<Record<Module, Access>>;
+}
+
+// Start from `read` on every module, then upgrade specific modules to `full`.
+function readWithFull(...fullModules: Module[]): Partial<Record<Module, Access>> {
+  const base: Record<Module, Access> = Object.fromEntries(
+    ALL_MODULES.map((m) => [m, "read" as Access]),
+  ) as Record<Module, Access>;
+  for (const m of fullModules) base[m] = "full";
+  return base;
+}
+
+// Every staff role now sees every module (at least read). Per-action
+// authorisation (refunds, role grants, password reset, super-admin overview)
+// still runs inside the relevant handlers.
 export const ACCESS_MATRIX: Record<Role, Partial<Record<Module, Access>>> = {
-  super_admin: {
-    dashboard: "full", leads: "full", orders: "full", payments: "full", invoices: "full",
-    customers: "full", documents: "full", complaints: "full", tickets: "full", tasks: "full",
-    reports: "full", employees: "full", email_templates: "full", audit_log: "full",
-  },
-  admin: {
-    dashboard: "full", leads: "full", orders: "full", payments: "full", invoices: "full",
-    customers: "full", documents: "full", complaints: "full", tickets: "full", tasks: "full",
-    reports: "full", employees: "full", email_templates: "full", audit_log: "full",
-  },
-  manager: {
-    dashboard: "full", leads: "full", orders: "full", payments: "read", invoices: "read",
-    customers: "full", documents: "full", complaints: "full", tickets: "full", tasks: "full",
-    reports: "full", email_templates: "read",
-  },
-  executive: {
-    dashboard: "own", leads: "assigned", orders: "assigned", customers: "assigned",
-    documents: "assigned", tasks: "own",
-  },
-  support: {
-    complaints: "full", tickets: "full", tasks: "own",
-  },
-  accounts: {
-    orders: "read", payments: "full", invoices: "full", reports: "finance_tab",
-  },
-  finance: {
-    dashboard: "revenue_only", orders: "read", payments: "full", invoices: "full",
-    reports: "finance_tab",
-  },
-  operations: {
-    // legacy alias, treat like manager
-    dashboard: "full", leads: "full", orders: "full", customers: "full",
-    documents: "full", complaints: "full", tickets: "full", tasks: "full",
-  },
+  super_admin: fullAll(),
+  admin: fullAll(),
+  manager: readWithFull(
+    "dashboard", "leads", "orders", "customers", "documents",
+    "complaints", "tickets", "tasks", "reports",
+  ),
+  executive: readWithFull(
+    "leads", "orders", "customers", "documents", "tasks",
+  ),
+  support: readWithFull(
+    "complaints", "tickets", "tasks",
+  ),
+  accounts: readWithFull(
+    "payments", "invoices",
+  ),
+  finance: readWithFull(
+    "payments", "invoices", "reports",
+  ),
+  operations: readWithFull(
+    "dashboard", "leads", "orders", "customers",
+    "documents", "complaints", "tickets", "tasks",
+  ),
 };
 
 export function bestAccess(roles: string[], module: Module): Access {
