@@ -211,7 +211,10 @@ function LeadDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="onboarding">
+        <TabsContent value="onboarding" className="space-y-5">
+          {applications && applications.length > 0 && (
+            <FormSubmissionPanel applicationId={applications[0].id} />
+          )}
           <AdminOnboardingPanel leadId={leadId} />
         </TabsContent>
 
