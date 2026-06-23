@@ -116,7 +116,13 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const role = useRole();
   const visibleNav: NavGroup[] = NAV
-    .map((g) => ({ ...g, items: g.items.filter((it) => !it.module || role.can(it.module)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) =>
+        (!it.module || role.can(it.module)) &&
+        (!it.requireRole || role.has(it.requireRole)),
+      ),
+    }))
     .filter((g) => g.items.length > 0);
   const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -163,6 +169,12 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
               {gi > 0 && (
                 <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
               )}
+              <div
+                className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider"
+                style={{ color: "var(--admin-sidebar-muted)" }}
+              >
+                {group.label}
+              </div>
               <div className="space-y-0.5">
                 {group.items.map((n) => {
                   const active = isActive(n.to);
