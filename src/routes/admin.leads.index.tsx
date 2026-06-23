@@ -41,6 +41,7 @@ function LeadsPage() {
   const staffFn = useServerFn(listStaff);
 
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
@@ -53,8 +54,15 @@ function LeadsPage() {
   const [defaultApplied, setDefaultApplied] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const role = useRole();
+
+  // Debounce the search input → committed `search` (300ms).
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
