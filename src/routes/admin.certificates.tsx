@@ -152,6 +152,11 @@ function CertificatesPage() {
                   <td className="py-3 px-4 text-right space-x-1">
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handlePreview(c.id)}><Eye className="w-3 h-3 mr-1" />View</Button>
                     {!c.delivered_at && <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-600" onClick={() => handleDeliver(c.id)}><Send className="w-3 h-3 mr-1" />Deliver</Button>}
+                    {c.delivered_at && c.application_id && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600" onClick={() => handleResend(c.application_id)}>
+                        <RefreshCw className="w-3 h-3 mr-1" />Resend
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
