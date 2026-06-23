@@ -164,61 +164,140 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           payment_date: newStatus === "paid" ? new Date().toISOString() : null,
           webhook_response: rawPayload,
           raw_response: { mihpayid, bankrefnum, ...fields, verified_payment: safeVerifiedPayment } as any,
-        }).eq("id", payment.id);
+          payu_mihpayid: mihpayid || null,
+          payu_mode: get("mode") || null,
+          payu_bank_ref_num: bankrefnum || null,
+          payu_net_amount_debit: get("net_amount_debit") ? Number(get("net_amount_debit")) : null,
+          payu_error_message: get("error_Message") || get("field9") || null,
+          webhook_received_at: new Date().toISOString(),
+          is_test_payment: (await import("@/lib/payments/payu.server")).PAYU_MODE !== "live",
+        } as any).eq("id", payment.id);
         if (paymentUpdateError) {
           console.error("[payu] payment update failed", { txnid: fields.txnid, error: paymentUpdateError });
+          await logWebhookError("payu", paymentUpdateError.message, rawPayload);
           return isBrowser
             ? redirectToPending(get("udf3") || fields.txnid)
             : new Response("payment-update-failed", { status: 200 });
         }
 
         if (newStatus === "paid") {
-          const { error: leadUpdateError } = await supabaseAdmin.from("leads")
-            .update({ status: "payment_successful" })
-            .eq("id", payment.lead_id);
-          if (leadUpdateError) console.error("[payu] lead update failed", { txnid: fields.txnid, leadId: payment.lead_id, error: leadUpdateError });
-
-          if (payment.application_id) {
-            const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
-            const tr = await transitionStatusSystem({
-              applicationId: payment.application_id,
-              toStatus: "payment_received",
-              reason: "PayU webhook payment success",
-              metadata: { txnid: fields.txnid, mihpayid },
-            });
-            if (!tr.ok) console.error("[payu] transition failed", { txnid: fields.txnid, applicationId: payment.application_id, reason: tr.reason });
-          }
-
-          try { await generateInvoiceInternal(payment.id); }
-          catch (e) { console.error("[payu] invoice generation failed", e); }
-
-          // Send welcome+receipt+onboarding email (best-effort, never blocks)
           try {
-            const { data: leadRow } = await supabaseAdmin
-              .from("leads")
-              .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
-              .eq("id", payment.lead_id)
-              .maybeSingle();
-            if (leadRow?.email && leadRow.lead_code) {
-              const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-              const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
-              await enqueueFromTemplateInternal(
-                "payment_success",
-                leadRow.email,
-                {
+            // 1. Auto-create application if missing (mirrors spec 4A-1).
+            let applicationId = payment.application_id as string | null;
+            if (!applicationId) {
+              const { data: lead } = await supabaseAdmin
+                .from("leads")
+                .select("id, service_id, customer_id, assigned_to")
+                .eq("id", payment.lead_id)
+                .maybeSingle();
+              const { data: createdApp, error: appErr } = await supabaseAdmin
+                .from("applications")
+                .insert({
+                  lead_id: payment.lead_id,
+                  customer_id: lead?.customer_id ?? null,
+                  service_id: lead?.service_id ?? null,
+                  assigned_to: lead?.assigned_to ?? null,
+                  fulfillment_status: "order_received" as any,
+                } as any)
+                .select("id")
+                .single();
+              if (appErr) {
+                console.error("[payu] application auto-create failed", appErr);
+                await logWebhookError("payu", `app auto-create: ${appErr.message}`, rawPayload);
+              } else if (createdApp) {
+                applicationId = createdApp.id;
+                await supabaseAdmin.from("payments").update({ application_id: applicationId } as any).eq("id", payment.id);
+              }
+            }
+
+            // 2. Flip legacy + v2 lead status to payment_successful.
+            const { error: leadUpdateError } = await supabaseAdmin.from("leads")
+              .update({ status: "payment_successful", lead_status_v2: "payment_successful" } as any)
+              .eq("id", payment.lead_id);
+            if (leadUpdateError) console.error("[payu] lead update failed", { txnid: fields.txnid, leadId: payment.lead_id, error: leadUpdateError });
+
+            // 3. Mark payment_links for this lead as paid.
+            await supabaseAdmin
+              .from("payment_links" as any)
+              .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: payment.id } as any)
+              .eq("lead_id", payment.lead_id)
+              .eq("status", "pending");
+
+            // 4. Move application's fulfillment_status forward.
+            if (applicationId) {
+              const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
+              const tr = await transitionStatusSystem({
+                applicationId,
+                toStatus: "payment_received",
+                reason: "PayU webhook payment success",
+                metadata: { txnid: fields.txnid, mihpayid },
+              });
+              if (!tr.ok) console.error("[payu] transition failed", { txnid: fields.txnid, applicationId, reason: tr.reason });
+            }
+
+            // 5. Generate invoice (PDF + storage).
+            try { await generateInvoiceInternal(payment.id); }
+            catch (e) {
+              console.error("[payu] invoice generation failed", e);
+              await logWebhookError("payu", `invoice: ${e instanceof Error ? e.message : "unknown"}`, rawPayload);
+            }
+
+            // 6. Send order_confirmation + welcome_and_form_link (30s delay).
+            try {
+              const { data: leadRow } = await supabaseAdmin
+                .from("leads")
+                .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+                .eq("id", payment.lead_id)
+                .maybeSingle();
+              if (leadRow?.email && leadRow.lead_code) {
+                const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+                const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+                const commonVars = {
                   name: leadRow.name ?? "",
+                  customer_name: leadRow.name ?? "",
                   lead_code: leadRow.lead_code,
+                  leadCode: leadRow.lead_code,
+                  order_number: leadRow.lead_code,
                   service: leadRow.service ?? "",
+                  service_name: leadRow.service ?? "",
                   base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
                   gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
                   total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                  amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                  form_link: onboardingUrl,
                   onboarding_url: onboardingUrl,
                   support_email: "help@businesshelpservices.com",
-                },
-                { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: payment.application_id ?? undefined },
-              );
+                };
+
+                // Order confirmation — immediate.
+                await enqueueFromTemplateInternal(
+                  "order_confirmation",
+                  leadRow.email,
+                  commonVars,
+                  { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: applicationId ?? undefined },
+                );
+
+                // Welcome + form link — 30s later so it lands after the receipt.
+                await enqueueFromTemplateInternal(
+                  "welcome_and_form_link",
+                  leadRow.email,
+                  commonVars,
+                  { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: applicationId ?? undefined, delaySeconds: 30 },
+                );
+
+                // 7. Advance lead to welcome_mail_sent now that the welcome email is queued.
+                await supabaseAdmin.from("leads")
+                  .update({ lead_status_v2: "welcome_mail_sent" } as any)
+                  .eq("id", payment.lead_id);
+              }
+            } catch (e) {
+              console.error("[payu] post-payment email enqueue failed", e);
+              await logWebhookError("payu", `emails: ${e instanceof Error ? e.message : "unknown"}`, rawPayload);
             }
-          } catch (e) { console.error("[payu] payment_success email enqueue failed", e); }
+          } catch (e) {
+            console.error("[payu] post-payment workflow failed", e);
+            await logWebhookError("payu", `post-paid: ${e instanceof Error ? e.message : "unknown"}`, rawPayload);
+          }
 
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
@@ -227,8 +306,13 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
 
         if (newStatus === "failed") {
           await supabaseAdmin.from("leads")
-            .update({ status: "payment_pending" })
+            .update({ status: "payment_pending", lead_status_v2: "payment_failed" } as any)
             .eq("id", payment.lead_id);
+          await supabaseAdmin
+            .from("payment_links" as any)
+            .update({ status: "failed" } as any)
+            .eq("lead_id", payment.lead_id)
+            .eq("status", "pending");
           return isBrowser
             ? redirectToFailure(get("udf3") || fields.txnid, "Payment failed")
             : new Response("OK", { status: 200 });
@@ -241,6 +325,19 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
     },
   },
 });
+
+async function logWebhookError(webhookType: string, errorMessage: string, payload: Record<string, unknown>) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("webhook_error_log" as any).insert({
+      webhook_type: webhookType,
+      error_message: errorMessage.slice(0, 2000),
+      raw_payload: payload as any,
+    } as any);
+  } catch (e) {
+    console.error("[webhook] error-log insert failed", e);
+  }
+}
 
 const APP_ORIGIN = process.env.APP_BASE_URL ||
   process.env.PUBLIC_SITE_URL ||

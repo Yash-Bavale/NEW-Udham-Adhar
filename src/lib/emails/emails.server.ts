@@ -19,18 +19,25 @@ export async function enqueueEmailInternal(input: {
   variables?: Record<string, unknown>;
   leadId?: string | null;
   applicationId?: string | null;
+  delaySeconds?: number;
 }) {
-  const { error } = await supabaseAdmin.from("email_queue").insert({
+  const row: Record<string, unknown> = {
     template_code: input.templateCode ?? null,
     to_email: input.toEmail.toLowerCase().trim(),
     to_name: input.toName ?? null,
     subject: input.subject,
     body_html: input.bodyHtml,
     body_text: input.bodyText ?? null,
-    variables: (input.variables ?? {}) as never,
+    variables: input.variables ?? {},
     lead_id: input.leadId ?? null,
     application_id: input.applicationId ?? null,
-  });
+  };
+  if (input.delaySeconds && input.delaySeconds > 0) {
+    const when = new Date(Date.now() + input.delaySeconds * 1000).toISOString();
+    row.scheduled_at = when;
+    row.next_attempt_at = when;
+  }
+  const { error } = await supabaseAdmin.from("email_queue").insert(row as never);
   if (error) throw new Error(error.message);
 }
 
@@ -39,7 +46,7 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   variables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number },
 ) {
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
@@ -60,6 +67,7 @@ export async function enqueueFromTemplateInternal(
     variables,
     leadId: opts?.leadId ?? null,
     applicationId: opts?.applicationId ?? null,
+    delaySeconds: opts?.delaySeconds,
   });
 }
 
