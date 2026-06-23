@@ -84,6 +84,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     .filter((g) => g.items.length > 0);
   const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { unseen: newLeads } = useNewLeadsWatcher();
 
   useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
 
