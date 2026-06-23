@@ -44,7 +44,8 @@ function AdminLandingPage() {
 }
 
 function pickLanding(roles: string[]): string {
-  if (roles.includes("super_admin") || roles.includes("admin")) return "/admin/dashboard";
+  if (roles.includes("super_admin")) return "/admin/super";
+  if (roles.includes("admin")) return "/admin/dashboard";
   if (roles.includes("finance") || roles.includes("accounts")) return "/admin/finance";
   if (roles.includes("operations") || roles.includes("support")) return "/admin/my-work";
   return "/admin/dashboard";

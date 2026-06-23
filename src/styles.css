@@ -39,6 +39,16 @@
   --color-form-header: var(--form-header);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
+
+  /* BHS premium palette (Part A) */
+  --color-bhs-navy: var(--bhs-navy);
+  --color-bhs-gold: var(--bhs-gold);
+  --color-bhs-cream: var(--bhs-cream);
+  --color-status-new: var(--status-new);
+  --color-status-process: var(--status-process);
+  --color-status-done: var(--status-done);
+  --color-status-urgent: var(--status-urgent);
+  --color-status-docs: var(--status-docs);
 }
 
 :root {
@@ -54,6 +64,16 @@
   --nav-bg: oklch(0.94 0.025 244); /* light blue strip */
   --disclaimer-bg: oklch(0.38 0.1 251); /* mid-dark blue marquee */
   --form-header: #1A4171;
+
+  /* BHS premium tokens (Part A — Final_CRM spec) */
+  --bhs-navy:    #0F1F3D;
+  --bhs-gold:    #C9973A;
+  --bhs-cream:   #FAF8F4;
+  --status-new:     #3B82F6;
+  --status-process: #F59E0B;
+  --status-done:    #10B981;
+  --status-urgent:  #EF4444;
+  --status-docs:    #8B5CF6;
 
   --primary: var(--brand-navy);
   --primary-foreground: oklch(1 0 0);

@@ -11,6 +11,7 @@ import {
   Send, Calendar, LifeBuoy, Activity as ActivityIcon, Bell,
 } from "lucide-react";
 import { getOpsDashboard, markFollowUpComplete, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
+import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({
@@ -301,12 +302,35 @@ function ServicePipeline({ data, loading }: { data?: OpsDashboardData; loading: 
 /* ---------------- 4. Documents Pending ---------------- */
 
 function DocumentsPending({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
+  const send = useServerFn(queueDocumentReminder);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const onSend = async (applicationId: string) => {
+    setBusyId(applicationId);
+    try {
+      const res = await send({ data: { applicationId } });
+      setToast(`Reminder queued to ${res.queuedTo}`);
+    } catch (e) {
+      setToast((e as Error).message);
+    } finally {
+      setBusyId(null);
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
+
   return (
     <SectionCard
       title="Documents Pending"
       action={<Link to="/admin/review" className="text-xs" style={{ color: "var(--admin-accent)" }}>Document review →</Link>}
     >
       <div className="p-4 space-y-2 max-h-[420px] overflow-y-auto">
+        {toast && (
+          <div className="rounded-md border px-3 py-2 text-[12px]"
+               style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)", color: "var(--admin-fg)" }}>
+            {toast}
+          </div>
+        )}
         {loading ? (
           <TableSkeleton rows={4} cols={2} />
         ) : (data?.documentsPending.length ?? 0) === 0 ? (
@@ -321,18 +345,20 @@ function DocumentsPending({ data, loading }: { data?: OpsDashboardData; loading:
                   <div className="text-[11px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{r.service ?? "—"}</div>
                 </div>
                 <button
-                  className="shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]"
+                  onClick={() => onSend(r.id)}
+                  disabled={busyId === r.id}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] hover:bg-[var(--admin-surface-2)] disabled:opacity-50"
                   style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-                  title="Send reminder (coming soon)"
+                  title="Queue a docs_required_reminder email to the customer"
                 >
-                  <Send className="size-3" /> Send reminder
+                  <Send className="size-3" /> {busyId === r.id ? "Sending…" : "Send reminder"}
                 </button>
               </div>
               {r.missing_docs.length > 0 && (
                 <ul className="mt-2 grid grid-cols-2 gap-1 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
                   {r.missing_docs.map((d) => (
                     <li key={d} className="flex items-center gap-1">
-                      <input type="checkbox" disabled className="accent-[var(--admin-primary)]" />
+                      <span className="size-3 inline-block rounded-sm border" style={{ borderColor: "var(--admin-border-strong)" }} />
                       {d}
                     </li>
                   ))}
@@ -345,6 +371,7 @@ function DocumentsPending({ data, loading }: { data?: OpsDashboardData; loading:
     </SectionCard>
   );
 }
+
 
 /* ---------------- 5. Complaint Tracker ---------------- */
 

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WwwUdyamregistrationGovInRouteImport } from './routes/www-udyamregistration-gov-in'
 import { Route as WwwUdyamregistrationRouteImport } from './routes/www-udyamregistration'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
+import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as UdyogAadharUpdateRouteImport } from './routes/udyog-aadhar-update'
 import { Route as UdyogAadharRegistrationOnlineRouteImport } from './routes/udyog-aadhar-registration-online'
 import { Route as UdyogAadharRegistration2RouteImport } from './routes/udyog-aadhar-registration-2'
@@ -189,6 +190,7 @@ import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whats
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
+import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
@@ -260,6 +262,11 @@ const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
 const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
   id: '/update-udyam-certificate',
   path: '/update-udyam-certificate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UnauthorizedRoute = UnauthorizedRouteImport.update({
+  id: '/unauthorized',
+  path: '/unauthorized',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UdyogAadharUpdateRoute = UdyogAadharUpdateRouteImport.update({
@@ -1179,6 +1186,11 @@ const AdminTasksRoute = AdminTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSuperRoute = AdminSuperRouteImport.update({
+  id: '/super',
+  path: '/super',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSubmissionsRoute = AdminSubmissionsRouteImport.update({
   id: '/submissions',
   path: '/submissions',
@@ -1641,6 +1653,7 @@ export interface FileRoutesByFullPath {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -1670,6 +1683,7 @@ export interface FileRoutesByFullPath {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -1878,6 +1892,7 @@ export interface FileRoutesByTo {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -1905,6 +1920,7 @@ export interface FileRoutesByTo {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -2115,6 +2131,7 @@ export interface FileRoutesById {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -2144,6 +2161,7 @@ export interface FileRoutesById {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -2355,6 +2373,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -2384,6 +2403,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -2592,6 +2612,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -2619,6 +2640,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -2828,6 +2850,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -2857,6 +2880,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -3067,6 +3091,7 @@ export interface RootRouteChildren {
   UdyogAadharRegistration2Route: typeof UdyogAadharRegistration2Route
   UdyogAadharRegistrationOnlineRoute: typeof UdyogAadharRegistrationOnlineRoute
   UdyogAadharUpdateRoute: typeof UdyogAadharUpdateRoute
+  UnauthorizedRoute: typeof UnauthorizedRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
@@ -3118,6 +3143,13 @@ declare module '@tanstack/react-router' {
       path: '/update-udyam-certificate'
       fullPath: '/update-udyam-certificate'
       preLoaderRoute: typeof UpdateUdyamCertificateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/unauthorized': {
+      id: '/unauthorized'
+      path: '/unauthorized'
+      fullPath: '/unauthorized'
+      preLoaderRoute: typeof UnauthorizedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/udyog-aadhar-update': {
@@ -4359,6 +4391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTasksRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/super': {
+      id: '/admin/super'
+      path: '/super'
+      fullPath: '/admin/super'
+      preLoaderRoute: typeof AdminSuperRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/submissions': {
       id: '/admin/submissions'
       path: '/submissions'
@@ -4893,6 +4932,7 @@ interface AdminRouteChildren {
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
+  AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
   AdminTicketsRoute: typeof AdminTicketsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
@@ -4927,6 +4967,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminServicesRoute: AdminServicesRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
+  AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
   AdminTicketsRoute: AdminTicketsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
@@ -5106,6 +5147,7 @@ const rootRouteChildren: RootRouteChildren = {
   UdyogAadharRegistration2Route: UdyogAadharRegistration2Route,
   UdyogAadharRegistrationOnlineRoute: UdyogAadharRegistrationOnlineRoute,
   UdyogAadharUpdateRoute: UdyogAadharUpdateRoute,
+  UnauthorizedRoute: UnauthorizedRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
