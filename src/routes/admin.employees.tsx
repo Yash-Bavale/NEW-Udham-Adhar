@@ -243,6 +243,8 @@ function EmployeesPage() {
 
           <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
             onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+
+          <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
         </TabsContent>
 
         <TabsContent value="assignment" className="mt-4">
