@@ -32,12 +32,40 @@ export const listStaffUsers = createServerFn({ method: "GET" })
     });
     if (uErr) throw new Error(uErr.message);
 
-    const [{ data: roles, error: rErr }, { data: profiles, error: pErr }] = await Promise.all([
+    // Month boundary (UTC ok — used only for "this month" counters)
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const monthStartIso = monthStart.toISOString();
+
+    const [
+      { data: roles, error: rErr },
+      { data: profiles, error: pErr },
+      { data: leadsAssigned, error: laErr },
+      { data: appsAssigned, error: aaErr },
+      { data: appsCompletedMonth, error: cmErr },
+      { data: appsCompletedAll, error: caErr },
+    ] = await Promise.all([
       admin.from("user_roles").select("user_id, role"),
       admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email"),
+      admin.from("leads").select("assigned_to, status, created_at, updated_at"),
+      admin.from("applications").select("assigned_to, application_status"),
+      admin
+        .from("applications")
+        .select("assigned_to, updated_at, application_status")
+        .eq("application_status", "completed")
+        .gte("updated_at", monthStartIso),
+      admin
+        .from("applications")
+        .select("assigned_to, created_at, updated_at, application_status")
+        .eq("application_status", "completed"),
     ]);
     if (rErr) throw new Error(rErr.message);
     if (pErr) throw new Error(pErr.message);
+    if (laErr) throw new Error(laErr.message);
+    if (aaErr) throw new Error(aaErr.message);
+    if (cmErr) throw new Error(cmErr.message);
+    if (caErr) throw new Error(caErr.message);
 
     const roleMap = new Map<string, string[]>();
     (roles ?? []).forEach((r) => {
@@ -53,9 +81,66 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       display_name: p.display_name ?? null,
     }));
 
+    // Performance aggregates keyed by user_id
+    type Perf = {
+      assignedLeads: number;
+      openLeads: number;
+      assignedApps: number;
+      openApps: number;
+      completedThisMonth: number;
+      avgTurnaroundHours: number | null;
+    };
+    const perf = new Map<string, Perf>();
+    const ensure = (id: string): Perf => {
+      let p = perf.get(id);
+      if (!p) {
+        p = { assignedLeads: 0, openLeads: 0, assignedApps: 0, openApps: 0, completedThisMonth: 0, avgTurnaroundHours: null };
+        perf.set(id, p);
+      }
+      return p;
+    };
+    const OPEN_LEAD = new Set(["new", "lead_received", "documents_pending", "under_process", "under_review"]);
+    const OPEN_APP = new Set(["details_pending", "documents_pending", "under_review", "under_process", "awaiting_payment"]);
+
+    (leadsAssigned ?? []).forEach((l) => {
+      if (!l.assigned_to) return;
+      const p = ensure(l.assigned_to);
+      p.assignedLeads += 1;
+      if (OPEN_LEAD.has(String(l.status ?? ""))) p.openLeads += 1;
+    });
+    (appsAssigned ?? []).forEach((a) => {
+      if (!a.assigned_to) return;
+      const p = ensure(a.assigned_to);
+      p.assignedApps += 1;
+      if (OPEN_APP.has(String(a.application_status ?? ""))) p.openApps += 1;
+    });
+    (appsCompletedMonth ?? []).forEach((a) => {
+      if (!a.assigned_to) return;
+      ensure(a.assigned_to).completedThisMonth += 1;
+    });
+    // Avg turnaround: completed apps, mean (updated_at - created_at) hours
+    const turnaroundAgg = new Map<string, { sum: number; n: number }>();
+    (appsCompletedAll ?? []).forEach((a) => {
+      if (!a.assigned_to || !a.created_at || !a.updated_at) return;
+      const ms = new Date(a.updated_at).getTime() - new Date(a.created_at).getTime();
+      if (!Number.isFinite(ms) || ms < 0) return;
+      const cur = turnaroundAgg.get(a.assigned_to) ?? { sum: 0, n: 0 };
+      cur.sum += ms / 3_600_000;
+      cur.n += 1;
+      turnaroundAgg.set(a.assigned_to, cur);
+    });
+    turnaroundAgg.forEach((v, id) => {
+      const p = ensure(id);
+      p.avgTurnaroundHours = v.n ? Math.round((v.sum / v.n) * 10) / 10 : null;
+    });
+
     return {
       rows: usersRes.users.map((u) => {
         const p = profMap.get(u.id);
+        const stats = perf.get(u.id) ?? {
+          assignedLeads: 0, openLeads: 0, assignedApps: 0, openApps: 0,
+          completedThisMonth: 0, avgTurnaroundHours: null as number | null,
+        };
         return {
           id: u.id,
           email: u.email ?? "",
@@ -65,10 +150,12 @@ export const listStaffUsers = createServerFn({ method: "GET" })
           created_at: u.created_at,
           last_sign_in_at: u.last_sign_in_at,
           roles: roleMap.get(u.id) ?? [],
+          perf: stats,
         };
       }),
     };
   });
+
 
 const RoleInput = z.object({
   user_id: z.string().uuid(),
