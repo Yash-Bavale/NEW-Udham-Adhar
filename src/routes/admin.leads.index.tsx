@@ -236,8 +236,8 @@ function LeadsPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: "var(--admin-fg-muted)" }} />
           <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search code, name, email, mobile…"
             className="rounded-lg border pl-9 pr-3 py-2 text-sm w-80 outline-none focus:ring-2"
             style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
