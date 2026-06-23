@@ -379,7 +379,7 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={12} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
