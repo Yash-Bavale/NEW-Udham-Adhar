@@ -11,6 +11,7 @@ import {
   Send, Calendar, LifeBuoy, Activity as ActivityIcon, Bell,
 } from "lucide-react";
 import { getOpsDashboard, markFollowUpComplete, type OpsDashboardData } from "@/lib/crm/ops-dashboard.functions";
+import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/dashboard")({
