@@ -39,6 +39,16 @@
   --color-form-header: var(--form-header);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
+
+  /* BHS premium palette (Part A) */
+  --color-bhs-navy: var(--bhs-navy);
+  --color-bhs-gold: var(--bhs-gold);
+  --color-bhs-cream: var(--bhs-cream);
+  --color-status-new: var(--status-new);
+  --color-status-process: var(--status-process);
+  --color-status-done: var(--status-done);
+  --color-status-urgent: var(--status-urgent);
+  --color-status-docs: var(--status-docs);
 }
 
 :root {
