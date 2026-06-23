@@ -257,10 +257,125 @@ function EmployeesPage() {
           <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
         </TabsContent>
 
+        <TabsContent value="performance" className="mt-4">
+          <PerformanceTab rows={filtered} loading={isLoading} />
+        </TabsContent>
+
         <TabsContent value="assignment" className="mt-4">
           <LeadAssignmentTab />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PerformanceTab({ rows, loading }: { rows: Row[]; loading: boolean }) {
+  // Staff only (must have at least one role), then sort by month completions desc.
+  const staff = useMemo(
+    () => rows.filter((r) => r.roles.length > 0).slice().sort((a, b) =>
+      (b.perf?.completedThisMonth ?? 0) - (a.perf?.completedThisMonth ?? 0),
+    ),
+    [rows],
+  );
+  const totals = useMemo(() => {
+    return staff.reduce(
+      (acc, r) => {
+        const p = r.perf;
+        if (!p) return acc;
+        acc.assignedLeads += p.assignedLeads;
+        acc.openLeads += p.openLeads;
+        acc.completedThisMonth += p.completedThisMonth;
+        return acc;
+      },
+      { assignedLeads: 0, openLeads: 0, completedThisMonth: 0 },
+    );
+  }, [staff]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label="Active staff" value={staff.filter((s) => s.is_active).length} />
+        <KpiCard label="Open leads (team)" value={totals.openLeads} />
+        <KpiCard label="Assigned leads (team)" value={totals.assignedLeads} />
+        <KpiCard label="Completed this month" value={totals.completedThisMonth} />
+      </div>
+
+      <SectionCard>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                <th className="px-4 py-2">Employee</th>
+                <th className="px-4 py-2">Role</th>
+                <th className="px-4 py-2 text-right">Open Leads</th>
+                <th className="px-4 py-2 text-right">Open Apps</th>
+                <th className="px-4 py-2 text-right">Assigned Leads</th>
+                <th className="px-4 py-2 text-right">Completed (month)</th>
+                <th className="px-4 py-2 text-right">Avg Turnaround</th>
+                <th className="px-4 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`pf-sk-${i}`} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
+                  {Array.from({ length: 8 }).map((__, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-3 rounded animate-pulse" style={{ background: "var(--admin-surface-2)" }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {!loading && staff.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+                  No staff with roles yet.
+                </td></tr>
+              )}
+              {!loading && staff.map((u, i) => {
+                const p = u.perf ?? { assignedLeads: 0, openLeads: 0, assignedApps: 0, openApps: 0, completedThisMonth: 0, avgTurnaroundHours: null };
+                return (
+                  <tr key={u.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: i % 2 ? "var(--admin-surface-2)" : "transparent" }}>
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium">{u.full_name ?? u.email}</div>
+                      <div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>{u.email}</div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-wrap gap-1">
+                        {u.roles.map((r) => <RoleBadge key={r} role={r} />)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono">{p.openLeads}</td>
+                    <td className="px-4 py-2.5 text-right font-mono">{p.openApps}</td>
+                    <td className="px-4 py-2.5 text-right font-mono">{p.assignedLeads}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold" style={{ color: p.completedThisMonth > 0 ? "#047857" : undefined }}>
+                      {p.completedThisMonth}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono">
+                      {p.avgTurnaroundHours == null ? "—" : `${p.avgTurnaroundHours}h`}
+                    </td>
+                    <td className="px-4 py-2.5"><StatusPill active={u.is_active} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+      <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+        Performance is computed live from assigned leads and applications. "Avg turnaround" is the mean time
+        from application creation to completion across all completed work for each employee.
+      </p>
+    </div>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border p-4" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}>
+      <div className="text-[11px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>
+      <div className="text-2xl font-semibold mt-1" style={{ color: "var(--admin-fg)" }}>
+        {new Intl.NumberFormat("en-IN").format(value)}
+      </div>
     </div>
   );
 }
