@@ -37,7 +37,7 @@ function ProcessingPage() {
 
   useEffect(() => {
     if (elapsed >= TOTAL_SECONDS) {
-      navigate({ to: "/payment/$leadCode", params: { leadCode }, replace: true });
+      navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
       return;
     }
     const t = setTimeout(() => setElapsed((s) => s + 1), 1000);
