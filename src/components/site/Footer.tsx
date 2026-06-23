@@ -335,7 +335,7 @@ function SeoTree({
         </li>
 
         {/* Locked: nothing else is shown. Unlocked: render the full SEO tree. */}
-        {unlocked && (
+        {mounted && unlocked && (
           <>
             {loading && <li className="py-2 text-sm text-white/75">Loading pages…</li>}
             {loadError && (
