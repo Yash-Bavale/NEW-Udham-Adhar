@@ -84,6 +84,7 @@ function LeadsPage() {
     const def = savedData.rows.find((r) => r.is_default);
     if (def) {
       const f = def.filter_json as FilterJson;
+      setSearchInput(f.search ?? "");
       setSearch(f.search ?? "");
       setStatus(f.status ?? "");
     }
