@@ -342,6 +342,11 @@ function LeadsPage() {
               <tbody>
                 {rows.map((l: any) => {
                   const checked = selected.has(l.id);
+                  const ageMs = Date.now() - new Date(l.created_at).getTime();
+                  const stale = !l.assigned_to && ageMs > 24 * 60 * 60 * 1000;
+                  const rowBg = checked
+                    ? "var(--admin-surface-2)"
+                    : stale ? "rgba(251, 191, 36, 0.08)" : undefined;
                   return (
                     <tr
                       key={l.id}
@@ -349,8 +354,9 @@ function LeadsPage() {
                         if ((e.target as HTMLElement).closest("input,a,button")) return;
                         setOpenId(l.id);
                       }}
-                      className={`border-t cursor-pointer hover:bg-[var(--admin-surface-2)] ${checked ? "bg-[var(--admin-surface-2)]" : ""}`}
-                      style={{ borderColor: "var(--admin-border)" }}
+                      className="border-t cursor-pointer hover:bg-[var(--admin-surface-2)] transition-colors"
+                      style={{ borderColor: "var(--admin-border)", background: rowBg, borderLeft: stale ? "3px solid #F59E0B" : undefined }}
+                      title={stale ? "Unassigned for over 24h" : undefined}
                     >
                       <td className="px-3 py-2.5">
                         <input
@@ -391,7 +397,15 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={12} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr>
+                    <td colSpan={12} className="px-3 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2" style={{ color: "var(--admin-fg-muted)" }}>
+                        <UsersIcon className="size-8 opacity-40" />
+                        <div className="text-sm font-medium">No leads match your filters</div>
+                        <div className="text-xs">Try clearing filters, or use “Add Lead” to create one.</div>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
