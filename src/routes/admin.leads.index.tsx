@@ -664,3 +664,15 @@ function Row({ label, children, required, full }: { label: string; children: Rea
     </div>
   );
 }
+
+function FormStatusChip({ status }: { status?: string | null }) {
+  const s = (status ?? "").toLowerCase();
+  let cls = "bg-slate-100 text-slate-600 border-slate-200";
+  let label = "Not submitted";
+  if (s === "submitted") { cls = "bg-emerald-50 text-emerald-700 border-emerald-200"; label = "Submitted"; }
+  else if (s === "resubmitted") { cls = "bg-blue-50 text-blue-700 border-blue-200"; label = "Resubmitted"; }
+  else if (s === "draft") { cls = "bg-amber-50 text-amber-700 border-amber-200"; label = "Draft"; }
+  else if (s === "approved") { cls = "bg-emerald-50 text-emerald-700 border-emerald-200"; label = "Approved"; }
+  else if (s === "needs_changes" || s === "rejected") { cls = "bg-red-50 text-red-700 border-red-200"; label = "Needs fix"; }
+  return <span className={`text-[10px] rounded-full px-2 py-0.5 border ${cls}`}>{label}</span>;
+}
