@@ -28,6 +28,9 @@ type NavItem = {
   module?: Module;
   /** Only show when current user holds this role. */
   requireRole?: string;
+  /** Only show when current user holds any of these roles. */
+  requireAnyRole?: string[];
+
 };
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
