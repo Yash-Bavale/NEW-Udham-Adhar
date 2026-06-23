@@ -16,6 +16,7 @@ import { OrderJourneyStepper } from "@/components/admin/OrderJourneyStepper";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
+import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
@@ -116,6 +117,7 @@ function OrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <FulfillmentStatusUpdater orderId={orderId} current={current} />
+          <FormSubmissionPanel applicationId={orderId} />
           <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
         </div>
         <div className="space-y-5">

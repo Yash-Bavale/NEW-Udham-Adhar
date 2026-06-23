@@ -322,6 +322,7 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Form</th>
                   <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-right font-medium">Action</th>
                 </tr>
@@ -362,6 +363,7 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-xs max-w-[200px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
+                      <td className="px-4 py-2.5"><FormStatusChip status={l.form_status} /></td>
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                       <td className="px-4 py-2.5 text-right">
                         <button
@@ -377,7 +379,7 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr><td colSpan={12} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -661,4 +663,16 @@ function Row({ label, children, required, full }: { label: string; children: Rea
       {children}
     </div>
   );
+}
+
+function FormStatusChip({ status }: { status?: string | null }) {
+  const s = (status ?? "").toLowerCase();
+  let cls = "bg-slate-100 text-slate-600 border-slate-200";
+  let label = "Not submitted";
+  if (s === "submitted") { cls = "bg-emerald-50 text-emerald-700 border-emerald-200"; label = "Submitted"; }
+  else if (s === "resubmitted") { cls = "bg-blue-50 text-blue-700 border-blue-200"; label = "Resubmitted"; }
+  else if (s === "draft") { cls = "bg-amber-50 text-amber-700 border-amber-200"; label = "Draft"; }
+  else if (s === "approved") { cls = "bg-emerald-50 text-emerald-700 border-emerald-200"; label = "Approved"; }
+  else if (s === "needs_changes" || s === "rejected") { cls = "bg-red-50 text-red-700 border-red-200"; label = "Needs fix"; }
+  return <span className={`text-[10px] rounded-full px-2 py-0.5 border ${cls}`}>{label}</span>;
 }
