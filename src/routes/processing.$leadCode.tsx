@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Lock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
@@ -28,8 +28,8 @@ const STEPS = [
 
 function ProcessingPage() {
   const { leadCode } = Route.useParams();
+  const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
-  const [cycles, setCycles] = useState(0);
 
   useEffect(() => {
     trackEvent("processing_viewed", {});
@@ -37,14 +37,12 @@ function ProcessingPage() {
 
   useEffect(() => {
     if (elapsed >= TOTAL_SECONDS) {
-      // Loop the countdown indefinitely — payment flow is temporarily disabled.
-      setElapsed(0);
-      setCycles((c) => c + 1);
+      navigate({ to: "/payment/$leadCode", params: { leadCode }, replace: true });
       return;
     }
     const t = setTimeout(() => setElapsed((s) => s + 1), 1000);
     return () => clearTimeout(t);
-  }, [elapsed]);
+  }, [elapsed, leadCode, navigate]);
 
   void leadCode;
 
@@ -153,9 +151,7 @@ function ProcessingPage() {
             />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            {cycles === 0
-              ? "Please don't close or refresh this window."
-              : "Our team will reach out shortly on your registered mobile and email."}
+            Please don't close or refresh this window.
           </p>
 
         </div>

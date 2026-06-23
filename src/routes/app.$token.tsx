@@ -74,7 +74,7 @@ function AppTokenPage() {
   const { purpose, lead, application } = data;
 
   if (purpose === "pay" && lead?.lead_code) {
-    return <Navigate to="/processing/$leadCode" params={{ leadCode: lead.lead_code }} replace />;
+    return <Navigate to="/payment/$leadCode" params={{ leadCode: lead.lead_code }} replace />;
   }
 
   return (
