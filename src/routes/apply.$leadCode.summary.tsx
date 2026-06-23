@@ -324,6 +324,9 @@ function SummaryPage() {
                       name: String(fd.get("name") ?? "").trim(),
                       email: String(fd.get("email") ?? "").trim(),
                       mobile: String(fd.get("mobile") ?? "").trim(),
+                      // Ownership proof — current values from the lead.
+                      currentEmail: lead.email ?? undefined,
+                      currentMobile: lead.mobile ?? undefined,
                     };
                     setSavingEdit(true);
                     setEditError(null);
