@@ -1,61 +1,40 @@
-## 1. Super-admin password reset for employees
+# Part P — Final Wiring Verification
 
-**New server fn** `resetEmployeePassword` in `src/lib/crm/users-admin.functions.ts`:
-- Middleware: `requireSupabaseAuth`.
-- Input: `{ user_id: uuid, new_password: string (min 8, max 72) }`.
-- Guard: caller must hold `super_admin` (tighter than the existing `assertAdmin` which also lets `admin` through — password reset is super-only).
-- Calls `supabaseAdmin.auth.admin.updateUserById(user_id, { password })`.
-- Writes an `audit_logs` row: `entity_type='user', action='password_reset', actor_id=caller`. Never logs the password itself.
+Audit the 20 production blockers from the launch checklist. For each item, read the relevant file(s), confirm the resolution is actually in place, and fix any gaps found. No new features — verification + targeted fixes only.
 
-**UI in `src/routes/admin.employees.tsx`:**
-- Add a "Reset password" item in the per-row action menu (next to Edit / Activate-Deactivate), visible only when `useRole().has('super_admin')`.
-- Opens a dialog: new password + confirm password fields, show/hide toggle, client-side validation (min 8, must match). Submit calls the new server fn, toasts success, closes.
-- No email is sent — super-admin tells the employee out-of-band.
+## Approach
 
-## 2. Surface every built admin page in the sidebar
+Work through the list in three passes so related code is opened together:
 
-**`src/components/admin/AdminShell.tsx` — rewrite `NAV`** into clearer groups so every existing route appears:
+**Pass 1 — Auth & access gates** (#1, #2, #3, #19)
+- `/admin/*` route gate: read `src/routes/admin/route.tsx` (or `_admin` layout) — confirm `beforeLoad` calls `has_role` for staff roles, not just "signed in".
+- Onboarding server fns (`src/lib/onboarding/*.functions.ts`): list public ones; mark each as intentionally public or add `requireSupabaseAuth`. Item #2 is tagged "separate sprint" — verify a TODO/comment exists; do not implement.
+- `updateLeadContact` in `src/lib/crm/*`: confirm `.middleware([requireSupabaseAuth])` present.
+- `bulkExportLeads`: confirm role check inside handler.
 
-```text
-Overview      Dashboard, My Dashboard, Pipeline, Activity, Notifications
-Sales         Leads, Customers, Orders, Applications, Documents, Submissions, Review
-Service       Complaints, Support Tickets, Tasks, Services
-Finance       Invoices, Payments, Gateways, Finance (GST / Settlements)
-Insights      Reports, Audit Log, SEO
-Admin         Employees, Users & Roles, Certificates, Email System,
-              Email Templates, WhatsApp Templates, Super Admin, Settings
-```
+**Pass 2 — Payments, cron, email** (#4, #5, #7, #9, #18)
+- CCAvenue: confirm warning banner renders in `src/routes/admin.super-admin*` / gateway settings.
+- PayU refund fn: confirm it throws a clean "not supported" error.
+- Closure cron route (`src/routes/api/public/cron/*`): confirm it authenticates via `apikey` header / anon key, not a custom secret.
+- Email queue: confirm Super Admin has a "Process Queue" action wired to the queue-drain server fn; confirm a doc/note explains external cron requirement.
+- Hardcoded Gmail address: grep `gmail.com` across `src/` to confirm none remain in code; replaced by `INTERNAL_NOTIFICATION_EMAIL` env.
 
-All entries are plain `Link`s — no new routes, just nav items pointing at routes that already exist (`/admin/my-work`, `/admin/pipeline`, `/admin/activity`, `/admin/notifications`, `/admin/applications`, `/admin/submissions`, `/admin/review`, `/admin/certificates`, `/admin/gateways`, `/admin/finance`, `/admin/audit`, `/admin/seo`, `/admin/users`, `/admin/super`).
+**Pass 3 — Data integrity, UI, state machines** (#6, #8, #10, #11, #12, #13, #14, #15, #16, #17, #20)
+- Item #6 (ops dashboard aggregation): confirm a TODO/comment tags it for post-launch; do not implement.
+- Email templates: query `email_templates` count — expect 12 seeded.
+- DB indexes (#10) and UNIQUE on `idempotency_key` (#20): run `supabase--linter` + `read_query` against `pg_indexes` / `pg_constraint` to confirm.
+- Rate limiter (#11): confirm middleware/util exists and is applied to sensitive endpoints.
+- State machines (#12): grep for direct `update({ status: ... })` writes on `leads`/`applications`/`complaints` outside the engine modules; flag any raw bypass.
+- C360 leak (#13): open Customer 360 route, confirm email/activity queries are scoped by `customer_id` and respect RLS.
+- `activity_logs` rendering (#14): confirm the timeline component renders rows in the customer/lead detail view.
+- Certificate history tab (#15) + resend (#16): confirm tab exists in certificate detail and resend action is enabled (no hard block).
+- Document status enum (#17): grep for `'verified'` literal in document code — should be `'approved'`.
 
-The Super Admin entry is rendered only when `useRole().has('super_admin')`; everything else is unconditional.
+## Output
 
-## 3. Open module access to all staff roles
+For each of the 20 items: ✅ verified in place / 🔧 fixed now (with file + change) / ⏭️ deferred (with reference). Any item that requires more than a small fix (e.g. real implementation work) gets flagged back to you before I touch it rather than silently expanding scope.
 
-**`src/lib/roles.ts` — broaden `ACCESS_MATRIX`** so every role in `ASSIGNABLE_ROLES` gets at least `read` (or `full` where it already had `full`) on every module: dashboard, leads, orders, payments, invoices, customers, documents, complaints, tickets, tasks, reports, employees, email_templates, audit_log.
+## Out of scope
 
-- `super_admin`, `admin`, `manager`: keep `full` everywhere.
-- `executive`, `support`, `accounts`, `finance`, `operations`: upgrade `none` cells to `read` so the sidebar shows the link and the page renders, while `full` cells stay `full`.
-
-Pages that already perform their own per-action authorisation (refunds, role grants, password reset, super-admin overview) keep those checks — broadening the matrix only opens visibility, not destructive actions.
-
-## 4. Out of scope
-
-- No new pages or routes.
-- No schema migration.
-- No nav copy/icon overhaul beyond regrouping; same lucide icons reused.
-- Password reset email flow not added (per choice "Set a new password directly").
-
-## Files touched
-
-- `src/lib/crm/users-admin.functions.ts` — add `resetEmployeePassword`.
-- `src/routes/admin.employees.tsx` — row action + dialog.
-- `src/components/admin/AdminShell.tsx` — expanded `NAV` groups.
-- `src/lib/roles.ts` — widened `ACCESS_MATRIX`.
-
-## Verification
-
-- Sign in as super-admin → /admin/employees → reset a test employee's password → sign in as that employee with new password.
-- Sign in as `executive` (or `support`) → confirm every sidebar group is visible and every linked page loads without an "unauthorized" flash.
-- Sign in as `admin` (non-super) → "Reset password" action is hidden.
-- Typecheck/build clean.
+- #2 (onboarding fn auth) and #6 (ops dashboard DB aggregation) — both explicitly tagged "separate sprint / post-launch" in your checklist; I will only confirm the TODO markers exist.
+- Any new features, redesigns, or refactors beyond the listed resolutions.
