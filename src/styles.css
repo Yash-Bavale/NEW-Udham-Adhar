@@ -65,6 +65,16 @@
   --disclaimer-bg: oklch(0.38 0.1 251); /* mid-dark blue marquee */
   --form-header: #1A4171;
 
+  /* BHS premium tokens (Part A — Final_CRM spec) */
+  --bhs-navy:    #0F1F3D;
+  --bhs-gold:    #C9973A;
+  --bhs-cream:   #FAF8F4;
+  --status-new:     #3B82F6;
+  --status-process: #F59E0B;
+  --status-done:    #10B981;
+  --status-urgent:  #EF4444;
+  --status-docs:    #8B5CF6;
+
   --primary: var(--brand-navy);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.96 0.01 248);
