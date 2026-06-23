@@ -264,6 +264,7 @@ export type Database = {
           documents_deleted_at: string | null
           documents_deleted_reason: string | null
           form_status: string
+          fulfilled_at: string | null
           fulfillment_status:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
@@ -293,6 +294,7 @@ export type Database = {
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
           form_status?: string
+          fulfilled_at?: string | null
           fulfillment_status?:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
@@ -322,6 +324,7 @@ export type Database = {
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
           form_status?: string
+          fulfilled_at?: string | null
           fulfillment_status?:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
