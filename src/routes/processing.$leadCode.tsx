@@ -151,9 +151,7 @@ function ProcessingPage() {
             />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            {cycles === 0
-              ? "Please don't close or refresh this window."
-              : "Our team will reach out shortly on your registered mobile and email."}
+            Please don't close or refresh this window.
           </p>
 
         </div>
