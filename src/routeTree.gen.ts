@@ -190,6 +190,7 @@ import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whats
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
+import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
@@ -1185,6 +1186,11 @@ const AdminTasksRoute = AdminTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSuperRoute = AdminSuperRouteImport.update({
+  id: '/super',
+  path: '/super',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSubmissionsRoute = AdminSubmissionsRouteImport.update({
   id: '/submissions',
   path: '/submissions',
@@ -1677,6 +1683,7 @@ export interface FileRoutesByFullPath {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -1913,6 +1920,7 @@ export interface FileRoutesByTo {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -2153,6 +2161,7 @@ export interface FileRoutesById {
   '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
+  '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
@@ -2394,6 +2403,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -2630,6 +2640,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -2869,6 +2880,7 @@ export interface FileRouteTypes {
     | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
+    | '/admin/super'
     | '/admin/tasks'
     | '/admin/tickets'
     | '/admin/users'
@@ -4379,6 +4391,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTasksRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/super': {
+      id: '/admin/super'
+      path: '/super'
+      fullPath: '/admin/super'
+      preLoaderRoute: typeof AdminSuperRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/submissions': {
       id: '/admin/submissions'
       path: '/submissions'
@@ -4913,6 +4932,7 @@ interface AdminRouteChildren {
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
+  AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
   AdminTicketsRoute: typeof AdminTicketsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
@@ -4947,6 +4967,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminServicesRoute: AdminServicesRouteWithChildren,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
+  AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
   AdminTicketsRoute: AdminTicketsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,

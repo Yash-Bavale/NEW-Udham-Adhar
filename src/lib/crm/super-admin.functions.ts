@@ -56,7 +56,7 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       admin
         .from("payments")
         .select("amount")
-        .eq("status", "success")
+        .eq("status", "paid")
         .gte("created_at", dayStartIso),
       admin
         .from("applications")
@@ -113,7 +113,8 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       emailQueue: queue,
       payu: { mode: payuMode, isProduction: payuMode === "production" },
       alerts,
-      activity: (activity.data ?? []) as SuperAdminOverview["activity"],
+      activity: ((activity.data ?? []) as Array<{ id: string; activity_description: string | null; created_at: string }>)
+        .map((r) => ({ id: r.id, description: r.activity_description ?? "(no description)", created_at: r.created_at })),
       webhookFailures24h: webhookErrs.count ?? 0,
     };
   });
