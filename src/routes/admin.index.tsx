@@ -44,9 +44,12 @@ function AdminLandingPage() {
 }
 
 function pickLanding(roles: string[]): string {
+  // Highest-privilege roles first.
   if (roles.includes("super_admin")) return "/admin/super";
   if (roles.includes("admin")) return "/admin/dashboard";
   if (roles.includes("finance") || roles.includes("accounts")) return "/admin/finance";
-  if (roles.includes("operations") || roles.includes("support")) return "/admin/my-work";
-  return "/admin/dashboard";
+  // Every other staff role (executive, manager, support, operations, or any
+  // future non-admin role) lands on the dedicated employee workspace.
+  if (roles.length > 0) return "/admin/my-work";
+  return "/admin/my-work";
 }
