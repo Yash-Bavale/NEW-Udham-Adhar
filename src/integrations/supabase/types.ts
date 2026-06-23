@@ -1763,6 +1763,73 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_links: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          lead_id: string | null
+          opened_at: string | null
+          paid_at: string | null
+          payment_id: string | null
+          payment_url: string
+          status: string
+          txnid: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          lead_id?: string | null
+          opened_at?: string | null
+          paid_at?: string | null
+          payment_id?: string | null
+          payment_url: string
+          status?: string
+          txnid: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          lead_id?: string | null
+          opened_at?: string | null
+          paid_at?: string | null
+          payment_id?: string | null
+          payment_url?: string
+          status?: string
+          txnid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_links_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_links_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_settlements: {
         Row: {
           created_at: string
@@ -1813,9 +1880,15 @@ export type Database = {
           gst_amount: number
           id: string
           idempotency_key: string | null
+          is_test_payment: boolean | null
           lead_id: string
           parent_payment_id: string | null
           payment_date: string | null
+          payu_bank_ref_num: string | null
+          payu_error_message: string | null
+          payu_mihpayid: string | null
+          payu_mode: string | null
+          payu_net_amount_debit: number | null
           raw_response: Json | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
@@ -1824,6 +1897,7 @@ export type Database = {
           status: Database["public"]["Enums"]["payment_status"]
           transaction_id: string | null
           updated_at: string
+          webhook_received_at: string | null
           webhook_response: Json | null
         }
         Insert: {
@@ -1837,9 +1911,15 @@ export type Database = {
           gst_amount?: number
           id?: string
           idempotency_key?: string | null
+          is_test_payment?: boolean | null
           lead_id: string
           parent_payment_id?: string | null
           payment_date?: string | null
+          payu_bank_ref_num?: string | null
+          payu_error_message?: string | null
+          payu_mihpayid?: string | null
+          payu_mode?: string | null
+          payu_net_amount_debit?: number | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
@@ -1848,6 +1928,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
+          webhook_received_at?: string | null
           webhook_response?: Json | null
         }
         Update: {
@@ -1861,9 +1942,15 @@ export type Database = {
           gst_amount?: number
           id?: string
           idempotency_key?: string | null
+          is_test_payment?: boolean | null
           lead_id?: string
           parent_payment_id?: string | null
           payment_date?: string | null
+          payu_bank_ref_num?: string | null
+          payu_error_message?: string | null
+          payu_mihpayid?: string | null
+          payu_mode?: string | null
+          payu_net_amount_debit?: number | null
           raw_response?: Json | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
@@ -1872,6 +1959,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
+          webhook_received_at?: string | null
           webhook_response?: Json | null
         }
         Relationships: [
@@ -2474,6 +2562,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_error_log: {
+        Row: {
+          created_at: string
+          error_message: string
+          id: string
+          raw_payload: Json | null
+          webhook_type: string
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          id?: string
+          raw_payload?: Json | null
+          webhook_type: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          id?: string
+          raw_payload?: Json | null
+          webhook_type?: string
         }
         Relationships: []
       }

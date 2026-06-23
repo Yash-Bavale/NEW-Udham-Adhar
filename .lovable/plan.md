@@ -1,67 +1,143 @@
-## Part 1 — Service-wise post-payment onboarding forms
+# PART 1 — PayU Audit & Fill-the-Gaps Plan
 
-After payment, `src/lib/onboarding/schemas.ts` resolves a form by `service_code` via `getSchema()`. Common docs (Aadhaar front/back, PAN) are defined but only used by services that explicitly list them.
+## Audit summary
 
-### 1. `new-udyam-registration` — "New Udyam Registration — Incomplete Information"
-~50 fields (full enterprise intake). Sections: Aadhaar/Identity, PAN & ITR, Investment & turnover, Enterprise details, Contact, Social/Gender/Divyang, Official Address (flat, premises, village, block, road, city, pincode, state, district), Previous EM-II/UAM, Status of Enterprise (incorporation date, commencement), Bank details (name, IFSC, account no.), Major Activity, NIC codes (2/4/5-digit pickers), Employees (M/F/Others), Government portal interest (GeM, TReDS, NCS, NSIC B2B, Skill India). **Documents:** none uploaded at this stage.
+Already implemented and matches spec (keep as-is):
+- SHA-512 outgoing + incoming hash, server-only (`payu.server.ts`)
+- Hash-verified webhook at `/api/public/webhooks/payu` with `verify_payment` fallback
+- Idempotent payment row creation, txnid uniqueness
+- Amount mismatch warning
+- `paid` status not downgradable
+- Invoice generation with GST split (CGST/SGST vs IGST) via `generateInvoiceInternal`
+- Payment-success email enqueue
+- Test/live mode flag (`PAYU_MODE`)
+- Public payment page `/payment/$leadCode` posting hidden form to PayU
+- `verify_payment` lookup fallback on hash mismatch (better than spec)
 
-### 2. `update-udyam-certificate` — "Update Udyam Certificate — Incomplete Information"
-Fields: applicant_name, udyam_number (pattern `UDYAM-XX-YY-#######`), registered_mobile, registered_email (optional), fields_to_update (textarea). **Documents:** none.
+Gaps vs spec (the work in this plan):
+1. No `payment_links` table → no employee-side "Generate Payment Link" UI
+2. No `webhook_error_log` table → errors only go to console
+3. Webhook does NOT auto-create an `application` row when one is missing
+4. Single `payment_success` email — spec wants separate `order_confirmation` (with invoice) + `welcome_and_form_link` (slight delay) + lead status flip to `welcome_mail_sent`
+5. Missing PayU-detail columns (mihpayid, mode, bank_ref_num, error_message, webhook_received_at, is_test_payment) — currently stuffed into `raw_response`
+6. No GST snapshot columns on invoice (`company_state_snapshot`, `customer_state_snapshot`) — spec wants these pinned
+7. No employee tooling to copy link / WhatsApp link / poll status
 
-### 3. `download-udyam-certificate` — "Udyam Registration Certificate Download — Incomplete Information"
-Fields: applicant_name, udyam_number, registered_mobile, registered_email (optional). **Documents:** none.
+Explicit non-goals (per your answers):
+- No Supabase Edge Function rewrite — keep `createServerFn` + TSS `/api/public/webhooks/payu`
+- No `razorpay_* → gateway_*` column rename
+- PART 2 (UI overhaul) is deferred
 
-### 4. `migrate-udyog-aadhaar-to-udyam` — "Migrate — Incomplete Information"
-Fields: applicant_name, uam_number (pattern `XX##X#######`), registered_mobile (optional), registered_email (optional). **Documents:** none.
+## Work
 
-### 5. `forgot-mobile-email` — "Recover Registered Mobile / Email"
-Fields: applicant_name, udyam_number (optional), aadhaar_number (12-digit), new_mobile, new_email, reason (textarea). **Documents (all required):** Aadhaar Card PDF, PAN Card PDF, Signed Standard Form (download → fill → sign → upload, link `/forms/forgot-mobile-email-application.pdf`).
+### A. Database migration (one migration)
 
-### 6. `correct-pan-aadhaar` — "Correct PAN / Aadhaar Name in Udyam — Incomplete Information"
-Stage 1 fields: applicant_name, udyam_number, registered_mobile, registered_email, correction_required (textarea).
-Stage 2 (`CORRECT_PAN_AADHAAR_STAGE2`) reuses the full New Udyam field set after Stage 1 is submitted. **Documents:** none.
+```sql
+-- payment_links: employee-issued / customer-self-checkout link tracking
+CREATE TABLE public.payment_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id uuid REFERENCES public.leads(id) ON DELETE CASCADE,
+  payment_id uuid REFERENCES public.payments(id) ON DELETE SET NULL,
+  txnid text UNIQUE NOT NULL,
+  payment_url text NOT NULL,
+  amount numeric NOT NULL,
+  status text NOT NULL DEFAULT 'pending',  -- pending|paid|failed|expired
+  expires_at timestamptz,
+  opened_at timestamptz,
+  paid_at timestamptz,
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE ON public.payment_links TO authenticated;
+GRANT ALL ON public.payment_links TO service_role;
+ALTER TABLE public.payment_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "staff read" ON public.payment_links FOR SELECT TO authenticated
+  USING (public.has_any_staff_role(auth.uid()));
+CREATE POLICY "staff write" ON public.payment_links FOR INSERT TO authenticated
+  WITH CHECK (public.has_any_staff_role(auth.uid()));
+CREATE POLICY "staff update" ON public.payment_links FOR UPDATE TO authenticated
+  USING (public.has_any_staff_role(auth.uid()));
 
-### 7. `talk-to-expert` — "Talk to Expert — Consultation Booked"
-No fields, no documents. Goes straight to thank-you page; team calls the registered mobile.
+-- webhook_error_log
+CREATE TABLE public.webhook_error_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  webhook_type text NOT NULL,
+  error_message text NOT NULL,
+  raw_payload jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.webhook_error_log TO authenticated;
+GRANT ALL ON public.webhook_error_log TO service_role;
+ALTER TABLE public.webhook_error_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin read" ON public.webhook_error_log FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'::app_role)
+      OR public.has_role(auth.uid(), 'super_admin'::app_role));
 
-### Fallback
-Any unmapped `service_code` falls back to `NEW_UDYAM`.
+-- PayU-specific columns on payments (idempotent)
+ALTER TABLE public.payments
+  ADD COLUMN IF NOT EXISTS payu_mihpayid text,
+  ADD COLUMN IF NOT EXISTS payu_mode text,
+  ADD COLUMN IF NOT EXISTS payu_bank_ref_num text,
+  ADD COLUMN IF NOT EXISTS payu_net_amount_debit numeric,
+  ADD COLUMN IF NOT EXISTS payu_error_message text,
+  ADD COLUMN IF NOT EXISTS webhook_received_at timestamptz,
+  ADD COLUMN IF NOT EXISTS is_test_payment boolean DEFAULT false;
 
-### Upload constraints (all services that have docs)
-Max 5 MB per file; allowed: PDF, JPG, PNG, WEBP.
+-- Invoice GST snapshots (idempotent)
+ALTER TABLE public.invoices
+  ADD COLUMN IF NOT EXISTS company_state_snapshot text,
+  ADD COLUMN IF NOT EXISTS customer_state_snapshot text;
+```
 
----
+### B. Webhook hardening (`src/routes/api/public/webhooks/payu.ts`)
 
-## Part 2 — Restore payment flow + redesign post-payment countdown
+- Populate the new PayU detail columns from form payload (`mihpayid`, `mode`, `bankrefnum`, `net_amount_debit`, `error_Message`, `webhook_received_at = now()`, `is_test_payment = PAYU_MODE !== 'live'`).
+- If the payment has no `application_id` when status becomes `paid`, auto-create one (mirrors spec Step 4A-1):
+  - Use existing `applications` table; rely on its `application_code` trigger.
+  - Set `fulfillment_status = 'order_received'`, copy `assigned_to` from lead.
+  - Patch `payments.application_id` after insert.
+- On any caught error, insert into `webhook_error_log` and return 200 (PayU must not retry forever).
+- After invoice generation, queue **two** emails instead of one:
+  1. `order_confirmation` — uses `invoice_pdf_url` from generated invoice
+  2. `welcome_and_form_link` — with `send_after_seconds: 30` so it lands after the receipt
+- Add `lead_status_v2` transitions: `payment_successful` then `welcome_mail_sent` after the welcome email is enqueued.
+- Mark `payment_links.status='paid'`, `paid_at=now()` keyed by `txnid`.
 
-### Problem
-- `src/components/site/LeadForm.tsx` (line 46) currently redirects to `/processing/$leadCode`, which loops a 30s countdown forever ("payment flow temporarily disabled").
-- `src/routes/success.$leadCode.tsx` uses a different 30-second phase UI after payment; you want it replaced with a 60-second countdown that matches the visual design of the processing page, with copy adapted to the post-payment context.
+### C. Generate-Payment-Link server function
 
-### Changes
+New `src/lib/payments/payment-links.functions.ts`:
+- `createPaymentLink({ leadId })` — `requireSupabaseAuth` + staff role check.
+  - Reuses existing pending link for that lead if one is still `pending` and not expired (returns it instead of minting a new one).
+  - Otherwise calls into the same code path as `createPayUOrder` to insert a fresh `payments` row with txnid, then writes a `payment_links` row with `payment_url = ${origin}/payment/${leadCode}`.
+  - Returns `{ paymentUrl, txnid, amount, status, expiresAt, isReused }`.
+- `getPaymentLinkStatus({ txnid })` — light poll for UI auto-refresh (every 15s).
+- `regeneratePaymentLink({ leadId })` — explicit "force new" path; voids prior pending row via `payments.status='failed'` and `payment_links.status='expired'`.
 
-**A. `src/components/site/LeadForm.tsx`** — restore payment redirect.
-- Line 46: change `to: "/processing/$leadCode"` → `to: "/payment/$leadCode"`.
+### D. Admin "Generate Payment Link" panel
 
-**B. `src/routes/app.$token.tsx`** — same restoration for the magic-link return path.
-- Line 77 + line 103: redirect / link to `/payment/$leadCode` instead of `/processing/$leadCode` (only when the lead is not yet paid; if already paid keep current logic that routes to success/onboarding).
+New `src/components/admin/PaymentLinkPanel.tsx` rendered inside the existing Lead Workspace (right column), visible when:
+- Lead has no `paid` payment, and
+- `lead.status` in {`new_lead`,`contacted`,`follow_up_required`,`payment_pending`,`payment_failed`}
 
-**C. `src/routes/processing.$leadCode.tsx`** — stop the indefinite loop.
-- Remove the `setElapsed(0); setCycles(...)` loop. When countdown hits 0, navigate to `/payment/$leadCode`. Keep the page as a graceful fallback in case any flow lands here, but it will no longer be the primary post-lead destination.
+Panel contents (functional only — no UI redesign here):
+- Service + amount breakup (base / GST / total) read from the lead
+- Primary button: "Generate & Copy Link"
+- After link exists: read-only URL field, Copy button (toast), WhatsApp share button (`https://wa.me/91${mobile}?text=...`), "Regenerate" (with confirm)
+- Status line auto-polls every 15s; on `paid` shows success state and triggers a workspace refresh.
 
-**D. `src/routes/success.$leadCode.tsx`** — rebuild as a 60-second post-payment countdown using the processing-page design.
-- Keep the existing payment-confirmation polling logic (poll `getApplicationSummary` until paid; redirect to `/payment-pending/$leadCode` if not confirmed).
-- Once confirmed, render the same visual shell as `processing.$leadCode.tsx` (concentric rotating rings, gradient sweep, center icon, large remaining-seconds counter, gradient progress bar, 4 step pips, ambient blur background, `TrustBlock` below).
-- `TOTAL_SECONDS = 60`. Single linear countdown (no looping).
-- New post-payment step sequence (4 pips, each ~15s):
-  1. 0s — ShieldCheck — "Payment received securely" / "Confirming transaction with bank"
-  2. 15s — FileCheck2 — "Preparing your onboarding form" / "Setting up your secure form"
-  3. 30s — Sparkles — "Personalising your application" / "Tailoring fields to your service"
-  4. 45s — CheckCircle2 — "Almost ready" / "Opening your form in a moment"
-- At 0 remaining → `navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true })`.
-- Keep the existing loading state, error state, and "Ref: {leadCode}" footer. Drop the rotating colour palette / `PHASE_STEPS` window logic — match the processing page exactly so both countdowns feel like one continuous brand experience.
-- Helper text below counter: "Please don't close or refresh this window. Your form is being prepared."
+No CRM design tokens are changed — uses existing components and the current Tailwind utility set. This is the functional hook for the prettier panel in PART 2.
 
-### Out of scope
-- No changes to onboarding form schemas, payment gateway code, or webhook handlers.
-- Sitemap and any other `/processing` references stay as-is (the route still exists as a fallback).
+### E. Verification (no Edge Functions involved)
+
+After build:
+1. Open a lead in admin, click Generate & Copy Link → confirm `payments` + `payment_links` rows + URL points to `/payment/<leadCode>`.
+2. Visit the URL, post to PayU test, complete a sandbox UPI/test card payment.
+3. Confirm webhook flips `payments.status='paid'`, fills new PayU columns, creates application if missing, generates invoice with snapshot columns set, enqueues both emails 30s apart, and lead lands at `welcome_mail_sent`.
+4. Force a failure (negative test) → `payment_links.status='failed'`, lead stays/returns to `payment_pending`, error logged (but not in webhook_error_log unless it's a code error).
+5. Re-POST the same webhook payload → second call returns OK without double-writing (idempotency check on `status='paid'` already in place).
+
+## Out of scope this plan
+- PART 2 admin UI redesign (status badges, KPI cards, lead-detail layout, design tokens, modals, slide-overs)
+- Renaming `razorpay_order_id/payment_id/signature` columns
+- Switching `/api/public/webhooks/payu` to a Supabase Edge Function
+- SMS gateway integration (WhatsApp share via `wa.me` only; no Twilio/MSG91 wiring)
