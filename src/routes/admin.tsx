@@ -12,8 +12,20 @@ export const Route = createFileRoute("/admin")({
   ssr: false,
   head: () => ({ meta: [{ title: "Admin — Business Help Services" }, { name: "robots", content: "noindex,nofollow" }] }),
   beforeLoad: async () => {
+    // 1) Must be signed in.
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/admin-login" });
+
+    // 2) P0 SECURITY (Final_CRM Part B / audit C-1) — must hold a staff role.
+    //    Uses the SECURITY DEFINER RPC `has_any_staff_role` which checks
+    //    public.user_roles for any of: super_admin, admin, manager, executive,
+    //    support, accounts, finance, operations.
+    const { data: isStaff, error: roleErr } = await supabase.rpc("has_any_staff_role", {
+      _user_id: data.user.id,
+    });
+    if (roleErr || isStaff !== true) {
+      throw redirect({ to: "/unauthorized" });
+    }
   },
   component: AdminLayout,
   errorComponent: ({ error }) => (
