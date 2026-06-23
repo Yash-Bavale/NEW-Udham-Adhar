@@ -35,6 +35,7 @@ import {
   createFollowUp, listFollowUpsForLead,
 } from "@/lib/crm/follow-ups.functions";
 import { useRole } from "@/hooks/useRole";
+import { PaymentLinkPanel } from "./PaymentLinkPanel";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
@@ -47,6 +48,10 @@ type LeadShape = {
   status: string;
   lead_status_v2?: LeadStatusV2 | null;
   customer_id?: string | null;
+  service?: string | null;
+  base_amount?: number | string | null;
+  gst_amount?: number | string | null;
+  total_amount?: number | string | null;
 };
 
 export function LeadWorkspacePanel({
@@ -67,6 +72,17 @@ export function LeadWorkspacePanel({
         <EventsTimeline leadId={lead.id} />
       </div>
       <div className="space-y-5">
+        <PaymentLinkPanel
+          leadId={lead.id}
+          leadCode={lead.lead_code}
+          mobile={lead.mobile ?? null}
+          customerName={lead.name}
+          service={lead.service ?? null}
+          baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
+          gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
+          totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+          leadStatusV2={currentStatus}
+        />
         <FollowUpScheduler leadId={lead.id} staff={staff} />
         <LinkedOrderPanel applications={applications} />
         <DocumentsPanel applications={applications} />
