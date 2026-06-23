@@ -1,57 +1,67 @@
-## Section A — Lead Auto-Assignment (Round-Robin)
+## Part 1 — Service-wise post-payment onboarding forms
 
-### 1. Database migration
-- Create `lead_assignment_config` (service_id nullable, assignment_mode, is_active) + GRANTs + RLS (admin/super_admin manage; staff read).
-- Create `assignment_pool` (user_id, service_id nullable, is_active, last_assigned_at, total_assigned, UNIQUE(user_id, service_id)) + GRANTs + RLS.
-- `leads`: ensure `assigned_to`, `assigned_at`, `auto_assigned` exist (add if missing).
-- `auto_assign_lead()` BEFORE INSERT trigger — only assigns if global config `is_active = true` AND `NEW.assigned_to IS NULL`. Picks next pool member preferring service-specific over global, ordering by `last_assigned_at NULLS FIRST, total_assigned ASC`. Bumps pool counters.
-- `log_lead_auto_assignment()` AFTER INSERT trigger — writes `application_events` (event_type `assignment_change`, staff_name, note).
-- Extend existing manual-edit lead trigger (or update `lead-status` server fn) to also log `assignment_change` events when `assigned_to` changes via UPDATE.
+After payment, `src/lib/onboarding/schemas.ts` resolves a form by `service_code` via `getSchema()`. Common docs (Aadhaar front/back, PAN) are defined but only used by services that explicitly list them.
 
-### 2. Server functions (`src/lib/crm/assignment.functions.ts`)
-- `getAssignmentConfig()` / `setAutoAssignEnabled({enabled})` — admin/super_admin only.
-- `listAssignmentPool()` — joined with profile name, role, service name.
-- `addToPool({userId, serviceId|null})` — validates user has role `executive` or `manager`.
-- `removeFromPool({id})`.
-- `reassignLead({leadId, userId})` — updates lead, bumps pool counter for new assignee, inserts `application_events` with note "Manually reassigned by …".
+### 1. `new-udyam-registration` — "New Udyam Registration — Incomplete Information"
+~50 fields (full enterprise intake). Sections: Aadhaar/Identity, PAN & ITR, Investment & turnover, Enterprise details, Contact, Social/Gender/Divyang, Official Address (flat, premises, village, block, road, city, pincode, state, district), Previous EM-II/UAM, Status of Enterprise (incorporation date, commencement), Bank details (name, IFSC, account no.), Major Activity, NIC codes (2/4/5-digit pickers), Employees (M/F/Others), Government portal interest (GeM, TReDS, NCS, NSIC B2B, Skill India). **Documents:** none uploaded at this stage.
 
-### 3. UI
-- **New tab in `/admin/employees`** called "Lead Assignment":
-  - Master toggle: Auto-Assignment ON/OFF.
-  - Pool table: Employee | Role | Service (or "All Services") | Active | Last Assigned (IST DD-MM-YYYY HH:MM AM/PM) | Total Assigned | Remove.
-  - "Add to Pool" dialog: employee dropdown (executive/manager only) + service dropdown (with "All Services").
-  - Gated to admin/super_admin via `useRole`.
-- **Lead Detail (`admin.leads.$leadId.tsx`)**: existing "Assigned To" dropdown wired through `reassignLead`. Show "Auto-assigned" badge when `auto_assigned = true`.
-- **Lead List (`admin.leads.index.tsx`)**: "My Leads" quick-filter chip (filters `assigned_to = auth.uid()`). For users whose top role is `executive`, default the filter to "My Leads" on first load.
+### 2. `update-udyam-certificate` — "Update Udyam Certificate — Incomplete Information"
+Fields: applicant_name, udyam_number (pattern `UDYAM-XX-YY-#######`), registered_mobile, registered_email (optional), fields_to_update (textarea). **Documents:** none.
 
----
+### 3. `download-udyam-certificate` — "Udyam Registration Certificate Download — Incomplete Information"
+Fields: applicant_name, udyam_number, registered_mobile, registered_email (optional). **Documents:** none.
 
-## Section B — Email Template Enable/Disable
+### 4. `migrate-udyog-aadhaar-to-udyam` — "Migrate — Incomplete Information"
+Fields: applicant_name, uam_number (pattern `XX##X#######`), registered_mobile (optional), registered_email (optional). **Documents:** none.
 
-### 1. Database migration
-- `email_templates`: add `is_enabled BOOLEAN DEFAULT true`, `disabled_reason TEXT`, `last_toggled_by UUID`, `last_toggled_at TIMESTAMPTZ`, `last_sent_at TIMESTAMPTZ`, `total_sent INT DEFAULT 0`.
+### 5. `forgot-mobile-email` — "Recover Registered Mobile / Email"
+Fields: applicant_name, udyam_number (optional), aadhaar_number (12-digit), new_mobile, new_email, reason (textarea). **Documents (all required):** Aadhaar Card PDF, PAN Card PDF, Signed Standard Form (download → fill → sign → upload, link `/forms/forgot-mobile-email-application.pdf`).
 
-### 2. Queue worker change (`src/lib/emails/emails.server.ts`)
-- In `processQueueInternal`, before sending each row: lookup `is_enabled` by `template_code`. If disabled:
-  - Mark queue row status `skipped`, insert `email_logs` with status `skipped_disabled`.
-  - Do NOT insert `application_events`.
-- On successful send: bump `email_templates.last_sent_at = now(), total_sent = total_sent + 1` (by template_code).
+### 6. `correct-pan-aadhaar` — "Correct PAN / Aadhaar Name in Udyam — Incomplete Information"
+Stage 1 fields: applicant_name, udyam_number, registered_mobile, registered_email, correction_required (textarea).
+Stage 2 (`CORRECT_PAN_AADHAAR_STAGE2`) reuses the full New Udyam field set after Stage 1 is submitted. **Documents:** none.
 
-### 3. Server functions (extend `emails-admin.functions.ts`)
-- `toggleTemplate({code, enabled, reason?})` — admin/super_admin only; stamps `last_toggled_by`/`last_toggled_at`.
-- `previewTemplate({code})` — renders subject + body_html with `previewData` (dummy variables) using existing `renderTemplate`.
+### 7. `talk-to-expert` — "Talk to Expert — Consultation Booked"
+No fields, no documents. Goes straight to thank-you page; team calls the registered mobile.
 
-### 4. UI (`/admin/email-templates`)
-- Add columns: Status (toggle switch — green/grey) | Last Sent (IST) | Sent Count.
-- Disabling opens confirm dialog with reason textarea ("Disabling this template means … emails will NOT be sent. Are you sure?"); enabling toggles without confirm.
-- "Preview" button opens a modal showing rendered subject + HTML iframe with dummy values.
+### Fallback
+Any unmapped `service_code` falls back to `NEW_UDYAM`.
+
+### Upload constraints (all services that have docs)
+Max 5 MB per file; allowed: PDF, JPG, PNG, WEBP.
 
 ---
 
-## Rules respected
-- All status/assignment changes write to `application_events`.
-- IST dates formatted DD-MM-YYYY HH:MM AM/PM in UI.
-- No hard deletes; pool uses `is_active` flag for soft disable.
-- `supabaseAdmin` only in `.server.ts` / server-fn handlers, never client.
-- Role gating via existing `useRole` / `has_role()`; no buttons rendered for users lacking permission.
-- New tables include explicit GRANTs + RLS in same migration.
+## Part 2 — Restore payment flow + redesign post-payment countdown
+
+### Problem
+- `src/components/site/LeadForm.tsx` (line 46) currently redirects to `/processing/$leadCode`, which loops a 30s countdown forever ("payment flow temporarily disabled").
+- `src/routes/success.$leadCode.tsx` uses a different 30-second phase UI after payment; you want it replaced with a 60-second countdown that matches the visual design of the processing page, with copy adapted to the post-payment context.
+
+### Changes
+
+**A. `src/components/site/LeadForm.tsx`** — restore payment redirect.
+- Line 46: change `to: "/processing/$leadCode"` → `to: "/payment/$leadCode"`.
+
+**B. `src/routes/app.$token.tsx`** — same restoration for the magic-link return path.
+- Line 77 + line 103: redirect / link to `/payment/$leadCode` instead of `/processing/$leadCode` (only when the lead is not yet paid; if already paid keep current logic that routes to success/onboarding).
+
+**C. `src/routes/processing.$leadCode.tsx`** — stop the indefinite loop.
+- Remove the `setElapsed(0); setCycles(...)` loop. When countdown hits 0, navigate to `/payment/$leadCode`. Keep the page as a graceful fallback in case any flow lands here, but it will no longer be the primary post-lead destination.
+
+**D. `src/routes/success.$leadCode.tsx`** — rebuild as a 60-second post-payment countdown using the processing-page design.
+- Keep the existing payment-confirmation polling logic (poll `getApplicationSummary` until paid; redirect to `/payment-pending/$leadCode` if not confirmed).
+- Once confirmed, render the same visual shell as `processing.$leadCode.tsx` (concentric rotating rings, gradient sweep, center icon, large remaining-seconds counter, gradient progress bar, 4 step pips, ambient blur background, `TrustBlock` below).
+- `TOTAL_SECONDS = 60`. Single linear countdown (no looping).
+- New post-payment step sequence (4 pips, each ~15s):
+  1. 0s — ShieldCheck — "Payment received securely" / "Confirming transaction with bank"
+  2. 15s — FileCheck2 — "Preparing your onboarding form" / "Setting up your secure form"
+  3. 30s — Sparkles — "Personalising your application" / "Tailoring fields to your service"
+  4. 45s — CheckCircle2 — "Almost ready" / "Opening your form in a moment"
+- At 0 remaining → `navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true })`.
+- Keep the existing loading state, error state, and "Ref: {leadCode}" footer. Drop the rotating colour palette / `PHASE_STEPS` window logic — match the processing page exactly so both countdowns feel like one continuous brand experience.
+- Helper text below counter: "Please don't close or refresh this window. Your form is being prepared."
+
+### Out of scope
+- No changes to onboarding form schemas, payment gateway code, or webhook handlers.
+- Sitemap and any other `/processing` references stay as-is (the route still exists as a fallback).
