@@ -183,18 +183,24 @@ function SeoTree({
 }) {
   const expandedAll = () =>
     Object.fromEntries(CATEGORIES.filter((c) => !c.isHome).map((c) => [c.key, true]));
-  const [unlocked, setUnlocked] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.sessionStorage.getItem("udyam_footer_unlock") === "1";
-  });
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return {};
-    return window.sessionStorage.getItem("udyam_footer_unlock") === "1" ? expandedAll() : {};
-  });
+  const [mounted, setMounted] = useState(false);
+  const [unlocked, setUnlocked] = useState<boolean>(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [clicks, setClicks] = useState(0);
   const [showPwd, setShowPwd] = useState(false);
   const [pwd, setPwd] = useState("");
   const [pwdError, setPwdError] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      if (window.sessionStorage.getItem("udyam_footer_unlock") === "1") {
+        setUnlocked(true);
+        setExpanded(expandedAll());
+      }
+    } catch { /* ignore */ }
+  }, []);
+
 
   const grouped = useMemo(() => {
     const map = new Map<string, SeoPageRow[]>();
