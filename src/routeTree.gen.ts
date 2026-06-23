@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WwwUdyamregistrationGovInRouteImport } from './routes/www-udyamregistration-gov-in'
 import { Route as WwwUdyamregistrationRouteImport } from './routes/www-udyamregistration'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
+import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as UdyogAadharUpdateRouteImport } from './routes/udyog-aadhar-update'
 import { Route as UdyogAadharRegistrationOnlineRouteImport } from './routes/udyog-aadhar-registration-online'
 import { Route as UdyogAadharRegistration2RouteImport } from './routes/udyog-aadhar-registration-2'
@@ -260,6 +261,11 @@ const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
 const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
   id: '/update-udyam-certificate',
   path: '/update-udyam-certificate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UnauthorizedRoute = UnauthorizedRouteImport.update({
+  id: '/unauthorized',
+  path: '/unauthorized',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UdyogAadharUpdateRoute = UdyogAadharUpdateRouteImport.update({
@@ -1641,6 +1647,7 @@ export interface FileRoutesByFullPath {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -1878,6 +1885,7 @@ export interface FileRoutesByTo {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -2115,6 +2123,7 @@ export interface FileRoutesById {
   '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/udyog-aadhar-registration-online': typeof UdyogAadharRegistrationOnlineRoute
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
+  '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
@@ -2355,6 +2364,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -2592,6 +2602,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -2828,6 +2839,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-registration-2'
     | '/udyog-aadhar-registration-online'
     | '/udyog-aadhar-update'
+    | '/unauthorized'
     | '/update-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
@@ -3067,6 +3079,7 @@ export interface RootRouteChildren {
   UdyogAadharRegistration2Route: typeof UdyogAadharRegistration2Route
   UdyogAadharRegistrationOnlineRoute: typeof UdyogAadharRegistrationOnlineRoute
   UdyogAadharUpdateRoute: typeof UdyogAadharUpdateRoute
+  UnauthorizedRoute: typeof UnauthorizedRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
@@ -3118,6 +3131,13 @@ declare module '@tanstack/react-router' {
       path: '/update-udyam-certificate'
       fullPath: '/update-udyam-certificate'
       preLoaderRoute: typeof UpdateUdyamCertificateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/unauthorized': {
+      id: '/unauthorized'
+      path: '/unauthorized'
+      fullPath: '/unauthorized'
+      preLoaderRoute: typeof UnauthorizedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/udyog-aadhar-update': {
@@ -5106,6 +5126,7 @@ const rootRouteChildren: RootRouteChildren = {
   UdyogAadharRegistration2Route: UdyogAadharRegistration2Route,
   UdyogAadharRegistrationOnlineRoute: UdyogAadharRegistrationOnlineRoute,
   UdyogAadharUpdateRoute: UdyogAadharUpdateRoute,
+  UnauthorizedRoute: UnauthorizedRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
