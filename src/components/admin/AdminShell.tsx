@@ -15,6 +15,8 @@ import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
+import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
+import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import type { Module } from "@/lib/roles";
 
 type NavItem = { to: string; label: string; icon: typeof Users; module?: Module };
