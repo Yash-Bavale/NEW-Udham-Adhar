@@ -15,6 +15,8 @@ import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
+import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
+import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import type { Module } from "@/lib/roles";
 
 type NavItem = { to: string; label: string; icon: typeof Users; module?: Module };
@@ -82,6 +84,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     .filter((g) => g.items.length > 0);
   const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { unseen: newLeads } = useNewLeadsWatcher();
 
   useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
 
@@ -128,6 +131,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                 {group.items.map((n) => {
                   const active = isActive(n.to);
                   const Icon = n.icon;
+                  const badge = n.to === "/admin/leads" && newLeads > 0 ? newLeads : 0;
                   return (
                     <Link
                       key={n.to}
@@ -140,7 +144,15 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                       }}
                     >
                       <Icon className="size-4 shrink-0" />
-                      <span className="truncate">{n.label}</span>
+                      <span className="truncate flex-1">{n.label}</span>
+                      {badge > 0 && (
+                        <span
+                          className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
+                          style={{ background: "var(--admin-danger)", color: "#fff" }}
+                        >
+                          {badge > 99 ? "99+" : badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -184,6 +196,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         </header>
 
         <div className="flex-1 p-6 pb-24 md:pb-6 w-full max-w-[1400px] mx-auto">
+          <NotificationsOptIn />
           {children}
         </div>
       </main>
