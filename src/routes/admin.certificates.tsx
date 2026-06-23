@@ -65,6 +65,16 @@ function CertificatesPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
+  const handleResend = async (applicationId: string | null | undefined) => {
+    if (!applicationId) { toast.error("This certificate is not linked to an order."); return; }
+    if (!confirm("Resend the certificate to the customer with a fresh download link?")) return;
+    try {
+      const res = await resendFn({ data: { orderId: applicationId } });
+      toast.success(`Certificate resent to ${res.resentTo}`);
+      qc.invalidateQueries({ queryKey: ["admin.certificates"] });
+    } catch (e: any) { toast.error(e?.message ?? "Resend failed"); }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
