@@ -146,6 +146,7 @@ function EmployeesPage() {
       <Tabs defaultValue="directory">
         <TabsList>
           <TabsTrigger value="directory">Directory</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="assignment">Lead Assignment</TabsTrigger>
         </TabsList>
 
