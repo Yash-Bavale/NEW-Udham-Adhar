@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead,
@@ -12,6 +12,7 @@ import { LEAD_STATUSES } from "@/lib/crm/types";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import { LeadsBulkBar } from "@/components/admin/LeadsBulkBar";
 import { SavedFiltersMenu } from "@/components/admin/SavedFiltersMenu";
+import { ConfirmModal } from "@/components/admin/primitives/ConfirmModal";
 import {
   bulkUpdateLeadStatus, bulkAssignLeads, bulkDeleteLeads, exportLeadsCsv,
 } from "@/lib/crm/leads-bulk.functions";
@@ -40,6 +41,7 @@ function LeadsPage() {
   const staffFn = useServerFn(listStaff);
 
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
@@ -52,8 +54,15 @@ function LeadsPage() {
   const [defaultApplied, setDefaultApplied] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const role = useRole();
+
+  // Debounce the search input → committed `search` (300ms).
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -75,6 +84,7 @@ function LeadsPage() {
     const def = savedData.rows.find((r) => r.is_default);
     if (def) {
       const f = def.filter_json as FilterJson;
+      setSearchInput(f.search ?? "");
       setSearch(f.search ?? "");
       setStatus(f.status ?? "");
     }
@@ -151,15 +161,16 @@ function LeadsPage() {
       clearSel(); refresh();
     } finally { setBusy(false); }
   };
-  const handleBulkDelete = async () => {
-    const ids = Array.from(selected);
-    const typed = prompt(`Type DELETE to confirm permanent deletion of ${ids.length} lead(s).\nLeads with payments will be skipped.`);
-    if (typed !== "DELETE") return;
+  const handleBulkDelete = () => setConfirmDeleteOpen(true);
+  const performBulkDelete = async () => {
     setBusy(true);
     try {
-      const res = await deleteFn({ data: { ids } });
-      alert(`Deleted ${res.deleted}, skipped ${res.blocked} (have payments).`);
+      const res = await deleteFn({ data: { ids: Array.from(selected) } });
+      toast.success(`Deleted ${res.deleted} lead(s)${res.blocked ? ` — skipped ${res.blocked} with payments` : ""}.`);
       clearSel(); refresh();
+      setConfirmDeleteOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Bulk delete failed");
     } finally { setBusy(false); }
   };
 
@@ -191,6 +202,7 @@ function LeadsPage() {
           <SavedFiltersMenu
             currentFilter={filter}
             onApply={(f) => {
+              setSearchInput(f.search ?? "");
               setSearch(f.search ?? "");
               setStatus(f.status ?? "");
               setPage(1);
@@ -224,8 +236,8 @@ function LeadsPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: "var(--admin-fg-muted)" }} />
           <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search code, name, email, mobile…"
             className="rounded-lg border pl-9 pr-3 py-2 text-sm w-80 outline-none focus:ring-2"
             style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
@@ -330,6 +342,11 @@ function LeadsPage() {
               <tbody>
                 {rows.map((l: any) => {
                   const checked = selected.has(l.id);
+                  const ageMs = Date.now() - new Date(l.created_at).getTime();
+                  const stale = !l.assigned_to && ageMs > 24 * 60 * 60 * 1000;
+                  const rowBg = checked
+                    ? "var(--admin-surface-2)"
+                    : stale ? "rgba(251, 191, 36, 0.08)" : undefined;
                   return (
                     <tr
                       key={l.id}
@@ -337,8 +354,9 @@ function LeadsPage() {
                         if ((e.target as HTMLElement).closest("input,a,button")) return;
                         setOpenId(l.id);
                       }}
-                      className={`border-t cursor-pointer hover:bg-[var(--admin-surface-2)] ${checked ? "bg-[var(--admin-surface-2)]" : ""}`}
-                      style={{ borderColor: "var(--admin-border)" }}
+                      className="border-t cursor-pointer hover:bg-[var(--admin-surface-2)] transition-colors"
+                      style={{ borderColor: "var(--admin-border)", background: rowBg, borderLeft: stale ? "3px solid #F59E0B" : undefined }}
+                      title={stale ? "Unassigned for over 24h" : undefined}
                     >
                       <td className="px-3 py-2.5">
                         <input
@@ -379,7 +397,15 @@ function LeadsPage() {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={12} className="px-3 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>No leads found.</td></tr>
+                  <tr>
+                    <td colSpan={12} className="px-3 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2" style={{ color: "var(--admin-fg-muted)" }}>
+                        <UsersIcon className="size-8 opacity-40" />
+                        <div className="text-sm font-medium">No leads match your filters</div>
+                        <div className="text-xs">Try clearing filters, or use “Add Lead” to create one.</div>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -414,6 +440,23 @@ function LeadsPage() {
         onOpenChange={setShowAdd}
         staff={staffData?.profiles ?? []}
         onCreated={refresh}
+      />
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title={`Delete ${selected.size} lead${selected.size === 1 ? "" : "s"}?`}
+        description={
+          <div className="space-y-2">
+            <p>This permanently removes the selected lead{selected.size === 1 ? "" : "s"} and all associated notes.</p>
+            <p className="text-xs text-amber-700">Leads with linked payments will be skipped automatically.</p>
+          </div>
+        }
+        confirmWord="DELETE"
+        confirmLabel="Delete leads"
+        danger
+        loading={busy}
+        onConfirm={performBulkDelete}
       />
     </div>
   );
