@@ -6,7 +6,10 @@ import {
   AlertTriangle, CheckCircle2, XCircle, Loader2,
   Calendar as CalendarIcon, FileText, Receipt, Trash2,
   Phone, FileWarning, Repeat2, Sparkles,
+  Copy, Mail, MessageCircle, BellRing, User as UserIcon,
 } from "lucide-react";
+import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
+import { CopyButton } from "@/components/admin/primitives/CopyButton";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -72,6 +75,8 @@ export function LeadWorkspacePanel({
         <EventsTimeline leadId={lead.id} />
       </div>
       <div className="space-y-5">
+        <CustomerQuickCard lead={lead} />
+        <QuickActionsCard lead={lead} />
         <PaymentLinkPanel
           leadId={lead.id}
           leadCode={lead.lead_code}
@@ -87,6 +92,121 @@ export function LeadWorkspacePanel({
         <LinkedOrderPanel applications={applications} />
         <DocumentsPanel applications={applications} />
       </div>
+    </div>
+  );
+}
+
+/* ------------------- Customer Quick Card ------------------- */
+
+function CustomerQuickCard({ lead }: { lead: LeadShape }) {
+  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
+  const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  return (
+    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <UserIcon className="size-4 text-slate-600" />
+        <h3 className="text-sm font-semibold">Customer</h3>
+      </div>
+      <div className="text-sm space-y-1.5">
+        <div className="font-medium text-slate-900">{lead.name}</div>
+        {lead.mobile && (
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-slate-600 tabular-nums">{lead.mobile}</span>
+            <CopyButton value={lead.mobile} label="Copy" />
+          </div>
+        )}
+        {lead.email && (
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-slate-600 truncate" title={lead.email}>{lead.email}</span>
+            <CopyButton value={lead.email} label="Copy" />
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 pt-1">
+        {waUrl && (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100"
+          >
+            <MessageCircle className="size-3.5" /> WhatsApp
+          </a>
+        )}
+        {lead.email && (
+          <a
+            href={`mailto:${lead.email}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Mail className="size-3.5" /> Email
+          </a>
+        )}
+        {lead.mobile && (
+          <a
+            href={`tel:${lead.mobile}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Phone className="size-3.5" /> Call
+          </a>
+        )}
+      </div>
+      {lead.customer_id && (
+        <a
+          href={`/admin/customers/${lead.customer_id}`}
+          className="block text-xs text-blue-600 hover:underline pt-1"
+        >
+          Open customer 360 →
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ------------------- Quick Actions Card ------------------- */
+
+function QuickActionsCard({ lead }: { lead: LeadShape }) {
+  const reminderFn = useServerFn(queueDocumentReminder);
+  const [busy, setBusy] = useState(false);
+
+  const formLink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/onboarding/${lead.lead_code}`
+      : `/onboarding/${lead.lead_code}`;
+
+  const sendReminder = async () => {
+    setBusy(true);
+    try {
+      const res = await reminderFn({ data: { leadId: lead.id } });
+      toast.success(`Reminder queued to ${res.queuedTo}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to queue reminder");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2">
+        <Sparkles className="size-4 text-slate-600" />
+        <h3 className="text-sm font-semibold">Quick Actions</h3>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || !lead.email}
+          onClick={sendReminder}
+          className="justify-start text-xs"
+        >
+          <BellRing className="size-3.5 mr-1.5" />
+          {busy ? "Sending…" : "Send Documents Reminder"}
+        </Button>
+        <CopyButton value={formLink} label="Copy Onboarding Link" className="justify-start" />
+      </div>
+      {!lead.email && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          Add a customer email to enable reminders.
+        </div>
+      )}
     </div>
   );
 }
