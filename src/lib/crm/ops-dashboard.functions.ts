@@ -276,7 +276,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
 
     // Documents pending list (latest 8)
     const pendingDocApps = apps
-      .filter((a: any) => a.document_status && a.document_status !== "verified" && a.application_status !== "completed")
+      .filter((a: any) => a.document_status && a.document_status !== "approved" && a.application_status !== "completed")
       .slice(0, 8);
     const documentsPending = pendingDocApps.map((a: any) => {
       const lead = leadById.get(a.lead_id);
