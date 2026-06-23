@@ -44,6 +44,7 @@ function SuccessPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [pendingFallback, setPendingFallback] = useState(false);
 
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
@@ -68,7 +69,7 @@ function SuccessPage() {
         await new Promise((r) => setTimeout(r, 2000));
       }
       if (cancelled) return;
-      navigate({ to: "/payment-pending/$leadCode", params: { leadCode }, replace: true });
+      setPendingFallback(true);
     })();
 
     return () => {
@@ -76,16 +77,27 @@ function SuccessPage() {
     };
   }, [leadCode, getSummary, navigate]);
 
+  // Countdown ticks immediately on mount, independent of confirmation.
   useEffect(() => {
-    if (!confirmed || error) return;
-    if (elapsed >= TOTAL_SECONDS) {
-      trackEvent("post_payment_auto_redirect", { leadCode, cancelled: false });
-      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
-      return;
-    }
+    if (error) return;
+    if (elapsed >= TOTAL_SECONDS) return;
     const t = setTimeout(() => setElapsed((s) => s + 1), 1000);
     return () => clearTimeout(t);
-  }, [confirmed, error, elapsed, leadCode, navigate]);
+  }, [elapsed, error]);
+
+  // Redirect logic: requires both countdown done AND payment confirmed.
+  // If polling exhausted without confirmation, fall back to pending page.
+  useEffect(() => {
+    if (error) return;
+    if (pendingFallback && elapsed >= TOTAL_SECONDS) {
+      navigate({ to: "/payment-pending/$leadCode", params: { leadCode }, replace: true });
+      return;
+    }
+    if (confirmed && elapsed >= TOTAL_SECONDS) {
+      trackEvent("post_payment_auto_redirect", { leadCode, cancelled: false });
+      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
+    }
+  }, [confirmed, pendingFallback, elapsed, error, leadCode, navigate]);
 
   if (error) {
     return (
@@ -104,25 +116,20 @@ function SuccessPage() {
     );
   }
 
-  if (!confirmed) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-brand-red border-t-transparent rounded-full animate-spin" />
-          <p className="text-brand-navy font-semibold">Confirming payment…</p>
-          <p className="text-xs text-slate-500">This can take a few seconds.</p>
-        </div>
-      </div>
-    );
-  }
-
   const pct = Math.min(100, (elapsed / TOTAL_SECONDS) * 100);
   const remaining = Math.max(0, TOTAL_SECONDS - elapsed);
   const activeIdx = STEPS.reduce(
     (acc, s, i) => (elapsed >= s.at ? i : acc),
     0,
   );
-  const active = STEPS[activeIdx];
+  const baseActive = STEPS[activeIdx];
+  // If countdown finished but we're still waiting on webhook confirmation,
+  // hold on the last step with a subtle "finalising" sub-label.
+  const holding = elapsed >= TOTAL_SECONDS && !confirmed && !pendingFallback;
+  const active = holding
+    ? { ...baseActive, label: "Almost ready", sub: "Finalising confirmation…" }
+    : baseActive;
+
 
   return (
     <div>
