@@ -39,7 +39,7 @@ const NAV: NavGroup[] = [
     id: "overview",
     label: "Overview",
     items: [
-      { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+      { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ["admin", "super_admin"] },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
       { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads" },
       { to: "/admin/activity", label: "Activity", icon: Activity },
