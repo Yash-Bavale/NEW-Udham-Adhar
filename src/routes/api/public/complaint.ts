@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
+const FALLBACK_INTERNAL_EMAIL = "support@udyamadhar.in";
 
 const ComplaintSchema = z.object({
   name: z.string().trim().min(2).max(120),

@@ -41,9 +41,9 @@ function DocumentsPage() {
   const rows = data?.rows ?? [];
   const docTypes = data?.docTypes ?? [];
   const counts = useMemo(() => {
-    const c = { all: rows.length, verified: 0, pending: 0, rejected: 0 };
+    const c = { all: rows.length, approved: 0, pending: 0, rejected: 0 };
     rows.forEach((r) => {
-      if (r.status === "verified") c.verified++;
+      if (r.status === "approved") c.approved++;
       else if (r.status === "rejected") c.rejected++;
       else c.pending++;
     });
@@ -68,8 +68,8 @@ function DocumentsPage() {
         <FilterChip active={!status} onClick={() => setStatus(undefined)}>
           All ({counts.all})
         </FilterChip>
-        <FilterChip active={status === "verified"} onClick={() => setStatus("verified")}>
-          Verified ({counts.verified})
+        <FilterChip active={status === "approved"} onClick={() => setStatus("approved")}>
+          Approved ({counts.approved})
         </FilterChip>
         <FilterChip active={status === "pending"} onClick={() => setStatus("pending")}>
           Pending ({counts.pending})
@@ -78,6 +78,7 @@ function DocumentsPage() {
           Rejected ({counts.rejected})
         </FilterChip>
       </div>
+
 
       <SectionCard>
         <div className="p-4 flex flex-wrap items-center gap-3 border-b" style={{ borderColor: "var(--admin-border)" }}>
