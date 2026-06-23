@@ -392,7 +392,7 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       id: z.string().uuid(),
-      status: z.enum(["pending", "verified", "rejected"]),
+      status: z.enum(["pending", "approved", "rejected"]),
       remarks: z.string().max(500).optional().nullable(),
     }).parse(i),
   )
@@ -401,7 +401,7 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
     const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     const { supabase, userId } = context;
-    const verified = data.status === "verified";
+    const verified = data.status === "approved";
     const { error } = await supabase
       .from("documents")
       .update({
