@@ -28,6 +28,9 @@ type NavItem = {
   module?: Module;
   /** Only show when current user holds this role. */
   requireRole?: string;
+  /** Only show when current user holds any of these roles. */
+  requireAnyRole?: string[];
+
 };
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
@@ -36,7 +39,7 @@ const NAV: NavGroup[] = [
     id: "overview",
     label: "Overview",
     items: [
-      { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+      { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ["admin", "super_admin"] },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
       { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads" },
       { to: "/admin/activity", label: "Activity", icon: Activity },
@@ -120,7 +123,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       ...g,
       items: g.items.filter((it) =>
         (!it.module || role.can(it.module)) &&
-        (!it.requireRole || role.has(it.requireRole)),
+        (!it.requireRole || role.has(it.requireRole)) &&
+        (!it.requireAnyRole || it.requireAnyRole.some((r) => role.has(r))),
       ),
     }))
     .filter((g) => g.items.length > 0);
