@@ -117,6 +117,7 @@ function OrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <FulfillmentStatusUpdater orderId={orderId} current={current} />
+          <FormSubmissionPanel applicationId={orderId} />
           <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
         </div>
         <div className="space-y-5">
