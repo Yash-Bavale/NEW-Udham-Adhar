@@ -5,6 +5,7 @@ import { useState } from "react";
 import { getLead, updateLead, addLeadNote, listStaff } from "@/lib/crm/leads-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
+import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { LeadTimeline } from "@/components/admin/LeadTimeline";
 import { LeadFinanceTab } from "@/components/admin/LeadFinanceTab";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
