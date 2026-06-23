@@ -20,6 +20,7 @@ function CertificatesPage() {
   const uploadFn = useServerFn(uploadCertificate);
   const deliverFn = useServerFn(deliverCertificate);
   const urlFn = useServerFn(getCertificateUrl);
+  const resendFn = useServerFn(resendOrderCertificate);
 
   const [filter, setFilter] = useState<"all" | "yes" | "no">("all");
   const [search, setSearch] = useState("");
