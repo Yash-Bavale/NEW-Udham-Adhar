@@ -147,9 +147,11 @@ function EmployeesPage() {
               <Input value={query} onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, email, mobile, role…" className="pl-9" />
             </div>
-            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-              <UserPlus className="size-4" /> Add Employee
-            </Button>
+            {canManage && (
+              <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+                <UserPlus className="size-4" /> Add Employee
+              </Button>
+            )}
           </div>
 
           <SectionCard>
@@ -202,14 +204,28 @@ function EmployeesPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="inline-flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setEditRow(u)}>
-                        <Pencil className="size-3.5" /> Edit
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 gap-1"
-                        style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
-                        onClick={() => setDeactivateRow(u)}>
-                        <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
-                      </Button>
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setEditRow(u)}>
+                          <Pencil className="size-3.5" /> Edit
+                        </Button>
+                      )}
+                      {isSuper && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: "#1d4ed8" }}
+                          onClick={() => setResetPwRow(u)}>
+                          <KeyRound className="size-3.5" /> Reset Password
+                        </Button>
+                      )}
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
+                          onClick={() => setDeactivateRow(u)}>
+                          <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                      )}
+                      {!canManage && !isSuper && (
+                        <span className="text-xs" style={{ color: "var(--admin-fg-subtle)" }}>—</span>
+                      )}
                     </div>
                   </td>
                 </tr>
