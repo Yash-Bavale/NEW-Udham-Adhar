@@ -6,6 +6,8 @@ import {
   LayoutDashboard, Users, UserCircle2, ShoppingBag, FileText, MessageSquareWarning,
   Briefcase, Receipt, CreditCard, LifeBuoy, ListChecks, BarChart3, UserCog,
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
+  Inbox, GitBranch, Activity, FileCheck2, ClipboardList, Eye, Award,
+  Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
@@ -19,47 +21,81 @@ import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import type { Module } from "@/lib/roles";
 
-type NavItem = { to: string; label: string; icon: typeof Users; module?: Module };
-type NavGroup = { id: string; items: NavItem[] };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof Users;
+  module?: Module;
+  /** Only show when current user holds this role. */
+  requireRole?: string;
+};
+type NavGroup = { id: string; label: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
   {
-    id: "g1",
-    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" }],
+    id: "overview",
+    label: "Overview",
+    items: [
+      { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+      { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
+      { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads" },
+      { to: "/admin/activity", label: "Activity", icon: Activity },
+      { to: "/admin/notifications", label: "Notifications", icon: Bell },
+    ],
   },
   {
-    id: "g2",
+    id: "sales",
+    label: "Sales",
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads" },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+      { to: "/admin/applications", label: "Applications", icon: FileCheck2, module: "orders" },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents" },
+      { to: "/admin/submissions", label: "Submissions", icon: ClipboardList, module: "documents" },
+      { to: "/admin/review", label: "Review", icon: Eye, module: "documents" },
     ],
   },
   {
-    id: "g3",
+    id: "service",
+    label: "Service",
     items: [
       { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints" },
-      { to: "/admin/services", label: "Services", icon: Briefcase },
-      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
-      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments" },
-    ],
-  },
-  {
-    id: "g4",
-    items: [
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets" },
       { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
-      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
+      { to: "/admin/services", label: "Services", icon: Briefcase },
     ],
   },
   {
-    id: "g5",
+    id: "finance",
+    label: "Finance",
+    items: [
+      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments" },
+      { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments" },
+      { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments" },
+      { to: "/admin/certificates", label: "Certificates", icon: Award },
+    ],
+  },
+  {
+    id: "insights",
+    label: "Insights",
+    items: [
+      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
+      { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log" },
+      { to: "/admin/seo", label: "SEO", icon: Globe },
+    ],
+  },
+  {
+    id: "admin",
+    label: "Admin",
     items: [
       { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees" },
+      { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, module: "employees" },
       { to: "/admin/emails", label: "Email System", icon: Mail },
       { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates" },
       { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle },
+      { to: "/admin/super", label: "Super Admin", icon: ShieldAlert, requireRole: "super_admin" },
       { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
     ],
   },
