@@ -305,6 +305,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         note: z.string().max(2000).optional(),
         // Required when transitioning to `completed`
         certificateDocumentId: z.string().uuid().optional(),
+        certificateNumber: z.string().trim().min(1).max(120).optional(),
+        completionNotes: z.string().trim().max(2000).optional(),
       })
       .parse(i),
   )
@@ -314,7 +316,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, fulfillment_status, lead_id, customer_id, service_id")
+      .select("id, application_code, fulfillment_status, lead_id, customer_id, service_id")
       .eq("id", data.orderId)
       .maybeSingle();
     if (!app) throw new Error("Order not found");
@@ -328,8 +330,13 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       throw new Error(`Invalid transition: ${current} → ${target}`);
     }
 
-    if (target === "completed" && !data.certificateDocumentId) {
-      throw new Error("Certificate upload required before marking complete.");
+    if (target === "completed") {
+      if (!data.certificateDocumentId) {
+        throw new Error("Certificate upload required before marking complete.");
+      }
+      if (!data.certificateNumber || !data.certificateNumber.trim()) {
+        throw new Error("Certificate / document number is required to complete this order.");
+      }
     }
 
     // Update fulfillment status (trigger logs `status_change` event).
@@ -353,22 +360,51 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
     }
 
     if (target === "completed") {
-      // Mark application_status completed too (for legacy consumers)
+      const certNumber = data.certificateNumber!.trim();
+      const completionNotes = data.completionNotes?.trim() || null;
+      const now = new Date().toISOString();
+
+      // Mark application_status completed too (for legacy consumers) and set fulfilled_at.
       await admin
         .from("applications")
-        .update({ application_status: "completed", documents_deleted_reason: "completed" } as never)
+        .update({
+          application_status: "completed",
+          fulfilled_at: now,
+          documents_deleted_reason: "completed",
+        } as never)
         .eq("id", data.orderId);
 
-      await admin.from("application_events").insert({
-        application_id: data.orderId,
-        lead_id: app.lead_id,
-        customer_id: app.customer_id ?? null,
-        event_type: "certificate_delivered",
-        note: `Certificate uploaded (doc id ${data.certificateDocumentId}).`,
-        created_by: context.userId,
-        staff_name,
-        staff_role,
-      } as never);
+      // Lookup the uploaded certificate document so we can mirror it into
+      // the `certificates` table (single source of truth for history & resend).
+      const { data: certDoc } = await admin
+        .from("documents")
+        .select("id, file_path, file_name, mime_type")
+        .eq("id", data.certificateDocumentId!)
+        .maybeSingle();
+
+      let certificateId: string | null = null;
+      if (certDoc) {
+        const { data: certRow, error: certErr } = await admin
+          .from("certificates")
+          .insert({
+            application_id: data.orderId,
+            lead_id: app.lead_id,
+            customer_id: app.customer_id ?? null,
+            certificate_number: certNumber,
+            file_path: certDoc.file_path,
+            file_name: certDoc.file_name,
+            mime_type: certDoc.mime_type,
+            issued_at: now,
+            uploaded_by: context.userId,
+          } as never)
+          .select("id")
+          .single();
+        if (certErr) {
+          console.error("[fulfillment.complete] certificate insert failed:", certErr);
+        } else {
+          certificateId = (certRow as { id: string }).id;
+        }
+      }
 
       // Wipe other docs via the existing edge function.
       try {
@@ -391,26 +427,224 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           .eq("id", app.lead_id);
       }
 
-      // Enqueue completion email.
-      const { data: lead } = app.lead_id
-        ? await admin.from("leads").select("name, email").eq("id", app.lead_id).maybeSingle()
-        : { data: null as any };
-      if (lead?.email) {
+      // Build certificate delivery email — signed URL valid 7 days.
+      const [{ data: lead }, { data: customer }, { data: service }] = await Promise.all([
+        app.lead_id
+          ? admin.from("leads").select("name, email, mobile, service").eq("id", app.lead_id).maybeSingle()
+          : Promise.resolve({ data: null as null | { name: string | null; email: string | null; mobile: string | null; service: string | null } }),
+        app.customer_id
+          ? admin.from("customers").select("name, primary_email, primary_mobile").eq("id", app.customer_id).maybeSingle()
+          : Promise.resolve({ data: null as null | { name: string | null; primary_email: string | null; primary_mobile: string | null } }),
+        app.service_id
+          ? admin.from("services").select("service_name, service_code").eq("id", app.service_id).maybeSingle()
+          : Promise.resolve({ data: null as null | { service_name: string | null; service_code: string | null } }),
+      ]);
+
+      const recipientEmail = customer?.primary_email || lead?.email || null;
+      const recipientName = customer?.name || lead?.name || "Customer";
+      const serviceName = service?.service_name || lead?.service || "Service";
+
+      let certificateUrl: string | null = null;
+      if (certDoc?.file_path) {
+        const { data: signed } = await admin.storage
+          .from("documents")
+          .createSignedUrl(certDoc.file_path, 60 * 60 * 24 * 7);
+        certificateUrl = signed?.signedUrl ?? null;
+      }
+
+      if (recipientEmail && certificateUrl) {
         await admin.from("email_queue").insert({
-          template_code: "order_completed",
-          to_email: lead.email,
-          to_name: lead.name ?? null,
-          subject: "Your application is complete",
+          template_code: "certificate_delivery",
+          to_email: recipientEmail,
+          to_name: recipientName,
+          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+          body_html: buildCertificateEmailHtml({
+            recipientName,
+            serviceName,
+            certificateNumber: certNumber,
+            certificateUrl,
+            completionNotes,
+            orderCode: app.application_code ?? "",
+          }),
           lead_id: app.lead_id,
           application_id: data.orderId,
-          variables: { application_id: data.orderId, certificate_document_id: data.certificateDocumentId },
+          variables: {
+            customer_name: recipientName,
+            service_name: serviceName,
+            certificate_number: certNumber,
+            certificate_url: certificateUrl,
+            completion_notes: completionNotes ?? "",
+            order_code: app.application_code ?? "",
+          },
           created_by: context.userId,
         } as never);
       }
+
+      await admin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: app.lead_id,
+        customer_id: app.customer_id ?? null,
+        event_type: "application_completed",
+        new_value: "completed",
+        note:
+          `Application completed. Certificate ${certNumber}` +
+          (recipientEmail ? ` queued to ${recipientEmail}` : " (no email on file)") +
+          (completionNotes ? `. Notes: ${completionNotes}` : "."),
+        created_by: context.userId,
+        staff_name,
+        staff_role,
+      } as never);
+
+      return {
+        ok: true,
+        certificateId,
+        certificateNumber: certNumber,
+        emailQueuedTo: recipientEmail,
+      };
     }
 
     return { ok: true };
   });
+
+/** Resend the latest certificate for an order. Generates a fresh 7-day signed URL. */
+export const resendOrderCertificate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ orderId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    const { data: cert, error: certErr } = await admin
+      .from("certificates")
+      .select("id, file_path, certificate_number, lead_id, customer_id, application_id")
+      .eq("application_id", data.orderId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (certErr) throw new Error(certErr.message);
+    if (!cert) throw new Error("No certificate has been issued for this order yet.");
+    if (!cert.file_path) throw new Error("Certificate file is missing — cannot resend.");
+
+    const { data: signed } = await admin.storage
+      .from("documents")
+      .createSignedUrl(cert.file_path, 60 * 60 * 24 * 7);
+    if (!signed?.signedUrl) throw new Error("Could not generate a fresh download link.");
+
+    const [{ data: app }, { data: customer }, { data: lead }] = await Promise.all([
+      admin.from("applications").select("application_code, service_id, lead_id, customer_id").eq("id", data.orderId).maybeSingle(),
+      cert.customer_id
+        ? admin.from("customers").select("name, primary_email").eq("id", cert.customer_id).maybeSingle()
+        : Promise.resolve({ data: null as null | { name: string | null; primary_email: string | null } }),
+      cert.lead_id
+        ? admin.from("leads").select("name, email, service").eq("id", cert.lead_id).maybeSingle()
+        : Promise.resolve({ data: null as null | { name: string | null; email: string | null; service: string | null } }),
+    ]);
+
+    const serviceRow = app?.service_id
+      ? (await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()).data
+      : null;
+
+    const recipientEmail = customer?.primary_email || lead?.email || null;
+    const recipientName = customer?.name || lead?.name || "Customer";
+    const serviceName = serviceRow?.service_name || lead?.service || "Service";
+
+    if (!recipientEmail) {
+      throw new Error("No email address on file for this customer — cannot resend certificate.");
+    }
+
+    await admin.from("email_queue").insert({
+      template_code: "certificate_delivery",
+      to_email: recipientEmail,
+      to_name: recipientName,
+      subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
+      body_html: buildCertificateEmailHtml({
+        recipientName,
+        serviceName,
+        certificateNumber: cert.certificate_number ?? "",
+        certificateUrl: signed.signedUrl,
+        completionNotes: null,
+        orderCode: app?.application_code ?? "",
+        resend: true,
+      }),
+      lead_id: cert.lead_id,
+      application_id: data.orderId,
+      variables: {
+        customer_name: recipientName,
+        service_name: serviceName,
+        certificate_number: cert.certificate_number,
+        certificate_url: signed.signedUrl,
+        resend: true,
+      },
+      created_by: context.userId,
+    } as never);
+
+    const { staff_name, staff_role } = await getStaff(context.userId);
+    await admin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: cert.lead_id,
+      customer_id: cert.customer_id ?? null,
+      event_type: "certificate_resent",
+      note: `Certificate ${cert.certificate_number ?? ""} resent to ${recipientEmail}.`,
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
+
+    return { ok: true, resentTo: recipientEmail };
+  });
+
+function buildCertificateEmailHtml(opts: {
+  recipientName: string;
+  serviceName: string;
+  certificateNumber: string;
+  certificateUrl: string;
+  completionNotes: string | null;
+  orderCode: string;
+  resend?: boolean;
+}): string {
+  const notesBlock = opts.completionNotes
+    ? `<p style="margin:16px 0 0 0;padding:12px;background:#f8fafc;border-left:3px solid #0f3460;color:#334155;font-size:13px">
+         <strong>Note from our team:</strong><br/>${escapeHtml(opts.completionNotes)}
+       </p>`
+    : "";
+  const resendBanner = opts.resend
+    ? `<p style="margin:0 0 16px 0;padding:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;color:#92400e;font-size:12px">
+         This is a fresh copy of your certificate, sent again at your request.
+       </p>`
+    : "";
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#0f172a">
+      ${resendBanner}
+      <h2 style="color:#0f3460;margin:0 0 12px 0">Your ${escapeHtml(opts.serviceName)} is complete</h2>
+      <p>Dear ${escapeHtml(opts.recipientName)},</p>
+      <p>Congratulations — your application has been successfully processed.</p>
+      <p style="margin:16px 0 8px 0"><strong>Certificate / Document Number:</strong><br/>
+        <span style="font-family:monospace;font-size:15px;color:#0f3460">${escapeHtml(opts.certificateNumber)}</span>
+      </p>
+      <p style="text-align:center;margin:28px 0">
+        <a href="${opts.certificateUrl}"
+           style="background:#0f3460;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
+          Download Certificate
+        </a>
+      </p>
+      <p style="font-size:12px;color:#64748b;margin:0">This download link is valid for 7 days. Save the file locally for future reference.</p>
+      ${notesBlock}
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
+      <p style="font-size:12px;color:#94a3b8;margin:0">Order: ${escapeHtml(opts.orderCode || "—")}</p>
+    </div>`;
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 
 /* ----------------------------- Document upload (cert + internal) -------- */
 

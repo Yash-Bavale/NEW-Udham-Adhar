@@ -3,12 +3,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listCertificates, uploadCertificate, deliverCertificate, getCertificateUrl } from "@/lib/crm/certificates.functions";
+import { resendOrderCertificate } from "@/lib/crm/orders-v2.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Award, Upload, Send, Eye, Loader2, Search } from "lucide-react";
+import { Award, Upload, Send, Eye, Loader2, Search, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/certificates")({ component: CertificatesPage });
@@ -19,6 +20,7 @@ function CertificatesPage() {
   const uploadFn = useServerFn(uploadCertificate);
   const deliverFn = useServerFn(deliverCertificate);
   const urlFn = useServerFn(getCertificateUrl);
+  const resendFn = useServerFn(resendOrderCertificate);
 
   const [filter, setFilter] = useState<"all" | "yes" | "no">("all");
   const [search, setSearch] = useState("");
@@ -61,6 +63,16 @@ function CertificatesPage() {
       const { url } = await urlFn({ data: { certificateId: id } });
       if (url) window.open(url, "_blank", "noopener");
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  const handleResend = async (applicationId: string | null | undefined) => {
+    if (!applicationId) { toast.error("This certificate is not linked to an order."); return; }
+    if (!confirm("Resend the certificate to the customer with a fresh download link?")) return;
+    try {
+      const res = await resendFn({ data: { orderId: applicationId } });
+      toast.success(`Certificate resent to ${res.resentTo}`);
+      qc.invalidateQueries({ queryKey: ["admin.certificates"] });
+    } catch (e: any) { toast.error(e?.message ?? "Resend failed"); }
   };
 
   return (
@@ -140,6 +152,11 @@ function CertificatesPage() {
                   <td className="py-3 px-4 text-right space-x-1">
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handlePreview(c.id)}><Eye className="w-3 h-3 mr-1" />View</Button>
                     {!c.delivered_at && <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-600" onClick={() => handleDeliver(c.id)}><Send className="w-3 h-3 mr-1" />Deliver</Button>}
+                    {c.delivered_at && c.application_id && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600" onClick={() => handleResend(c.application_id)}>
+                        <RefreshCw className="w-3 h-3 mr-1" />Resend
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
