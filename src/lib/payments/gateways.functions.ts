@@ -91,6 +91,14 @@ const UpdateContact = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+  // Ownership proof — caller must echo back the email OR mobile already on
+  // the lead. Without this, anyone who guesses a lead_code could repurpose
+  // someone else's application. This is the public customer-facing edit flow
+  // (apply.$leadCode.summary.tsx) so we cannot use requireSupabaseAuth.
+  currentEmail: z.string().trim().email().max(160).optional(),
+  currentMobile: z.string().trim().regex(/^[6-9]\d{9}$/).optional(),
+}).refine((v) => v.currentEmail || v.currentMobile, {
+  message: "currentEmail or currentMobile is required to prove ownership",
 });
 
 export const updateLeadContact = createServerFn({ method: "POST" })
@@ -100,12 +108,20 @@ export const updateLeadContact = createServerFn({ method: "POST" })
     // Only allow edits before payment is captured
     const { data: lead } = await supabaseAdmin
       .from("leads")
-      .select("id, status")
+      .select("id, status, email, mobile")
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (!lead) throw new Error("Application not found");
     if (lead.status === "payment_successful" || lead.status === "completed") {
       throw new Error("Details can't be changed after payment.");
+    }
+
+    // Verify caller owns this lead by matching one of the existing contact fields.
+    const emailMatches = data.currentEmail &&
+      lead.email && lead.email.toLowerCase() === data.currentEmail.toLowerCase();
+    const mobileMatches = data.currentMobile && lead.mobile === data.currentMobile;
+    if (!emailMatches && !mobileMatches) {
+      throw new Error("Verification failed. Please contact support.");
     }
 
     const { error } = await supabaseAdmin
@@ -119,6 +135,7 @@ export const updateLeadContact = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 // ── Admin: gateway management ──
 
