@@ -181,3 +181,140 @@ export const updateSubmissionStatus = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+// ───────── New: per-application "Form Submission" panel + Resend link ─────────
+
+export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ applicationId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: app, error: appErr } = await supabase
+      .from("applications")
+      .select(
+        "id, application_code, lead_id, service_id, form_status, fulfillment_status, application_status, created_at",
+      )
+      .eq("id", data.applicationId)
+      .maybeSingle();
+    if (appErr) throw new Error(appErr.message);
+    if (!app) throw new Error("Application not found");
+
+    const [{ data: lead }, { data: submission }, { data: docs }, { data: service }] =
+      await Promise.all([
+        supabase
+          .from("leads")
+          .select("id, lead_code, name, email, mobile, service")
+          .eq("id", app.lead_id!)
+          .maybeSingle(),
+        supabase
+          .from("onboarding_submissions")
+          .select("id, service_code, form_data, status, submitted_at, updated_at")
+          .eq("application_id", app.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("documents")
+          .select(
+            "id, doc_type, file_name, file_path, mime_type, size_bytes, status, remarks, uploaded_at",
+          )
+          .eq("application_id", app.id)
+          .order("uploaded_at", { ascending: false }),
+        app.service_id
+          ? supabase
+              .from("services")
+              .select("id, service_code, service_name")
+              .eq("id", app.service_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+
+    // Fallback: submission may not yet be linked to the application (legacy rows)
+    let sub = submission;
+    if (!sub && app.lead_id) {
+      const { data: bylead } = await supabase
+        .from("onboarding_submissions")
+        .select("id, service_code, form_data, status, submitted_at, updated_at")
+        .eq("lead_id", app.lead_id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      sub = bylead;
+    }
+
+    const serviceCode = sub?.service_code ?? (service as any)?.service_code ?? null;
+
+    let requiredDocs: Array<{ key: string; label: string; required: boolean }> = [];
+    if (serviceCode) {
+      const { data: schema } = await supabase
+        .from("service_form_schemas")
+        .select("documents")
+        .eq("service_code", serviceCode)
+        .eq("is_active", true)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const docList = (schema?.documents as any[]) ?? [];
+      requiredDocs = docList.map((d) => ({
+        key: String(d.key ?? d.type ?? ""),
+        label: String(d.label ?? d.name ?? d.key ?? ""),
+        required: d.required !== false,
+      }));
+    }
+
+    return {
+      application: app,
+      lead: lead ?? null,
+      service: service ?? null,
+      submission: sub ?? null,
+      documents: docs ?? [],
+      requiredDocs,
+      serviceCode,
+    };
+  });
+
+export const resendFormLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    const { supabase, userId } = context;
+
+    const { data: lead, error } = await supabase
+      .from("leads")
+      .select("id, lead_code, name, email, mobile, service")
+      .eq("id", data.leadId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!lead?.email) throw new Error("Lead has no email on file");
+
+    const origin =
+      process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
+    const formLink = `${origin}/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`;
+
+    await enqueueFromTemplateInternal(
+      "welcome_and_form_link",
+      lead.email,
+      {
+        name: lead.name ?? "",
+        leadCode: lead.lead_code ?? "",
+        service: lead.service ?? "",
+        formLink,
+        mobile: lead.mobile ?? "",
+      },
+      { toName: lead.name ?? undefined, leadId: lead.id },
+    );
+
+    await supabaseAdmin.from("activity_logs").insert({
+      lead_id: lead.id,
+      user_id: userId,
+      activity_type: "form_link_resent",
+      activity_description: `Form link resent to ${lead.email}`,
+    });
+
+    return { ok: true, email: lead.email, formLink };
+  });
