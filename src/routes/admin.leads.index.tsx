@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar, Users as UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead,
@@ -12,6 +12,7 @@ import { LEAD_STATUSES } from "@/lib/crm/types";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import { LeadsBulkBar } from "@/components/admin/LeadsBulkBar";
 import { SavedFiltersMenu } from "@/components/admin/SavedFiltersMenu";
+import { ConfirmModal } from "@/components/admin/primitives/ConfirmModal";
 import {
   bulkUpdateLeadStatus, bulkAssignLeads, bulkDeleteLeads, exportLeadsCsv,
 } from "@/lib/crm/leads-bulk.functions";
