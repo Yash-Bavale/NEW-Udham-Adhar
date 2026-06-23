@@ -26,6 +26,17 @@ function GatewaysPage() {
         </p>
       </div>
 
+      <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="font-semibold">CCAvenue webhooks are not HMAC-signed</div>
+        <p className="mt-1">
+          CCAvenue's standard checkout does not sign webhook callbacks with HMAC — verification relies on the
+          encrypted response from CCAvenue plus our own order lookup. This is an architectural limitation of the
+          provider, not a configuration bug. Keep CCAvenue disabled unless you've reviewed the webhook handler
+          and accept this tradeoff. PayU webhooks are fully signature-verified.
+        </p>
+      </div>
+
+
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
