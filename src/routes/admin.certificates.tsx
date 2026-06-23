@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listCertificates, uploadCertificate, deliverCertificate, getCertificateUrl } from "@/lib/crm/certificates.functions";
+import { resendOrderCertificate } from "@/lib/crm/orders-v2.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
