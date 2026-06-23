@@ -438,3 +438,81 @@ import { useEffect } from "react";
 function useMemoOnRow(row: Row | null, cb: (r: Row) => void) {
   useEffect(() => { if (row) cb(row); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [row?.id]);
 }
+
+function ResetPasswordDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const fn = useServerFn(resetEmployeePassword);
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!row) return null;
+
+  function reset() { setPw(""); setConfirm(""); setShow(false); setErr(null); }
+
+  async function submit() {
+    if (!row) return;
+    setErr(null);
+    if (pw.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    if (pw !== confirm) { setErr("Passwords do not match."); return; }
+    setBusy(true);
+    try {
+      await fn({ data: { user_id: row.id, new_password: pw } });
+      toast.success(`Password reset for ${row.email}. Share it with the employee securely.`);
+      reset();
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset password — {row.full_name ?? row.email}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Field label="Email"><Input value={row.email} disabled /></Field>
+          <Field label="New password">
+            <div className="relative">
+              <Input
+                type={show ? "text" : "password"}
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                placeholder="At least 8 characters"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                aria-label={show ? "Hide password" : "Show password"}
+              >
+                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </Field>
+          <Field label="Confirm new password">
+            <Input
+              type={show ? "text" : "password"}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+            />
+          </Field>
+          {err && <div className="text-[12px]" style={{ color: "#b91c1c" }}>{err}</div>}
+          <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+            The employee will be able to sign in immediately with the new password. No email is sent — share it through a secure channel.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { reset(); onClose(); }} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy}>{busy ? "Resetting…" : "Set Password"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
