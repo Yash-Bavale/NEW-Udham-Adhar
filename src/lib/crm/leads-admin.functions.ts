@@ -175,11 +175,27 @@ export const listLeads = createServerFn({ method: "GET" })
         .in("id", assigneeIds as string[]);
       profilesById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
     }
+    // Pull latest application + onboarding form status for each lead
+    const leadIdsRaw = (rows ?? []).map((r: any) => r.id).filter(Boolean) as string[];
+    let appsByLead: Record<string, { form_status: string | null }> = {};
+    if (leadIdsRaw.length) {
+      const { data: apps } = await admin
+        .from("applications")
+        .select("lead_id, form_status, created_at")
+        .in("lead_id", leadIdsRaw)
+        .order("created_at", { ascending: false });
+      for (const a of apps ?? []) {
+        const lid = (a as any).lead_id as string;
+        if (!appsByLead[lid]) appsByLead[lid] = { form_status: (a as any).form_status ?? null };
+      }
+    }
+
     const enriched = (rows ?? []).map((r: any) => ({
       ...r,
       assignee_name: r.assigned_to
         ? (profilesById[r.assigned_to]?.display_name || profilesById[r.assigned_to]?.email || null)
         : null,
+      form_status: appsByLead[r.id]?.form_status ?? null,
     }));
 
     return { rows: enriched, total: count || 0 };
