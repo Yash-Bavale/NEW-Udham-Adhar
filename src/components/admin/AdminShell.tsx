@@ -131,6 +131,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                 {group.items.map((n) => {
                   const active = isActive(n.to);
                   const Icon = n.icon;
+                  const badge = n.to === "/admin/leads" && newLeads > 0 ? newLeads : 0;
                   return (
                     <Link
                       key={n.to}
@@ -143,7 +144,15 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                       }}
                     >
                       <Icon className="size-4 shrink-0" />
-                      <span className="truncate">{n.label}</span>
+                      <span className="truncate flex-1">{n.label}</span>
+                      {badge > 0 && (
+                        <span
+                          className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
+                          style={{ background: "var(--admin-danger)", color: "#fff" }}
+                        >
+                          {badge > 99 ? "99+" : badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
