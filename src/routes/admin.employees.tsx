@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { UserCog, UserPlus, Pencil, Power, Search } from "lucide-react";
+import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
-  listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive,
+  listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
 } from "@/lib/crm/users-admin.functions";
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 import { useRole } from "@/hooks/useRole";
@@ -104,16 +104,19 @@ function EmployeesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
+  const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
 
   const canManage = role.access("employees") === "full";
-  if (!role.loading && !canManage) {
+  const canSee = role.access("employees") !== "none";
+  const isSuper = role.has("super_admin");
+  if (!role.loading && !canSee) {
     return (
       <SectionCard>
         <div className="p-8 text-center">
           <UserCog className="size-10 mx-auto mb-3" style={{ color: "var(--admin-fg-subtle)" }} />
           <div className="text-sm font-medium">You don't have access to Employees.</div>
           <div className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>
-            Ask a super admin to grant you the admin role.
+            Ask a super admin to grant you access.
           </div>
         </div>
       </SectionCard>
