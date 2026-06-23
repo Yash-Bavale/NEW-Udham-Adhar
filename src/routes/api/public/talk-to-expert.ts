@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
-const FALLBACK_INTERNAL_EMAIL = "vinoddaware28@gmail.com";
+const FALLBACK_INTERNAL_EMAIL = "support@udyamadhar.in";
 
 // Talk-to-Expert is a paid consultation. ₹99 + 18% GST.
 const BASE = 99;
