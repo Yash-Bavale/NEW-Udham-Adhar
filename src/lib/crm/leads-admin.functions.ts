@@ -52,6 +52,14 @@ export const updateLead = createServerFn({ method: "POST" })
 
     await assertRole(supabase, ["super_admin", "operations", "admin"]);
 
+    const financeFields = ["service", "base_amount", "gst_amount", "total_amount"];
+    const hasFinanceField = Object.keys(patch).some(k => financeFields.includes(k));
+    if (hasFinanceField) {
+      await assertRole(supabase, ["super_admin", "finance"]);
+    }
+
+    const admin = await getAdmin();
+
     // Completion gate: lead.status="completed" cannot be set manually here.
     // It is set by the fulfillment engine after certificate upload + delivery.
     if (patch.status === "completed") {
@@ -60,14 +68,6 @@ export const updateLead = createServerFn({ method: "POST" })
         throw new Error("Cannot mark lead completed manually. Complete the application via the Completion Gate (certificate upload).");
       }
     }
-
-    const financeFields = ["service", "base_amount", "gst_amount", "total_amount"];
-    const hasFinanceField = Object.keys(patch).some(k => financeFields.includes(k));
-    if (hasFinanceField) {
-      await assertRole(supabase, ["super_admin", "finance"]);
-    }
-
-    const admin = await getAdmin();
     const { data: prev, error: fetchErr } = await admin
       .from("leads")
       .select("*")
