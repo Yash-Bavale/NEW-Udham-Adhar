@@ -28,8 +28,8 @@ const STEPS = [
 
 function ProcessingPage() {
   const { leadCode } = Route.useParams();
+  const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
-  const [cycles, setCycles] = useState(0);
 
   useEffect(() => {
     trackEvent("processing_viewed", {});
@@ -37,14 +37,12 @@ function ProcessingPage() {
 
   useEffect(() => {
     if (elapsed >= TOTAL_SECONDS) {
-      // Loop the countdown indefinitely — payment flow is temporarily disabled.
-      setElapsed(0);
-      setCycles((c) => c + 1);
+      navigate({ to: "/payment/$leadCode", params: { leadCode }, replace: true });
       return;
     }
     const t = setTimeout(() => setElapsed((s) => s + 1), 1000);
     return () => clearTimeout(t);
-  }, [elapsed]);
+  }, [elapsed, leadCode, navigate]);
 
   void leadCode;
 
