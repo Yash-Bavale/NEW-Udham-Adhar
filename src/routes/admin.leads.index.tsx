@@ -161,15 +161,16 @@ function LeadsPage() {
       clearSel(); refresh();
     } finally { setBusy(false); }
   };
-  const handleBulkDelete = async () => {
-    const ids = Array.from(selected);
-    const typed = prompt(`Type DELETE to confirm permanent deletion of ${ids.length} lead(s).\nLeads with payments will be skipped.`);
-    if (typed !== "DELETE") return;
+  const handleBulkDelete = () => setConfirmDeleteOpen(true);
+  const performBulkDelete = async () => {
     setBusy(true);
     try {
-      const res = await deleteFn({ data: { ids } });
-      alert(`Deleted ${res.deleted}, skipped ${res.blocked} (have payments).`);
+      const res = await deleteFn({ data: { ids: Array.from(selected) } });
+      toast.success(`Deleted ${res.deleted} lead(s)${res.blocked ? ` — skipped ${res.blocked} with payments` : ""}.`);
       clearSel(); refresh();
+      setConfirmDeleteOpen(false);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Bulk delete failed");
     } finally { setBusy(false); }
   };
 
