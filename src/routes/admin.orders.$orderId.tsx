@@ -162,12 +162,17 @@ function OrderDetailPage() {
 
           <ProcessingChecklist payments={payments} documents={documents} application={application} hideAmount={hideAmount} />
 
+          <div id="order-workflow" className="scroll-mt-32">
+            <WorkflowTimelinePanel applicationId={orderId} workflowStatus={(application as any).workflow_status} />
+          </div>
+
           <UnifiedTimeline
             events={events}
             payments={hideAmount ? [] : payments}
             documents={documents}
             createdAt={application.created_at}
           />
+
 
           <div id="order-notes" className="scroll-mt-32">
             <InternalNotes orderId={orderId} />
