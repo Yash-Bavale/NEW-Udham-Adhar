@@ -32,6 +32,7 @@ export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
 function LeadsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(listLeads);
   const countsFn = useServerFn(getLeadCounts);
   const exportFn = useServerFn(exportLeadsCsv);
