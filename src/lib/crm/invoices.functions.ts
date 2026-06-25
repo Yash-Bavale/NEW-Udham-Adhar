@@ -18,7 +18,28 @@ const GST_RATE = 18; // %
 
 const BUCKET = "invoices";
 
-async function generateAndStore(paymentId: string): Promise<string> {
+/** Append a lifecycle event for an invoice. Never throws — failures are logged. */
+async function logInvoiceEvent(
+  invoiceId: string,
+  eventType: "generated" | "regenerated" | "replaced" | "emailed" | "email_failed" | "delivery_update" | "preview",
+  detail: Record<string, unknown> = {},
+  actor?: { id?: string | null; label?: string | null },
+): Promise<void> {
+  try {
+    const admin = await getAdmin();
+    await (admin as any).from("invoice_events").insert({
+      invoice_id: invoiceId,
+      event_type: eventType,
+      actor_id: actor?.id ?? null,
+      actor_label: actor?.label ?? "system",
+      detail,
+    });
+  } catch (e) {
+    console.error("[invoice_events] log failed", e);
+  }
+}
+
+async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
   const admin = await getAdmin();
 
   const { data: payment, error: pErr } = await admin
