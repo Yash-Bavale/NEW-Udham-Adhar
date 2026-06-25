@@ -301,15 +301,21 @@ function ActionRequired({ data, loading }: { data?: OpsDashboardData; loading: b
 
 function ServicePipeline({ data, loading }: { data?: OpsDashboardData; loading: boolean }) {
   return (
-    <SectionCard title="Service Pipeline" action={<Link to="/admin/applications" className="text-xs" style={{ color: "var(--admin-accent)" }}>View applications →</Link>}>
+    <SectionCard title="Service Pipeline" action={<Link to="/admin/orders" className="text-xs" style={{ color: "var(--admin-accent)" }}>All orders →</Link>}>
       <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {loading || !data
           ? Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 rounded-md animate-pulse" style={{ background: "var(--admin-surface-2)" }} />)
           : data.servicePipeline.map((s, i) => (
-            <div key={s.stage + i} className="rounded-md border p-3" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}>
+            <Link
+              key={s.stage + i}
+              to="/admin/orders"
+              search={{ fulfillment: s.key } as any}
+              className="rounded-md border p-3 hover:border-[var(--admin-primary)] transition-colors block"
+              style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}
+            >
               <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>{s.stage}</div>
               <div className="mt-1 text-xl font-medium tabular-nums" style={{ color: "var(--admin-primary)" }}>{fmtN(s.count)}</div>
-            </div>
+            </Link>
           ))}
       </div>
     </SectionCard>
