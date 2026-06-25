@@ -16,16 +16,20 @@ import {
 } from "@/lib/crm/orders-v2.functions";
 
 export function OrderDocumentsPanel({
-  orderId, documents, deletedAt, deletedReason,
+  orderId, documents, deletedAt, deletedReason, hideMoney = false,
 }: {
   orderId: string;
   documents: any[];
   deletedAt?: string | null;
   deletedReason?: string | null;
+  hideMoney?: boolean;
 }) {
   const qc = useQueryClient();
   const urlFn = useServerFn(getOrderDocumentSignedUrl);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const visibleDocs = hideMoney
+    ? documents.filter((d) => !/invoice/i.test(String(d.doc_type ?? "")))
+    : documents;
 
   const open = async (path: string) => {
     try {
@@ -57,11 +61,11 @@ export function OrderDocumentsPanel({
         </div>
       )}
 
-      {documents.length === 0 ? (
+      {visibleDocs.length === 0 ? (
         <div className="text-xs text-slate-500 italic">No documents on file.</div>
       ) : (
         <ul className="divide-y" style={{ borderColor: "var(--admin-border)" }}>
-          {documents.map((d) => (
+          {visibleDocs.map((d) => (
             <li key={d.id} className="py-2 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-slate-800 truncate">{d.file_name}</div>
