@@ -169,31 +169,51 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               .maybeSingle();
             if (leadRow?.email && leadRow.lead_code) {
               const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+              const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
-              await enqueueFromTemplateInternal(
-                "payment_success",
-                leadRow.email,
-                {
-                  name: leadRow.name ?? "",
-                  customer_name: leadRow.name ?? "",
-                  lead_code: leadRow.lead_code,
-                  order_number: leadRow.lead_code,
-                  service: leadRow.service ?? "",
-                  service_name: leadRow.service ?? "",
-                  base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
-                  gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
-                  total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
-                  amount: Number(leadRow.total_amount ?? 0).toFixed(2),
-                  onboarding_url: onboardingUrl,
-                  support_email: "help@businesshelpservices.com",
-                },
-                {
-                  toName: leadRow.name ?? undefined,
-                  leadId: payment.lead_id,
-                  applicationId: payment.application_id ?? undefined,
-                  attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
-                },
-              );
+              try {
+                await enqueueFromTemplateInternal(
+                  "payment_success",
+                  leadRow.email,
+                  {
+                    name: leadRow.name ?? "",
+                    customer_name: leadRow.name ?? "",
+                    lead_code: leadRow.lead_code,
+                    order_number: leadRow.lead_code,
+                    service: leadRow.service ?? "",
+                    service_name: leadRow.service ?? "",
+                    base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
+                    gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
+                    total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                    amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                    onboarding_url: onboardingUrl,
+                    support_email: "help@businesshelpservices.com",
+                  },
+                  {
+                    toName: leadRow.name ?? undefined,
+                    leadId: payment.lead_id,
+                    applicationId: payment.application_id ?? undefined,
+                    attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
+                  },
+                );
+                await markInvoiceEmailedByPayment(payment.id, {
+                  recipient: leadRow.email,
+                  template: "payment_success",
+                  attachmentFilename: invoiceAttachment?.filename ?? null,
+                  success: true,
+                  actorLabel: "ccavenue-webhook",
+                });
+              } catch (e) {
+                await markInvoiceEmailedByPayment(payment.id, {
+                  recipient: leadRow.email,
+                  template: "payment_success",
+                  attachmentFilename: invoiceAttachment?.filename ?? null,
+                  success: false,
+                  error: e instanceof Error ? e.message : String(e),
+                  actorLabel: "ccavenue-webhook",
+                });
+                throw e;
+              }
             }
           } catch (e) { console.error("[ccavenue] payment_success email enqueue failed", e); }
 
