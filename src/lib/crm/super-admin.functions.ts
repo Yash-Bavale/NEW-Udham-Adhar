@@ -112,12 +112,13 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
     }
 
     const topMap = new Map<string, { name: string; orders: number; revenueInr: number }>();
-    for (const r of (topServicesRes.data ?? []) as Array<{ service_id: string; total_amount: number | null; services: { service_name: string } | { service_name: string }[] | null }>) {
+    for (const r of (topServicesRes.data ?? []) as Array<{ service_id: string | null; leads: { total_amount: number } | { total_amount: number }[] | null; services: { service_name: string } | { service_name: string }[] | null }>) {
       const svc = Array.isArray(r.services) ? r.services[0] : r.services;
+      const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
       const name = svc?.service_name || "Unknown";
       const cur = topMap.get(name) ?? { name, orders: 0, revenueInr: 0 };
       cur.orders += 1;
-      cur.revenueInr += Number(r.total_amount ?? 0);
+      cur.revenueInr += Number(lead?.total_amount ?? 0);
       topMap.set(name, cur);
     }
     const topServicesArr = Array.from(topMap.values())
