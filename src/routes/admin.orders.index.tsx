@@ -67,9 +67,38 @@ function OrdersListPage() {
     }),
   });
 
-  const rows = data?.rows ?? [];
+  const allRows = data?.rows ?? [];
+  const rows = stageBucket === "all"
+    ? allRows
+    : allRows.filter((r: any) => {
+        const stage = r.stage as OrderStage;
+        if (stageBucket === "needs_action") return NEEDS_ACTION.includes(stage);
+        if (stageBucket === "active") return ACTIVE_STAGES.includes(stage);
+        if (stageBucket === "completed") return stage === "completed";
+        if (stageBucket === "exception") return EXCEPTION_STAGES.includes(stage);
+        return true;
+      });
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / 25));
+
+  const bucketCount = (b: StageBucket) => {
+    if (b === "all") return allRows.length;
+    return allRows.filter((r: any) => {
+      const stage = r.stage as OrderStage;
+      if (b === "needs_action") return NEEDS_ACTION.includes(stage);
+      if (b === "active") return ACTIVE_STAGES.includes(stage);
+      if (b === "completed") return stage === "completed";
+      if (b === "exception") return EXCEPTION_STAGES.includes(stage);
+      return false;
+    }).length;
+  };
+  const BUCKETS: { id: StageBucket; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "needs_action", label: "Needs Action" },
+    { id: "active", label: "Active" },
+    { id: "completed", label: "Completed" },
+    { id: "exception", label: "Exception" },
+  ];
 
   return (
     <div className="space-y-5">
