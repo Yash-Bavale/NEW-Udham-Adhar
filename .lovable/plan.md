@@ -1,40 +1,46 @@
-## Goal
-Restore the original premium "concentric ring + step pips" countdown design that previously ran on the 30-second post-lead-form page, and use that same design for both:
-- `/processing/$leadCode` — 30 seconds (post-lead-form)
-- `/success/$leadCode` — 60 seconds (post-payment)
+## Problem
 
-The current emerald `CountdownCard` (single SVG ring + step pill) is not what the user approved. The earlier brand-navy/amber design with concentric rotating rings, animated center icon, gradient progress bar, and a grid of step pips is the canonical one.
+After payment, the customer email is rendered from the `email_templates` row with code `payment_success` (used by `resendInvoiceEmail` / webhook flows via `enqueueFromTemplateInternal`). That row has two defects:
+
+1. The "Download invoice" link is hardcoded to `https://udyamadhar.everythinghappens.in/api/public/invoice/{{lead_code}}` (wrong domain — leaks the staging host).
+2. The HTML layout pre-dates the current Zoho-style invoice / brand refresh and no longer matches the PDF + summary page design.
+
+Separately, the PDF that downloads at `udyamadhar.in/api/public/invoice/UA-2026-007530` looks "old" because that invoice file was rendered and stored before the new `pdf.server.ts` Zoho layout shipped. The renderer itself is current; only the stored PDF is stale.
 
 ## Changes
 
-### 1. Rewrite `src/components/site/CountdownCard.tsx`
-Replace the emerald single-ring layout with the original premium design, kept as a reusable shared component:
-- Ambient blurred background blobs (brand-navy + amber).
-- Card: `rounded-3xl border bg-card/85 backdrop-blur shadow-2xl`.
-- Concentric loader (w-32 h-32):
-  - Outer slow ring (8s rotate).
-  - Gradient sweep ring (1.8s rotate, brand-navy top/right).
-  - Inner counter-rotating ring (2.4s, amber bottom/left).
-  - Center pulsing dot with the active step icon (animates on change).
-- Large countdown number `{remaining}s` in brand-navy.
-- Gradient progress bar (brand-navy → brand-navy-deep → amber).
-- Step pips grid: `grid-cols-2 sm:grid-cols-N` (N = steps.length, capped at 6) showing done / active / pending states with check icon when complete.
-- Footer: encrypted/ISO line + optional ref code.
-- Props unchanged: `totalSeconds`, `elapsed`, `steps`, `leadCode`, `holdLabel`, `holdSub` so existing callers keep working.
+### 1. Replace the `payment_success` email template (DB migration)
 
-### 2. `src/routes/processing.$leadCode.tsx`
-- Keep 30-second timer, 4 steps (Securing → Validating → Compliance → Finalising).
-- Continue using `<CountdownCard />`; no logic change.
+Add a new migration that `UPDATE`s `public.email_templates WHERE code = 'payment_success'` with:
 
-### 3. `src/routes/success.$leadCode.tsx`
-- Keep 60-second timer, 6 steps already defined.
-- Continue using `<CountdownCard />` with `holdLabel` / `holdSub` for the late-confirmation case; no logic change.
+- Correct download URL: `https://udyamadhar.in/api/public/invoice/{{lead_code}}` (matches the working public route).
+- Refreshed Zoho-aligned brand layout matching current pages:
+  - BHS navy gradient header + "Payment received" pill, `Ref: {{lead_code}}`.
+  - Greeting `Thank you, {{name}}!` + service line.
+  - Action-required card with rounded gradient CTA → `{{onboarding_url}}` ("Fill incomplete information").
+  - Payment summary card (Service charges / GST 18% / Total) with `{{base_amount}} / {{gst_amount}} / {{total_amount}}`.
+  - Invoice card: shows `{{invoice_number}}`, notes the PDF is attached, plus a secondary "Download invoice" link → `https://udyamadhar.in/api/public/invoice/{{lead_code}}`.
+  - Dark "What happens next" timeline card.
+  - Footer: `help@businesshelpservices.in`, `udyamadhar.in`, address line — matches the rest of the brand emails.
+- Subject left as-is unless it also references the old domain (will refresh wording if needed: "Payment received — Invoice {{invoice_number}}").
 
-### 4. No other files touched
-- Timer durations, redirects, polling, and tracking remain exactly as they are.
-- No backend, server-function, or styling-token changes.
+No code touches `enqueueFromTemplateInternal` — all variables already passed in `resendInvoiceEmail` (`name`, `service`, `lead_code`, `invoice_number`, `base_amount`, `gst_amount`, `total_amount`, `support_email`) plus webhook flows are reused. `{{onboarding_url}}` will be added to the template-data payload at the two webhook call sites and in `resendInvoiceEmail` (derived as `https://udyamadhar.in/onboarding/{{lead_code}}`) so the CTA works.
 
-## Verification
-- Visit `/processing/<code>` → confirm concentric rings, navy/amber palette, step pips grid, 30s countdown.
-- Visit `/success/<code>` after a test payment → confirm identical look with 6 step pips and 60s countdown.
-- Resize to mobile → pips collapse to 2 columns, card stays centered.
+### 2. Regenerate the stale PDF for UA-2026-007530
+
+One-off: call existing `regenerateInvoice` for the invoice attached to that lead's payment so the stored PDF picks up the current Zoho layout. Done via a short SQL+server-fn invocation; no schema change.
+
+Optional (ask before doing): bulk-regenerate all invoices issued before the redesign cutoff so historical downloads also reflect the new layout.
+
+### 3. Verification
+
+- `supabase--read_query` on `email_templates` to confirm the new body has no `everythinghappens` and uses `udyamadhar.in`.
+- Trigger `resendInvoiceEmail` for the test payment and inspect `email_queue.body_html` (and rendered preview) — confirm the new layout, working CTA, correct download link, and PDF attached.
+- Open the regenerated PDF via `/api/public/invoice/UA-2026-007530` and confirm it matches the current Zoho design.
+- I want all invoice to be genrated as new format no old, automatically delete the old format & replace it with new 
+
+## Out of scope
+
+- No changes to `pdf.server.ts` (already current).
+- No changes to the public invoice download route.
+- No changes to webhook signature/processing logic.

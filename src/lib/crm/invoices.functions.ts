@@ -39,7 +39,7 @@ async function logInvoiceEvent(
   }
 }
 
-async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
+export async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
   const admin = await getAdmin();
 
   const { data: payment, error: pErr } = await admin
@@ -333,7 +333,8 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
           gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
           total_amount: Number(lead.total_amount ?? 0).toFixed(2),
           amount: Number(lead.total_amount ?? 0).toFixed(2),
-          support_email: "help@businesshelpservices.com",
+          onboarding_url: `https://udyamadhar.in/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`,
+          support_email: "help@businesshelpservices.in",
         },
         {
           toName: lead.name ?? undefined,
@@ -412,6 +413,43 @@ export const regenerateInvoice = createServerFn({ method: "POST" })
       label: profile?.display_name ?? profile?.email ?? "staff",
     });
     return { ok: true };
+  });
+
+/**
+ * Bulk-regenerate every existing invoice PDF using the current renderer.
+ * Existing files are upserted in place (same `pdf_path`), so any old layout
+ * is replaced by the new Zoho-style layout on the next download.
+ * Super-admin only.
+ */
+export const regenerateAllInvoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: roles } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    const ok = (roles ?? []).some((r) => r.role === "super_admin");
+    if (!ok) throw new Error("Forbidden");
+
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin
+      .from("invoices")
+      .select("id, payment_id")
+      .not("payment_id", "is", null);
+    if (error) throw new Error(error.message);
+
+    const { data: profile } = await context.supabase
+      .from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle();
+    const actor = { id: context.userId, label: profile?.display_name ?? profile?.email ?? "staff" };
+
+    let ok_count = 0; const failed: { id: string; error: string }[] = [];
+    for (const r of rows ?? []) {
+      try {
+        await generateAndStore(r.payment_id as string, actor);
+        ok_count++;
+      } catch (e) {
+        failed.push({ id: r.id, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    return { total: (rows ?? []).length, regenerated: ok_count, failed };
   });
 
 export const getInvoiceSignedUrl = createServerFn({ method: "POST" })
