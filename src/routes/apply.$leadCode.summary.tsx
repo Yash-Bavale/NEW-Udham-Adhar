@@ -14,6 +14,9 @@ import {
   Info,
   Loader2,
   X,
+  CreditCard,
+  Sparkles,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   getApplicationSummary,
@@ -21,9 +24,22 @@ import {
 } from "@/lib/payments/gateways.functions";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
+import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
+import { TrustBlock } from "@/components/site/TrustBlock";
 import payuLogo from "@/assets/gateways/payu.svg";
 import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
+
+const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
+const POST_PAY_SECONDS = 60;
+const POST_PAY_STEPS: readonly CountdownStep[] = [
+  { at: 0,  icon: ShieldCheck,    label: "Verifying payment",          sub: "Confirming transaction with your bank" },
+  { at: 10, icon: CreditCard,     label: "Reconciling transaction",    sub: "Matching payment to your application" },
+  { at: 20, icon: FileText,       label: "Preparing your application", sub: "Setting up your secure onboarding form with your details." },
+  { at: 32, icon: Sparkles,       label: "Personalising your form",    sub: "Tailoring fields to your selected service" },
+  { at: 44, icon: ClipboardCheck, label: "Final compliance checks",    sub: "Aligning with MSME guidelines" },
+  { at: 54, icon: CheckCircle2,   label: "Almost ready",               sub: "Opening your form in a moment…" },
+] as const;
 
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
@@ -168,11 +184,23 @@ function SummaryPage() {
   const lead = data?.lead;
   const gateways = data?.gateways ?? [];
 
+  const isPaid = !!lead && (!!lead.payment || PAID_STATUSES.has(lead.status as string));
+
+  // Post-payment countdown elapsed (only ticks once paid)
+  const [postElapsed, setPostElapsed] = useState(0);
   useEffect(() => {
-    if (lead?.payment || ["payment_successful", "under_process", "completed"].includes(lead?.status)) {
-      navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
+    if (!isPaid) return;
+    if (postElapsed >= POST_PAY_SECONDS) {
+      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
+      return;
     }
-  }, [lead?.payment, lead?.status, leadCode, navigate]);
+    const t = setTimeout(() => setPostElapsed((s) => s + 1), 1000);
+    return () => clearTimeout(t);
+  }, [isPaid, postElapsed, leadCode, navigate]);
+
+  useEffect(() => {
+    if (isPaid) trackEvent("post_payment_inline_countdown", { leadCode });
+  }, [isPaid, leadCode]);
 
   const SUPPORTED_GATEWAYS = ["payu", "ccavenue"] as const;
   const isSupportedGateway = (name: string) => (SUPPORTED_GATEWAYS as readonly string[]).includes(name);
@@ -201,6 +229,23 @@ function SummaryPage() {
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error instanceof Error ? error.message : "Could not load your application."}
         </div>
+      </div>
+    );
+  }
+
+  if (isPaid) {
+    const holding = postElapsed >= POST_PAY_SECONDS;
+    return (
+      <div>
+        <CountdownCard
+          totalSeconds={POST_PAY_SECONDS}
+          elapsed={postElapsed}
+          steps={POST_PAY_STEPS}
+          leadCode={leadCode}
+          holdLabel={holding ? "Almost ready" : undefined}
+          holdSub={holding ? "Opening your secure onboarding form…" : undefined}
+        />
+        <TrustBlock />
       </div>
     );
   }
