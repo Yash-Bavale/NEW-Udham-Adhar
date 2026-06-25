@@ -192,14 +192,16 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
     data.applications.forEach((a: any) =>
       items.push({ id: `app-${a.id}`, time: a.created_at, type: "application", description: `Order ${a.application_code ?? a.id.slice(0, 8)} (${a.application_status})` })
     );
-    data.payments.forEach((p: any) =>
-      items.push({ id: `pay-${p.id}`, time: p.created_at, type: "payment", description: `Payment ${fmtINR(Number(p.amount))} · ${p.gateway_name} · ${p.status}` })
-    );
+    if (!hideMoney) {
+      data.payments.forEach((p: any) =>
+        items.push({ id: `pay-${p.id}`, time: p.created_at, type: "payment", description: `Payment ${fmtINR(Number(p.amount))} · ${p.gateway_name} · ${p.status}` })
+      );
+    }
     data.complaints.forEach((c: any) =>
       items.push({ id: `comp-${c.id}`, time: c.created_at, type: "complaint", description: `Complaint ${c.complaint_number ?? ""} · ${c.severity}` })
     );
     return items.sort((a, b) => +new Date(b.time) - +new Date(a.time)).slice(0, 30).map((i) => ({ ...i, time: fmtDT(i.time) }));
-  }, [data]);
+  }, [data, hideMoney]);
 
   const c = data.customer;
 
