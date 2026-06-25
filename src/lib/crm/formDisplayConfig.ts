@@ -230,18 +230,9 @@ export function formatValue(raw: unknown, format?: FieldDef["format"]): string {
   }
 }
 
-export function maskValue(raw: unknown, mask: FieldMask): string {
+export function maskValue(raw: unknown, _mask: FieldMask): string {
+  // Masking disabled — staff always see full sensitive values (Aadhaar, PAN, bank account).
   const str = raw == null ? "" : String(raw);
-  if (!str) return "—";
-  const digits = str.replace(/\D/g, "");
-  switch (mask) {
-    case "aadhaar":
-      return digits.length === 12 ? `XXXX XXXX ${digits.slice(-4)}` : "XXXX XXXX XXXX";
-    case "account":
-      return digits.length >= 4 ? `${"X".repeat(Math.max(digits.length - 4, 4))}${digits.slice(-4)}` : "XXXX XXXX";
-    case "pan":
-      return str.length === 10 ? `XXXXX${str.slice(-5)}` : "XXXXXXXXXX";
-    default:
-      return "•••";
-  }
+  return str || "—";
 }
+
