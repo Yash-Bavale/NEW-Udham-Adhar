@@ -50,7 +50,7 @@ export const updateLead = createServerFn({ method: "POST" })
     const { id: leadId, ...patch } = data;
     const supabase = context.supabase;
 
-    await assertRole(supabase, ["super_admin", "operations", "admin"]);
+    await assertRole(supabase, ["super_admin", "operations", "admin", "manager"]);
 
     const financeFields = ["service", "base_amount", "gst_amount", "total_amount"];
     const hasFinanceField = Object.keys(patch).some(k => financeFields.includes(k));
@@ -146,7 +146,7 @@ export const listLeads = createServerFn({ method: "GET" })
     dateTo: z.string().optional(),
   }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support", "executive", "manager", "accounts", "finance"]);
     const admin = await getAdmin();
 
     let query = admin.from("leads").select("*", { count: "exact" });
@@ -214,7 +214,7 @@ export const getLead = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support", "executive", "manager", "accounts", "finance"]);
     const admin = await getAdmin();
     const { data: lead, error } = await admin
       .from("leads")
@@ -245,7 +245,7 @@ export const addLeadNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ lead_id: z.string().uuid(), note: z.string().min(1) }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support", "executive", "manager", "accounts", "finance"]);
     const admin = await getAdmin();
     const { error } = await admin
       .from("lead_notes")
@@ -275,7 +275,7 @@ export const addLeadNote = createServerFn({ method: "POST" })
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "manager"]);
     
     const { data: staffRoles, error: rolesErr } = await (await getAdmin())
       .from("user_roles")
@@ -298,7 +298,7 @@ export const listStaff = createServerFn({ method: "GET" })
 export const getLeadCounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support", "executive", "manager", "accounts", "finance"]);
     const admin = await getAdmin();
     const { data, error } = await admin.from("leads").select("status");
     if (error) throw new Error(error.message);
@@ -327,7 +327,7 @@ export const addLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => AddLeadSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "manager"]);
     const admin = await getAdmin();
 
     // Match existing customer by mobile, then email.
@@ -407,7 +407,7 @@ export const updateLeadAssignee = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => UpdateAssigneeSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "manager"]);
     const admin = await getAdmin();
     const { data: prev } = await admin
       .from("leads")
