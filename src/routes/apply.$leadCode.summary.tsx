@@ -184,11 +184,23 @@ function SummaryPage() {
   const lead = data?.lead;
   const gateways = data?.gateways ?? [];
 
+  const isPaid = !!lead && (!!lead.payment || PAID_STATUSES.has(lead.status as string));
+
+  // Post-payment countdown elapsed (only ticks once paid)
+  const [postElapsed, setPostElapsed] = useState(0);
   useEffect(() => {
-    if (lead?.payment || ["payment_successful", "under_process", "completed"].includes(lead?.status)) {
-      navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
+    if (!isPaid) return;
+    if (postElapsed >= POST_PAY_SECONDS) {
+      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
+      return;
     }
-  }, [lead?.payment, lead?.status, leadCode, navigate]);
+    const t = setTimeout(() => setPostElapsed((s) => s + 1), 1000);
+    return () => clearTimeout(t);
+  }, [isPaid, postElapsed, leadCode, navigate]);
+
+  useEffect(() => {
+    if (isPaid) trackEvent("post_payment_inline_countdown", { leadCode });
+  }, [isPaid, leadCode]);
 
   const SUPPORTED_GATEWAYS = ["payu", "ccavenue"] as const;
   const isSupportedGateway = (name: string) => (SUPPORTED_GATEWAYS as readonly string[]).includes(name);
