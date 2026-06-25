@@ -124,7 +124,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, payment_successful_at, status").in("id", leadIds)
+        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, status").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
