@@ -19,7 +19,7 @@ const RED = rgb(0.78, 0.12, 0.18);
 const WHITE = rgb(1, 1, 1);
 
 const COMPANY_NAME = "Business Help Services";
-const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
+const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra - 410505, India";
 const COMPANY_EMAIL = "help@businesshelpservices.com";
 const COMPANY_PHONE = "+91-9767870331";
 const COMPANY_WEB = "businesshelpservices.com";
@@ -40,8 +40,8 @@ const IN_STATE_CODES: Record<string, string> = {
   "dadra and nagar haveli and daman and diu": "26", "lakshadweep": "31",
 };
 function stateCode(name?: string | null): string {
-  if (!name) return "—";
-  return IN_STATE_CODES[name.toLowerCase().trim()] ?? "—";
+  if (!name) return "-";
+  return IN_STATE_CODES[name.toLowerCase().trim()] ?? "-";
 }
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -57,6 +57,24 @@ function rupees(n: number): string {
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function safePdfText(value: string): string {
+  return String(value ?? "")
+    .replace(/₹/g, "Rs.")
+    .replace(/[‐‑‒–—―−]/g, "-")
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/…/g, "...")
+    .replace(/·/g, "|")
+    .replace(/\u00a0/g, " ")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, "?");
+}
+
+function textWidth(font: PDFFont, text: string, size: number): number {
+  return font.widthOfTextAtSize(safePdfText(text), size);
 }
 
 // Indian numbering: amount-in-words for INR
@@ -99,16 +117,16 @@ function drawText(
   text: string,
   opts: { x: number; y: number; size: number; font: PDFFont; color?: RGB },
 ) {
-  page.drawText(text, { x: opts.x, y: opts.y, size: opts.size, font: opts.font, color: opts.color ?? NAVY });
+  page.drawText(safePdfText(text), { x: opts.x, y: opts.y, size: opts.size, font: opts.font, color: opts.color ?? NAVY });
 }
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/);
+  const words = safePdfText(text).split(/\s+/);
   const lines: string[] = [];
   let cur = "";
   for (const w of words) {
     const trial = cur ? cur + " " + w : w;
-    if (font.widthOfTextAtSize(trial, size) <= maxWidth) cur = trial;
+    if (textWidth(font, trial, size) <= maxWidth) cur = trial;
     else { if (cur) lines.push(cur); cur = w; }
   }
   if (cur) lines.push(cur);
@@ -138,7 +156,7 @@ function brandFooter(page: PDFPage, helv: PDFFont, note?: string) {
   page.drawLine({ start: { x: 40, y: 70 }, end: { x: 555, y: 70 }, thickness: 0.5, color: LINE });
   drawText(page, note ?? "This is a computer-generated document and does not require a signature.",
     { x: 40, y: 55, size: 8, font: helv, color: MUTED });
-  drawText(page, `${COMPANY_NAME}  ·  ${COMPANY_WEB}  ·  ${COMPANY_EMAIL}`,
+  drawText(page, `${COMPANY_NAME}  |  ${COMPANY_WEB}  |  ${COMPANY_EMAIL}`,
     { x: 40, y: 42, size: 8, font: helv, color: MUTED });
 }
 
@@ -222,7 +240,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     ["Invoice No.", d.invoiceNumber],
     ["Invoice Date", fmtDate(d.invoiceDate)],
     ["Order No.", d.applicationCode ?? d.leadCode],
-    ["Place of Supply", `${d.placeOfSupply ?? d.customerState ?? "—"} (${stateCode(d.placeOfSupply ?? d.customerState)})`],
+    ["Place of Supply", `${d.placeOfSupply ?? d.customerState ?? "-"} (${stateCode(d.placeOfSupply ?? d.customerState)})`],
     ["Payment Date", fmtDate(d.invoiceDate)],
     ["Payment Status", "PAID"],
   ];
@@ -250,15 +268,15 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   drawText(page, d.customerName, { x: MX + 10, y: y - 30, size: 12, font: helvBold, color: NAVY });
   drawText(page, d.customerEmail, { x: MX + 10, y: y - 46, size: 9, font: helv, color: GRAY });
   drawText(page, `+91 ${d.customerMobile}`, { x: MX + 10, y: y - 60, size: 9, font: helv, color: GRAY });
-  drawText(page, `State: ${d.customerState ?? "—"} (${stateCode(d.customerState)})`, { x: MX + 10, y: y - 74, size: 9, font: helv, color: GRAY });
-  drawText(page, `Place of Supply: ${d.placeOfSupply ?? d.customerState ?? "—"}`, { x: MX + 10, y: y - 88, size: 9, font: helv, color: GRAY });
+  drawText(page, `State: ${d.customerState ?? "-"} (${stateCode(d.customerState)})`, { x: MX + 10, y: y - 74, size: 9, font: helv, color: GRAY });
+  drawText(page, `Place of Supply: ${d.placeOfSupply ?? d.customerState ?? "-"}`, { x: MX + 10, y: y - 88, size: 9, font: helv, color: GRAY });
 
   // Payment / Transaction
   const px = MX + cardW + 22;
   drawText(page, "PAYMENT DETAILS", { x: px, y: y - 14, size: 8, font: helvBold, color: MUTED });
-  drawText(page, `Gateway: ${d.gatewayName?.toUpperCase() ?? "—"}`, { x: px, y: y - 30, size: 10, font: helvBold, color: NAVY });
-  drawText(page, `Transaction ID: ${d.paymentId ?? "—"}`, { x: px, y: y - 46, size: 9, font: helv, color: GRAY });
-  drawText(page, `Status: PAID  ·  ${fmtDate(d.invoiceDate)}`, { x: px, y: y - 60, size: 9, font: helvBold, color: GREEN });
+  drawText(page, `Gateway: ${d.gatewayName?.toUpperCase() ?? "-"}`, { x: px, y: y - 30, size: 10, font: helvBold, color: NAVY });
+  drawText(page, `Transaction ID: ${d.paymentId ?? "-"}`, { x: px, y: y - 46, size: 9, font: helv, color: GRAY });
+  drawText(page, `Status: PAID  |  ${fmtDate(d.invoiceDate)}`, { x: px, y: y - 60, size: 9, font: helvBold, color: GREEN });
   drawText(page, `Lead Code: ${d.leadCode}`, { x: px, y: y - 74, size: 9, font: helv, color: GRAY });
   if (d.applicationCode) drawText(page, `Application: ${d.applicationCode}`, { x: px, y: y - 88, size: 9, font: helv, color: GRAY });
 
@@ -298,7 +316,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const totalLine = (label: string, val: string, opts?: { bold?: boolean; color?: RGB; bg?: RGB }) => {
     if (opts?.bg) page.drawRectangle({ x: totalsX - 6, y: y - 6, width: totalsRight - totalsX + 12, height: 22, color: opts.bg });
     drawText(page, label, { x: totalsX, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? GRAY });
-    const tw = (opts?.bold ? helvBold : helv).widthOfTextAtSize(val, 10);
+    const tw = textWidth(opts?.bold ? helvBold : helv, val, 10);
     drawText(page, val, { x: totalsRight - tw, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? NAVY });
     y -= 18;
   };
@@ -364,13 +382,13 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
 
   // ─── Footer signature strip
   page.drawLine({ start: { x: MX, y: 76 }, end: { x: RX, y: 76 }, thickness: 0.5, color: LINE });
-  drawText(page, `Support: ${COMPANY_EMAIL}  ·  ${COMPANY_PHONE}`, { x: MX, y: 60, size: 8.5, font: helv, color: GRAY });
+  drawText(page, `Support: ${COMPANY_EMAIL}  |  ${COMPANY_PHONE}`, { x: MX, y: 60, size: 8.5, font: helv, color: GRAY });
   drawText(page, COMPANY_WEB, { x: MX, y: 48, size: 8.5, font: helvBold, color: NAVY });
   // Right side: For Company signature
   const sigText = `For ${COMPANY_NAME}`;
-  drawText(page, sigText, { x: RX - helvBold.widthOfTextAtSize(sigText, 10), y: 62, size: 10, font: helvBold, color: NAVY });
+  drawText(page, sigText, { x: RX - textWidth(helvBold, sigText, 10), y: 62, size: 10, font: helvBold, color: NAVY });
   const auth = "Authorised Signatory";
-  drawText(page, auth, { x: RX - helv.widthOfTextAtSize(auth, 8.5), y: 48, size: 8.5, font: helv, color: GRAY });
+  drawText(page, auth, { x: RX - textWidth(helv, auth, 8.5), y: 48, size: 8.5, font: helv, color: GRAY });
 
   return await pdf.save();
 }
@@ -434,7 +452,7 @@ export async function renderGrievancePdf(d: GrievanceData): Promise<Uint8Array> 
   drawText(page, "DESCRIPTION OF GRIEVANCE", { x: 40, y, size: 9, font: helvBold, color: MUTED });
   y -= 18;
   page.drawLine({ start: { x: 40, y: y + 8 }, end: { x: 555, y: y + 8 }, thickness: 0.5, color: LINE });
-  const descLines = wrap(d.description || "—", helv, 11, 515);
+  const descLines = wrap(d.description || "-", helv, 11, 515);
   for (const ln of descLines) {
     if (y < 140) break;
     drawText(page, ln, { x: 40, y, size: 11, font: helv, color: NAVY_SOFT });
