@@ -56,7 +56,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
       supabase
         .from("applications")
         .select(
-          "id, application_code, application_status, form_status, document_status, created_at, updated_at, lead:leads(id, name, email, mobile, service)"
+          "id, application_code, application_status, form_status, document_status, created_at, updated_at, lead:leads!fk_applications_lead(id, name, email, mobile, service)"
         )
         .eq("assigned_to", userId)
         .order("updated_at", { ascending: true })
