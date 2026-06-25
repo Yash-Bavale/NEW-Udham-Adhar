@@ -161,8 +161,8 @@ function CustomerProfilePage() {
         })}
       </div>
 
-      {tab === "overview" && <OverviewTab data={data} customerId={customerId} />}
-      {tab === "orders" && <OrdersTab data={data} />}
+      {tab === "overview" && <OverviewTab data={data} customerId={customerId} hideMoney={hideMoney} />}
+      {tab === "orders" && <OrdersTab data={data} hideMoney={hideMoney} />}
       {tab === "complaints" && <ComplaintsTab data={data} />}
       {tab === "payments" && !hideMoney && <PaymentsTab data={data} />}
       {tab === "documents" && <DocumentsTab data={data} />}
