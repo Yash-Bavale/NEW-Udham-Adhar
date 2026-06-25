@@ -34,27 +34,32 @@ type NavItem = {
 };
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
+const OPS_ROLES = ["admin", "super_admin", "manager", "operations", "executive"];
+const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts"];
+const ADMIN_ROLES = ["admin", "super_admin"];
+
 const NAV: NavGroup[] = [
   {
     id: "overview",
     label: "Overview",
     items: [
-      { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ["admin", "super_admin"] },
+      { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-      { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads" },
+      { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads", requireAnyRole: OPS_ROLES },
       { to: "/admin/activity", label: "Activity", icon: Activity },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
     ],
   },
   {
-    id: "sales",
-    label: "Sales",
+    id: "work",
+    label: "Work",
     items: [
-      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads" },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: OPS_ROLES },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: OPS_ROLES },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
-      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents" },
-      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ["admin", "super_admin", "operations_manager"] },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: OPS_ROLES },
+      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
     ],
   },
   {
@@ -63,41 +68,40 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints" },
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets" },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
-      { to: "/admin/services", label: "Services", icon: Briefcase },
+      { to: "/admin/services", label: "Services", icon: Briefcase, requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
     id: "finance",
     label: "Finance",
     items: [
-      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
-      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments" },
-      { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments" },
-      { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments" },
-      { to: "/admin/certificates", label: "Certificates", icon: Award },
+      { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices", requireAnyRole: FINANCE_ROLES },
+      { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments", requireAnyRole: FINANCE_ROLES },
+      { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments", requireAnyRole: FINANCE_ROLES },
+      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: OPS_ROLES },
     ],
   },
   {
     id: "insights",
     label: "Insights",
     items: [
-      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
-      { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log" },
-      { to: "/admin/seo", label: "SEO", icon: Globe },
+      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/seo", label: "SEO", icon: Globe, requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
     id: "admin",
-    label: "Admin",
+    label: "System",
     items: [
-      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees" },
-      { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, module: "employees" },
-      { to: "/admin/emails", label: "Email System", icon: Mail },
-      { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates" },
-      { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle },
+      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, module: "employees", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/emails", label: "Email System", icon: Mail, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/super", label: "Super Admin", icon: ShieldAlert, requireRole: "super_admin" },
-      { to: "/admin/settings", label: "Settings", icon: SettingsIcon },
+      { to: "/admin/settings", label: "Settings", icon: SettingsIcon, requireAnyRole: ADMIN_ROLES },
     ],
   },
 ];
