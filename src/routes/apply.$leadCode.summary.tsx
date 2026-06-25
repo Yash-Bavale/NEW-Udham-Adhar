@@ -14,6 +14,9 @@ import {
   Info,
   Loader2,
   X,
+  CreditCard,
+  Sparkles,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   getApplicationSummary,
@@ -21,9 +24,22 @@ import {
 } from "@/lib/payments/gateways.functions";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
+import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
+import { TrustBlock } from "@/components/site/TrustBlock";
 import payuLogo from "@/assets/gateways/payu.svg";
 import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
+
+const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
+const POST_PAY_SECONDS = 60;
+const POST_PAY_STEPS: readonly CountdownStep[] = [
+  { at: 0,  icon: ShieldCheck,    label: "Verifying payment",          sub: "Confirming transaction with your bank" },
+  { at: 10, icon: CreditCard,     label: "Reconciling transaction",    sub: "Matching payment to your application" },
+  { at: 20, icon: FileText,       label: "Preparing your application", sub: "Setting up your secure onboarding form with your details." },
+  { at: 32, icon: Sparkles,       label: "Personalising your form",    sub: "Tailoring fields to your selected service" },
+  { at: 44, icon: ClipboardCheck, label: "Final compliance checks",    sub: "Aligning with MSME guidelines" },
+  { at: 54, icon: CheckCircle2,   label: "Almost ready",               sub: "Opening your form in a moment…" },
+] as const;
 
 
 export const Route = createFileRoute("/apply/$leadCode/summary")({
