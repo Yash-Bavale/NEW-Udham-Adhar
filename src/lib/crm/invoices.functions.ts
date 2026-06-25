@@ -333,7 +333,8 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
           gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
           total_amount: Number(lead.total_amount ?? 0).toFixed(2),
           amount: Number(lead.total_amount ?? 0).toFixed(2),
-          support_email: "help@businesshelpservices.com",
+          onboarding_url: `https://udyamadhar.in/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`,
+          support_email: "help@businesshelpservices.in",
         },
         {
           toName: lead.name ?? undefined,
