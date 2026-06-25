@@ -190,6 +190,13 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       activity: ((activity.data ?? []) as Array<{ id: string; activity_description: string | null; created_at: string }>)
         .map((r) => ({ id: r.id, description: r.activity_description ?? "(no description)", created_at: r.created_at })),
       webhookFailures24h: webhookErrs.count ?? 0,
+      workflow: {
+        externalDelay: wfExternalDelay.count ?? 0,
+        onHold: wfOnHold.count ?? 0,
+        refundPending: wfRefundPending.count ?? 0,
+        remindersDue: wfRemindersDue.count ?? 0,
+        closedThisMonth: wfClosedMonth.count ?? 0,
+      },
     };
   });
 
