@@ -385,12 +385,29 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
 function NotificationsBell() {
   const fetchCount = useServerFn(getUnreadNotificationCount);
   const qc = useQueryClient();
+  const [hasSession, setHasSession] = useState(false);
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setHasSession(!!data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setHasSession(!!session);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
   const { data } = useQuery<{ count: number }>({
     queryKey: ["notifications", "unread-count"],
     queryFn: () => fetchCount(),
     refetchInterval: 60_000,
+    enabled: hasSession,
+    retry: false,
   });
   useRealtimeTable("notifications", () => {
+    if (!hasSession) return;
     qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
   });
   const count = data?.count ?? 0;
