@@ -236,7 +236,7 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
                   <div>
                     <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
                     <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                      {l.service} · {fmtD(l.created_at)} · {fmtINR(Number(l.total_amount))}
+                      {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
                     </div>
                   </div>
                   <StatusBadge status={l.status} />
