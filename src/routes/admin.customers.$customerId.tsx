@@ -41,12 +41,18 @@ function CustomerProfilePage() {
   const { customerId } = Route.useParams();
   const navigate = useNavigate();
   const fn = useServerFn(getCustomer360);
+  const role = useRole();
+  const hideMoney = role.hasAny(["operations", "support"]) && !role.hasAny(["super_admin", "admin", "accounts", "finance"]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin.customer360", customerId],
     queryFn: () => fn({ data: { customerId } }),
   });
 
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => !(hideMoney && t.key === "payments")),
+    [hideMoney],
+  );
   const [tab, setTab] = useState<TabKey>("overview");
 
   if (error) {
