@@ -15,15 +15,15 @@ export const Route = createFileRoute("/processing/$leadCode")({
   component: ProcessingPage,
 });
 
-const TOTAL_SECONDS = 30;
+const TOTAL_SECONDS = 60;
 
 // Intentionally vague — we don't mention "reference number" (already shown
 // later) or "payment" (don't pre-announce the next step).
 const STEPS = [
   { at: 0,  icon: ShieldCheck,  label: "Securing your details",        sub: "Encrypting personal information" },
-  { at: 8,  icon: FileCheck2,   label: "Validating application data",  sub: "Cross-checking required fields" },
-  { at: 16, icon: Sparkles,     label: "Running compliance checks",    sub: "Aligning with MSME guidelines" },
-  { at: 24, icon: CheckCircle2, label: "Finalising your application",  sub: "Almost done…" },
+  { at: 15, icon: FileCheck2,   label: "Validating application data",  sub: "Cross-checking required fields" },
+  { at: 30, icon: Sparkles,     label: "Running compliance checks",    sub: "Aligning with MSME guidelines" },
+  { at: 45, icon: CheckCircle2, label: "Finalising your application",  sub: "Almost done…" },
 ] as const;
 
 function ProcessingPage() {
