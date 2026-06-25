@@ -95,9 +95,11 @@ export function OrderCommandHeader({
             </span>
           </Meta>
 
-          <Meta label="Payment">
-            <PaymentChip status={paymentStatus} />
-          </Meta>
+          {!hideAmount && (
+            <Meta label="Payment">
+              <PaymentChip status={paymentStatus} />
+            </Meta>
+          )}
 
           {!hideAmount && (
             <Meta label="Total">
