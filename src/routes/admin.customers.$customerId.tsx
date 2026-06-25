@@ -290,7 +290,7 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
   );
 }
 
-function OrdersTab({ data }: { data: any }) {
+function OrdersTab({ data, hideMoney }: { data: any; hideMoney: boolean }) {
   const leadById = new Map<string, any>();
   for (const l of data.leads ?? []) leadById.set(l.id, l);
   return (
