@@ -12,6 +12,7 @@ import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { LeadEditableCard } from "@/components/admin/LeadEditableCard";
 import { LeadWorkspacePanel } from "@/components/admin/LeadWorkspacePanel";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { useRole } from "@/hooks/useRole";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ function LeadDetailPage() {
   const updateFn = useServerFn(updateLead);
   const noteFn = useServerFn(addLeadNote);
   const staffFn = useServerFn(listStaff);
+  const role = useRole();
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.lead", leadId],
@@ -56,6 +58,8 @@ function LeadDetailPage() {
   if (isLoading) return <div className="p-10 text-center text-slate-500">Loading lead details…</div>;
   if (!data) return null;
   const { lead, applications, notes } = data;
+  const canEditLead = role.hasAny(["super_admin", "operations", "admin", "manager", "executive"]);
+  const canEditFinance = role.hasAny(["super_admin", "admin", "finance"]);
 
   return (
     <div className="space-y-6">
@@ -85,7 +89,7 @@ function LeadDetailPage() {
           <div className="flex items-center gap-3">
             <select
               value={lead.status}
-              disabled={busy}
+              disabled={busy || !canEditLead}
               onChange={async (e) => {
                 setBusy(true);
                 try {
@@ -142,6 +146,7 @@ function LeadDetailPage() {
               title="Customer Contact"
               leadId={leadId}
               data={lead}
+              canEdit={canEditLead}
               fields={[
                 { key: "name", label: "Full Name" },
                 { key: "email", label: "Email Address", type: "email" },
@@ -155,6 +160,7 @@ function LeadDetailPage() {
               title="Service & Pricing"
               leadId={leadId}
               data={lead}
+              canEdit={canEditFinance}
               fields={[
                 { key: "service", label: "Service Type" },
                 { key: "base_amount", label: "Base Amount", type: "number" },
@@ -167,6 +173,7 @@ function LeadDetailPage() {
               title="Assignment & Source"
               leadId={leadId}
               data={{ ...lead, assigned_to: (lead as any).assignee_name || (lead.assigned_to ? lead.assigned_to.slice(0,8)+"…" : "Unassigned") }}
+              canEdit={canEditLead}
               fields={[
                 { key: "assigned_to", label: "Assigned To", readOnly: true },
                 { key: "lead_source", label: "Lead Source" },
