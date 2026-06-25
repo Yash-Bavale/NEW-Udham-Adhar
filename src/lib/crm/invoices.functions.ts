@@ -302,12 +302,7 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
           template: "payment_success",
         }, actor);
       }
-        await logInvoiceEvent(inv.id, "emailed", {
-          recipient: lead.email,
-          attachment: attachment.filename,
-          template: "payment_success",
-        }, actor);
-      }
+
     } catch (e) {
       if (inv?.id) {
         await (admin as any).from("invoices").update({
