@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
 import { maskAadhaar } from "@/lib/crm/mask";
+import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
 
 export const Route = createFileRoute("/admin/customers/$customerId")({
   head: () => ({ meta: [{ title: "Customer Profile — CRM" }, { name: "robots", content: "noindex,nofollow" }] }),
