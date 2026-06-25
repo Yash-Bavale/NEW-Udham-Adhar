@@ -139,7 +139,7 @@ export const searchOrderOptions = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     let query = admin
       .from("applications")
-      .select("id, application_code, lead_id, service_id, fulfillment_status")
+      .select("id, application_code, lead_id, service_id, fulfillment_status, services(service_name)")
       .order("created_at", { ascending: false })
       .limit(15);
     if (data.leadId) query = query.eq("lead_id", data.leadId);
@@ -149,7 +149,19 @@ export const searchOrderOptions = createServerFn({ method: "POST" })
     }
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
-    return { rows: rows ?? [] };
+    return {
+      rows: (rows ?? []).map((r: any) => {
+        const service = Array.isArray(r.services) ? r.services[0] : r.services;
+        return {
+          id: r.id,
+          application_code: r.application_code,
+          lead_id: r.lead_id,
+          service_id: r.service_id,
+          fulfillment_status: r.fulfillment_status,
+          service_name: service?.service_name ?? null,
+        };
+      }),
+    };
   });
 
 export const createTask = createServerFn({ method: "POST" })
