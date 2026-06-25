@@ -264,6 +264,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     ];
     const servicePipeline = pipelineStages.map(([stage, fs]) => ({
       stage,
+      key: fs,
       count: apps.filter((a: any) => a.fulfillment_status === fs).length,
     }));
 
