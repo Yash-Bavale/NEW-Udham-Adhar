@@ -83,6 +83,8 @@ function SuperAdminPage() {
         <SuperActions onChanged={() => refetch()} />
       </div>
 
+      <WorkflowHealth data={data} loading={isLoading} />
+
       <ActivityFeed data={data} loading={isLoading} />
     </div>
   );
