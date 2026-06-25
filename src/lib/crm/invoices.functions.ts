@@ -165,6 +165,13 @@ async function generateAndStore(paymentId: string, actor?: { id?: string | null;
     pdf_generated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
 
+  await logInvoiceEvent(
+    invoiceId,
+    existing ? "regenerated" : "generated",
+    { invoice_number: invoiceNumber, pdf_path: path, payment_id: paymentId },
+    actor,
+  );
+
   return invoiceId;
 }
 
