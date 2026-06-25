@@ -85,15 +85,33 @@ function CompanyTab() {
   return (
     <SectionCard title="Company Information">
       <div className="p-4 grid md:grid-cols-2 gap-4 text-sm">
-        <Field label="Company Name" value="Business Help Services" />
-        <Field label="Brand" value="Udyam Aadhar" />
-        <Field label="Support Email" value="support@udyamadhar.in" />
-        <Field label="Website" value="udyamadhar.in" />
+        <Field label="Company Name" value={COMPANY_NAME} />
+        <Field label="Brand" value={SITE_NAME} />
+        <Field label="Support Email" value={SUPPORT_EMAIL} />
+        <Field label="Website" value={BASE_URL.replace(/^https?:\/\//, "")} />
         <Field label="Address" value="—" />
         <Field label="GST Number" value="—" />
       </div>
       <div className="px-4 py-3 border-t text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
         Read-only display. Edit via your account manager.
+      </div>
+    </SectionCard>
+  );
+}
+
+function TemplatesTab() {
+  return (
+    <SectionCard
+      title="Email Templates"
+      action={<Link to="/admin/email-templates" className="text-xs" style={{ color: "var(--admin-accent)" }}>Open template editor →</Link>}
+    >
+      <div className="p-4 text-sm space-y-2" style={{ color: "var(--admin-fg-muted)" }}>
+        <p>
+          All workflow emails (delay notices, 3 / 5 / 7-day follow-ups, no-response warnings, closure notice, refund decisions) are managed in the Email Templates editor.
+        </p>
+        <p className="text-xs">
+          Variables available: <code className="font-mono">{"{{customer_name}}"}</code> <code className="font-mono">{"{{order_id}}"}</code> <code className="font-mono">{"{{service_name}}"}</code> <code className="font-mono">{"{{reason}}"}</code> <code className="font-mono">{"{{date}}"}</code> <code className="font-mono">{"{{company_name}}"}</code> <code className="font-mono">{"{{support_email}}"}</code>.
+        </p>
       </div>
     </SectionCard>
   );
