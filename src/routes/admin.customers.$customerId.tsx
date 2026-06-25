@@ -332,7 +332,7 @@ function OrdersTab({ data, hideMoney }: { data: any; hideMoney: boolean }) {
                       </span>
                     </td>
                     <td className="py-2 pr-3"><StatusBadge status={a.fulfillment_status ?? a.application_status} /></td>
-                    <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>
+                    {!hideMoney && <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>}
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtD(a.created_at)}</td>
                     <td className="py-2 pr-3 text-right">
                       <Link to="/admin/orders/$orderId" params={{ orderId: a.id }} className="inline-flex">
