@@ -255,6 +255,7 @@ export type Database = {
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_to: string | null
           cancellation_requested_at: string | null
+          certificate_uploaded_at: string | null
           closure_next_at: string | null
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
@@ -264,10 +265,12 @@ export type Database = {
           documents_deleted_at: string | null
           documents_deleted_reason: string | null
           form_status: string
+          form_submitted_at: string | null
           fulfilled_at: string | null
           fulfillment_status:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
+          govt_portals_selected: Json | null
           id: string
           is_deleted: boolean | null
           lead_id: string
@@ -285,6 +288,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           cancellation_requested_at?: string | null
+          certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
@@ -294,10 +298,12 @@ export type Database = {
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
           form_status?: string
+          form_submitted_at?: string | null
           fulfilled_at?: string | null
           fulfillment_status?:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
+          govt_portals_selected?: Json | null
           id?: string
           is_deleted?: boolean | null
           lead_id: string
@@ -315,6 +321,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           cancellation_requested_at?: string | null
+          certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
@@ -324,10 +331,12 @@ export type Database = {
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
           form_status?: string
+          form_submitted_at?: string | null
           fulfilled_at?: string | null
           fulfillment_status?:
             | Database["public"]["Enums"]["fulfillment_status_enum"]
             | null
+          govt_portals_selected?: Json | null
           id?: string
           is_deleted?: boolean | null
           lead_id?: string
