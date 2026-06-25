@@ -1,21 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, ListChecks, Bell, CreditCard, Workflow } from "lucide-react";
+import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
+import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
+import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
+import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Settings — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: SettingsPage,
 });
 
-type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow";
+type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
   { id: "statuses", label: "Status Master", icon: ListChecks },
+  { id: "templates", label: "Email Templates", icon: Mail },
+  { id: "reasons", label: "Reason Library", icon: BookOpen },
+  { id: "automation", label: "Automation Rules", icon: Zap },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "gateways", label: "Payment Gateways", icon: CreditCard },
-  { id: "workflow", label: "Workflow Automation", icon: Workflow },
+  { id: "workflow", label: "Cancellation Flow", icon: Workflow },
 ];
 
 const LEAD_STATUSES = [
