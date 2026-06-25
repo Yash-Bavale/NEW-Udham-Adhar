@@ -39,7 +39,7 @@ async function logInvoiceEvent(
   }
 }
 
-async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
+export async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
   const admin = await getAdmin();
 
   const { data: payment, error: pErr } = await admin
