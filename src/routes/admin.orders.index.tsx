@@ -22,6 +22,11 @@ export const Route = createFileRoute("/admin/orders/")({ component: OrdersListPa
 
 const PAY_STATUSES = ["Pending", "Paid", "Partially Paid", "Refunded", "Failed"];
 
+type StageBucket = "all" | "needs_action" | "active" | "completed" | "exception";
+const NEEDS_ACTION: OrderStage[] = ["lead_received", "payment_pending", "payment_done", "form_submitted", "certificate_ready"];
+const ACTIVE_STAGES: OrderStage[] = ["under_review", "in_progress", "submitted_to_govt", "under_processing"];
+const EXCEPTION_STAGES: OrderStage[] = ["uninterested", "refund_requested", "refunded"];
+
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
   const staffFn = useServerFn(listStaff);
