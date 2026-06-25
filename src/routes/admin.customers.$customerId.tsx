@@ -306,7 +306,7 @@ function OrdersTab({ data, hideMoney }: { data: any; hideMoney: boolean }) {
                 <th className="py-2 pr-3">Service</th>
                 <th className="py-2 pr-3">Stage</th>
                 <th className="py-2 pr-3">Fulfillment</th>
-                <th className="py-2 pr-3 text-right">Amount</th>
+                {!hideMoney && <th className="py-2 pr-3 text-right">Amount</th>}
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3"></th>
               </tr>
