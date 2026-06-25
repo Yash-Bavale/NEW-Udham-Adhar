@@ -471,8 +471,8 @@ function DocumentsTab({ data }: { data: any }) {
               <tbody>
                 {data.documents.map((d: any) => (
                   <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                    <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
-                    <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
+                    <td className="py-2 pr-3 text-xs font-medium uppercase">{d.doc_type}</td>
+                    <td className="py-2 pr-3 text-xs">{d.file_name}</td>
                     <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
