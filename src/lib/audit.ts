@@ -1,15 +1,18 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../integrations/supabase/types";
 
-export type AuditEntity = 
-  | "lead" 
-  | "application" 
-  | "payment" 
-  | "complaint" 
-  | "onboarding" 
-  | "document" 
+export type AuditEntity =
+  | "lead"
+  | "application"
+  | "payment"
+  | "complaint"
+  | "onboarding"
+  | "document"
   | "certificate"
-  | "payment_gateway";
+  | "payment_gateway"
+  | "workflow_delay_reasons"
+  | "workflow_closure_reasons"
+  | "workflow_automation_rules";
 
 export async function writeAudit(
   params: {
