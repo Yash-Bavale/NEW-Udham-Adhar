@@ -22,6 +22,7 @@ import { OrderActionBar } from "@/components/admin/OrderActionBar";
 import { ProcessTracker } from "@/components/admin/ProcessTracker";
 import { ProcessingChecklist } from "@/components/admin/ProcessingChecklist";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
+import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel";
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
 import { computeOrderStage, STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
@@ -161,12 +162,17 @@ function OrderDetailPage() {
 
           <ProcessingChecklist payments={payments} documents={documents} application={application} hideAmount={hideAmount} />
 
+          <div id="order-workflow" className="scroll-mt-32">
+            <WorkflowTimelinePanel applicationId={orderId} workflowStatus={(application as any).workflow_status} />
+          </div>
+
           <UnifiedTimeline
             events={events}
             payments={hideAmount ? [] : payments}
             documents={documents}
             createdAt={application.created_at}
           />
+
 
           <div id="order-notes" className="scroll-mt-32">
             <InternalNotes orderId={orderId} />

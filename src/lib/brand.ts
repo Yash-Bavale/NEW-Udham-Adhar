@@ -3,7 +3,11 @@
 
 export const SITE_NAME = "Udyam Aadhar";
 export const LEGAL_ENTITY = "Udyam Registration Consultancy & Assistance Services";
-export const CONTACT_EMAIL = "help@businesshelpservices.com";
+export const COMPANY_NAME = "Business Help Services";
+/** Customer-facing support inbox. Used across email templates and footers. */
+export const SUPPORT_EMAIL = "help@businesshelpservices.in";
+/** Legacy alias retained for older imports. */
+export const CONTACT_EMAIL = SUPPORT_EMAIL;
 export const BASE_URL = "https://udyamadhar.in";
 
 export const LEGAL_FOOTER_LINE = `${SITE_NAME} is operated by ${LEGAL_ENTITY}, a private consultancy. We are not affiliated with, authorised by, endorsed by, or associated with any government authority or department.`;

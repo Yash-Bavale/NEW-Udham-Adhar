@@ -197,6 +197,7 @@ import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
@@ -243,6 +244,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
+import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api/public/cron/workflow-reminders'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
@@ -1221,6 +1223,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRefundsRoute = AdminRefundsRouteImport.update({
+  id: '/refunds',
+  path: '/refunds',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPipelineRoute = AdminPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
@@ -1462,6 +1469,12 @@ const ApiPublicInvoiceLeadCodeRoute =
     path: '/api/public/invoice/$leadCode',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronWorkflowRemindersRoute =
+  ApiPublicCronWorkflowRemindersRouteImport.update({
+    id: '/api/public/cron/workflow-reminders',
+    path: '/api/public/cron/workflow-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronProcessEmailsRoute =
   ApiPublicCronProcessEmailsRouteImport.update({
     id: '/api/public/cron/process-emails',
@@ -1677,6 +1690,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -1720,6 +1734,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -1914,6 +1929,7 @@ export interface FileRoutesByTo {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -1957,6 +1973,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -2155,6 +2172,7 @@ export interface FileRoutesById {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -2198,6 +2216,7 @@ export interface FileRoutesById {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -2397,6 +2416,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -2440,6 +2460,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -2634,6 +2655,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -2677,6 +2699,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -2874,6 +2897,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -2917,6 +2941,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -3114,6 +3139,7 @@ export interface RootRouteChildren {
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
+  ApiPublicCronWorkflowRemindersRoute: typeof ApiPublicCronWorkflowRemindersRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
@@ -4440,6 +4466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReportsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/refunds': {
+      id: '/admin/refunds'
+      path: '/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pipeline': {
       id: '/admin/pipeline'
       path: '/pipeline'
@@ -4762,6 +4795,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInvoiceLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/workflow-reminders': {
+      id: '/api/public/cron/workflow-reminders'
+      path: '/api/public/cron/workflow-reminders'
+      fullPath: '/api/public/cron/workflow-reminders'
+      preLoaderRoute: typeof ApiPublicCronWorkflowRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/process-emails': {
       id: '/api/public/cron/process-emails'
       path: '/api/public/cron/process-emails'
@@ -4926,6 +4966,7 @@ interface AdminRouteChildren {
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
+  AdminRefundsRoute: typeof AdminRefundsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
   AdminSeoRoute: typeof AdminSeoRoute
@@ -4961,6 +5002,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
+  AdminRefundsRoute: AdminRefundsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,
   AdminSeoRoute: AdminSeoRoute,
@@ -5170,6 +5212,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
+  ApiPublicCronWorkflowRemindersRoute: ApiPublicCronWorkflowRemindersRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,

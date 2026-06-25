@@ -79,6 +79,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments", requireAnyRole: FINANCE_ROLES },
+      { to: "/admin/refunds", label: "Refund Review", icon: Banknote, requireAnyRole: FINANCE_ROLES },
       { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: OPS_ROLES },
     ],
   },

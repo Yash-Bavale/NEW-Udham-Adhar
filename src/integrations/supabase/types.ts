@@ -282,6 +282,10 @@ export type Database = {
           refund_requested_at: string | null
           service_id: string | null
           updated_at: string
+          workflow_delay_reason: string | null
+          workflow_expected_review_at: string | null
+          workflow_priority: string | null
+          workflow_status: Database["public"]["Enums"]["workflow_status"] | null
         }
         Insert: {
           application_code?: string | null
@@ -315,6 +319,12 @@ export type Database = {
           refund_requested_at?: string | null
           service_id?: string | null
           updated_at?: string
+          workflow_delay_reason?: string | null
+          workflow_expected_review_at?: string | null
+          workflow_priority?: string | null
+          workflow_status?:
+            | Database["public"]["Enums"]["workflow_status"]
+            | null
         }
         Update: {
           application_code?: string | null
@@ -348,6 +358,12 @@ export type Database = {
           refund_requested_at?: string | null
           service_id?: string | null
           updated_at?: string
+          workflow_delay_reason?: string | null
+          workflow_expected_review_at?: string | null
+          workflow_priority?: string | null
+          workflow_status?:
+            | Database["public"]["Enums"]["workflow_status"]
+            | null
         }
         Relationships: [
           {
@@ -2144,6 +2160,89 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_requests: {
+        Row: {
+          admin_notes: string | null
+          application_id: string
+          created_at: string
+          created_by: string | null
+          customer_notes: string | null
+          decided_at: string | null
+          id: string
+          lead_id: string | null
+          payment_id: string | null
+          reason: string | null
+          reason_code: string | null
+          refund_amount: number | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["refund_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          application_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_notes?: string | null
+          decided_at?: string | null
+          id?: string
+          lead_id?: string | null
+          payment_id?: string | null
+          reason?: string | null
+          reason_code?: string | null
+          refund_amount?: number | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["refund_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          application_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_notes?: string | null
+          decided_at?: string | null
+          id?: string
+          lead_id?: string | null
+          payment_id?: string | null
+          reason?: string | null
+          reason_code?: string | null
+          refund_amount?: number | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["refund_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_lead_filters: {
         Row: {
           created_at: string
@@ -2405,6 +2504,7 @@ export type Database = {
           status: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject: string
           ticket_number: string | null
+          ticket_state: Database["public"]["Enums"]["support_ticket_state"]
           updated_at: string | null
         }
         Insert: {
@@ -2421,6 +2521,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject: string
           ticket_number?: string | null
+          ticket_state?: Database["public"]["Enums"]["support_ticket_state"]
           updated_at?: string | null
         }
         Update: {
@@ -2437,6 +2538,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject?: string
           ticket_number?: string | null
+          ticket_state?: Database["public"]["Enums"]["support_ticket_state"]
           updated_at?: string | null
         }
         Relationships: [
@@ -2656,6 +2758,246 @@ export type Database = {
           webhook_type?: string
         }
         Relationships: []
+      }
+      workflow_automation_rules: {
+        Row: {
+          action_type: string
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          repeat_count: number
+          template_code: string | null
+          trigger_status: Database["public"]["Enums"]["workflow_status"]
+          updated_at: string
+          wait_days: number
+        }
+        Insert: {
+          action_type: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          repeat_count?: number
+          template_code?: string | null
+          trigger_status: Database["public"]["Enums"]["workflow_status"]
+          updated_at?: string
+          wait_days?: number
+        }
+        Update: {
+          action_type?: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          repeat_count?: number
+          template_code?: string | null
+          trigger_status?: Database["public"]["Enums"]["workflow_status"]
+          updated_at?: string
+          wait_days?: number
+        }
+        Relationships: []
+      }
+      workflow_closure_reasons: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      workflow_delay_reasons: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      workflow_events: {
+        Row: {
+          actor_id: string | null
+          actor_name: string
+          application_id: string | null
+          created_at: string
+          customer_visible: boolean
+          description: string | null
+          event_type: string
+          id: string
+          is_system: boolean
+          lead_id: string | null
+          metadata: Json
+          title: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string
+          application_id?: string | null
+          created_at?: string
+          customer_visible?: boolean
+          description?: string | null
+          event_type: string
+          id?: string
+          is_system?: boolean
+          lead_id?: string | null
+          metadata?: Json
+          title: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string
+          application_id?: string | null
+          created_at?: string
+          customer_visible?: boolean
+          description?: string | null
+          event_type?: string
+          id?: string
+          is_system?: boolean
+          lead_id?: string | null
+          metadata?: Json
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_reminders: {
+        Row: {
+          application_id: string
+          assigned_to: string | null
+          attempts: number
+          created_at: string
+          created_by: string | null
+          due_at: string
+          id: string
+          kind: Database["public"]["Enums"]["workflow_reminder_kind"]
+          last_attempt_at: string | null
+          last_error: string | null
+          lead_id: string | null
+          payload: Json
+          sent_at: string | null
+          status: Database["public"]["Enums"]["workflow_reminder_status"]
+          template_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          assigned_to?: string | null
+          attempts?: number
+          created_at?: string
+          created_by?: string | null
+          due_at: string
+          id?: string
+          kind: Database["public"]["Enums"]["workflow_reminder_kind"]
+          last_attempt_at?: string | null
+          last_error?: string | null
+          lead_id?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_reminder_status"]
+          template_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          assigned_to?: string | null
+          attempts?: number
+          created_at?: string
+          created_by?: string | null
+          due_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["workflow_reminder_kind"]
+          last_attempt_at?: string | null
+          last_error?: string | null
+          lead_id?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_reminder_status"]
+          template_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_reminders_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workflow_settings: {
         Row: {
@@ -2906,12 +3248,48 @@ export type Database = {
         | "cancelled"
         | "failed"
       priority_enum: "high" | "medium" | "low"
+      refund_request_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "info_needed"
+        | "escalated"
+      support_ticket_state:
+        | "open"
+        | "pending"
+        | "waiting_customer"
+        | "closed"
+        | "escalated"
       ticket_status_enum:
         | "open"
         | "in_progress"
         | "waiting_customer"
         | "resolved"
         | "closed"
+      workflow_reminder_kind:
+        | "followup_3d"
+        | "followup_5d"
+        | "followup_7d"
+        | "closure_24h"
+        | "custom"
+      workflow_reminder_status: "pending" | "sent" | "cancelled" | "failed"
+      workflow_status:
+        | "new"
+        | "documents_pending"
+        | "processing"
+        | "government_portal_pending"
+        | "verification_pending"
+        | "external_dependency"
+        | "waiting_for_customer"
+        | "waiting_for_documents"
+        | "customer_non_responsive"
+        | "processing_resumed"
+        | "completed"
+        | "pending_closure"
+        | "closed"
+        | "refund_review"
+        | "refund_closed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3136,12 +3514,52 @@ export const Constants = {
         "failed",
       ],
       priority_enum: ["high", "medium", "low"],
+      refund_request_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "info_needed",
+        "escalated",
+      ],
+      support_ticket_state: [
+        "open",
+        "pending",
+        "waiting_customer",
+        "closed",
+        "escalated",
+      ],
       ticket_status_enum: [
         "open",
         "in_progress",
         "waiting_customer",
         "resolved",
         "closed",
+      ],
+      workflow_reminder_kind: [
+        "followup_3d",
+        "followup_5d",
+        "followup_7d",
+        "closure_24h",
+        "custom",
+      ],
+      workflow_reminder_status: ["pending", "sent", "cancelled", "failed"],
+      workflow_status: [
+        "new",
+        "documents_pending",
+        "processing",
+        "government_portal_pending",
+        "verification_pending",
+        "external_dependency",
+        "waiting_for_customer",
+        "waiting_for_documents",
+        "customer_non_responsive",
+        "processing_resumed",
+        "completed",
+        "pending_closure",
+        "closed",
+        "refund_review",
+        "refund_closed",
+        "cancelled",
       ],
     },
   },
