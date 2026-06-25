@@ -19,7 +19,7 @@ const RED = rgb(0.78, 0.12, 0.18);
 const WHITE = rgb(1, 1, 1);
 
 const COMPANY_NAME = "Business Help Services";
-const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
+const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra - 410505, India";
 const COMPANY_EMAIL = "help@businesshelpservices.com";
 const COMPANY_PHONE = "+91-9767870331";
 const COMPANY_WEB = "businesshelpservices.com";
@@ -40,8 +40,8 @@ const IN_STATE_CODES: Record<string, string> = {
   "dadra and nagar haveli and daman and diu": "26", "lakshadweep": "31",
 };
 function stateCode(name?: string | null): string {
-  if (!name) return "—";
-  return IN_STATE_CODES[name.toLowerCase().trim()] ?? "—";
+  if (!name) return "-";
+  return IN_STATE_CODES[name.toLowerCase().trim()] ?? "-";
 }
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -57,6 +57,24 @@ function rupees(n: number): string {
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function safePdfText(value: string): string {
+  return String(value ?? "")
+    .replace(/₹/g, "Rs.")
+    .replace(/[‐‑‒–—―−]/g, "-")
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/…/g, "...")
+    .replace(/·/g, "|")
+    .replace(/\u00a0/g, " ")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, "?");
+}
+
+function textWidth(font: PDFFont, text: string, size: number): number {
+  return font.widthOfTextAtSize(safePdfText(text), size);
 }
 
 // Indian numbering: amount-in-words for INR
@@ -99,16 +117,16 @@ function drawText(
   text: string,
   opts: { x: number; y: number; size: number; font: PDFFont; color?: RGB },
 ) {
-  page.drawText(text, { x: opts.x, y: opts.y, size: opts.size, font: opts.font, color: opts.color ?? NAVY });
+  page.drawText(safePdfText(text), { x: opts.x, y: opts.y, size: opts.size, font: opts.font, color: opts.color ?? NAVY });
 }
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/);
+  const words = safePdfText(text).split(/\s+/);
   const lines: string[] = [];
   let cur = "";
   for (const w of words) {
     const trial = cur ? cur + " " + w : w;
-    if (font.widthOfTextAtSize(trial, size) <= maxWidth) cur = trial;
+    if (textWidth(font, trial, size) <= maxWidth) cur = trial;
     else { if (cur) lines.push(cur); cur = w; }
   }
   if (cur) lines.push(cur);
