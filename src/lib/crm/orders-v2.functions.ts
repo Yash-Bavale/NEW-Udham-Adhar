@@ -20,7 +20,7 @@ async function getAdmin() {
 async function assertStaff(supabase: any) {
   const { data } = await supabase.from("user_roles").select("role").limit(50);
   const roles = new Set((data ?? []).map((r: any) => r.role));
-  const allowed = ["admin", "super_admin", "operations", "support", "accounts", "finance"];
+  const allowed = ["admin", "super_admin", "operations", "support", "accounts", "finance", "executive", "manager"];
   if (!allowed.some((r) => roles.has(r))) throw new Error("Forbidden");
 }
 
