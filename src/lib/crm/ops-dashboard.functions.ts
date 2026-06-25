@@ -23,7 +23,7 @@ export type OpsDashboardData = {
     followupsTodayOpen: number;
   };
   refundTracker: { requested: number; approved: number; refunded: number };
-  servicePipeline: { stage: string; count: number }[];
+  servicePipeline: { stage: string; count: number; key: string }[];
   documentsPending: {
     id: string;
     application_code: string | null;
