@@ -196,204 +196,220 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const logo = await pdf.embedPng(base64ToBytes(BHS_LOGO_BASE64));
 
   const W = 595.28;
-  const MX = 36;        // page margin
-  const RX = W - MX;    // right edge
+  const MX = 36;
+  const RX = W - MX;
   const sac = d.sacCode ?? "998311";
   const cgst = d.cgstAmount ?? 0;
   const sgst = d.sgstAmount ?? 0;
   const igst = d.igstAmount ?? 0;
   const isIntra = cgst + sgst > 0;
-  const gstRate = isIntra ? 18 : 18;
+  const gstRate = 18;
   const subtotal = d.baseAmount;
   const totalTax = cgst + sgst + igst;
   const grand = d.totalAmount;
-  const roundOff = +(grand - subtotal - totalTax).toFixed(2);
+  const placeOfSupply = d.placeOfSupply ?? d.customerState ?? "-";
+  const posCode = stateCode(placeOfSupply);
 
-  // ─── Outer frame
-  page.drawRectangle({ x: MX - 4, y: 36, width: (W - (MX - 4) * 2), height: 769, borderColor: LINE, borderWidth: 0.75, color: WHITE });
+  // Light border around the page (Zoho style is mostly whitespace)
+  const TEXT = rgb(0.15, 0.18, 0.25);
+  const LABEL = rgb(0.45, 0.48, 0.55);
+  const BORDER = rgb(0.82, 0.84, 0.88);
+  const ROWLINE = rgb(0.9, 0.91, 0.94);
 
-  // ─── Header band
-  let y = 805 - 10;
-  // Logo
-  const logoDim = logo.scale(0.16); // ~58pt wide
-  page.drawImage(logo, { x: MX, y: y - 58, width: 58, height: 58 });
-  // Company block
-  drawText(page, COMPANY_NAME.toUpperCase(), { x: MX + 70, y: y - 6, size: 14, font: helvBold, color: NAVY });
-  drawText(page, COMPANY_ADDRESS, { x: MX + 70, y: y - 22, size: 8.5, font: helv, color: GRAY });
-  drawText(page, `Email: ${COMPANY_EMAIL}    Phone: ${COMPANY_PHONE}`, { x: MX + 70, y: y - 34, size: 8.5, font: helv, color: GRAY });
-  drawText(page, `GSTIN: ${COMPANY_GSTIN}    State: ${COMPANY_STATE_NAME} (${COMPANY_STATE_CODE})`, { x: MX + 70, y: y - 46, size: 8.5, font: helvBold, color: NAVY_SOFT });
+  // ─── Header: Company (left) + TAX INVOICE (right)
+  let y = 805;
+  page.drawImage(logo, { x: MX, y: y - 60, width: 60, height: 60 });
+  const cx = MX + 72;
+  drawText(page, COMPANY_NAME.toUpperCase(), { x: cx, y: y - 6, size: 12, font: helvBold, color: TEXT });
+  drawText(page, "Koregaon Bk, Taluka-Khed", { x: cx, y: y - 20, size: 8.5, font: helv, color: TEXT });
+  drawText(page, "Pune, Maharashtra 410505", { x: cx, y: y - 31, size: 8.5, font: helv, color: TEXT });
+  drawText(page, "India", { x: cx, y: y - 42, size: 8.5, font: helv, color: TEXT });
+  drawText(page, COMPANY_PHONE, { x: cx, y: y - 53, size: 8.5, font: helv, color: TEXT });
+  drawText(page, COMPANY_EMAIL, { x: cx, y: y - 64, size: 8.5, font: helv, color: TEXT });
+  drawText(page, `GSTIN: ${COMPANY_GSTIN}`, { x: cx, y: y - 75, size: 8.5, font: helvBold, color: TEXT });
 
-  // Title pill (right)
-  page.drawRectangle({ x: RX - 150, y: y - 14, width: 150, height: 24, color: NAVY });
-  drawText(page, "TAX INVOICE", { x: RX - 124, y: y - 7, size: 13, font: helvBold, color: WHITE });
-  drawText(page, "ORIGINAL FOR RECIPIENT", { x: RX - 110, y: y - 28, size: 7.5, font: helvBold, color: MUTED });
+  // TAX INVOICE title (right)
+  drawText(page, "TAX INVOICE", { x: RX - textWidth(helvBold, "TAX INVOICE", 18), y: y - 6, size: 18, font: helvBold, color: TEXT });
 
-  // Divider
-  y -= 70;
-  page.drawLine({ start: { x: MX, y }, end: { x: RX, y }, thickness: 1, color: ACCENT });
-
-  // ─── Invoice meta strip (3-column grid)
-  y -= 14;
-  const colW = (RX - MX) / 3;
-  const metaTop = y;
-  const metaRows: Array<[string, string]> = [
-    ["Invoice No.", d.invoiceNumber],
-    ["Invoice Date", fmtDate(d.invoiceDate)],
-    ["Order No.", d.applicationCode ?? d.leadCode],
-    ["Place of Supply", `${d.placeOfSupply ?? d.customerState ?? "-"} (${stateCode(d.placeOfSupply ?? d.customerState)})`],
-    ["Payment Date", fmtDate(d.invoiceDate)],
-    ["Payment Status", "PAID"],
-  ];
-  for (let i = 0; i < metaRows.length; i++) {
-    const col = i % 3;
-    const row = Math.floor(i / 3);
-    const cx = MX + col * colW;
-    const cy = metaTop - row * 30;
-    drawText(page, metaRows[i][0].toUpperCase(), { x: cx, y: cy, size: 7.5, font: helvBold, color: MUTED });
-    const isPaid = metaRows[i][0] === "Payment Status";
-    drawText(page, metaRows[i][1], { x: cx, y: cy - 12, size: 10, font: helvBold, color: isPaid ? GREEN : NAVY });
-  }
-  y = metaTop - 60 - 6;
-  page.drawLine({ start: { x: MX, y }, end: { x: RX, y }, thickness: 0.5, color: SOFT_LINE });
-
-  // ─── Bill To / Payment block
-  y -= 14;
-  const cardH = 100;
-  const cardW = (RX - MX - 12) / 2;
-  page.drawRectangle({ x: MX, y: y - cardH, width: cardW, height: cardH, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
-  page.drawRectangle({ x: MX + cardW + 12, y: y - cardH, width: cardW, height: cardH, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
-
-  // Bill To
-  drawText(page, "BILL TO", { x: MX + 10, y: y - 14, size: 8, font: helvBold, color: MUTED });
-  drawText(page, d.customerName, { x: MX + 10, y: y - 30, size: 12, font: helvBold, color: NAVY });
-  drawText(page, d.customerEmail, { x: MX + 10, y: y - 46, size: 9, font: helv, color: GRAY });
-  drawText(page, `+91 ${d.customerMobile}`, { x: MX + 10, y: y - 60, size: 9, font: helv, color: GRAY });
-  drawText(page, `State: ${d.customerState ?? "-"} (${stateCode(d.customerState)})`, { x: MX + 10, y: y - 74, size: 9, font: helv, color: GRAY });
-  drawText(page, `Place of Supply: ${d.placeOfSupply ?? d.customerState ?? "-"}`, { x: MX + 10, y: y - 88, size: 9, font: helv, color: GRAY });
-
-  // Payment / Transaction
-  const px = MX + cardW + 22;
-  drawText(page, "PAYMENT DETAILS", { x: px, y: y - 14, size: 8, font: helvBold, color: MUTED });
-  drawText(page, `Gateway: ${d.gatewayName?.toUpperCase() ?? "-"}`, { x: px, y: y - 30, size: 10, font: helvBold, color: NAVY });
-  drawText(page, `Transaction ID: ${d.paymentId ?? "-"}`, { x: px, y: y - 46, size: 9, font: helv, color: GRAY });
-  drawText(page, `Status: PAID  |  ${fmtDate(d.invoiceDate)}`, { x: px, y: y - 60, size: 9, font: helvBold, color: GREEN });
-  drawText(page, `Lead Code: ${d.leadCode}`, { x: px, y: y - 74, size: 9, font: helv, color: GRAY });
-  if (d.applicationCode) drawText(page, `Application: ${d.applicationCode}`, { x: px, y: y - 88, size: 9, font: helv, color: GRAY });
-
-  y -= cardH + 18;
-
-  // ─── Line items table
-  const tH = 26;
-  page.drawRectangle({ x: MX, y: y - tH, width: RX - MX, height: tH, color: NAVY });
-  const cols = [
-    { x: MX + 8,   label: "#" },
-    { x: MX + 30,  label: "DESCRIPTION" },
-    { x: MX + 300, label: "SAC" },
-    { x: MX + 350, label: "QTY" },
-    { x: MX + 390, label: "RATE (Rs.)" },
-    { x: RX - 80,  label: "AMOUNT (Rs.)" },
-  ];
-  for (const c of cols) drawText(page, c.label, { x: c.x, y: y - tH + 9, size: 9, font: helvBold, color: WHITE });
-
-  y -= tH;
-  // Row
-  const rowH = 46;
-  page.drawRectangle({ x: MX, y: y - rowH, width: RX - MX, height: rowH, color: WHITE, borderColor: SOFT_LINE, borderWidth: 0.5 });
-  drawText(page, "1", { x: MX + 8, y: y - 18, size: 10, font: helv, color: GRAY });
-  drawText(page, d.serviceName, { x: MX + 30, y: y - 16, size: 11, font: helvBold, color: NAVY });
-  drawText(page, "Consultation Service Fee", { x: MX + 30, y: y - 30, size: 8.5, font: helv, color: MUTED });
-  drawText(page, `SAC: ${sac}`, { x: MX + 30, y: y - 40, size: 8, font: helv, color: MUTED });
-  drawText(page, sac, { x: MX + 300, y: y - 18, size: 10, font: helv, color: NAVY });
-  drawText(page, "1", { x: MX + 358, y: y - 18, size: 10, font: helv, color: NAVY });
-  drawText(page, subtotal.toFixed(2), { x: MX + 390, y: y - 18, size: 10, font: helv, color: NAVY });
-  drawText(page, subtotal.toFixed(2), { x: RX - 80, y: y - 18, size: 10, font: helvBold, color: NAVY });
-
-  y -= rowH + 4;
-
-  // ─── Totals (right side)
-  const totalsX = MX + 320;
-  const totalsRight = RX - 8;
-  const totalLine = (label: string, val: string, opts?: { bold?: boolean; color?: RGB; bg?: RGB }) => {
-    if (opts?.bg) page.drawRectangle({ x: totalsX - 6, y: y - 6, width: totalsRight - totalsX + 12, height: 22, color: opts.bg });
-    drawText(page, label, { x: totalsX, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? GRAY });
-    const tw = textWidth(opts?.bold ? helvBold : helv, val, 10);
-    drawText(page, val, { x: totalsRight - tw, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? NAVY });
-    y -= 18;
+  // ─── Meta rows (label : value | label : value)
+  y -= 100;
+  const labelCol1 = MX;
+  const valCol1 = MX + 110;
+  const labelCol2 = MX + 290;
+  const valCol2 = MX + 400;
+  const metaLine = (l1: string, v1: string, l2: string, v2: string) => {
+    drawText(page, l1, { x: labelCol1, y, size: 9, font: helv, color: LABEL });
+    drawText(page, `: ${v1}`, { x: valCol1 - 6, y, size: 9, font: helvBold, color: TEXT });
+    if (l2) {
+      drawText(page, l2, { x: labelCol2, y, size: 9, font: helv, color: LABEL });
+      drawText(page, `: ${v2}`, { x: valCol2 - 6, y, size: 9, font: helvBold, color: TEXT });
+    }
+    y -= 14;
   };
-  totalLine("Subtotal", `Rs. ${subtotal.toFixed(2)}`);
-  if (isIntra) {
-    totalLine("CGST (9%)", `Rs. ${cgst.toFixed(2)}`);
-    totalLine("SGST (9%)", `Rs. ${sgst.toFixed(2)}`);
-  } else {
-    totalLine("IGST (18%)", `Rs. ${igst.toFixed(2)}`);
-  }
-  totalLine("Round Off", `${roundOff >= 0 ? "+" : "-"} Rs. ${Math.abs(roundOff).toFixed(2)}`);
-  page.drawLine({ start: { x: totalsX - 6, y: y + 12 }, end: { x: totalsRight, y: y + 12 }, thickness: 0.5, color: LINE });
-  y -= 2;
-  totalLine("GRAND TOTAL", `Rs. ${grand.toFixed(2)}`, { bold: true, color: WHITE, bg: NAVY });
-  y -= 4;
+  metaLine("Invoice Number", d.invoiceNumber, "Place Of Supply", `${placeOfSupply} (${posCode})`);
+  metaLine("Invoice Date", fmtDate(d.invoiceDate), "Order No.", d.applicationCode ?? d.leadCode);
+  metaLine("Payment Date", fmtDate(d.invoiceDate), "Payment Status", "PAID");
+  metaLine("Gateway", (d.gatewayName ?? "-").toUpperCase(), "Transaction ID", d.paymentId ?? "-");
+  metaLine("Terms", "Due on Receipt", "Service", d.serviceName);
 
-  // ─── Amount in words
-  drawText(page, "Amount in Words:", { x: MX, y, size: 8, font: helvBold, color: MUTED });
-  const words = wrap(amountInWords(grand), helvBold, 10, RX - MX - 100);
-  let wy = y - 14;
-  for (const w of words) { drawText(page, w, { x: MX, y: wy, size: 10, font: helvBold, color: NAVY }); wy -= 13; }
-  y = wy - 8;
-
-  // ─── HSN / SAC Summary
-  page.drawRectangle({ x: MX, y: y - 22, width: RX - MX, height: 22, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
-  drawText(page, "HSN / SAC SUMMARY", { x: MX + 8, y: y - 15, size: 9, font: helvBold, color: NAVY });
-  y -= 22;
-  const sumHeader = ["HSN/SAC", "Taxable Value", "GST %", "CGST", "SGST", "IGST", "Total Tax"];
-  const sumX = [MX + 8, MX + 90, MX + 200, MX + 250, MX + 310, MX + 370, MX + 440];
-  page.drawRectangle({ x: MX, y: y - 20, width: RX - MX, height: 20, color: NAVY });
-  for (let i = 0; i < sumHeader.length; i++) drawText(page, sumHeader[i], { x: sumX[i], y: y - 14, size: 8.5, font: helvBold, color: WHITE });
-  y -= 20;
-  page.drawRectangle({ x: MX, y: y - 22, width: RX - MX, height: 22, color: WHITE, borderColor: SOFT_LINE, borderWidth: 0.5 });
-  const sumVals = [
-    sac,
-    `Rs. ${subtotal.toFixed(2)}`,
-    `${gstRate}%`,
-    `Rs. ${cgst.toFixed(2)}`,
-    `Rs. ${sgst.toFixed(2)}`,
-    `Rs. ${igst.toFixed(2)}`,
-    `Rs. ${totalTax.toFixed(2)}`,
-  ];
-  for (let i = 0; i < sumVals.length; i++) drawText(page, sumVals[i], { x: sumX[i], y: y - 15, size: 9, font: helv, color: NAVY });
-  y -= 32;
-
-  // ─── Notes
-  drawText(page, "NOTES", { x: MX, y, size: 8, font: helvBold, color: MUTED });
-  y -= 12;
-  const notes = [
-    "Thank you for the payment. Your order has been successfully received.",
-    "Our experts shall process your application during business hours Monday to Saturday, 10:00 AM to 6:00 PM.",
-  ];
-  for (const n of notes) {
-    for (const ln of wrap(n, helv, 9, RX - MX)) { drawText(page, ln, { x: MX, y, size: 9, font: helv, color: GRAY }); y -= 12; }
-  }
+  // ─── Bill To
   y -= 6;
-
-  // ─── Terms
-  drawText(page, "TERMS & CONDITIONS", { x: MX, y, size: 8, font: helvBold, color: MUTED });
+  drawText(page, "Bill To", { x: MX, y, size: 10, font: helvBold, color: TEXT });
+  y -= 14;
+  drawText(page, d.customerName, { x: MX, y, size: 11, font: helvBold, color: TEXT });
   y -= 12;
+  drawText(page, d.customerEmail, { x: MX, y, size: 9, font: helv, color: TEXT }); y -= 11;
+  drawText(page, `+91 ${d.customerMobile}`, { x: MX, y, size: 9, font: helv, color: TEXT }); y -= 11;
+  drawText(page, placeOfSupply, { x: MX, y, size: 9, font: helv, color: TEXT });
+  y -= 18;
+
+  // ─── Items table header
+  const tableTop = y;
+  // Column positions
+  const cNo = MX + 4;
+  const cDesc = MX + 28;
+  const cQty = MX + 280;
+  const cRate = MX + 330;
+  const cGstPct = MX + 390;
+  const cGstAmt = MX + 430;
+  const cAmt = RX - 4;
+
+  // Header band
+  page.drawRectangle({ x: MX, y: tableTop - 20, width: RX - MX, height: 20, color: NAVY });
+  drawText(page, "#", { x: cNo, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  drawText(page, "Item & Description", { x: cDesc, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  drawText(page, "Qty", { x: cQty, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  drawText(page, "Rate", { x: cRate, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  const gstHdr = isIntra ? "GST" : "IGST";
+  drawText(page, `${gstHdr} %`, { x: cGstPct, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  drawText(page, "Amt", { x: cGstAmt, y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+  const amtLbl = "Amount";
+  drawText(page, amtLbl, { x: cAmt - textWidth(helvBold, amtLbl, 9), y: tableTop - 13, size: 9, font: helvBold, color: WHITE });
+
+  // Row
+  y = tableTop - 20 - 4;
+  drawText(page, "1", { x: cNo, y: y - 12, size: 10, font: helv, color: TEXT });
+  drawText(page, d.serviceName, { x: cDesc, y: y - 12, size: 10, font: helvBold, color: TEXT });
+  drawText(page, "Consultation Service Fee", { x: cDesc, y: y - 24, size: 8.5, font: helv, color: LABEL });
+  drawText(page, `SAC - ${sac}`, { x: cDesc, y: y - 35, size: 8.5, font: helv, color: LABEL });
+  const qtyStr = "1.00";
+  drawText(page, qtyStr, { x: cQty, y: y - 12, size: 10, font: helv, color: TEXT });
+  drawText(page, subtotal.toFixed(2), { x: cRate, y: y - 12, size: 10, font: helv, color: TEXT });
+  drawText(page, `${gstRate}%`, { x: cGstPct, y: y - 12, size: 10, font: helv, color: TEXT });
+  drawText(page, totalTax.toFixed(2), { x: cGstAmt, y: y - 12, size: 10, font: helv, color: TEXT });
+  const amtStr = subtotal.toFixed(2);
+  drawText(page, amtStr, { x: cAmt - textWidth(helvBold, amtStr, 10), y: y - 12, size: 10, font: helvBold, color: TEXT });
+
+  y -= 50;
+  page.drawLine({ start: { x: MX, y }, end: { x: RX, y }, thickness: 0.5, color: BORDER });
+
+  // ─── Totals on right column
+  const totLabelX = MX + 330;
+  const totValRight = RX - 4;
+  y -= 14;
+  const totRow = (label: string, val: string, opts?: { bold?: boolean; color?: RGB; line?: boolean; bg?: RGB }) => {
+    if (opts?.bg) page.drawRectangle({ x: totLabelX - 8, y: y - 5, width: totValRight - totLabelX + 12, height: 20, color: opts.bg });
+    const f = opts?.bold ? helvBold : helv;
+    const col = opts?.color ?? TEXT;
+    drawText(page, label, { x: totLabelX, y, size: 10, font: f, color: col });
+    drawText(page, val, { x: totValRight - textWidth(f, val, 10), y, size: 10, font: f, color: col });
+    if (opts?.line) page.drawLine({ start: { x: totLabelX - 4, y: y - 4 }, end: { x: totValRight, y: y - 4 }, thickness: 0.4, color: ROWLINE });
+    y -= 16;
+  };
+  totRow("Sub Total", subtotal.toFixed(2));
+  if (isIntra) {
+    totRow(`CGST (${gstRate / 2}%)`, cgst.toFixed(2));
+    totRow(`SGST (${gstRate / 2}%)`, sgst.toFixed(2), { line: true });
+  } else {
+    totRow(`IGST (${gstRate}%)`, igst.toFixed(2), { line: true });
+  }
+  totRow("Total", `INR ${grand.toFixed(2)}`, { bold: true, bg: rgb(0.95, 0.96, 0.99) });
+  totRow("Payment Made", `(-) ${grand.toFixed(2)}`, { color: GREEN });
+  totRow("Balance Due", `INR 0.00`, { bold: true, line: true });
+
+  // ─── Amount in Words (left side, aligned with totals start)
+  let leftY = y + 16 * 6 + 14; // approximate top of totals
+  drawText(page, "Total In Words", { x: MX, y: leftY, size: 9, font: helvBold, color: TEXT });
+  leftY -= 14;
+  const wordLines = wrap(`Indian ${amountInWords(grand)}`, helv, 10, 290);
+  for (const ln of wordLines) {
+    drawText(page, ln, { x: MX, y: leftY, size: 10, font: helv, color: TEXT });
+    leftY -= 13;
+  }
+
+  // ─── Notes + Terms (left), Signature (right)
+  y -= 6;
+  let notesY = y;
+  drawText(page, "Notes", { x: MX, y: notesY, size: 9, font: helvBold, color: TEXT });
+  notesY -= 12;
+  const noteLines = [
+    "Thank you for the payment. Your order has been successfully received.",
+    "Our experts shall process your application during business hours",
+    "(Monday to Saturday, 10:00 AM - 6:00 PM).",
+  ];
+  for (const n of noteLines) {
+    drawText(page, n, { x: MX, y: notesY, size: 9, font: helv, color: TEXT });
+    notesY -= 11;
+  }
+  notesY -= 8;
+  drawText(page, "Terms & Conditions", { x: MX, y: notesY, size: 9, font: helvBold, color: TEXT });
+  notesY -= 12;
   const terms = [
     "1. Orders once received are Non-Cancellable & Non-Refundable.",
-    "2. Refund Policy available on website.",
-    "3. Jurisdiction: Pune, Maharashtra.",
+    "2. Refund Policy available on our website.",
+    "3. All disputes are subject to Pune, Maharashtra jurisdiction.",
     "4. Computer Generated Invoice - Signature Not Required.",
   ];
-  for (const t of terms) { drawText(page, t, { x: MX, y, size: 8.5, font: helv, color: GRAY }); y -= 11; }
+  for (const t of terms) {
+    drawText(page, t, { x: MX, y: notesY, size: 8.5, font: helv, color: TEXT });
+    notesY -= 11;
+  }
 
-  // ─── Footer signature strip
-  page.drawLine({ start: { x: MX, y: 76 }, end: { x: RX, y: 76 }, thickness: 0.5, color: LINE });
-  drawText(page, `Support: ${COMPANY_EMAIL}  |  ${COMPANY_PHONE}`, { x: MX, y: 60, size: 8.5, font: helv, color: GRAY });
-  drawText(page, COMPANY_WEB, { x: MX, y: 48, size: 8.5, font: helvBold, color: NAVY });
-  // Right side: For Company signature
-  const sigText = `For ${COMPANY_NAME}`;
-  drawText(page, sigText, { x: RX - textWidth(helvBold, sigText, 10), y: 62, size: 10, font: helvBold, color: NAVY });
-  const auth = "Authorised Signatory";
-  drawText(page, auth, { x: RX - textWidth(helv, auth, 8.5), y: 48, size: 8.5, font: helv, color: GRAY });
+  // Signature (right)
+  const sigY = y - 50;
+  page.drawLine({ start: { x: RX - 140, y: sigY }, end: { x: RX, y: sigY }, thickness: 0.4, color: BORDER });
+  const sigText = "Authorized Signature";
+  drawText(page, sigText, { x: RX - textWidth(helv, sigText, 9), y: sigY - 12, size: 9, font: helv, color: LABEL });
+
+  // ─── HSN/SAC Summary
+  let sy = Math.min(notesY, 220) - 12;
+  drawText(page, "HSN/SAC Summary", { x: MX, y: sy, size: 10, font: helvBold, color: TEXT });
+  sy -= 14;
+
+  // Header
+  page.drawRectangle({ x: MX, y: sy - 18, width: RX - MX, height: 18, color: rgb(0.95, 0.96, 0.99), borderColor: BORDER, borderWidth: 0.4 });
+  const sCols = [
+    { x: MX + 6, label: "HSN/SAC" },
+    { x: MX + 110, label: "Taxable Amount" },
+    { x: MX + 230, label: isIntra ? "CGST %" : "IGST %" },
+    { x: MX + 290, label: isIntra ? "CGST Amt" : "IGST Amt" },
+    { x: MX + 360, label: isIntra ? "SGST Amt" : "" },
+    { x: MX + 430, label: "Total Tax" },
+  ];
+  for (const c of sCols) if (c.label) drawText(page, c.label, { x: c.x, y: sy - 12, size: 8.5, font: helvBold, color: TEXT });
+  sy -= 18;
+
+  page.drawRectangle({ x: MX, y: sy - 18, width: RX - MX, height: 18, borderColor: BORDER, borderWidth: 0.4 });
+  drawText(page, sac, { x: MX + 6, y: sy - 12, size: 9, font: helv, color: TEXT });
+  drawText(page, subtotal.toFixed(2), { x: MX + 110, y: sy - 12, size: 9, font: helv, color: TEXT });
+  drawText(page, `${gstRate}%`, { x: MX + 230, y: sy - 12, size: 9, font: helv, color: TEXT });
+  drawText(page, (isIntra ? cgst : igst).toFixed(2), { x: MX + 290, y: sy - 12, size: 9, font: helv, color: TEXT });
+  if (isIntra) drawText(page, sgst.toFixed(2), { x: MX + 360, y: sy - 12, size: 9, font: helv, color: TEXT });
+  drawText(page, totalTax.toFixed(2), { x: MX + 430, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+  sy -= 18;
+
+  page.drawRectangle({ x: MX, y: sy - 18, width: RX - MX, height: 18, color: rgb(0.97, 0.98, 1), borderColor: BORDER, borderWidth: 0.4 });
+  drawText(page, "Total", { x: MX + 6, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+  drawText(page, subtotal.toFixed(2), { x: MX + 110, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+  drawText(page, (isIntra ? cgst : igst).toFixed(2), { x: MX + 290, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+  if (isIntra) drawText(page, sgst.toFixed(2), { x: MX + 360, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+  drawText(page, totalTax.toFixed(2), { x: MX + 430, y: sy - 12, size: 9, font: helvBold, color: TEXT });
+
+  // Footer
+  drawText(page, "This is a computer-generated tax invoice and does not require a signature.",
+    { x: MX, y: 40, size: 8, font: helv, color: LABEL });
+  const footRight = `${COMPANY_NAME}  |  ${COMPANY_WEB}`;
+  drawText(page, footRight, { x: RX - textWidth(helv, footRight, 8), y: 40, size: 8, font: helv, color: LABEL });
 
   return await pdf.save();
 }
