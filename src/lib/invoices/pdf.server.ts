@@ -365,18 +365,23 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   // ─── Notes
   drawText(page, "NOTES", { x: MX, y, size: 8, font: helvBold, color: MUTED });
   y -= 12;
-  const notes = "Thank you for the payment. Your order has been successfully received. Our experts shall be processing your order during our standard business hours Monday to Saturday (10am to 6pm).";
-  for (const ln of wrap(notes, helv, 9, RX - MX)) { drawText(page, ln, { x: MX, y, size: 9, font: helv, color: GRAY }); y -= 12; }
+  const notes = [
+    "Thank you for the payment. Your order has been successfully received.",
+    "Our experts shall process your application during business hours Monday to Saturday, 10:00 AM to 6:00 PM.",
+  ];
+  for (const n of notes) {
+    for (const ln of wrap(n, helv, 9, RX - MX)) { drawText(page, ln, { x: MX, y, size: 9, font: helv, color: GRAY }); y -= 12; }
+  }
   y -= 6;
 
   // ─── Terms
   drawText(page, "TERMS & CONDITIONS", { x: MX, y, size: 8, font: helvBold, color: MUTED });
   y -= 12;
   const terms = [
-    "1. All orders, once received, are Non-cancellable & Non-refundable.",
-    "2. Refund and other policies are published on our website.",
-    "3. All disputes are subject to Pune, Maharashtra jurisdictions only.",
-    "4. This is a computer generated receipt not requiring signatures.",
+    "1. Orders once received are Non-Cancellable & Non-Refundable.",
+    "2. Refund Policy available on website.",
+    "3. Jurisdiction: Pune, Maharashtra.",
+    "4. Computer Generated Invoice - Signature Not Required.",
   ];
   for (const t of terms) { drawText(page, t, { x: MX, y, size: 8.5, font: helv, color: GRAY }); y -= 11; }
 
