@@ -265,7 +265,7 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
                   <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
                     <StickyNote className="size-3" /> {fmtDT(n.created_at)}
                   </div>
-                  <div className="mt-1 text-sm whitespace-pre-wrap">{maskAadhaar(n.note)}</div>
+                  <div className="mt-1 text-sm whitespace-pre-wrap">{n.note}</div>
                 </div>
               ))
             )}
