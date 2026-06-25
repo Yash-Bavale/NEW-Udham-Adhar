@@ -147,6 +147,29 @@ function OrdersListPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-1.5">
+        {BUCKETS.map((b) => {
+          const active = stageBucket === b.id;
+          return (
+            <button
+              key={b.id}
+              onClick={() => setStageBucket(b.id)}
+              className={
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
+                (active
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")
+              }
+            >
+              {b.label}
+              <span className={"ml-1.5 text-[10px] " + (active ? "text-slate-300" : "text-slate-400")}>
+                {bucketCount(b.id)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border)" }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
