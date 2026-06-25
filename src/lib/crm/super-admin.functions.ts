@@ -52,46 +52,77 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     const dayStartIso = dayStart.toISOString();
+    const yStart = new Date(dayStart.getTime() - 86_400_000);
+    const yStartIso = yStart.toISOString();
+    const yEndIso = dayStartIso;
     const dayAgoIso = new Date(Date.now() - 86_400_000).toISOString();
+    const weekAgoIso = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const monthAgoIso = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
     const [
-      leadsToday,
-      paymentsToday,
-      openApps,
-      docsPending,
-      certsToday,
-      emailCounts,
-      activity,
-      webhookErrs,
+      leadsToday, leadsYesterday, paymentsToday, paymentsYesterday, payments30d,
+      paymentsTrend, leadsTrend,
+      openApps, docsPending, certsToday, emailCounts, activity, webhookErrs,
+      totalCustomers, staffRoles, leads30d, paidLeads30d, topServicesRes,
     ] = await Promise.all([
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayStartIso),
-      admin
-        .from("payments")
-        .select("amount")
-        .eq("status", "paid")
-        .gte("created_at", dayStartIso),
-      admin
-        .from("applications")
-        .select("id", { count: "exact", head: true })
+      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", yStartIso).lt("created_at", yEndIso),
+      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", dayStartIso),
+      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", yStartIso).lt("created_at", yEndIso),
+      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", monthAgoIso),
+      admin.from("payments").select("amount, created_at").eq("status", "paid").gte("created_at", weekAgoIso),
+      admin.from("leads").select("id, created_at").gte("created_at", weekAgoIso),
+      admin.from("applications").select("id", { count: "exact", head: true })
         .in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]),
-      admin
-        .from("applications")
-        .select("id", { count: "exact", head: true })
-        .eq("application_status", "documents_pending"),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"),
       admin.from("certificates").select("id", { count: "exact", head: true }).gte("created_at", dayStartIso),
       admin.from("email_queue").select("status"),
-      admin
-        .from("activity_logs")
-        .select("id, activity_description, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50),
+      admin.from("activity_logs").select("id, activity_description, created_at").order("created_at", { ascending: false }).limit(50),
       admin.from("webhook_error_log").select("id", { count: "exact", head: true }).gte("created_at", dayAgoIso),
+      admin.from("customers").select("id", { count: "exact", head: true }),
+      admin.from("user_roles").select("user_id"),
+      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso),
+      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso).not("payment_successful_at", "is", null),
+      admin.from("applications").select("service_id, total_amount, services(service_name)").eq("is_deleted", false).gte("created_at", monthAgoIso).limit(2000),
     ]);
 
-    const paymentsTodayInr = (paymentsToday.data ?? []).reduce(
-      (s: number, r: { amount: number | null }) => s + Number(r.amount ?? 0),
-      0,
-    );
+    const sumPaid = (rows: any[] | null | undefined) =>
+      (rows ?? []).reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
+    const paymentsTodayInr = sumPaid(paymentsToday.data);
+    const paymentsYesterdayInr = sumPaid(paymentsYesterday.data);
+    const revenue30dInr = sumPaid(payments30d.data);
+
+    const days: string[] = [];
+    const leadsByDay: Record<string, number> = {};
+    const revByDay: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86_400_000);
+      const key = d.toISOString().slice(0, 10);
+      days.push(key);
+      leadsByDay[key] = 0;
+      revByDay[key] = 0;
+    }
+    for (const r of (leadsTrend.data ?? []) as Array<{ created_at: string }>) {
+      const k = new Date(r.created_at).toISOString().slice(0, 10);
+      if (k in leadsByDay) leadsByDay[k]! += 1;
+    }
+    for (const r of (paymentsTrend.data ?? []) as Array<{ amount: number; created_at: string }>) {
+      const k = new Date(r.created_at).toISOString().slice(0, 10);
+      if (k in revByDay) revByDay[k]! += Number(r.amount ?? 0);
+    }
+
+    const topMap = new Map<string, { name: string; orders: number; revenueInr: number }>();
+    for (const r of (topServicesRes.data ?? []) as Array<{ service_id: string; total_amount: number | null; services: { service_name: string } | { service_name: string }[] | null }>) {
+      const svc = Array.isArray(r.services) ? r.services[0] : r.services;
+      const name = svc?.service_name || "Unknown";
+      const cur = topMap.get(name) ?? { name, orders: 0, revenueInr: 0 };
+      cur.orders += 1;
+      cur.revenueInr += Number(r.total_amount ?? 0);
+      topMap.set(name, cur);
+    }
+    const topServicesArr = Array.from(topMap.values())
+      .sort((a, b) => b.revenueInr - a.revenueInr)
+      .slice(0, 5);
 
     const queueRows = (emailCounts.data ?? []) as { status: string }[];
     const queue = {
@@ -113,15 +144,32 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       alerts.push({ id: "webhook-fail", severity: "med", message: `${webhookErrs.count} webhook failures in last 24h.` });
     }
 
+    const leads30dCount = leads30d.count ?? 0;
+    const paidLeads30dCount = paidLeads30d.count ?? 0;
+    const conversionRate30d = leads30dCount > 0 ? Math.round((paidLeads30dCount / leads30dCount) * 1000) / 10 : 0;
+    const uniqueStaff = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
+
     return {
       kpis: {
         leadsToday: leadsToday.count ?? 0,
+        leadsYesterday: leadsYesterday.count ?? 0,
         paymentsTodayInr,
+        paymentsYesterdayInr,
         openApplications: openApps.count ?? 0,
         documentsPending: docsPending.count ?? 0,
         certificatesToday: certsToday.count ?? 0,
         emailQueueDepth: queue.queued + queue.failed,
+        totalCustomers: totalCustomers.count ?? 0,
+        activeStaff: uniqueStaff,
+        conversionRate30d,
+        revenue30dInr,
       },
+      trend: {
+        days,
+        leads: days.map((k) => leadsByDay[k] ?? 0),
+        revenueInr: days.map((k) => revByDay[k] ?? 0),
+      },
+      topServices: topServicesArr,
       emailQueue: queue,
       payu: { mode: payuMode, isProduction: payuMode === "production" },
       alerts,
