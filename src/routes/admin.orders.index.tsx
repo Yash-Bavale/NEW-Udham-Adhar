@@ -178,8 +178,8 @@ function OrdersListPage() {
                 <th className="text-left px-3 py-2.5">Order #</th>
                 <th className="text-left px-3 py-2.5">Customer</th>
                 <th className="text-left px-3 py-2.5">Service</th>
+                <th className="text-left px-3 py-2.5">Stage</th>
                 <th className="text-left px-3 py-2.5">Fulfillment</th>
-                <th className="text-left px-3 py-2.5">Lead Status</th>
                 <th className="text-left px-3 py-2.5">Assigned</th>
                 <th className="text-right px-3 py-2.5">Amount</th>
                 <th className="text-left px-3 py-2.5">Payment</th>
