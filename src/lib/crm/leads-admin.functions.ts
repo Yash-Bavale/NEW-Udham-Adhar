@@ -280,10 +280,12 @@ export const listStaff = createServerFn({ method: "GET" })
     const { data: staffRoles, error: rolesErr } = await (await getAdmin())
       .from("user_roles")
       .select("user_id, role")
-      .in("role", ["super_admin", "admin", "operations", "support", "finance", "accounts"]);
+      .in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]);
 
     if (rolesErr) throw new Error(rolesErr.message);
-    const userIds = Array.from(new Set(staffRoles.map(r => r.user_id)));
+    const userIds = Array.from(new Set((staffRoles ?? []).map(r => r.user_id)));
+
+    if (userIds.length === 0) return { profiles: [] };
 
     const { data: profiles, error: profilesErr } = await (await getAdmin())
       .from("profiles")
