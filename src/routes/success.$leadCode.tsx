@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ShieldCheck,
+  CreditCard,
   FileText,
   Sparkles,
+  ClipboardCheck,
   CheckCircle2,
-  Lock,
   History,
 } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { Button } from "@/components/ui/button";
 import { TrustBlock } from "@/components/site/TrustBlock";
+import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
 
 export const Route = createFileRoute("/success/$leadCode")({
   head: () => ({
@@ -29,11 +30,13 @@ export const Route = createFileRoute("/success/$leadCode")({
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
 const TOTAL_SECONDS = 60;
 
-const STEPS = [
-  { at: 0,  icon: ShieldCheck,  label: "Verifying payment",          sub: "Confirming transaction with your bank" },
-  { at: 15, icon: FileText,     label: "Preparing your application", sub: "Setting up your secure onboarding form" },
-  { at: 30, icon: Sparkles,     label: "Personalising your form",    sub: "Tailoring fields to your selected service" },
-  { at: 45, icon: CheckCircle2, label: "Almost ready",               sub: "Opening your form in a moment…" },
+const STEPS: readonly CountdownStep[] = [
+  { at: 0,  icon: ShieldCheck,     label: "Verifying payment",          sub: "Confirming transaction with your bank" },
+  { at: 10, icon: CreditCard,      label: "Reconciling transaction",    sub: "Matching payment to your application" },
+  { at: 20, icon: FileText,        label: "Preparing your application", sub: "Setting up your secure onboarding form with your details." },
+  { at: 32, icon: Sparkles,        label: "Personalising your form",    sub: "Tailoring fields to your selected service" },
+  { at: 44, icon: ClipboardCheck,  label: "Final compliance checks",    sub: "Aligning with MSME guidelines" },
+  { at: 54, icon: CheckCircle2,    label: "Almost ready",               sub: "Opening your form in a moment…" },
 ] as const;
 
 function SuccessPage() {
@@ -113,157 +116,18 @@ function SuccessPage() {
     );
   }
 
-  const pct = Math.min(100, (elapsed / TOTAL_SECONDS) * 100);
-  const remaining = Math.max(0, TOTAL_SECONDS - elapsed);
-  const activeIdx = STEPS.reduce(
-    (acc, s, i) => (elapsed >= s.at ? i : acc),
-    0,
-  );
-  const baseActive = STEPS[activeIdx];
   const holding = elapsed >= TOTAL_SECONDS && !confirmed && !pendingFallback;
-  const active = holding
-    ? { ...baseActive, label: "Almost ready", sub: "Finalising confirmation with your bank…" }
-    : baseActive;
 
   return (
     <div>
-      <section className="relative mx-auto max-w-2xl px-4 py-12 md:py-20">
-        {/* ambient background */}
-        <div className="absolute inset-0 -z-10 overflow-hidden">
-          <motion.div
-            className="absolute -top-32 -left-24 w-96 h-96 rounded-full bg-brand-navy/10 blur-3xl"
-            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-amber-400/10 blur-3xl"
-            animate={{ scale: [1.1, 1, 1.1], opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="rounded-3xl border border-border bg-card/85 backdrop-blur shadow-2xl p-8 md:p-12 text-center"
-        >
-          {/* Premium concentric ring loader */}
-          <div className="relative mx-auto w-32 h-32">
-            <motion.div
-              className="absolute inset-0 rounded-full border-[3px] border-brand-navy/10"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            />
-            <motion.div
-              className="absolute inset-0 rounded-full border-[3px] border-transparent"
-              style={{
-                borderTopColor: "hsl(var(--brand-navy, 215 60% 25%))",
-                borderRightColor: "hsl(var(--brand-navy, 215 60% 25%))",
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-            />
-            <motion.div
-              className="absolute inset-3 rounded-full border-[2px] border-transparent border-b-amber-400 border-l-amber-400"
-              animate={{ rotate: -360 }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <motion.div
-                className="w-14 h-14 rounded-full bg-brand-navy/5 flex items-center justify-center"
-                animate={{ scale: [1, 1.08, 1] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <motion.div
-                  key={active.label}
-                  initial={{ opacity: 0, scale: 0.6, rotate: -20 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                >
-                  <active.icon className="w-7 h-7 text-brand-navy" />
-                </motion.div>
-              </motion.div>
-            </div>
-          </div>
-
-          <motion.h1
-            key={active.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="mt-8 text-2xl md:text-3xl font-bold font-display text-foreground"
-          >
-            {active.label}
-          </motion.h1>
-          <motion.p
-            key={active.sub}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="mt-2 text-sm text-muted-foreground"
-          >
-            {active.sub}
-          </motion.p>
-
-          <div className="mt-8">
-            <div className="text-5xl font-bold font-display text-brand-navy tabular-nums">
-              {remaining}<span className="text-2xl text-muted-foreground font-normal">s</span>
-            </div>
-            <div className="mt-5 h-2 w-full rounded-full bg-muted overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-brand-navy via-brand-navy-deep to-amber-500"
-                animate={{ width: `${pct}%` }}
-                transition={{ duration: 0.9, ease: "linear" }}
-              />
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Please don't close or refresh this window.
-            </p>
-          </div>
-
-          {/* Step pips */}
-          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {STEPS.map((s, i) => {
-              const done = i < activeIdx;
-              const isActive = i === activeIdx;
-              const Icon = s.icon;
-              return (
-                <motion.div
-                  key={s.label}
-                  initial={{ opacity: 0.4 }}
-                  animate={{
-                    opacity: done || isActive ? 1 : 0.45,
-                    scale: isActive ? 1.04 : 1,
-                  }}
-                  transition={{ duration: 0.3 }}
-                  className={`rounded-xl border px-3 py-3 text-[11px] font-medium leading-tight flex flex-col items-center gap-1.5 ${
-                    done
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                      : isActive
-                      ? "border-brand-navy bg-brand-navy/5 text-brand-navy shadow-sm"
-                      : "border-border bg-background text-muted-foreground"
-                  }`}
-                >
-                  {done ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-                  <span>{s.label}</span>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          <p className="mt-6 text-[11px] text-muted-foreground font-mono">
-            Ref:{" "}
-            <span className="text-brand-navy font-semibold tracking-wider">
-              {leadCode}
-            </span>
-          </p>
-
-          <p className="mt-4 text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-            <Lock className="w-3 h-3" /> End-to-end encrypted · ISO 27001 aligned
-          </p>
-        </motion.div>
-      </section>
+      <CountdownCard
+        totalSeconds={TOTAL_SECONDS}
+        elapsed={elapsed}
+        steps={STEPS}
+        leadCode={leadCode}
+        holdLabel={holding ? "Almost ready" : undefined}
+        holdSub={holding ? "Finalising confirmation with your bank…" : undefined}
+      />
       <TrustBlock />
     </div>
   );
