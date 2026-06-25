@@ -58,6 +58,7 @@ function LeadDetailPage() {
   if (isLoading) return <div className="p-10 text-center text-slate-500">Loading lead details…</div>;
   if (!data) return null;
   const { lead, applications, notes } = data;
+  const canEditLead = role.hasAny(["super_admin", "operations", "admin", "manager", "executive"]);
   const canEditFinance = role.hasAny(["super_admin", "admin", "finance"]);
 
   return (
@@ -88,7 +89,7 @@ function LeadDetailPage() {
           <div className="flex items-center gap-3">
             <select
               value={lead.status}
-              disabled={busy}
+              disabled={busy || !canEditLead}
               onChange={async (e) => {
                 setBusy(true);
                 try {
@@ -145,6 +146,7 @@ function LeadDetailPage() {
               title="Customer Contact"
               leadId={leadId}
               data={lead}
+              canEdit={canEditLead}
               fields={[
                 { key: "name", label: "Full Name" },
                 { key: "email", label: "Email Address", type: "email" },
@@ -171,6 +173,7 @@ function LeadDetailPage() {
               title="Assignment & Source"
               leadId={leadId}
               data={{ ...lead, assigned_to: (lead as any).assignee_name || (lead.assigned_to ? lead.assigned_to.slice(0,8)+"…" : "Unassigned") }}
+              canEdit={canEditLead}
               fields={[
                 { key: "assigned_to", label: "Assigned To", readOnly: true },
                 { key: "lead_source", label: "Lead Source" },
