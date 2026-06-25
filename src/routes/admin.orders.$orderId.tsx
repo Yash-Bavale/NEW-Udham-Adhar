@@ -203,6 +203,7 @@ function OrderDetailPage() {
               documents={documents}
               deletedAt={application.documents_deleted_at}
               deletedReason={application.documents_deleted_reason}
+              hideMoney={hideAmount}
             />
           </div>
 

@@ -65,6 +65,8 @@ export function LeadWorkspacePanel({
   staff: Staff[];
 }) {
   const currentStatus: LeadStatusV2 = (lead.lead_status_v2 ?? "new_lead") as LeadStatusV2;
+  const role = useRole();
+  const hideMoney = role.hideMoney();
   return (
     <div className="grid lg:grid-cols-3 gap-5">
       <div className="lg:col-span-2 space-y-5">
@@ -77,19 +79,21 @@ export function LeadWorkspacePanel({
       <div className="space-y-5">
         <CustomerQuickCard lead={lead} />
         <QuickActionsCard lead={lead} />
-        <PaymentLinkPanel
-          leadId={lead.id}
-          leadCode={lead.lead_code}
-          mobile={lead.mobile ?? null}
-          customerName={lead.name}
-          service={lead.service ?? null}
-          baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
-          gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
-          totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-          leadStatusV2={currentStatus}
-        />
+        {!hideMoney && (
+          <PaymentLinkPanel
+            leadId={lead.id}
+            leadCode={lead.lead_code}
+            mobile={lead.mobile ?? null}
+            customerName={lead.name}
+            service={lead.service ?? null}
+            baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
+            gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
+            totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+            leadStatusV2={currentStatus}
+          />
+        )}
         <FollowUpScheduler leadId={lead.id} staff={staff} />
-        <LinkedOrderPanel applications={applications} />
+        <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
         <DocumentsPanel applications={applications} />
       </div>
     </div>
@@ -636,7 +640,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
 
 /* ------------------- Linked Order Panel ------------------- */
 
-function LinkedOrderPanel({ applications }: { applications: any[] }) {
+function LinkedOrderPanel({ applications, hideMoney = false }: { applications: any[]; hideMoney?: boolean }) {
   if (!applications || applications.length === 0) {
     return (
       <div className="rounded-lg border bg-white p-4" style={{ borderColor: "var(--admin-border)" }}>
@@ -655,7 +659,7 @@ function LinkedOrderPanel({ applications }: { applications: any[] }) {
       <div className="text-xs space-y-1.5">
         <Row k="Order #" v={<span className="font-mono">{app.application_code}</span>} />
         <Row k="Fulfillment" v={<Badge variant="secondary" className="text-[10px]">{(app.fulfillment_status ?? app.application_status ?? "—").replace(/_/g, " ")}</Badge>} />
-        <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />
+        {!hideMoney && <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />}
         <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline pt-1">
           Open order →
         </a>

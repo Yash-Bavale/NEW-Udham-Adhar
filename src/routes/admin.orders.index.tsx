@@ -18,6 +18,7 @@ import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/comput
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/admin/orders/")({ component: OrdersListPage });
 
@@ -32,6 +33,8 @@ function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
   const staffFn = useServerFn(listStaff);
   const svcFn = useServerFn(listServices);
+  const role = useRole();
+  const hideMoney = role.hideMoney();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -139,10 +142,12 @@ function OrdersListPage() {
               <option key={s.id} value={s.id}>{s.display_name || s.email}</option>
             ))}
           </select>
-          <select value={paymentStatus} onChange={(e) => { setPaymentStatus(e.target.value); setPage(1); }} className="rounded-md border px-2 py-1.5 text-sm bg-white">
-            <option value="">All payment</option>
-            {PAY_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {!hideMoney && (
+            <select value={paymentStatus} onChange={(e) => { setPaymentStatus(e.target.value); setPage(1); }} className="rounded-md border px-2 py-1.5 text-sm bg-white">
+              <option value="">All payment</option>
+              {PAY_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
           <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="h-9 text-sm max-w-[150px]" />
           <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="h-9 text-sm max-w-[150px]" />
         </div>
@@ -182,8 +187,8 @@ function OrdersListPage() {
                 <th className="text-left px-3 py-2.5">Stage</th>
                 <th className="text-left px-3 py-2.5">Fulfillment</th>
                 <th className="text-left px-3 py-2.5">Assigned</th>
-                <th className="text-right px-3 py-2.5">Amount</th>
-                <th className="text-left px-3 py-2.5">Payment</th>
+                {!hideMoney && <th className="text-right px-3 py-2.5">Amount</th>}
+                {!hideMoney && <th className="text-left px-3 py-2.5">Payment</th>}
                 <th className="text-left px-3 py-2.5">Created</th>
                 <th className="px-3 py-2.5" />
               </tr>
@@ -216,8 +221,8 @@ function OrdersListPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
-                  <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>
-                  <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{r.payment_status}</Badge></td>
+                  {!hideMoney && <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>}
+                  {!hideMoney && <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{r.payment_status}</Badge></td>}
                   <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
                     <div>{formatIST(r.created_at, { dateOnly: true })}</div>
                     <div className="text-[10px] text-slate-400">{formatIST(r.created_at, { timeOnly: true })} IST</div>
