@@ -77,16 +77,30 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
 
-    // Orders surface = leads where payment has succeeded. Inner-join to leads
-    // and require lead.payment_successful_at IS NOT NULL.
+    // Orders surface = applications with at least one successful payment.
+    // Pre-resolve paid application IDs from the payments table, then filter.
+    const { data: paidRows, error: paidErr } = await admin
+      .from("payments")
+      .select("application_id")
+      .eq("status", "paid")
+      .not("application_id", "is", null);
+    if (paidErr) throw new Error(paidErr.message);
+    const paidAppIds = Array.from(
+      new Set((paidRows ?? []).map((r: any) => r.application_id).filter(Boolean)),
+    ) as string[];
+
+    if (paidAppIds.length === 0) {
+      return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
+    }
+
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, leads!fk_applications_lead!inner(payment_successful_at)",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at",
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .not("leads.payment_successful_at", "is", null)
+      .in("id", paidAppIds)
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
@@ -110,7 +124,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, payment_successful_at, status").in("id", leadIds)
+        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, status").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
