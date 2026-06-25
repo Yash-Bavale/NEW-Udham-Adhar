@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
 import { maskAadhaar } from "@/lib/crm/mask";
+import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
 
 export const Route = createFileRoute("/admin/customers/$customerId")({
   head: () => ({ meta: [{ title: "Customer Profile — CRM" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -293,8 +294,8 @@ function OrdersTab({ data }: { data: any }) {
               <tr className="text-left text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
                 <th className="py-2 pr-3">Order No</th>
                 <th className="py-2 pr-3">Service</th>
+                <th className="py-2 pr-3">Stage</th>
                 <th className="py-2 pr-3">Fulfillment</th>
-                <th className="py-2 pr-3">Lead Status</th>
                 <th className="py-2 pr-3 text-right">Amount</th>
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3"></th>
@@ -303,6 +304,10 @@ function OrdersTab({ data }: { data: any }) {
             <tbody>
               {data.applications.map((a: any) => {
                 const lead = a.lead_id ? leadById.get(a.lead_id) : null;
+                const stage = computeOrderStage(
+                  { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: lead?.payment_successful_at },
+                  { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
+                );
                 return (
                   <tr key={a.id} className="border-t hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
                     <td className="py-2 pr-3">
@@ -311,8 +316,12 @@ function OrdersTab({ data }: { data: any }) {
                       </Link>
                     </td>
                     <td className="py-2 pr-3 text-xs">{lead?.service ?? "—"}</td>
+                    <td className="py-2 pr-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_BADGE_CLASS[stage]}`}>
+                        {STAGE_META[stage].label}
+                      </span>
+                    </td>
                     <td className="py-2 pr-3"><StatusBadge status={a.fulfillment_status ?? a.application_status} /></td>
-                    <td className="py-2 pr-3">{lead ? <StatusBadge status={lead.status} /> : <span className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>—</span>}</td>
                     <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtD(a.created_at)}</td>
                     <td className="py-2 pr-3 text-right">
