@@ -269,12 +269,23 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       const payIds = payments.map((p) => p.id);
       const { data: invs } = await admin
         .from("invoices")
-        .select("id, payment_id, invoice_number, pdf_path")
+        .select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at")
         .in("payment_id", payIds);
       const map = new Map((invs ?? []).map((i: any) => [i.payment_id, i]));
       payments = payments.map((p) => {
-        const inv = map.get(p.id);
-        return { ...p, invoice_id: inv?.id ?? null, invoice_number: inv?.invoice_number ?? null, has_pdf: !!inv?.pdf_path };
+        const inv: any = map.get(p.id);
+        return {
+          ...p,
+          invoice_id: inv?.id ?? null,
+          invoice_number: inv?.invoice_number ?? null,
+          invoice_issued_at: inv?.issued_at ?? null,
+          invoice_last_emailed_at: inv?.last_emailed_at ?? null,
+          invoice_email_attempts: inv?.email_attempts ?? 0,
+          invoice_last_email_status: inv?.last_email_status ?? null,
+          invoice_delivery_status: inv?.delivery_status ?? null,
+          invoice_replaced_at: inv?.replaced_at ?? null,
+          has_pdf: !!inv?.pdf_path,
+        };
       });
     }
     const paymentStatus = rollupPaymentStatus(
