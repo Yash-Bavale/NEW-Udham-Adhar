@@ -203,16 +203,16 @@ function OrdersListPage() {
                   </td>
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.service_name ?? "—"}</td>
                   <td className="px-3 py-2">
+                    {(r as any).stage ? (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_BADGE_CLASS[(r as any).stage as OrderStage]}`}>
+                        {STAGE_META[(r as any).stage as OrderStage].label}
+                      </span>
+                    ) : <span className="text-slate-400 text-xs">—</span>}
+                  </td>
+                  <td className="px-3 py-2">
                     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${FULFILLMENT_BADGE[r.fulfillment_status]}`}>
                       {FULFILLMENT_LABEL[r.fulfillment_status]}
                     </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.lead_status_v2 ? (
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${LEAD_STATUS_BADGE[r.lead_status_v2 as LeadStatusV2] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                        {LEAD_STATUS_LABEL[r.lead_status_v2 as LeadStatusV2] ?? r.lead_status_v2}
-                      </span>
-                    ) : <span className="text-slate-400 text-xs">—</span>}
                   </td>
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
                   <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>
