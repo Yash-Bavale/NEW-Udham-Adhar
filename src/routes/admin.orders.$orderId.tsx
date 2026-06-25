@@ -12,12 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
+import { useRef } from "react";
 import { OrderJourneyStepper } from "@/components/admin/OrderJourneyStepper";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { StageJourneyStrip } from "@/components/admin/StageJourneyStrip";
+import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
+import { computeOrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
 export const Route = createFileRoute("/admin/orders/$orderId")({ component: OrderDetailPage });
