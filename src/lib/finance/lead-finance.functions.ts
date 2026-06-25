@@ -17,7 +17,7 @@ export const getLeadFinance = createServerFn({ method: "POST" })
     const ok = (roles ?? []).some((r) =>
       ["admin", "super_admin", "finance", "accounts"].includes(r.role as string),
     );
-    if (!ok) throw new Error("Forbidden");
+    if (!ok) return { payments: [], invoices: [], settlements: [] };
 
     const [paymentsRes, invoicesRes, settlementsRes] = await Promise.all([
       (await getAdmin())
