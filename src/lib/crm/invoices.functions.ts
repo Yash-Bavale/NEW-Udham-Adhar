@@ -289,18 +289,19 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
         },
       );
       if (inv?.id) {
+        const { data: cur } = await admin.from("invoices").select("email_attempts").eq("id", inv.id).maybeSingle();
         await (admin as any).from("invoices").update({
           last_emailed_at: new Date().toISOString(),
-          email_attempts: ((admin as any), 0), // bumped below via rpc-less increment
+          email_attempts: Number((cur as any)?.email_attempts ?? 0) + 1,
           last_email_status: "queued",
           delivery_status: "queued",
         }).eq("id", inv.id);
-        // increment email_attempts atomically
-        await (admin as any).rpc("noop").catch(() => null); // placeholder; real bump below
-        const { data: cur } = await admin.from("invoices").select("email_attempts").eq("id", inv.id).maybeSingle();
-        await (admin as any).from("invoices").update({
-          email_attempts: Number(cur?.email_attempts ?? 0) + 1,
-        }).eq("id", inv.id);
+        await logInvoiceEvent(inv.id, "emailed", {
+          recipient: lead.email,
+          attachment: attachment.filename,
+          template: "payment_success",
+        }, actor);
+      }
         await logInvoiceEvent(inv.id, "emailed", {
           recipient: lead.email,
           attachment: attachment.filename,
