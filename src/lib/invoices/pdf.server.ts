@@ -316,7 +316,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const totalLine = (label: string, val: string, opts?: { bold?: boolean; color?: RGB; bg?: RGB }) => {
     if (opts?.bg) page.drawRectangle({ x: totalsX - 6, y: y - 6, width: totalsRight - totalsX + 12, height: 22, color: opts.bg });
     drawText(page, label, { x: totalsX, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? GRAY });
-    const tw = (opts?.bold ? helvBold : helv).widthOfTextAtSize(val, 10);
+    const tw = textWidth(opts?.bold ? helvBold : helv, val, 10);
     drawText(page, val, { x: totalsRight - tw, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? NAVY });
     y -= 18;
   };
