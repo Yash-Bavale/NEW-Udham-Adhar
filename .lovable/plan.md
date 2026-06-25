@@ -1,46 +1,59 @@
-## Problem
+## Goal
 
-After payment, the customer email is rendered from the `email_templates` row with code `payment_success` (used by `resendInvoiceEmail` / webhook flows via `enqueueFromTemplateInternal`). That row has two defects:
+Two scoped changes for the staff console:
 
-1. The "Download invoice" link is hardcoded to `https://udyamadhar.everythinghappens.in/api/public/invoice/{{lead_code}}` (wrong domain — leaks the staging host).
-2. The HTML layout pre-dates the current Zoho-style invoice / brand refresh and no longer matches the PDF + summary page design.
+1. **Show Aadhaar in full** — stop masking the 12‑digit number / bank account anywhere staff view it.
+2. **Hide payments and invoices from employees** — operations and support roles should not see any monetary information, payment status, or invoice artifacts. Admin, super_admin, accounts, and finance keep full visibility.
 
-Separately, the PDF that downloads at `udyamadhar.in/api/public/invoice/UA-2026-007530` looks "old" because that invoice file was rendered and stored before the new `pdf.server.ts` Zoho layout shipped. The renderer itself is current; only the stored PDF is stale.
+## Scope of "employee"
+
+Same definition already used by the order workspace:
+```
+hideMoney = role.hasAny(["operations","support"]) && !role.hasAny(["super_admin","admin","accounts","finance"])
+```
+This is the rule that will gate every payment/invoice surface listed below.
 
 ## Changes
 
-### 1. Replace the `payment_success` email template (DB migration)
+### 1. Unmask Aadhaar (and related sensitive numbers)
 
-Add a new migration that `UPDATE`s `public.email_templates WHERE code = 'payment_success'` with:
+- `src/components/admin/FormSubmissionPanel.tsx` — `MASKED_FIELDS` is emptied; `mask()` becomes a plain string formatter so Aadhaar, bank account, etc. render in full.
+- `src/lib/crm/formDisplayConfig.ts` — `maskValue()` returns the raw value; `Reveal` flow becomes a no‑op (value always shown). Field configs keep their `mask` metadata so future reversal is one‑line.
+- `src/routes/admin.customers.$customerId.tsx` — drop `maskAadhaar` wrapping on notes and document names (it was incidentally redacting any string with 12 digits).
+- `src/lib/crm/mask.ts` — kept but marked deprecated (other callers can be removed later); no behavior change required this turn beyond the call sites above.
 
-- Correct download URL: `https://udyamadhar.in/api/public/invoice/{{lead_code}}` (matches the working public route).
-- Refreshed Zoho-aligned brand layout matching current pages:
-  - BHS navy gradient header + "Payment received" pill, `Ref: {{lead_code}}`.
-  - Greeting `Thank you, {{name}}!` + service line.
-  - Action-required card with rounded gradient CTA → `{{onboarding_url}}` ("Fill incomplete information").
-  - Payment summary card (Service charges / GST 18% / Total) with `{{base_amount}} / {{gst_amount}} / {{total_amount}}`.
-  - Invoice card: shows `{{invoice_number}}`, notes the PDF is attached, plus a secondary "Download invoice" link → `https://udyamadhar.in/api/public/invoice/{{lead_code}}`.
-  - Dark "What happens next" timeline card.
-  - Footer: `help@businesshelpservices.in`, `udyamadhar.in`, address line — matches the rest of the brand emails.
-- Subject left as-is unless it also references the old domain (will refresh wording if needed: "Payment received — Invoice {{invoice_number}}").
+No DB or server function changes — masking was purely presentational.
 
-No code touches `enqueueFromTemplateInternal` — all variables already passed in `resendInvoiceEmail` (`name`, `service`, `lead_code`, `invoice_number`, `base_amount`, `gst_amount`, `total_amount`, `support_email`) plus webhook flows are reused. `{{onboarding_url}}` will be added to the template-data payload at the two webhook call sites and in `resendInvoiceEmail` (derived as `https://udyamadhar.in/onboarding/{{lead_code}}`) so the CTA works.
+### 2. Hide payments & invoices from operations/support
 
-### 2. Regenerate the stale PDF for UA-2026-007530
+Order workspace (`src/routes/admin.orders.$orderId.tsx`):
+- Already hides ₹ total, OrderPaymentsPanel, payments in UnifiedTimeline, and the "Payment received" checklist row.
+- Add: hide the **Payment status chip** in `OrderCommandHeader` when `hideAmount` is true (pass through and gate the `<Meta label="Payment">` block).
+- `OrderDocumentsPanel` — when `hideAmount`, suppress any document row whose `doc_type` is `invoice` / `tax_invoice` (defensive — invoices are usually stored in the invoices table, not documents, but the panel renders whatever is attached).
 
-One-off: call existing `regenerateInvoice` for the invoice attached to that lead's payment so the stored PDF picks up the current Zoho layout. Done via a short SQL+server-fn invocation; no schema change.
+Customer profile (`src/routes/admin.customers.$customerId.tsx`):
+- Read `useRole()`, compute the same `hideMoney` flag.
+- When `hideMoney`:
+  - Skip the "Invoices" stat card in the KPI row.
+  - Skip the entire "Invoices (n)" section.
+  - Hide any amount columns on the Payments section (or hide the whole Payments section — see Question below).
 
-Optional (ask before doing): bulk-regenerate all invoices issued before the redesign cutoff so historical downloads also reflect the new layout.
+My Work (`src/routes/admin.my-work.tsx`) and any operations list views:
+- Audit for ₹ / invoice columns; gate the same way. (Spot check confirmed no direct invoice rendering today, but the audit closes the loop.)
 
-### 3. Verification
+Sidebar (`src/components/admin/AdminShell.tsx`):
+- Already gated by `FINANCE_ROLES`; no change.
 
-- `supabase--read_query` on `email_templates` to confirm the new body has no `everythinghappens` and uses `udyamadhar.in`.
-- Trigger `resendInvoiceEmail` for the test payment and inspect `email_queue.body_html` (and rendered preview) — confirm the new layout, working CTA, correct download link, and PDF attached.
-- Open the regenerated PDF via `/api/public/invoice/UA-2026-007530` and confirm it matches the current Zoho design.
-- I want all invoice to be genrated as new format no old, automatically delete the old format & replace it with new 
+### Verification
 
-## Out of scope
+- Sign in as a `support` user → open `/admin/orders/<id>` and `/admin/customers/<id>`: no ₹, no payment chip, no invoice section.
+- Sign in as `admin` → same pages show payment chip, totals, invoice section, and full Aadhaar.
+- Spot‑check `FormSubmissionPanel`: Aadhaar field renders as `1234 5678 9012`, not `XXXX XXXX 9012`.
 
-- No changes to `pdf.server.ts` (already current).
-- No changes to the public invoice download route.
-- No changes to webhook signature/processing logic.
+## Question
+
+For operations/support on the customer profile, should the **Payments section** be:
+- (A) hidden entirely, or
+- (B) shown with amount columns blanked (so they can still see "a payment exists" and its date/status)?
+
+Default if you don't answer: **(A) hidden entirely** — matches how the order page hides `OrderPaymentsPanel` outright.

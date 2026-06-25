@@ -10,8 +10,8 @@ import {
 import { toast } from "sonner";
 import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
-import { maskAadhaar } from "@/lib/crm/mask";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
+import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/admin/customers/$customerId")({
   head: () => ({ meta: [{ title: "Customer Profile — CRM" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -41,12 +41,18 @@ function CustomerProfilePage() {
   const { customerId } = Route.useParams();
   const navigate = useNavigate();
   const fn = useServerFn(getCustomer360);
+  const role = useRole();
+  const hideMoney = role.hasAny(["operations", "support"]) && !role.hasAny(["super_admin", "admin", "accounts", "finance"]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin.customer360", customerId],
     queryFn: () => fn({ data: { customerId } }),
   });
 
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => !(hideMoney && t.key === "payments")),
+    [hideMoney],
+  );
   const [tab, setTab] = useState<TabKey>("overview");
 
   if (error) {
@@ -120,10 +126,14 @@ function CustomerProfilePage() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard index={0} label="Lifetime Value" value={fmtINR(Number(c.lifetime_value))} icon={<Wallet className="size-4" />} gradient="primary" />
+        {!hideMoney && (
+          <StatCard index={0} label="Lifetime Value" value={fmtINR(Number(c.lifetime_value))} icon={<Wallet className="size-4" />} gradient="primary" />
+        )}
         <StatCard index={1} label="Orders" value={c.total_applications} icon={<FileText className="size-4" />} gradient="primary" hint={`${c.completed_applications} completed · ${c.pending_applications} open`} />
         <StatCard index={2} label="Certificates" value={data.certificates.length} icon={<Award className="size-4" />} gradient="success" />
-        <StatCard index={3} label="Invoices" value={data.invoices.length} icon={<Receipt className="size-4" />} gradient="warn" />
+        {!hideMoney && (
+          <StatCard index={3} label="Invoices" value={data.invoices.length} icon={<Receipt className="size-4" />} gradient="warn" />
+        )}
       </div>
 
       {/* Tabs */}
@@ -131,7 +141,7 @@ function CustomerProfilePage() {
         className="flex items-center gap-1 border-b overflow-x-auto"
         style={{ borderColor: "var(--admin-border)" }}
       >
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           const active = t.key === tab;
           return (
@@ -151,10 +161,10 @@ function CustomerProfilePage() {
         })}
       </div>
 
-      {tab === "overview" && <OverviewTab data={data} customerId={customerId} />}
-      {tab === "orders" && <OrdersTab data={data} />}
+      {tab === "overview" && <OverviewTab data={data} customerId={customerId} hideMoney={hideMoney} />}
+      {tab === "orders" && <OrdersTab data={data} hideMoney={hideMoney} />}
       {tab === "complaints" && <ComplaintsTab data={data} />}
-      {tab === "payments" && <PaymentsTab data={data} />}
+      {tab === "payments" && !hideMoney && <PaymentsTab data={data} />}
       {tab === "documents" && <DocumentsTab data={data} />}
       {tab === "activity" && <ActivityTab data={data} />}
       {tab === "communication" && <CommunicationTab data={data} />}
@@ -164,7 +174,7 @@ function CustomerProfilePage() {
 
 /* ---------- Tabs ---------- */
 
-function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
+function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: string; hideMoney: boolean }) {
   const qc = useQueryClient();
   const noteFn = useServerFn(addCustomerNote);
   const [noteDraft, setNoteDraft] = useState("");
@@ -182,14 +192,16 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
     data.applications.forEach((a: any) =>
       items.push({ id: `app-${a.id}`, time: a.created_at, type: "application", description: `Order ${a.application_code ?? a.id.slice(0, 8)} (${a.application_status})` })
     );
-    data.payments.forEach((p: any) =>
-      items.push({ id: `pay-${p.id}`, time: p.created_at, type: "payment", description: `Payment ${fmtINR(Number(p.amount))} · ${p.gateway_name} · ${p.status}` })
-    );
+    if (!hideMoney) {
+      data.payments.forEach((p: any) =>
+        items.push({ id: `pay-${p.id}`, time: p.created_at, type: "payment", description: `Payment ${fmtINR(Number(p.amount))} · ${p.gateway_name} · ${p.status}` })
+      );
+    }
     data.complaints.forEach((c: any) =>
       items.push({ id: `comp-${c.id}`, time: c.created_at, type: "complaint", description: `Complaint ${c.complaint_number ?? ""} · ${c.severity}` })
     );
     return items.sort((a, b) => +new Date(b.time) - +new Date(a.time)).slice(0, 30).map((i) => ({ ...i, time: fmtDT(i.time) }));
-  }, [data]);
+  }, [data, hideMoney]);
 
   const c = data.customer;
 
@@ -203,7 +215,7 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
             <Field label="Total Orders" value={String(c.total_applications ?? 0)} />
             <Field label="Completed" value={String(c.completed_applications ?? 0)} />
             <Field label="Pending" value={String(c.pending_applications ?? 0)} />
-            <Field label="Lifetime Value" value={fmtINR(Number(c.lifetime_value ?? 0))} />
+            {!hideMoney && <Field label="Lifetime Value" value={fmtINR(Number(c.lifetime_value ?? 0))} />}
             <Field label="Last Order" value={fmtD(c.last_seen_at)} />
           </dl>
         </SectionCard>
@@ -224,7 +236,7 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
                   <div>
                     <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
                     <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                      {l.service} · {fmtD(l.created_at)} · {fmtINR(Number(l.total_amount))}
+                      {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
                     </div>
                   </div>
                   <StatusBadge status={l.status} />
@@ -265,7 +277,7 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
                   <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
                     <StickyNote className="size-3" /> {fmtDT(n.created_at)}
                   </div>
-                  <div className="mt-1 text-sm whitespace-pre-wrap">{maskAadhaar(n.note)}</div>
+                  <div className="mt-1 text-sm whitespace-pre-wrap">{n.note}</div>
                 </div>
               ))
             )}
@@ -280,7 +292,7 @@ function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
   );
 }
 
-function OrdersTab({ data }: { data: any }) {
+function OrdersTab({ data, hideMoney }: { data: any; hideMoney: boolean }) {
   const leadById = new Map<string, any>();
   for (const l of data.leads ?? []) leadById.set(l.id, l);
   return (
@@ -296,7 +308,7 @@ function OrdersTab({ data }: { data: any }) {
                 <th className="py-2 pr-3">Service</th>
                 <th className="py-2 pr-3">Stage</th>
                 <th className="py-2 pr-3">Fulfillment</th>
-                <th className="py-2 pr-3 text-right">Amount</th>
+                {!hideMoney && <th className="py-2 pr-3 text-right">Amount</th>}
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3"></th>
               </tr>
@@ -322,7 +334,7 @@ function OrdersTab({ data }: { data: any }) {
                       </span>
                     </td>
                     <td className="py-2 pr-3"><StatusBadge status={a.fulfillment_status ?? a.application_status} /></td>
-                    <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>
+                    {!hideMoney && <td className="py-2 pr-3 text-right font-medium">{fmtINR(Number(a.total_amount ?? lead?.total_amount ?? 0))}</td>}
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtD(a.created_at)}</td>
                     <td className="py-2 pr-3 text-right">
                       <Link to="/admin/orders/$orderId" params={{ orderId: a.id }} className="inline-flex">
@@ -471,8 +483,8 @@ function DocumentsTab({ data }: { data: any }) {
               <tbody>
                 {data.documents.map((d: any) => (
                   <tr key={d.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                    <td className="py-2 pr-3 text-xs font-medium uppercase">{maskAadhaar(d.doc_type)}</td>
-                    <td className="py-2 pr-3 text-xs">{maskAadhaar(d.file_name)}</td>
+                    <td className="py-2 pr-3 text-xs font-medium uppercase">{d.doc_type}</td>
+                    <td className="py-2 pr-3 text-xs">{d.file_name}</td>
                     <td className="py-2 pr-3"><StatusBadge status={d.status} /></td>
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.uploaded_at)}</td>
                     <td className="py-2 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{fmtDT(d.verified_at)}</td>
