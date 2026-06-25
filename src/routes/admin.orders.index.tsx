@@ -218,8 +218,9 @@ function OrdersListPage() {
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
                   <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>
                   <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{r.payment_status}</Badge></td>
-                  <td className="px-3 py-2 text-xs text-slate-500">
-                    {new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
+                  <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
+                    <div>{formatIST(r.created_at, { dateOnly: true })}</div>
+                    <div className="text-[10px] text-slate-400">{formatIST(r.created_at, { timeOnly: true })} IST</div>
                   </td>
                   <td className="px-3 py-2 text-right">
                     <Link to="/admin/orders/$orderId" params={{ orderId: r.id }} className="text-blue-600 hover:underline text-xs inline-flex items-center gap-1">
