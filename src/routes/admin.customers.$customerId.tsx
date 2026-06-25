@@ -174,7 +174,7 @@ function CustomerProfilePage() {
 
 /* ---------- Tabs ---------- */
 
-function OverviewTab({ data, customerId }: { data: any; customerId: string }) {
+function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: string; hideMoney: boolean }) {
   const qc = useQueryClient();
   const noteFn = useServerFn(addCustomerNote);
   const [noteDraft, setNoteDraft] = useState("");
