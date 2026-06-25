@@ -10,8 +10,9 @@ async function getAdmin() {
 }
 
 // Place of supply / GSTIN for the seller. Override per-environment.
-const COMPANY_STATE = (process.env.COMPANY_STATE ?? "Delhi").trim();
-const COMPANY_GSTIN = (process.env.COMPANY_GSTIN ?? "").trim() || null;
+const COMPANY_STATE = (process.env.COMPANY_STATE ?? "Maharashtra").trim();
+const COMPANY_GSTIN = (process.env.COMPANY_GSTIN ?? "27COFPD1743E2ZB").trim() || null;
+
 const DEFAULT_SAC = "998311";
 const GST_RATE = 18; // %
 
@@ -160,6 +161,98 @@ export const generateInvoice = createServerFn({ method: "POST" })
 export async function generateInvoiceInternal(paymentId: string) {
   return generateAndStore(paymentId);
 }
+
+/** Load the latest invoice PDF for a payment as a base64 email attachment. */
+export async function loadInvoiceAttachmentByPayment(paymentId: string): Promise<
+  { filename: string; content_base64: string; content_type: string } | null
+> {
+  const admin = await getAdmin();
+  const { data: inv } = await admin
+    .from("invoices")
+    .select("invoice_number, pdf_path, application_id, lead_id")
+    .eq("payment_id", paymentId)
+    .maybeSingle();
+  if (!inv?.pdf_path) return null;
+  const { data: blob, error } = await admin.storage.from(BUCKET).download(inv.pdf_path);
+  if (error || !blob) return null;
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  // base64 encode
+  let bin = "";
+  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  const b64 = btoa(bin);
+
+  // Pretty file name: prefer order/application code if available.
+  let orderRef = inv.invoice_number;
+  if (inv.application_id) {
+    const { data: app } = await admin
+      .from("applications").select("application_code").eq("id", inv.application_id).maybeSingle();
+    if (app?.application_code) orderRef = app.application_code;
+  } else if (inv.lead_id) {
+    const { data: l } = await admin
+      .from("leads").select("lead_code").eq("id", inv.lead_id).maybeSingle();
+    if (l?.lead_code) orderRef = l.lead_code;
+  }
+  return {
+    filename: `Invoice-${orderRef}.pdf`,
+    content_base64: b64,
+    content_type: "application/pdf",
+  };
+}
+
+export const resendInvoiceEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "finance"]);
+    const admin = await getAdmin();
+    const { data: payment } = await admin
+      .from("payments")
+      .select("id, lead_id, application_id")
+      .eq("id", data.paymentId)
+      .single();
+    if (!payment) throw new Error("Payment not found");
+
+    // Ensure invoice exists (regenerate if missing).
+    let attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
+    if (!attachment) {
+      await generateAndStore(data.paymentId);
+      attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
+    }
+    if (!attachment) throw new Error("Invoice PDF unavailable");
+
+    const { data: lead } = await admin
+      .from("leads")
+      .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+      .eq("id", payment.lead_id).single();
+    if (!lead?.email) throw new Error("Customer email missing");
+
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    await enqueueFromTemplateInternal(
+      "payment_success",
+      lead.email,
+      {
+        name: lead.name ?? "",
+        customer_name: lead.name ?? "",
+        lead_code: lead.lead_code ?? "",
+        order_number: lead.lead_code ?? "",
+        service: lead.service ?? "",
+        service_name: lead.service ?? "",
+        base_amount: Number(lead.base_amount ?? 0).toFixed(2),
+        gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
+        total_amount: Number(lead.total_amount ?? 0).toFixed(2),
+        amount: Number(lead.total_amount ?? 0).toFixed(2),
+        support_email: "help@businesshelpservices.com",
+      },
+      {
+        toName: lead.name ?? undefined,
+        leadId: payment.lead_id,
+        applicationId: payment.application_id ?? undefined,
+        attachments: [attachment],
+      },
+    );
+    return { ok: true };
+  });
+
 
 export const regenerateInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
