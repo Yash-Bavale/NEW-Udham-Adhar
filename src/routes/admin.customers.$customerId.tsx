@@ -126,10 +126,14 @@ function CustomerProfilePage() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard index={0} label="Lifetime Value" value={fmtINR(Number(c.lifetime_value))} icon={<Wallet className="size-4" />} gradient="primary" />
+        {!hideMoney && (
+          <StatCard index={0} label="Lifetime Value" value={fmtINR(Number(c.lifetime_value))} icon={<Wallet className="size-4" />} gradient="primary" />
+        )}
         <StatCard index={1} label="Orders" value={c.total_applications} icon={<FileText className="size-4" />} gradient="primary" hint={`${c.completed_applications} completed · ${c.pending_applications} open`} />
         <StatCard index={2} label="Certificates" value={data.certificates.length} icon={<Award className="size-4" />} gradient="success" />
-        <StatCard index={3} label="Invoices" value={data.invoices.length} icon={<Receipt className="size-4" />} gradient="warn" />
+        {!hideMoney && (
+          <StatCard index={3} label="Invoices" value={data.invoices.length} icon={<Receipt className="size-4" />} gradient="warn" />
+        )}
       </div>
 
       {/* Tabs */}
@@ -137,7 +141,7 @@ function CustomerProfilePage() {
         className="flex items-center gap-1 border-b overflow-x-auto"
         style={{ borderColor: "var(--admin-border)" }}
       >
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           const active = t.key === tab;
           return (
