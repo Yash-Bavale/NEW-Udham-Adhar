@@ -227,6 +227,60 @@ export async function loadInvoiceAttachmentByPayment(paymentId: string): Promise
   };
 }
 
+/**
+ * Internal helper used by webhooks (and any non-auth server path) to mark an
+ * invoice as emailed/failed and log a lifecycle event. Never throws — failures
+ * are logged so they don't break the payment-success workflow.
+ */
+export async function markInvoiceEmailedByPayment(
+  paymentId: string,
+  opts: {
+    recipient: string;
+    template: string;
+    attachmentFilename?: string | null;
+    success: boolean;
+    error?: string | null;
+    actorLabel?: string;
+  },
+): Promise<void> {
+  try {
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices")
+      .select("id, email_attempts")
+      .eq("payment_id", paymentId)
+      .maybeSingle();
+    if (!inv?.id) return;
+    const actor = { id: null, label: opts.actorLabel ?? "webhook" };
+    if (opts.success) {
+      await (admin as any).from("invoices").update({
+        last_emailed_at: new Date().toISOString(),
+        email_attempts: Number((inv as any).email_attempts ?? 0) + 1,
+        last_email_status: "queued",
+        delivery_status: "queued",
+      }).eq("id", inv.id);
+      await logInvoiceEvent(inv.id, "emailed", {
+        recipient: opts.recipient,
+        attachment: opts.attachmentFilename ?? null,
+        template: opts.template,
+      }, actor);
+    } else {
+      await (admin as any).from("invoices").update({
+        last_email_status: "failed",
+        delivery_status: "failed",
+        email_attempts: Number((inv as any).email_attempts ?? 0) + 1,
+      }).eq("id", inv.id);
+      await logInvoiceEvent(inv.id, "email_failed", {
+        recipient: opts.recipient,
+        template: opts.template,
+        error: opts.error ?? null,
+      }, actor);
+    }
+  } catch (e) {
+    console.error("[markInvoiceEmailedByPayment] failed", e);
+  }
+}
+
 export const resendInvoiceEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
