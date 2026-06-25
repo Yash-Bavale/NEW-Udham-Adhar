@@ -1,4 +1,5 @@
 import { PDFDocument, PDFPage, PDFFont, StandardFonts, rgb, type RGB } from "pdf-lib";
+import { BHS_LOGO_BASE64 } from "./bhs-logo";
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Shared brand palette + helpers
@@ -10,14 +11,45 @@ const ACCENT = rgb(0.95, 0.62, 0.07);
 const GRAY = rgb(0.35, 0.38, 0.45);
 const MUTED = rgb(0.55, 0.58, 0.63);
 const LINE = rgb(0.85, 0.87, 0.9);
+const SOFT_LINE = rgb(0.92, 0.93, 0.96);
 const ZEBRA = rgb(0.97, 0.98, 0.995);
+const HEADBG = rgb(0.95, 0.96, 0.99);
 const GREEN = rgb(0.05, 0.55, 0.25);
+const RED = rgb(0.78, 0.12, 0.18);
 const WHITE = rgb(1, 1, 1);
 
-const COMPANY_NAME = "Business Help Services Consultancy";
-const COMPANY_ADDRESS = "Udyam Adhar Consulting, India";
-const COMPANY_EMAIL = "support@everythinghappens.in";
-const COMPANY_WEB = "udyamadhar.everythinghappens.in";
+const COMPANY_NAME = "Business Help Services";
+const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
+const COMPANY_EMAIL = "help@businesshelpservices.com";
+const COMPANY_PHONE = "+91-9767870331";
+const COMPANY_WEB = "businesshelpservices.com";
+const COMPANY_GSTIN = "27COFPD1743E2ZB";
+const COMPANY_STATE_NAME = "Maharashtra";
+const COMPANY_STATE_CODE = "27";
+
+const IN_STATE_CODES: Record<string, string> = {
+  "andhra pradesh": "37", "arunachal pradesh": "12", "assam": "18", "bihar": "10",
+  "chhattisgarh": "22", "goa": "30", "gujarat": "24", "haryana": "06",
+  "himachal pradesh": "02", "jharkhand": "20", "karnataka": "29", "kerala": "32",
+  "madhya pradesh": "23", "maharashtra": "27", "manipur": "14", "meghalaya": "17",
+  "mizoram": "15", "nagaland": "13", "odisha": "21", "punjab": "03",
+  "rajasthan": "08", "sikkim": "11", "tamil nadu": "33", "telangana": "36",
+  "tripura": "16", "uttar pradesh": "09", "uttarakhand": "05", "west bengal": "19",
+  "delhi": "07", "jammu and kashmir": "01", "ladakh": "38", "puducherry": "34",
+  "chandigarh": "04", "andaman and nicobar islands": "35",
+  "dadra and nagar haveli and daman and diu": "26", "lakshadweep": "31",
+};
+function stateCode(name?: string | null): string {
+  if (!name) return "—";
+  return IN_STATE_CODES[name.toLowerCase().trim()] ?? "—";
+}
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 
 function rupees(n: number): string {
   return `INR ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -143,116 +175,206 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   const page = pdf.addPage([595.28, 841.89]);
   const helv = await pdf.embedFont(StandardFonts.Helvetica);
   const helvBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(base64ToBytes(BHS_LOGO_BASE64));
 
+  const W = 595.28;
+  const MX = 36;        // page margin
+  const RX = W - MX;    // right edge
   const sac = d.sacCode ?? "998311";
   const cgst = d.cgstAmount ?? 0;
   const sgst = d.sgstAmount ?? 0;
   const igst = d.igstAmount ?? 0;
   const isIntra = cgst + sgst > 0;
+  const gstRate = isIntra ? 18 : 18;
+  const subtotal = d.baseAmount;
+  const totalTax = cgst + sgst + igst;
+  const grand = d.totalAmount;
+  const roundOff = +(grand - subtotal - totalTax).toFixed(2);
 
-  await brandHeader(page, helv, helvBold, {
-    title: "TAX INVOICE",
-    rightLabel: "INVOICE NO.",
-    rightValue: d.invoiceNumber,
-  });
+  // ─── Outer frame
+  page.drawRectangle({ x: MX - 4, y: 36, width: (W - (MX - 4) * 2), height: 769, borderColor: LINE, borderWidth: 0.75, color: WHITE });
 
-  // Meta strip
-  let y = 760;
-  drawText(page, "Issued on", { x: 40, y, size: 8, font: helv, color: MUTED });
-  drawText(page, fmtDate(d.invoiceDate), { x: 40, y: y - 13, size: 11, font: helvBold });
-  drawText(page, "Reference", { x: 200, y, size: 8, font: helv, color: MUTED });
-  drawText(page, d.leadCode, { x: 200, y: y - 13, size: 11, font: helvBold });
-  if (d.applicationCode) {
-    drawText(page, "Application", { x: 360, y, size: 8, font: helv, color: MUTED });
-    drawText(page, d.applicationCode, { x: 360, y: y - 13, size: 11, font: helvBold });
+  // ─── Header band
+  let y = 805 - 10;
+  // Logo
+  const logoDim = logo.scale(0.16); // ~58pt wide
+  page.drawImage(logo, { x: MX, y: y - 58, width: 58, height: 58 });
+  // Company block
+  drawText(page, COMPANY_NAME.toUpperCase(), { x: MX + 70, y: y - 6, size: 14, font: helvBold, color: NAVY });
+  drawText(page, COMPANY_ADDRESS, { x: MX + 70, y: y - 22, size: 8.5, font: helv, color: GRAY });
+  drawText(page, `Email: ${COMPANY_EMAIL}    Phone: ${COMPANY_PHONE}`, { x: MX + 70, y: y - 34, size: 8.5, font: helv, color: GRAY });
+  drawText(page, `GSTIN: ${COMPANY_GSTIN}    State: ${COMPANY_STATE_NAME} (${COMPANY_STATE_CODE})`, { x: MX + 70, y: y - 46, size: 8.5, font: helvBold, color: NAVY_SOFT });
+
+  // Title pill (right)
+  page.drawRectangle({ x: RX - 150, y: y - 14, width: 150, height: 24, color: NAVY });
+  drawText(page, "TAX INVOICE", { x: RX - 124, y: y - 7, size: 13, font: helvBold, color: WHITE });
+  drawText(page, "ORIGINAL FOR RECIPIENT", { x: RX - 110, y: y - 28, size: 7.5, font: helvBold, color: MUTED });
+
+  // Divider
+  y -= 70;
+  page.drawLine({ start: { x: MX, y }, end: { x: RX, y }, thickness: 1, color: ACCENT });
+
+  // ─── Invoice meta strip (3-column grid)
+  y -= 14;
+  const colW = (RX - MX) / 3;
+  const metaTop = y;
+  const metaRows: Array<[string, string]> = [
+    ["Invoice No.", d.invoiceNumber],
+    ["Invoice Date", fmtDate(d.invoiceDate)],
+    ["Order No.", d.applicationCode ?? d.leadCode],
+    ["Place of Supply", `${d.placeOfSupply ?? d.customerState ?? "—"} (${stateCode(d.placeOfSupply ?? d.customerState)})`],
+    ["Payment Date", fmtDate(d.invoiceDate)],
+    ["Payment Status", "PAID"],
+  ];
+  for (let i = 0; i < metaRows.length; i++) {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const cx = MX + col * colW;
+    const cy = metaTop - row * 30;
+    drawText(page, metaRows[i][0].toUpperCase(), { x: cx, y: cy, size: 7.5, font: helvBold, color: MUTED });
+    const isPaid = metaRows[i][0] === "Payment Status";
+    drawText(page, metaRows[i][1], { x: cx, y: cy - 12, size: 10, font: helvBold, color: isPaid ? GREEN : NAVY });
   }
-  drawText(page, "Place of Supply", { x: 470, y, size: 8, font: helv, color: MUTED });
-  drawText(page, d.placeOfSupply ?? d.customerState ?? "—", { x: 470, y: y - 13, size: 11, font: helvBold });
+  y = metaTop - 60 - 6;
+  page.drawLine({ start: { x: MX, y }, end: { x: RX, y }, thickness: 0.5, color: SOFT_LINE });
 
-  // Bill-to / From cards
-  y = 710;
-  page.drawRectangle({ x: 40, y: y - 78, width: 250, height: 90, color: ZEBRA });
-  page.drawRectangle({ x: 305, y: y - 78, width: 250, height: 90, color: ZEBRA });
-  drawText(page, "BILL TO", { x: 50, y: y - 4, size: 8, font: helvBold, color: MUTED });
-  drawText(page, d.customerName, { x: 50, y: y - 22, size: 12, font: helvBold });
-  drawText(page, d.customerEmail, { x: 50, y: y - 38, size: 9, font: helv, color: GRAY });
-  drawText(page, d.customerMobile, { x: 50, y: y - 52, size: 9, font: helv, color: GRAY });
-  if (d.customerState) drawText(page, d.customerState, { x: 50, y: y - 66, size: 9, font: helv, color: GRAY });
+  // ─── Bill To / Payment block
+  y -= 14;
+  const cardH = 100;
+  const cardW = (RX - MX - 12) / 2;
+  page.drawRectangle({ x: MX, y: y - cardH, width: cardW, height: cardH, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
+  page.drawRectangle({ x: MX + cardW + 12, y: y - cardH, width: cardW, height: cardH, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
 
-  drawText(page, "FROM", { x: 315, y: y - 4, size: 8, font: helvBold, color: MUTED });
-  drawText(page, d.companyName ?? COMPANY_NAME, { x: 315, y: y - 22, size: 11, font: helvBold });
-  drawText(page, d.companyAddress ?? COMPANY_ADDRESS, { x: 315, y: y - 38, size: 9, font: helv, color: GRAY });
-  drawText(page, "Consultancy Services", { x: 315, y: y - 52, size: 9, font: helv, color: GRAY });
-  drawText(page, COMPANY_EMAIL, { x: 315, y: y - 66, size: 9, font: helv, color: GRAY });
+  // Bill To
+  drawText(page, "BILL TO", { x: MX + 10, y: y - 14, size: 8, font: helvBold, color: MUTED });
+  drawText(page, d.customerName, { x: MX + 10, y: y - 30, size: 12, font: helvBold, color: NAVY });
+  drawText(page, d.customerEmail, { x: MX + 10, y: y - 46, size: 9, font: helv, color: GRAY });
+  drawText(page, `+91 ${d.customerMobile}`, { x: MX + 10, y: y - 60, size: 9, font: helv, color: GRAY });
+  drawText(page, `State: ${d.customerState ?? "—"} (${stateCode(d.customerState)})`, { x: MX + 10, y: y - 74, size: 9, font: helv, color: GRAY });
+  drawText(page, `Place of Supply: ${d.placeOfSupply ?? d.customerState ?? "—"}`, { x: MX + 10, y: y - 88, size: 9, font: helv, color: GRAY });
 
-  // Table header
-  y = 600;
-  page.drawRectangle({ x: 40, y: y - 6, width: 515, height: 26, color: NAVY });
-  drawText(page, "#", { x: 50, y: y + 2, size: 9, font: helvBold, color: WHITE });
-  drawText(page, "DESCRIPTION", { x: 78, y: y + 2, size: 9, font: helvBold, color: WHITE });
-  drawText(page, "SAC", { x: 340, y: y + 2, size: 9, font: helvBold, color: WHITE });
-  drawText(page, "QTY", { x: 395, y: y + 2, size: 9, font: helvBold, color: WHITE });
-  drawText(page, "RATE", { x: 435, y: y + 2, size: 9, font: helvBold, color: WHITE });
-  drawText(page, "AMOUNT", { x: 500, y: y + 2, size: 9, font: helvBold, color: WHITE });
+  // Payment / Transaction
+  const px = MX + cardW + 22;
+  drawText(page, "PAYMENT DETAILS", { x: px, y: y - 14, size: 8, font: helvBold, color: MUTED });
+  drawText(page, `Gateway: ${d.gatewayName?.toUpperCase() ?? "—"}`, { x: px, y: y - 30, size: 10, font: helvBold, color: NAVY });
+  drawText(page, `Transaction ID: ${d.paymentId ?? "—"}`, { x: px, y: y - 46, size: 9, font: helv, color: GRAY });
+  drawText(page, `Status: PAID  ·  ${fmtDate(d.invoiceDate)}`, { x: px, y: y - 60, size: 9, font: helvBold, color: GREEN });
+  drawText(page, `Lead Code: ${d.leadCode}`, { x: px, y: y - 74, size: 9, font: helv, color: GRAY });
+  if (d.applicationCode) drawText(page, `Application: ${d.applicationCode}`, { x: px, y: y - 88, size: 9, font: helv, color: GRAY });
 
-  // Single zebra row
-  y -= 34;
-  page.drawRectangle({ x: 40, y: y - 16, width: 515, height: 36, color: ZEBRA });
-  drawText(page, "1", { x: 50, y, size: 10, font: helv, color: GRAY });
-  drawText(page, d.serviceName, { x: 78, y, size: 11, font: helvBold });
-  drawText(page, "Professional consultancy fee", { x: 78, y: y - 12, size: 8, font: helv, color: MUTED });
-  drawText(page, sac, { x: 340, y, size: 10, font: helv });
-  drawText(page, "1", { x: 400, y, size: 10, font: helv });
-  drawText(page, rupees(d.baseAmount), { x: 425, y, size: 10, font: helv });
-  drawText(page, rupees(d.baseAmount), { x: 495, y, size: 10, font: helvBold });
+  y -= cardH + 18;
 
-  // Totals block (right)
-  y -= 50;
-  const totalsX = 360;
-  drawText(page, "Subtotal", { x: totalsX, y, size: 10, font: helv, color: GRAY });
-  drawText(page, rupees(d.baseAmount), { x: 495, y, size: 10, font: helv });
-  y -= 16;
+  // ─── Line items table
+  const tH = 26;
+  page.drawRectangle({ x: MX, y: y - tH, width: RX - MX, height: tH, color: NAVY });
+  const cols = [
+    { x: MX + 8,   label: "#" },
+    { x: MX + 30,  label: "DESCRIPTION" },
+    { x: MX + 300, label: "SAC" },
+    { x: MX + 350, label: "QTY" },
+    { x: MX + 390, label: "RATE (₹)" },
+    { x: RX - 80,  label: "AMOUNT (₹)" },
+  ];
+  for (const c of cols) drawText(page, c.label, { x: c.x, y: y - tH + 9, size: 9, font: helvBold, color: WHITE });
+
+  y -= tH;
+  // Row
+  const rowH = 46;
+  page.drawRectangle({ x: MX, y: y - rowH, width: RX - MX, height: rowH, color: WHITE, borderColor: SOFT_LINE, borderWidth: 0.5 });
+  drawText(page, "1", { x: MX + 8, y: y - 18, size: 10, font: helv, color: GRAY });
+  drawText(page, d.serviceName, { x: MX + 30, y: y - 16, size: 11, font: helvBold, color: NAVY });
+  drawText(page, "Consultation Service Fee", { x: MX + 30, y: y - 30, size: 8.5, font: helv, color: MUTED });
+  drawText(page, `SAC: ${sac}`, { x: MX + 30, y: y - 40, size: 8, font: helv, color: MUTED });
+  drawText(page, sac, { x: MX + 300, y: y - 18, size: 10, font: helv, color: NAVY });
+  drawText(page, "1", { x: MX + 358, y: y - 18, size: 10, font: helv, color: NAVY });
+  drawText(page, subtotal.toFixed(2), { x: MX + 390, y: y - 18, size: 10, font: helv, color: NAVY });
+  drawText(page, subtotal.toFixed(2), { x: RX - 80, y: y - 18, size: 10, font: helvBold, color: NAVY });
+
+  y -= rowH + 4;
+
+  // ─── Totals (right side)
+  const totalsX = MX + 320;
+  const totalsRight = RX - 8;
+  const totalLine = (label: string, val: string, opts?: { bold?: boolean; color?: RGB; bg?: RGB }) => {
+    if (opts?.bg) page.drawRectangle({ x: totalsX - 6, y: y - 6, width: totalsRight - totalsX + 12, height: 22, color: opts.bg });
+    drawText(page, label, { x: totalsX, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? GRAY });
+    const tw = (opts?.bold ? helvBold : helv).widthOfTextAtSize(val, 10);
+    drawText(page, val, { x: totalsRight - tw, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? NAVY });
+    y -= 18;
+  };
+  totalLine("Subtotal", `₹ ${subtotal.toFixed(2)}`);
   if (isIntra) {
-    drawText(page, "CGST (9%)", { x: totalsX, y, size: 10, font: helv, color: GRAY });
-    drawText(page, rupees(cgst), { x: 495, y, size: 10, font: helv });
-    y -= 16;
-    drawText(page, "SGST (9%)", { x: totalsX, y, size: 10, font: helv, color: GRAY });
-    drawText(page, rupees(sgst), { x: 495, y, size: 10, font: helv });
-    y -= 16;
+    totalLine("CGST (9%)", `₹ ${cgst.toFixed(2)}`);
+    totalLine("SGST (9%)", `₹ ${sgst.toFixed(2)}`);
   } else {
-    drawText(page, "IGST (18%)", { x: totalsX, y, size: 10, font: helv, color: GRAY });
-    drawText(page, rupees(igst || d.gstAmount), { x: 495, y, size: 10, font: helv });
-    y -= 16;
+    totalLine("IGST (18%)", `₹ ${igst.toFixed(2)}`);
   }
-  page.drawLine({ start: { x: totalsX, y }, end: { x: 555, y }, thickness: 0.7, color: LINE });
-  y -= 18;
-  page.drawRectangle({ x: totalsX - 10, y: y - 6, width: 195, height: 24, color: NAVY });
-  drawText(page, "TOTAL PAID", { x: totalsX, y, size: 11, font: helvBold, color: WHITE });
-  drawText(page, rupees(d.totalAmount), { x: 490, y, size: 12, font: helvBold, color: WHITE });
+  totalLine("Round Off", `${roundOff >= 0 ? "+" : "−"} ₹ ${Math.abs(roundOff).toFixed(2)}`);
+  page.drawLine({ start: { x: totalsX - 6, y: y + 12 }, end: { x: totalsRight, y: y + 12 }, thickness: 0.5, color: LINE });
+  y -= 2;
+  totalLine("GRAND TOTAL", `₹ ${grand.toFixed(2)}`, { bold: true, color: WHITE, bg: NAVY });
+  y -= 4;
 
-  // Amount in words
-  y -= 40;
-  drawText(page, "Amount in words", { x: 40, y, size: 8, font: helv, color: MUTED });
-  const words = wrap(amountInWords(d.totalAmount), helvBold, 10, 500);
-  for (const w of words) { y -= 14; drawText(page, w, { x: 40, y, size: 10, font: helvBold }); }
+  // ─── Amount in words
+  drawText(page, "Amount in Words:", { x: MX, y, size: 8, font: helvBold, color: MUTED });
+  const words = wrap(amountInWords(grand), helvBold, 10, RX - MX - 100);
+  let wy = y - 14;
+  for (const w of words) { drawText(page, w, { x: MX, y: wy, size: 10, font: helvBold, color: NAVY }); wy -= 13; }
+  y = wy - 8;
 
-  // Payment block
-  y -= 30;
-  page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 0.5, color: LINE });
-  y -= 18;
-  drawText(page, "PAYMENT DETAILS", { x: 40, y, size: 9, font: helvBold, color: MUTED });
-  drawText(page, `Gateway: ${d.gatewayName.toUpperCase()}`, { x: 40, y: y - 16, size: 10, font: helv, color: GRAY });
-  if (d.paymentId) drawText(page, `Txn Reference: ${d.paymentId}`, { x: 40, y: y - 30, size: 10, font: helv, color: GRAY });
-  drawText(page, "Status: PAID", { x: 40, y: y - 44, size: 10, font: helvBold, color: GREEN });
+  // ─── HSN / SAC Summary
+  page.drawRectangle({ x: MX, y: y - 22, width: RX - MX, height: 22, color: HEADBG, borderColor: SOFT_LINE, borderWidth: 0.5 });
+  drawText(page, "HSN / SAC SUMMARY", { x: MX + 8, y: y - 15, size: 9, font: helvBold, color: NAVY });
+  y -= 22;
+  const sumHeader = ["HSN/SAC", "Taxable Value", "GST %", "CGST", "SGST", "IGST", "Total Tax"];
+  const sumX = [MX + 8, MX + 90, MX + 200, MX + 250, MX + 310, MX + 370, MX + 440];
+  page.drawRectangle({ x: MX, y: y - 20, width: RX - MX, height: 20, color: NAVY });
+  for (let i = 0; i < sumHeader.length; i++) drawText(page, sumHeader[i], { x: sumX[i], y: y - 14, size: 8.5, font: helvBold, color: WHITE });
+  y -= 20;
+  page.drawRectangle({ x: MX, y: y - 22, width: RX - MX, height: 22, color: WHITE, borderColor: SOFT_LINE, borderWidth: 0.5 });
+  const sumVals = [
+    sac,
+    `₹ ${subtotal.toFixed(2)}`,
+    `${gstRate}%`,
+    `₹ ${cgst.toFixed(2)}`,
+    `₹ ${sgst.toFixed(2)}`,
+    `₹ ${igst.toFixed(2)}`,
+    `₹ ${totalTax.toFixed(2)}`,
+  ];
+  for (let i = 0; i < sumVals.length; i++) drawText(page, sumVals[i], { x: sumX[i], y: y - 15, size: 9, font: helv, color: NAVY });
+  y -= 32;
 
-  drawText(page, "TERMS", { x: 320, y, size: 9, font: helvBold, color: MUTED });
-  drawText(page, "Service consultancy fees are non-refundable once", { x: 320, y: y - 16, size: 8, font: helv, color: GRAY });
-  drawText(page, "the application processing has commenced.", { x: 320, y: y - 28, size: 8, font: helv, color: GRAY });
-  drawText(page, "GST collected as per applicable rules.", { x: 320, y: y - 40, size: 8, font: helv, color: GRAY });
+  // ─── Notes
+  drawText(page, "NOTES", { x: MX, y, size: 8, font: helvBold, color: MUTED });
+  y -= 12;
+  const notes = "Thank you for the payment. Your order has been successfully received. Our experts shall be processing your order during our standard business hours Monday to Saturday (10am to 6pm).";
+  for (const ln of wrap(notes, helv, 9, RX - MX)) { drawText(page, ln, { x: MX, y, size: 9, font: helv, color: GRAY }); y -= 12; }
+  y -= 6;
 
-  brandFooter(page, helv, "This is a computer-generated tax invoice and does not require a signature.");
+  // ─── Terms
+  drawText(page, "TERMS & CONDITIONS", { x: MX, y, size: 8, font: helvBold, color: MUTED });
+  y -= 12;
+  const terms = [
+    "1. All orders, once received, are Non-cancellable & Non-refundable.",
+    "2. Refund and other policies are published on our website.",
+    "3. All disputes are subject to Pune, Maharashtra jurisdictions only.",
+    "4. This is a computer generated receipt not requiring signatures.",
+  ];
+  for (const t of terms) { drawText(page, t, { x: MX, y, size: 8.5, font: helv, color: GRAY }); y -= 11; }
+
+  // ─── Footer signature strip
+  page.drawLine({ start: { x: MX, y: 76 }, end: { x: RX, y: 76 }, thickness: 0.5, color: LINE });
+  drawText(page, `Support: ${COMPANY_EMAIL}  ·  ${COMPANY_PHONE}`, { x: MX, y: 60, size: 8.5, font: helv, color: GRAY });
+  drawText(page, COMPANY_WEB, { x: MX, y: 48, size: 8.5, font: helvBold, color: NAVY });
+  // Right side: For Company signature
+  const sigText = `For ${COMPANY_NAME}`;
+  drawText(page, sigText, { x: RX - helvBold.widthOfTextAtSize(sigText, 10), y: 62, size: 10, font: helvBold, color: NAVY });
+  const auth = "Authorised Signatory";
+  drawText(page, auth, { x: RX - helv.widthOfTextAtSize(auth, 8.5), y: 48, size: 8.5, font: helv, color: GRAY });
+
   return await pdf.save();
 }
+
 
 // ────────────────────────────────────────────────────────────────────────────────
 // 2. GRIEVANCE APPLICATION

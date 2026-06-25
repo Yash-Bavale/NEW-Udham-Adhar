@@ -9,6 +9,12 @@ const LOVABLE_SENDER_DOMAIN = "notify.businesshelpservices.com";
 // Used internally by other server fns (createLead, payu webhook, etc.).
 // Lives in a `.server.ts` file so it can never be imported into the client bundle.
 
+export type EmailAttachment = {
+  filename: string;
+  content_base64: string;
+  content_type: string;
+};
+
 export async function enqueueEmailInternal(input: {
   templateCode?: string | null;
   toEmail: string;
@@ -20,7 +26,12 @@ export async function enqueueEmailInternal(input: {
   leadId?: string | null;
   applicationId?: string | null;
   delaySeconds?: number;
+  attachments?: EmailAttachment[];
 }) {
+  const variables: Record<string, unknown> = { ...(input.variables ?? {}) };
+  if (input.attachments && input.attachments.length > 0) {
+    variables.__attachments = input.attachments;
+  }
   const row: Record<string, unknown> = {
     template_code: input.templateCode ?? null,
     to_email: input.toEmail.toLowerCase().trim(),
@@ -28,7 +39,7 @@ export async function enqueueEmailInternal(input: {
     subject: input.subject,
     body_html: input.bodyHtml,
     body_text: input.bodyText ?? null,
-    variables: input.variables ?? {},
+    variables,
     lead_id: input.leadId ?? null,
     application_id: input.applicationId ?? null,
   };
@@ -46,7 +57,7 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   variables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[] },
 ) {
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
@@ -68,8 +79,10 @@ export async function enqueueFromTemplateInternal(
     leadId: opts?.leadId ?? null,
     applicationId: opts?.applicationId ?? null,
     delaySeconds: opts?.delaySeconds,
+    attachments: opts?.attachments,
   });
 }
+
 
 // ─────────────────────────── Queue processor ───────────────────────────
 
@@ -175,26 +188,63 @@ export async function processQueueInternal(limit = 20) {
         }
       }
 
-      const res = await sendLovableEmail(
-        {
-          to: recipient,
-          from: `${fromName} <${fromEmail}>`,
-          sender_domain: LOVABLE_SENDER_DOMAIN,
-          subject: row.subject,
-          html: row.body_html,
-          text: row.body_text ?? "",
-          reply_to: settings.reply_to ?? undefined,
-          purpose: "transactional",
-          idempotency_key: `bhs-${row.id}-${attempt}`,
-          unsubscribe_token: unsubscribeToken!,
-        },
-        { apiKey: lovableApiKey },
-      );
-      smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
-      ok = true;
+      // Pull any attachments stashed on the queue row.
+      const variables = (row.variables ?? {}) as Record<string, unknown>;
+      const atts = Array.isArray((variables as any).__attachments)
+        ? ((variables as any).__attachments as EmailAttachment[])
+        : [];
+
+      const basePayload = {
+        to: recipient,
+        from: `${fromName} <${fromEmail}>`,
+        sender_domain: LOVABLE_SENDER_DOMAIN,
+        subject: row.subject,
+        html: row.body_html,
+        text: row.body_text ?? "",
+        reply_to: settings.reply_to ?? undefined,
+        purpose: "transactional" as const,
+        idempotency_key: `bhs-${row.id}-${attempt}`,
+        unsubscribe_token: unsubscribeToken!,
+      };
+
+      try {
+        if (atts.length > 0) {
+          // Direct POST so we can pass the (undocumented) `attachments` field.
+          const url = "https://api.lovable.dev/v1/messaging/email/send";
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableApiKey}`,
+              "Content-Type": "application/json",
+              "Idempotency-Key": basePayload.idempotency_key,
+            },
+            body: JSON.stringify({ ...basePayload, attachments: atts }),
+          });
+          if (resp.ok) {
+            const j: any = await resp.json().catch(() => ({}));
+            smtpResponse = `[lovable+att] ${j.message_id ?? j.status ?? "ok"}`;
+            ok = true;
+          } else {
+            // Fall back to send without attachments (so the customer still receives the email).
+            const errTxt = (await resp.text()).slice(0, 300);
+            const res = await sendLovableEmail(basePayload, { apiKey: lovableApiKey });
+            smtpResponse = `[lovable·no-att fallback ${resp.status}] ${res.message_id ?? res.status ?? "ok"} :: ${errTxt}`;
+            ok = true;
+          }
+        } else {
+          const res = await sendLovableEmail(basePayload, { apiKey: lovableApiKey });
+          smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
+          ok = true;
+        }
+      } catch (e) {
+        lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
+      }
     } catch (e) {
-      lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
+      lastError = `[setup] ${e instanceof Error ? e.message : "unknown"}`;
     }
+
+
+
 
     if (ok) {
       const writes: Array<PromiseLike<unknown>> = [

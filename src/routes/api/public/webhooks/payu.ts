@@ -235,14 +235,18 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
               if (!tr.ok) console.error("[payu] transition failed", { txnid: fields.txnid, applicationId, reason: tr.reason });
             }
 
-            // 5. Generate invoice (PDF + storage).
-            try { await generateInvoiceInternal(payment.id); }
-            catch (e) {
+            // 5. Generate invoice (PDF + storage), then load PDF for attaching.
+            let invoiceAttachment: { filename: string; content_base64: string; content_type: string } | null = null;
+            try {
+              await generateInvoiceInternal(payment.id);
+              const { loadInvoiceAttachmentByPayment } = await import("@/lib/crm/invoices.functions");
+              invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
+            } catch (e) {
               console.error("[payu] invoice generation failed", e);
               await logWebhookError("payu", `invoice: ${e instanceof Error ? e.message : "unknown"}`, rawPayload);
             }
 
-            // 6. Send order_confirmation + welcome_and_form_link (30s delay).
+            // 6. Send order_confirmation (with PDF attached) + welcome_and_form_link (30s delay).
             try {
               const { data: leadRow } = await supabaseAdmin
                 .from("leads")
@@ -269,12 +273,17 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   support_email: "help@businesshelpservices.com",
                 };
 
-                // Order confirmation — immediate.
+                // Order confirmation — immediate, with invoice PDF attached.
                 await enqueueFromTemplateInternal(
                   "order_confirmation",
                   leadRow.email,
                   commonVars,
-                  { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: applicationId ?? undefined },
+                  {
+                    toName: leadRow.name ?? undefined,
+                    leadId: payment.lead_id,
+                    applicationId: applicationId ?? undefined,
+                    attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
+                  },
                 );
 
                 // Welcome + form link — 30s later so it lands after the receipt.
@@ -284,6 +293,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   commonVars,
                   { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: applicationId ?? undefined, delaySeconds: 30 },
                 );
+
+
 
                 // 7. Advance lead to welcome_mail_sent now that the welcome email is queued.
                 await supabaseAdmin.from("leads")

@@ -263,11 +263,25 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
 
     const lead = (leadRes as any).data;
     const total = Number(lead?.total_amount || 0);
-    const payments = (paysRes.data ?? []) as any[];
+    let payments = (paysRes.data ?? []) as any[];
+    // Enrich with invoice_id so admin actions know which invoice to email/download.
+    if (payments.length > 0) {
+      const payIds = payments.map((p) => p.id);
+      const { data: invs } = await admin
+        .from("invoices")
+        .select("id, payment_id, invoice_number, pdf_path")
+        .in("payment_id", payIds);
+      const map = new Map((invs ?? []).map((i: any) => [i.payment_id, i]));
+      payments = payments.map((p) => {
+        const inv = map.get(p.id);
+        return { ...p, invoice_id: inv?.id ?? null, invoice_number: inv?.invoice_number ?? null, has_pdf: !!inv?.pdf_path };
+      });
+    }
     const paymentStatus = rollupPaymentStatus(
       payments.map((p) => ({ status: String(p.status), amount: Number(p.amount || 0) })),
       total,
     );
+
 
     // Build per-stage timestamps + actor from application_events
     const stageEvents = (evRes.data ?? []).filter((e: any) => e.event_type === "status_change");

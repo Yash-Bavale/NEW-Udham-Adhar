@@ -154,8 +154,12 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             if (!tr.ok) console.error("[ccavenue] transition failed", { orderId, applicationId: payment.application_id, reason: tr.reason });
           }
 
-          try { await generateInvoiceInternal(payment.id); }
-          catch (e) { console.error("[ccavenue] invoice generation failed", e); }
+          let invoiceAttachment: { filename: string; content_base64: string; content_type: string } | null = null;
+          try {
+            await generateInvoiceInternal(payment.id);
+            const { loadInvoiceAttachmentByPayment } = await import("@/lib/crm/invoices.functions");
+            invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
+          } catch (e) { console.error("[ccavenue] invoice generation failed", e); }
 
           try {
             const { data: leadRow } = await supabaseAdmin
@@ -171,18 +175,28 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                 leadRow.email,
                 {
                   name: leadRow.name ?? "",
+                  customer_name: leadRow.name ?? "",
                   lead_code: leadRow.lead_code,
+                  order_number: leadRow.lead_code,
                   service: leadRow.service ?? "",
+                  service_name: leadRow.service ?? "",
                   base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
                   gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
                   total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                  amount: Number(leadRow.total_amount ?? 0).toFixed(2),
                   onboarding_url: onboardingUrl,
                   support_email: "help@businesshelpservices.com",
                 },
-                { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: payment.application_id ?? undefined },
+                {
+                  toName: leadRow.name ?? undefined,
+                  leadId: payment.lead_id,
+                  applicationId: payment.application_id ?? undefined,
+                  attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
+                },
               );
             }
           } catch (e) { console.error("[ccavenue] payment_success email enqueue failed", e); }
+
 
           return isBrowser
             ? redirectToSuccess(leadCodeFromParam || orderId)
