@@ -2,7 +2,7 @@
 // Use these constants instead of hardcoding strings in components and templates.
 
 export const SITE_NAME = "Udyam Aadhar";
-export const LEGAL_ENTITY = "Business Help Services";
+export const LEGAL_ENTITY = "Udyam Registration Consultancy & Assistance Services";
 export const CONTACT_EMAIL = "help@businesshelpservices.com";
 export const BASE_URL = "https://udyamadhar.in";
 
