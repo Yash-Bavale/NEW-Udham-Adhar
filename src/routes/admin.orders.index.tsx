@@ -12,6 +12,7 @@ import {
   type FulfillmentStatus,
 } from "@/lib/crm/fulfillment-transitions";
 import { LEAD_STATUS_BADGE, LEAD_STATUS_LABEL, type LeadStatusV2 } from "@/lib/crm/lead-transitions";
+import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,11 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/admin/orders/")({ component: OrdersListPage });
 
 const PAY_STATUSES = ["Pending", "Paid", "Partially Paid", "Refunded", "Failed"];
+
+type StageBucket = "all" | "needs_action" | "active" | "completed" | "exception";
+const NEEDS_ACTION: OrderStage[] = ["lead_received", "payment_pending", "payment_done", "form_submitted", "certificate_ready"];
+const ACTIVE_STAGES: OrderStage[] = ["under_review", "in_progress", "submitted_to_govt", "under_processing"];
+const EXCEPTION_STAGES: OrderStage[] = ["uninterested", "refund_requested", "refunded"];
 
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
@@ -34,6 +40,7 @@ function OrdersListPage() {
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [stageBucket, setStageBucket] = useState<StageBucket>("all");
 
   const { data: staffData } = useQuery({
     queryKey: ["admin.staff"],
@@ -60,9 +67,38 @@ function OrdersListPage() {
     }),
   });
 
-  const rows = data?.rows ?? [];
+  const allRows = data?.rows ?? [];
+  const rows = stageBucket === "all"
+    ? allRows
+    : allRows.filter((r: any) => {
+        const stage = r.stage as OrderStage;
+        if (stageBucket === "needs_action") return NEEDS_ACTION.includes(stage);
+        if (stageBucket === "active") return ACTIVE_STAGES.includes(stage);
+        if (stageBucket === "completed") return stage === "completed";
+        if (stageBucket === "exception") return EXCEPTION_STAGES.includes(stage);
+        return true;
+      });
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / 25));
+
+  const bucketCount = (b: StageBucket) => {
+    if (b === "all") return allRows.length;
+    return allRows.filter((r: any) => {
+      const stage = r.stage as OrderStage;
+      if (b === "needs_action") return NEEDS_ACTION.includes(stage);
+      if (b === "active") return ACTIVE_STAGES.includes(stage);
+      if (b === "completed") return stage === "completed";
+      if (b === "exception") return EXCEPTION_STAGES.includes(stage);
+      return false;
+    }).length;
+  };
+  const BUCKETS: { id: StageBucket; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "needs_action", label: "Needs Action" },
+    { id: "active", label: "Active" },
+    { id: "completed", label: "Completed" },
+    { id: "exception", label: "Exception" },
+  ];
 
   return (
     <div className="space-y-5">
@@ -111,6 +147,29 @@ function OrdersListPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-1.5">
+        {BUCKETS.map((b) => {
+          const active = stageBucket === b.id;
+          return (
+            <button
+              key={b.id}
+              onClick={() => setStageBucket(b.id)}
+              className={
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors " +
+                (active
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")
+              }
+            >
+              {b.label}
+              <span className={"ml-1.5 text-[10px] " + (active ? "text-slate-300" : "text-slate-400")}>
+                {bucketCount(b.id)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border)" }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -119,8 +178,8 @@ function OrdersListPage() {
                 <th className="text-left px-3 py-2.5">Order #</th>
                 <th className="text-left px-3 py-2.5">Customer</th>
                 <th className="text-left px-3 py-2.5">Service</th>
+                <th className="text-left px-3 py-2.5">Stage</th>
                 <th className="text-left px-3 py-2.5">Fulfillment</th>
-                <th className="text-left px-3 py-2.5">Lead Status</th>
                 <th className="text-left px-3 py-2.5">Assigned</th>
                 <th className="text-right px-3 py-2.5">Amount</th>
                 <th className="text-left px-3 py-2.5">Payment</th>
@@ -144,16 +203,16 @@ function OrdersListPage() {
                   </td>
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.service_name ?? "—"}</td>
                   <td className="px-3 py-2">
+                    {(r as any).stage ? (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_BADGE_CLASS[(r as any).stage as OrderStage]}`}>
+                        {STAGE_META[(r as any).stage as OrderStage].label}
+                      </span>
+                    ) : <span className="text-slate-400 text-xs">—</span>}
+                  </td>
+                  <td className="px-3 py-2">
                     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${FULFILLMENT_BADGE[r.fulfillment_status]}`}>
                       {FULFILLMENT_LABEL[r.fulfillment_status]}
                     </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.lead_status_v2 ? (
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${LEAD_STATUS_BADGE[r.lead_status_v2 as LeadStatusV2] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                        {LEAD_STATUS_LABEL[r.lead_status_v2 as LeadStatusV2] ?? r.lead_status_v2}
-                      </span>
-                    ) : <span className="text-slate-400 text-xs">—</span>}
                   </td>
                   <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
                   <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>

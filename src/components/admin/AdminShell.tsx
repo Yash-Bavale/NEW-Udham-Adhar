@@ -51,12 +51,10 @@ const NAV: NavGroup[] = [
     label: "Sales",
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads" },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
-      { to: "/admin/applications", label: "Applications", icon: FileCheck2, module: "orders" },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents" },
-      { to: "/admin/submissions", label: "Submissions", icon: ClipboardList, module: "documents" },
-      { to: "/admin/review", label: "Review", icon: Eye, module: "documents" },
+      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ["admin", "super_admin", "operations_manager"] },
     ],
   },
   {

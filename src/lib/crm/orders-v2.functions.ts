@@ -10,6 +10,7 @@ import {
   type FulfillmentStatus,
   getAllowedFulfillmentTransitions,
 } from "./fulfillment-transitions";
+import { computeOrderStage } from "./computeOrderStage";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -79,7 +80,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at",
         { count: "exact" },
       )
       .eq("is_deleted", false)
@@ -106,7 +107,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code").in("id", leadIds)
+        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, payment_successful_at, status").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
@@ -157,6 +158,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         payment_status: rollupPaymentStatus(payments, total),
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
+        stage: computeOrderStage(
+          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: lead?.payment_successful_at },
+          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
+        ),
       };
     });
 
