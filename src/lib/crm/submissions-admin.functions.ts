@@ -190,7 +190,13 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
     z.object({ applicationId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    // Authorize as staff using the user-scoped client, then read via service-role
+    // to avoid RLS gaps on applications / onboarding_submissions for non-admin staff.
+    const { data: roleRows } = await context.supabase.from("user_roles").select("role").limit(50);
+    const roles = new Set((roleRows ?? []).map((r: any) => r.role));
+    const allowed = ["admin", "super_admin", "operations", "support", "accounts", "finance", "executive", "manager"];
+    if (!allowed.some((r) => roles.has(r))) throw new Error("Forbidden");
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
 
     const { data: app, error: appErr } = await supabase
       .from("applications")
