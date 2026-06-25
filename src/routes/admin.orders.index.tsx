@@ -40,6 +40,7 @@ function OrdersListPage() {
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [stageBucket, setStageBucket] = useState<StageBucket>("all");
 
   const { data: staffData } = useQuery({
     queryKey: ["admin.staff"],
