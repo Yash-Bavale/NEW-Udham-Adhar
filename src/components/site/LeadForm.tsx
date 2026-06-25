@@ -116,8 +116,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
             <a href="/disclaimer" className="text-brand-navy underline">Disclaimer</a>,{" "}
             <a href="/pricing-transparency" className="text-brand-navy underline">Pricing Transparency</a>,{" "}
             <a href="/consent-acknowledgment" className="text-brand-navy underline">Consents and Acknowledgements</a>{" "}
-            and related service policies of this website, and I understand that Business Help Services is a private
-            consultancy providing paid consultancy and assistance services only.
+            and related service policies of this website.
           </span>
         </label>
 
