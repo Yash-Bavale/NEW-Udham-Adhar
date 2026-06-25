@@ -60,6 +60,7 @@ function LeadDetailPage() {
   const { lead, applications, notes } = data;
   const canEditLead = role.hasAny(["super_admin", "operations", "admin", "manager", "executive"]);
   const canEditFinance = role.hasAny(["super_admin", "admin", "finance"]);
+  const hideMoney = role.hideMoney();
 
   return (
     <div className="space-y-6">
@@ -125,7 +126,7 @@ function LeadDetailPage() {
           <TabsTrigger value="overview" className="gap-2 py-2 px-4"><User className="w-4 h-4" /> Overview</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2 py-2 px-4"><ClipboardList className="w-4 h-4" /> Onboarding</TabsTrigger>
           <TabsTrigger value="emails" className="gap-2 py-2 px-4"><Mail className="w-4 h-4" /> Emails</TabsTrigger>
-          <TabsTrigger value="finance" className="gap-2 py-2 px-4"><IndianRupee className="w-4 h-4" /> Finance</TabsTrigger>
+          {!hideMoney && <TabsTrigger value="finance" className="gap-2 py-2 px-4"><IndianRupee className="w-4 h-4" /> Finance</TabsTrigger>}
           <TabsTrigger value="timeline" className="gap-2 py-2 px-4"><History className="w-4 h-4" /> Timeline</TabsTrigger>
           <TabsTrigger value="notes" className="gap-2 py-2 px-4"><MessageSquare className="w-4 h-4" /> Notes</TabsTrigger>
         </TabsList>
@@ -163,9 +164,11 @@ function LeadDetailPage() {
               canEdit={canEditFinance}
               fields={[
                 { key: "service", label: "Service Type" },
-                { key: "base_amount", label: "Base Amount", type: "number" },
-                { key: "gst_amount", label: "GST Amount", type: "number" },
-                { key: "total_amount", label: "Total Amount", type: "number" },
+                ...(hideMoney ? [] : [
+                  { key: "base_amount", label: "Base Amount", type: "number" as const },
+                  { key: "gst_amount", label: "GST Amount", type: "number" as const },
+                  { key: "total_amount", label: "Total Amount", type: "number" as const },
+                ]),
               ]}
             />
 
@@ -237,9 +240,11 @@ function LeadDetailPage() {
           <LeadEmailsTab leadId={leadId} leadService={lead.service} />
         </TabsContent>
 
-        <TabsContent value="finance">
-          <LeadFinanceTab leadId={leadId} />
-        </TabsContent>
+        {!hideMoney && (
+          <TabsContent value="finance">
+            <LeadFinanceTab leadId={leadId} />
+          </TabsContent>
+        )}
 
         <TabsContent value="timeline">
           <LeadTimeline leadId={leadId} />
