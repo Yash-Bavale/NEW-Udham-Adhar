@@ -153,17 +153,17 @@ function OrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <div id="order-form" className="scroll-mt-32">
-            <FormSubmissionPanel applicationId={orderId} />
+            <FormSubmissionPanel applicationId={application.id} />
           </div>
 
           <div id="order-fulfillment" className="scroll-mt-32">
-            <FulfillmentStatusUpdater orderId={orderId} current={current} />
+            <FulfillmentStatusUpdater orderId={application.id} current={current} />
           </div>
 
           <ProcessingChecklist payments={payments} documents={documents} application={application} hideAmount={hideAmount} />
 
           <div id="order-workflow" className="scroll-mt-32">
-            <WorkflowTimelinePanel applicationId={orderId} workflowStatus={(application as any).workflow_status} />
+            <WorkflowTimelinePanel applicationId={application.id} workflowStatus={(application as any).workflow_status} />
           </div>
 
           <UnifiedTimeline
