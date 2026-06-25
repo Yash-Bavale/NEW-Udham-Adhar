@@ -92,11 +92,11 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso).not("payment_successful_at", "is", null),
       admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", monthAgoIso).limit(2000),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("workflow_status", "external_delay"),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("workflow_status", "on_hold"),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["external_dependency", "government_portal_pending"]),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["waiting_for_customer", "waiting_for_documents", "customer_non_responsive"]),
       admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
       admin.from("workflow_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lte("scheduled_for", new Date().toISOString()),
-      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["closed", "cancelled", "refunded"]).gte("updated_at", monthAgoIso),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["closed", "cancelled", "refund_closed"]).gte("updated_at", monthAgoIso),
     ]);
 
     const sumPaid = (rows: any[] | null | undefined) =>
