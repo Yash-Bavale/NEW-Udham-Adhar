@@ -43,6 +43,13 @@ export type SuperAdminOverview = {
   alerts: { id: string; severity: "high" | "med" | "low"; message: string }[];
   activity: { id: string; description: string; created_at: string }[];
   webhookFailures24h: number;
+  workflow: {
+    externalDelay: number;
+    onHold: number;
+    refundPending: number;
+    remindersDue: number;
+    closedThisMonth: number;
+  };
 };
 
 export const getSuperAdminOverview = createServerFn({ method: "GET" })
