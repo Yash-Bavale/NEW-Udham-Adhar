@@ -204,8 +204,8 @@ export function Header() {
           {/* Desktop */}
           <div className="hidden md:grid grid-cols-3 items-center gap-4">
             <Link to="/" className="flex flex-col">
-              <span className="text-2xl font-bold text-brand-red leading-tight font-display">
-                Udyam<br />Registration
+              <span className="text-2xl font-bold text-brand-red leading-tight font-display whitespace-nowrap">
+                Udyam Registration
               </span>
               <span className="text-sm text-foreground/80">
                 Consultancy & Assistance Services
