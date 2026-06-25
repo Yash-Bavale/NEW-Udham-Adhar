@@ -106,7 +106,7 @@ function OrdersListPage() {
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Orders</h1>
-          <div className="text-xs text-slate-500 mt-0.5">{total.toLocaleString("en-IN")} total · created automatically on payment</div>
+          <div className="text-xs text-slate-500 mt-0.5">{total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST</div>
         </div>
       </div>
 
