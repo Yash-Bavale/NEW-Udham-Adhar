@@ -47,6 +47,12 @@ function OrderDetailPage() {
 
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, assignedStaff, workflowStages, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
+  const stage = computeOrderStage(lead, application);
+
+  const scrollTo = (target: "fulfillment" | "form" | "documents" | "notes") => {
+    const el = document.getElementById(`order-${target}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const setAssignee = async (v: string) => {
     try {
