@@ -275,7 +275,7 @@ export const addLeadNote = createServerFn({ method: "POST" })
 export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "manager"]);
+    await assertRole(context.supabase, ["super_admin", "operations", "admin", "manager", "executive", "support", "accounts", "finance"]);
     
     const { data: staffRoles, error: rolesErr } = await (await getAdmin())
       .from("user_roles")
