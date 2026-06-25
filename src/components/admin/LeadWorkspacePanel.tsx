@@ -640,7 +640,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
 
 /* ------------------- Linked Order Panel ------------------- */
 
-function LinkedOrderPanel({ applications }: { applications: any[] }) {
+function LinkedOrderPanel({ applications, hideMoney = false }: { applications: any[]; hideMoney?: boolean }) {
   if (!applications || applications.length === 0) {
     return (
       <div className="rounded-lg border bg-white p-4" style={{ borderColor: "var(--admin-border)" }}>
@@ -659,7 +659,7 @@ function LinkedOrderPanel({ applications }: { applications: any[] }) {
       <div className="text-xs space-y-1.5">
         <Row k="Order #" v={<span className="font-mono">{app.application_code}</span>} />
         <Row k="Fulfillment" v={<Badge variant="secondary" className="text-[10px]">{(app.fulfillment_status ?? app.application_status ?? "—").replace(/_/g, " ")}</Badge>} />
-        <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />
+        {!hideMoney && <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />}
         <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline pt-1">
           Open order →
         </a>
