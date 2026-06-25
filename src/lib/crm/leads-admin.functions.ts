@@ -21,6 +21,9 @@ const LEAD_WRITE_ROLES: Database["public"]["Enums"]["app_role"][] = [
   "admin",
   "manager",
   "executive",
+  "support",
+  "accounts",
+  "finance",
 ];
 
 const LEAD_FINANCE_WRITE_ROLES: Database["public"]["Enums"]["app_role"][] = [
