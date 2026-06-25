@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar, Users as UsersIcon } from "lucide-react";
+import { formatIST } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead,
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
 function LeadsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const listFn = useServerFn(listLeads);
   const countsFn = useServerFn(getLeadCounts);
   const exportFn = useServerFn(exportLeadsCsv);
@@ -352,7 +354,7 @@ function LeadsPage() {
                       key={l.id}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest("input,a,button")) return;
-                        setOpenId(l.id);
+                        navigate({ to: "/admin/leads/$leadId", params: { leadId: l.id } });
                       }}
                       className="border-t cursor-pointer hover:bg-[var(--admin-surface-2)] transition-colors"
                       style={{ borderColor: "var(--admin-border)", background: rowBg, borderLeft: stale ? "3px solid #F59E0B" : undefined }}
@@ -382,16 +384,21 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       <td className="px-4 py-2.5"><FormStatusChip status={l.form_status} /></td>
-                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
+                        <div>{formatIST(l.created_at, { dateOnly: true })}</div>
+                        <div className="text-[10px] text-slate-400">{formatIST(l.created_at, { timeOnly: true })} IST</div>
+                      </td>
                       <td className="px-4 py-2.5 text-right">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setOpenId(l.id); }}
+                        <Link
+                          to="/admin/leads/$leadId"
+                          params={{ leadId: l.id }}
+                          onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--admin-surface)] border"
                           style={{ borderColor: "var(--admin-border)", color: "var(--admin-accent)" }}
-                          title="View details"
+                          title="Open full lead page"
                         >
                           <Eye className="size-3.5" /> View
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   );
