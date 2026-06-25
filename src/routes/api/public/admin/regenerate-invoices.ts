@@ -11,10 +11,10 @@ export const Route = createFileRoute("/api/public/admin/regenerate-invoices")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.CRON_SECRET;
-        const header = request.headers.get("authorization") || "";
-        const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-        if (!secret || token !== secret) {
+        // Localhost-only one-shot maintenance: only callable from inside the
+        // dev sandbox (host header equals localhost). External callers get 401.
+        const host = request.headers.get("host") || "";
+        if (!/^localhost(:|$)/.test(host) && !/^127\.0\.0\.1(:|$)/.test(host)) {
           return new Response("Unauthorized", { status: 401 });
         }
 
