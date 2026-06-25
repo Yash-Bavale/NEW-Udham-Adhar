@@ -107,3 +107,14 @@ export function canApproveRefund(roles: string[]): boolean {
 export function canSeeModule(roles: string[], module: Module): boolean {
   return bestAccess(roles, module) !== "none";
 }
+
+// Single source of truth for financial visibility.
+// Operations/support/executive/manager NEVER see money unless they also hold
+// a finance/admin role.
+const MONEY_ROLES = new Set<string>(["super_admin", "admin", "accounts", "finance"]);
+export function canSeeMoney(roles: string[]): boolean {
+  return roles.some((r) => MONEY_ROLES.has(r));
+}
+export function hideMoneyFor(roles: string[]): boolean {
+  return !canSeeMoney(roles);
+}
