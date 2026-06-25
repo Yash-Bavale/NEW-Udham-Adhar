@@ -1,87 +1,64 @@
-## Tax Invoice — Spec Alignment & Hardening
+# Test Plan: Payment Success → Invoice → Email Delivery
 
-The core invoice engine (single `pdf.server.ts` renderer, GST split, Maharashtra CGST/SGST vs out-of-state IGST, SAC 998311, SAC summary, amount-in-words, base64 attachment via Lovable Emails direct POST, regenerate, signed-URL admin download, webhook attach on PayU + CCAvenue) is already in place. This plan closes the remaining gaps against the spec — no parallel/legacy renderer is introduced.
+Goal: prove that a successful payment (a) generates a valid PDF stored in the `invoices` bucket, (b) reaches Lovable Email as a real `application/pdf` MIME attachment (not a link), (c) updates `invoices.last_email_status` / `delivery_status`, and (d) appends correct rows to `invoice_events` and `email_logs`.
 
-### 1. Invoice number format → `BHS-YYYY-000NNN`
+## 1. Pre-flight inspection (read-only)
 
-New migration: replace `public.set_invoice_number()` so it emits `BHS-{YYYY}-{6-digit seq}` (e.g. `BHS-2026-000145`). Existing invoice numbers are left untouched; only new rows pick up the new prefix. Sequence is reused.
+- Confirm webhook entrypoints actually call invoice generation + email:
+  - `src/routes/api/public/webhooks/payu.ts`
+  - `src/routes/api/public/webhooks/ccavenue.ts`
+- Confirm the Lovable Email POST in `src/lib/emails/emails.server.ts` sends `attachments[].content` as base64 with `contentType: "application/pdf"` and `disposition: "attachment"` (not a URL field).
+- Confirm `generateAndStore` in `src/lib/crm/invoices.functions.ts` uploads to bucket `invoices`, sets `pdf_path`, `pdf_generated_at`, and triggers `logInvoiceEvent("generated")`.
+- DB check via `supabase--read_query`:
+  - `invoices` row count, latest `invoice_number` format `BHS-YYYY-000NNN`.
+  - `invoice_events` has rows for the most recent invoice with types `generated` and `emailed`.
 
-### 2. PDF wording (exact spec text)
+## 2. Seed a controlled test payment
 
-Edit `src/lib/invoices/pdf.server.ts`:
-- Notes (2 lines, exactly):
-  1. "Thank you for the payment. Your order has been successfully received."
-  2. "Our experts shall process your application during business hours Monday to Saturday, 10:00 AM to 6:00 PM."
-- Terms & Conditions (4 lines, exactly):
-  1. Orders once received are Non-Cancellable & Non-Refundable.
-  2. Refund Policy available on website.
-  3. Jurisdiction: Pune, Maharashtra.
-  4. Computer Generated Invoice - Signature Not Required.
-- Signature block: keep "For Business Help Services" + "Authorised Signatory".
+Use a migration-free path (insert via service role inside a temporary test-only server route is not acceptable in prod). Instead:
 
-No layout/colour changes.
+- Pick an existing `paid` payment with no invoice yet (or the most recent paid one) via `supabase--read_query`.
+- If none exists, ask the user to either (a) run a real sandbox PayU/CCAvenue payment, or (b) approve a one-shot admin "Generate invoice" trigger from `/admin/orders/$orderId` (uses existing `resendInvoiceEmail` path).
 
-### 3. Invoice lifecycle audit trail
+## 3. Trigger the flow three ways
 
-New migration creates `public.invoice_events`:
+a. **Webhook simulation** — POST a signed PayU success payload to `/api/public/webhooks/payu` via `stack_modern--invoke-server-function`. Requires the exact signature scheme; if signature can't be reproduced in test, skip this path and rely on b + c.
 
-```text
-id uuid pk
-invoice_id uuid fk -> invoices
-event_type text   -- generated | regenerated | replaced | emailed | delivery_update
-actor_id uuid?    -- super_admin/finance who triggered (null for webhook/system)
-actor_label text  -- 'system' | display name
-detail jsonb      -- { recipient, message_id, error, prev_pdf_path, ... }
-created_at timestamptz default now()
-```
+b. **Admin "Email again"** — call `resendInvoiceEmail` against the chosen payment (covers PDF render + attachment + email queue path).
 
-GRANTs + RLS (read: super_admin/admin/finance via `has_role`; write: service_role only). Triggers in `generateAndStore`, `resendInvoiceEmail`, `regenerateInvoice`, and the new `replaceInvoice` write rows.
+c. **Admin "Regenerate"** — call `regenerateInvoice` to verify the archive-and-replace branch logs `regenerated`.
 
-Additionally add columns to `public.invoices`: `last_emailed_at timestamptz`, `email_attempts int default 0`, `last_email_status text`, `delivery_status text`. These are updated by the email send path and by Lovable bounce/complaint hooks where available.
+## 4. Verification matrix
 
-### 4. Server functions (extend `src/lib/crm/invoices.functions.ts`)
+For each trigger, verify:
 
-- `previewInvoice({ invoiceId })` — regenerates the PDF in-memory (no storage write) and returns a short-lived signed URL of a `preview/{id}.pdf` object (10 min TTL). Used by Super Admin "Preview".
-- `replaceInvoice({ invoiceId, fileBase64, filename })` — finance/super_admin only; archives current `pdf_path` to `archive/{invoice_number}-{ts}.pdf`, uploads supplied PDF, writes `invoice_events` row of type `replaced` with `prev_pdf_path`.
-- `listInvoiceEvents({ invoiceId })` — returns ordered event log for the Admin panel.
-- `getInvoiceDetail({ invoiceId })` — bundles invoice row, lifecycle events, and last 20 `email_logs` filtered by the linked queue rows (delivery + regen history in one fetch).
+| Check | How |
+|---|---|
+| PDF exists in storage | `supabase--read_query` on `invoices.pdf_path`; download via signed URL and assert `%PDF-` header + non-zero size |
+| PDF renders valid GST layout | Open signed URL in Playwright headless, screenshot page 1, confirm invoice number, SAC 998311, CGST/SGST or IGST split, "Rs." prefix, Notes + T&C verbatim |
+| Email sent as MIME attachment | Inspect outbound POST body — search server logs (`stack_modern--server-function-logs` for `resendInvoiceEmail`) for `"attachments"` array containing `content` (base64) + `contentType: application/pdf`, and absence of any download URL in `html`/`text` |
+| `invoices` updated | `last_emailed_at` set, `email_attempts` incremented, `last_email_status='queued'`, eventually `delivery_status` flips to `sent`/`delivered` once Lovable Email callback lands |
+| `invoice_events` | Rows for `generated` (first run), `emailed` (every send), `regenerated` (regen run) with non-null `actor_label` |
+| `email_logs` | Row with `template_code='payment_success'`, `to_email` = lead email, `status` progressing `queued` → `sent` |
+| Idempotency | Re-running `regenerateInvoice` archives previous PDF into `invoices.prev_pdf_paths` and sets `replaced_at` |
+| UI reflection | Reload `/admin/orders/$orderId`; OrderPaymentsPanel shows green "Ready" PDF chip, latest "Email" status badge, and InvoiceHistoryDrawer lists events in reverse-chrono order |
 
-All gated through existing `assertRole` helper. `resendInvoiceEmail` and `regenerateInvoice` start writing to `invoice_events` and bumping the new `invoices.last_email_status`/`last_emailed_at`/`email_attempts` columns.
+## 5. Failure-mode probes
 
-### 5. Admin UI: Order → Payments & Invoices panel
+- Force email failure: temporarily set lead email to an invalid syntax; confirm `last_email_status='failed'`, `delivery_status='failed'`, `invoice_events` gets `email_failed` with error message — then restore the email.
+- Confirm no PII (auth tokens, service-role key) appears in `email_logs.smtp_response` or server logs.
 
-Rebuild `src/components/admin/OrderPaymentsPanel.tsx` so each paid row exposes:
+## 6. Reporting
 
-- Invoice no, Invoice date, GST type badge, PDF status (`ready`/`pending`/`failed`), Email status (last attempt + delivery), Attachment name (`Invoice-{InvoiceNumber}.pdf`).
-- Action menu (icons): Preview · Download · Print · Email again · Regenerate · Replace (upload).
-- "History" drawer (new `InvoiceHistoryDrawer.tsx`) that calls `getInvoiceDetail` and shows two timelines: Lifecycle events (generate/regen/replace/emailed) and Email delivery log (recipient, status, error, message id, timestamp).
+Produce a single PASS/FAIL table covering every row in §4 plus a sample signed URL screenshot of the generated PDF. List any FAILs with the exact log line + suggested fix; do not fix in this pass — testing only.
 
-Print uses `window.open(signedUrl)` + `iframe.contentWindow.print()` so it stays a true PDF, never a screenshot.
+## Technical notes
 
-### 6. Acceptance sweep — remove storage URLs from customer emails
+- All DB inspection uses `supabase--read_query` (read-only).
+- Server function logs via `stack_modern--server-function-logs` filtered by function name (`resendInvoiceEmail`, `regenerateInvoice`, `generateAndStore`).
+- Webhook test requires `PAYU_MERCHANT_SALT`; if signature reproduction is brittle, fall back to admin-triggered paths (b, c) which exercise the same `generateAndStore` + email POST code path.
+- No schema changes. No code edits. Only read queries, server-function invocations against existing endpoints, and Playwright for PDF visual check.
 
-Audit and patch:
-- `src/lib/email-templates/*` and DB-stored `email_templates` rows for any `{{invoice_url}}` / public Supabase URL in `payment_success` and `order_confirmation`. Replace with attachment-only wording: "Your tax invoice is attached as `Invoice-{{invoice_number}}.pdf`."
-- `enqueueFromTemplateInternal` callers in webhooks pass `invoice_number` into `templateData` so the body can reference the file name without a link.
+## Open question before execution
 
-Customer-facing `getCustomerInvoiceUrl` server fn stays — it only powers the success/onboarding page (not email), which is permitted by the spec (in-app, not email).
-
-### 7. QA after build
-
-- Generate a fresh invoice in dev, render with `pdftoppm`, visually verify Notes/T&C wording, GST split for both Maharashtra and an outside-state lead, amount in words, SAC summary.
-- Trigger a PayU webhook with a stub paid payment and confirm: invoice row created with `BHS-…` number, PDF in storage, `invoice_events` has `generated` + `emailed` rows, `payment_success` email body contains no `supabase.co/storage` URL, queue payload includes `attachments` with `Invoice-BHS-….pdf`.
-- Replace flow: upload a custom PDF, verify archive path saved and `replaced` event logged.
-
-### Files touched
-
-New
-- `supabase/migrations/<ts>_invoice_number_bhs_prefix.sql`
-- `supabase/migrations/<ts>_invoice_events_and_status.sql`
-- `src/components/admin/InvoiceHistoryDrawer.tsx`
-
-Modified
-- `src/lib/invoices/pdf.server.ts` (Notes + T&C text only)
-- `src/lib/crm/invoices.functions.ts` (preview/replace/list events/detail + lifecycle writes)
-- `src/components/admin/OrderPaymentsPanel.tsx` (richer rows + actions)
-- `src/routes/api/public/webhooks/payu.ts`, `…/ccavenue.ts` (pass `invoice_number` into template data, write `emailed` events)
-- DB email templates for `payment_success` / `order_confirmation` if they currently embed a URL.
+Should I attempt the live PayU webhook simulation (needs a valid signed payload, may write a fake `payments` row), or restrict the test to the admin-triggered Resend/Regenerate paths against an existing paid payment? The admin path covers ~95% of the same code and is safer in a live DB.
