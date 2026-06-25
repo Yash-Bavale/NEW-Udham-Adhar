@@ -21,24 +21,14 @@ import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
 import { Button } from "@/components/ui/button";
 
-const MASKED_FIELDS = new Set([
-  "aadhaar_number",
-  "aadhar_number",
-  "adhar_number",
-  "bank_account_number",
-  "account_number",
-]);
-
-function mask(field: string, value: unknown): string {
+// Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
+// masking was removed per business decision so operations can verify values.
+function mask(_field: string, value: unknown): string {
   const v = String(value ?? "");
   if (!v) return "—";
-  if (MASKED_FIELDS.has(field)) {
-    const cleaned = v.replace(/\s+/g, "");
-    if (cleaned.length <= 4) return cleaned;
-    return `XXXX XXXX ${cleaned.slice(-4)}`;
-  }
   return v;
 }
+
 
 function formatIST(iso?: string | null) {
   if (!iso) return "—";
