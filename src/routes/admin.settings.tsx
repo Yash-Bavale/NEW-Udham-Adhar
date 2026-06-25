@@ -71,6 +71,9 @@ function SettingsPage() {
 
       {tab === "company" && <CompanyTab />}
       {tab === "statuses" && <StatusesTab />}
+      {tab === "templates" && <TemplatesTab />}
+      {tab === "reasons" && <ReasonLibraryTab />}
+      {tab === "automation" && <AutomationRulesTab />}
       {tab === "notifications" && <NotificationsTab />}
       {tab === "gateways" && <GatewaysTab />}
       {tab === "workflow" && <WorkflowTab />}
