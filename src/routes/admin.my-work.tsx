@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight } from "lucide-react";
 import { getMyWorkSummary, type MyWorkSummary } from "@/lib/crm/my-work.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/my-work")({
   head: () => ({ meta: [{ title: "My Work — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -13,9 +14,17 @@ export const Route = createFileRoute("/admin/my-work")({
 
 function MyWorkPage() {
   const fetchSummary = useServerFn(getMyWorkSummary);
+  const [hasSession, setHasSession] = useState(false);
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => { if (active) setHasSession(!!data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setHasSession(!!session));
+    return () => { active = false; sub.subscription.unsubscribe(); };
+  }, []);
   const { data, isLoading, refetch } = useQuery<MyWorkSummary>({
     queryKey: ["my-work"],
     queryFn: () => fetchSummary(),
+    enabled: hasSession,
   });
 
   useRealtimeTable("notifications", () => refetch());
