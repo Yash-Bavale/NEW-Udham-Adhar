@@ -1280,6 +1280,44 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_events: {
+        Row: {
+          actor_id: string | null
+          actor_label: string
+          created_at: string
+          detail: Json
+          event_type: string
+          id: string
+          invoice_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string
+          created_at?: string
+          detail?: Json
+          event_type: string
+          id?: string
+          invoice_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string
+          created_at?: string
+          detail?: Json
+          event_type?: string
+          id?: string
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_events_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           application_id: string | null
@@ -1292,17 +1330,23 @@ export type Database = {
           customer_gstin_snapshot: string | null
           customer_id: string | null
           customer_state_snapshot: string | null
+          delivery_status: string | null
+          email_attempts: number
           gst_amount: number
           id: string
           igst_amount: number
           igst_rate: number
           invoice_number: string | null
           issued_at: string
+          last_email_status: string | null
+          last_emailed_at: string | null
           lead_id: string
           payment_id: string
           pdf_generated_at: string | null
           pdf_path: string | null
           place_of_supply: string | null
+          prev_pdf_paths: string[]
+          replaced_at: string | null
           sac_code: string
           sgst_amount: number
           sgst_rate: number
@@ -1320,17 +1364,23 @@ export type Database = {
           customer_gstin_snapshot?: string | null
           customer_id?: string | null
           customer_state_snapshot?: string | null
+          delivery_status?: string | null
+          email_attempts?: number
           gst_amount: number
           id?: string
           igst_amount?: number
           igst_rate?: number
           invoice_number?: string | null
           issued_at?: string
+          last_email_status?: string | null
+          last_emailed_at?: string | null
           lead_id: string
           payment_id: string
           pdf_generated_at?: string | null
           pdf_path?: string | null
           place_of_supply?: string | null
+          prev_pdf_paths?: string[]
+          replaced_at?: string | null
           sac_code?: string
           sgst_amount?: number
           sgst_rate?: number
@@ -1348,17 +1398,23 @@ export type Database = {
           customer_gstin_snapshot?: string | null
           customer_id?: string | null
           customer_state_snapshot?: string | null
+          delivery_status?: string | null
+          email_attempts?: number
           gst_amount?: number
           id?: string
           igst_amount?: number
           igst_rate?: number
           invoice_number?: string | null
           issued_at?: string
+          last_email_status?: string | null
+          last_emailed_at?: string | null
           lead_id?: string
           payment_id?: string
           pdf_generated_at?: string | null
           pdf_path?: string | null
           place_of_supply?: string | null
+          prev_pdf_paths?: string[]
+          replaced_at?: string | null
           sac_code?: string
           sgst_amount?: number
           sgst_rate?: number

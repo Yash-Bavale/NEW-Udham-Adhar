@@ -18,7 +18,28 @@ const GST_RATE = 18; // %
 
 const BUCKET = "invoices";
 
-async function generateAndStore(paymentId: string): Promise<string> {
+/** Append a lifecycle event for an invoice. Never throws — failures are logged. */
+async function logInvoiceEvent(
+  invoiceId: string,
+  eventType: "generated" | "regenerated" | "replaced" | "emailed" | "email_failed" | "delivery_update" | "preview",
+  detail: Record<string, unknown> = {},
+  actor?: { id?: string | null; label?: string | null },
+): Promise<void> {
+  try {
+    const admin = await getAdmin();
+    await (admin as any).from("invoice_events").insert({
+      invoice_id: invoiceId,
+      event_type: eventType,
+      actor_id: actor?.id ?? null,
+      actor_label: actor?.label ?? "system",
+      detail,
+    });
+  } catch (e) {
+    console.error("[invoice_events] log failed", e);
+  }
+}
+
+async function generateAndStore(paymentId: string, actor?: { id?: string | null; label?: string | null }): Promise<string> {
   const admin = await getAdmin();
 
   const { data: payment, error: pErr } = await admin
@@ -144,6 +165,13 @@ async function generateAndStore(paymentId: string): Promise<string> {
     pdf_generated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
 
+  await logInvoiceEvent(
+    invoiceId,
+    existing ? "regenerated" : "generated",
+    { invoice_number: invoiceNumber, pdf_path: path, payment_id: paymentId },
+    actor,
+  );
+
   return invoiceId;
 }
 
@@ -212,10 +240,14 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .single();
     if (!payment) throw new Error("Payment not found");
 
+    const { data: profile } = await context.supabase
+      .from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle();
+    const actor = { id: context.userId, label: profile?.display_name ?? profile?.email ?? "staff" };
+
     // Ensure invoice exists (regenerate if missing).
     let attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
     if (!attachment) {
-      await generateAndStore(data.paymentId);
+      await generateAndStore(data.paymentId, actor);
       attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
     }
     if (!attachment) throw new Error("Invoice PDF unavailable");
@@ -226,30 +258,64 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .eq("id", payment.lead_id).single();
     if (!lead?.email) throw new Error("Customer email missing");
 
+    const { data: inv } = await admin
+      .from("invoices").select("id, invoice_number").eq("payment_id", data.paymentId).maybeSingle();
+
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-    await enqueueFromTemplateInternal(
-      "payment_success",
-      lead.email,
-      {
-        name: lead.name ?? "",
-        customer_name: lead.name ?? "",
-        lead_code: lead.lead_code ?? "",
-        order_number: lead.lead_code ?? "",
-        service: lead.service ?? "",
-        service_name: lead.service ?? "",
-        base_amount: Number(lead.base_amount ?? 0).toFixed(2),
-        gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
-        total_amount: Number(lead.total_amount ?? 0).toFixed(2),
-        amount: Number(lead.total_amount ?? 0).toFixed(2),
-        support_email: "help@businesshelpservices.com",
-      },
-      {
-        toName: lead.name ?? undefined,
-        leadId: payment.lead_id,
-        applicationId: payment.application_id ?? undefined,
-        attachments: [attachment],
-      },
-    );
+    try {
+      await enqueueFromTemplateInternal(
+        "payment_success",
+        lead.email,
+        {
+          name: lead.name ?? "",
+          customer_name: lead.name ?? "",
+          lead_code: lead.lead_code ?? "",
+          order_number: lead.lead_code ?? "",
+          service: lead.service ?? "",
+          service_name: lead.service ?? "",
+          invoice_number: inv?.invoice_number ?? "",
+          invoice_attachment: attachment.filename,
+          base_amount: Number(lead.base_amount ?? 0).toFixed(2),
+          gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
+          total_amount: Number(lead.total_amount ?? 0).toFixed(2),
+          amount: Number(lead.total_amount ?? 0).toFixed(2),
+          support_email: "help@businesshelpservices.com",
+        },
+        {
+          toName: lead.name ?? undefined,
+          leadId: payment.lead_id,
+          applicationId: payment.application_id ?? undefined,
+          attachments: [attachment],
+        },
+      );
+      if (inv?.id) {
+        const { data: cur } = await admin.from("invoices").select("email_attempts").eq("id", inv.id).maybeSingle();
+        await (admin as any).from("invoices").update({
+          last_emailed_at: new Date().toISOString(),
+          email_attempts: Number((cur as any)?.email_attempts ?? 0) + 1,
+          last_email_status: "queued",
+          delivery_status: "queued",
+        }).eq("id", inv.id);
+        await logInvoiceEvent(inv.id, "emailed", {
+          recipient: lead.email,
+          attachment: attachment.filename,
+          template: "payment_success",
+        }, actor);
+      }
+
+    } catch (e) {
+      if (inv?.id) {
+        await (admin as any).from("invoices").update({
+          last_email_status: "failed",
+          delivery_status: "failed",
+        }).eq("id", inv.id);
+        await logInvoiceEvent(inv.id, "email_failed", {
+          recipient: lead.email,
+          error: e instanceof Error ? e.message : String(e),
+        }, actor);
+      }
+      throw e;
+    }
     return { ok: true };
   });
 
@@ -263,10 +329,34 @@ export const regenerateInvoice = createServerFn({ method: "POST" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data: inv } = await (await getAdmin())
-      .from("invoices").select("payment_id").eq("id", data.invoiceId).single();
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices").select("payment_id, pdf_path").eq("id", data.invoiceId).single();
     if (!inv?.payment_id) throw new Error("Invoice not found");
-    await generateAndStore(inv.payment_id);
+
+    // Archive existing pdf path so it's recoverable.
+    if (inv.pdf_path) {
+      const archivePath = inv.pdf_path.replace(/\.pdf$/, `-${Date.now()}.pdf`).replace(/^/, "archive/");
+      try {
+        await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath);
+        await (admin as any).rpc("noop").catch(() => null);
+        const { data: row } = await admin.from("invoices")
+          .select("prev_pdf_paths").eq("id", data.invoiceId).maybeSingle();
+        const arr = Array.isArray((row as any)?.prev_pdf_paths) ? (row as any).prev_pdf_paths : [];
+        await (admin as any).from("invoices").update({
+          prev_pdf_paths: [...arr, archivePath],
+        }).eq("id", data.invoiceId);
+      } catch (e) {
+        console.error("[invoice archive] failed", e);
+      }
+    }
+
+    const { data: profile } = await context.supabase
+      .from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle();
+    await generateAndStore(inv.payment_id, {
+      id: context.userId,
+      label: profile?.display_name ?? profile?.email ?? "staff",
+    });
     return { ok: true };
   });
 
@@ -513,3 +603,177 @@ export const getPaymentsFilterMeta = createServerFn({ method: "GET" })
       statuses: ["created", "attempted", "paid", "failed", "refunded"],
     };
   });
+
+// ── Lifecycle: preview / replace / events / detail ───────────────────────
+
+const FINANCE_ROLES = ["super_admin", "admin", "finance"] as const;
+
+async function ensureFinanceRole(ctx: any) {
+  const { data: roles } = await ctx.supabase
+    .from("user_roles").select("role").eq("user_id", ctx.userId);
+  const ok = (roles ?? []).some((r: any) => (FINANCE_ROLES as readonly string[]).includes(r.role));
+  if (!ok) throw new Error("Forbidden");
+}
+
+async function loadActor(ctx: any) {
+  const { data: profile } = await ctx.supabase
+    .from("profiles").select("display_name, email").eq("id", ctx.userId).maybeSingle();
+  return { id: ctx.userId, label: profile?.display_name ?? profile?.email ?? "staff" };
+}
+
+/** Generate a fresh, in-memory PDF and put it in a short-lived preview path. */
+export const previewInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ invoiceId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await ensureFinanceRole(context);
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices").select("id, payment_id, invoice_number").eq("id", data.invoiceId).maybeSingle();
+    if (!inv?.payment_id) throw new Error("Invoice not found");
+
+    // Re-render PDF in memory (does not overwrite stored copy).
+    const { data: payment } = await admin
+      .from("payments")
+      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, transaction_id, payment_date, created_at")
+      .eq("id", inv.payment_id).single();
+    if (!payment) throw new Error("Payment missing");
+    const { data: lead } = await admin
+      .from("leads").select("name, email, mobile, state, service, lead_code").eq("id", payment.lead_id).single();
+    if (!lead) throw new Error("Lead missing");
+    const { data: invFull } = await admin
+      .from("invoices")
+      .select("invoice_number, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply")
+      .eq("id", inv.id).single();
+    let applicationCode: string | null = null;
+    if (payment.application_id) {
+      const { data: app } = await admin.from("applications").select("application_code").eq("id", payment.application_id).maybeSingle();
+      applicationCode = app?.application_code ?? null;
+    }
+    const { renderInvoicePdf } = await import("@/lib/invoices/pdf.server");
+    const pdfBytes = await renderInvoicePdf({
+      invoiceNumber: invFull?.invoice_number ?? inv.invoice_number ?? "",
+      invoiceDate: payment.payment_date ? new Date(payment.payment_date) : new Date(payment.created_at),
+      customerName: lead.name,
+      customerEmail: lead.email,
+      customerMobile: lead.mobile,
+      customerState: lead.state,
+      serviceName: lead.service,
+      leadCode: lead.lead_code!,
+      applicationCode,
+      baseAmount: Number(payment.base_amount),
+      gstAmount: Number(payment.gst_amount),
+      totalAmount: Number(payment.amount),
+      cgstAmount: Number(invFull?.cgst_amount ?? 0),
+      sgstAmount: Number(invFull?.sgst_amount ?? 0),
+      igstAmount: Number(invFull?.igst_amount ?? 0),
+      sacCode: invFull?.sac_code ?? DEFAULT_SAC,
+      placeOfSupply: invFull?.place_of_supply ?? lead.state ?? null,
+      paymentId: payment.transaction_id ?? null,
+      gatewayName: payment.gateway_name,
+    });
+
+    const path = `preview/${inv.id}-${Date.now()}.pdf`;
+    const { error } = await admin.storage.from(BUCKET)
+      .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
+    if (error) throw new Error(error.message);
+    const { data: signed, error: sErr } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10);
+    if (sErr) throw new Error(sErr.message);
+    await logInvoiceEvent(inv.id, "preview", { path }, await loadActor(context));
+    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
+  });
+
+/** Upload a user-supplied PDF that replaces the active invoice PDF. */
+export const replaceInvoice = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    invoiceId: z.string().uuid(),
+    fileBase64: z.string().min(10),
+    filename: z.string().max(200).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await ensureFinanceRole(context);
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices").select("id, invoice_number, pdf_path, prev_pdf_paths").eq("id", data.invoiceId).single();
+    if (!inv) throw new Error("Invoice not found");
+
+    // Archive existing PDF.
+    let archivePath: string | null = null;
+    if (inv.pdf_path) {
+      archivePath = `archive/${inv.invoice_number}-${Date.now()}.pdf`;
+      try { await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath); } catch (e) { console.error(e); }
+    }
+
+    // Decode base64 (strip data URL prefix if present).
+    const b64 = data.fileBase64.replace(/^data:application\/pdf;base64,/, "");
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    const path = inv.pdf_path ?? `${new Date().getFullYear()}/${inv.invoice_number}.pdf`;
+    const { error: upErr } = await admin.storage.from(BUCKET)
+      .upload(path, bytes, { contentType: "application/pdf", upsert: true });
+    if (upErr) throw new Error(upErr.message);
+
+    const prevArr = Array.isArray((inv as any).prev_pdf_paths) ? (inv as any).prev_pdf_paths : [];
+    await (admin as any).from("invoices").update({
+      pdf_path: path,
+      pdf_generated_at: new Date().toISOString(),
+      replaced_at: new Date().toISOString(),
+      prev_pdf_paths: archivePath ? [...prevArr, archivePath] : prevArr,
+    }).eq("id", inv.id);
+
+    await logInvoiceEvent(inv.id, "replaced", {
+      filename: data.filename ?? null,
+      prev_pdf_path: archivePath,
+      size: bytes.byteLength,
+    }, await loadActor(context));
+    return { ok: true };
+  });
+
+export const listInvoiceEvents = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ invoiceId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await ensureFinanceRole(context);
+    const admin = await getAdmin();
+    const { data: rows } = await (admin as any).from("invoice_events")
+      .select("id, event_type, actor_label, detail, created_at")
+      .eq("invoice_id", data.invoiceId)
+      .order("created_at", { ascending: false });
+    return { rows: rows ?? [] };
+  });
+
+export const getInvoiceDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ invoiceId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await ensureFinanceRole(context);
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices")
+      .select("id, invoice_number, issued_at, pdf_path, pdf_generated_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply, lead_id, application_id, payment_id, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at, prev_pdf_paths")
+      .eq("id", data.invoiceId).maybeSingle();
+    if (!inv) throw new Error("Invoice not found");
+
+    const [{ data: events }, { data: emailLogs }] = await Promise.all([
+      (admin as any).from("invoice_events")
+        .select("id, event_type, actor_label, detail, created_at")
+        .eq("invoice_id", data.invoiceId)
+        .order("created_at", { ascending: false }),
+      admin.from("email_logs")
+        .select("id, to_email, subject, status, smtp_response, error_message, created_at, template_code")
+        .eq("lead_id", inv.lead_id)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
+
+    const attachmentName = `Invoice-${inv.invoice_number}.pdf`;
+    return {
+      invoice: { ...inv, attachment_name: attachmentName },
+      events: events ?? [],
+      emailLogs: emailLogs ?? [],
+    };
+  });
+
