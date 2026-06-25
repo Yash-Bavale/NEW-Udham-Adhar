@@ -40,7 +40,7 @@ export const listCertificates = createServerFn({ method: "GET" })
     search: z.string().optional(),
   }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
+    await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts", "finance", "manager", "executive"]);
     let q = (await getAdmin()).from("certificates").select("*").order("created_at", { ascending: false });
     if (data.delivered === "yes") q = q.not("delivered_at", "is", null);
     if (data.delivered === "no") q = q.is("delivered_at", null);
