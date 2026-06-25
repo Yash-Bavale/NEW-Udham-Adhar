@@ -20,12 +20,24 @@ async function requireSuper(supabase: any, userId: string) {
 export type SuperAdminOverview = {
   kpis: {
     leadsToday: number;
+    leadsYesterday: number;
     paymentsTodayInr: number;
+    paymentsYesterdayInr: number;
     openApplications: number;
     documentsPending: number;
     certificatesToday: number;
     emailQueueDepth: number;
+    totalCustomers: number;
+    activeStaff: number;
+    conversionRate30d: number; // % paid leads / total leads in last 30 days
+    revenue30dInr: number;
   };
+  trend: {
+    days: string[]; // ISO date (YYYY-MM-DD) in IST, oldest → newest
+    leads: number[];
+    revenueInr: number[];
+  };
+  topServices: { name: string; orders: number; revenueInr: number }[];
   emailQueue: { queued: number; processing: number; failed: number; sent: number };
   payu: { mode: string; isProduction: boolean };
   alerts: { id: string; severity: "high" | "med" | "low"; message: string }[];
