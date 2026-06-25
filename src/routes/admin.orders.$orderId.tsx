@@ -12,12 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
+
 import { OrderJourneyStepper } from "@/components/admin/OrderJourneyStepper";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { StageJourneyStrip } from "@/components/admin/StageJourneyStrip";
+import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
+import { computeOrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
 export const Route = createFileRoute("/admin/orders/$orderId")({ component: OrderDetailPage });
@@ -43,6 +47,12 @@ function OrderDetailPage() {
 
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, assignedStaff, workflowStages, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
+  const stage = computeOrderStage(lead, application);
+
+  const scrollTo = (target: "fulfillment" | "form" | "documents" | "notes") => {
+    const el = document.getElementById(`order-${target}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const setAssignee = async (v: string) => {
     try {
@@ -112,21 +122,38 @@ function OrderDetailPage() {
         </div>
       </div>
 
+      <StageJourneyStrip stage={stage} />
+
+      <StageActionsPanel
+        stage={stage}
+        leadId={lead?.id ?? null}
+        leadCode={lead?.lead_code ?? null}
+        onScrollTo={scrollTo}
+      />
+
       <OrderJourneyStepper current={current} stages={workflowStages} stageMeta={stageMeta} />
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          <FulfillmentStatusUpdater orderId={orderId} current={current} />
-          <FormSubmissionPanel applicationId={orderId} />
-          <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
+          <div id="order-fulfillment" className="scroll-mt-20">
+            <FulfillmentStatusUpdater orderId={orderId} current={current} />
+          </div>
+          <div id="order-form" className="scroll-mt-20">
+            <FormSubmissionPanel applicationId={orderId} />
+          </div>
+          <div id="order-notes" className="scroll-mt-20">
+            <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
+          </div>
         </div>
         <div className="space-y-5">
-          <OrderDocumentsPanel
-            orderId={orderId}
-            documents={documents}
-            deletedAt={application.documents_deleted_at}
-            deletedReason={application.documents_deleted_reason}
-          />
+          <div id="order-documents" className="scroll-mt-20">
+            <OrderDocumentsPanel
+              orderId={orderId}
+              documents={documents}
+              deletedAt={application.documents_deleted_at}
+              deletedReason={application.documents_deleted_reason}
+            />
+          </div>
           <OrderPaymentsPanel payments={payments} />
         </div>
       </div>
