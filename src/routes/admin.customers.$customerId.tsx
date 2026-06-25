@@ -215,7 +215,7 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
             <Field label="Total Orders" value={String(c.total_applications ?? 0)} />
             <Field label="Completed" value={String(c.completed_applications ?? 0)} />
             <Field label="Pending" value={String(c.pending_applications ?? 0)} />
-            <Field label="Lifetime Value" value={fmtINR(Number(c.lifetime_value ?? 0))} />
+            {!hideMoney && <Field label="Lifetime Value" value={fmtINR(Number(c.lifetime_value ?? 0))} />}
             <Field label="Last Order" value={fmtD(c.last_seen_at)} />
           </dl>
         </SectionCard>
