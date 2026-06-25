@@ -77,13 +77,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
 
+    // Orders surface = leads where payment has succeeded. Inner-join to leads
+    // and require lead.payment_successful_at IS NOT NULL.
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, leads!fk_applications_lead!inner(payment_successful_at)",
         { count: "exact" },
       )
       .eq("is_deleted", false)
+      .not("leads.payment_successful_at", "is", null)
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
