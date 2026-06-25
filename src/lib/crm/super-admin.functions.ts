@@ -83,7 +83,7 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       admin.from("user_roles").select("user_id"),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso).not("payment_successful_at", "is", null),
-      admin.from("applications").select("service_id, total_amount, services(service_name)").eq("is_deleted", false).gte("created_at", monthAgoIso).limit(2000),
+      admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", monthAgoIso).limit(2000),
     ]);
 
     const sumPaid = (rows: any[] | null | undefined) =>
