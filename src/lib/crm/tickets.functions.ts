@@ -94,7 +94,7 @@ export const getTicket = createServerFn({ method: "POST" })
     const { data: row, error } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile), applications(id, application_code, service_name), services(service_name)"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile), applications(id, application_code), services(service_name)"
       )
       .eq("id", data.id)
       .maybeSingle();
