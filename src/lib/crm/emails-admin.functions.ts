@@ -16,7 +16,11 @@ export const listLeadEmails = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ leadId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "operations", "admin", "support"]);
+    const { data: roleRows } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    const roles = new Set((roleRows ?? []).map((r: any) => r.role));
+    const allowed = ["super_admin", "admin", "operations", "support", "accounts", "finance", "executive", "manager"];
+    if (!allowed.some((r) => roles.has(r))) return { logs: [], queue: [] };
 
     const { data: logs, error: logErr } = await (await getAdmin())
       .from("email_logs")
