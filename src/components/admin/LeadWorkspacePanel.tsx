@@ -65,6 +65,8 @@ export function LeadWorkspacePanel({
   staff: Staff[];
 }) {
   const currentStatus: LeadStatusV2 = (lead.lead_status_v2 ?? "new_lead") as LeadStatusV2;
+  const role = useRole();
+  const hideMoney = role.hideMoney();
   return (
     <div className="grid lg:grid-cols-3 gap-5">
       <div className="lg:col-span-2 space-y-5">
@@ -77,19 +79,21 @@ export function LeadWorkspacePanel({
       <div className="space-y-5">
         <CustomerQuickCard lead={lead} />
         <QuickActionsCard lead={lead} />
-        <PaymentLinkPanel
-          leadId={lead.id}
-          leadCode={lead.lead_code}
-          mobile={lead.mobile ?? null}
-          customerName={lead.name}
-          service={lead.service ?? null}
-          baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
-          gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
-          totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-          leadStatusV2={currentStatus}
-        />
+        {!hideMoney && (
+          <PaymentLinkPanel
+            leadId={lead.id}
+            leadCode={lead.lead_code}
+            mobile={lead.mobile ?? null}
+            customerName={lead.name}
+            service={lead.service ?? null}
+            baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
+            gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
+            totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+            leadStatusV2={currentStatus}
+          />
+        )}
         <FollowUpScheduler leadId={lead.id} staff={staff} />
-        <LinkedOrderPanel applications={applications} />
+        <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
         <DocumentsPanel applications={applications} />
       </div>
     </div>
