@@ -316,6 +316,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     if (opts?.line) page.drawLine({ start: { x: totLabelX - 4, y: y - 4 }, end: { x: totValRight, y: y - 4 }, thickness: 0.4, color: ROWLINE });
     y -= 16;
   };
+  const totalsTopY = y;
   totRow("Sub Total", subtotal.toFixed(2));
   if (isIntra) {
     totRow(`CGST (${gstRate / 2}%)`, cgst.toFixed(2));
@@ -328,7 +329,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   totRow("Balance Due", `INR 0.00`, { bold: true, line: true });
 
   // ─── Amount in Words (left side, aligned with totals start)
-  let leftY = y + 16 * 6 + 14; // approximate top of totals
+  let leftY = totalsTopY;
   drawText(page, "Total In Words", { x: MX, y: leftY, size: 9, font: helvBold, color: TEXT });
   leftY -= 14;
   const wordLines = wrap(`Indian ${amountInWords(grand)}`, helv, 10, 290);
