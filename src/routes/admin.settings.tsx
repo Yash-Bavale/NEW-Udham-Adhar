@@ -1,21 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, ListChecks, Bell, CreditCard, Workflow } from "lucide-react";
+import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
+import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
+import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
+import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Settings — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: SettingsPage,
 });
 
-type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow";
+type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
   { id: "statuses", label: "Status Master", icon: ListChecks },
+  { id: "templates", label: "Email Templates", icon: Mail },
+  { id: "reasons", label: "Reason Library", icon: BookOpen },
+  { id: "automation", label: "Automation Rules", icon: Zap },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "gateways", label: "Payment Gateways", icon: CreditCard },
-  { id: "workflow", label: "Workflow Automation", icon: Workflow },
+  { id: "workflow", label: "Cancellation Flow", icon: Workflow },
 ];
 
 const LEAD_STATUSES = [
@@ -65,6 +71,9 @@ function SettingsPage() {
 
       {tab === "company" && <CompanyTab />}
       {tab === "statuses" && <StatusesTab />}
+      {tab === "templates" && <TemplatesTab />}
+      {tab === "reasons" && <ReasonLibraryTab />}
+      {tab === "automation" && <AutomationRulesTab />}
       {tab === "notifications" && <NotificationsTab />}
       {tab === "gateways" && <GatewaysTab />}
       {tab === "workflow" && <WorkflowTab />}
@@ -76,15 +85,33 @@ function CompanyTab() {
   return (
     <SectionCard title="Company Information">
       <div className="p-4 grid md:grid-cols-2 gap-4 text-sm">
-        <Field label="Company Name" value="Business Help Services" />
-        <Field label="Brand" value="Udyam Aadhar" />
-        <Field label="Support Email" value="support@udyamadhar.in" />
-        <Field label="Website" value="udyamadhar.in" />
+        <Field label="Company Name" value={COMPANY_NAME} />
+        <Field label="Brand" value={SITE_NAME} />
+        <Field label="Support Email" value={SUPPORT_EMAIL} />
+        <Field label="Website" value={BASE_URL.replace(/^https?:\/\//, "")} />
         <Field label="Address" value="—" />
         <Field label="GST Number" value="—" />
       </div>
       <div className="px-4 py-3 border-t text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
         Read-only display. Edit via your account manager.
+      </div>
+    </SectionCard>
+  );
+}
+
+function TemplatesTab() {
+  return (
+    <SectionCard
+      title="Email Templates"
+      action={<Link to="/admin/email-templates" className="text-xs" style={{ color: "var(--admin-accent)" }}>Open template editor →</Link>}
+    >
+      <div className="p-4 text-sm space-y-2" style={{ color: "var(--admin-fg-muted)" }}>
+        <p>
+          All workflow emails (delay notices, 3 / 5 / 7-day follow-ups, no-response warnings, closure notice, refund decisions) are managed in the Email Templates editor.
+        </p>
+        <p className="text-xs">
+          Variables available: <code className="font-mono">{"{{customer_name}}"}</code> <code className="font-mono">{"{{order_id}}"}</code> <code className="font-mono">{"{{service_name}}"}</code> <code className="font-mono">{"{{reason}}"}</code> <code className="font-mono">{"{{date}}"}</code> <code className="font-mono">{"{{company_name}}"}</code> <code className="font-mono">{"{{support_email}}"}</code>.
+        </p>
       </div>
     </SectionCard>
   );

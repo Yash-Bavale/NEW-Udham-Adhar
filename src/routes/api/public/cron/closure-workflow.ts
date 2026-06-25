@@ -7,7 +7,7 @@
 // Step 2 and Step 3 emails are enqueued here as stages advance.
 import { createFileRoute } from "@tanstack/react-router";
 
-const SUPPORT_EMAIL = process.env.INTERNAL_NOTIFICATION_EMAIL || "support@udyamadhar.in";
+const SUPPORT_EMAIL = process.env.INTERNAL_NOTIFICATION_EMAIL || "help@businesshelpservices.in";
 const REFUND_POLICY_URL = "https://udyamadhar.in/refund-policy";
 
 export const Route = createFileRoute("/api/public/cron/closure-workflow")({

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 
 // Internal admin notification target. Configured via env secret.
-const FALLBACK_INTERNAL_EMAIL = "support@udyamadhar.in";
+const FALLBACK_INTERNAL_EMAIL = "help@businesshelpservices.in";
 
 
 const ContactSchema = z.object({

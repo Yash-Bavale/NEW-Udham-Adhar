@@ -7,7 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SUPPORT_EMAIL =
   (typeof process !== "undefined" && process.env?.INTERNAL_NOTIFICATION_EMAIL) ||
-  "support@udyamadhar.in";
+  "help@businesshelpservices.in";
 const REFUND_POLICY_URL = "https://udyamadhar.in/refund-policy";
 
 export const requestCancellation = createServerFn({ method: "POST" })
