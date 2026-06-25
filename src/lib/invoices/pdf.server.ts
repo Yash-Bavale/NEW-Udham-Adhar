@@ -272,8 +272,8 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     { x: MX + 30,  label: "DESCRIPTION" },
     { x: MX + 300, label: "SAC" },
     { x: MX + 350, label: "QTY" },
-    { x: MX + 390, label: "RATE (₹)" },
-    { x: RX - 80,  label: "AMOUNT (₹)" },
+    { x: MX + 390, label: "RATE (Rs.)" },
+    { x: RX - 80,  label: "AMOUNT (Rs.)" },
   ];
   for (const c of cols) drawText(page, c.label, { x: c.x, y: y - tH + 9, size: 9, font: helvBold, color: WHITE });
 
@@ -302,17 +302,17 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     drawText(page, val, { x: totalsRight - tw, y: y, size: 10, font: opts?.bold ? helvBold : helv, color: opts?.color ?? NAVY });
     y -= 18;
   };
-  totalLine("Subtotal", `₹ ${subtotal.toFixed(2)}`);
+  totalLine("Subtotal", `Rs. ${subtotal.toFixed(2)}`);
   if (isIntra) {
-    totalLine("CGST (9%)", `₹ ${cgst.toFixed(2)}`);
-    totalLine("SGST (9%)", `₹ ${sgst.toFixed(2)}`);
+    totalLine("CGST (9%)", `Rs. ${cgst.toFixed(2)}`);
+    totalLine("SGST (9%)", `Rs. ${sgst.toFixed(2)}`);
   } else {
-    totalLine("IGST (18%)", `₹ ${igst.toFixed(2)}`);
+    totalLine("IGST (18%)", `Rs. ${igst.toFixed(2)}`);
   }
-  totalLine("Round Off", `${roundOff >= 0 ? "+" : "−"} ₹ ${Math.abs(roundOff).toFixed(2)}`);
+  totalLine("Round Off", `${roundOff >= 0 ? "+" : "-"} Rs. ${Math.abs(roundOff).toFixed(2)}`);
   page.drawLine({ start: { x: totalsX - 6, y: y + 12 }, end: { x: totalsRight, y: y + 12 }, thickness: 0.5, color: LINE });
   y -= 2;
-  totalLine("GRAND TOTAL", `₹ ${grand.toFixed(2)}`, { bold: true, color: WHITE, bg: NAVY });
+  totalLine("GRAND TOTAL", `Rs. ${grand.toFixed(2)}`, { bold: true, color: WHITE, bg: NAVY });
   y -= 4;
 
   // ─── Amount in words
@@ -334,12 +334,12 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   page.drawRectangle({ x: MX, y: y - 22, width: RX - MX, height: 22, color: WHITE, borderColor: SOFT_LINE, borderWidth: 0.5 });
   const sumVals = [
     sac,
-    `₹ ${subtotal.toFixed(2)}`,
+    `Rs. ${subtotal.toFixed(2)}`,
     `${gstRate}%`,
-    `₹ ${cgst.toFixed(2)}`,
-    `₹ ${sgst.toFixed(2)}`,
-    `₹ ${igst.toFixed(2)}`,
-    `₹ ${totalTax.toFixed(2)}`,
+    `Rs. ${cgst.toFixed(2)}`,
+    `Rs. ${sgst.toFixed(2)}`,
+    `Rs. ${igst.toFixed(2)}`,
+    `Rs. ${totalTax.toFixed(2)}`,
   ];
   for (let i = 0; i < sumVals.length; i++) drawText(page, sumVals[i], { x: sumX[i], y: y - 15, size: 9, font: helv, color: NAVY });
   y -= 32;
