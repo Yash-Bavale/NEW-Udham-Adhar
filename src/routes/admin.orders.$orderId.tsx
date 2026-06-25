@@ -122,21 +122,38 @@ function OrderDetailPage() {
         </div>
       </div>
 
+      <StageJourneyStrip stage={stage} />
+
+      <StageActionsPanel
+        stage={stage}
+        leadId={lead?.id ?? null}
+        leadCode={lead?.lead_code ?? null}
+        onScrollTo={scrollTo}
+      />
+
       <OrderJourneyStepper current={current} stages={workflowStages} stageMeta={stageMeta} />
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          <FulfillmentStatusUpdater orderId={orderId} current={current} />
-          <FormSubmissionPanel applicationId={orderId} />
-          <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
+          <div id="order-fulfillment" className="scroll-mt-20">
+            <FulfillmentStatusUpdater orderId={orderId} current={current} />
+          </div>
+          <div id="order-form" className="scroll-mt-20">
+            <FormSubmissionPanel applicationId={orderId} />
+          </div>
+          <div id="order-notes" className="scroll-mt-20">
+            <InternalActivity orderId={orderId} leadId={application.lead_id} events={events} />
+          </div>
         </div>
         <div className="space-y-5">
-          <OrderDocumentsPanel
-            orderId={orderId}
-            documents={documents}
-            deletedAt={application.documents_deleted_at}
-            deletedReason={application.documents_deleted_reason}
-          />
+          <div id="order-documents" className="scroll-mt-20">
+            <OrderDocumentsPanel
+              orderId={orderId}
+              documents={documents}
+              deletedAt={application.documents_deleted_at}
+              deletedReason={application.documents_deleted_reason}
+            />
+          </div>
           <OrderPaymentsPanel payments={payments} />
         </div>
       </div>
