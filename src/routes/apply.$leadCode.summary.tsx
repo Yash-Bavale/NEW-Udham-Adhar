@@ -233,6 +233,23 @@ function SummaryPage() {
     );
   }
 
+  if (isPaid) {
+    const holding = postElapsed >= POST_PAY_SECONDS;
+    return (
+      <div>
+        <CountdownCard
+          totalSeconds={POST_PAY_SECONDS}
+          elapsed={postElapsed}
+          steps={POST_PAY_STEPS}
+          leadCode={leadCode}
+          holdLabel={holding ? "Almost ready" : undefined}
+          holdSub={holding ? "Opening your secure onboarding form…" : undefined}
+        />
+        <TrustBlock />
+      </div>
+    );
+  }
+
   const canPay = !!activeGateway && !payBusy && !order;
 
   async function handlePay() {
