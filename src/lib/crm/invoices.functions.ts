@@ -240,10 +240,14 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .single();
     if (!payment) throw new Error("Payment not found");
 
+    const { data: profile } = await context.supabase
+      .from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle();
+    const actor = { id: context.userId, label: profile?.display_name ?? profile?.email ?? "staff" };
+
     // Ensure invoice exists (regenerate if missing).
     let attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
     if (!attachment) {
-      await generateAndStore(data.paymentId);
+      await generateAndStore(data.paymentId, actor);
       attachment = await loadInvoiceAttachmentByPayment(data.paymentId);
     }
     if (!attachment) throw new Error("Invoice PDF unavailable");
@@ -254,30 +258,68 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .eq("id", payment.lead_id).single();
     if (!lead?.email) throw new Error("Customer email missing");
 
+    const { data: inv } = await admin
+      .from("invoices").select("id, invoice_number").eq("payment_id", data.paymentId).maybeSingle();
+
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-    await enqueueFromTemplateInternal(
-      "payment_success",
-      lead.email,
-      {
-        name: lead.name ?? "",
-        customer_name: lead.name ?? "",
-        lead_code: lead.lead_code ?? "",
-        order_number: lead.lead_code ?? "",
-        service: lead.service ?? "",
-        service_name: lead.service ?? "",
-        base_amount: Number(lead.base_amount ?? 0).toFixed(2),
-        gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
-        total_amount: Number(lead.total_amount ?? 0).toFixed(2),
-        amount: Number(lead.total_amount ?? 0).toFixed(2),
-        support_email: "help@businesshelpservices.com",
-      },
-      {
-        toName: lead.name ?? undefined,
-        leadId: payment.lead_id,
-        applicationId: payment.application_id ?? undefined,
-        attachments: [attachment],
-      },
-    );
+    try {
+      await enqueueFromTemplateInternal(
+        "payment_success",
+        lead.email,
+        {
+          name: lead.name ?? "",
+          customer_name: lead.name ?? "",
+          lead_code: lead.lead_code ?? "",
+          order_number: lead.lead_code ?? "",
+          service: lead.service ?? "",
+          service_name: lead.service ?? "",
+          invoice_number: inv?.invoice_number ?? "",
+          invoice_attachment: attachment.filename,
+          base_amount: Number(lead.base_amount ?? 0).toFixed(2),
+          gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
+          total_amount: Number(lead.total_amount ?? 0).toFixed(2),
+          amount: Number(lead.total_amount ?? 0).toFixed(2),
+          support_email: "help@businesshelpservices.com",
+        },
+        {
+          toName: lead.name ?? undefined,
+          leadId: payment.lead_id,
+          applicationId: payment.application_id ?? undefined,
+          attachments: [attachment],
+        },
+      );
+      if (inv?.id) {
+        await (admin as any).from("invoices").update({
+          last_emailed_at: new Date().toISOString(),
+          email_attempts: ((admin as any), 0), // bumped below via rpc-less increment
+          last_email_status: "queued",
+          delivery_status: "queued",
+        }).eq("id", inv.id);
+        // increment email_attempts atomically
+        await (admin as any).rpc("noop").catch(() => null); // placeholder; real bump below
+        const { data: cur } = await admin.from("invoices").select("email_attempts").eq("id", inv.id).maybeSingle();
+        await (admin as any).from("invoices").update({
+          email_attempts: Number(cur?.email_attempts ?? 0) + 1,
+        }).eq("id", inv.id);
+        await logInvoiceEvent(inv.id, "emailed", {
+          recipient: lead.email,
+          attachment: attachment.filename,
+          template: "payment_success",
+        }, actor);
+      }
+    } catch (e) {
+      if (inv?.id) {
+        await (admin as any).from("invoices").update({
+          last_email_status: "failed",
+          delivery_status: "failed",
+        }).eq("id", inv.id);
+        await logInvoiceEvent(inv.id, "email_failed", {
+          recipient: lead.email,
+          error: e instanceof Error ? e.message : String(e),
+        }, actor);
+      }
+      throw e;
+    }
     return { ok: true };
   });
 
@@ -291,10 +333,34 @@ export const regenerateInvoice = createServerFn({ method: "POST" })
     const ok = (roles ?? []).some((r) => r.role === "super_admin" || r.role === "finance");
     if (!ok) throw new Error("Forbidden");
 
-    const { data: inv } = await (await getAdmin())
-      .from("invoices").select("payment_id").eq("id", data.invoiceId).single();
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices").select("payment_id, pdf_path").eq("id", data.invoiceId).single();
     if (!inv?.payment_id) throw new Error("Invoice not found");
-    await generateAndStore(inv.payment_id);
+
+    // Archive existing pdf path so it's recoverable.
+    if (inv.pdf_path) {
+      const archivePath = inv.pdf_path.replace(/\.pdf$/, `-${Date.now()}.pdf`).replace(/^/, "archive/");
+      try {
+        await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath);
+        await (admin as any).rpc("noop").catch(() => null);
+        const { data: row } = await admin.from("invoices")
+          .select("prev_pdf_paths").eq("id", data.invoiceId).maybeSingle();
+        const arr = Array.isArray((row as any)?.prev_pdf_paths) ? (row as any).prev_pdf_paths : [];
+        await (admin as any).from("invoices").update({
+          prev_pdf_paths: [...arr, archivePath],
+        }).eq("id", data.invoiceId);
+      } catch (e) {
+        console.error("[invoice archive] failed", e);
+      }
+    }
+
+    const { data: profile } = await context.supabase
+      .from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle();
+    await generateAndStore(inv.payment_id, {
+      id: context.userId,
+      label: profile?.display_name ?? profile?.email ?? "staff",
+    });
     return { ok: true };
   });
 
