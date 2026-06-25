@@ -274,17 +274,38 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                 };
 
                 // Order confirmation — immediate, with invoice PDF attached.
-                await enqueueFromTemplateInternal(
-                  "order_confirmation",
-                  leadRow.email,
-                  commonVars,
-                  {
-                    toName: leadRow.name ?? undefined,
-                    leadId: payment.lead_id,
-                    applicationId: applicationId ?? undefined,
-                    attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
-                  },
-                );
+                try {
+                  await enqueueFromTemplateInternal(
+                    "order_confirmation",
+                    leadRow.email,
+                    commonVars,
+                    {
+                      toName: leadRow.name ?? undefined,
+                      leadId: payment.lead_id,
+                      applicationId: applicationId ?? undefined,
+                      attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
+                    },
+                  );
+                  const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
+                  await markInvoiceEmailedByPayment(payment.id, {
+                    recipient: leadRow.email,
+                    template: "order_confirmation",
+                    attachmentFilename: invoiceAttachment?.filename ?? null,
+                    success: true,
+                    actorLabel: "payu-webhook",
+                  });
+                } catch (e) {
+                  const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
+                  await markInvoiceEmailedByPayment(payment.id, {
+                    recipient: leadRow.email,
+                    template: "order_confirmation",
+                    attachmentFilename: invoiceAttachment?.filename ?? null,
+                    success: false,
+                    error: e instanceof Error ? e.message : String(e),
+                    actorLabel: "payu-webhook",
+                  });
+                  throw e;
+                }
 
                 // Welcome + form link — 30s later so it lands after the receipt.
                 await enqueueFromTemplateInternal(
