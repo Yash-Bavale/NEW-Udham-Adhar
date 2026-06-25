@@ -197,6 +197,7 @@ import { Route as AdminServicesRouteImport } from './routes/admin.services'
 import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
@@ -1222,6 +1223,11 @@ const AdminReportsRoute = AdminReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRefundsRoute = AdminRefundsRouteImport.update({
+  id: '/refunds',
+  path: '/refunds',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPipelineRoute = AdminPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
@@ -1684,6 +1690,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -1922,6 +1929,7 @@ export interface FileRoutesByTo {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -2164,6 +2172,7 @@ export interface FileRoutesById {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
@@ -2407,6 +2416,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -2645,6 +2655,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -2886,6 +2897,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
@@ -4454,6 +4466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReportsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/refunds': {
+      id: '/admin/refunds'
+      path: '/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pipeline': {
       id: '/admin/pipeline'
       path: '/pipeline'
@@ -4947,6 +4966,7 @@ interface AdminRouteChildren {
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
+  AdminRefundsRoute: typeof AdminRefundsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
   AdminSeoRoute: typeof AdminSeoRoute
@@ -4982,6 +5002,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
+  AdminRefundsRoute: AdminRefundsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,
   AdminSeoRoute: AdminSeoRoute,
