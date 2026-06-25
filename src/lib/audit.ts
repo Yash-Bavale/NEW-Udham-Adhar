@@ -43,12 +43,16 @@ export async function assertRole(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const { data: userRoles } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id);
+  const checks = await Promise.all(
+    roles.map((role) =>
+      supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: role,
+      })
+    )
+  );
 
-  const hasRole = userRoles?.some(ur => roles.includes(ur.role));
+  const hasRole = checks.some(({ data, error }) => !error && data === true);
 
   if (!hasRole) {
     throw new Error("Forbidden: You do not have permission to perform this action.");
