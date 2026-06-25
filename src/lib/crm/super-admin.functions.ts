@@ -43,6 +43,13 @@ export type SuperAdminOverview = {
   alerts: { id: string; severity: "high" | "med" | "low"; message: string }[];
   activity: { id: string; description: string; created_at: string }[];
   webhookFailures24h: number;
+  workflow: {
+    externalDelay: number;
+    onHold: number;
+    refundPending: number;
+    remindersDue: number;
+    closedThisMonth: number;
+  };
 };
 
 export const getSuperAdminOverview = createServerFn({ method: "GET" })
@@ -64,6 +71,7 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       paymentsTrend, leadsTrend,
       openApps, docsPending, certsToday, emailCounts, activity, webhookErrs,
       totalCustomers, staffRoles, leads30d, paidLeads30d, topServicesRes,
+      wfExternalDelay, wfOnHold, wfRefundPending, wfRemindersDue, wfClosedMonth,
     ] = await Promise.all([
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", dayStartIso),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", yStartIso).lt("created_at", yEndIso),
@@ -84,6 +92,11 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", monthAgoIso).not("payment_successful_at", "is", null),
       admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", monthAgoIso).limit(2000),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["external_dependency", "government_portal_pending"]),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["waiting_for_customer", "waiting_for_documents", "customer_non_responsive"]),
+      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      admin.from("workflow_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lte("scheduled_for", new Date().toISOString()),
+      admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["closed", "cancelled", "refund_closed"]).gte("updated_at", monthAgoIso),
     ]);
 
     const sumPaid = (rows: any[] | null | undefined) =>
@@ -177,6 +190,13 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
       activity: ((activity.data ?? []) as Array<{ id: string; activity_description: string | null; created_at: string }>)
         .map((r) => ({ id: r.id, description: r.activity_description ?? "(no description)", created_at: r.created_at })),
       webhookFailures24h: webhookErrs.count ?? 0,
+      workflow: {
+        externalDelay: wfExternalDelay.count ?? 0,
+        onHold: wfOnHold.count ?? 0,
+        refundPending: wfRefundPending.count ?? 0,
+        remindersDue: wfRemindersDue.count ?? 0,
+        closedThisMonth: wfClosedMonth.count ?? 0,
+      },
     };
   });
 

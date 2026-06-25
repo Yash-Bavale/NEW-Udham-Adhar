@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   Users, Wallet, ShoppingBag, FileText, Award, Mail, Activity, AlertTriangle, Send, Database,
-  ShieldCheck, TrendingUp, TrendingDown, Target, UserCheck, Briefcase, Globe,
+  ShieldCheck, TrendingUp, TrendingDown, Target, UserCheck, Briefcase, Globe, Clock, Bell, Undo2,
 } from "lucide-react";
 import {
   getSuperAdminOverview, processEmailQueueNow, seedMissingEmailTemplates,
@@ -82,6 +82,8 @@ function SuperAdminPage() {
         <SecurityAlerts data={data} loading={isLoading} />
         <SuperActions onChanged={() => refetch()} />
       </div>
+
+      <WorkflowHealth data={data} loading={isLoading} />
 
       <ActivityFeed data={data} loading={isLoading} />
     </div>
@@ -458,6 +460,48 @@ function Row({ label, value, tone }: { label: string; value: string | number; to
     <div className="flex items-center justify-between">
       <span className="text-slate-400">{label}</span>
       <span className={`font-semibold tabular-nums ${color}`}>{value}</span>
+    </div>
+  );
+}
+
+function WorkflowHealth({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
+  const w = data?.workflow;
+  const tiles: { label: string; value: number; icon: React.ReactNode; tone: "amber" | "rose" | "emerald" | "sky" | "violet"; to?: string }[] = [
+    { label: "External Delay", value: w?.externalDelay ?? 0, icon: <Clock className="size-4" />, tone: "amber" },
+    { label: "Waiting on Customer", value: w?.onHold ?? 0, icon: <UserCheck className="size-4" />, tone: "sky" },
+    { label: "Refunds Pending", value: w?.refundPending ?? 0, icon: <Undo2 className="size-4" />, tone: "rose", to: "/admin/refunds" },
+    { label: "Reminders Due", value: w?.remindersDue ?? 0, icon: <Bell className="size-4" />, tone: "violet" },
+    { label: "Closed (30d)", value: w?.closedThisMonth ?? 0, icon: <ShieldCheck className="size-4" />, tone: "emerald" },
+  ];
+  const toneMap: Record<string, string> = {
+    amber: "bg-amber-500/15 text-amber-300",
+    rose: "bg-rose-500/15 text-rose-300",
+    emerald: "bg-emerald-500/15 text-emerald-300",
+    sky: "bg-sky-500/15 text-sky-300",
+    violet: "bg-violet-500/15 text-violet-300",
+  };
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0F1424] p-5 mt-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white flex items-center gap-1.5">
+            <Activity className="size-4 text-slate-400" /> Workflow Engine Health
+          </h2>
+          <p className="text-[11px] text-slate-500">Delay, follow-up, closure & refund pipeline</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {tiles.map((t) => {
+          const inner = (
+            <div className="rounded-xl border border-white/10 bg-[#0A0E1A] p-3 hover:bg-white/5 transition-colors">
+              <div className={`inline-flex rounded-md p-1.5 ${toneMap[t.tone]}`}>{t.icon}</div>
+              <div className="mt-2 text-2xl font-bold tabular-nums text-white">{loading ? "—" : fmtN(t.value)}</div>
+              <div className="text-[11px] text-slate-400">{t.label}</div>
+            </div>
+          );
+          return t.to ? <Link key={t.label} to={t.to}>{inner}</Link> : <div key={t.label}>{inner}</div>;
+        })}
+      </div>
     </div>
   );
 }
