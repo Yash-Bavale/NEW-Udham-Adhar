@@ -79,7 +79,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at",
         { count: "exact" },
       )
       .eq("is_deleted", false)
