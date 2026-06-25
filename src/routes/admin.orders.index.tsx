@@ -12,6 +12,7 @@ import {
   type FulfillmentStatus,
 } from "@/lib/crm/fulfillment-transitions";
 import { LEAD_STATUS_BADGE, LEAD_STATUS_LABEL, type LeadStatusV2 } from "@/lib/crm/lead-transitions";
+import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
