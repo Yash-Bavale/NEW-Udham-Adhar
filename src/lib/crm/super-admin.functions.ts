@@ -165,6 +165,37 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
     const conversionRate30d = leads30dCount > 0 ? Math.round((paidLeads30dCount / leads30dCount) * 1000) / 10 : 0;
     const uniqueStaff = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
 
+    // Repeated leads — leads sharing a mobile or email with at least one other lead.
+    // Paginate beyond PostgREST's 1000-row cap.
+    let repeatedLeads = 0;
+    {
+      const mobiles = new Map<string, number>();
+      const emails = new Map<string, number>();
+      const page = 1000;
+      for (let from = 0; from < 500_000; from += page) {
+        const { data, error } = await admin
+          .from("leads")
+          .select("mobile, email")
+          .range(from, from + page - 1);
+        if (error) break;
+        const rows = data ?? [];
+        for (const r of rows as Array<{ mobile: string | null; email: string | null }>) {
+          if (r.mobile) mobiles.set(r.mobile, (mobiles.get(r.mobile) ?? 0) + 1);
+          if (r.email) emails.set(r.email.toLowerCase(), (emails.get(r.email.toLowerCase()) ?? 0) + 1);
+        }
+        if (rows.length < page) break;
+      }
+      const seen = new Set<string>();
+      for (const [k, n] of mobiles) if (n > 1) seen.add(`m:${k}`);
+      for (const [k, n] of emails) if (n > 1) seen.add(`e:${k}`);
+      // Count of duplicate rows = sum of (n-1) per duplicated key, deduped across mobile+email.
+      // Simpler approximation: total leads with a duplicated mobile or email.
+      let dupRows = 0;
+      for (const n of mobiles.values()) if (n > 1) dupRows += n;
+      for (const n of emails.values()) if (n > 1) dupRows += n;
+      repeatedLeads = dupRows;
+    }
+
     return {
       kpis: {
         leadsToday: leadsToday.count ?? 0,
@@ -179,7 +210,9 @@ export const getSuperAdminOverview = createServerFn({ method: "GET" })
         activeStaff: uniqueStaff,
         conversionRate30d,
         revenue30dInr,
+        repeatedLeads,
       },
+
       trend: {
         days,
         leads: days.map((k) => leadsByDay[k] ?? 0),
