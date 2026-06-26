@@ -247,6 +247,77 @@ function HomePage() {
         </div>
       </section>
 
+      {/* About Udyam Registration */}
+      <section className="mx-auto max-w-5xl px-4 py-8 md:py-12">
+        <h2 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+          About Udyam Registration
+        </h2>
+        <div className="mt-4 space-y-3 text-sm md:text-base leading-relaxed text-foreground/85">
+          <p>
+            Udyam Registration is the official recognition issued by the Ministry of Micro, Small &amp; Medium
+            Enterprises (MSME), Government of India, that classifies a business as a Micro, Small or Medium
+            Enterprise based on investment and annual turnover. It replaced the earlier Udyog Aadhaar Memorandum
+            (UAM) system and is the single identifier that lenders, government departments, and procurement
+            portals use to verify a business as an MSME.
+          </p>
+          <p>
+            A valid Udyam certificate helps eligible businesses access benefits such as collateral-free MSME
+            loans under CGTMSE, priority sector lending, interest subvention, protection against delayed
+            payments under the MSMED Act, preference in government tenders (GeM), subsidies on patent and
+            trademark fees, and easier participation in state &amp; central MSME schemes. Proprietors, partnerships,
+            LLPs, private limited companies, traders, manufacturers and service providers are all eligible
+            subject to the prescribed investment and turnover limits.
+          </p>
+          <p>
+            <strong>Disclaimer:</strong> We are a private consultancy and are not affiliated with the
+            Government of India or the Ministry of MSME. Udyam Registration is available free of cost on the
+            official portal <span className="underline">udyamregistration.gov.in</span>. Our paid service
+            covers form preparation, document review, error-handling, follow-ups and post-issuance support.
+          </p>
+        </div>
+      </section>
+
+      {/* Why choose us */}
+      <section className="bg-brand-navy/5">
+        <div className="mx-auto max-w-5xl px-4 py-8 md:py-12">
+          <h2 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+            Why choose our Udyam consultancy
+          </h2>
+          <div className="mt-4 space-y-3 text-sm md:text-base leading-relaxed text-foreground/85">
+            <p>
+              Our team has assisted thousands of MSMEs across India with new Udyam registration, certificate
+              updates (name, address, mobile, email, NIC code, bank details), Udyog Aadhaar to Udyam migration,
+              and re-downloads of lost certificates. Every application is handled by a trained operator,
+              cross-checked before submission, and tracked end-to-end so customers are not left guessing.
+            </p>
+            <p>
+              We offer transparent fixed pricing, GST tax invoices, support in English and Hindi, secure
+              handling of Aadhaar and PAN information, and email + WhatsApp updates at every stage. Post-issuance
+              assistance is included — if a correction is needed after the certificate is generated, our team
+              guides the customer through the right process.
+            </p>
+            <ul className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 text-center">
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">Pan-India</div>
+                <div className="text-xs text-muted-foreground">All 28 states &amp; UTs</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">English + Hindi</div>
+                <div className="text-xs text-muted-foreground">Bilingual support</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">GST Invoice</div>
+                <div className="text-xs text-muted-foreground">Tax invoice on every order</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">Secure</div>
+                <div className="text-xs text-muted-foreground">Encrypted document handling</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ Section */}
       <section className="mx-auto max-w-4xl px-4 py-8 md:py-12">
         <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground leading-tight">
