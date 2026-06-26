@@ -179,6 +179,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
               const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+              const invoiceUrl = `${APP_ORIGIN}/api/public/invoice/${encodeURIComponent(leadRow.lead_code)}`;
               const total = Number(invoiceRow?.total_amount ?? leadRow.total_amount ?? 0);
               const issued = invoiceRow?.issued_at ? new Date(invoiceRow.issued_at) : new Date();
               try {
@@ -208,6 +209,8 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                     igst_amount: Number(invoiceRow?.igst_amount ?? 0).toFixed(2),
                     onboarding_url: onboardingUrl,
                     form_link: onboardingUrl,
+                    invoice_url: invoiceUrl,
+                    invoice_download_url: invoiceUrl,
                     transaction_id: trackingId || orderId || payment.id,
                     payment_datetime: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST",
                     support_email: "help@businesshelpservices.com",
