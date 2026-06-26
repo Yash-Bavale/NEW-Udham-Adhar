@@ -62,9 +62,9 @@ function OrderDetailPage() {
   }
   if (!data) return null;
 
-  const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = data as any;
+  const { application, lead, customer, service, payments, paymentStatus, paymentSuccessfulAt, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
-  const stage: OrderStage = computeOrderStage(lead, application);
+  const stage: OrderStage = computeOrderStage({ ...(lead ?? {}), payment_successful_at: paymentSuccessfulAt }, application);
   const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
 
   // Default-hide money: only finance/admin roles see rupee figures.
@@ -74,7 +74,7 @@ function OrderDetailPage() {
   // Build timestamps for the process tracker tooltips
   const timestamps: Partial<Record<OrderStage, string | null>> = {
     lead_received: application.created_at,
-    payment_done: lead?.payment_successful_at ?? null,
+    payment_done: paymentSuccessfulAt ?? null,
     form_submitted: application?.form_submitted_at ?? null,
     under_review: stageMeta?.verification_pending?.at ?? null,
     in_progress: stageMeta?.documents_received?.at ?? null,

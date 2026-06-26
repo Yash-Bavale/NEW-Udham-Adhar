@@ -124,7 +124,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, payment_successful_at").in("id", leadIds)
+        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
@@ -133,7 +133,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ? admin.from("services").select("id, service_name").in("id", serviceIds)
         : Promise.resolve({ data: [] as any[] }),
       ids.length
-        ? admin.from("payments").select("application_id, status, amount").in("application_id", ids)
+        ? admin.from("payments").select("application_id, status, amount, payment_date").in("application_id", ids)
         : Promise.resolve({ data: [] as any[] }),
       staffIds.length
         ? admin.from("profiles").select("id, display_name, email").in("id", staffIds)
@@ -145,10 +145,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const svcMap  = new Map((svcsRes.data  ?? []).map((s: any) => [s.id, s]));
     const staffMap = new Map((staffRes.data ?? []).map((s: any) => [s.id, s]));
     const payByApp = new Map<string, Array<{ status: string; amount: number }>>();
+    const paidAtByApp = new Map<string, string>();
     for (const p of paysRes.data ?? []) {
       const arr = payByApp.get(p.application_id) ?? [];
       arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
       payByApp.set(p.application_id, arr);
+      if (["paid", "success", "successful"].includes(String(p.status)) && (p as any).payment_date) {
+        const prev = paidAtByApp.get(p.application_id);
+        const cur = (p as any).payment_date as string;
+        if (!prev || cur < prev) paidAtByApp.set(p.application_id, cur);
+      }
     }
 
     let rows = appList.map((a) => {
@@ -177,7 +183,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
         stage: computeOrderStage(
-          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: lead?.payment_successful_at },
+          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
           { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
         ),
       };
@@ -216,7 +222,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
 
     const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes] = await Promise.all([
       app.lead_id
-        ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, payment_successful_at, service").eq("id", app.lead_id).maybeSingle()
+        ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
       app.customer_id
         ? admin.from("customers").select("id, customer_code, name, primary_email, primary_mobile").eq("id", app.customer_id).maybeSingle()
@@ -307,6 +313,12 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       stageMeta["order_received"] = { at: app.created_at as string, staff_name: null };
     }
 
+    // Derive paymentSuccessfulAt from the earliest successful payment_date.
+    const paymentSuccessfulAt = payments
+      .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)) && p.payment_date)
+      .map((p: any) => p.payment_date as string)
+      .sort()[0] ?? null;
+
     return {
       application: app,
       lead,
@@ -314,6 +326,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       service: (svcRes as any).data,
       payments,
       paymentStatus,
+      paymentSuccessfulAt,
       total,
       documents: docsRes.data ?? [],
       events: evRes.data ?? [],
