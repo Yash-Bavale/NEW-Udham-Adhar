@@ -30,7 +30,7 @@ export const createPayUOrder = createServerFn({ method: "POST" })
     // 2. Load the lead
     const { data: lead, error: leadErr } = await supabaseAdmin
       .from("leads")
-      .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service")
+      .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2")
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (leadErr) throw new Error(leadErr.message);
@@ -56,7 +56,9 @@ export const createPayUOrder = createServerFn({ method: "POST" })
       .eq("status", "paid")
       .limit(1)
       .maybeSingle();
-    if (paidAlready) {
+    const awaitingConvertedServicePayment =
+      lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+    if (paidAlready && !awaitingConvertedServicePayment) {
       throw new Error("This application has already been paid.");
     }
 
