@@ -155,22 +155,32 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           }
 
           let invoiceAttachment: { filename: string; content_base64: string; content_type: string } | null = null;
+          let invoiceRow: any = null;
           try {
             await generateInvoiceInternal(payment.id);
             const { loadInvoiceAttachmentByPayment } = await import("@/lib/crm/invoices.functions");
             invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
+            const { data: inv } = await supabaseAdmin
+              .from("invoices")
+              .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
+              .eq("payment_id", payment.id)
+              .maybeSingle();
+            invoiceRow = inv;
           } catch (e) { console.error("[ccavenue] invoice generation failed", e); }
 
           try {
             const { data: leadRow } = await supabaseAdmin
               .from("leads")
-              .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+              .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
               .eq("id", payment.lead_id)
               .maybeSingle();
             if (leadRow?.email && leadRow.lead_code) {
               const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
               const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
+              const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+              const total = Number(invoiceRow?.total_amount ?? leadRow.total_amount ?? 0);
+              const issued = invoiceRow?.issued_at ? new Date(invoiceRow.issued_at) : new Date();
               try {
                 await enqueueFromTemplateInternal(
                   "payment_success",
@@ -178,14 +188,24 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                   {
                     name: leadRow.name ?? "",
                     customer_name: leadRow.name ?? "",
+                    customer_email: leadRow.email,
+                    customer_mobile: leadRow.mobile ?? "",
                     lead_code: leadRow.lead_code,
                     order_number: leadRow.lead_code,
                     service: leadRow.service ?? "",
                     service_name: leadRow.service ?? "",
-                    base_amount: Number(leadRow.base_amount ?? 0).toFixed(2),
-                    gst_amount: Number(leadRow.gst_amount ?? 0).toFixed(2),
-                    total_amount: Number(leadRow.total_amount ?? 0).toFixed(2),
-                    amount: Number(leadRow.total_amount ?? 0).toFixed(2),
+                    base_amount: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
+                    gst_amount: Number(invoiceRow?.gst_amount ?? leadRow.gst_amount ?? 0).toFixed(2),
+                    total_amount: total.toFixed(2),
+                    amount: total.toFixed(2),
+                    amount_in_words: amountInWordsINR(total),
+                    invoice_number: invoiceRow?.invoice_number ?? "",
+                    invoice_date: issued.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+                    sac_code: invoiceRow?.sac_code ?? "998311",
+                    place_of_supply: invoiceRow?.place_of_supply ?? "Maharashtra",
+                    cgst_amount: Number(invoiceRow?.cgst_amount ?? 0).toFixed(2),
+                    sgst_amount: Number(invoiceRow?.sgst_amount ?? 0).toFixed(2),
+                    igst_amount: Number(invoiceRow?.igst_amount ?? 0).toFixed(2),
                     onboarding_url: onboardingUrl,
                     support_email: "help@businesshelpservices.com",
                   },
@@ -196,6 +216,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                     attachments: invoiceAttachment ? [invoiceAttachment] : undefined,
                   },
                 );
+
                 await markInvoiceEmailedByPayment(payment.id, {
                   recipient: leadRow.email,
                   template: "payment_success",
