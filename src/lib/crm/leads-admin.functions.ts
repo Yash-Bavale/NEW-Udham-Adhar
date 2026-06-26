@@ -342,12 +342,23 @@ export const getLeadCounts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
-    const { data, error } = await admin.from("leads").select("status");
-    if (error) throw new Error(error.message);
-    const counts: Record<string, number> = { all: data.length };
-    for (const r of data) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    // Paginate beyond PostgREST's 1000-row cap to get true counts per status.
+    const counts: Record<string, number> = { all: 0 };
+    const pageSize = 1000;
+    for (let from = 0; from < 500_000; from += pageSize) {
+      const { data, error } = await admin
+        .from("leads")
+        .select("status")
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message);
+      const rows = data ?? [];
+      counts.all += rows.length;
+      for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
+      if (rows.length < pageSize) break;
+    }
     return { counts };
   });
+
 
 const AddLeadSchema = z.object({
   name: z.string().trim().min(2),
