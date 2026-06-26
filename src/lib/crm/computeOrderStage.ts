@@ -5,6 +5,7 @@ export type OrderStage =
   | "lead_received"
   | "payment_pending"
   | "payment_done"
+  | "consultation_pending"
   | "form_submitted"
   | "under_review"
   | "in_progress"
@@ -47,6 +48,9 @@ export function computeOrderStage(
   }
 
   if (!application) return "payment_done";
+  if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled") {
+    return "consultation_pending";
+  }
   if (!application.form_submitted_at) return "payment_done";
 
   // Employee-side, driven by fulfillment_status
@@ -70,13 +74,14 @@ export const STAGE_META: Record<
   lead_received:     { label: "Lead Received",      short: "Lead",       order: 0, tone: "blue",    side: "customer" },
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
   payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
-  form_submitted:    { label: "Form Submitted",     short: "Form",       order: 3, tone: "indigo",  side: "customer" },
-  under_review:      { label: "Under Review",       short: "Review",     order: 4, tone: "violet",  side: "employee" },
-  in_progress:       { label: "In Progress",        short: "Progress",   order: 5, tone: "violet",  side: "employee" },
-  submitted_to_govt: { label: "Submitted to Govt",  short: "Govt",       order: 6, tone: "indigo",  side: "employee" },
-  under_processing:  { label: "Under Processing",   short: "Processing", order: 7, tone: "violet",  side: "employee" },
-  certificate_ready: { label: "Certificate Ready",  short: "Cert",       order: 8, tone: "emerald", side: "employee" },
-  completed:         { label: "Completed",          short: "Done",       order: 9, tone: "emerald", side: "employee" },
+  consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
+  form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
+  under_review:      { label: "Under Review",       short: "Review",     order: 5, tone: "violet",  side: "employee" },
+  in_progress:       { label: "In Progress",        short: "Progress",   order: 6, tone: "violet",  side: "employee" },
+  submitted_to_govt: { label: "Submitted to Govt",  short: "Govt",       order: 7, tone: "indigo",  side: "employee" },
+  under_processing:  { label: "Under Processing",   short: "Processing", order: 8, tone: "violet",  side: "employee" },
+  certificate_ready: { label: "Certificate Ready",  short: "Cert",       order: 9, tone: "emerald", side: "employee" },
+  completed:         { label: "Completed",          short: "Done",       order: 10, tone: "emerald", side: "employee" },
   uninterested:      { label: "Uninterested",       short: "Uninterested", order: -1, tone: "rose", side: "exception" },
   refund_requested:  { label: "Refund Requested",   short: "Refund Req", order: -1, tone: "rose",   side: "exception" },
   refunded:          { label: "Refunded",           short: "Refunded",   order: -1, tone: "slate",  side: "exception" },
@@ -86,6 +91,7 @@ export const STAGE_META: Record<
 export const JOURNEY_STAGES: OrderStage[] = [
   "lead_received",
   "payment_done",
+  "consultation_pending",
   "form_submitted",
   "under_review",
   "in_progress",
@@ -98,6 +104,7 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   lead_received:     "bg-blue-100 text-blue-800 border-blue-200",
   payment_pending:   "bg-amber-100 text-amber-900 border-amber-200",
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
+  consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
   under_review:      "bg-violet-100 text-violet-800 border-violet-200",
   in_progress:       "bg-violet-100 text-violet-800 border-violet-200",
