@@ -251,6 +251,38 @@ function OrderDetailPage() {
   );
 }
 
+function ConsultationContactStrip({
+  name, mobile, email,
+}: { name: string; mobile: string | null; email: string | null }) {
+  const waPhone = mobile ? String(mobile).replace(/\D/g, "") : "";
+  const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  return (
+    <div className="rounded-xl border bg-white p-4 flex flex-wrap items-center gap-x-5 gap-y-2" style={{ borderColor: "var(--admin-border)" }}>
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Customer</div>
+        <div className="text-sm font-semibold">{name}</div>
+      </div>
+      {mobile && (
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Mobile</div>
+          <div className="text-sm font-mono">{mobile}</div>
+        </div>
+      )}
+      {email && (
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Email</div>
+          <div className="text-sm break-all">{email}</div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1.5 ml-auto">
+        {mobile && <a href={`tel:${mobile}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Call</a>}
+        {waUrl && <a href={waUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100">WhatsApp</a>}
+        {email && <a href={`mailto:${email}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Email</a>}
+      </div>
+    </div>
+  );
+}
+
 function StageSummaryCard({
   stage, timestamps,
 }: { stage: OrderStage; timestamps: Partial<Record<OrderStage, string | null>> }) {
