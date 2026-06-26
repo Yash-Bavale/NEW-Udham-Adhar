@@ -145,21 +145,17 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
 
 
 
-    const leads = leadsRes.data ?? [];
-    const apps = applicationsRes.data ?? [];
-    const complaints = complaintsRes.data ?? [];
-    const payments = paymentsRes.data ?? [];
-    const docs = documentsRes.data ?? [];
-    const activity = activityRes.data ?? [];
+    const activityRows = (activity as any).data ?? [];
     const services = servicesRes.data ?? [];
     const profiles = profilesRes.data ?? [];
     const followups = followupsRes.data ?? [];
     const overdueTasks = tasksRes.data ?? [];
-    const customerNameById = new Map<string, string>(((customersLookupRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
+    const customerNameById = new Map<string, string>((customersLookup as any[]).map((c) => [c.id, c.name]));
 
     const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
     const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
     const leadById = new Map(leads.map((l: any) => [l.id, l]));
+
 
     const inWindow = (createdAt: string, sinceISO: string) => createdAt >= sinceISO;
 
