@@ -115,7 +115,7 @@ export const selectConsultationService = createServerFn({ method: "POST" })
         actor_id: context.userId,
         actor_name: "Staff",
         is_system: false,
-        metadata: { service_id: svc.id, service_name: svc.service_name, payment_url: paymentUrl } as never,
+        metadata: { service_id: svc.id, service_name: svc.service_name, payment_url: paymentUrl, original_lead_source: originalSource } as never,
       } as never);
     }
 
