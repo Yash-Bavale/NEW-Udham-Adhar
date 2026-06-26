@@ -65,7 +65,13 @@ function OrderDetailPage() {
   const { application, lead, customer, service, payments, paymentStatus, paymentSuccessfulAt, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const stage: OrderStage = computeOrderStage({ ...(lead ?? {}), payment_successful_at: paymentSuccessfulAt }, application);
-  const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
+  const selectStep = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
+  const awaitingSecondPayment =
+    !!lead?.id && !!lead?.lead_code &&
+    isConvertedConsultationLead(lead) &&
+    (application as any)?.application_status === "awaiting_payment";
+  const showConsultationPanel = selectStep || awaitingSecondPayment;
+  const consultationMode: "select" | "awaiting_payment" = selectStep ? "select" : "awaiting_payment";
 
   // Default-hide money: only finance/admin roles see rupee figures.
   // Using role.hideMoney() ensures the UI is hidden during role-loading too.
