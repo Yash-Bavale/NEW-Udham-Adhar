@@ -82,13 +82,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "google-site-verification", content: "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY" },
-      { title: "Udyam Aadhar Registration" },
+      { title: "Udyam Registration | MSME Registration Assistance" },
       {
         name: "description",
         content:
           "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance.",
       },
-      { property: "og:title", content: "Udyam Aadhar Registration" },
+      { property: "og:title", content: "Udyam Registration | MSME Registration Assistance" },
       {
         property: "og:description",
         content:
@@ -98,10 +98,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:url", content: "https://udyamadhar.in/" },
       { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Udyam Aadhar Registration" },
-      { name: "twitter:description", content: "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections." },
+      { name: "twitter:title", content: "Udyam Registration | MSME Registration Assistance" },
+      { name: "twitter:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
+      { name: "description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
+      { property: "og:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
