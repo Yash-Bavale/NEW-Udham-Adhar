@@ -42,7 +42,7 @@ function CustomerProfilePage() {
   const navigate = useNavigate();
   const fn = useServerFn(getCustomer360);
   const role = useRole();
-  const hideMoney = role.hasAny(["operations", "support"]) && !role.hasAny(["super_admin", "admin", "accounts", "finance"]);
+  const hideMoney = role.hideMoney();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin.customer360", customerId],
