@@ -37,6 +37,7 @@ export type WorkDocument = {
 export type MyWorkSummary = {
   counters: {
     assignedApps: number;
+    orderReceived: number;
     pendingDocs: number;
     assignedLeads: number;
     unreadNotifications: number;
@@ -46,6 +47,7 @@ export type MyWorkSummary = {
   pendingDocuments: WorkDocument[];
   assignedLeads: WorkLead[];
 };
+
 
 const SLA_HOURS = 48; // app stale after 48h without movement
 
