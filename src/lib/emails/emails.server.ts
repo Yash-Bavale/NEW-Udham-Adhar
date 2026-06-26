@@ -32,6 +32,10 @@ export async function enqueueEmailInternal(input: {
   if (input.attachments && input.attachments.length > 0) {
     variables.__attachments = input.attachments;
   }
+  const scheduled = input.delaySeconds && input.delaySeconds > 0
+    ? new Date(Date.now() + input.delaySeconds * 1000).toISOString()
+    : null;
+
   const row: Record<string, unknown> = {
     template_code: input.templateCode ?? null,
     to_email: input.toEmail.toLowerCase().trim(),
@@ -43,14 +47,28 @@ export async function enqueueEmailInternal(input: {
     lead_id: input.leadId ?? null,
     application_id: input.applicationId ?? null,
   };
-  if (input.delaySeconds && input.delaySeconds > 0) {
-    const when = new Date(Date.now() + input.delaySeconds * 1000).toISOString();
-    row.scheduled_at = when;
-    row.next_attempt_at = when;
+  if (scheduled) {
+    row.scheduled_at = scheduled;
+    row.next_attempt_at = scheduled;
   }
-  const { error } = await supabaseAdmin.from("email_queue").insert(row as never);
+  const { data: inserted, error } = await supabaseAdmin
+    .from("email_queue")
+    .insert(row as never)
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+
+  // Send immediately unless explicitly scheduled for the future.
+  if (!scheduled && inserted?.id) {
+    try {
+      await sendQueueRowById(inserted.id as string);
+    } catch {
+      // Failures are already recorded on the row by sendQueueRowById; the
+      // background processor (if any) will retry per backoff policy.
+    }
+  }
 }
+
 
 /** Enqueue using a template code; pulls subject/body from email_templates. */
 export async function enqueueFromTemplateInternal(
