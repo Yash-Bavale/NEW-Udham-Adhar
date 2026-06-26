@@ -154,12 +154,37 @@ export const deliverCertificate = createServerFn({ method: "POST" })
     }
 
     if (lead?.email && signed?.signedUrl) {
+      // Try to attach the actual file (PDF/JPG/PNG) to the email.
+      let attachment: { filename: string; content_type: string; content_base64: string } | null = null;
+      try {
+        const { data: blob, error: dlErr } = await (await getAdmin()).storage
+          .from("documents")
+          .download(cert.file_path);
+        if (dlErr) throw dlErr;
+        if (blob) {
+          const buf = Buffer.from(await blob.arrayBuffer());
+          if (buf.byteLength <= 9 * 1024 * 1024) {
+            const ext = ((cert as any).file_name?.split(".").pop() || "pdf").toLowerCase();
+            attachment = {
+              filename: `${cert.certificate_number || app?.application_code || "certificate"}.${ext}`,
+              content_type: (cert as any).mime_type || "application/octet-stream",
+              content_base64: buf.toString("base64"),
+            };
+          } else {
+            console.warn("[certificate.deliver] attachment skipped: file >9MB", buf.byteLength);
+          }
+        }
+      } catch (e) {
+        console.warn("[certificate.deliver] attachment skipped: download failed", e);
+      }
+
       const subject = `Your Udyam Certificate is ready — Order ${app?.application_code ?? ""}`;
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
           <h2 style="color:#0f3460">Your certificate is ready</h2>
           <p>Dear ${lead.name},</p>
           <p>Your Udyam Registration certificate has been issued and is ready to download.</p>
+          <p>The certificate is also attached to this email as a file.</p>
           <p style="text-align:center;margin:32px 0">
             <a href="${signed.signedUrl}" style="background:#0f3460;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600">
               Download Certificate
@@ -177,10 +202,14 @@ export const deliverCertificate = createServerFn({ method: "POST" })
         template_code: "certificate-delivered",
         lead_id: lead.id,
         application_id: app?.id ?? null,
-        variables: { certificateId: cert.id },
+        variables: {
+          certificateId: cert.id,
+          ...(attachment ? { __attachments: [attachment] } : {}),
+        },
         created_by: user.id,
       });
     }
+
 
     await writeAudit({
       supabase: context.supabase, entityType: "certificate", entityId: cert.id,
