@@ -162,15 +162,21 @@ function OrderDetailPage() {
             </div>
           )}
 
-          <div id="order-form" className="scroll-mt-32">
-            <FormSubmissionPanel applicationId={application.id} />
-          </div>
+          {/* Talk-to-Expert orders have no onboarding form / fulfillment until staff
+              calls the customer and picks the real service. Hide both panels until then. */}
+          {!showConsultationPanel && (
+            <>
+              <div id="order-form" className="scroll-mt-32">
+                <FormSubmissionPanel applicationId={application.id} />
+              </div>
 
-          <div id="order-fulfillment" className="scroll-mt-32">
-            <FulfillmentStatusUpdater orderId={application.id} current={current} />
-          </div>
+              <div id="order-fulfillment" className="scroll-mt-32">
+                <FulfillmentStatusUpdater orderId={application.id} current={current} />
+              </div>
 
-          <ProcessingChecklist payments={payments} documents={documents} application={application} hideAmount={hideAmount} />
+              <ProcessingChecklist payments={payments} documents={documents} application={application} hideAmount={hideAmount} />
+            </>
+          )}
 
           <div id="order-workflow" className="scroll-mt-32">
             <WorkflowTimelinePanel applicationId={application.id} workflowStatus={(application as any).workflow_status} />
