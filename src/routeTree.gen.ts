@@ -180,7 +180,6 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
-import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
 import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
@@ -1139,11 +1138,6 @@ const SuccessLeadCodeRoute = SuccessLeadCodeRouteImport.update({
   path: '/success/$leadCode',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProcessingLeadCodeRoute = ProcessingLeadCodeRouteImport.update({
-  id: '/processing/$leadCode',
-  path: '/processing/$leadCode',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PaymentLeadCodeRoute = PaymentLeadCodeRouteImport.update({
   id: '/payment/$leadCode',
   path: '/payment/$leadCode',
@@ -1714,7 +1708,6 @@ export interface FileRoutesByFullPath {
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
-  '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
@@ -1954,7 +1947,6 @@ export interface FileRoutesByTo {
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
-  '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
@@ -2198,7 +2190,6 @@ export interface FileRoutesById {
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
-  '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
@@ -2443,7 +2434,6 @@ export interface FileRouteTypes {
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
-    | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/applications/$applicationId'
@@ -2683,7 +2673,6 @@ export interface FileRouteTypes {
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
-    | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin'
     | '/admin/applications/$applicationId'
@@ -2926,7 +2915,6 @@ export interface FileRouteTypes {
     | '/payment-failed/$leadCode'
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
-    | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
     | '/admin/applications/$applicationId'
@@ -3138,7 +3126,6 @@ export interface RootRouteChildren {
   PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
-  ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
@@ -4361,13 +4348,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuccessLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/processing/$leadCode': {
-      id: '/processing/$leadCode'
-      path: '/processing/$leadCode'
-      fullPath: '/processing/$leadCode'
-      preLoaderRoute: typeof ProcessingLeadCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/payment/$leadCode': {
       id: '/payment/$leadCode'
       path: '/payment/$leadCode'
@@ -5219,7 +5199,6 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
-  ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
