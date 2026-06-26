@@ -1,52 +1,41 @@
-## Flow (as I understand it)
+## Homepage SEO Fixes
 
-1. **Customer pays for "Talk to Expert"** → order lands in admin as a consultation.
-2. **Staff calls customer**, discusses, then on the order page **selects the next service** they actually need.
-3. On Save, the system computes pricing and **mints a payment link**, but does NOT auto-email yet. Instead the panel reveals two buttons:
-   - **Send Payment Link** (emails + WhatsApp-ready text to customer)
-   - **Copy Payment Link** (copies URL to clipboard for manual share)
-   Staff can re-send / re-copy as many times as needed.
-4. **Order stays in "Awaiting 2nd Payment" stage** — no onboarding form is shown to the customer, no form-submission panel in admin.
-5. **Customer pays the 2nd payment** (webhook flips status).
-6. **Only then** does the system:
-   - Show the onboarding form link to the customer (success page + email).
-   - Reveal the **FormSubmissionPanel** and **"Share Form Link / Copy Form Link"** buttons to staff inside the order workspace.
-   - Resume the normal fulfillment workflow (documents → verification → completed).
+Targeted, minimal-scope changes to `src/routes/index.tsx` (and one Header tweak). No business logic, no styling overhaul beyond what's needed.
 
-## What changes
+### 1. SEO title + meta (route `head()`)
+Replace current title/og:title with keyword-led copy:
+- **Title:** `Udyam Registration Online — Apply, Update & Download MSME Certificate`
+- **Meta description:** `Udyam (MSME) registration consultancy: apply for new Udyam certificate, update details, download Udyam/Udyog Aadhaar certificate. Pan-India assistance.`
+- Mirror into `og:title` / `og:description`.
 
-### `src/lib/crm/talk-to-expert.functions.ts`
-- Split `convertConsultationLead` into two calls:
-  - `selectConsultationService({ leadId, serviceId })` — updates lead with new service + pricing, sets `applications.application_status = 'awaiting_payment'`, voids old pending links, mints fresh `payment_links` row. **Does NOT send email.** Returns `{ paymentUrl, txnid, amount }`.
-  - `sendConsultationPaymentLink({ leadId })` — sends the `consultation_service_converted` email using the currently active pending link. Idempotent — staff can click multiple times (rate-limit at ~1/min in UI).
-- Keep activity-log + workflow_events entries for both actions separately ("service_selected", "payment_link_sent").
+### 2. Visible H1 with primary keyword (above the fold)
+Currently the only H1 is `sr-only`; the visually prominent line is Hindi inside `Header.tsx`.
+- Promote the homepage H1 to a real visible heading rendered at the very top of `HomePage()`, above the form section:
+  - H1 text: **"Udyam Registration Online — Apply, Update & Download MSME Certificate"**
+  - Short sub-line: "Consultancy & assistance for Udyam / MSME / Udyog Aadhaar across India."
+- Demote the Hindi line in `Header.tsx` from `<h2>` / large `div` heading to a plain `<p>` (keeps visual, removes heading-rank confusion). No other header changes.
 
-### `src/components/admin/ConvertConsultationPanel.tsx`
-Rewrite as a 2-step panel:
-- **Step A (no service selected yet):** service dropdown + "Save Service" button.
-- **Step B (service selected, awaiting payment):** read-only service name + price summary (staff-visible only), masked payment URL, and three buttons:
-  - **Send Payment Link** (calls `sendConsultationPaymentLink`)
-  - **Copy Link** (clipboard copy)
-  - **Change Service** (reverts to Step A, voids current link)
-- Poll `getPaymentLinkStatusForLead` every 15 s; when `paid: true`, panel collapses with a success state and triggers `qc.invalidateQueries(['admin.order'])` so the rest of the workspace re-renders into the normal flow.
+### 3. FAQ answers crawlable in HTML
+Radix `Accordion` only mounts `AccordionContent` when open, so answers are absent from SSR HTML.
+- Keep the interactive Accordion visually unchanged, but ALSO render a hidden, SSR-present `<div className="sr-only">` block right after the Accordion containing every Q&A pair as `<h3>` + `<p>`. This guarantees Google and AI crawlers see the full answers without changing UX.
+- (FAQPage JSON-LD already includes answers — keep as is.)
 
-### `src/routes/admin.orders.$orderId.tsx`
-Current logic already hides `FormSubmissionPanel` + `FulfillmentStatusUpdater` while the lead is an unconverted consultation. Extend that check to also hide them while the lead is **converted but the 2nd payment is still pending** (`application_status === 'awaiting_payment'` AND no successful payment for the new service). Re-show them only after 2nd payment success.
+### 4. Original body content + E-E-A-T signals
+Add two compact text sections between the form and the FAQ (semantic `<section>` with `<h2>`s, ~150–200 words each, no new components, plain Tailwind):
+- **"About Udyam Registration"** — what it is, who needs it, benefits (subsidies, collateral-free loans, tender preference), free of cost on the government portal, our role as a private consultancy.
+- **"Why choose our consultancy"** — experience handling MSME filings pan-India, dedicated support, secure document handling, transparent pricing, post-issuance assistance. Include a small trust strip (years assisting, applications processed, languages supported) as plain text — no fabricated certifications.
+- Add a clear disclaimer line: "We are a private consultancy and not affiliated with the Government of India or the Ministry of MSME. Udyam registration is available free of cost on the official portal udyamregistration.gov.in."
 
-### `src/components/admin/StageActionsPanel.tsx` / `computeOrderStage.ts`
-Add stage label "Awaiting 2nd payment" between `consultation_pending` and `payment_done` for converted consultation orders. Tone: amber.
+### 5. Extra schema
+Already present: Organization, LocalBusiness, Service, FAQPage. Add:
+- `BreadcrumbList` (Home).
+- `WebSite` with `potentialAction` SearchAction pointed at `/faqs` (lightweight, helps AI crawlers).
 
-### Customer-facing
-- The `/payment/$leadCode` route already re-initiates a fresh PayU/CCAvenue order on open — no change needed; the relaxed `paidAlready` check for converted consultations is already in place.
-- Onboarding form email (`onboarding_form_link` template) is already triggered by the payment webhook on success — works as-is for the 2nd payment because the webhook fires the same path.
+### Out of scope
+- No changes to the form, certificate image, India map, footer, or any other route.
+- No design system, color, or component-library changes.
+- No copy changes to FAQ questions/answers themselves — only making them SSR-visible.
 
-## What stays the same
-- Pricing/amount stays hidden from non-finance staff (existing `canSeeMoney` gating).
-- Customer contact strip + side profile stay visible.
-- No DB schema changes — uses existing `payment_links`, `applications.application_status`, `workflow_events`.
-
-## Out of scope
-- WhatsApp deep-link button (can add later if you want a `wa.me/<mobile>?text=...` shortcut next to Copy).
-- SMS sending — only email + manual copy for now.
-
-Confirm and I'll build it.
+### Files touched
+- `src/routes/index.tsx` — title/meta, visible H1, SSR FAQ mirror, two new content sections, extra JSON-LD entries.
+- `src/components/site/Header.tsx` — change the Hindi `<h2>`/heading element to `<p>` (both mobile + desktop blocks). Visual styling preserved.

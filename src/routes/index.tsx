@@ -17,17 +17,17 @@ import mapImg from "@/assets/india-map.svg.asset.json";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Business Help Services — Apply, Update, Download" },
+      { title: "Udyam Registration Online — Apply, Update & Download MSME Certificate" },
       {
         name: "description",
         content:
-          "Get expert consultancy for Udyam/MSME registration, certificate updates, downloads, and Udyog Aadhaar migration across India.",
+          "Udyam (MSME) registration consultancy: apply for new Udyam certificate, update details, download Udyam / Udyog Aadhaar certificate. Pan-India assistance.",
       },
-      { property: "og:title", content: "Business Help Services — Apply, Update, Download" },
+      { property: "og:title", content: "Udyam Registration Online — Apply, Update & Download MSME Certificate" },
       {
         property: "og:description",
         content:
-          "Expert consultancy assistance for Udyam/MSME registration, certificate updates, downloads and migration.",
+          "Udyam (MSME) registration consultancy: new registration, certificate updates, downloads and Udyog Aadhaar migration. Trusted assistance across India.",
       },
       { property: "og:url", content: "https://udyamadhar.in/" },
     ],
@@ -119,6 +119,28 @@ export const Route = createFileRoute("/")({
                 acceptedAnswer: { "@type": "Answer", text: f.a },
               })),
             },
+            {
+              "@type": "WebSite",
+              "@id": "https://udyamadhar.in/#website",
+              url: "https://udyamadhar.in/",
+              name: "Udyam Registration Consultancy & Assistance Services",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: "https://udyamadhar.in/faqs?q={search_term_string}",
+                "query-input": "required name=search_term_string",
+              },
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                {
+                  "@type": "ListItem",
+                  position: 1,
+                  name: "Home",
+                  item: "https://udyamadhar.in/",
+                },
+              ],
+            },
           ],
         }),
       },
@@ -192,7 +214,16 @@ function HomePage() {
   }, []);
   return (
     <>
-      <h1 className="sr-only">Udyam Registration Consultancy & Assistance Services</h1>
+      {/* SEO H1 — visible above the fold */}
+      <section className="mx-auto max-w-7xl px-4 pt-6 md:pt-8">
+        <h1 className="text-2xl md:text-4xl font-extrabold font-display text-brand-navy leading-tight">
+          Udyam Registration Online — Apply, Update &amp; Download MSME Certificate
+        </h1>
+        <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-3xl">
+          Private consultancy &amp; assistance for new Udyam (MSME) registration, certificate updates,
+          downloads and Udyog Aadhaar to Udyam migration — pan-India support in English &amp; Hindi.
+        </p>
+      </section>
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm />
@@ -212,6 +243,77 @@ function HomePage() {
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Note: Sample Udyam Certificate shown for reference purposes only.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* About Udyam Registration */}
+      <section className="mx-auto max-w-5xl px-4 py-8 md:py-12">
+        <h2 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+          About Udyam Registration
+        </h2>
+        <div className="mt-4 space-y-3 text-sm md:text-base leading-relaxed text-foreground/85">
+          <p>
+            Udyam Registration is the official recognition issued by the Ministry of Micro, Small &amp; Medium
+            Enterprises (MSME), Government of India, that classifies a business as a Micro, Small or Medium
+            Enterprise based on investment and annual turnover. It replaced the earlier Udyog Aadhaar Memorandum
+            (UAM) system and is the single identifier that lenders, government departments, and procurement
+            portals use to verify a business as an MSME.
+          </p>
+          <p>
+            A valid Udyam certificate helps eligible businesses access benefits such as collateral-free MSME
+            loans under CGTMSE, priority sector lending, interest subvention, protection against delayed
+            payments under the MSMED Act, preference in government tenders (GeM), subsidies on patent and
+            trademark fees, and easier participation in state &amp; central MSME schemes. Proprietors, partnerships,
+            LLPs, private limited companies, traders, manufacturers and service providers are all eligible
+            subject to the prescribed investment and turnover limits.
+          </p>
+          <p>
+            <strong>Disclaimer:</strong> We are a private consultancy and are not affiliated with the
+            Government of India or the Ministry of MSME. Udyam Registration is available free of cost on the
+            official portal <span className="underline">udyamregistration.gov.in</span>. Our paid service
+            covers form preparation, document review, error-handling, follow-ups and post-issuance support.
+          </p>
+        </div>
+      </section>
+
+      {/* Why choose us */}
+      <section className="bg-brand-navy/5">
+        <div className="mx-auto max-w-5xl px-4 py-8 md:py-12">
+          <h2 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+            Why choose our Udyam consultancy
+          </h2>
+          <div className="mt-4 space-y-3 text-sm md:text-base leading-relaxed text-foreground/85">
+            <p>
+              Our team has assisted thousands of MSMEs across India with new Udyam registration, certificate
+              updates (name, address, mobile, email, NIC code, bank details), Udyog Aadhaar to Udyam migration,
+              and re-downloads of lost certificates. Every application is handled by a trained operator,
+              cross-checked before submission, and tracked end-to-end so customers are not left guessing.
+            </p>
+            <p>
+              We offer transparent fixed pricing, GST tax invoices, support in English and Hindi, secure
+              handling of Aadhaar and PAN information, and email + WhatsApp updates at every stage. Post-issuance
+              assistance is included — if a correction is needed after the certificate is generated, our team
+              guides the customer through the right process.
+            </p>
+            <ul className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 text-center">
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">Pan-India</div>
+                <div className="text-xs text-muted-foreground">All 28 states &amp; UTs</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">English + Hindi</div>
+                <div className="text-xs text-muted-foreground">Bilingual support</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">GST Invoice</div>
+                <div className="text-xs text-muted-foreground">Tax invoice on every order</div>
+              </li>
+              <li className="rounded-lg border border-border bg-card p-3">
+                <div className="text-lg font-bold text-brand-navy">Secure</div>
+                <div className="text-xs text-muted-foreground">Encrypted document handling</div>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
@@ -241,6 +343,16 @@ function HomePage() {
             </AccordionItem>
           ))}
         </Accordion>
+
+        {/* SSR-visible FAQ mirror for crawlers — Radix Accordion does not render closed panels in HTML */}
+        <div className="sr-only" aria-hidden="true">
+          {FAQS.map((f, i) => (
+            <div key={`faq-ssr-${i}`}>
+              <h3>{f.q.replace(/^\d+\.\s*/, "")}</h3>
+              <p>{f.a}</p>
+            </div>
+          ))}
+        </div>
 
         <div className="mt-8 flex flex-col items-center gap-3 text-center">
           <Button
