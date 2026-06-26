@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useEffect, useState } from "react";
-import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight } from "lucide-react";
+import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight, PackageOpen } from "lucide-react";
 import { getMyWorkSummary, type MyWorkSummary } from "@/lib/crm/my-work.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,7 @@ function MyWorkPage() {
   const cards = useMemo(
     () => [
       { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)" },
+      { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316" },
       { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)" },
       { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)" },
       { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)" },
@@ -43,6 +44,7 @@ function MyWorkPage() {
     ],
     [counters],
   );
+
 
   return (
     <div className="space-y-6">
@@ -55,7 +57,7 @@ function MyWorkPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {cards.map((c) => (
           <div
             key={c.label}
@@ -77,31 +79,55 @@ function MyWorkPage() {
 
       <Section
         title="Next-best actions"
-        subtitle="Your assigned applications, oldest first"
+        subtitle="Order Received items shown first — these are ready to work on now"
         empty="No assigned applications — you're clear."
         href="/admin/applications"
       >
-        {(data?.assignedApplications ?? []).slice(0, 8).map((a) => (
-          <Link
-            key={a.id}
-            to="/admin/applications/$applicationId"
-            params={{ applicationId: a.id }}
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
-          >
-            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
-              {a.application_code ?? a.id.slice(0, 8)}
-            </code>
-            <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>
-              {a.lead?.name ?? "Unknown"}
-            </span>
-            <StatusPill status={a.application_status} />
-            <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-              {formatRelative(a.updated_at)}
-            </span>
-            <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
-          </Link>
-        ))}
+        {[...(data?.assignedApplications ?? [])]
+          .sort((a, b) => {
+            const aFresh = a.fulfillment_status === "order_received" ? 0 : 1;
+            const bFresh = b.fulfillment_status === "order_received" ? 0 : 1;
+            return aFresh - bFresh;
+          })
+          .slice(0, 12)
+          .map((a) => {
+            const fresh = a.fulfillment_status === "order_received";
+            return (
+              <Link
+                key={a.id}
+                to="/admin/applications/$applicationId"
+                params={{ applicationId: a.id }}
+                className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm border"
+                style={
+                  fresh
+                    ? { background: "rgba(249, 115, 22, 0.10)", borderColor: "rgba(249, 115, 22, 0.45)" }
+                    : { borderColor: "transparent" }
+                }
+              >
+                {fresh && (
+                  <span
+                    className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                    style={{ background: "#F97316", color: "white" }}
+                  >
+                    Act now
+                  </span>
+                )}
+                <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
+                  {a.application_code ?? a.id.slice(0, 8)}
+                </code>
+                <span className="font-medium truncate flex-1" style={{ color: fresh ? "#F97316" : "var(--admin-fg)" }}>
+                  {a.lead?.name ?? "Unknown"}
+                </span>
+                <StatusPill status={a.fulfillment_status ?? a.application_status} fresh={fresh} />
+                <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                  {formatRelative(a.updated_at)}
+                </span>
+                <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
+              </Link>
+            );
+          })}
       </Section>
+
 
       <Section
         title="Documents pending review"
@@ -185,16 +211,21 @@ function Section({
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status, fresh }: { status: string; fresh?: boolean }) {
   return (
     <span
       className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border"
-      style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)", background: "var(--admin-surface-2)" }}
+      style={
+        fresh
+          ? { borderColor: "rgba(249,115,22,0.5)", color: "#F97316", background: "rgba(249,115,22,0.10)" }
+          : { borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)", background: "var(--admin-surface-2)" }
+      }
     >
       {status.replace(/_/g, " ")}
     </span>
   );
 }
+
 
 function formatRelative(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();

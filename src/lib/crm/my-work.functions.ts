@@ -5,12 +5,14 @@ export type WorkApplication = {
   id: string;
   application_code: string | null;
   application_status: string;
+  fulfillment_status: string | null;
   form_status: string;
   document_status: string;
   created_at: string;
   updated_at: string;
   lead: { id: string; name: string; email: string; mobile: string; service: string } | null;
 };
+
 
 export type WorkLead = {
   id: string;
@@ -35,6 +37,7 @@ export type WorkDocument = {
 export type MyWorkSummary = {
   counters: {
     assignedApps: number;
+    orderReceived: number;
     pendingDocs: number;
     assignedLeads: number;
     unreadNotifications: number;
@@ -44,6 +47,7 @@ export type MyWorkSummary = {
   pendingDocuments: WorkDocument[];
   assignedLeads: WorkLead[];
 };
+
 
 const SLA_HOURS = 48; // app stale after 48h without movement
 
@@ -56,11 +60,12 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
       supabase
         .from("applications")
         .select(
-          "id, application_code, application_status, form_status, document_status, created_at, updated_at, lead:leads!fk_applications_lead(id, name, email, mobile, service)"
+          "id, application_code, application_status, fulfillment_status, form_status, document_status, created_at, updated_at, lead:leads!fk_applications_lead(id, name, email, mobile, service)"
         )
         .eq("assigned_to", userId)
         .order("updated_at", { ascending: true })
-        .limit(50),
+        .limit(100),
+
       supabase
         .from("documents")
         .select("id, doc_type, file_name, uploaded_at, lead_id, application_id")
@@ -98,6 +103,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     return {
       counters: {
         assignedApps: apps.length,
+        orderReceived: apps.filter((a) => a.fulfillment_status === "order_received").length,
         pendingDocs: docs.length,
         assignedLeads: leads.length,
         unreadNotifications: notifRes.count ?? 0,
@@ -108,3 +114,4 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
       assignedLeads: leads,
     };
   });
+

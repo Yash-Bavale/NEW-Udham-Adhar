@@ -61,6 +61,22 @@ function daysAgo(n: number) {
   return x;
 }
 
+// Paginate beyond PostgREST's 1000-row cap.
+async function fetchAll<T = any>(builder: any, pageSize = 1000): Promise<T[]> {
+  const out: T[] = [];
+  let from = 0;
+  // hard cap to avoid runaway loops
+  for (let i = 0; i < 200; i++) {
+    const { data, error } = await builder.range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 export const getOpsDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OpsDashboardData> => {
@@ -80,62 +96,66 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       roles.has("admin") || roles.has("super_admin") || roles.has("manager");
     const canViewFinance = isPrivileged || roles.has("finance") || roles.has("accounts");
 
-    const leadsQ = supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id, assigned_to").order("created_at", { ascending: false }).limit(5000);
-    const appsQ = supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false }).limit(5000);
+    const makeLeadsQ = () => {
+      const q = supabase.from("leads").select("id, status, created_at, service, name, mobile, email, customer_id, assigned_to").order("created_at", { ascending: false });
+      if (!isPrivileged) (q as any).eq("assigned_to", userId);
+      return q;
+    };
+    const makeAppsQ = () => {
+      const q = supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false });
+      if (!isPrivileged) (q as any).eq("assigned_to", userId);
+      return q;
+    };
     const followupsQ = supabase.from("follow_ups").select("id, customer_id, lead_id, application_id, scheduled_at, reason, assigned_to, is_completed").eq("is_completed", false).gte("scheduled_at", startOfDay().toISOString()).lt("scheduled_at", daysAgo(-1).toISOString()).order("scheduled_at", { ascending: true }).limit(50);
     const tasksQ = supabase.from("tasks").select("id, due_date, is_completed, assigned_to").eq("is_completed", false).lt("due_date", new Date().toISOString()).limit(500);
 
     if (!isPrivileged) {
-      (leadsQ as any).eq("assigned_to", userId);
-      (appsQ as any).eq("assigned_to", userId);
       (followupsQ as any).eq("assigned_to", userId);
       (tasksQ as any).eq("assigned_to", userId);
     }
 
     const [
-      leadsRes,
-      applicationsRes,
-      complaintsRes,
-      paymentsRes,
-      documentsRes,
-      activityRes,
+      leads,
+      apps,
+      complaints,
+      payments,
+      docs,
+      activity,
       servicesRes,
       profilesRes,
       followupsRes,
       tasksRes,
-      customersLookupRes,
+      customersLookup,
       gatewaysRes,
     ] = await Promise.all([
-      leadsQ,
-      appsQ,
-      supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at, updated_at").order("created_at", { ascending: false }).limit(2000),
-      supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason, application_id, lead_id, parent_payment_id").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false }).limit(5000),
+      fetchAll<any>(makeLeadsQ()),
+      fetchAll<any>(makeAppsQ()),
+      fetchAll<any>(supabase.from("complaints").select("id, complaint_number, status, category, customer_id, lead_id, created_at, resolved_at, last_reminded_at, sla_due_at, updated_at").order("created_at", { ascending: false })),
+      fetchAll<any>(supabase.from("payments").select("id, amount, status, gateway_name, payment_date, created_at, refund_reason, application_id, lead_id, parent_payment_id").order("created_at", { ascending: false })),
+      fetchAll<any>(supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false })),
       supabase.from("application_events").select("id, event_type, old_value, new_value, staff_name, created_at, application_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("services").select("id, service_name, service_code, is_active"),
       supabase.from("profiles").select("id, display_name, email"),
       followupsQ,
       tasksQ,
-      supabase.from("customers").select("id, name").limit(5000),
+      fetchAll<any>(supabase.from("customers").select("id, name")),
       supabase.from("payment_gateways").select("name, mode"),
     ]);
 
 
-    const leads = leadsRes.data ?? [];
-    const apps = applicationsRes.data ?? [];
-    const complaints = complaintsRes.data ?? [];
-    const payments = paymentsRes.data ?? [];
-    const docs = documentsRes.data ?? [];
-    const activity = activityRes.data ?? [];
+
+
+    const activityRows = (activity as any).data ?? [];
     const services = servicesRes.data ?? [];
     const profiles = profilesRes.data ?? [];
     const followups = followupsRes.data ?? [];
     const overdueTasks = tasksRes.data ?? [];
-    const customerNameById = new Map<string, string>(((customersLookupRes.data ?? []) as any[]).map((c) => [c.id, c.name]));
+    const customerNameById = new Map<string, string>((customersLookup as any[]).map((c) => [c.id, c.name]));
 
     const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
     const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
     const leadById = new Map(leads.map((l: any) => [l.id, l]));
+
 
     const inWindow = (createdAt: string, sinceISO: string) => createdAt >= sinceISO;
 
@@ -374,7 +394,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     })).sort((a, b) => b.handled - a.handled).slice(0, 8);
 
     // Recent activity — from application_events
-    const recentActivity = activity.map((a: any) => ({
+    const recentActivity = (activityRows as any[]).map((a: any) => ({
       id: a.id,
       created_at: a.created_at,
       event_type: a.event_type,

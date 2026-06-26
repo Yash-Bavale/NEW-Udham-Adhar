@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, UserCircle2, ShoppingBag, FileText, MessageSquareWarning,
   Briefcase, Receipt, CreditCard, LifeBuoy, ListChecks, BarChart3, UserCog,
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
-  Inbox, GitBranch, Activity, FileCheck2, ClipboardList, Eye, Award,
+  Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
   Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +45,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-      { to: "/admin/pipeline", label: "Pipeline", icon: GitBranch, module: "leads", requireAnyRole: OPS_ROLES },
+      
       { to: "/admin/activity", label: "Activity", icon: Activity },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
     ],
