@@ -221,21 +221,19 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
         </SectionCard>
 
         <SectionCard
-          title={
-            <div className="flex items-center gap-2">
-              <span>Submissions ({data.leads.length})</span>
-              {data.leads.length > 1 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                  REPEAT CUSTOMER · {data.leads.length} forms
-                </span>
-              )}
-            </div>
+          title={`Submissions (${data.leads.length})`}
+          action={
+            data.leads.length > 1 ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                REPEAT CUSTOMER · {data.leads.length} forms
+              </span>
+            ) : undefined
           }
         >
           {data.leads.length === 0 ? (
             <Empty label="No leads linked" />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 p-3">
               {data.leads.map((l: any) => (
                 <ExpandableLeadRow key={l.id} lead={l} hideMoney={hideMoney} />
               ))}
