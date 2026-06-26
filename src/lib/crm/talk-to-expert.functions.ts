@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertRole } from "@/lib/audit";
+import { isTalkToExpertLead, isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 const STAFF_ROLES = [
   "super_admin", "admin", "manager", "executive",
@@ -42,10 +43,10 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       .maybeSingle();
     if (leadErr) throw new Error(leadErr.message);
     if (!lead) throw new Error("Lead not found");
-    if (lead.lead_source !== "talk_to_expert") {
+    if (!isTalkToExpertLead(lead)) {
       throw new Error("This lead is not a Talk-to-Expert consultation.");
     }
-    if (lead.service && lead.service !== "Expert Consultation") {
+    if (!isUnconvertedConsultationLead(lead)) {
       throw new Error("Lead has already been converted to a service.");
     }
 
@@ -70,10 +71,47 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
         base_amount: base,
         gst_amount: gst,
         total_amount: total,
+        status: "payment_pending",
         lead_status_v2: "payment_pending",
       } as never)
       .eq("id", lead.id);
     if (updErr) throw new Error(updErr.message);
+
+    // Keep the paid consultation order visible, but make it point at the newly
+    // selected service and wait for the second payment before normal fulfillment.
+    const { data: app } = await supabaseAdmin
+      .from("applications")
+      .select("id")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (app?.id) {
+      await supabaseAdmin
+        .from("applications")
+        .update({
+          service_id: svc.id,
+          application_status: "awaiting_payment",
+          workflow_status: "waiting_for_customer",
+          workflow_priority: "high",
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", app.id);
+
+      await supabaseAdmin.from("workflow_events").insert({
+        application_id: app.id,
+        lead_id: lead.id,
+        event_type: "consultation_converted",
+        title: "Consultation converted to service",
+        description: `Customer requirement confirmed. New service selected: ${svc.service_name}. Payment link sent automatically.`,
+        customer_visible: false,
+        actor_id: context.userId,
+        actor_name: "Staff",
+        is_system: false,
+        metadata: { service_id: svc.id, service_name: svc.service_name, payment_url: paymentUrl } as never,
+      } as never);
+    }
 
     // 2. Activity log
     await supabaseAdmin.from("activity_logs").insert({
