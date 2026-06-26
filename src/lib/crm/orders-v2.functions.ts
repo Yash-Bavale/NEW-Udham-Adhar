@@ -492,11 +492,34 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       const serviceName = service?.service_name || lead?.service || "Service";
 
       let certificateUrl: string | null = null;
+      let certAttachment: { filename: string; content_type: string; content_base64: string } | null = null;
       if (certDoc?.file_path) {
         const { data: signed } = await admin.storage
           .from("documents")
           .createSignedUrl(certDoc.file_path, 60 * 60 * 24 * 7);
         certificateUrl = signed?.signedUrl ?? null;
+
+        try {
+          const { data: blob, error: dlErr } = await admin.storage
+            .from("documents")
+            .download(certDoc.file_path);
+          if (dlErr) throw dlErr;
+          if (blob) {
+            const buf = Buffer.from(await blob.arrayBuffer());
+            if (buf.byteLength <= 9 * 1024 * 1024) {
+              const ext = (certDoc.file_name?.split(".").pop() || "pdf").toLowerCase();
+              certAttachment = {
+                filename: `${certNumber || app.application_code || "certificate"}.${ext}`,
+                content_type: certDoc.mime_type || "application/octet-stream",
+                content_base64: buf.toString("base64"),
+              };
+            } else {
+              console.warn("[certificate] attachment skipped: file >9MB", buf.byteLength);
+            }
+          }
+        } catch (e) {
+          console.warn("[certificate] attachment skipped: download failed", e);
+        }
       }
 
       if (recipientEmail && certificateUrl) {
@@ -522,10 +545,12 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
             certificate_url: certificateUrl,
             completion_notes: completionNotes ?? "",
             order_code: app.application_code ?? "",
+            ...(certAttachment ? { __attachments: [certAttachment] } : {}),
           },
           created_by: context.userId,
         } as never);
       }
+
 
       await admin.from("application_events").insert({
         application_id: data.orderId,
