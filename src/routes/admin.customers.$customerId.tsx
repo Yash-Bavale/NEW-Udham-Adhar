@@ -220,27 +220,24 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
           </dl>
         </SectionCard>
 
-        <SectionCard title="Linked leads">
+        <SectionCard
+          title={
+            <div className="flex items-center gap-2">
+              <span>Submissions ({data.leads.length})</span>
+              {data.leads.length > 1 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  REPEAT CUSTOMER · {data.leads.length} forms
+                </span>
+              )}
+            </div>
+          }
+        >
           {data.leads.length === 0 ? (
             <Empty label="No leads linked" />
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {data.leads.map((l: any) => (
-                <Link
-                  key={l.id}
-                  to="/admin/leads/$leadId"
-                  params={{ leadId: l.id }}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-[var(--admin-surface-2)]"
-                  style={{ borderColor: "var(--admin-border)" }}
-                >
-                  <div>
-                    <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
-                    <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                      {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
-                    </div>
-                  </div>
-                  <StatusBadge status={l.status} />
-                </Link>
+                <ExpandableLeadRow key={l.id} lead={l} hideMoney={hideMoney} />
               ))}
             </div>
           )}
