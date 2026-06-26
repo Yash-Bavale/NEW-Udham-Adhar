@@ -207,6 +207,9 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                     sgst_amount: Number(invoiceRow?.sgst_amount ?? 0).toFixed(2),
                     igst_amount: Number(invoiceRow?.igst_amount ?? 0).toFixed(2),
                     onboarding_url: onboardingUrl,
+                    form_link: onboardingUrl,
+                    transaction_id: trackingId || orderId || payment.transaction_id || payment.id,
+                    payment_datetime: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST",
                     support_email: "help@businesshelpservices.com",
                   },
                   {
