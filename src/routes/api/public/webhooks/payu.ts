@@ -290,7 +290,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   igst_amount: Number(invoiceRow?.igst_amount ?? 0).toFixed(2),
                   form_link: onboardingUrl,
                   onboarding_url: onboardingUrl,
-                  transaction_id: mihpayid || fields.txnid |||| payment.id,
+                  transaction_id: mihpayid || fields.txnid || payment.id,
                   payment_datetime: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST",
                   support_email: "help@businesshelpservices.com",
                 };
