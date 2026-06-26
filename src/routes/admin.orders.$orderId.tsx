@@ -62,7 +62,7 @@ function OrderDetailPage() {
   }
   if (!data) return null;
 
-  const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = data as any;
+  const { application, lead, customer, service, payments, paymentStatus, paymentSuccessfulAt, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const stage: OrderStage = computeOrderStage(lead, application);
   const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
