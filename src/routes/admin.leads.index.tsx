@@ -376,7 +376,27 @@ function LeadsPage() {
                           {l.lead_code}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 font-medium">{l.name}</td>
+                      <td className="px-4 py-2.5 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <span>{l.name}</span>
+                          {l.is_duplicate && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                              title="Same mobile/email submitted again — original lead exists"
+                            >
+                              REPEAT
+                            </span>
+                          )}
+                          {(l.duplicate_count ?? 0) > 0 && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"
+                              title={`Customer resubmitted ${l.duplicate_count} more time(s) after this lead`}
+                            >
+                              ×{(l.duplicate_count ?? 0) + 1}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 text-xs">{l.mobile || "—"}</td>
                       <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
                       <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
