@@ -109,7 +109,7 @@ export function TrustBlock() {
             className="bg-brand-navy text-white hover:bg-brand-navy-deep shadow-sm"
           >
             <Link to="/faqs">
-              Read More <ArrowRight className="ml-2 h-4 w-4" />
+              Read all MSME registration FAQs <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </div>
