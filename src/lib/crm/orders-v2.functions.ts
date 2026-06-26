@@ -215,7 +215,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
 
     const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes] = await Promise.all([
       app.lead_id
-        ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, service").eq("id", app.lead_id).maybeSingle()
+        ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, payment_successful_at, service").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
       app.customer_id
         ? admin.from("customers").select("id, customer_code, name, primary_email, primary_mobile").eq("id", app.customer_id).maybeSingle()
