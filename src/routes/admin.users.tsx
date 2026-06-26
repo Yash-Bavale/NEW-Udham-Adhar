@@ -1,10 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listStaffUsers, grantRole, revokeRole } from "@/lib/crm/users-admin.functions";
 import { STAFF_ROLES } from "@/lib/crm/types";
+import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/admin/users")({ component: UsersPage });
+export const Route = createFileRoute("/admin/users")({
+  beforeLoad: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/admin-login" });
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["admin", "super_admin"]);
+    if (!data || data.length === 0) throw redirect({ to: "/admin/my-work" });
+  },
+  component: UsersPage,
+});
 
 function UsersPage() {
   const listFn = useServerFn(listStaffUsers);
