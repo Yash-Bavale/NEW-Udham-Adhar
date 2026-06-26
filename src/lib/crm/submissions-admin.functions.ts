@@ -291,6 +291,83 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
     };
   });
 
+export const getFormSubmissionForLead = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ leadId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (!roles || roles.length === 0) throw new Error("Forbidden");
+
+    const supabase = supabaseAdmin;
+
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("id, lead_code, name, email, mobile, service, service_id, created_at")
+      .eq("id", data.leadId)
+      .maybeSingle();
+    if (leadErr) throw new Error(leadErr.message);
+    if (!lead) return null;
+
+    const [{ data: submission }, { data: docs }, { data: service }] = await Promise.all([
+      supabase
+        .from("onboarding_submissions")
+        .select("id, service_code, form_data, status, submitted_at, updated_at")
+        .eq("lead_id", lead.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("documents")
+        .select("id, doc_type, file_name, file_path, mime_type, size_bytes, status, remarks, uploaded_at")
+        .eq("lead_id", lead.id)
+        .order("uploaded_at", { ascending: false }),
+      (lead as any).service_id
+        ? supabase
+            .from("services")
+            .select("id, service_code, service_name")
+            .eq("id", (lead as any).service_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const serviceCode = submission?.service_code ?? (service as any)?.service_code ?? null;
+
+    let requiredDocs: Array<{ key: string; label: string; required: boolean }> = [];
+    if (serviceCode) {
+      const { data: schema } = await supabase
+        .from("service_form_schemas")
+        .select("documents")
+        .eq("service_code", serviceCode)
+        .eq("is_active", true)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const docList = (schema?.documents as any[]) ?? [];
+      requiredDocs = docList.map((d) => ({
+        key: String(d.key ?? d.type ?? ""),
+        label: String(d.label ?? d.name ?? d.key ?? ""),
+        required: d.required !== false,
+      }));
+    }
+
+    return {
+      lead,
+      service: service ?? null,
+      submission: submission ?? null,
+      documents: docs ?? [],
+      requiredDocs,
+      serviceCode,
+    };
+  });
+
 export const resendFormLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))

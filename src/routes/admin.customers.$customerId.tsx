@@ -6,10 +6,12 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Copy, FileText, Award, Receipt, Wallet,
   MessageSquareWarning, MessageCircle, StickyNote, Activity as ActivityIcon,
   Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
+import { LeadFormSubmissionInline } from "@/components/admin/LeadFormSubmissionInline";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
 import { useRole } from "@/hooks/useRole";
 
@@ -220,27 +222,22 @@ function OverviewTab({ data, customerId, hideMoney }: { data: any; customerId: s
           </dl>
         </SectionCard>
 
-        <SectionCard title="Linked leads">
+        <SectionCard
+          title={`Submissions (${data.leads.length})`}
+          action={
+            data.leads.length > 1 ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                REPEAT CUSTOMER · {data.leads.length} forms
+              </span>
+            ) : undefined
+          }
+        >
           {data.leads.length === 0 ? (
             <Empty label="No leads linked" />
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2 p-3">
               {data.leads.map((l: any) => (
-                <Link
-                  key={l.id}
-                  to="/admin/leads/$leadId"
-                  params={{ leadId: l.id }}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-[var(--admin-surface-2)]"
-                  style={{ borderColor: "var(--admin-border)" }}
-                >
-                  <div>
-                    <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
-                    <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                      {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
-                    </div>
-                  </div>
-                  <StatusBadge status={l.status} />
-                </Link>
+                <ExpandableLeadRow key={l.id} lead={l} hideMoney={hideMoney} />
               ))}
             </div>
           )}
@@ -536,6 +533,40 @@ function Field({ label, value }: { label: string; value: any }) {
 
 function Empty({ label }: { label: string }) {
   return <div className="p-6 text-sm text-center italic" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>;
+}
+
+function ExpandableLeadRow({ lead: l, hideMoney }: { lead: any; hideMoney: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-[var(--admin-surface)]">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="p-1 rounded hover:bg-[var(--admin-surface-2)] shrink-0"
+          title={open ? "Collapse" : "Expand"}
+          aria-label="Toggle form details"
+        >
+          {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <button onClick={() => setOpen((v) => !v)} className="flex-1 min-w-0 text-left">
+          <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
+          <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+            {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
+          </div>
+        </button>
+        <StatusBadge status={l.status} />
+        <Link
+          to="/admin/leads/$leadId"
+          params={{ leadId: l.id }}
+          className="p-1 rounded hover:bg-[var(--admin-surface-2)] shrink-0"
+          title="Open lead"
+        >
+          <ExternalLink className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
+        </Link>
+      </div>
+      {open && <LeadFormSubmissionInline leadId={l.id} />}
+    </div>
+  );
 }
 
 function CopyBtn({ value }: { value: string }) {
