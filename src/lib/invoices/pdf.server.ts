@@ -242,26 +242,36 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     drawText(page, `: ${v1}`, { x: valCol1 - 6, y, size: 9, font: helvBold, color: TEXT });
     if (l2) {
       drawText(page, l2, { x: labelCol2, y, size: 9, font: helv, color: LABEL });
-      // Fit right-column value within available width; shrink and ellipsize if needed
-      const maxW = RX - (valCol2 - 6) - 2;
-      let size = 9;
-      let txt = `: ${v2}`;
-      if (textWidth(helvBold, txt, size) > maxW) size = 8;
-      if (textWidth(helvBold, txt, size) > maxW) {
-        while (txt.length > 4 && textWidth(helvBold, txt + "…", size) > maxW) {
-          txt = txt.slice(0, -1);
-        }
-        txt = txt + "…";
-      }
-      drawText(page, txt, { x: valCol2 - 6, y, size, font: helvBold, color: TEXT });
+      drawText(page, `: ${v2}`, { x: valCol2 - 6, y, size: 9, font: helvBold, color: TEXT });
     }
     y -= 14;
   };
   metaLine("Invoice Number", d.invoiceNumber, "Place Of Supply", `${placeOfSupply} (${posCode})`);
   metaLine("Invoice Date", fmtDate(d.invoiceDate), "Order No.", d.applicationCode ?? d.leadCode);
   metaLine("Payment Date", fmtDate(d.invoiceDate), "Payment Status", "PAID");
-  metaLine("Gateway", (d.gatewayName ?? "-").toUpperCase(), "Transaction ID", d.paymentId ?? "-");
-  metaLine("Terms", "Due on Receipt", "Service", d.serviceName);
+  metaLine("Gateway", (d.gatewayName ?? "-").toUpperCase(), "Service", d.serviceName);
+  metaLine("Terms", "Due on Receipt", "", "");
+
+  // Transaction ID — full width, wraps onto a second line if needed
+  const txnId = d.paymentId ?? "-";
+  drawText(page, "Transaction ID", { x: labelCol1, y, size: 9, font: helv, color: LABEL });
+  const txnStartX = valCol1 - 6;
+  const txnMaxW = RX - txnStartX;
+  const txnPrefix = ": ";
+  const full = `${txnPrefix}${txnId}`;
+  if (textWidth(helvBold, full, 9) <= txnMaxW) {
+    drawText(page, full, { x: txnStartX, y, size: 9, font: helvBold, color: TEXT });
+    y -= 14;
+  } else {
+    // split into two lines on character boundary
+    let i = txnId.length;
+    while (i > 1 && textWidth(helvBold, txnPrefix + txnId.slice(0, i), 9) > txnMaxW) i--;
+    drawText(page, txnPrefix + txnId.slice(0, i), { x: txnStartX, y, size: 9, font: helvBold, color: TEXT });
+    y -= 12;
+    drawText(page, txnId.slice(i), { x: txnStartX, y, size: 9, font: helvBold, color: TEXT });
+    y -= 14;
+  }
+
 
   // ─── Bill To
   y -= 6;
