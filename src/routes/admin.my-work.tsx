@@ -57,7 +57,7 @@ function MyWorkPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {cards.map((c) => (
           <div
             key={c.label}
