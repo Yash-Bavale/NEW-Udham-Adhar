@@ -219,9 +219,17 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
         sub={data?.payu.isProduction ? "live payments" : "test mode"}
         accent={data?.payu.isProduction ? "emerald" : "rose"}
       />
+      <KpiTile
+        icon={<Undo2 className="size-4" />}
+        label="Repeated Leads"
+        value={loading ? "—" : fmtN(k?.repeatedLeads ?? 0)}
+        sub="duplicate mobile/email"
+        accent={k && k.repeatedLeads > 0 ? "amber" : "emerald"}
+      />
     </div>
   );
 }
+
 
 /* ---------- Trend chart (inline SVG sparkline + bars) ---------- */
 
