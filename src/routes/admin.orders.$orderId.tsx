@@ -64,7 +64,7 @@ function OrderDetailPage() {
 
   const { application, lead, customer, service, payments, paymentStatus, paymentSuccessfulAt, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
-  const stage: OrderStage = computeOrderStage(lead, application);
+  const stage: OrderStage = computeOrderStage({ ...(lead ?? {}), payment_successful_at: paymentSuccessfulAt }, application);
   const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
 
   // Default-hide money: only finance/admin roles see rupee figures.
