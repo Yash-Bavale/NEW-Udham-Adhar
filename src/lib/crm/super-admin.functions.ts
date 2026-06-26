@@ -31,6 +31,8 @@ export type SuperAdminOverview = {
     activeStaff: number;
     conversionRate30d: number; // % paid leads / total leads in last 30 days
     revenue30dInr: number;
+    repeatedLeads: number; // count of leads sharing a mobile/email with another lead
+
   };
   trend: {
     days: string[]; // ISO date (YYYY-MM-DD) in IST, oldest → newest
