@@ -145,10 +145,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const svcMap  = new Map((svcsRes.data  ?? []).map((s: any) => [s.id, s]));
     const staffMap = new Map((staffRes.data ?? []).map((s: any) => [s.id, s]));
     const payByApp = new Map<string, Array<{ status: string; amount: number }>>();
+    const paidAtByApp = new Map<string, string>();
     for (const p of paysRes.data ?? []) {
       const arr = payByApp.get(p.application_id) ?? [];
       arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
       payByApp.set(p.application_id, arr);
+      if (["paid", "success", "successful"].includes(String(p.status)) && (p as any).payment_date) {
+        const prev = paidAtByApp.get(p.application_id);
+        const cur = (p as any).payment_date as string;
+        if (!prev || cur < prev) paidAtByApp.set(p.application_id, cur);
+      }
     }
 
     let rows = appList.map((a) => {
