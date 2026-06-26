@@ -39,6 +39,7 @@ import {
 } from "@/lib/crm/follow-ups.functions";
 import { useRole } from "@/hooks/useRole";
 import { PaymentLinkPanel } from "./PaymentLinkPanel";
+import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
@@ -52,6 +53,7 @@ type LeadShape = {
   lead_status_v2?: LeadStatusV2 | null;
   customer_id?: string | null;
   service?: string | null;
+  lead_source?: string | null;
   base_amount?: number | string | null;
   gst_amount?: number | string | null;
   total_amount?: number | string | null;
@@ -77,6 +79,9 @@ export function LeadWorkspacePanel({
         <EventsTimeline leadId={lead.id} />
       </div>
       <div className="space-y-5">
+        {lead.lead_source === "talk_to_expert" && (lead.service ?? "") === "Expert Consultation" && (
+          <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
+        )}
         <CustomerQuickCard lead={lead} />
         <QuickActionsCard lead={lead} />
         {!hideMoney && (
