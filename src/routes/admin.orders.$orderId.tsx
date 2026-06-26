@@ -26,7 +26,7 @@ import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel"
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { computeOrderStage, STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
-import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
+import { isConvertedConsultationLead, isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import { useRole } from "@/hooks/useRole";
 import { formatIST } from "@/lib/datetime";
