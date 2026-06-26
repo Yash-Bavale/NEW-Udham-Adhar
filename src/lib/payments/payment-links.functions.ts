@@ -113,12 +113,16 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
 
     if (!link) return { link: null, paid: false };
 
-    // Cross-check actual payment status; webhook may have already flipped it.
+    // Cross-check actual payment status, but only count payments that arrived
+    // AFTER this link was minted. Otherwise, for a Talk-to-Expert converted
+    // lead the original ₹99 consultation payment would falsely mark the new
+    // link as paid and hide the share UI.
     const { data: paidRow } = await supabaseAdmin
       .from("payments")
-      .select("id, status, payment_date, amount")
+      .select("id, status, payment_date, amount, created_at")
       .eq("lead_id", data.leadId)
       .eq("status", "paid")
+      .gte("created_at", (link as any).created_at)
       .order("payment_date", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -130,6 +134,7 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
       paidAmount: paidRow?.amount ? Number(paidRow.amount) : null,
     };
   });
+
 
 /** Force a brand-new link, voiding any pending ones for the same lead. */
 export const regeneratePaymentLink = createServerFn({ method: "POST" })
