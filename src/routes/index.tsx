@@ -214,7 +214,16 @@ function HomePage() {
   }, []);
   return (
     <>
-      <h1 className="sr-only">Udyam Registration Consultancy & Assistance Services</h1>
+      {/* SEO H1 — visible above the fold */}
+      <section className="mx-auto max-w-7xl px-4 pt-6 md:pt-8">
+        <h1 className="text-2xl md:text-4xl font-extrabold font-display text-brand-navy leading-tight">
+          Udyam Registration Online — Apply, Update &amp; Download MSME Certificate
+        </h1>
+        <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-3xl">
+          Private consultancy &amp; assistance for new Udyam (MSME) registration, certificate updates,
+          downloads and Udyog Aadhaar to Udyam migration — pan-India support in English &amp; Hindi.
+        </p>
+      </section>
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm />
