@@ -81,7 +81,15 @@ export function LeadWorkspacePanel({
       </div>
       <div className="space-y-5">
         {isUnconvertedConsultationLead(lead) && (
-          <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
+          <ConvertConsultationPanel
+            leadId={lead.id}
+            leadCode={lead.lead_code}
+            mode="select"
+            customerName={lead.name}
+            customerMobile={lead.mobile ?? null}
+            service={lead.service ?? null}
+            totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+          />
         )}
         <CustomerQuickCard lead={lead} />
         <QuickActionsCard lead={lead} />
