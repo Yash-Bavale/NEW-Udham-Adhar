@@ -179,6 +179,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
               const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
               const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+              const invoiceUrl = `${APP_ORIGIN}/api/public/invoice/${encodeURIComponent(leadRow.lead_code)}`;
               const total = Number(invoiceRow?.total_amount ?? leadRow.total_amount ?? 0);
               const issued = invoiceRow?.issued_at ? new Date(invoiceRow.issued_at) : new Date();
               try {
