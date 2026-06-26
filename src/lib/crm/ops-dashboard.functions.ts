@@ -102,7 +102,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       return q;
     };
     const makeAppsQ = () => {
-      const q = supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at, total_amount").order("created_at", { ascending: false });
+      const q = supabase.from("applications").select("id, application_code, application_status, fulfillment_status, document_status, form_status, service_id, lead_id, customer_id, assigned_to, created_at, updated_at").order("created_at", { ascending: false });
       if (!isPrivileged) (q as any).eq("assigned_to", userId);
       return q;
     };
