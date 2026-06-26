@@ -1,57 +1,46 @@
-## Current behaviour — closure / "document sent" email
+## Goal
+Rewrite the post-payment email (sent right after PayU/CCAvenue webhook marks the lead paid) with the exact copy you provided, including a banner header image titled "Order Successfully Received", and ensure all merge fields render correctly.
 
-When an order is moved to **Completed** via the Completion Gate (`updateFulfillmentStatus` in `src/lib/crm/orders-v2.functions.ts`):
+## What I'll change
 
-1. The uploaded certificate is stored in the `documents` storage bucket and a row is written to `certificates`.
-2. The application transitions to `completed`, `lead_status_v2` becomes `closed`, and an `application_completed` event is logged.
-3. A `certificate_delivery` email row is inserted into `email_queue` with:
-   - Customer's primary email (falls back to lead email)
-   - HTML body via `buildCertificateEmailHtml(...)`
-   - A **7-day signed download URL** placed inside the body as a "Download Certificate" button
-4. The shared poller in `src/lib/emails/emails.server.ts` picks up the queue row every cycle and sends through Mailgun.
+### 1. Generate the header banner image
+- Create `src/assets/email-order-received-banner.png` (1200×280) with brand navy gradient + amber accent + the text **"Order Successfully Received"**.
+- Upload via `lovable-assets` so the image is served from a public CDN URL (email clients can't load `/src/...`).
+- Reference the CDN URL in the email `<img>` so it renders inline in Gmail/Outlook/Apple Mail.
 
-`resendOrderCertificate` and the legacy `deliverCertificate` follow the same shape.
+### 2. Update DB template `order_confirmation` (code = `order_confirmation`)
+This is the template the PayU and CCAvenue webhooks actually send after payment success (with the Tax Invoice PDF attached). I will replace:
+- **Subject** → `Order Confirmation & Tax Invoice – Order No. {{order_number}}`
+- **body_html** → new Zoho-style layout containing your exact copy, in this order:
+  1. Banner image header (CDN URL above)
+  2. Greeting: `Dear {{customer_name}},` + thank-you paragraph
+  3. **ORDER SUMMARY** block (Order No, Service, Payment Status, Transaction No., Date & Time, Service Fee, GST, Total)
+  4. **IMPORTANT SERVICE INFORMATION** bullet list (all 10 bullets verbatim)
+  5. **NEXT STEP** with CTA button → `{{form_link}}`
+  6. Follow-up paragraphs (support contact, failure-to-respond clause, policy list)
+  7. **SUPPORT AVAILABILITY** block
+  8. **TAX INVOICE** note (attached to this email)
+  9. **SUPPORT INFORMATION** + signature + `https://udyamadhar.in`
+- **body_text** → plain-text mirror for non-HTML clients
+- **variables** → expand to include `transaction_id`, `payment_datetime`, `customer_name`, `order_number`, `service_name`, `base_amount`, `gst_amount`, `total_amount`, `form_link`
 
-### Verdict
+### 3. Inject the new merge fields from the webhooks
+In both `src/routes/api/public/webhooks/payu.ts` and `src/routes/api/public/webhooks/ccavenue.ts`, extend `commonVars` to include:
+- `transaction_id` → gateway txn id (PayU: `mihpayid`/`txnid`; CCAvenue: `tracking_id`/`order_id`) — already on the `payments` row, will fetch with the invoice query.
+- `payment_datetime` → IST-formatted `dd MMM yyyy, hh:mm a` from `payments.captured_at` (fallback `invoices.issued_at`).
 
-- **Email is delivered** to the customer (subject to suppression/bounce) — the queue + poller path is the same one used for invoices, which we already verified is working.
-- **PDF/JPG is NOT attached** to the email. None of the three closure paths set `variables.__attachments`, which is the only field the sender reads to attach files. The customer only gets a signed link valid 7 days.
+No change to PDF generation or attachment logic — the invoice PDF stays attached to this same email.
 
-So "delivered with attachment" today = **No** — only a link.
+### 4. Verify
+- `supabase--read_query` to confirm subject + body updated.
+- Trigger a fresh test payment (or re-enqueue via existing webhook replay) and inspect `email_queue` row to confirm all `{{...}}` placeholders resolved and the banner URL is reachable.
 
-## What this plan changes
+## Files touched
+- `src/assets/email-order-received-banner.png` + `.asset.json` (new)
+- `email_templates` row `order_confirmation` (DB update via `supabase--insert` upsert)
+- `src/routes/api/public/webhooks/payu.ts` — add `transaction_id`, `payment_datetime` to `commonVars`
+- `src/routes/api/public/webhooks/ccavenue.ts` — same
 
-Make the certificate file ride the email as a real attachment, on top of the existing signed-link button.
-
-### Files to edit
-
-1. `src/lib/crm/orders-v2.functions.ts`
-   - In `updateFulfillmentStatus` (completion branch) and `resendOrderCertificate`:
-     - After we resolve `certDoc.file_path`, download the file bytes via `admin.storage.from("documents").download(filePath)`.
-     - Convert to base64 (Buffer-safe, server runtime).
-     - Skip attaching only if size > 9 MB (Mailgun + provider safety margin); otherwise always attach.
-     - When inserting into `email_queue`, add to the `variables` object:
-       ```
-       __attachments: [{
-         filename: `${certificate_number || application_code}.pdf|.jpg|.png`,
-         content_type: certDoc.mime_type,
-         content_base64: <base64>,
-       }]
-       ```
-     - Keep the signed URL in the body as a backup.
-
-2. `src/lib/crm/certificates.functions.ts` (`deliverCertificate`)
-   - Same pattern so the legacy "Deliver" button on `/admin/certificates` also attaches the file.
-
-3. No DB migration, no new packages, no template changes required — `emails.server.ts` already reads `__attachments` from `variables` and POSTs them to Mailgun (`src/lib/emails/emails.server.ts` lines 191-228).
-
-### Safety checks
-
-- If the file download fails, fall back to the current link-only email (do not block completion).
-- Log `[certificate] attachment skipped: <reason>` so we can see it in server logs.
-- File size guard (~9 MB) to avoid Mailgun's 25 MB hard limit being approached after base64 inflation.
-
-### Verification after build mode
-
-- Use Playwright on the running app to: open a completed order, click "Resend certificate", then read `email_send_log` for the new row and confirm the attached row in Mailgun (or inspect the queue row's `variables.__attachments` length to confirm it was set).
-- Manually check one real recipient inbox if the user provides a test address.
+## Out of scope
+- `payment_success` template (legacy, not currently sent by webhooks) — left untouched unless you want it synced too.
+- Tax Invoice PDF layout — unchanged.
