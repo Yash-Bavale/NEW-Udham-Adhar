@@ -118,9 +118,13 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
           lead.email,
           {
             customer_name: lead.name,
+            order_number: leadCode,
             service: svc.service_name,
             payment_url: paymentUrl,
             total_amount: total.toFixed(2),
+            support_email: "help@businesshelpservices.com",
+            business_name: "Business Help Services",
+            website: "udyamadhar.in",
           },
           { toName: lead.name, leadId: lead.id },
         );
