@@ -26,7 +26,7 @@ import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel"
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { computeOrderStage, STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
-import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
+import { isConvertedConsultationLead, isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import { useRole } from "@/hooks/useRole";
 import { formatIST } from "@/lib/datetime";
@@ -65,7 +65,13 @@ function OrderDetailPage() {
   const { application, lead, customer, service, payments, paymentStatus, paymentSuccessfulAt, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const stage: OrderStage = computeOrderStage({ ...(lead ?? {}), payment_successful_at: paymentSuccessfulAt }, application);
-  const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
+  const selectStep = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
+  const awaitingSecondPayment =
+    !!lead?.id && !!lead?.lead_code &&
+    isConvertedConsultationLead(lead) &&
+    (application as any)?.application_status === "awaiting_payment";
+  const showConsultationPanel = selectStep || awaitingSecondPayment;
+  const consultationMode: "select" | "awaiting_payment" = selectStep ? "select" : "awaiting_payment";
 
   // Default-hide money: only finance/admin roles see rupee figures.
   // Using role.hideMoney() ensures the UI is hidden during role-loading too.
@@ -163,7 +169,15 @@ function OrderDetailPage() {
                 mobile={customer?.primary_mobile ?? lead?.mobile ?? null}
                 email={customer?.primary_email ?? lead?.email ?? null}
               />
-              <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
+              <ConvertConsultationPanel
+                leadId={lead.id}
+                leadCode={lead.lead_code}
+                mode={consultationMode}
+                customerName={customer?.name ?? lead?.name ?? null}
+                customerMobile={customer?.primary_mobile ?? lead?.mobile ?? null}
+                service={service?.service_name ?? lead?.service ?? null}
+                totalAmount={total ?? (lead?.total_amount != null ? Number(lead.total_amount) : null)}
+              />
             </div>
           )}
 

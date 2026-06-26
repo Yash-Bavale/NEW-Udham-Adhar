@@ -9,10 +9,11 @@ const STAFF_ROLES = [
   "support", "accounts", "finance", "operations",
 ] as const;
 
-const Input = z.object({
+const SelectInput = z.object({
   leadId: z.string().uuid(),
   serviceId: z.string().uuid(),
 });
+const LeadOnlyInput = z.object({ leadId: z.string().uuid() });
 
 function appOrigin() {
   return process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
@@ -22,16 +23,14 @@ function newTrackingToken(leadCode: string) {
 }
 
 /**
- * Convert a Talk-to-Expert lead into a real paid service.
- * - Updates the lead with the new service & pricing (server-computed, never returned).
- * - Mints a fresh payment link.
- * - Sends the link to the customer via email (template: consultation_service_converted).
- *
- * Employee sees zero pricing — this is intentional per product spec.
+ * Step 1: Staff picks the customer's actual service after the consultation call.
+ * - Updates the lead with new service + pricing.
+ * - Voids prior pending links, mints a fresh `payment_links` row.
+ * - DOES NOT email the customer. UI then exposes Send / Copy buttons.
  */
-export const convertConsultationLead = createServerFn({ method: "POST" })
+export const selectConsultationService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => Input.parse(i))
+  .inputValidator((i: unknown) => SelectInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, [...STAFF_ROLES] as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -81,8 +80,7 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       .eq("id", lead.id);
     if (updErr) throw new Error(updErr.message);
 
-    // Keep the paid consultation order visible, but make it point at the newly
-    // selected service and wait for the second payment before normal fulfillment.
+    // 2. Mark the existing paid consultation order as awaiting the 2nd payment.
     const { data: app } = await supabaseAdmin
       .from("applications")
       .select("id")
@@ -106,9 +104,9 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       await supabaseAdmin.from("workflow_events").insert({
         application_id: app.id,
         lead_id: lead.id,
-        event_type: "consultation_converted",
-        title: "Consultation converted to service",
-        description: `Customer requirement confirmed. New service selected: ${svc.service_name}. Payment link sent automatically.`,
+        event_type: "consultation_service_selected",
+        title: "Consultation service selected",
+        description: `Staff selected service: ${svc.service_name}. Awaiting customer payment.`,
         customer_visible: false,
         actor_id: context.userId,
         actor_name: "Staff",
@@ -117,16 +115,16 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // 2. Activity log
+    // 3. Activity log
     await supabaseAdmin.from("activity_logs").insert({
       lead_id: lead.id,
       user_id: context.userId,
-      activity_type: "service_converted",
-      activity_description: `Converted from Expert Consultation → ${svc.service_name}`,
+      activity_type: "service_selected",
+      activity_description: `Service selected after consultation: ${svc.service_name}`,
       metadata: { service_id: svc.id, service_name: svc.service_name } as never,
     } as never);
 
-    // 3. Void any existing pending links, mint a fresh one
+    // 4. Void any existing pending links, mint a fresh one
     await supabaseAdmin
       .from("payment_links" as any)
       .update({ status: "expired" } as any)
@@ -146,29 +144,126 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       } as any);
     if (linkErr) throw new Error(linkErr.message);
 
-    // 4. Email the customer (best-effort)
-    if (lead.email) {
-      try {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        await enqueueFromTemplateInternal(
-          "consultation_service_converted",
-          lead.email,
-          {
-            customer_name: lead.name,
-            order_number: leadCode,
-            service: svc.service_name,
-            payment_url: paymentUrl,
-            total_amount: total.toFixed(2),
-            support_email: "help@businesshelpservices.com",
-            business_name: "Business Help Services",
-            website: "udyamadhar.in",
-          },
-          { toName: lead.name, leadId: lead.id },
-        );
-      } catch {
-        // Don't fail the whole conversion if email enqueue hiccups.
-      }
-    }
+    return { ok: true as const, paymentUrl, txnid, amount: total };
+  });
 
+/**
+ * Step 2: Staff hits "Send Payment Link" — emails the customer the link
+ * using the `consultation_service_converted` template. Idempotent.
+ */
+export const sendConsultationPaymentLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LeadOnlyInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, [...STAFF_ROLES] as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: lead, error: leadErr } = await supabaseAdmin
+      .from("leads")
+      .select("id, lead_code, name, email, service, total_amount")
+      .eq("id", data.leadId)
+      .maybeSingle();
+    if (leadErr) throw new Error(leadErr.message);
+    if (!lead) throw new Error("Lead not found");
+    if (!lead.email) throw new Error("Customer has no email on file.");
+
+    const { data: link } = await supabaseAdmin
+      .from("payment_links" as any)
+      .select("payment_url, amount, status, expires_at")
+      .eq("lead_id", lead.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!link) throw new Error("No active payment link. Please select the service again.");
+
+    const leadCode = lead.lead_code ?? lead.id;
+    const total = Number((link as any).amount ?? lead.total_amount ?? 0);
+    const paymentUrl = (link as any).payment_url as string;
+
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    await enqueueFromTemplateInternal(
+      "consultation_service_converted",
+      lead.email,
+      {
+        customer_name: lead.name,
+        order_number: leadCode,
+        service: lead.service,
+        payment_url: paymentUrl,
+        total_amount: total.toFixed(2),
+        support_email: "help@businesshelpservices.com",
+        business_name: "Business Help Services",
+        website: "udyamadhar.in",
+      },
+      { toName: lead.name, leadId: lead.id },
+    );
+
+    await supabaseAdmin.from("activity_logs").insert({
+      lead_id: lead.id,
+      user_id: context.userId,
+      activity_type: "payment_link_sent",
+      activity_description: `Payment link emailed to ${lead.email}`,
+      metadata: { payment_url: paymentUrl } as never,
+    } as never);
+
+    return { ok: true as const };
+  });
+
+/**
+ * Staff "Change Service" — voids the active pending link and reverts the lead's
+ * service label so the select step reappears. The original consultation payment
+ * is unaffected.
+ */
+export const resetConsultationSelection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LeadOnlyInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, [...STAFF_ROLES] as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("id, lead_source")
+      .eq("id", data.leadId)
+      .maybeSingle();
+    if (!lead) throw new Error("Lead not found");
+
+    await supabaseAdmin
+      .from("payment_links" as any)
+      .update({ status: "expired" } as any)
+      .eq("lead_id", lead.id)
+      .eq("status", "pending");
+
+    // Restore the consultation service label so the select step renders again.
+    await supabaseAdmin
+      .from("leads")
+      .update({
+        service: "Talk To Expert – Suitable Service Selection",
+        service_id: null,
+        status: "new_lead",
+        lead_status_v2: "new_lead",
+      } as never)
+      .eq("id", lead.id);
+
+    await supabaseAdmin.from("activity_logs").insert({
+      lead_id: lead.id,
+      user_id: context.userId,
+      activity_type: "service_selection_reset",
+      activity_description: "Staff reverted consultation selection to pick a different service.",
+    } as never);
+
+    return { ok: true as const };
+  });
+
+/**
+ * @deprecated Kept for backwards compatibility. New UI uses
+ * `selectConsultationService` + `sendConsultationPaymentLink` separately.
+ */
+export const convertConsultationLead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => SelectInput.parse(i))
+  .handler(async ({ data }) => {
+    await selectConsultationService({ data });
+    await sendConsultationPaymentLink({ data: { leadId: data.leadId } });
     return { ok: true as const };
   });
