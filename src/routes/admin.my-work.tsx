@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useEffect, useState } from "react";
-import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight } from "lucide-react";
+import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight, PackageOpen } from "lucide-react";
 import { getMyWorkSummary, type MyWorkSummary } from "@/lib/crm/my-work.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { supabase } from "@/integrations/supabase/client";
