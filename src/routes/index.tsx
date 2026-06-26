@@ -214,12 +214,12 @@ function HomePage() {
   }, []);
   return (
     <>
-      {/* SEO H1 — visible above the fold */}
-      <section className="mx-auto max-w-7xl px-4 pt-6 md:pt-8">
-        <h1 className="text-2xl md:text-4xl font-extrabold font-display text-brand-navy leading-tight">
+      {/* SEO H1 — kept in DOM for crawlers, visually hidden */}
+      <section className="sr-only">
+        <h1>
           Udyam Registration Online — Apply, Update &amp; Download MSME Certificate
         </h1>
-        <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-3xl">
+        <p>
           Private consultancy &amp; assistance for new Udyam (MSME) registration, certificate updates,
           downloads and Udyog Aadhaar to Udyam migration — pan-India support in English &amp; Hindi.
         </p>
