@@ -394,7 +394,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     })).sort((a, b) => b.handled - a.handled).slice(0, 8);
 
     // Recent activity — from application_events
-    const recentActivity = activity.map((a: any) => ({
+    const recentActivity = (activityRows as any[]).map((a: any) => ({
       id: a.id,
       created_at: a.created_at,
       event_type: a.event_type,
