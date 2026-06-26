@@ -225,7 +225,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         email: lead.email ?? "",
         service: lead.service ?? "",
         docCount: String(docCount ?? 0),
-        adminUrl: `https://${process.env.PUBLIC_SITE_HOST ?? "udyamadhar.everythinghappens.in"}/admin/leads`,
+        adminUrl: `https://${process.env.PUBLIC_SITE_HOST ?? "udyamadhar.in"}/admin/leads`,
       };
 
       if (lead.email) {

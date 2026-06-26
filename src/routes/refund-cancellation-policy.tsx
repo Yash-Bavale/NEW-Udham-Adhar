@@ -11,7 +11,7 @@ export const Route = createFileRoute("/refund-cancellation-policy")({
       { property: "og:description", content: "When and how refunds may be issued for consultancy fees." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/refund-cancellation-policy" },
+      { rel: "canonical", href: "https://udyamadhar.in/refund-cancellation-policy" },
     ],
   }),
   component: () => <WpPage title="Refund & Cancellation Policy" html={html} />,

@@ -11,7 +11,7 @@ export const Route = createFileRoute("/other-problem")({
       { property: "og:description", content: "Get consultancy help for forgotten OTP, mobile/email recovery, PAN/Aadhaar corrections, and more." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/other-problem" },
+      { rel: "canonical", href: "https://udyamadhar.in/other-problem" },
     ],
   }),
   component: () => <SeoLandingPage title="Other Problem" linkTitle="Udyog Aadhar Registration" html={html} />,

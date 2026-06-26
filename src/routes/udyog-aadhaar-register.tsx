@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyog-aadhaar-register")({
       { property: "og:description", content: "Udyog Aadhaar Register was the former online system for registering MSMEs across India. It allowed small businesses to obtain a Udyog Aadhaar Number (UAN)..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyog-aadhaar-register" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyog-aadhaar-register" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyog Aadhaar Register" linkTitle="Udyog Aadhaar Register – MSME Registration for Small Businesses" content={`Udyog Aadhaar Register was the former online system for registering MSMEs across India. It allowed small businesses to obtain a Udyog Aadhaar Number (UAN) using Aadhaar verification and basic enterprise details. Thousands of micro, small, and medium enterprises successfully registered, enabling them to access government schemes, financial assistance, and subsidies. Although the system has now been replaced by Udyam Registration, existing businesses can still access, update, and verify their UAN records online. Migration to Udyam ensures uninterrupted eligibility for MSME benefits, seamless certificate issuance, and digital recognition. The Udyog Aadhaar Register remains a valuable reference for historic MSME registration data and verification purposes.`} html={html} />,

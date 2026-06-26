@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyam-certificate-update")({
       { property: "og:description", content: "Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-update" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyam-certificate-update" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam certificate update" linkTitle="Udyam Certificate Update - Modify Your MSME Registration Details" content={`Udyam certificate update allows MSMEs to modify their business details on the official Udyam portal to ensure that the MSME certificate reflects accurate information. Changes can include business address, nature of activity, ownership details, or contact information. Updating the certificate is essential to maintain eligibility for government schemes, subsidies, loans, interest-free or collateral-free financing, and participation in procurement tenders. The process is completely free, secure, and paperless, allowing businesses to instantly update their records and ensure compliance with government regulations. Keeping the certificate information current also enhances credibility with banks, financial institutions, clients, and government authorities while supporting uninterrupted access to benefits, incentives, and operational support. Udyam certificate updates enable businesses to remain competitive, strengthen their market presence, and leverage opportunities provided by government programs aimed at fostering MSME growth, sustainability, and long-term success in India.`} html={html} />,

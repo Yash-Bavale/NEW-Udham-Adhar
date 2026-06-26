@@ -13,7 +13,7 @@ export const Route = createFileRoute("/talk-to-expert")({
       { property: "og:description", content: "Paid expert consultation for Udyam, MSME, PAN/Aadhaar and related issues. ₹99 + GST." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/talk-to-expert" },
+      { rel: "canonical", href: "https://udyamadhar.in/talk-to-expert" },
     ],
   }),
   component: TalkToExpertPage,

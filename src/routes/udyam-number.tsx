@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyam-number")({
       { property: "og:description", content: "The Udyam number is a unique registration ID assigned to businesses upon successful MSME registration through the official Udyam portal. This number acts..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-number" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyam-number" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam number" linkTitle="Udyam Number - Unique MSME Registration ID" content={`The Udyam number is a unique registration ID assigned to businesses upon successful MSME registration through the official Udyam portal. This number acts as permanent proof of the enterprise’s Micro, Small, or Medium status and is essential for accessing government benefits, including priority sector lending, interest-free or collateral-free loans, subsidies, and participation in procurement tenders. The Udyam number is linked to a digitally signed MSME certificate that can be downloaded anytime online, ensuring credibility and authenticity for financial institutions, clients, and government authorities. The unique registration ID allows businesses to formalize operations, comply with regulations, and maintain uninterrupted eligibility for government programs aimed at promoting MSME growth. Entrepreneurs and businesses can also use the Udyam number to update details, access schemes, and enhance market presence while leveraging financial and operational benefits designed to strengthen the MSME ecosystem.`} html={html} />,

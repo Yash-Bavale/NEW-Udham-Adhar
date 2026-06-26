@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyam-adhar-2")({
       { property: "og:description", content: "Udyam Adhar refers to the government’s new MSME registration system, replacing Udyog Aadhaar. Businesses can register online using Aadhaar authentication..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-adhar-2" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyam-adhar-2" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Adhar" linkTitle="Udyam Adhar Registration | New MSME Registration Online" content={`Udyam Adhar refers to the government’s new MSME registration system, replacing Udyog Aadhaar. Businesses can register online using Aadhaar authentication to obtain a unique Udyam Number and digitally signed MSME certificate. This process is completely digital, paperless, and free of cost. The Udyam Adhar system provides eligibility for government loans, subsidies, and financial schemes while allowing easy updates, verification, and certificate downloads. Startups and established businesses benefit from simplified compliance, faster registration, and instant digital recognition. Udyam Adhar ensures uninterrupted access to government programs, enhances credibility, and enables formal recognition of micro, small, and medium enterprises across India.`} html={html} />,
