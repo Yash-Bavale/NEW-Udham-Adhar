@@ -133,7 +133,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ? admin.from("services").select("id, service_name").in("id", serviceIds)
         : Promise.resolve({ data: [] as any[] }),
       ids.length
-        ? admin.from("payments").select("application_id, status, amount").in("application_id", ids)
+        ? admin.from("payments").select("application_id, status, amount, payment_date").in("application_id", ids)
         : Promise.resolve({ data: [] as any[] }),
       staffIds.length
         ? admin.from("profiles").select("id, display_name, email").in("id", staffIds)
