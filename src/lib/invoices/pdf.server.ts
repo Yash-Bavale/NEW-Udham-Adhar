@@ -242,7 +242,18 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     drawText(page, `: ${v1}`, { x: valCol1 - 6, y, size: 9, font: helvBold, color: TEXT });
     if (l2) {
       drawText(page, l2, { x: labelCol2, y, size: 9, font: helv, color: LABEL });
-      drawText(page, `: ${v2}`, { x: valCol2 - 6, y, size: 9, font: helvBold, color: TEXT });
+      // Fit right-column value within available width; shrink and ellipsize if needed
+      const maxW = RX - (valCol2 - 6) - 2;
+      let size = 9;
+      let txt = `: ${v2}`;
+      if (textWidth(helvBold, txt, size) > maxW) size = 8;
+      if (textWidth(helvBold, txt, size) > maxW) {
+        while (txt.length > 4 && textWidth(helvBold, txt + "…", size) > maxW) {
+          txt = txt.slice(0, -1);
+        }
+        txt = txt + "…";
+      }
+      drawText(page, txt, { x: valCol2 - 6, y, size, font: helvBold, color: TEXT });
     }
     y -= 14;
   };
