@@ -313,6 +313,12 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       stageMeta["order_received"] = { at: app.created_at as string, staff_name: null };
     }
 
+    // Derive paymentSuccessfulAt from the earliest successful payment_date.
+    const paymentSuccessfulAt = payments
+      .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)) && p.payment_date)
+      .map((p: any) => p.payment_date as string)
+      .sort()[0] ?? null;
+
     return {
       application: app,
       lead,
@@ -320,6 +326,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       service: (svcRes as any).data,
       payments,
       paymentStatus,
+      paymentSuccessfulAt,
       total,
       documents: docsRes.data ?? [],
       events: evRes.data ?? [],
