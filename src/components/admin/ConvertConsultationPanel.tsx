@@ -47,6 +47,7 @@ export function ConvertConsultationPanel({ leadId, leadCode }: Props) {
       toast.success("Service set. Payment link sent to customer.");
       // Refresh everything downstream so PaymentLinkPanel & details update
       await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin.order"] }),
         qc.invalidateQueries({ queryKey: ["admin.lead-detail", leadId] }),
         qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] }),
         qc.invalidateQueries({ queryKey: ["admin.payment-link", leadId] }),
