@@ -157,7 +157,12 @@ function OrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           {showConsultationPanel && (
-            <div id="order-consultation" className="scroll-mt-32">
+            <div id="order-consultation" className="scroll-mt-32 space-y-3">
+              <ConsultationContactStrip
+                name={customer?.name ?? lead?.name ?? "—"}
+                mobile={customer?.primary_mobile ?? lead?.mobile ?? null}
+                email={customer?.primary_email ?? lead?.email ?? null}
+              />
               <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
             </div>
           )}
@@ -196,22 +201,36 @@ function OrderDetailPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Customer mini-profile */}
-          <div className="rounded-xl border bg-white p-5" style={{ borderColor: "var(--admin-border)" }}>
-            <div className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-2" style={{ color: "var(--admin-fg-muted)" }}>Customer</div>
-            <div className="text-sm font-semibold">{customer?.name ?? lead?.name ?? "—"}</div>
-            {customer?.primary_mobile && <div className="text-xs mt-0.5 font-mono" style={{ color: "var(--admin-fg-muted)" }}>{customer.primary_mobile}</div>}
-            {customer?.primary_email && <div className="text-xs mt-0.5 truncate" style={{ color: "var(--admin-fg-muted)" }}>{customer.primary_email}</div>}
-            {customer?.id && (
-              <Link
-                to="/admin/customers/$customerId"
-                params={{ customerId: customer.id }}
-                className="mt-3 inline-block text-xs font-medium text-blue-600 hover:underline"
-              >
-                Open full profile →
-              </Link>
-            )}
-          </div>
+          {/* Customer mini-profile — always show full contact (name, mobile, email) */}
+          {(() => {
+            const cName = customer?.name ?? lead?.name ?? "—";
+            const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
+            const cEmail = customer?.primary_email ?? lead?.email ?? null;
+            const waPhone = cMobile ? String(cMobile).replace(/\D/g, "") : "";
+            const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+            return (
+              <div className="rounded-xl border bg-white p-5" style={{ borderColor: "var(--admin-border)" }}>
+                <div className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-2" style={{ color: "var(--admin-fg-muted)" }}>Customer</div>
+                <div className="text-sm font-semibold">{cName}</div>
+                {cMobile && <div className="text-xs mt-0.5 font-mono" style={{ color: "var(--admin-fg-muted)" }}>{cMobile}</div>}
+                {cEmail && <div className="text-xs mt-0.5 break-all" style={{ color: "var(--admin-fg-muted)" }}>{cEmail}</div>}
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {cMobile && <a href={`tel:${cMobile}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Call</a>}
+                  {waUrl && <a href={waUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">WhatsApp</a>}
+                  {cEmail && <a href={`mailto:${cEmail}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Email</a>}
+                </div>
+                {customer?.id && (
+                  <Link
+                    to="/admin/customers/$customerId"
+                    params={{ customerId: customer.id }}
+                    className="mt-3 inline-block text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    Open full profile →
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
 
           <div id="order-documents" className="scroll-mt-32">
             <OrderDocumentsPanel
@@ -227,6 +246,38 @@ function OrderDetailPage() {
 
           <StageSummaryCard stage={stage} timestamps={timestamps} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ConsultationContactStrip({
+  name, mobile, email,
+}: { name: string; mobile: string | null; email: string | null }) {
+  const waPhone = mobile ? String(mobile).replace(/\D/g, "") : "";
+  const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  return (
+    <div className="rounded-xl border bg-white p-4 flex flex-wrap items-center gap-x-5 gap-y-2" style={{ borderColor: "var(--admin-border)" }}>
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Customer</div>
+        <div className="text-sm font-semibold">{name}</div>
+      </div>
+      {mobile && (
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Mobile</div>
+          <div className="text-sm font-mono">{mobile}</div>
+        </div>
+      )}
+      {email && (
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: "var(--admin-fg-muted)" }}>Email</div>
+          <div className="text-sm break-all">{email}</div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-1.5 ml-auto">
+        {mobile && <a href={`tel:${mobile}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Call</a>}
+        {waUrl && <a href={waUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100">WhatsApp</a>}
+        {email && <a href={`mailto:${email}`} className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">Email</a>}
       </div>
     </div>
   );

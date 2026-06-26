@@ -124,7 +124,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, total_amount, lead_status_v2, lead_code, status, lead_source, payment_successful_at").in("id", leadIds)
+        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, payment_successful_at").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
@@ -168,7 +168,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         lead_code: lead?.lead_code ?? null,
         customer_id: a.customer_id,
         customer_name: cust?.name ?? lead?.name ?? "—",
-        customer_mobile: cust?.primary_mobile ?? null,
+        customer_mobile: cust?.primary_mobile ?? lead?.mobile ?? null,
+        customer_email: cust?.primary_email ?? lead?.email ?? null,
         service_id: a.service_id,
         service_name: svc?.service_name ?? null,
         total_amount: total,
