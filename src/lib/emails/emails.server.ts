@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate } from "./smtp.server";
 import { sendLovableEmail } from "@lovable.dev/email-js";
 
-const LOVABLE_SENDER_DOMAIN = "notify.businesshelpservices.com";
+const LOVABLE_SENDER_DOMAIN = "notify.mail.businesshelpservices.com";
 
 
 // ─────────────────────────── Public-server helpers ───────────────────────────
