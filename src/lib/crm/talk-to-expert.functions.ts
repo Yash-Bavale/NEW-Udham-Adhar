@@ -91,8 +91,9 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       .eq("lead_id", lead.id)
       .eq("status", "pending");
 
-    const txnid = newTrackingToken(lead.lead_code);
-    const paymentUrl = `${appOrigin()}/payment/${encodeURIComponent(lead.lead_code)}`;
+    const leadCode = lead.lead_code ?? lead.id;
+    const txnid = newTrackingToken(leadCode);
+    const paymentUrl = `${appOrigin()}/payment/${encodeURIComponent(leadCode)}`;
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { error: linkErr } = await supabaseAdmin
