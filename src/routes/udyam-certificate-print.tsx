@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyam-certificate-print")({
       { property: "og:description", content: "Udyam Certificate Print provides MSMEs the ability to download and print their official MSME registration certificate instantly. Using the Udyam..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-certificate-print" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyam-certificate-print" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam Certificate Print" linkTitle="Udyam Certificate Print | Download MSME Certificate Instantly" content={`Udyam Certificate Print provides MSMEs the ability to download and print their official MSME registration certificate instantly. Using the Udyam Registration Number and OTP verification, businesses can securely access a digitally signed PDF version of their certificate. The Udyam certificate serves as official proof of micro, small, or medium enterprise classification and is required for availing government loans, subsidies, and participation in tenders. The online process is fast, paperless, and user-friendly, designed for entrepreneurs with minimal technical knowledge. Maintaining a printed or digital copy ensures compliance with MSME regulations, enhances credibility with financial institutions, and guarantees uninterrupted access to government benefits. The portal allows updates, reprints, and verification of certificate details at any time, providing flexibility for both startups and established businesses.`} html={html} />,

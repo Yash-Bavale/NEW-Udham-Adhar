@@ -40,7 +40,7 @@ const PAGE_TITLE =
   "Udyam, MSME & Udyog Aadhaar FAQs — 115 Answers to Common Questions";
 const PAGE_DESC =
   "Detailed Udyam Registration, MSME Certificate and Udyog Aadhaar FAQs — registration, documents, download, print, updates, migration, fees and benefits. Updated answers for 2026.";
-const CANONICAL = "https://udyamadhar.everythinghappens.in/faqs";
+const CANONICAL = "https://udyamadhar.in/faqs";
 
 export const Route = createFileRoute("/faqs")({
   head: () => {

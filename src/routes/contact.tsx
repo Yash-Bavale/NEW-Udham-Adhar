@@ -10,7 +10,7 @@ export const Route = createFileRoute("/contact")({
       { property: "og:description", content: "Reach out to Business Help Services for help with your Business Help Services." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/contact" },
+      { rel: "canonical", href: "https://udyamadhar.in/contact" },
     ],
   }),
   component: ContactPage,

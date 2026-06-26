@@ -11,7 +11,7 @@ export const Route = createFileRoute("/service-delivery-policy")({
       { property: "og:description", content: "How we deliver our consultancy and assistance services." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/service-delivery-policy" },
+      { rel: "canonical", href: "https://udyamadhar.in/service-delivery-policy" },
     ],
   }),
   component: () => <WpPage title="Service Delivery Policy" html={html} />,

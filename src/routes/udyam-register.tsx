@@ -11,7 +11,7 @@ export const Route = createFileRoute("/udyam-register")({
       { property: "og:description", content: "Udyam register is the official process for formally listing your business as a Micro, Small, or Medium Enterprise through the government’s Udyam portal...." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/udyam-register" },
+      { rel: "canonical", href: "https://udyamadhar.in/udyam-register" },
     ],
   }),
   component: () => <SeoLandingPage title="Udyam register" linkTitle="Udyam Register - How to Register Your Business as MSME" content={`Udyam register is the official process for formally listing your business as a Micro, Small, or Medium Enterprise through the government’s Udyam portal. The registration process is free, secure, and entirely digital, requiring basic business details and Aadhaar verification. Once registered, businesses receive a unique Udyam Registration Number and a digitally signed MSME certificate, providing legal proof of their enterprise status. This certificate enables access to government benefits, including loans, interest subsidies, priority sector lending, participation in procurement tenders, and eligibility for multiple schemes aimed at supporting MSME growth. Udyam registration also enhances credibility with financial institutions, clients, and government authorities while facilitating future updates to maintain accurate business records. By completing Udyam registration, startups, entrepreneurs, and existing businesses gain formal recognition, unlock financial and operational support, and establish a foundation for long-term sustainability, competitiveness, and market growth in India’s MSME ecosystem.`} html={html} />,

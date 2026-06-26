@@ -93,7 +93,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
     const paymentId = inserted.id;
 
     const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
-      "https://udyamadhar.everythinghappens.in";
+      "https://udyamadhar.in";
     const redirectUrl = `${origin}/api/public/webhooks/ccavenue`;
     const cancelUrl   = `${origin}/api/public/webhooks/ccavenue`;
 

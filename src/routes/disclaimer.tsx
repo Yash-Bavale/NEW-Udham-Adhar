@@ -11,7 +11,7 @@ export const Route = createFileRoute("/disclaimer")({
       { property: "og:description", content: "Important disclaimer from Business Help Services." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/disclaimer" },
+      { rel: "canonical", href: "https://udyamadhar.in/disclaimer" },
     ],
   }),
   component: () => <WpPage title="Website Disclaimer" html={html} legal />,

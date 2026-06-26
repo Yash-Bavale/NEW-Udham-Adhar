@@ -11,7 +11,7 @@ export const Route = createFileRoute("/about")({
       { property: "og:description", content: "Learn about Business Help Services and our Business Help Services consultancy assistance." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/about" },
+      { rel: "canonical", href: "https://udyamadhar.in/about" },
     ],
   }),
   component: () => <WpPage title="About Us" html={html} />,

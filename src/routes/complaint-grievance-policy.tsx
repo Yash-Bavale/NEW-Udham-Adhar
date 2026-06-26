@@ -10,7 +10,7 @@ export const Route = createFileRoute("/complaint-grievance-policy")({
       { property: "og:description", content: "Submit a complaint or grievance to Business Help Services." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.everythinghappens.in/complaint-grievance-policy" },
+      { rel: "canonical", href: "https://udyamadhar.in/complaint-grievance-policy" },
     ],
   }),
   component: ComplaintFormPage,
