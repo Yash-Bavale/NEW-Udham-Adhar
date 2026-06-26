@@ -169,7 +169,15 @@ function OrderDetailPage() {
                 mobile={customer?.primary_mobile ?? lead?.mobile ?? null}
                 email={customer?.primary_email ?? lead?.email ?? null}
               />
-              <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
+              <ConvertConsultationPanel
+                leadId={lead.id}
+                leadCode={lead.lead_code}
+                mode={consultationMode}
+                customerName={customer?.name ?? lead?.name ?? null}
+                customerMobile={customer?.primary_mobile ?? lead?.mobile ?? null}
+                service={service?.service_name ?? lead?.service ?? null}
+                totalAmount={total ?? (lead?.total_amount != null ? Number(lead.total_amount) : null)}
+              />
             </div>
           )}
 
