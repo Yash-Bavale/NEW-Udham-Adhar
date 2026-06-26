@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
             followup_5d: { kind: "followup_7d", tplCode: "workflow_processing_update_3d", daysFromNow: 2 },
             followup_7d: null,
             custom: null,
+            pending_closure_followup: null,
           };
+
 
           for (const r of due ?? []) {
             processed++;
