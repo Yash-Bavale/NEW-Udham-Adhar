@@ -535,6 +535,40 @@ function Empty({ label }: { label: string }) {
   return <div className="p-6 text-sm text-center italic" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>;
 }
 
+function ExpandableLeadRow({ lead: l, hideMoney }: { lead: any; hideMoney: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--admin-border)" }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-[var(--admin-surface)]">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="p-1 rounded hover:bg-[var(--admin-surface-2)] shrink-0"
+          title={open ? "Collapse" : "Expand"}
+          aria-label="Toggle form details"
+        >
+          {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <button onClick={() => setOpen((v) => !v)} className="flex-1 min-w-0 text-left">
+          <div className="font-medium text-sm font-mono">{l.lead_code ?? l.id.slice(0, 8)}</div>
+          <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+            {l.service} · {fmtD(l.created_at)}{!hideMoney && ` · ${fmtINR(Number(l.total_amount))}`}
+          </div>
+        </button>
+        <StatusBadge status={l.status} />
+        <Link
+          to="/admin/leads/$leadId"
+          params={{ leadId: l.id }}
+          className="p-1 rounded hover:bg-[var(--admin-surface-2)] shrink-0"
+          title="Open lead"
+        >
+          <ExternalLink className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
+        </Link>
+      </div>
+      {open && <LeadFormSubmissionInline leadId={l.id} />}
+    </div>
+  );
+}
+
 function CopyBtn({ value }: { value: string }) {
   return (
     <button
