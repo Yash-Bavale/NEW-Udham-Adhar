@@ -190,9 +190,21 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
     z.object({ applicationId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    // Use the user-scoped client; staff RLS policies on applications/onboarding/documents
-    // already permit admin, super_admin, operations, support, accounts.
-    const supabase = context.supabase;
+    // Authorize via user-scoped client, then read with admin client so that
+    // operations/support/executive staff (whose RLS on onboarding tables may
+    // be narrower) can still view full form details required to fill the
+    // government portal.
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Staff check — any staff role qualifies.
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    if (!roles || roles.length === 0) throw new Error("Forbidden");
+
+    const supabase = supabaseAdmin;
 
     const { data: app, error: appErr } = await supabase
       .from("applications")
@@ -233,6 +245,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
               .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
+
 
     // Fallback: submission may not yet be linked to the application (legacy rows)
     let sub = submission;
