@@ -157,7 +157,12 @@ function OrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           {showConsultationPanel && (
-            <div id="order-consultation" className="scroll-mt-32">
+            <div id="order-consultation" className="scroll-mt-32 space-y-3">
+              <ConsultationContactStrip
+                name={customer?.name ?? lead?.name ?? "—"}
+                mobile={customer?.primary_mobile ?? lead?.mobile ?? null}
+                email={customer?.primary_email ?? lead?.email ?? null}
+              />
               <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
             </div>
           )}
