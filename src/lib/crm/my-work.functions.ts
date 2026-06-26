@@ -5,12 +5,14 @@ export type WorkApplication = {
   id: string;
   application_code: string | null;
   application_status: string;
+  fulfillment_status: string | null;
   form_status: string;
   document_status: string;
   created_at: string;
   updated_at: string;
   lead: { id: string; name: string; email: string; mobile: string; service: string } | null;
 };
+
 
 export type WorkLead = {
   id: string;
