@@ -6,10 +6,13 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Copy, FileText, Award, Receipt, Wallet,
   MessageSquareWarning, MessageCircle, StickyNote, Activity as ActivityIcon,
   Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
+  Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCustomer360, addCustomerNote, updateCustomer, uploadCustomerKyc, getCustomerKycSignedUrl } from "@/lib/crm/customers.functions";
 import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/components/admin/ui";
+import { LeadFormSubmissionInline } from "@/components/admin/LeadFormSubmissionInline";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
 import { useRole } from "@/hooks/useRole";
 
