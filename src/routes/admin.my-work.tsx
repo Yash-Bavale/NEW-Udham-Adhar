@@ -79,31 +79,55 @@ function MyWorkPage() {
 
       <Section
         title="Next-best actions"
-        subtitle="Your assigned applications, oldest first"
+        subtitle="Order Received items shown first — these are ready to work on now"
         empty="No assigned applications — you're clear."
         href="/admin/applications"
       >
-        {(data?.assignedApplications ?? []).slice(0, 8).map((a) => (
-          <Link
-            key={a.id}
-            to="/admin/applications/$applicationId"
-            params={{ applicationId: a.id }}
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
-          >
-            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
-              {a.application_code ?? a.id.slice(0, 8)}
-            </code>
-            <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>
-              {a.lead?.name ?? "Unknown"}
-            </span>
-            <StatusPill status={a.application_status} />
-            <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-              {formatRelative(a.updated_at)}
-            </span>
-            <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
-          </Link>
-        ))}
+        {[...(data?.assignedApplications ?? [])]
+          .sort((a, b) => {
+            const aFresh = a.fulfillment_status === "order_received" ? 0 : 1;
+            const bFresh = b.fulfillment_status === "order_received" ? 0 : 1;
+            return aFresh - bFresh;
+          })
+          .slice(0, 12)
+          .map((a) => {
+            const fresh = a.fulfillment_status === "order_received";
+            return (
+              <Link
+                key={a.id}
+                to="/admin/applications/$applicationId"
+                params={{ applicationId: a.id }}
+                className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm border"
+                style={
+                  fresh
+                    ? { background: "rgba(249, 115, 22, 0.10)", borderColor: "rgba(249, 115, 22, 0.45)" }
+                    : { borderColor: "transparent" }
+                }
+              >
+                {fresh && (
+                  <span
+                    className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                    style={{ background: "#F97316", color: "white" }}
+                  >
+                    Act now
+                  </span>
+                )}
+                <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
+                  {a.application_code ?? a.id.slice(0, 8)}
+                </code>
+                <span className="font-medium truncate flex-1" style={{ color: fresh ? "#F97316" : "var(--admin-fg)" }}>
+                  {a.lead?.name ?? "Unknown"}
+                </span>
+                <StatusPill status={a.fulfillment_status ?? a.application_status} fresh={fresh} />
+                <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                  {formatRelative(a.updated_at)}
+                </span>
+                <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
+              </Link>
+            );
+          })}
       </Section>
+
 
       <Section
         title="Documents pending review"
