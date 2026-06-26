@@ -672,9 +672,11 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
         certificate_number: cert.certificate_number,
         certificate_url: signed.signedUrl,
         resend: true,
+        ...(resendAttachment ? { __attachments: [resendAttachment] } : {}),
       },
       created_by: context.userId,
     } as never);
+
 
     const { staff_name, staff_role } = await getStaff(context.userId);
     await admin.from("application_events").insert({
