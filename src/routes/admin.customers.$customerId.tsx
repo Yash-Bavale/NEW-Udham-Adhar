@@ -6,7 +6,6 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Copy, FileText, Award, Receipt, Wallet,
   MessageSquareWarning, MessageCircle, StickyNote, Activity as ActivityIcon,
   Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
-  Calendar, CheckCircle2, ExternalLink, User, ShoppingBag, IndianRupee, FolderOpen, Send,
   ChevronDown, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
