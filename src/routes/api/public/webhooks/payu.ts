@@ -298,10 +298,12 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   support_email: "help@businesshelpservices.com",
                 };
 
-                // Order confirmation — immediate, with invoice PDF attached.
+                // Payment success — immediate, with invoice PDF attached.
+                // Uses the enabled `payment_success` template (the Zoho-style
+                // "Order Confirmation & Tax Invoice" email customers expect).
                 try {
                   await enqueueFromTemplateInternal(
-                    "order_confirmation",
+                    "payment_success",
                     leadRow.email,
                     commonVars,
                     {
@@ -315,7 +317,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
                   await markInvoiceEmailedByPayment(payment.id, {
                     recipient: leadRow.email,
-                    template: "order_confirmation",
+                    template: "payment_success",
                     attachmentFilename: invoiceAttachment?.filename ?? null,
                     success: true,
                     actorLabel: "payu-webhook",
@@ -324,7 +326,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
                   await markInvoiceEmailedByPayment(payment.id, {
                     recipient: leadRow.email,
-                    template: "order_confirmation",
+                    template: "payment_success",
                     attachmentFilename: invoiceAttachment?.filename ?? null,
                     success: false,
                     error: e instanceof Error ? e.message : String(e),
