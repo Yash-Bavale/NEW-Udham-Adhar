@@ -74,7 +74,7 @@ function OrderDetailPage() {
   // Build timestamps for the process tracker tooltips
   const timestamps: Partial<Record<OrderStage, string | null>> = {
     lead_received: application.created_at,
-    payment_done: lead?.payment_successful_at ?? null,
+    payment_done: paymentSuccessfulAt ?? null,
     form_submitted: application?.form_submitted_at ?? null,
     under_review: stageMeta?.verification_pending?.at ?? null,
     in_progress: stageMeta?.documents_received?.at ?? null,
