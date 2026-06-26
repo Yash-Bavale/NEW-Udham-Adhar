@@ -211,16 +211,21 @@ function Section({
   );
 }
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status, fresh }: { status: string; fresh?: boolean }) {
   return (
     <span
       className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border"
-      style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)", background: "var(--admin-surface-2)" }}
+      style={
+        fresh
+          ? { borderColor: "rgba(249,115,22,0.5)", color: "#F97316", background: "rgba(249,115,22,0.10)" }
+          : { borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)", background: "var(--admin-surface-2)" }
+      }
     >
       {status.replace(/_/g, " ")}
     </span>
   );
 }
+
 
 function formatRelative(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
