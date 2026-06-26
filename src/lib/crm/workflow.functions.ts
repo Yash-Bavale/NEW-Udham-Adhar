@@ -219,33 +219,86 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       created_by: context.userId,
     } as never);
 
-    // 4) Schedule 3-day customer email (engine will reschedule 5/7 day on each tick)
-    const threeDays = new Date(Date.now() + 3 * 86400 * 1000).toISOString();
-    await admin.from("workflow_reminders").insert({
-      application_id: app.id,
-      lead_id: app.lead_id,
-      kind: "followup_3d",
-      template_code: "workflow_processing_update_3d",
-      due_at: threeDays,
-      assigned_to: lead?.assigned_to ?? null,
-      status: "pending",
-      payload: { reason: data.reasonLabel, customer_email: lead?.email ?? null },
-      created_by: context.userId,
-    } as never);
+    // Distinguish "denied service / pending closure" reasons from pure external/technical delays.
+    // Denied reasons route to the order_pending_closure email + 24h auto-closure follow-up.
+    // Other reasons keep the existing 3/5/7-day processing-update cadence and use service_processing_update.
+    const DENIED_CLOSURE_REASONS = new Set([
+      "government_platform_assumption",
+      "change_of_mind",
+      "user_does_not_wish_to_proceed",
+      "otp_not_provided",
+      "change_in_service_requirement",
+      "incorrect_information",
+      "documents_missing",
+      "customer_non_responsive",
+      "eligibility_issue",
+      "service_already_started",
+    ]);
+    const isDeniedReason = DENIED_CLOSURE_REASONS.has(data.reasonCode);
 
-    // 5) Immediate "delay notice" email to customer
+    // Fetch the full reason description (used as {{reason_block}} in the new templates).
+    let reasonBlock = data.reasonLabel;
+    try {
+      const { data: rr } = await admin
+        .from("workflow_delay_reasons")
+        .select("description")
+        .eq("code", data.reasonCode)
+        .maybeSingle();
+      if (rr?.description) reasonBlock = rr.description as string;
+    } catch {
+      /* ignore — fall back to reasonLabel */
+    }
+
+    if (isDeniedReason) {
+      // Schedule 24-hour auto-closure follow-up (will fire order_closure_confirmation + close order).
+      const followupDue = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+      await admin.from("workflow_reminders").insert({
+        application_id: app.id,
+        lead_id: app.lead_id,
+        kind: "pending_closure_followup",
+        template_code: "order_closure_confirmation",
+        due_at: followupDue,
+        assigned_to: lead?.assigned_to ?? null,
+        status: "pending",
+        payload: {
+          reason: data.reasonLabel,
+          reason_block: reasonBlock,
+          customer_email: lead?.email ?? null,
+        },
+        created_by: context.userId,
+      } as never);
+    } else {
+      // Standard external/technical delay → keep 3/5/7 day cadence.
+      const threeDays = new Date(Date.now() + 3 * 86400 * 1000).toISOString();
+      await admin.from("workflow_reminders").insert({
+        application_id: app.id,
+        lead_id: app.lead_id,
+        kind: "followup_3d",
+        template_code: "workflow_processing_update_3d",
+        due_at: threeDays,
+        assigned_to: lead?.assigned_to ?? null,
+        status: "pending",
+        payload: { reason: data.reasonLabel, reason_block: reasonBlock, customer_email: lead?.email ?? null },
+        created_by: context.userId,
+      } as never);
+    }
+
+    // 5) Immediate customer email — denied = "Order Pending Closure", else generic Service Processing Update.
     if (lead?.email) {
       try {
         const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
         const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+        const tplCode = isDeniedReason ? "order_pending_closure" : "service_processing_update";
         await enqueueFromTemplateInternal(
-          "workflow_external_delay_notice",
+          tplCode,
           lead.email,
           {
             customer_name: lead.name ?? "Customer",
             order_id: app.application_code ?? "",
+            order_number: app.application_code ?? "",
             service_name: lead.service ?? "",
             reason: data.reasonLabel,
+            reason_block: reasonBlock,
             date: new Date().toLocaleDateString("en-IN"),
             company_name: COMPANY_NAME,
             support_email: SUPPORT_EMAIL,
@@ -257,6 +310,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         console.error("[workflow] delay-notice email failed", e);
       }
     }
+
+
 
     await writeAudit({
       supabase: context.supabase,
