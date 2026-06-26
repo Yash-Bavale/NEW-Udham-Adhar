@@ -17,17 +17,17 @@ import mapImg from "@/assets/india-map.svg.asset.json";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Business Help Services — Apply, Update, Download" },
+      { title: "Udyam Registration Online — Apply, Update & Download MSME Certificate" },
       {
         name: "description",
         content:
-          "Get expert consultancy for Udyam/MSME registration, certificate updates, downloads, and Udyog Aadhaar migration across India.",
+          "Udyam (MSME) registration consultancy: apply for new Udyam certificate, update details, download Udyam / Udyog Aadhaar certificate. Pan-India assistance.",
       },
-      { property: "og:title", content: "Business Help Services — Apply, Update, Download" },
+      { property: "og:title", content: "Udyam Registration Online — Apply, Update & Download MSME Certificate" },
       {
         property: "og:description",
         content:
-          "Expert consultancy assistance for Udyam/MSME registration, certificate updates, downloads and migration.",
+          "Udyam (MSME) registration consultancy: new registration, certificate updates, downloads and Udyog Aadhaar migration. Trusted assistance across India.",
       },
       { property: "og:url", content: "https://udyamadhar.in/" },
     ],
