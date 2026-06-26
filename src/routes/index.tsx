@@ -273,6 +273,16 @@ function HomePage() {
           ))}
         </Accordion>
 
+        {/* SSR-visible FAQ mirror for crawlers — Radix Accordion does not render closed panels in HTML */}
+        <div className="sr-only" aria-hidden="true">
+          {FAQS.map((f, i) => (
+            <div key={`faq-ssr-${i}`}>
+              <h3>{f.q.replace(/^\d+\.\s*/, "")}</h3>
+              <p>{f.a}</p>
+            </div>
+          ))}
+        </div>
+
         <div className="mt-8 flex flex-col items-center gap-3 text-center">
           <Button
             asChild
