@@ -100,7 +100,7 @@ function AppTokenPage() {
               <Link to="/onboarding/$leadCode/documents" params={{ leadCode: lead.lead_code }} className="rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white">Upload documents</Link>
             )}
             {purpose === "status" && lead?.lead_code && (
-              <Link to="/processing/$leadCode" params={{ leadCode: lead.lead_code }} className="rounded border border-brand-navy px-4 py-2 text-sm font-medium text-brand-navy">View live status</Link>
+              <Link to="/apply/$leadCode/summary" params={{ leadCode: lead.lead_code }} className="rounded border border-brand-navy px-4 py-2 text-sm font-medium text-brand-navy">View live status</Link>
             )}
             {purpose === "certificate" && (
               <a href="#" onClick={(e) => { e.preventDefault(); alert("Certificate download link will be enabled after ops upload completes."); }} className="rounded bg-brand-green px-4 py-2 text-sm font-medium text-white">Download certificate</a>
