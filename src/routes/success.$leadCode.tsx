@@ -54,9 +54,15 @@ function SuccessPage() {
             return;
           }
         } catch (err: any) {
+          // "Application not found" can happen transiently right after redirect
+          // while the webhook is still writing. Keep polling silently; only
+          // surface real failures after several consecutive errors.
           if (cancelled) return;
-          setError(err?.message || "Failed to load details");
-          return;
+          const msg = String(err?.message ?? "");
+          if (!/not found/i.test(msg) && attempt >= 5) {
+            setError(msg || "Failed to load details");
+            return;
+          }
         }
         await new Promise((r) => setTimeout(r, 2000));
       }
@@ -65,6 +71,7 @@ function SuccessPage() {
       cancelled = true;
     };
   }, [leadCode, getSummary]);
+
 
   // Local countdown — independent of confirmation polling.
   useEffect(() => {
