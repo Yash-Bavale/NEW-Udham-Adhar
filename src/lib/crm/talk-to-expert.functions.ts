@@ -65,7 +65,10 @@ export const selectConsultationService = createServerFn({ method: "POST" })
     const paymentUrl = `${appOrigin()}/payment/${encodeURIComponent(leadCode)}`;
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Update lead → new service + pricing + status
+    // 1. Update lead → new service + pricing + status + consultation marker
+    // We stamp lead_source so post-conversion detection works regardless of the
+    // original capture source (website, ads, etc.).
+    const originalSource = (lead as any).lead_source ?? null;
     const { error: updErr } = await supabaseAdmin
       .from("leads")
       .update({
@@ -76,6 +79,7 @@ export const selectConsultationService = createServerFn({ method: "POST" })
         total_amount: total,
         status: "payment_pending",
         lead_status_v2: "payment_pending",
+        lead_source: "talk_to_expert_converted",
       } as never)
       .eq("id", lead.id);
     if (updErr) throw new Error(updErr.message);
@@ -111,7 +115,7 @@ export const selectConsultationService = createServerFn({ method: "POST" })
         actor_id: context.userId,
         actor_name: "Staff",
         is_system: false,
-        metadata: { service_id: svc.id, service_name: svc.service_name, payment_url: paymentUrl } as never,
+        metadata: { service_id: svc.id, service_name: svc.service_name, payment_url: paymentUrl, original_lead_source: originalSource } as never,
       } as never);
     }
 

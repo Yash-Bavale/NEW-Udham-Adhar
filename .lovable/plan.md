@@ -1,34 +1,40 @@
-## Root cause (verified in DB + code)
+## Root cause
 
-The post-payment email isn't showing the transaction ID and isn't carrying the tax-invoice PDF, but for **two different reasons** depending on the gateway:
+I checked the live order `11448f96…` (lead `UA-2026-007629`) in the database. After Step 1 fired, the row looks like this:
 
-1. **PayU customers get nothing useful.** PayU's webhook (`src/routes/api/public/webhooks/payu.ts`) enqueues template code `order_confirmation`. That template row in `email_templates` has `is_enabled = false`, so `enqueueFromTemplateInternal` (`src/lib/emails/emails.server.ts:69`) silently returns and the PDF + variables are dropped on the floor. Same for `welcome_and_form_link` (also disabled).
+```
+lead_source     = "website"          ← original capture source, never changed
+service         = "New Udyam Registration"
+status / v2     = payment_pending
+application.application_status = awaiting_payment
+```
 
-2. **CCAvenue + admin "resend invoice" emails are missing fields.** The CCAvenue webhook already passes the full variable set, but `resendInvoiceEmail` in `src/lib/crm/invoices.functions.ts` (lines 320–345) builds a sparse variable map — no `transaction_id`, `invoice_url`, `invoice_date`, `payment_datetime`, `cgst/sgst/igst_amount`, `amount_in_words`, `customer_email`, `customer_mobile`, `place_of_supply`, `sac_code`. The `payment_success` template references `{{transaction_id}}` (position 2200) and `{{invoice_url}}` (position 8747), so they render as blanks.
+`isConvertedConsultationLead()` requires `lead_source` to contain `talktoexpert` / `expertconsultation`. Because the original lead was captured with `lead_source = "website"` and `selectConsultationService` never stamps a conversion marker, the check returns **false** after Step 1 runs. So:
 
-DB evidence: every `email_queue` row for `payment_success` in the last 24 h has `has_txn=false, has_url=false`, and most have `has_att=false`. The only one with `has_att=true` (d5bdc41e) came from resend — its variables JSON has only 15 keys and excludes `transaction_id`/`invoice_url`.
+- `selectStep` is false (service is no longer the consultation label)
+- `awaitingSecondPayment` is false (lead_source isn't a consultation source)
+- `showConsultationPanel` is false → Step 2 panel never mounts → no "Copy / Send Payment Link" buttons, so no email can be sent either.
 
-## Changes
+The visible symptom on this order matches exactly: the normal `FormSubmissionPanel` appears instead of the amber Step 2 card.
 
-**1. `src/routes/api/public/webhooks/payu.ts`**
-- Change the post-payment enqueue from `order_confirmation` → `payment_success` (the enabled, Zoho-style template the customer is supposed to receive). All the existing variables (`transaction_id`, `invoice_url`, `payment_datetime`, attachment) are already being passed, so nothing else changes — the email will now actually go out with the PDF attached and the transaction ID populated.
-- Keep the rest of the handler (status flips, invoice generation, logging) untouched.
+## Fix
 
-**2. `src/lib/crm/invoices.functions.ts` — `resendInvoiceEmail`**
-- Load invoice + payment row alongside the lead so we can fill the full template:
-  - `invoice_url` = `https://udyamadhar.in/api/public/invoice/{lead_code}`
-  - `invoice_download_url` = same
-  - `transaction_id` = `payments.transaction_id` (fallback `razorpay_order_id` → `payment.id`)
-  - `payment_datetime` = `payments.payment_date` formatted IST, fallback `now()`
-  - `invoice_date` = `invoices.issued_at` formatted IST
-  - `customer_email`, `customer_mobile`, `amount_in_words` (via existing `amountInWordsINR`)
-  - `sac_code`, `place_of_supply`, `cgst_amount`, `sgst_amount`, `igst_amount`, `form_link`
-- Keep the attachment path (`__attachments` already set via `opts.attachments`).
+Stamp an unambiguous "this lead came from Talk-to-Expert" marker at Step 1 and teach the detector to honor it, independent of the original lead capture source.
 
-**3. (Optional cleanup, no behavior change to customer)** Skip — leave `order_confirmation` and `welcome_and_form_link` template rows alone. Switching PayU to `payment_success` in step 1 removes the silent-skip without needing a DB migration.
+### 1. `src/lib/crm/talk-to-expert.functions.ts` — `selectConsultationService`
+- In the `leads` update, also set `lead_source = "talk_to_expert_converted"` (preserving the original value in `workflow_events.metadata.original_lead_source` for audit).
+- In `resetConsultationSelection`, restore `lead_source` back to its original value if present in metadata, otherwise leave the converted marker (still recognized as consultation).
 
-## Verification
+### 2. `src/lib/crm/consultation.ts`
+- Extend `isConsultationSource()` so it also matches `talk_to_expert_converted` (normalized form `talktoexpertconverted` already contains `talktoexpert`, so no change needed — verify with the existing regex).
+- Confirm: `isUnconvertedConsultationLead` stays purely service-name based; `isConvertedConsultationLead` keeps source-based check, which now succeeds.
 
-- Re-query a fresh `email_queue` row after a test payment (PayU + CCAvenue) and confirm `has_txn=true`, `has_url=true`, `has_att=true`, and `position('{{' in body_html) = 0` (no unrendered placeholders left).
-- Trigger "Resend invoice" from the admin UI on a paid order and confirm the same three flags are true on the new row.
-- No UI / no template HTML changes — purely fixing what variables and template code we hand to the queue.
+### 3. Backfill existing rows
+Run a one-off SQL migration to mark any lead whose latest application has `application_status = 'awaiting_payment'` AND has a prior successful payment AND was originally a Talk-to-Expert lead (detected via `workflow_events` of type `consultation_service_selected`). For these, set `leads.lead_source = 'talk_to_expert_converted'`. This rescues lead `c3c8a623…` and any siblings.
+
+### 4. Verification
+- Reload `/admin/orders/11448f96-6cc0-473c-a4df-4353a8217f17` — the amber **Step 2 · Share Payment Link** card should render with the payment URL, Copy, Send Email (60 s cooldown), WhatsApp, and Change Service controls.
+- Click **Send Payment Link** → `email_queue` row inserted for template `consultation_service_converted`; with the recently-shipped immediate-send change, the email fires synchronously.
+- Test a fresh Talk-to-Expert order end-to-end: Step 1 → Step 2 visible → email sends → after webhook flips `application_status`, the panel auto-hides and `FormSubmissionPanel` / `FulfillmentStatusUpdater` reappear.
+
+No UI/UX changes — only the gating logic and a marker field.
