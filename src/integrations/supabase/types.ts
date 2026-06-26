@@ -3272,6 +3272,7 @@ export type Database = {
         | "followup_7d"
         | "closure_24h"
         | "custom"
+        | "pending_closure_followup"
       workflow_reminder_status: "pending" | "sent" | "cancelled" | "failed"
       workflow_status:
         | "new"
@@ -3541,6 +3542,7 @@ export const Constants = {
         "followup_7d",
         "closure_24h",
         "custom",
+        "pending_closure_followup",
       ],
       workflow_reminder_status: ["pending", "sent", "cancelled", "failed"],
       workflow_status: [

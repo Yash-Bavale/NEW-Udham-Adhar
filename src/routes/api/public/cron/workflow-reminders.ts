@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
             followup_5d: { kind: "followup_7d", tplCode: "workflow_processing_update_3d", daysFromNow: 2 },
             followup_7d: null,
             custom: null,
+            pending_closure_followup: null,
           };
+
 
           for (const r of due ?? []) {
             processed++;
@@ -71,8 +73,10 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   {
                     customer_name: lead.name ?? "Customer",
                     order_id: app.application_code ?? "",
+                    order_number: app.application_code ?? "",
                     service_name: lead.service ?? "",
                     reason: payload.reason ?? "Processing update",
+                    reason_block: payload.reason_block ?? payload.reason ?? "Processing update",
                     date: new Date().toLocaleDateString("en-IN"),
                     company_name: COMPANY_NAME,
                     support_email: SUPPORT_EMAIL,
@@ -93,6 +97,26 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   metadata: { reminder_id: r.id, template: r.template_code },
                 } as never);
               }
+
+              // Auto-close the order when the 24h pending-closure window elapses.
+              if (r.kind === "pending_closure_followup") {
+                await supabaseAdmin
+                  .from("applications")
+                  .update({ workflow_status: "closed", workflow_closed_at: nowIso } as never)
+                  .eq("id", app.id);
+                await supabaseAdmin.from("workflow_events").insert({
+                  application_id: app.id,
+                  lead_id: app.lead_id,
+                  event_type: "order_auto_closed",
+                  title: "Order auto-closed after pending-closure window",
+                  description: "No response received within the reasonable period after the pending-closure notice.",
+                  customer_visible: false,
+                  actor_name: "System",
+                  is_system: true,
+                  metadata: { reminder_id: r.id, reason: (r.payload as any)?.reason ?? null },
+                } as never);
+              }
+
 
               // Reschedule next step in the 3/5/7 cadence
               const next = NEXT_KIND[r.kind as string];
