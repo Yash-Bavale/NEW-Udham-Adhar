@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, UserCircle2, ShoppingBag, FileText, MessageSquareWarning,
   Briefcase, Receipt, CreditCard, LifeBuoy, ListChecks, BarChart3, UserCog,
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
-  Inbox, GitBranch, Activity, FileCheck2, ClipboardList, Eye, Award,
+  Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
   Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
