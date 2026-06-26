@@ -1,6 +1,8 @@
 // Single source of truth for the unified Order Workspace stage.
 // Pure, client-safe. Derived from real DB columns — no new status field added.
 
+import { isUnconvertedConsultationLead } from "./consultation";
+
 export type OrderStage =
   | "lead_received"
   | "payment_pending"
@@ -21,6 +23,10 @@ export interface ComputeStageLead {
   lead_status_v2?: string | null;
   payment_successful_at?: string | null;
   status?: string | null;
+  lead_source?: string | null;
+  source?: string | null;
+  service?: string | null;
+  service_name?: string | null;
 }
 
 export interface ComputeStageApplication {
@@ -48,7 +54,7 @@ export function computeOrderStage(
   }
 
   if (!application) return "payment_done";
-  if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled") {
+  if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
     return "consultation_pending";
   }
   if (!application.form_submitted_at) return "payment_done";
