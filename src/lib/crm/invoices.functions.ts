@@ -308,12 +308,29 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
 
     const { data: lead } = await admin
       .from("leads")
-      .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+      .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
       .eq("id", payment.lead_id).single();
     if (!lead?.email) throw new Error("Customer email missing");
 
     const { data: inv } = await admin
-      .from("invoices").select("id, invoice_number").eq("payment_id", data.paymentId).maybeSingle();
+      .from("invoices")
+      .select("id, invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
+      .eq("payment_id", data.paymentId).maybeSingle();
+
+    const { data: pay } = await admin
+      .from("payments")
+      .select("transaction_id, razorpay_order_id, payment_date")
+      .eq("id", data.paymentId).maybeSingle();
+
+    const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
+    const onboardingUrl = `https://udyamadhar.in/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`;
+    const invoiceUrl = `https://udyamadhar.in/api/public/invoice/${encodeURIComponent(lead.lead_code ?? "")}`;
+    const total = Number(inv?.total_amount ?? lead.total_amount ?? 0);
+    const issued = inv?.issued_at ? new Date(inv.issued_at) : new Date();
+    const paidAt = pay?.payment_date ? new Date(pay.payment_date) : new Date();
+    const fmtDate = (d: Date) => d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    const fmtDateTime = (d: Date) =>
+      d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST";
 
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
@@ -323,18 +340,33 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
         {
           name: lead.name ?? "",
           customer_name: lead.name ?? "",
+          customer_email: lead.email,
+          customer_mobile: lead.mobile ?? "",
           lead_code: lead.lead_code ?? "",
+          leadCode: lead.lead_code ?? "",
           order_number: lead.lead_code ?? "",
           service: lead.service ?? "",
           service_name: lead.service ?? "",
+          base_amount: Number(inv?.base_amount ?? lead.base_amount ?? 0).toFixed(2),
+          gst_amount: Number(inv?.gst_amount ?? lead.gst_amount ?? 0).toFixed(2),
+          total_amount: total.toFixed(2),
+          amount: total.toFixed(2),
+          amount_in_words: amountInWordsINR(total),
           invoice_number: inv?.invoice_number ?? "",
+          invoice_date: fmtDate(issued),
+          sac_code: inv?.sac_code ?? "998311",
+          place_of_supply: inv?.place_of_supply ?? "Maharashtra",
+          cgst_amount: Number(inv?.cgst_amount ?? 0).toFixed(2),
+          sgst_amount: Number(inv?.sgst_amount ?? 0).toFixed(2),
+          igst_amount: Number(inv?.igst_amount ?? 0).toFixed(2),
+          onboarding_url: onboardingUrl,
+          form_link: onboardingUrl,
+          invoice_url: invoiceUrl,
+          invoice_download_url: invoiceUrl,
           invoice_attachment: attachment.filename,
-          base_amount: Number(lead.base_amount ?? 0).toFixed(2),
-          gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
-          total_amount: Number(lead.total_amount ?? 0).toFixed(2),
-          amount: Number(lead.total_amount ?? 0).toFixed(2),
-          onboarding_url: `https://udyamadhar.in/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`,
-          support_email: "help@businesshelpservices.in",
+          transaction_id: pay?.transaction_id ?? pay?.razorpay_order_id ?? data.paymentId,
+          payment_datetime: fmtDateTime(paidAt),
+          support_email: "help@businesshelpservices.com",
         },
         {
           toName: lead.name ?? undefined,
