@@ -64,8 +64,9 @@ function OrderDetailPage() {
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const stage: OrderStage = computeOrderStage(lead, application);
 
-  // Hide rupee figures from operations/support — they should never see money
-  const hideAmount = role.hasAny(["operations", "support"]) && !role.hasAny(["super_admin", "admin", "accounts", "finance"]);
+  // Default-hide money: only finance/admin roles see rupee figures.
+  // Using role.hideMoney() ensures the UI is hidden during role-loading too.
+  const hideAmount = role.hideMoney();
 
   // Build timestamps for the process tracker tooltips
   const timestamps: Partial<Record<OrderStage, string | null>> = {

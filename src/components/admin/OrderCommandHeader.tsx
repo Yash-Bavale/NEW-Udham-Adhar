@@ -78,9 +78,9 @@ export function OrderCommandHeader({
               <Link
                 to="/admin/leads/$leadId"
                 params={{ leadId }}
-                className="ml-1 inline-flex items-center gap-0.5 text-[11px] text-blue-600 hover:underline"
+                className="ml-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100"
               >
-                Lead <ExternalLink className="size-3" />
+                Open Lead <ExternalLink className="size-3" />
               </Link>
             )}
           </div>
