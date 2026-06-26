@@ -183,7 +183,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
         stage: computeOrderStage(
-          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: lead?.payment_successful_at },
+          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
           { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
         ),
       };
