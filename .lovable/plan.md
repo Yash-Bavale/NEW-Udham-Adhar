@@ -1,25 +1,74 @@
-## What happened
 
-Two earlier domain attempts are no longer active in this project:
-- `notify.businesshelpservices.in` — not present in the workspace anymore
-- `notify.businesshelpservices.com` — was rejected by Mailgun (owned by another account)
+## Goal
 
-The only active sender domain on this project is now:
-- **`notify.mail.businesshelpservices.com`** — DNS just verified, currently in "completing setup"
+For **Talk to Expert** leads (₹99 consultation already paid), let the employee pick the actual service the customer needs after the call. On save, the system silently generates a payment link for the new service and sends it to the customer via email + WhatsApp — no pricing visible to the employee.
 
-So nothing is broken — the project simply moved from one domain attempt to the final one, and it's finishing provisioning right now.
+The ₹99 consultation fee stays as-is (already paid, non-adjusted).
 
-## Plan
+## UX
 
-1. **Wait for provisioning to finish.** The domain shows "Domain verified — completing setup". This is the last automatic step before sends will succeed. No action needed — usually a few minutes.
+A compact panel **"Convert Consultation → Service"** appears at the top of the lead workspace ONLY when:
+- `lead.lead_source = 'talk_to_expert'`
+- service is still `Expert Consultation`
+- no paid payment exists for the new service yet
 
-2. **Once active, verify a real send.** Trigger one transactional email (e.g. resend a payment-success email for a recent test order) and check `email_logs` / `email_send_log` for a `sent` status instead of the previous `403 no_matching_sender`.
+```text
+┌────────────────────────────────────────────┐
+│ 🎯 Set Customer's Service                  │
+│ Pick the service the customer needs.       │
+│ A payment link will be sent automatically. │
+│                                            │
+│ Service     [ Select service ▾ ]           │
+│                                            │
+│ [ Save & Send Payment Link ]               │
+└────────────────────────────────────────────┘
+```
 
-3. **No code changes required.** The send route already uses the project's configured sender via `SENDER_DOMAIN`, middleware already bypasses `/lovable/*`, and all queue infrastructure is in place from the prior setup runs. The 403 was purely because no domain was active yet; that condition is now resolving on its own.
+- No price shown anywhere in this panel.
+- After save → toast "Service set. Payment link sent to customer." Panel disappears.
+- Existing PaymentLinkPanel (which does show price to roles with finance access) takes over for follow-up tracking.
 
-4. **If after ~15 minutes it still hasn't flipped to Active**, re-run domain setup once to nudge provisioning, then check **Cloud → Emails** for the exact reason.
+## Technical plan
 
-## Notes
+### 1. Server function `convertConsultationLead`
+New file `src/lib/crm/talk-to-expert.functions.ts`
 
-- All outgoing emails (order confirmation, tax invoice, workflow updates, closure flows) will start sending from `notify@mail.businesshelpservices.com` automatically once the domain shows Active.
-- No auth-email scaffolding is needed unless you want branded signup/password-reset emails — your CRM doesn't currently use Supabase auth emails for customer-facing flows.
+- Auth: `requireSupabaseAuth` + staff role check.
+- Input (Zod): `{ leadId: uuid, serviceId: uuid }`.
+- Loads service from `services` (price + gst). Computes base/gst/total server-side — never returned to client.
+- Guard:
+  - `lead.lead_source === 'talk_to_expert'`
+  - lead not already converted (still "Expert Consultation")
+  - no existing `payments` row with `status='paid'` for the *new* service amount
+- Updates `leads`: `service`, `service_id`, `base_amount`, `gst_amount`, `total_amount`, `lead_status_v2 = 'payment_pending'`, append note "Converted from Expert Consultation → {service} by {staff}".
+- Inserts `activity_logs` row (`service_converted`).
+- Internally invokes the same code path as `createPaymentLink` to mint a fresh pending link.
+- Enqueues email via existing `enqueueFromTemplateInternal` using new template `consultation_service_converted` with `{customer_name, service, payment_url, total_amount}`.
+- Returns `{ ok: true }` only — no pricing.
+
+### 2. Email template (migration)
+Insert one row into `email_templates`:
+- code: `consultation_service_converted`
+- subject: `Your service & secure payment link — {{service}}`
+- body: Zoho-style HTML matching existing brand templates with one prominent "Pay Securely" button → `{{payment_url}}`.
+
+### 3. UI component
+`src/components/admin/ConvertConsultationPanel.tsx`
+
+- Uses existing `listActiveServices` server-fn for the dropdown (label only — name).
+- No price fields rendered.
+- Confirm button → calls `convertConsultationLead`.
+- On success: toast + invalidate `admin.lead-detail`, `admin.lead-events`, `admin.payment-link` queries so PaymentLinkPanel refreshes.
+
+### 4. Wire-up
+In the lead workspace composer (`LeadWorkspacePanel.tsx`), render `<ConvertConsultationPanel />` conditionally above existing panels when the talk-to-expert criteria are met.
+
+### 5. WhatsApp auto-send
+Email is sent server-side automatically. WhatsApp is opened by employee (browser cannot auto-send WA from server). The existing PaymentLinkPanel already shows the WhatsApp share button with the freshly-generated link — employee can click it once after conversion. We won't auto-fire WA from the server (not possible without WhatsApp Business API integration, which isn't configured in this project).
+
+### Out of scope
+- ₹99 refund/adjustment logic (kept as-is per your instruction).
+- Pricing visibility changes to other panels.
+- WhatsApp Business API automation.
+
+No schema changes; only the new email-template row.
