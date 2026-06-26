@@ -61,6 +61,10 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
     const base = Number(svc.base_amount ?? 0);
     const gst = Number(svc.gst_amount ?? 0);
     const total = Number(svc.total_amount ?? base + gst);
+    const leadCode = lead.lead_code ?? lead.id;
+    const txnid = newTrackingToken(leadCode);
+    const paymentUrl = `${appOrigin()}/payment/${encodeURIComponent(leadCode)}`;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     // 1. Update lead → new service + pricing + status
     const { error: updErr } = await supabaseAdmin
@@ -128,11 +132,6 @@ export const convertConsultationLead = createServerFn({ method: "POST" })
       .update({ status: "expired" } as any)
       .eq("lead_id", lead.id)
       .eq("status", "pending");
-
-    const leadCode = lead.lead_code ?? lead.id;
-    const txnid = newTrackingToken(leadCode);
-    const paymentUrl = `${appOrigin()}/payment/${encodeURIComponent(leadCode)}`;
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { error: linkErr } = await supabaseAdmin
       .from("payment_links" as any)
