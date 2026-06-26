@@ -36,6 +36,7 @@ function MyWorkPage() {
   const cards = useMemo(
     () => [
       { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)" },
+      { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316" },
       { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)" },
       { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)" },
       { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)" },
@@ -43,6 +44,7 @@ function MyWorkPage() {
     ],
     [counters],
   );
+
 
   return (
     <div className="space-y-6">
