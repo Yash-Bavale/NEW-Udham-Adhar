@@ -31,7 +31,7 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
 
     const { data: lead, error: leadErr } = await (await getAdmin())
       .from("leads")
-      .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state")
+      .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2")
       .eq("lead_code", data.leadCode)
       .maybeSingle();
     if (leadErr) throw new Error(leadErr.message);
@@ -53,7 +53,9 @@ export const createCcavenueOrder = createServerFn({ method: "POST" })
       .eq("status", "paid")
       .limit(1)
       .maybeSingle();
-    if (paidAlready) {
+    const awaitingConvertedServicePayment =
+      lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+    if (paidAlready && !awaitingConvertedServicePayment) {
       throw new Error("This application has already been paid.");
     }
 

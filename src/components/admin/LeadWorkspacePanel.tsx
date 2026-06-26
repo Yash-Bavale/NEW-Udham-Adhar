@@ -40,6 +40,7 @@ import {
 import { useRole } from "@/hooks/useRole";
 import { PaymentLinkPanel } from "./PaymentLinkPanel";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
+import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
@@ -79,7 +80,7 @@ export function LeadWorkspacePanel({
         <EventsTimeline leadId={lead.id} />
       </div>
       <div className="space-y-5">
-        {lead.lead_source === "talk_to_expert" && (lead.service ?? "") === "Expert Consultation" && (
+        {isUnconvertedConsultationLead(lead) && (
           <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
         )}
         <CustomerQuickCard lead={lead} />

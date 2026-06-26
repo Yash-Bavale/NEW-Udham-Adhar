@@ -16,7 +16,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     console.log("[getApplicationSummary] code:", data.leadCode);
     const code = data.leadCode.trim();
-    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, service_id";
+    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id";
 
     // Accept either a lead_code (UA-...) or an application_code (AP-...).
     let lead: any = null;
@@ -58,7 +58,11 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false });
 
-    const successfulPayment = payments?.find(p => p.status === 'paid') || null;
+    const isAwaitingConvertedServicePayment =
+      lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+    const successfulPayment = isAwaitingConvertedServicePayment
+      ? null
+      : payments?.find(p => p.status === 'paid') || null;
 
     const { data: gateways } = await supabaseAdmin
       .from("payment_gateways")
@@ -78,6 +82,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         gstAmount: Number(lead.gst_amount ?? 0),
         totalAmount: Number(lead.total_amount ?? 0),
         status: lead.status,
+        leadStatusV2: lead.lead_status_v2,
         payment: successfulPayment,
       },
       gateways: gateways ?? [],

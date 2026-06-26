@@ -24,7 +24,9 @@ import { ProcessingChecklist } from "@/components/admin/ProcessingChecklist";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel";
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
+import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { computeOrderStage, STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
+import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import { useRole } from "@/hooks/useRole";
 import { formatIST } from "@/lib/datetime";
@@ -63,6 +65,7 @@ function OrderDetailPage() {
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = data as any;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const stage: OrderStage = computeOrderStage(lead, application);
+  const showConsultationPanel = !!lead?.id && !!lead?.lead_code && isUnconvertedConsultationLead(lead);
 
   // Default-hide money: only finance/admin roles see rupee figures.
   // Using role.hideMoney() ensures the UI is hidden during role-loading too.
@@ -153,6 +156,12 @@ function OrderDetailPage() {
       {/* Workspace canvas */}
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
+          {showConsultationPanel && (
+            <div id="order-consultation" className="scroll-mt-32">
+              <ConvertConsultationPanel leadId={lead.id} leadCode={lead.lead_code} />
+            </div>
+          )}
+
           <div id="order-form" className="scroll-mt-32">
             <FormSubmissionPanel applicationId={application.id} />
           </div>

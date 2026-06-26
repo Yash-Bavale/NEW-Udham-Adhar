@@ -7,7 +7,7 @@ interface Props {
   stage: OrderStage;
   leadId?: string | null;
   leadCode?: string | null;
-  onScrollTo: (target: "fulfillment" | "form" | "documents" | "notes") => void;
+  onScrollTo: (target: "fulfillment" | "form" | "documents" | "notes" | "consultation" | "workflow") => void;
 }
 
 /**
@@ -52,6 +52,15 @@ export function StageActionsPanel({ stage, leadId, leadCode, onScrollTo }: Props
       primary = (
         <Button size="sm" onClick={() => onScrollTo("form")}>
           <Mail className="size-3.5 mr-1.5" /> View / Resend Form
+        </Button>
+      );
+      break;
+    case "consultation_pending":
+      title = "Call customer and set final service";
+      helper = "This is a Talk-to-Expert order. Discuss the need, select the service, and the payment link will go automatically.";
+      primary = (
+        <Button size="sm" onClick={() => onScrollTo("consultation")} className="bg-amber-600 hover:bg-amber-700 text-white">
+          Set Service <ArrowRight className="size-3.5 ml-1" />
         </Button>
       );
       break;
