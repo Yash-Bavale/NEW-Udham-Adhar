@@ -119,6 +119,28 @@ export const Route = createFileRoute("/")({
                 acceptedAnswer: { "@type": "Answer", text: f.a },
               })),
             },
+            {
+              "@type": "WebSite",
+              "@id": "https://udyamadhar.in/#website",
+              url: "https://udyamadhar.in/",
+              name: "Udyam Registration Consultancy & Assistance Services",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: "https://udyamadhar.in/faqs?q={search_term_string}",
+                "query-input": "required name=search_term_string",
+              },
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                {
+                  "@type": "ListItem",
+                  position: 1,
+                  name: "Home",
+                  item: "https://udyamadhar.in/",
+                },
+              ],
+            },
           ],
         }),
       },
