@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, History, Loader2, ArrowRight } from "lucide-react";
+import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Mail, History } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { Button } from "@/components/ui/button";
 import { TrustBlock } from "@/components/site/TrustBlock";
+import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
 
 export const Route = createFileRoute("/success/$leadCode")({
   head: () => ({
@@ -19,12 +20,22 @@ export const Route = createFileRoute("/success/$leadCode")({
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
+const TOTAL_SECONDS = 60;
+
+const STEPS: readonly CountdownStep[] = [
+  { at: 0,  icon: CheckCircle2, label: "Payment received",            sub: "Transaction confirmed with your bank" },
+  { at: 10, icon: ShieldCheck,  label: "Securing your details",       sub: "Encrypting personal information" },
+  { at: 22, icon: FileCheck2,   label: "Generating tax invoice",      sub: "Preparing GST-compliant invoice" },
+  { at: 36, icon: Mail,         label: "Sending confirmation email",  sub: "Invoice attached to your inbox" },
+  { at: 48, icon: Sparkles,     label: "Finalising your application", sub: "Routing to onboarding…" },
+] as const;
 
 function SuccessPage() {
   const { leadCode } = Route.useParams();
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
 
+  const [elapsed, setElapsed] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +43,7 @@ function SuccessPage() {
     trackEvent("payment_success_page_view", { leadCode });
     let cancelled = false;
     (async () => {
-      const maxAttempts = 15;
+      const maxAttempts = 30;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           const res = await getSummary({ data: { leadCode } });
@@ -40,7 +51,6 @@ function SuccessPage() {
           const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
           if (isPaid) {
             setConfirmed(true);
-            navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
             return;
           }
         } catch (err: any) {
@@ -54,7 +64,26 @@ function SuccessPage() {
     return () => {
       cancelled = true;
     };
-  }, [leadCode, getSummary, navigate]);
+  }, [leadCode, getSummary]);
+
+  // Local countdown — independent of confirmation polling.
+  useEffect(() => {
+    if (elapsed >= TOTAL_SECONDS) {
+      if (confirmed) {
+        navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
+      }
+      return;
+    }
+    const t = setTimeout(() => setElapsed((s) => s + 1), 1000);
+    return () => clearTimeout(t);
+  }, [elapsed, confirmed, leadCode, navigate]);
+
+  // If confirmed after countdown ended, redirect immediately.
+  useEffect(() => {
+    if (confirmed && elapsed >= TOTAL_SECONDS) {
+      navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
+    }
+  }, [confirmed, elapsed, leadCode, navigate]);
 
   if (error) {
     return (
@@ -75,38 +104,14 @@ function SuccessPage() {
 
   return (
     <div>
-      <section className="relative mx-auto max-w-2xl px-4 py-12 md:py-20">
-        <div className="rounded-3xl border border-border bg-card/85 backdrop-blur shadow-2xl p-8 md:p-12 text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-            {confirmed ? (
-              <CheckCircle2 className="w-9 h-9 text-emerald-600" />
-            ) : (
-              <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-            )}
-          </div>
-          <h1 className="mt-6 text-2xl md:text-3xl font-bold font-display text-foreground">
-            {confirmed ? "Payment received" : "Confirming payment…"}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {confirmed
-              ? "Redirecting you to your application…"
-              : "We're confirming the transaction with your bank. This usually takes a few seconds."}
-          </p>
-          <p className="mt-6 text-[11px] text-muted-foreground font-mono">
-            Ref:{" "}
-            <span className="text-foreground font-semibold tracking-wider">{leadCode}</span>
-          </p>
-          {confirmed && (
-            <Link
-              to="/apply/$leadCode/summary"
-              params={{ leadCode }}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-navy px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-navy-deep"
-            >
-              Continue <ArrowRight className="w-4 h-4" />
-            </Link>
-          )}
-        </div>
-      </section>
+      <CountdownCard
+        totalSeconds={TOTAL_SECONDS}
+        elapsed={elapsed}
+        steps={STEPS}
+        leadCode={leadCode}
+        holdLabel={confirmed ? "Redirecting to your application…" : "Waiting for bank confirmation…"}
+        holdSub={confirmed ? "All set — taking you to the next step" : "This usually takes a few more seconds"}
+      />
       <TrustBlock />
     </div>
   );
