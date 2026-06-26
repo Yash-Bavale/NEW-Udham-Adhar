@@ -103,6 +103,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     return {
       counters: {
         assignedApps: apps.length,
+        orderReceived: apps.filter((a) => a.fulfillment_status === "order_received").length,
         pendingDocs: docs.length,
         assignedLeads: leads.length,
         unreadNotifications: notifRes.count ?? 0,
@@ -113,3 +114,4 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
       assignedLeads: leads,
     };
   });
+
