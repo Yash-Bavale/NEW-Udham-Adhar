@@ -1,55 +1,46 @@
-## Problem
+## Goal
+Replace the old payment-confirmation email body with a new Zoho-style HTML tax invoice that visually matches the attached PDF, then verify it sends correctly after a payment webhook.
 
-On the order detail page, a **support** user still sees:
-- `TOTAL ₹1` and the green **Paid** chip in the sticky header
-- The entire **Payments & Invoices** panel (right column)
-- The **Payment received · ₹1 · payu · paid** entry in the unified Timeline
-
-Root cause in `src/routes/admin.orders.$orderId.tsx`:
-
-```ts
-const hideAmount = role.hasAny(["operations","support"]) && !role.hasAny([...moneyRoles]);
-```
-
-This is **opt-in to hide**. While `useRole` is still loading (`roles = []`), `hasAny(["operations","support"])` is `false`, so `hideAmount = false` → money renders for one paint and stays rendered (React Query keeps the empty roles array until the query resolves on public-session boots). It also doesn't cover `executive` / `manager`, who per `src/lib/roles.ts` also must not see money.
-
-We already have the correct helper: `role.hideMoney()` returns `!canSeeMoney(roles)` — i.e. **default-hide** until a money role is proven. That is the single source of truth and matches the rule baked into `src/lib/roles.ts`.
-
-Separately, the user wants clicking the "Lead" pointer on the order header to clearly open that specific lead's profile (it already routes to `/admin/leads/$leadId`, but the link is tiny and easy to miss next to the service name).
+## What's wrong today
+- The email actually sent after a successful payment is the DB template `order_confirmation`, whose body is a 3-line plaintext message ("Your payment is confirmed... GST invoice attached"). The PDF attached to it is already the new Zoho-style invoice (from `src/lib/invoices/pdf.server.ts`), but the **email body itself doesn't reflect that design**.
+- An older fancier template `payment_success` still exists in the DB but is unused — it's the "old format" the user is seeing in legacy emails / previews.
+- Both templates need to be replaced with the same new Zoho-style HTML invoice so the email body and the PDF look identical.
 
 ## Changes
 
-### 1. `src/routes/admin.orders.$orderId.tsx`
-- Replace the local `hideAmount` calculation with `const hideAmount = role.hideMoney();`.
-- Keep all existing prop wiring (`OrderCommandHeader`, `OrderPaymentsPanel`, `OrderDocumentsPanel`, `UnifiedTimeline payments`, `ProcessingChecklist`) — they already accept `hideAmount` / `hideMoney`. Default-hide now propagates everywhere.
+### 1. New Zoho-style invoice HTML (DB migration)
+Replace `body_html` for both `order_confirmation` and `payment_success` in `email_templates` with a single, email-safe Zoho-style tax invoice layout. The HTML mirrors the PDF:
+- Header: BHS logo / company name, address, GSTIN, email/phone/website, and a navy "TAX INVOICE" badge on the right with `{{invoice_number}}` and `{{invoice_date}}`.
+- Bill-To block: `{{customer_name}}`, `{{customer_email}}`, `{{customer_mobile}}`, place of supply `{{place_of_supply}}`.
+- Line-item table: Description (`{{service_name}}`), HSN/SAC `{{sac_code}}`, Qty 1, Rate `Rs. {{base_amount}}`, Amount `Rs. {{base_amount}}`.
+- Tax block: conditional `CGST + SGST` (`{{cgst_amount}} / {{sgst_amount}}`) when intra-state, else `IGST` (`{{igst_amount}}`). Defaults to GST 18%.
+- Totals: subtotal, tax, **Total Rs. {{total_amount}}**, amount-in-words `{{amount_in_words}}`.
+- Footer: "Download invoice PDF" button → `https://udyamadhar.in/api/public/invoice/{{lead_code}}`, plus "Fill incomplete information" CTA → `{{onboarding_url}}`, and a thin Terms/Support strip (`{{support_email}}`).
+- All inline styles, table layout (no flex/grid), 600px wrapper, `#ffffff` body background — safe for Gmail/Outlook.
+Update subject for both templates to: `Tax Invoice {{invoice_number}} — Business Help Services`.
 
-This alone fixes:
-- TOTAL + Payment chip in header (already gated by `!hideAmount`)
-- "Payments & Invoices" panel (already gated by `{!hideAmount && <OrderPaymentsPanel/>}`)
-- "Payment received" timeline entry (UnifiedTimeline receives `payments={[]}`, so the row never renders)
-- Invoice docs in the documents panel (already filtered by `hideMoney`)
+Issued via `supabase--migration` (UPDATE only — no schema changes).
 
-### 2. `src/components/admin/OrderCommandHeader.tsx`
-Make the "Lead" pointer obviously clickable so staff can jump to the originating lead from the order:
-- Render the existing `<Link to="/admin/leads/$leadId">` as a small pill (border + hover background) instead of inline text, with label "Open Lead" and the external-link icon. No route change — purely presentational so it's discoverable.
+### 2. Pass invoice fields into the email render
+Update both webhooks to fetch the invoice row right after `loadInvoiceAttachmentByPayment` and merge into `commonVars`:
+- Files: `src/routes/api/public/webhooks/payu.ts`, `src/routes/api/public/webhooks/ccavenue.ts`.
+- New vars added: `invoice_number`, `invoice_date` (formatted IST), `sac_code`, `place_of_supply`, `cgst_amount`, `sgst_amount`, `igst_amount`, `customer_email`, `customer_mobile`, `amount_in_words`.
+- `amount_in_words` computed inline (reuse the same helper logic shape as the PDF; small local function in a shared helper at `src/lib/invoices/amount-in-words.ts`).
 
-### 3. Sanity sweep (no behavior change expected, just verify gates use `role.hideMoney()` consistently)
-Re-grep these files to confirm no remaining `hasAny(["operations","support"])`-style local computations are used for money gating; if any are found in the order/lead workspace, switch them to `role.hideMoney()` too:
-- `src/components/admin/ProcessingChecklist.tsx`
-- `src/components/admin/OrderDocumentsPanel.tsx`
-- `src/routes/admin.customers.$customerId.tsx`
-- `src/routes/admin.leads.$leadId.tsx`
+### 3. Keep the PDF attachment unchanged
+The PDF generator (`src/lib/invoices/pdf.server.ts`) already produces the Zoho-style PDF — no changes.
+
+### 4. Delete dead "old design"
+Remove the legacy `payment_success` template only if nothing in code still calls it. `rg "payment_success"` in `src/lib/emails/` will confirm. If unused, drop the row in the same migration; if still referenced, just overwrite its body (Step 1 already does).
 
 ## Verification
+1. Build passes.
+2. Render preview: call the existing admin email preview route for `order_confirmation` with sample vars and visually inspect the HTML in the preview tab.
+3. End-to-end: trigger a sandbox PayU webhook (or use the existing admin "Resend invoice email" action on a paid order) against a test lead, then check the inbox — body should match the PDF layout, with the PDF still attached.
+4. Confirm the legacy `payment_success` preview no longer shows the old gradient hero design.
 
-1. Sign in as a **support** user, open the same order shown in the screenshot.
-   - Header shows Created + Assigned only (no TOTAL, no Payment chip).
-   - Right column has no "Payments & Invoices" card.
-   - Timeline has no "Payment received" row.
-   - Invoice PDFs do not appear in Documents.
-2. The "Open Lead" pill next to the customer/service line navigates to `/admin/leads/<that lead's id>`.
-3. Sign in as **admin** — money UI and invoice PDFs all reappear unchanged.
-
-## Out of scope
-
-Server-side gating of `getLeadFinance` / invoice endpoints — already enforced (returns `{ payments: [], invoices: [], settlements: [] }` for non-finance roles). This change is UI-only.
+## Technical notes
+- Email HTML must use inline styles + nested `<table>`s only (no `<style>` blocks, no flexbox). Body background stays `#ffffff` per project email rules.
+- Logo: use a hosted PNG URL (e.g. `https://udyamadhar.in/logo.png`) — do NOT inline the base64 logo from `bhs-logo.ts` (would bloat the email and trip spam filters).
+- All money values are pre-formatted strings (`toFixed(2)`) in webhooks; the template just prints them with `Rs.` prefix to stay ASCII-safe.
+- Variable substitution uses the existing `{{var}}` mustache that `enqueueFromTemplateInternal` already handles — no template-engine changes needed.
