@@ -255,6 +255,7 @@ export type Database = {
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_to: string | null
           cancellation_requested_at: string | null
+          certificate_number: string | null
           certificate_uploaded_at: string | null
           closure_next_at: string | null
           closure_reason_code: string | null
@@ -294,6 +295,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           cancellation_requested_at?: string | null
+          certificate_number?: string | null
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_reason_code?: string | null
@@ -335,6 +337,7 @@ export type Database = {
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_to?: string | null
           cancellation_requested_at?: string | null
+          certificate_number?: string | null
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_reason_code?: string | null
