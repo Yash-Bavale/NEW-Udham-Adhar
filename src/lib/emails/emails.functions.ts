@@ -323,5 +323,5 @@ export const sendTestTemplateEmail = createServerFn({ method: "POST" })
       await enqueueFromTemplateInternal(tpl.code, data.toEmail, variables);
     }
     const result = await processQueueInternal(5);
-    return { ok: true, template: tpl.code, variablesUsed: variables, ...result };
+    return { ok: true, template: tpl.code, variablesUsed: variables as Record<string, string>, ...result };
   });
