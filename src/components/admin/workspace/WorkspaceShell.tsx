@@ -221,7 +221,7 @@ export function WorkspaceShell(p: Props) {
                   This is a <b>Talk-to-Expert</b> order. The post-payment service form will appear here once you select the customer's service in the <b>Overview</b> tab and the second payment is received.
                 </div>
               ) : (
-                <FormSubmissionPanel applicationId={application.id} />
+                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} />
               )}
               <OrderDocumentsPanel
                 orderId={p.orderId}
