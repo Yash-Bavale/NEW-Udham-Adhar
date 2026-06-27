@@ -570,6 +570,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           fulfilled_at: now,
           certificate_uploaded_at: now,
           certificate_number: certNumber,
+          documents_deleted_at: now,
           documents_deleted_reason: "completed",
         } as never)
         .eq("id", data.orderId);
@@ -581,17 +582,26 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           .eq("id", certificateId);
       }
 
-      // Wipe other docs via the existing edge function.
+      // Wipe other docs, but never delete the just-uploaded certificate file.
+      // This is intentionally done here instead of relying on the Edge
+      // Function deployment, so completion cannot accidentally remove the
+      // certificate before/after delivery.
       try {
-        await admin.functions.invoke("delete-order-documents", {
-          body: {
-            application_id: data.orderId,
-            reason: "completed",
-            keep_document_id: data.certificateDocumentId,
-          },
+        const { data: docs } = await admin
+          .from("documents")
+          .select("id, file_path, doc_type")
+          .eq("application_id", data.orderId);
+        const removable = (docs ?? []).filter((d: any) => {
+          if (d.id === data.certificateDocumentId) return false;
+          if (String(d.doc_type ?? "").toLowerCase() === "certificate") return false;
+          return true;
         });
+        const paths = removable.map((d: any) => d.file_path).filter(Boolean);
+        if (paths.length) await admin.storage.from("documents").remove(paths);
+        const ids = removable.map((d: any) => d.id).filter(Boolean);
+        if (ids.length) await admin.from("documents").delete().in("id", ids);
       } catch (e) {
-        console.error("delete-order-documents invocation failed:", e);
+        console.error("completed order document cleanup failed:", e);
       }
 
       // Close the parent lead (trigger logs lead_status_change automatically).
