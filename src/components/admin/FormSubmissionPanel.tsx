@@ -129,7 +129,9 @@ export function FormSubmissionPanel({
   }
   if (!data) return null;
 
-  const { submission, documents, requiredDocs, serviceCode, lead } = data as any;
+  const { submission, documents, requiredDocs, serviceCode, lead, service } = data as any;
+  const serviceLabel: string =
+    (service?.service_name as string) || (lead?.service as string) || serviceCode || "Service";
 
   // Build a "submitted" status pill
   const statusPill = submission ? (
@@ -152,7 +154,14 @@ export function FormSubmissionPanel({
   const sections = groupFieldsBySection(serviceCode);
   const formData: Record<string, any> = submission?.form_data ?? {};
   const renderedKeys = new Set(sections.flatMap((s) => s.fields.map((f) => f.key)));
-  const extras = Object.keys(formData).filter((k) => !renderedKeys.has(k));
+  const extras = Object.keys(formData).filter((k) => {
+    if (renderedKeys.has(k)) return false;
+    if (k.startsWith("section_")) return false; // UI separator garbage
+    const v = formData[k];
+    if (v === undefined || v === null) return false;
+    if (typeof v === "string" && v.trim() === "") return false;
+    return true;
+  });
 
   // Documents matching
   const uploadedByType = new Map(documents.map((d: any) => [d.doc_type, d]));
