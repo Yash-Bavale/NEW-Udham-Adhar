@@ -54,20 +54,22 @@ export function computeOrderStage(
   }
 
   if (!application) return "payment_done";
-  if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
-    return "consultation_pending";
-  }
-  if (!application.form_submitted_at) return "payment_done";
 
-  // Employee-side, driven by fulfillment_status
+  // Employee-side, driven by fulfillment_status — terminal/late stages take
+  // precedence over the form-submitted gate so the journey doesn't stall on
+  // "Payment Done" if an order is force-completed without a customer form.
   const fs = application.fulfillment_status ?? "order_received";
-
-  if (fs === "completed") return "completed";
+  if (fs === "completed" || application.application_status === "completed") return "completed";
   if (application.certificate_uploaded_at) return "certificate_ready";
   if (fs === "under_processing") return "under_processing";
   if (fs === "application_submitted") return "submitted_to_govt";
   if (fs === "verification_pending") return "under_review";
   if (fs === "documents_received") return "in_progress";
+
+  if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
+    return "consultation_pending";
+  }
+  if (!application.form_submitted_at) return "payment_done";
 
   return "form_submitted";
 }
