@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WwwUdyamregistrationGovInRouteImport } from './routes/www-udyamregistration-gov-in'
 import { Route as WwwUdyamregistrationRouteImport } from './routes/www-udyamregistration'
+import { Route as VerifyUdyamCertificateRouteImport } from './routes/verify-udyam-certificate'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as UdyogAadharUpdateRouteImport } from './routes/udyog-aadhar-update'
@@ -40,6 +41,7 @@ import { Route as UdyamReprintRouteImport } from './routes/udyam-reprint'
 import { Route as UdyamRegnCertificateRouteImport } from './routes/udyam-regn-certificate'
 import { Route as UdyamRegnRouteImport } from './routes/udyam-regn'
 import { Route as UdyamRegistrationUpdateRouteImport } from './routes/udyam-registration-update'
+import { Route as UdyamRegistrationProcessRouteImport } from './routes/udyam-registration-process'
 import { Route as UdyamRegistrationPortalRouteImport } from './routes/udyam-registration-portal'
 import { Route as UdyamRegistrationOnlineRouteImport } from './routes/udyam-registration-online'
 import { Route as UdyamRegistrationNumberVerifyRouteImport } from './routes/udyam-registration-number-verify'
@@ -262,6 +264,11 @@ const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
   path: '/www-udyamregistration',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyUdyamCertificateRoute = VerifyUdyamCertificateRouteImport.update({
+  id: '/verify-udyam-certificate',
+  path: '/verify-udyam-certificate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
   id: '/update-udyam-certificate',
   path: '/update-udyam-certificate',
@@ -413,6 +420,12 @@ const UdyamRegistrationUpdateRoute = UdyamRegistrationUpdateRouteImport.update({
   path: '/udyam-registration-update',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UdyamRegistrationProcessRoute =
+  UdyamRegistrationProcessRouteImport.update({
+    id: '/udyam-registration-process',
+    path: '/udyam-registration-process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const UdyamRegistrationPortalRoute = UdyamRegistrationPortalRouteImport.update({
   id: '/udyam-registration-portal',
   path: '/udyam-registration-portal',
@@ -1646,6 +1659,7 @@ export interface FileRoutesByFullPath {
   '/udyam-registration-number-verify': typeof UdyamRegistrationNumberVerifyRoute
   '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
   '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
+  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
   '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
   '/udyam-regn': typeof UdyamRegnRoute
   '/udyam-regn-certificate': typeof UdyamRegnCertificateRoute
@@ -1675,6 +1689,7 @@ export interface FileRoutesByFullPath {
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1888,6 +1903,7 @@ export interface FileRoutesByTo {
   '/udyam-registration-number-verify': typeof UdyamRegistrationNumberVerifyRoute
   '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
   '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
+  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
   '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
   '/udyam-regn': typeof UdyamRegnRoute
   '/udyam-regn-certificate': typeof UdyamRegnCertificateRoute
@@ -1917,6 +1933,7 @@ export interface FileRoutesByTo {
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -2130,6 +2147,7 @@ export interface FileRoutesById {
   '/udyam-registration-number-verify': typeof UdyamRegistrationNumberVerifyRoute
   '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
   '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
+  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
   '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
   '/udyam-regn': typeof UdyamRegnRoute
   '/udyam-regn-certificate': typeof UdyamRegnCertificateRoute
@@ -2159,6 +2177,7 @@ export interface FileRoutesById {
   '/udyog-aadhar-update': typeof UdyogAadharUpdateRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -2375,6 +2394,7 @@ export interface FileRouteTypes {
     | '/udyam-registration-number-verify'
     | '/udyam-registration-online'
     | '/udyam-registration-portal'
+    | '/udyam-registration-process'
     | '/udyam-registration-update'
     | '/udyam-regn'
     | '/udyam-regn-certificate'
@@ -2404,6 +2424,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-update'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
@@ -2617,6 +2638,7 @@ export interface FileRouteTypes {
     | '/udyam-registration-number-verify'
     | '/udyam-registration-online'
     | '/udyam-registration-portal'
+    | '/udyam-registration-process'
     | '/udyam-registration-update'
     | '/udyam-regn'
     | '/udyam-regn-certificate'
@@ -2646,6 +2668,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-update'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
@@ -2858,6 +2881,7 @@ export interface FileRouteTypes {
     | '/udyam-registration-number-verify'
     | '/udyam-registration-online'
     | '/udyam-registration-portal'
+    | '/udyam-registration-process'
     | '/udyam-registration-update'
     | '/udyam-regn'
     | '/udyam-regn-certificate'
@@ -2887,6 +2911,7 @@ export interface FileRouteTypes {
     | '/udyog-aadhar-update'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
     | '/admin/activity'
@@ -3102,6 +3127,7 @@ export interface RootRouteChildren {
   UdyamRegistrationNumberVerifyRoute: typeof UdyamRegistrationNumberVerifyRoute
   UdyamRegistrationOnlineRoute: typeof UdyamRegistrationOnlineRoute
   UdyamRegistrationPortalRoute: typeof UdyamRegistrationPortalRoute
+  UdyamRegistrationProcessRoute: typeof UdyamRegistrationProcessRoute
   UdyamRegistrationUpdateRoute: typeof UdyamRegistrationUpdateRoute
   UdyamRegnRoute: typeof UdyamRegnRoute
   UdyamRegnCertificateRoute: typeof UdyamRegnCertificateRoute
@@ -3131,6 +3157,7 @@ export interface RootRouteChildren {
   UdyogAadharUpdateRoute: typeof UdyogAadharUpdateRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
+  VerifyUdyamCertificateRoute: typeof VerifyUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
   AppTokenRoute: typeof AppTokenRoute
@@ -3176,6 +3203,13 @@ declare module '@tanstack/react-router' {
       path: '/www-udyamregistration'
       fullPath: '/www-udyamregistration'
       preLoaderRoute: typeof WwwUdyamregistrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-udyam-certificate': {
+      id: '/verify-udyam-certificate'
+      path: '/verify-udyam-certificate'
+      fullPath: '/verify-udyam-certificate'
+      preLoaderRoute: typeof VerifyUdyamCertificateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/update-udyam-certificate': {
@@ -3379,6 +3413,13 @@ declare module '@tanstack/react-router' {
       path: '/udyam-registration-update'
       fullPath: '/udyam-registration-update'
       preLoaderRoute: typeof UdyamRegistrationUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/udyam-registration-process': {
+      id: '/udyam-registration-process'
+      path: '/udyam-registration-process'
+      fullPath: '/udyam-registration-process'
+      preLoaderRoute: typeof UdyamRegistrationProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/udyam-registration-portal': {
@@ -5183,6 +5224,7 @@ const rootRouteChildren: RootRouteChildren = {
   UdyamRegistrationNumberVerifyRoute: UdyamRegistrationNumberVerifyRoute,
   UdyamRegistrationOnlineRoute: UdyamRegistrationOnlineRoute,
   UdyamRegistrationPortalRoute: UdyamRegistrationPortalRoute,
+  UdyamRegistrationProcessRoute: UdyamRegistrationProcessRoute,
   UdyamRegistrationUpdateRoute: UdyamRegistrationUpdateRoute,
   UdyamRegnRoute: UdyamRegnRoute,
   UdyamRegnCertificateRoute: UdyamRegnCertificateRoute,
@@ -5212,6 +5254,7 @@ const rootRouteChildren: RootRouteChildren = {
   UdyogAadharUpdateRoute: UdyogAadharUpdateRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
+  VerifyUdyamCertificateRoute: VerifyUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
   AppTokenRoute: AppTokenRoute,
