@@ -151,32 +151,44 @@ export function OrderWorkflowPanel({
         </div>
 
         {lane === "happy" && (
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 space-y-2">
             {!nextStage ? (
               <div className="text-sm text-slate-500 italic flex items-center gap-2">
-                <Check className="size-4 text-emerald-600" /> Terminal status — no further transitions.
+                <Check className="size-4 text-emerald-600" /> Order completed — no further stages.
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    if (nextStage === "completed") setCertOpen(true);
-                    else advance();
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow-md transition disabled:opacity-60"
-                >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                  Advance to {FULFILLMENT_LABEL[nextStage]}
-                </button>
-                <div className="text-xs text-slate-500">
-                  Next step in the order flow. Use the buttons below to pause or cancel.
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (nextStage === "completed") setCertOpen(true);
+                      else advance();
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow-md transition disabled:opacity-60"
+                  >
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+                    Mark as {FULFILLMENT_LABEL[nextStage]}
+                  </button>
+                  {previousStage && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setRevertOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      title={`Revert to ${FULFILLMENT_LABEL[previousStage]}`}
+                    >
+                      <Undo2 className="size-4" /> Revert to {FULFILLMENT_LABEL[previousStage]}
+                    </button>
+                  )}
                 </div>
-              </div>
+                <div className="text-xs text-slate-500">Next step in this order.</div>
+              </>
             )}
           </div>
         )}
+
 
         {lane === "delay" && (
           <div className="px-5 py-4 space-y-3">
