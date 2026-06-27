@@ -15,6 +15,7 @@ import {
   listWorkflowEvents, listWorkflowReminders, resumeOrder,
   markCustomerReplied, appendWorkflowEvent, cancelWorkflowReminder,
 } from "@/lib/crm/workflow.functions";
+import { resumeCancelledOrder } from "@/lib/crm/cancellation.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import {
   FULFILLMENT_STAGES, FULFILLMENT_LABEL, FULFILLMENT_BADGE,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/crm/fulfillment-transitions";
 import { formatIST } from "@/lib/datetime";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
+import { useRole } from "@/hooks/useRole";
 
 type Lane = "happy" | "delay" | "cancellation";
 
@@ -50,19 +52,26 @@ export function OrderWorkflowPanel({
   reasonText?: string | null;
 }) {
   const qc = useQueryClient();
-  const cancellationActive = (closureStage ?? "none") !== "none";
+  const cancellationActive =
+    (closureStage ?? "none") !== "none" || current === "cancelled";
   const inDelay = !!workflowStatus && DELAY_STATUSES.includes(workflowStatus);
   const lane: Lane = cancellationActive ? "cancellation" : inDelay ? "delay" : "happy";
 
   const updateFn = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeOrder);
   const fnReplied = useServerFn(markCustomerReplied);
+  const fnResumeCancelled = useServerFn(resumeCancelledOrder);
+  const role = useRole();
+  const isSuperAdmin = role.has("super_admin");
 
   const [busy, setBusy] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [delayOpen, setDelayOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [resumeCancelOpen, setResumeCancelOpen] = useState(false);
+  const [resumeTarget, setResumeTarget] = useState<FulfillmentStatus>("order_received");
+  const [resumeNote, setResumeNote] = useState("");
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
@@ -131,6 +140,23 @@ export function OrderWorkflowPanel({
   const repliedMut = useMutation({
     mutationFn: async () => fnReplied({ data: { applicationId } }),
     onSuccess: () => { toast.success("Customer reply logged."); refresh(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+  const resumeCancelMut = useMutation({
+    mutationFn: async () =>
+      fnResumeCancelled({
+        data: {
+          applicationId,
+          toStatus: resumeTarget as any,
+          note: resumeNote.trim() || undefined,
+        },
+      }),
+    onSuccess: () => {
+      toast.success(`Order resumed → ${FULFILLMENT_LABEL[resumeTarget]}`);
+      setResumeCancelOpen(false);
+      setResumeNote("");
+      refresh();
+    },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
@@ -217,7 +243,7 @@ export function OrderWorkflowPanel({
         )}
 
         {lane === "cancellation" && (
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 space-y-3">
             <CancellationPanel
               applicationId={applicationId}
               closureStage={closureStage}
@@ -226,9 +252,27 @@ export function OrderWorkflowPanel({
               reasonCode={reasonCode}
               reasonText={reasonText}
             />
+            {isSuperAdmin && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-emerald-900">
+                  <div className="font-semibold">Super-admin override</div>
+                  <div className="text-emerald-800/80">
+                    Resume this cancelled order. Closure workflow will be cleared and pending reminders cancelled.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResumeCancelOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:shadow-md"
+                >
+                  <RotateCcw className="size-4" /> Resume Cancelled Order
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
 
       {/* CARD 2 — STAGE MAP */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
@@ -278,6 +322,52 @@ export function OrderWorkflowPanel({
         busy={busy}
         onConfirm={(p: { certificateDocumentId: string; certificateNumber: string; completionNotes?: string }) => advance(p)}
       />
+
+      {resumeCancelOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border bg-white p-5 shadow-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <RotateCcw className="size-4 text-emerald-700" />
+              <div className="font-semibold text-slate-900">Resume cancelled order</div>
+            </div>
+            <div className="text-sm text-slate-600 mb-3">
+              This will clear the cancellation workflow, cancel pending reminders, and
+              restore the order to the stage you choose.
+            </div>
+            <label className="text-xs font-semibold text-slate-600">Resume to stage</label>
+            <select
+              value={resumeTarget}
+              onChange={(e) => setResumeTarget(e.target.value as FulfillmentStatus)}
+              className="mt-1 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+            >
+              {FULFILLMENT_STAGES.filter(
+                (s) => s !== "cancelled" && s !== "completed",
+              ).map((s) => (
+                <option key={s} value={s}>{FULFILLMENT_LABEL[s]}</option>
+              ))}
+            </select>
+            <label className="mt-3 block text-xs font-semibold text-slate-600">Reason (optional)</label>
+            <textarea
+              value={resumeNote}
+              onChange={(e) => setResumeNote(e.target.value)}
+              rows={3}
+              placeholder="e.g. Customer changed mind, refund withdrawn"
+              className="mt-1 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { setResumeCancelOpen(false); setResumeNote(""); }}
+                disabled={resumeCancelMut.isPending}
+                className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
+              <button onClick={() => resumeCancelMut.mutate()} disabled={resumeCancelMut.isPending}
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60">
+                {resumeCancelMut.isPending && <Loader2 className="size-3 animate-spin" />}
+                Resume Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {revertOpen && previousStage && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
