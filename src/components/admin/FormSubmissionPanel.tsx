@@ -133,17 +133,31 @@ export function FormSubmissionPanel({
   const serviceLabel: string =
     (service?.service_name as string) || (lead?.service as string) || serviceCode || "Service";
 
+  const isDraft = !!submission && (submission.status !== "submitted" || !submission.submitted_at);
+
+  // Resolve full schema once so we know which fields are required.
+  const fullSchema = serviceCode ? getSchema(serviceCode) : null;
+  const requiredFields = (fullSchema?.fields ?? []).filter(
+    (f: any) => f.required && f.type !== "section",
+  );
+  const requiredKeys = new Set(requiredFields.map((f: any) => f.key));
+  const isBlank = (v: any) =>
+    v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+  const missingRequiredFields = submission
+    ? requiredFields.filter((f: any) => isBlank((submission.form_data ?? {})[f.key]))
+    : requiredFields;
+
   // Build a "submitted" status pill
   const statusPill = submission ? (
     <span
       className={
         "text-[11px] rounded-full px-2 py-0.5 font-medium border " +
-        (submission.status === "submitted"
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-          : "bg-amber-50 text-amber-700 border-amber-200")
+        (isDraft
+          ? "bg-amber-100 text-amber-800 border-amber-300"
+          : "bg-emerald-50 text-emerald-700 border-emerald-200")
       }
     >
-      {submission.status}
+      {isDraft ? "DRAFT — not submitted" : "submitted"}
     </span>
   ) : (
     <span className="text-[11px] rounded-full px-2 py-0.5 font-medium border bg-slate-100 text-slate-600 border-slate-200">
@@ -170,6 +184,7 @@ export function FormSubmissionPanel({
     (r: any) => r.required && !uploadedByType.has(r.key),
   );
 
+
   return (
     <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
       {/* Header */}
@@ -182,11 +197,16 @@ export function FormSubmissionPanel({
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {submission ? (
-                <>Submitted {formatIST(submission.submitted_at ?? submission.updated_at)}</>
+                isDraft ? (
+                  <>Auto-saved draft at {formatIST(submission.updated_at)} — customer has NOT pressed Submit.</>
+                ) : (
+                  <>Submitted {formatIST(submission.submitted_at ?? submission.updated_at)}</>
+                )
               ) : (
                 <>Customer hasn't submitted the service form yet.</>
               )}
             </p>
+
           </div>
           {statusPill}
         </div>
@@ -263,6 +283,29 @@ export function FormSubmissionPanel({
         </div>
       ) : (
         <>
+          {isDraft && (
+            <div className="px-5 py-4 bg-amber-50 border-b border-amber-200">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="size-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">
+                    Customer started filling this form but did NOT submit it.
+                  </p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    The values below are an auto-saved draft. Required fields validated only run on
+                    final submit, so this draft can be incomplete. Use <b>Resend form link</b> or
+                    WhatsApp them the copy-link to get them to complete the form.
+                  </p>
+                  {missingRequiredFields.length > 0 && (
+                    <div className="mt-2 text-xs text-amber-900">
+                      <b>{missingRequiredFields.length} required field{missingRequiredFields.length > 1 ? "s" : ""} still empty:</b>{" "}
+                      {missingRequiredFields.map((f: any) => f.label).join(", ")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="divide-y">
             {sections.map((section) => {
               if (!section.fields.length) return null;
@@ -272,18 +315,33 @@ export function FormSubmissionPanel({
                     {section.label}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                    {section.fields.map((f) => (
-                      <div key={f.key} className="flex flex-col min-w-0">
-                        <span className="text-[11px] text-slate-400">{f.label}</span>
-                        <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
-                          {mask(f.key, formData[f.key])}
-                        </span>
-                      </div>
-                    ))}
+                    {section.fields.map((f) => {
+                      const v = formData[f.key];
+                      const required = requiredKeys.has(f.key);
+                      const blank = isBlank(v);
+                      return (
+                        <div key={f.key} className="flex flex-col min-w-0">
+                          <span className="text-[11px] text-slate-400">
+                            {f.label}
+                            {required && <span className="text-red-500 ml-0.5">*</span>}
+                          </span>
+                          {required && blank ? (
+                            <span className="text-sm font-semibold text-red-600 mt-0.5 inline-flex items-center gap-1">
+                              <AlertTriangle className="size-3.5" /> Required — empty
+                            </span>
+                          ) : (
+                            <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
+                              {mask(f.key, v)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
+
 
 
             {extras.length > 0 && (
