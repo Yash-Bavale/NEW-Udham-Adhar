@@ -1,40 +1,38 @@
-## Root cause
+## Issues
 
-I checked the live order `11448f96…` (lead `UA-2026-007629`) in the database. After Step 1 fired, the row looks like this:
+1. **All emails failing with `400 missing_parameter: text`**
+   `src/lib/emails/emails.server.ts` sends `text: row.body_text ?? ""` to Lovable's email API. The API now rejects empty strings as a missing parameter, so every queued email (incl. the certificate delivery email) fails with this 400.
 
-```
-lead_source     = "website"          ← original capture source, never changed
-service         = "New Udyam Registration"
-status / v2     = payment_pending
-application.application_status = awaiting_payment
-```
+2. **Certificate delivery email not arriving**
+   Same root cause — `deliverCertificate` / `resendOrderCertificate` enqueue with HTML only, no `body_text`, so the send call ships `text: ""` and is rejected.
 
-`isConvertedConsultationLead()` requires `lead_source` to contain `talktoexpert` / `expertconsultation`. Because the original lead was captured with `lead_source = "website"` and `selectConsultationService` never stamps a conversion marker, the check returns **false** after Step 1 runs. So:
-
-- `selectStep` is false (service is no longer the consultation label)
-- `awaitingSecondPayment` is false (lead_source isn't a consultation source)
-- `showConsultationPanel` is false → Step 2 panel never mounts → no "Copy / Send Payment Link" buttons, so no email can be sent either.
-
-The visible symptom on this order matches exactly: the normal `FormSubmissionPanel` appears instead of the amber Step 2 card.
+3. **Lead list service column shows the wrong / truncated label**
+   For the "Udyam Registration Certificate Download" service, the leads table cell is `max-w-[200px] truncate` (`src/routes/admin.leads.index.tsx:403`) which clips it to "Udyam Registration Certificat…". User wants the full, correct service name visible.
 
 ## Fix
 
-Stamp an unambiguous "this lead came from Talk-to-Expert" marker at Step 1 and teach the detector to honor it, independent of the original lead capture source.
+### 1. Always send a non-empty `text` to Lovable email API
+In `src/lib/emails/emails.server.ts`:
+- Add a tiny `htmlToPlainText(html)` helper (strip `<style>/<script>`, unwrap tags, decode common entities, collapse whitespace, trim).
+- Build `text` as: `row.body_text?.trim() || htmlToPlainText(row.body_html) || row.subject || " "` so it is never an empty string.
+- Apply for both the attachments branch (`fetch /v1/messaging/email/send`) and the no-attachments branch (`sendLovableEmail`).
 
-### 1. `src/lib/crm/talk-to-expert.functions.ts` — `selectConsultationService`
-- In the `leads` update, also set `lead_source = "talk_to_expert_converted"` (preserving the original value in `workflow_events.metadata.original_lead_source` for audit).
-- In `resetConsultationSelection`, restore `lead_source` back to its original value if present in metadata, otherwise leave the converted marker (still recognized as consultation).
+This single change unblocks:
+- Order confirmation / payment success emails
+- Certificate delivery + resend emails (they reuse the same queue → sender path)
+- Talk-to-Expert payment-link emails
+- All workflow / delay / closure emails
 
-### 2. `src/lib/crm/consultation.ts`
-- Extend `isConsultationSource()` so it also matches `talk_to_expert_converted` (normalized form `talktoexpertconverted` already contains `talktoexpert`, so no change needed — verify with the existing regex).
-- Confirm: `isUnconvertedConsultationLead` stays purely service-name based; `isConvertedConsultationLead` keeps source-based check, which now succeeds.
+### 2. Verify certificate delivery
+No code change beyond #1 — `deliverCertificate` and `resendOrderCertificate` already attach the file and enqueue. Once the 400 is gone they will go out. After deploy, re-test by hitting "Resend" on a delivered certificate and confirm `email_queue.status = 'sent'` and the recipient receives the PDF.
 
-### 3. Backfill existing rows
-Run a one-off SQL migration to mark any lead whose latest application has `application_status = 'awaiting_payment'` AND has a prior successful payment AND was originally a Talk-to-Expert lead (detected via `workflow_events` of type `consultation_service_selected`). For these, set `leads.lead_source = 'talk_to_expert_converted'`. This rescues lead `c3c8a623…` and any siblings.
+### 3. Show full service name in leads table
+In `src/routes/admin.leads.index.tsx` (line ~403), remove the hard `max-w-[200px] truncate` on the Service `<td>` and let it wrap (or widen to `max-w-[260px]` with `break-words`, no truncation) so "Udyam Registration Certificate Download" and "Talk to Expert – Suitable Service Selection" render in full. No data-layer change — `leads.service` already stores the correct label from `SERVICES` in `src/lib/constants.ts`.
 
-### 4. Verification
-- Reload `/admin/orders/11448f96-6cc0-473c-a4df-4353a8217f17` — the amber **Step 2 · Share Payment Link** card should render with the payment URL, Copy, Send Email (60 s cooldown), WhatsApp, and Change Service controls.
-- Click **Send Payment Link** → `email_queue` row inserted for template `consultation_service_converted`; with the recently-shipped immediate-send change, the email fires synchronously.
-- Test a fresh Talk-to-Expert order end-to-end: Step 1 → Step 2 visible → email sends → after webhook flips `application_status`, the panel auto-hides and `FormSubmissionPanel` / `FulfillmentStatusUpdater` reappear.
+## Verification
 
-No UI/UX changes — only the gating logic and a marker field.
+- `psql` check `email_queue` after a manual resend → `status='sent'`, `last_error` null.
+- Open `/admin/certificates`, click **Resend** on a delivered row → toast success, row in `email_logs`, customer inbox receives PDF.
+- Open `/admin/leads` → confirm the certificate-download and talk-to-expert rows now show the full service label.
+
+No other behavior, schema, or UI changes.
