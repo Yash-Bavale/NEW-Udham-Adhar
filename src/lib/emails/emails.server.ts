@@ -4,6 +4,26 @@ import { sendLovableEmail } from "@lovable.dev/email-js";
 
 const LOVABLE_SENDER_DOMAIN = "notify.mail.businesshelpservices.com";
 
+/** Strip HTML → plain-text fallback. Lovable email API rejects empty `text`. */
+function htmlToPlainText(html: string | null | undefined): string {
+  if (!html) return "";
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<\/(p|div|li|tr|h[1-6]|br)>/gi, "\n")
+    .replace(/<br\s*\/?>(?!\n)/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 
 // ─────────────────────────── Public-server helpers ───────────────────────────
 // Used internally by other server fns (createLead, payu webhook, etc.).
