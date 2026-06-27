@@ -59,12 +59,18 @@ export function OrderWorkflowPanel({
   const updateFn = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeOrder);
   const fnReplied = useServerFn(markCustomerReplied);
+  const fnResumeCancelled = useServerFn(resumeCancelledOrder);
+  const role = useRole();
+  const isSuperAdmin = role.has("super_admin");
 
   const [busy, setBusy] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [delayOpen, setDelayOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [resumeCancelOpen, setResumeCancelOpen] = useState(false);
+  const [resumeTarget, setResumeTarget] = useState<FulfillmentStatus>("order_received");
+  const [resumeNote, setResumeNote] = useState("");
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
