@@ -100,7 +100,7 @@ export function WorkspaceShell(p: Props) {
             </div>
             <div className="mt-1 flex items-center gap-2 text-[13px] text-slate-700 flex-wrap">
               <span className="font-semibold truncate">{customer?.name ?? lead?.name ?? "—"}</span>
-              {cMobile && <><span className="opacity-40">·</span><span className="font-mono text-xs">{cMobile}</span></>}
+              {cMobile && <><span className="opacity-40">·</span><a href={`tel:${cMobile}`} className="font-mono text-base font-bold text-slate-900 tracking-tight hover:text-indigo-700">{cMobile}</a></>}
               {cEmail && <><span className="opacity-40">·</span><span className="text-xs truncate">{cEmail}</span></>}
               <span className="opacity-40">·</span>
               <span className="text-xs text-indigo-600 font-medium truncate">{service?.service_name ?? lead?.service ?? "—"}</span>
