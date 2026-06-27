@@ -437,6 +437,7 @@ function TemplatesTab() {
             </tbody>
           </table>
         </div>
+        {rowMsg && <p className="mt-2 text-xs text-slate-600">{rowMsg}</p>}
       </Section>
     </div>
   );
