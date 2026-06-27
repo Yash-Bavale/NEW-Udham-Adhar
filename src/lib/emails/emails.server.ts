@@ -188,94 +188,78 @@ async function sendQueueRow(row: QueueRow) {
     .maybeSingle();
   if (!settings?.is_enabled) return { ok: false, error: "smtp_disabled" };
 
-  const lovableApiKey = process.env.LOVABLE_API_KEY;
-  if (!lovableApiKey) return { ok: false, error: "lovable_api_key_missing" };
-
   await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
 
   const attempt = (row.attempts ?? 0) + 1;
-  const fromEmail = settings.from_email;
-  const fromName = settings.from_name;
+  const fromName = settings.from_name || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services";
   let smtpResponse: string | null = null;
   let lastError: string | null = null;
   let ok = false;
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
-
-    // Per-recipient unsubscribe token.
-    let unsubscribeToken: string | null = null;
-    const { data: existing } = await supabaseAdmin
-      .from("email_unsubscribe_tokens")
-      .select("token")
-      .eq("email", recipient)
-      .maybeSingle();
-    if (existing?.token) {
-      unsubscribeToken = existing.token;
-    } else {
-      const newToken = crypto.randomUUID();
-      const { error: insErr } = await supabaseAdmin
-        .from("email_unsubscribe_tokens")
-        .insert({ email: recipient, token: newToken });
-      if (insErr) {
-        const { data: again } = await supabaseAdmin
-          .from("email_unsubscribe_tokens")
-          .select("token")
-          .eq("email", recipient)
-          .maybeSingle();
-        unsubscribeToken = again?.token ?? null;
-        if (!unsubscribeToken) throw new Error(insErr.message);
-      } else {
-        unsubscribeToken = newToken;
-      }
-    }
-
     const variables = (row.variables ?? {}) as Record<string, unknown>;
-    const atts = Array.isArray((variables as any).__attachments)
-      ? ((variables as any).__attachments as EmailAttachment[])
+    const atts = Array.isArray((variables as { __attachments?: EmailAttachment[] }).__attachments)
+      ? ((variables as { __attachments?: EmailAttachment[] }).__attachments as EmailAttachment[])
       : [];
 
-    const basePayload = {
+    const plainText =
+      (row.body_text && row.body_text.trim()) ||
+      htmlToPlainText(row.body_html) ||
+      row.subject ||
+      " ";
+
+    const res = await sendViaZoho({
       to: recipient,
-      from: `${fromName} <${fromEmail}>`,
-      sender_domain: LOVABLE_SENDER_DOMAIN,
       subject: row.subject,
       html: row.body_html,
-      text: (row.body_text && row.body_text.trim()) || htmlToPlainText(row.body_html) || row.subject || " ",
-      reply_to: settings.reply_to ?? undefined,
-      purpose: "transactional" as const,
-      idempotency_key: `bhs-${row.id}-${attempt}`,
-      unsubscribe_token: unsubscribeToken!,
-    };
+      text: plainText,
+      fromName,
+      replyTo: settings.reply_to ?? undefined,
+      attachments: atts.length ? atts.map((a) => ({
+        filename: a.filename,
+        content_base64: a.content_base64,
+        content_type: a.content_type,
+      })) : undefined,
+      headers: {
+        "X-BHS-Queue-Id": row.id,
+        "X-BHS-Template": row.template_code ?? "ad_hoc",
+        "X-BHS-Attempt": String(attempt),
+      },
+    });
 
-    try {
-      if (atts.length > 0) {
-        const resp = await fetch("https://api.lovable.dev/v1/messaging/email/send", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-            "Idempotency-Key": basePayload.idempotency_key,
+    if (res.ok) {
+      smtpResponse = `[zoho] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
+      ok = true;
+
+      // Mirror to email_send_log (canonical dashboard table).
+      try {
+        await supabaseAdmin.from("email_send_log").insert({
+          message_id: res.messageId ?? `bhs-${row.id}-${attempt}`,
+          template_name: row.template_code ?? "ad_hoc",
+          recipient_email: recipient,
+          status: "sent",
+          metadata: {
+            queue_id: row.id,
+            attempt,
+            response: (res.response ?? "").slice(0, 500),
+            lead_id: row.lead_id,
+            application_id: row.application_id,
           },
-          body: JSON.stringify({ ...basePayload, attachments: atts }),
-        });
-        if (resp.ok) {
-          const j: any = await resp.json().catch(() => ({}));
-          smtpResponse = `[lovable+att] ${j.message_id ?? j.status ?? "ok"}`;
-          ok = true;
-        } else {
-          const errTxt = (await resp.text()).slice(0, 300);
-          const res = await sendLovableEmail(basePayload, { apiKey: lovableApiKey });
-          smtpResponse = `[lovable·no-att fallback ${resp.status}] ${res.message_id ?? res.status ?? "ok"} :: ${errTxt}`;
-          ok = true;
-        }
-      } else {
-        const res = await sendLovableEmail(basePayload, { apiKey: lovableApiKey });
-        smtpResponse = `[lovable] ${res.message_id ?? res.status ?? "ok"}`;
-        ok = true;
-      }
-    } catch (e) {
-      lastError = `[lovable] ${e instanceof Error ? e.message : "unknown"}`;
+        } as never);
+      } catch { /* non-fatal */ }
+    } else {
+      lastError = `[zoho] ${res.error ?? "unknown"}`;
+      try {
+        await supabaseAdmin.from("email_send_log").insert({
+          message_id: `bhs-${row.id}-${attempt}`,
+          template_name: row.template_code ?? "ad_hoc",
+          recipient_email: recipient,
+          status: "failed",
+          error_message: lastError.slice(0, 1000),
+          metadata: { queue_id: row.id, attempt, lead_id: row.lead_id, application_id: row.application_id },
+        } as never);
+      } catch { /* non-fatal */ }
     }
   } catch (e) {
     lastError = `[setup] ${e instanceof Error ? e.message : "unknown"}`;
