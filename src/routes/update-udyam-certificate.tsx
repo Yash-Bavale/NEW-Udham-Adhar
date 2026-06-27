@@ -1,18 +1,133 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SeoLandingPage } from "@/components/site/SeoLandingPage";
-import html from "@/content/wp/udyam-update.html?raw";
+import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
+import {
+  jsonLdScript,
+  serviceSchema,
+  faqSchema,
+  howToSchema,
+  breadcrumbSchema,
+} from "@/lib/seo/jsonld";
+
+const URL = "https://udyamadhar.in/update-udyam-certificate";
+const TITLE = "Update Udyam Certificate Online | Edit MSME Details";
+const DESC =
+  "Update your Udyam (MSME) certificate — change business name, address, NIC activity, bank or contact details. Professional consultancy assistance, pan-India.";
+
+const FAQS = [
+  {
+    q: "What details can I update on my Udyam certificate?",
+    a: "You can update business name, registered address, additional activities (NIC codes), bank account, contact details, organisation type, investment and turnover. Every update is OTP-verified and reflected in a freshly signed certificate.",
+  },
+  {
+    q: "What if my registered mobile number is no longer active?",
+    a: "If the mobile linked to your Udyam (or to Aadhaar) is inactive, you cannot receive the OTP. Our team will guide you through the official process to update the Aadhaar mobile first, and then proceed with the Udyam edit.",
+  },
+  {
+    q: "Is updating Udyam a paid government service?",
+    a: "The government does not charge a fee for updates. Our charge is a professional consultancy fee for handling the documentation, OTP coordination, submission and certificate delivery.",
+  },
+  {
+    q: "How long does an update take?",
+    a: "Most updates are completed within 1 to 2 business days. Updates that involve mobile-number changes or Aadhaar correction can take longer because of the upstream dependencies.",
+  },
+  {
+    q: "Will updating change my Udyam Registration Number (URN)?",
+    a: "No. The URN remains the same for the lifetime of your business. Only the details on the certificate change, and a new digitally signed certificate is issued with the same URN.",
+  },
+];
+
+const STEPS = [
+  {
+    name: "Specify what you want to change",
+    text: "Share the exact fields to be updated (e.g., new address, additional NIC code).",
+  },
+  {
+    name: "Document verification",
+    text: "Our team checks that the new details match your Aadhaar, PAN, GST and supporting proofs.",
+  },
+  {
+    name: "Portal edit & OTP",
+    text: "We submit the edit on the official portal and coordinate the OTP with your registered mobile/email.",
+  },
+  {
+    name: "Updated certificate delivery",
+    text: "The freshly signed Udyam certificate is emailed to you with the same URN.",
+  },
+];
+
+const BLOCKS: RichBlock[] = [
+  { type: "h2", text: "When you should update your Udyam certificate" },
+  {
+    type: "ul",
+    items: [
+      "Business name change or rebrand.",
+      "Shift of registered office address.",
+      "Adding or removing a business activity (NIC code).",
+      "Change of bank account.",
+      "Change of contact mobile or email.",
+      "Change of organisation type (e.g., proprietorship to LLP).",
+    ],
+  },
+  { type: "h2", text: "How we handle your update" },
+  { type: "ol", items: STEPS.map((s) => `${s.name}: ${s.text}`) },
+  { type: "h2", text: "Documents you should keep ready" },
+  {
+    type: "ul",
+    items: [
+      "Existing Udyam certificate (or URN).",
+      "Aadhaar of the registered proprietor / signatory.",
+      "Proof of new detail being updated (e.g., new address proof).",
+      "Active access to the registered mobile / email for OTP.",
+    ],
+  },
+  {
+    type: "note",
+    text: "Government fee for updating the Udyam certificate is ₹0. We charge a transparent professional fee published on our Pricing Transparency page.",
+  },
+  { type: "h2", text: "Frequently Asked Questions" },
+  { type: "faq", items: FAQS },
+];
 
 export const Route = createFileRoute("/update-udyam-certificate")({
   head: () => ({
     meta: [
-      { title: "Udyam Update - How to Update Your MSME Details Online" },
-      { name: "description", content: "Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact..." },
-      { property: "og:title", content: "Udyam Update - How to Update Your MSME Details Online" },
-      { property: "og:description", content: "Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact..." },
+      { title: TITLE },
+      { name: "description", content: DESC },
+      { property: "og:title", content: TITLE },
+      { property: "og:description", content: DESC },
+      { property: "og:url", content: URL },
     ],
-    links: [
-      { rel: "canonical", href: "https://udyamadhar.in/update-udyam-certificate" },
+    links: [{ rel: "canonical", href: URL }],
+    scripts: [
+      jsonLdScript(
+        serviceSchema({
+          name: "Update Udyam Certificate",
+          url: URL,
+          description: DESC,
+        }),
+      ),
+      jsonLdScript(
+        howToSchema({
+          name: "How to update Udyam (MSME) certificate details",
+          totalTime: "P2D",
+          steps: STEPS,
+        }),
+      ),
+      jsonLdScript(faqSchema(FAQS)),
+      jsonLdScript(
+        breadcrumbSchema([
+          { name: "Home", url: "https://udyamadhar.in/" },
+          { name: "Update Udyam Certificate", url: URL },
+        ]),
+      ),
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam update" linkTitle="Udyam Update - How to Update Your MSME Details Online" content={`Udyam update allows registered MSMEs to modify and maintain accurate business information such as address, category, nature of activity, or contact details through the official Udyam portal. Keeping registration details current is crucial for uninterrupted access to government schemes, subsidies, loans, priority lending, and participation in procurement tenders. The update process is free, paperless, and secure, enabling businesses to reflect changes promptly and maintain compliance with regulatory requirements. Udyam update ensures that the unique Udyam Registration Number and digitally signed MSME certificate remain valid and reliable for verification by banks, clients, and government authorities. Regular updates also support eligibility for new schemes, grants, and financial assistance programs while enhancing credibility and trust in the marketplace. By using the Udyam update facility, businesses can focus on growth, expansion, and operational efficiency while leveraging all available government benefits designed to strengthen the MSME ecosystem in India..`} html={html} />,
+  component: () => (
+    <RichServicePage
+      serviceTitle="Update Udyam Certificate"
+      h1="Update Udyam Certificate — Edit MSME Registration Details"
+      intro="Need to update your Udyam (MSME) certificate? Business Help Services handles every type of edit — name, address, activity (NIC), bank, organisation type and contact details — with professional consultancy support."
+      blocks={BLOCKS}
+    />
+  ),
 });
