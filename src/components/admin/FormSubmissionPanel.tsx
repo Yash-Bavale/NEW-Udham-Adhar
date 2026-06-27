@@ -254,18 +254,14 @@ export function FormSubmissionPanel({
         <>
           <div className="divide-y">
             {sections.map((section) => {
-              const visible = section.fields.filter((f) => {
-                const v = formData[f.key];
-                return v !== undefined && v !== null && String(v).trim() !== "";
-              });
-              if (!visible.length) return null;
+              if (!section.fields.length) return null;
               return (
                 <div key={section.label} className="px-5 py-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
                     {section.label}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                    {visible.map((f) => (
+                    {section.fields.map((f) => (
                       <div key={f.key} className="flex flex-col min-w-0">
                         <span className="text-[11px] text-slate-400">{f.label}</span>
                         <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
@@ -277,6 +273,7 @@ export function FormSubmissionPanel({
                 </div>
               );
             })}
+
 
             {extras.length > 0 && (
               <div className="px-5 py-4">

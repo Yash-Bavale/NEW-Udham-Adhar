@@ -1,35 +1,35 @@
 ## Problem
 
-The leads table shows the service "Udyam Registration Certificate Download", which doesn't match the customer-facing service name shown in navigation and on the site ("Download Udyam Certificate"). This makes staff think it's a different/unknown service. 3,476 existing leads carry the long label.
+For `UA-2026-007641` (Download Udyam Certificate) the workspace's Form Submission panel shows only Applicant Name, Registered Mobile, Registered Email — **no Udyam Registration Number**. Reason: in the stored submission, `udyam_number` is an empty string (the customer saved the form as `draft` without entering it; the value shown in the screenshot is just the input placeholder, not real data). The panel's render loop filters out any field whose value is `undefined / null / ""`, so the missing field disappears entirely instead of showing as blank.
 
-## Canonical label
+This makes staff think we didn't capture the field at all. The fix is to mirror the form: every schema field, in the same order as the form, always visible — with a `—` placeholder when empty.
 
-Use the same wording that already appears in the public nav and matches the slug `download-udyam-certificate`:
+## Change (UI only — frontend)
 
-- **Slug:** `download-udyam-certificate`
-- **Label (everywhere in CRM, forms, emails, dropdowns):** `Download Udyam Certificate`
+`src/components/admin/FormSubmissionPanel.tsx`
 
-All other service labels in `src/lib/constants.ts` already match the nav and stay unchanged.
+1. In `groupFieldsBySection` keep current ordering (already mirrors the schema → mirrors the form). No change there.
+2. In the body render (`sections.map(...)`):
+   - **Remove the `visible = section.fields.filter(...)` empty-value filter.** Render every field in the section.
+   - Show empty values as `—` (the existing `mask()` already returns `—` for null/empty, so it just works once filtering is removed).
+   - Drop the `if (!visible.length) return null` early-out so a section with all-empty values still renders its header.
+3. In "Copy All Details": keep filtering empties out of the clipboard text (staff don't want to paste blanks to customers). Only the on-screen render changes.
+4. No schema, server, or DB changes. `download-udyam-certificate` schema already has the correct fields in the correct order: Applicant Name → Udyam Registration Number → Registered Mobile Number → Registered Email ID.
 
-## Changes
+## Out of scope
 
-1. `src/lib/constants.ts` — change line 6 label from `"Udyam Registration Certificate Download"` to `"Download Udyam Certificate"`.
-2. `src/routes/apply.$leadCode.summary.tsx:89` — rename the object key `"Udyam Registration Certificate Download"` → `"Download Udyam Certificate"` so the summary page keeps mapping the right copy.
-3. `src/lib/onboarding/schemas.ts:193` — update the schema entry title from `"Udyam Registration Certificate Download — Incomplete Information"` to `"Download Udyam Certificate — Incomplete Information"` so the onboarding form keeps matching by service label.
-4. Backfill database (data migration, not schema):
-   ```sql
-   UPDATE public.leads
-      SET service = 'Download Udyam Certificate'
-    WHERE service = 'Udyam Registration Certificate Download';
-   ```
-   (3,476 rows; only the `leads.service` text column stores this label — applications join via `lead_id`, and `services.service_name` is a separate catalogue that already uses short labels.)
-
-## Out of scope (intentionally not touched)
-
-- SEO landing routes / WordPress imports under `src/routes/udyam-registration-certificate-download.tsx`, `src/content/wp/*.html`, and `seo_pages` rows — these are public marketing pages where the long phrase is the targeted keyword. Renaming them would hurt SEO and is not what the user asked for.
-- Other service labels (New Udyam Registration, Update Udyam Certificate, Migration, Forgot Mobile/Email, PAN/Aadhaar correction, Talk to Expert) — they already align with the nav and the user only flagged the Download one.
+- The `aadhaar_mobile` value under "Other fields" — that key comes from the public landing form and isn't part of the service schema. Leaving it where it is.
+- The submission's `draft` status / why the customer didn't fill the field — that's a customer behaviour issue, not a UI bug.
 
 ## Verification
 
-- Open `/admin/leads` → the affected rows now display "Download Udyam Certificate" with no truncation.
-- Submit a new "Download Udyam Certificate" lead from the public form → onboarding summary + incomplete-info schema still resolve (no "unknown service" fallback).
+Reload `/admin/orders/<orderId>` for the same order. The Form Submission panel should list, in form order:
+
+```
+Applicant Name           Udyam Registration Number
+shailini ben             —
+Registered Mobile Number Registered Email ID
+9913235755               jontipatel94@gmail.com
+```
+
+Repeat against a fully-filled submission to confirm filled values still render normally.
