@@ -257,6 +257,8 @@ export type Database = {
           cancellation_requested_at: string | null
           certificate_uploaded_at: string | null
           closure_next_at: string | null
+          closure_reason_code: string | null
+          closure_reason_text: string | null
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
           customer_id: string | null
@@ -294,6 +296,8 @@ export type Database = {
           cancellation_requested_at?: string | null
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
+          closure_reason_code?: string | null
+          closure_reason_text?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
@@ -333,6 +337,8 @@ export type Database = {
           cancellation_requested_at?: string | null
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
+          closure_reason_code?: string | null
+          closure_reason_text?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
@@ -3001,6 +3007,7 @@ export type Database = {
       }
       workflow_settings: {
         Row: {
+          cancel_wait_hours: number
           created_at: string
           enabled: boolean
           id: string
@@ -3012,6 +3019,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_wait_hours?: number
           created_at?: string
           enabled?: boolean
           id?: string
@@ -3023,6 +3031,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_wait_hours?: number
           created_at?: string
           enabled?: boolean
           id?: string
@@ -3193,6 +3202,10 @@ export type Database = {
         | "closure_pending"
         | "notice_sent"
         | "closed"
+        | "concern_reply_sent"
+        | "refund_reviewed"
+        | "final_ticket_closed"
+        | "acknowledged"
       complaint_status_enum:
         | "draft"
         | "submitted"
@@ -3454,6 +3467,10 @@ export const Constants = {
         "closure_pending",
         "notice_sent",
         "closed",
+        "concern_reply_sent",
+        "refund_reviewed",
+        "final_ticket_closed",
+        "acknowledged",
       ],
       complaint_status_enum: [
         "draft",

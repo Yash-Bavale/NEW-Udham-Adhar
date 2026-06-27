@@ -1,14 +1,13 @@
-// Cancellation closure workflow runner. pg_cron hits this hourly (or daily) with
-// CRON_SECRET in the `apikey` header. Advances applications through:
-//   request_received -> closure_pending (after step2_days)
-//                    -> notice_sent     (after step3_days)
-//                    -> closed
-// Step 1 email is enqueued at the moment the request is recorded (server fn),
-// Step 2 and Step 3 emails are enqueued here as stages advance.
+// Cancellation closure-workflow runner.
+// pg_cron hits this hourly with CRON_SECRET (or apikey) in the `apikey` header.
+//
+// Auto-advances applications through:
+//   request_received     → closed                 (Step 2 email; order CANCELLED)
+//   concern_reply_sent   → final_ticket_closed    (Step 4 email)
+//   refund_reviewed      → closed (terminal)       (Step 6 email)
+//
+// All wait windows use workflow_settings.cancel_wait_hours (default 24h).
 import { createFileRoute } from "@tanstack/react-router";
-
-const SUPPORT_EMAIL = process.env.INTERNAL_NOTIFICATION_EMAIL || "help@businesshelpservices.in";
-const REFUND_POLICY_URL = "https://udyamadhar.in/refund-policy";
 
 export const Route = createFileRoute("/api/public/cron/closure-workflow")({
   server: {
@@ -23,33 +22,44 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
+        const { enqueueFromTemplateInternal } = await import(
+          "@/lib/emails/emails.server"
+        );
 
-        // Load workflow settings (singleton row).
         const { data: settingsRow } = await supabaseAdmin
           .from("workflow_settings")
           .select("*")
           .limit(1)
           .maybeSingle();
-
-        if (!settingsRow || settingsRow.enabled === false) {
+        if (!settingsRow || (settingsRow as any).enabled === false) {
           return Response.json({ ok: true, skipped: "disabled" });
         }
 
         const now = new Date();
         const nowIso = now.toISOString();
+        const STAGES_DUE = [
+          "request_received",
+          "concern_reply_sent",
+          "refund_reviewed",
+        ];
 
-        // Find applications whose next stage transition is due.
         const { data: due, error } = await supabaseAdmin
           .from("applications")
-          .select("id, application_code, lead_id, closure_stage, closure_next_at")
-          .in("closure_stage", ["request_received", "closure_pending"])
+          .select(
+            "id, application_code, lead_id, closure_stage, closure_next_at, closure_reason_code, closure_reason_text",
+          )
+          .in("closure_stage", STAGES_DUE as never)
           .lte("closure_next_at", nowIso)
           .limit(200);
 
         if (error) {
-          return Response.json({ ok: false, error: error.message }, { status: 500 });
+          return Response.json(
+            { ok: false, error: error.message },
+            { status: 500 },
+          );
         }
 
         let advanced = 0;
@@ -57,62 +67,94 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
 
         for (const app of due ?? []) {
           try {
-            // Pull lead + customer info for email merge.
             const { data: lead } = await supabaseAdmin
               .from("leads")
               .select("name, email, service")
               .eq("id", app.lead_id)
               .maybeSingle();
 
-            if (!lead?.email) {
-              failed++;
-              continue;
+            // Resolve reason_block from the stored reason code.
+            let reasonBlock = (app as any).closure_reason_text ?? "";
+            if ((app as any).closure_reason_code) {
+              const { data: rr } = await supabaseAdmin
+                .from("workflow_delay_reasons")
+                .select("description, label")
+                .eq("code", (app as any).closure_reason_code)
+                .maybeSingle();
+              if (rr?.description) reasonBlock = rr.description as string;
+              else if (rr?.label) reasonBlock = rr.label as string;
             }
 
             const baseVars = {
-              customer_name: lead.name ?? "",
+              customer_name: lead?.name ?? "",
               order_number: app.application_code ?? "",
-              service_name: lead.service ?? "",
-              refund_policy_url: REFUND_POLICY_URL,
-              support_email: SUPPORT_EMAIL,
+              service_name: lead?.service ?? "",
+              reason_block: reasonBlock,
+              ticket_id: app.application_code ?? "",
+              date_ist: now.toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              }),
             };
 
             if (app.closure_stage === "request_received") {
-              // -> closure_pending, send Step 2 email, set next due in step3_days
-              await enqueueFromTemplateInternal(
-                settingsRow.step2_template_code ?? "final-notice-before-closure",
-                lead.email,
-                baseVars,
-                { toName: lead.name ?? undefined, leadId: app.lead_id },
-              );
-              const nextAt = new Date(
-                now.getTime() + (settingsRow.step3_days ?? 7) * 86400_000,
-              ).toISOString();
-              await supabaseAdmin
-                .from("applications")
-                .update({ closure_stage: "closure_pending", closure_next_at: nextAt })
-                .eq("id", app.id);
-              advanced++;
-            } else if (app.closure_stage === "closure_pending") {
-              // -> closed (notice_sent + closure email)
-              await enqueueFromTemplateInternal(
-                settingsRow.step3_template_code ?? "order-closed-notice",
-                lead.email,
-                baseVars,
-                { toName: lead.name ?? undefined, leadId: app.lead_id },
-              );
+              if (lead?.email) {
+                await enqueueFromTemplateInternal(
+                  "cancel-closure-confirmation",
+                  lead.email,
+                  baseVars,
+                  { toName: lead.name ?? undefined, leadId: app.lead_id },
+                );
+              }
               await supabaseAdmin
                 .from("applications")
                 .update({
                   closure_stage: "closed",
                   closure_next_at: null,
                   application_status: "cancelled",
-                })
+                  fulfillment_status: "cancelled",
+                } as never)
+                .eq("id", app.id);
+              advanced++;
+            } else if (app.closure_stage === "concern_reply_sent") {
+              if (lead?.email) {
+                await enqueueFromTemplateInternal(
+                  "cancel-ticket-closed",
+                  lead.email,
+                  baseVars,
+                  { toName: lead.name ?? undefined, leadId: app.lead_id },
+                );
+              }
+              await supabaseAdmin
+                .from("applications")
+                .update({
+                  closure_stage: "final_ticket_closed",
+                  closure_next_at: null,
+                } as never)
+                .eq("id", app.id);
+              advanced++;
+            } else if (app.closure_stage === "refund_reviewed") {
+              if (lead?.email) {
+                await enqueueFromTemplateInternal(
+                  "cancel-ticket-closed-final",
+                  lead.email,
+                  baseVars,
+                  { toName: lead.name ?? undefined, leadId: app.lead_id },
+                );
+              }
+              await supabaseAdmin
+                .from("applications")
+                .update({
+                  closure_stage: "closed",
+                  closure_next_at: null,
+                } as never)
                 .eq("id", app.id);
               advanced++;
             }
           } catch (e) {
-            console.error("[closure-workflow] failed", { applicationId: app.id, e });
+            console.error("[closure-workflow] failed", {
+              applicationId: app.id,
+              e,
+            });
             failed++;
           }
         }

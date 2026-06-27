@@ -9,11 +9,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { StageStepper } from "./StageStepper";
 import { CustomerProfileCard } from "./CustomerProfileCard";
+import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel";
+import { CancellationPanel } from "@/components/admin/CancellationPanel";
 import { ProcessingChecklist } from "@/components/admin/ProcessingChecklist";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
@@ -180,6 +182,15 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-3 gap-4 mt-4">
           <div className="lg:col-span-2 space-y-4 min-w-0">
             <TabsContent value="overview" className="space-y-4 mt-0 animate-fade-in">
+              <CustomerJourneyMap
+                application={application}
+                paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
+                stageMeta={stageMeta}
+                workflowStatus={(application as any).workflow_status}
+                closureStage={(application as any).closure_stage}
+                closureNextAt={(application as any).closure_next_at}
+                closureReasonLabel={(application as any).closure_reason_code}
+              />
               {p.showConsultationPanel ? (
                 <ConvertConsultationPanel
                   leadId={lead.id} leadCode={lead.lead_code}
@@ -227,6 +238,14 @@ export function WorkspaceShell(p: Props) {
               {!p.showConsultationPanel && (
                 <FulfillmentStatusUpdater orderId={application.id} current={current} />
               )}
+              <CancellationPanel
+                applicationId={application.id}
+                closureStage={(application as any).closure_stage}
+                closureNextAt={(application as any).closure_next_at}
+                cancellationRequestedAt={(application as any).cancellation_requested_at}
+                reasonCode={(application as any).closure_reason_code}
+                reasonText={(application as any).closure_reason_text}
+              />
               <WorkflowTimelinePanel applicationId={application.id} workflowStatus={(application as any).workflow_status} />
             </TabsContent>
 

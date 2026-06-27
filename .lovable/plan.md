@@ -1,69 +1,124 @@
-## Goal
-Rebuild `src/routes/admin.orders.$orderId.tsx` as a **modern colorful Tabbed Command Center**. Keep every existing capability (customer details, lead form, post-payment form, fulfillment, workflow, timeline, emails, payments, documents, notes, consultation flow, RBAC money-hiding) — only the shell + visual language change.
+## What you'll see in the workspace
 
-## Visual direction
-- Palette: Indigo `#4f46e5` (primary), Cyan `#06b6d4` (info/active stage), Amber `#f59e0b` (warnings/pending), Coral `#ef4444` (danger/closure), Emerald `#10b981` (success). Soft gradient backgrounds (`from-indigo-50 via-white to-cyan-50`).
-- Typography: keep current font stack. Bold headings, uppercase micro-labels with tracking.
-- Surface: rounded-2xl cards, subtle ring + colored gradient borders for the active stage, smooth `animate-fade-in` / `hover-scale` transitions.
-- Stage stepper: full-width horizontal pill-stepper with gradient fills per stage, animated pulsing dot on the active stage, click to jump to that tab.
-- Density: everything visible — tabs are the primary nav, but Overview tab shows a bento of mini-cards so power users see the whole picture without clicking.
+One **Order Journey** strip at the top of every order page. It always shows three lanes side-by-side so the employee never has to guess where the order is:
 
-## New shell layout
 ```text
-┌────────────────────────────────────────────────────────────────────┐
-│ ← Back to orders                                       [+ Add Task] │
-├────────────────────────────────────────────────────────────────────┤
-│ STICKY GRADIENT HEADER                                              │
-│  AP-2026-006630  •  Payment Done  •  Download Udyam Certificate     │
-│  Customer • Mobile • Email • Created • Payment • Total • Assignee   │
-├────────────────────────────────────────────────────────────────────┤
-│ COLORFUL GRADIENT STAGE STEPPER  (9 pills, active = pulse + glow)   │
-├────────────────────────────────────────────────────────────────────┤
-│ PERSISTENT ACTION BAR  [Call][WhatsApp][Email][Docs][Cert][Done]    │
-├────────────────────────────────────────────────────────────────────┤
-│ TABS:  Overview | Customer | Form & Docs | Workflow | Emails | Log  │
-│ ┌──────────────────────────────────────┬──────────────────────────┐ │
-│ │ Active tab content (2/3 width)       │ Right rail (1/3)         │ │
-│ │                                      │ • Customer mini card     │ │
-│ │                                      │ • Stage summary          │ │
-│ │                                      │ • Payments & Invoices    │ │
-│ │                                      │ • Documents quick list   │ │
-│ └──────────────────────────────────────┴──────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────┘
+┌─ HAPPY PATH ──────────────────────────────────────────────────┐ ┌─ SIDE TRACK ─────────────┐
+│ Lead → Payment → Order Received → (Talk-to-Expert?) → Form    │ │ External Delay (if any)  │
+│      → Docs → Verification → Submitted → Processing → DONE    │ │ reason · auto-resume in  │
+└───────────────────────────────────────────────────────────────┘ └──────────────────────────┘
+┌─ CANCELLATION (only if started) ─────────────────────────────────────────────────────────────┐
+│ Req Received → Closed (24h) → Concern Reply → Ticket Closed (24h) → Refund Reviewed → Final  │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Tabs (content mapping — all existing components reused)
-1. **Overview** — Bento of: StageActionsPanel (next step), ProcessingChecklist, mini Form status card, mini Workflow status card, last 3 timeline events. One-glance health.
-2. **Customer** — Full customer profile card (name/mobile/email/repeat badges) + LeadWorkspacePanel-style lead form details (the original website lead form submission).
-3. **Form & Docs** — `FormSubmissionPanel` (post-payment service form) + `OrderDocumentsPanel` side-by-side on wide screens.
-4. **Workflow** — `FulfillmentStatusUpdater` + `WorkflowTimelinePanel` (external delay, reminders, closure actions) + `ConvertConsultationPanel` when applicable.
-5. **Emails** — Existing emails history (LeadEmailsTab-style) scoped to this order/lead — read-only list with subject, status, sent time, preview drawer.
-6. **Activity Log** — `UnifiedTimeline` (events + payments + documents) + `InternalNotes` composer at top.
+Active step = colored & pulsing. Completed = green check. Future = grey. Next auto-action shows a live countdown (e.g. "Auto-closure in 18h 22m").
 
-Consultation (Talk-to-Expert) special case: when `showConsultationPanel` is true, Overview + Form & Docs tabs are replaced by a single highlighted "Consultation" tab hosting `ConsultationContactStrip` + `ConvertConsultationPanel` — matches current gating exactly.
+---
 
-## New components (presentation only — no business logic changes)
-- `src/components/admin/workspace/WorkspaceHeader.tsx` — gradient sticky header (wraps current `OrderCommandHeader` data into the new look).
-- `src/components/admin/workspace/StageStepper.tsx` — colorful gradient horizontal stepper (replaces `ProcessTracker` visually; same `stage` + `timestamps` props; click → switch tab).
-- `src/components/admin/workspace/WorkspaceTabs.tsx` — shadcn `Tabs` with colored active indicator, icons, count badges (e.g. unread emails, missing docs).
-- `src/components/admin/workspace/OverviewBento.tsx` — bento grid of summary cards composed from existing data.
-- `src/components/admin/workspace/EmailsTab.tsx` — thin wrapper around the existing emails-admin query for this lead/application.
-- `src/components/admin/workspace/RightRail.tsx` — assembles customer card + stage summary + payments + docs quick list.
+## Full user journey (the map)
 
-All other panels (`FormSubmissionPanel`, `OrderDocumentsPanel`, `OrderPaymentsPanel`, `FulfillmentStatusUpdater`, `WorkflowTimelinePanel`, `ProcessingChecklist`, `UnifiedTimeline`, `ConvertConsultationPanel`, `StageActionsPanel`) are **reused as-is** — no prop changes.
+```text
+LEAD CAPTURED ─▶ PAYMENT SUCCESS ─▶ ORDER RECEIVED
+                                         │
+                              ┌─ Talk-to-Expert? ─┐
+                              │ yes               │ no
+                              ▼                   ▼
+                  CONSULTATION PENDING     FORM SUBMITTED
+                  (pick service +                │
+                   2nd payment link)             ▼
+                              │           DOCUMENTS RECEIVED
+                              └────────────────▶ │
+                                                 ▼
+                                          VERIFICATION PENDING
+                                                 │
+                                                 ▼
+                                          APPLICATION SUBMITTED
+                                                 │
+                                                 ▼
+                                          UNDER PROCESSING
+                                                 │
+                                                 ▼
+                                          COMPLETED (cert uploaded + emailed)
 
-## Files touched
-- `src/routes/admin.orders.$orderId.tsx` — rewritten shell using the new components; data fetching, RBAC, consultation gating, assignee/notes/reminder handlers all unchanged.
-- New files under `src/components/admin/workspace/` listed above.
-- No changes to server functions, schemas, RLS, emails, or workflow logic.
+SIDE TRACKS — branch from any active stage, never skip the main flow:
 
-## Out of scope
-- Lead list, orders list, dashboards, customer profile route, settings — untouched.
-- No DB migrations, no API changes.
-- No removal of any data currently shown.
+  EXTERNAL DELAY (13 reasons)
+     └─ customer emailed · employee sets auto-resume · order pauses, never closes
 
-## Acceptance
-- Same URL, same data, same role-based money hiding.
-- All previous actions reachable in ≤ 1 click from the action bar or active tab.
-- Stage stepper, header, and action bar stay sticky while scrolling within a tab.
-- Works at 1280px and at mobile (tabs become a horizontal scroller; right rail stacks).
+  CANCELLATION / REFUND  (NEW — replaces the instant "cancelled" jump)
+     1. Request Received    ── Email A "Action Required" (+ chosen REASON_BLOCK)
+        wait 24h
+     2. Closed — No Response── Email B "Closure Confirmation" · status=cancelled
+        │
+        ├─ customer agrees ──▶ Resume order (closure_stage cleared)
+        │
+        └─ customer argues ──▶ employee clicks "Send Concern Reply"
+     3. Concern Reply Sent  ── Email C "Regarding Your Concern"
+        wait 24h
+     4. Ticket Closed       ── Email D "Ticket Closed"
+        │
+        └─ argues again ─────▶ employee clicks "Send Refund Decision"
+     5. Refund Reviewed     ── Email E "Not Refundable"
+        wait 24h
+     6. Final Ticket Closed ── Email F "Final Closure"
+        │
+        └─ any further reply▶ employee clicks "Acknowledge"
+     7. Acknowledged        ── Email G "Already Reviewed" (one-shot)
+
+  Revert button available at every step until Step 6.
+```
+
+Visual version of the same flow is attached below.
+
+---
+
+## What changes in code (UI/wiring only — no business logic invented)
+
+### 1. Cancel button no longer cancels directly
+- `FulfillmentStatusUpdater.tsx` — remove `"cancelled"` from the dropdown.
+- A new red **Cancel Order** button (in the workspace action bar) opens the cancellation dialog with the **13 REASON_BLOCK** picker. Submitting calls `requestCancellation` → enters Step 1 of the workflow above.
+
+### 2. Cancellation panel restored & extended
+- `src/components/admin/CancellationPanel.tsx` rewritten as a stage-aware card mounted in the workspace right rail.
+- Always visible. Shows current step (1–7), live countdown to next cron action, the REASON_BLOCK used, and the *next manual action* button that's valid for the current step:
+  - Step 2 → "Customer Argued · Send Concern Reply" / "Customer Agreed · Resume"
+  - Step 4 → "Send Refund Decision" / "Customer Agreed · Resume"
+  - Step 6 → "Acknowledge Customer Reply"
+  - Any step before 6 → "Revert Workflow"
+- Mini timeline inside the card lists Email A–G as they fire with sent-at IST.
+
+### 3. Unified Customer Journey strip (the "one view")
+- New component `src/components/admin/workspace/CustomerJourneyMap.tsx` shown as the top block of the **Overview** tab.
+- Three lanes: Happy Path, External Delay, Cancellation. Each lane is a horizontal stepper with `STAGE_META` colors, timestamps in IST, and a "Next: …" line.
+- Stage data merged from: `application.fulfillment_status`, `application.workflow_status`, `application.closure_stage`, `application.external_delay_*`.
+- Clicking a step deep-links to the relevant tab (e.g. cancellation step → Workflow tab → CancellationPanel highlighted).
+
+### 4. Workflow Timeline already exists — just wire it
+- `WorkflowTimelinePanel` is the canonical event log. Every new cancellation event (`cancellation_requested`, `concern_reply_sent`, `refund_reviewed`, `ticket_closed`, `acknowledged`) is inserted into `workflow_events`, so the timeline shows the same story as the strip. No new component for this.
+
+### 5. Customer fields you asked for earlier
+- `CustomerProfileCard.tsx`: add **State** and **Language** rows (from `customer.state/language`, fallback to `lead.state/language`).
+- Right-rail mini-card: append `State · Language` line under the email.
+
+---
+
+## Files
+
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` (new — the unified strip)
+- `src/components/admin/workspace/CustomerProfileCard.tsx` (add State/Language)
+- `src/components/admin/workspace/WorkspaceShell.tsx` (mount strip + cancellation panel in right rail, mini-card line)
+- `src/components/admin/CancellationPanel.tsx` (rewrite to stage-aware card with manual-action buttons)
+- `src/components/admin/FulfillmentStatusUpdater.tsx` (remove direct `cancelled`, add Cancel Order trigger that opens the dialog)
+- `src/lib/crm/cancellation.functions.ts` (already extended in previous plan: `requestCancellation` with reasonCode, `sendConcernReply`, `sendRefundDecision`, `acknowledgePostClosure`, `customerAgreedResume`)
+- `src/routes/api/public/cron/closure-workflow.ts` (24h advance for new stages — covered in previous plan)
+- `src/routes/admin.orders.$orderId.tsx` (select `closure_stage`, `closure_next_at`, `closure_reason_code`, `cancellation_requested_at`, `external_delay_*` and pass to shell)
+- Migration: extend `closure_stage` values + add `closure_reason_code`, `cancel_wait_hours` (covered in previous plan)
+
+No other functionality touched. Refund money-movement, invoices, fulfillment updater, lead status engine, and unrelated email templates remain unchanged.
+
+---
+
+## Diagram
+
+<lov-artifact url="/__l5e/documents/Order_Journey_Map.mmd" mime_type="text/vnd.mermaid"></lov-artifact>
