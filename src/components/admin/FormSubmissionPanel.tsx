@@ -64,8 +64,10 @@ function groupFieldsBySection(serviceCode: string | null): SectionGroup[] {
 
 export function FormSubmissionPanel({
   applicationId,
+  isLocked = false,
 }: {
   applicationId: string;
+  isLocked?: boolean;
 }) {
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
