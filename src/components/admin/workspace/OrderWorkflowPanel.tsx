@@ -52,7 +52,8 @@ export function OrderWorkflowPanel({
   reasonText?: string | null;
 }) {
   const qc = useQueryClient();
-  const cancellationActive = (closureStage ?? "none") !== "none";
+  const cancellationActive =
+    (closureStage ?? "none") !== "none" || current === "cancelled";
   const inDelay = !!workflowStatus && DELAY_STATUSES.includes(workflowStatus);
   const lane: Lane = cancellationActive ? "cancellation" : inDelay ? "delay" : "happy";
 
