@@ -1,56 +1,59 @@
-# Form fidelity audit + fixes (CRM Workspace)
+## What actually happened on AP-2026-006630
 
-## What I verified from the DB
+I checked the database for this application:
 
-I read 50 recent submissions and inspected three representative rows (UA-2026-007641, UA-2026-007634, UA-2026-007570).
+- Lead service: **Download Udyam Certificate** (`download-udyam-certificate`)
+- Onboarding submission row:
+  - `status = "draft"`
+  - `submitted_at = NULL`
+  - `form_data.udyam_number = ""`
 
-Stored form_data keys per service:
+So the customer **never actually submitted the form**. They opened it, typed name / email / mobile, the form auto-saved as a **draft**, and they closed the tab before pressing the final "Submit Details" button. Required-field validation only runs on the real submit (server `submitOnboarding` checks `if (!data.draft)`), which is correct — we must allow drafts to be saved with missing fields, otherwise auto-save would constantly error out.
 
-- `download-udyam-certificate` → `applicant_name`, `udyam_number`, `registered_mobile`, `registered_email`, **`aadhaar_mobile`** (leaked)
-- `update-udyam-certificate` → above + `fields_to_update`, **`aadhaar_mobile`** (leaked)
-- `new-udyam-registration` → full 40+ field payload + 4 empty `section_*` separator keys
+The Udyam-number field IS mandatory: both the TS fallback schema (`UDYAM_DOWNLOAD`) and the DB schema row mark `udyam_number` as `required: true` with the `UDYAM-XX-00-0000000` pattern. The server would have rejected the empty value if the customer had clicked Submit.
 
-`service_form_schemas` table is empty, so the CRM uses the TS schema in `src/lib/onboarding/schemas.ts` as source of truth (correct behavior).
+The real problem is in the CRM: the workspace shows draft data the same way as submitted data, so it looks like "the customer submitted with an empty field" when in fact they abandoned the form mid-way.
 
-## What's actually wrong
+## Plan — make draft vs submitted unmistakable, and recover the lead
 
-1. **`aadhaar_mobile` leak for Update / Download / Migrate / Correct-PAN flows.**
-   `src/routes/onboarding.$leadCode.index.tsx:81` seeds `initial.aadhaar_mobile = lead.mobile` for **every** service. The non-New schemas don't define this field, so it's never shown in the form, but it still gets saved into `form_data`. In the CRM it then surfaces under "Other fields" as `aadhaar mobile`, which looks like a duplicate of Registered Mobile and confuses staff.
+### 1. Strong "DRAFT — not submitted" banner in `FormSubmissionPanel.tsx`
 
-2. **Empty `section_*` separator keys** (`section_address`, `section_status`, `section_bank`, `section_employees`) are persisted as empty strings for New Udyam and pollute "Other fields".
+When `submission.status !== "submitted"` (or `submitted_at` is null):
 
-3. **Sequence/labels**: schema fields render in correct order after the previous fix, but the "Other fields" block currently mixes real leaked data (`aadhaar_mobile`) with garbage separator keys, breaking the "same as form" rule.
+- Replace the small grey pill with a full-width **amber warning banner** at the top of the panel:
+  > "Customer started filling this form but did NOT submit it. Values below are an auto-saved draft and may be incomplete. Required fields are still missing."
+- List the specific required fields that are still blank (computed from the active schema) so staff instantly see e.g. *"Udyam Registration Number — missing"*.
+- Each required field row in the panel gets a red "Required — empty" tag when its value is blank, instead of the silent "—".
+- Add two action buttons in the banner:
+  - **Copy onboarding link** (same `/onboarding/<leadCode>` URL we already build elsewhere)
+  - **Resend onboarding email** (calls existing `enqueueFromTemplateInternal("onboarding_reminder", …)` if available, else falls back to the generic reminder template already wired in `emails-admin.functions.ts`)
 
-4. **Service name displayed in workspace** uses `lead.service` (free-text) in headers and in the lead row. Canonical name is `services.service_name` keyed off `lead.service_id`. They match today, but a future rename in `services` would desync. Worth wiring the panel header to prefer the canonical label.
+### 2. Surface "draft, not submitted" everywhere we currently say "Form submitted"
 
-5. **`udyam_number` empty for UA-2026-007641**: the row is a *draft*, not a submission — `status='draft'`. The required-field guard only fires on submit, so this is expected. No fix needed, but the new always-render rule is what made it visible.
+- `LeadWorkspacePanel` / `OrderJourney` / `StageJourneyStrip`: the "Form Submission" stage tile should render in amber with label **"Form started — not submitted"** when `onboarding_submissions.status = 'draft'`, instead of the current green "submitted" treatment. Tile already reads the submission row; we just branch on `status`.
+- `/admin/my-work` and `/admin/leads` (Form column): show a small amber **"Draft"** chip next to leads whose latest submission is a draft, so staff can chase them.
 
-## Fixes
+### 3. Stop the `applications.form_status` / `form_submitted_at` triggers from firing on drafts
 
-### A. Stop polluting `form_data` with fields the form never showed
-`src/routes/onboarding.$leadCode.index.tsx`
-- Only seed `aadhaar_mobile` when the **active service schema actually contains** an `aadhaar_mobile` field. Otherwise leave it unset.
-- Strip `section`-type keys from the payload before save (they're UI-only separators).
+Quick audit while I was in the file:
+- `submitOnboarding` only sets `form_status = "submitted"` and transitions the application to `details_pending` when `!data.draft` ✓ correct.
+- DB trigger `set_application_form_submitted_at` fires on **insert** of `onboarding_submissions`, regardless of `status`. That means a pure draft row stamps `applications.form_submitted_at`, which is what makes the workspace look "submitted". Migration: change the trigger to only stamp when `NEW.status = 'submitted'` (and add an `UPDATE` trigger so it stamps later when the draft is converted to submitted).
 
-### B. Filter "Other fields" in `FormSubmissionPanel`
-`src/components/admin/FormSubmissionPanel.tsx`
-- Compute `extras` as keys that are (a) not in the schema, (b) not `section_*`, (c) not empty strings/nulls. This keeps the panel a faithful mirror of the form the customer saw, while still surfacing genuinely unmapped data if any sneaks in.
+### 4. Recover this specific lead
 
-### C. Show the exact customer-selected service name in the workspace
-`src/components/admin/FormSubmissionPanel.tsx` header + the order workspace header strip
-- Prefer `service.service_name` (already fetched from `services` table in `getFormSubmissionForApplication`) over `lead.service`. Fall back to `lead.service` when the service row is missing. No truncation (`break-words`, no max-width).
+- Add a one-click **"Re-send onboarding link"** action on the application page (uses the existing onboarding email template + the customer's email/WhatsApp). Action is also useful for any future abandoned drafts.
+- Optional: a tiny cron (or just a manual button for now) that emails customers whose draft is older than 24h and still missing required fields. Out of scope unless you want it — flag if yes.
 
-### D. One-time data cleanup (migration)
-- `UPDATE onboarding_submissions SET form_data = form_data - 'aadhaar_mobile' WHERE service_code IN ('update-udyam-certificate','download-udyam-certificate','migrate-udyog-aadhaar-to-udyam','correct-pan-aadhaar') AND (form_data->>'aadhaar_mobile') IS NOT NULL;`
-- `UPDATE onboarding_submissions SET form_data = form_data - 'section_address' - 'section_status' - 'section_bank' - 'section_employees' - 'section_documents' WHERE form_data ?| array['section_address','section_status','section_bank','section_employees','section_documents'];`
+### Files touched
 
-### E. Sanity check (no code change, just verification)
-After A–D, re-query the same three leads and confirm the workspace shows:
-- service header = canonical service name (e.g. "Download Udyam Certificate")
-- all schema fields in schema order, full values, no truncation, `—` only for genuinely blank required ones
-- "Other fields" block hidden when there's nothing extra
+- `src/components/admin/FormSubmissionPanel.tsx` — banner, required-empty highlighting, action buttons.
+- `src/components/admin/LeadWorkspacePanel.tsx`, `OrderJourney.tsx`, `StageJourneyStrip.tsx` — draft-aware stage tile.
+- `src/routes/admin.leads.index.tsx`, `src/routes/admin.my-work.tsx` — "Draft" chip in form column.
+- `src/lib/crm/emails-admin.functions.ts` (or new `resendOnboardingLink` server fn) — re-send action.
+- New migration: update `set_application_form_submitted_at` trigger to gate on `status = 'submitted'`.
 
-## Out of scope (won't change)
-- Field labels, ordering, validation, or the public onboarding form UI.
-- New Udyam payload structure or any other service schema.
-- The "Copy All Details" clipboard format (already filters empties).
+### What I will NOT change
+
+- I will not force required fields on draft auto-save (that would break the auto-save UX).
+- I will not change the customer-facing schema — `udyam_number` is already `required: true` with the correct pattern.
+- I will not retroactively rewrite `AP-2026-006630`'s form_data; the draft row stays so the customer can resume from where they left off.
