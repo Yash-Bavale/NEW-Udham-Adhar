@@ -289,7 +289,7 @@ export const sendTestTemplateEmail = createServerFn({ method: "POST" })
       if (lk.includes("reason")) return "Sample reason for testing";
       return `[Sample ${k}]`;
     };
-    const auto: Record<string, unknown> = {};
+    const auto: Record<string, string> = {};
     for (const v of (tpl.variables ?? []) as string[]) auto[v] = sampleFor(v);
 
     let overrides: Record<string, unknown> = {};
