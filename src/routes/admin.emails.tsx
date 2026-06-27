@@ -242,18 +242,88 @@ function TemplatesTab() {
   const saveFn = useServerFn(saveEmailTemplate);
   const dupFn = useServerFn(duplicateEmailTemplate);
   const delFn = useServerFn(deleteEmailTemplate);
+  const testTplFn = useServerFn(sendTestTemplateEmail);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin.emails.templates"], queryFn: () => listFn() });
   const [form, setForm] = useState<TplForm | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Test-by-template console state
+  const [testCode, setTestCode] = useState("");
+  const [testTo, setTestTo] = useState("");
+  const [testVars, setTestVars] = useState("");
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [testBusy, setTestBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [rowMsg, setRowMsg] = useState<string | null>(null);
+
+  const runTest = async (code: string, to: string, varsJson?: string) => {
+    setTestMsg(null);
+    const r = await testTplFn({ data: { code, toEmail: to, variablesJson: varsJson } });
+    return `Template "${r.template}" — sent ${r.sent}, failed ${r.failed}.`;
+  };
+
   if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
 
   return (
     <div className="space-y-4">
+      <Section title="Send test by template (end-to-end verify)">
+        <p className="text-xs text-slate-500 mb-2">
+          Sends a sample of the selected template via Zoho SMTP using auto-generated sample variables
+          (override any with JSON). Disabled templates are still sent for testing and prefixed with [TEST].
+        </p>
+        <div className="grid md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Template</label>
+            <select
+              value={testCode}
+              onChange={(e) => setTestCode(e.target.value)}
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">— Select template —</option>
+              {(data?.rows ?? []).map((t) => (
+                <option key={t.id} value={t.code}>
+                  {t.name} ({t.code}){t.is_enabled ? "" : " — disabled"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Input label="Recipient" value={testTo} onChange={setTestTo} />
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Variables override (JSON, optional)</label>
+            <input
+              value={testVars}
+              onChange={(e) => setTestVars(e.target.value)}
+              placeholder='{"customer_name":"Asha"}'
+              className="w-full rounded border border-slate-300 px-3 py-2 text-xs font-mono"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            disabled={testBusy || !testCode || !testTo}
+            onClick={async () => {
+              setTestBusy(true);
+              try {
+                const m = await runTest(testCode, testTo, testVars || undefined);
+                setTestMsg(m);
+                await qc.invalidateQueries({ queryKey: ["admin.emails.logs"] });
+                await qc.invalidateQueries({ queryKey: ["admin.emails.dash"] });
+              } catch (e) { setTestMsg((e as Error).message); }
+              finally { setTestBusy(false); }
+            }}
+            className="rounded bg-emerald-600 text-white px-3 py-1.5 text-sm disabled:opacity-40"
+          >
+            {testBusy ? "Sending…" : "Send test"}
+          </button>
+          {testMsg && <span className="text-xs text-slate-600">{testMsg}</span>}
+        </div>
+      </Section>
+
       <div className="flex justify-end">
         <button onClick={() => { setForm(emptyTpl()); setErr(null); }} className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">+ New Template</button>
       </div>
+
 
       {form && (
         <Section title={form.id ? "Edit template" : "New template"}>
