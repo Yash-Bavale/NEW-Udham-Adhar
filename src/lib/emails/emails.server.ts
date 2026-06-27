@@ -243,7 +243,7 @@ async function sendQueueRow(row: QueueRow) {
       sender_domain: LOVABLE_SENDER_DOMAIN,
       subject: row.subject,
       html: row.body_html,
-      text: row.body_text ?? "",
+      text: (row.body_text && row.body_text.trim()) || htmlToPlainText(row.body_html) || row.subject || " ",
       reply_to: settings.reply_to ?? undefined,
       purpose: "transactional" as const,
       idempotency_key: `bhs-${row.id}-${attempt}`,
