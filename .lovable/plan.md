@@ -1,59 +1,69 @@
-## What actually happened on AP-2026-006630
+## Goal
+Rebuild `src/routes/admin.orders.$orderId.tsx` as a **modern colorful Tabbed Command Center**. Keep every existing capability (customer details, lead form, post-payment form, fulfillment, workflow, timeline, emails, payments, documents, notes, consultation flow, RBAC money-hiding) — only the shell + visual language change.
 
-I checked the database for this application:
+## Visual direction
+- Palette: Indigo `#4f46e5` (primary), Cyan `#06b6d4` (info/active stage), Amber `#f59e0b` (warnings/pending), Coral `#ef4444` (danger/closure), Emerald `#10b981` (success). Soft gradient backgrounds (`from-indigo-50 via-white to-cyan-50`).
+- Typography: keep current font stack. Bold headings, uppercase micro-labels with tracking.
+- Surface: rounded-2xl cards, subtle ring + colored gradient borders for the active stage, smooth `animate-fade-in` / `hover-scale` transitions.
+- Stage stepper: full-width horizontal pill-stepper with gradient fills per stage, animated pulsing dot on the active stage, click to jump to that tab.
+- Density: everything visible — tabs are the primary nav, but Overview tab shows a bento of mini-cards so power users see the whole picture without clicking.
 
-- Lead service: **Download Udyam Certificate** (`download-udyam-certificate`)
-- Onboarding submission row:
-  - `status = "draft"`
-  - `submitted_at = NULL`
-  - `form_data.udyam_number = ""`
+## New shell layout
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│ ← Back to orders                                       [+ Add Task] │
+├────────────────────────────────────────────────────────────────────┤
+│ STICKY GRADIENT HEADER                                              │
+│  AP-2026-006630  •  Payment Done  •  Download Udyam Certificate     │
+│  Customer • Mobile • Email • Created • Payment • Total • Assignee   │
+├────────────────────────────────────────────────────────────────────┤
+│ COLORFUL GRADIENT STAGE STEPPER  (9 pills, active = pulse + glow)   │
+├────────────────────────────────────────────────────────────────────┤
+│ PERSISTENT ACTION BAR  [Call][WhatsApp][Email][Docs][Cert][Done]    │
+├────────────────────────────────────────────────────────────────────┤
+│ TABS:  Overview | Customer | Form & Docs | Workflow | Emails | Log  │
+│ ┌──────────────────────────────────────┬──────────────────────────┐ │
+│ │ Active tab content (2/3 width)       │ Right rail (1/3)         │ │
+│ │                                      │ • Customer mini card     │ │
+│ │                                      │ • Stage summary          │ │
+│ │                                      │ • Payments & Invoices    │ │
+│ │                                      │ • Documents quick list   │ │
+│ └──────────────────────────────────────┴──────────────────────────┘ │
+└────────────────────────────────────────────────────────────────────┘
+```
 
-So the customer **never actually submitted the form**. They opened it, typed name / email / mobile, the form auto-saved as a **draft**, and they closed the tab before pressing the final "Submit Details" button. Required-field validation only runs on the real submit (server `submitOnboarding` checks `if (!data.draft)`), which is correct — we must allow drafts to be saved with missing fields, otherwise auto-save would constantly error out.
+## Tabs (content mapping — all existing components reused)
+1. **Overview** — Bento of: StageActionsPanel (next step), ProcessingChecklist, mini Form status card, mini Workflow status card, last 3 timeline events. One-glance health.
+2. **Customer** — Full customer profile card (name/mobile/email/repeat badges) + LeadWorkspacePanel-style lead form details (the original website lead form submission).
+3. **Form & Docs** — `FormSubmissionPanel` (post-payment service form) + `OrderDocumentsPanel` side-by-side on wide screens.
+4. **Workflow** — `FulfillmentStatusUpdater` + `WorkflowTimelinePanel` (external delay, reminders, closure actions) + `ConvertConsultationPanel` when applicable.
+5. **Emails** — Existing emails history (LeadEmailsTab-style) scoped to this order/lead — read-only list with subject, status, sent time, preview drawer.
+6. **Activity Log** — `UnifiedTimeline` (events + payments + documents) + `InternalNotes` composer at top.
 
-The Udyam-number field IS mandatory: both the TS fallback schema (`UDYAM_DOWNLOAD`) and the DB schema row mark `udyam_number` as `required: true` with the `UDYAM-XX-00-0000000` pattern. The server would have rejected the empty value if the customer had clicked Submit.
+Consultation (Talk-to-Expert) special case: when `showConsultationPanel` is true, Overview + Form & Docs tabs are replaced by a single highlighted "Consultation" tab hosting `ConsultationContactStrip` + `ConvertConsultationPanel` — matches current gating exactly.
 
-The real problem is in the CRM: the workspace shows draft data the same way as submitted data, so it looks like "the customer submitted with an empty field" when in fact they abandoned the form mid-way.
+## New components (presentation only — no business logic changes)
+- `src/components/admin/workspace/WorkspaceHeader.tsx` — gradient sticky header (wraps current `OrderCommandHeader` data into the new look).
+- `src/components/admin/workspace/StageStepper.tsx` — colorful gradient horizontal stepper (replaces `ProcessTracker` visually; same `stage` + `timestamps` props; click → switch tab).
+- `src/components/admin/workspace/WorkspaceTabs.tsx` — shadcn `Tabs` with colored active indicator, icons, count badges (e.g. unread emails, missing docs).
+- `src/components/admin/workspace/OverviewBento.tsx` — bento grid of summary cards composed from existing data.
+- `src/components/admin/workspace/EmailsTab.tsx` — thin wrapper around the existing emails-admin query for this lead/application.
+- `src/components/admin/workspace/RightRail.tsx` — assembles customer card + stage summary + payments + docs quick list.
 
-## Plan — make draft vs submitted unmistakable, and recover the lead
+All other panels (`FormSubmissionPanel`, `OrderDocumentsPanel`, `OrderPaymentsPanel`, `FulfillmentStatusUpdater`, `WorkflowTimelinePanel`, `ProcessingChecklist`, `UnifiedTimeline`, `ConvertConsultationPanel`, `StageActionsPanel`) are **reused as-is** — no prop changes.
 
-### 1. Strong "DRAFT — not submitted" banner in `FormSubmissionPanel.tsx`
+## Files touched
+- `src/routes/admin.orders.$orderId.tsx` — rewritten shell using the new components; data fetching, RBAC, consultation gating, assignee/notes/reminder handlers all unchanged.
+- New files under `src/components/admin/workspace/` listed above.
+- No changes to server functions, schemas, RLS, emails, or workflow logic.
 
-When `submission.status !== "submitted"` (or `submitted_at` is null):
+## Out of scope
+- Lead list, orders list, dashboards, customer profile route, settings — untouched.
+- No DB migrations, no API changes.
+- No removal of any data currently shown.
 
-- Replace the small grey pill with a full-width **amber warning banner** at the top of the panel:
-  > "Customer started filling this form but did NOT submit it. Values below are an auto-saved draft and may be incomplete. Required fields are still missing."
-- List the specific required fields that are still blank (computed from the active schema) so staff instantly see e.g. *"Udyam Registration Number — missing"*.
-- Each required field row in the panel gets a red "Required — empty" tag when its value is blank, instead of the silent "—".
-- Add two action buttons in the banner:
-  - **Copy onboarding link** (same `/onboarding/<leadCode>` URL we already build elsewhere)
-  - **Resend onboarding email** (calls existing `enqueueFromTemplateInternal("onboarding_reminder", …)` if available, else falls back to the generic reminder template already wired in `emails-admin.functions.ts`)
-
-### 2. Surface "draft, not submitted" everywhere we currently say "Form submitted"
-
-- `LeadWorkspacePanel` / `OrderJourney` / `StageJourneyStrip`: the "Form Submission" stage tile should render in amber with label **"Form started — not submitted"** when `onboarding_submissions.status = 'draft'`, instead of the current green "submitted" treatment. Tile already reads the submission row; we just branch on `status`.
-- `/admin/my-work` and `/admin/leads` (Form column): show a small amber **"Draft"** chip next to leads whose latest submission is a draft, so staff can chase them.
-
-### 3. Stop the `applications.form_status` / `form_submitted_at` triggers from firing on drafts
-
-Quick audit while I was in the file:
-- `submitOnboarding` only sets `form_status = "submitted"` and transitions the application to `details_pending` when `!data.draft` ✓ correct.
-- DB trigger `set_application_form_submitted_at` fires on **insert** of `onboarding_submissions`, regardless of `status`. That means a pure draft row stamps `applications.form_submitted_at`, which is what makes the workspace look "submitted". Migration: change the trigger to only stamp when `NEW.status = 'submitted'` (and add an `UPDATE` trigger so it stamps later when the draft is converted to submitted).
-
-### 4. Recover this specific lead
-
-- Add a one-click **"Re-send onboarding link"** action on the application page (uses the existing onboarding email template + the customer's email/WhatsApp). Action is also useful for any future abandoned drafts.
-- Optional: a tiny cron (or just a manual button for now) that emails customers whose draft is older than 24h and still missing required fields. Out of scope unless you want it — flag if yes.
-
-### Files touched
-
-- `src/components/admin/FormSubmissionPanel.tsx` — banner, required-empty highlighting, action buttons.
-- `src/components/admin/LeadWorkspacePanel.tsx`, `OrderJourney.tsx`, `StageJourneyStrip.tsx` — draft-aware stage tile.
-- `src/routes/admin.leads.index.tsx`, `src/routes/admin.my-work.tsx` — "Draft" chip in form column.
-- `src/lib/crm/emails-admin.functions.ts` (or new `resendOnboardingLink` server fn) — re-send action.
-- New migration: update `set_application_form_submitted_at` trigger to gate on `status = 'submitted'`.
-
-### What I will NOT change
-
-- I will not force required fields on draft auto-save (that would break the auto-save UX).
-- I will not change the customer-facing schema — `udyam_number` is already `required: true` with the correct pattern.
-- I will not retroactively rewrite `AP-2026-006630`'s form_data; the draft row stays so the customer can resume from where they left off.
+## Acceptance
+- Same URL, same data, same role-based money hiding.
+- All previous actions reachable in ≤ 1 click from the action bar or active tab.
+- Stage stepper, header, and action bar stay sticky while scrolling within a tab.
+- Works at 1280px and at mobile (tabs become a horizontal scroller; right rail stacks).
