@@ -686,32 +686,36 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       throw new Error("No email address on file for this customer — cannot resend certificate.");
     }
 
-    await admin.from("email_queue").insert({
-      template_code: "certificate_delivery",
-      to_email: recipientEmail,
-      to_name: recipientName,
-      subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
-      body_html: buildCertificateEmailHtml({
-        recipientName,
-        serviceName,
-        certificateNumber: cert.certificate_number ?? "",
-        certificateUrl: signed.signedUrl,
-        completionNotes: null,
-        orderCode: app?.application_code ?? "",
-        resend: true,
-      }),
-      lead_id: cert.lead_id,
-      application_id: data.orderId,
-      variables: {
-        customer_name: recipientName,
-        service_name: serviceName,
-        certificate_number: cert.certificate_number,
-        certificate_url: signed.signedUrl,
-        resend: true,
-        ...(resendAttachment ? { __attachments: [resendAttachment] } : {}),
-      },
-      created_by: context.userId,
-    } as never);
+    {
+      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      await enqueueEmailInternal({
+        templateCode: "certificate_delivery",
+        toEmail: recipientEmail,
+        toName: recipientName,
+        subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
+        bodyHtml: buildCertificateEmailHtml({
+          recipientName,
+          serviceName,
+          certificateNumber: cert.certificate_number ?? "",
+          certificateUrl: signed.signedUrl,
+          completionNotes: null,
+          orderCode: app?.application_code ?? "",
+          resend: true,
+        }),
+        leadId: cert.lead_id,
+        applicationId: data.orderId,
+        variables: {
+          customer_name: recipientName,
+          service_name: serviceName,
+          certificate_number: cert.certificate_number,
+          certificate_url: signed.signedUrl,
+          resend: true,
+        },
+        attachments: resendAttachment
+          ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
+          : undefined,
+      });
+    }
 
 
     const { staff_name, staff_role } = await getStaff(context.userId);
