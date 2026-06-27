@@ -238,6 +238,14 @@ export function WorkspaceShell(p: Props) {
               {!p.showConsultationPanel && (
                 <FulfillmentStatusUpdater orderId={application.id} current={current} />
               )}
+              <CancellationPanel
+                applicationId={application.id}
+                closureStage={(application as any).closure_stage}
+                closureNextAt={(application as any).closure_next_at}
+                cancellationRequestedAt={(application as any).cancellation_requested_at}
+                reasonCode={(application as any).closure_reason_code}
+                reasonText={(application as any).closure_reason_text}
+              />
               <WorkflowTimelinePanel applicationId={application.id} workflowStatus={(application as any).workflow_status} />
             </TabsContent>
 
