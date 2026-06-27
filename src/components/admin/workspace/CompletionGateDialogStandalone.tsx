@@ -102,7 +102,7 @@ export function CompletionGateDialogStandalone({
             <FileCheck2 className="size-4 text-emerald-600" /> Complete Service — {serviceName}
           </DialogTitle>
           <DialogDescription>
-            Three quick steps. The order moves to <strong>Completed</strong> only after the certificate email is queued.
+            Three quick steps. The order moves to <strong>Completed</strong> only after the certificate email is sent.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
