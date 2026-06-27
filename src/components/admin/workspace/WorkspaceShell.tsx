@@ -182,6 +182,15 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-3 gap-4 mt-4">
           <div className="lg:col-span-2 space-y-4 min-w-0">
             <TabsContent value="overview" className="space-y-4 mt-0 animate-fade-in">
+              <CustomerJourneyMap
+                application={application}
+                paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
+                stageMeta={stageMeta}
+                workflowStatus={(application as any).workflow_status}
+                closureStage={(application as any).closure_stage}
+                closureNextAt={(application as any).closure_next_at}
+                closureReasonLabel={(application as any).closure_reason_code}
+              />
               {p.showConsultationPanel ? (
                 <ConvertConsultationPanel
                   leadId={lead.id} leadCode={lead.lead_code}
