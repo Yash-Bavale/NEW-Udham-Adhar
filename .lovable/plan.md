@@ -1,124 +1,73 @@
-## What you'll see in the workspace
+## Goal
 
-One **Order Journey** strip at the top of every order page. It always shows three lanes side-by-side so the employee never has to guess where the order is:
+Stop using Lovable Emails. Send every CRM/transactional email through your Zoho Mail account (SMTP) and log every send (success/failure/bounce) so you can track delivery from inside the admin panel.
 
-```text
-┌─ HAPPY PATH ──────────────────────────────────────────────────┐ ┌─ SIDE TRACK ─────────────┐
-│ Lead → Payment → Order Received → (Talk-to-Expert?) → Form    │ │ External Delay (if any)  │
-│      → Docs → Verification → Submitted → Processing → DONE    │ │ reason · auto-resume in  │
-└───────────────────────────────────────────────────────────────┘ └──────────────────────────┘
-┌─ CANCELLATION (only if started) ─────────────────────────────────────────────────────────────┐
-│ Req Received → Closed (24h) → Concern Reply → Ticket Closed (24h) → Refund Reviewed → Final  │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+## What changes
 
-Active step = colored & pulsing. Completed = green check. Future = grey. Next auto-action shows a live countdown (e.g. "Auto-closure in 18h 22m").
+### 1. Sending layer (server)
 
----
+Replace the Lovable Email API call inside `src/lib/emails/emails.server.ts` with a Zoho SMTP sender.
 
-## Full user journey (the map)
+- Add `nodemailer` (Worker-compatible build) using SMTP over TLS to `smtp.zoho.in:465` (or `smtppro.zoho.com:465` for Zoho Mail Pro / `smtp.zoho.com` for .com accounts).
+- Read credentials from secrets (added via `add_secret`, never hardcoded):
+  - `ZOHO_SMTP_HOST` (default `smtp.zoho.in`)
+  - `ZOHO_SMTP_PORT` (default `465`)
+  - `ZOHO_SMTP_USER` (full Zoho mailbox, e.g. `notify@businesshelpservices.com`)
+  - `ZOHO_SMTP_PASS` (Zoho **App Password**, not the login password — generated from Zoho Account → Security → App Passwords)
+  - `ZOHO_FROM_NAME` (display name, default "Udyam Registration Consultancy & Assistance Services")
+- `from` header = `"<ZOHO_FROM_NAME>" <ZOHO_SMTP_USER>`. Reply-To stays `help@businesshelpservices.com`.
+- Attachments (tax-invoice PDF) keep working — nodemailer supports them natively, so the existing invoice attachment flow is preserved.
 
-```text
-LEAD CAPTURED ─▶ PAYMENT SUCCESS ─▶ ORDER RECEIVED
-                                         │
-                              ┌─ Talk-to-Expert? ─┐
-                              │ yes               │ no
-                              ▼                   ▼
-                  CONSULTATION PENDING     FORM SUBMITTED
-                  (pick service +                │
-                   2nd payment link)             ▼
-                              │           DOCUMENTS RECEIVED
-                              └────────────────▶ │
-                                                 ▼
-                                          VERIFICATION PENDING
-                                                 │
-                                                 ▼
-                                          APPLICATION SUBMITTED
-                                                 │
-                                                 ▼
-                                          UNDER PROCESSING
-                                                 │
-                                                 ▼
-                                          COMPLETED (cert uploaded + emailed)
+### 2. Tracking layer
 
-SIDE TRACKS — branch from any active stage, never skip the main flow:
+Every send writes a row to `email_send_log` (already exists) with: `message_id` (from SMTP response, e.g. `<xxx@businesshelpservices.com>`), `template_name`, `recipient_email`, `status` (`sent` / `failed`), `error_message`, `metadata` (order number, transaction id), `created_at`. The existing `email_queue` audit row is also updated to `sent` / `failed`.
 
-  EXTERNAL DELAY (13 reasons)
-     └─ customer emailed · employee sets auto-resume · order pauses, never closes
+Bounce / complaint tracking via SMTP is limited (no webhooks like Lovable/Resend). Two options I will wire:
 
-  CANCELLATION / REFUND  (NEW — replaces the instant "cancelled" jump)
-     1. Request Received    ── Email A "Action Required" (+ chosen REASON_BLOCK)
-        wait 24h
-     2. Closed — No Response── Email B "Closure Confirmation" · status=cancelled
-        │
-        ├─ customer agrees ──▶ Resume order (closure_stage cleared)
-        │
-        └─ customer argues ──▶ employee clicks "Send Concern Reply"
-     3. Concern Reply Sent  ── Email C "Regarding Your Concern"
-        wait 24h
-     4. Ticket Closed       ── Email D "Ticket Closed"
-        │
-        └─ argues again ─────▶ employee clicks "Send Refund Decision"
-     5. Refund Reviewed     ── Email E "Not Refundable"
-        wait 24h
-     6. Final Ticket Closed ── Email F "Final Closure"
-        │
-        └─ any further reply▶ employee clicks "Acknowledge"
-     7. Acknowledged        ── Email G "Already Reviewed" (one-shot)
+- **Reply-path capture**: set SMTP `envelope.from` = `bounce+<message_id>@notify.businesshelpservices.com` so Zoho returns bounces to a mailbox we can poll (optional, off by default).
+- **In-app dashboard**: query `email_send_log` deduplicated by `message_id` → status counts, per-template breakdown, per-recipient history, retry button for `failed` rows. Mounted at `/admin/emails` (super-admin + admin only).
 
-  Revert button available at every step until Step 6.
-```
+### 3. Lovable Emails decommission
 
-Visual version of the same flow is attached below.
+- Keep the `email_queue` table and templates — only the *delivery* path changes.
+- Remove the `fetch('https://...lovable.app/api/email')` call site.
+- Do NOT call `email_domain--toggle_project_emails`; we leave it as-is so Supabase auth emails (password reset / OTP) keep working through their default path. If you'd rather also route Supabase auth emails through Zoho SMTP, say so and I'll configure Supabase Auth → SMTP with the same Zoho credentials.
 
----
+### 4. Admin dashboard — `/admin/emails`
 
-## What changes in code (UI/wiring only — no business logic invented)
+- KPI cards: Sent (24h / 7d / 30d), Failed, Suppressed, Success rate.
+- Filters: date range, template, status, recipient search.
+- Table (paginated, 50/page): Template • Recipient • Status badge • Sent at (IST) • Error • Resend button.
+- Detail drawer: full HTML preview, raw SMTP response, headers, attachment list, related order link.
+- All queries deduped on `message_id` per the email dashboard guide.
 
-### 1. Cancel button no longer cancels directly
-- `FulfillmentStatusUpdater.tsx` — remove `"cancelled"` from the dropdown.
-- A new red **Cancel Order** button (in the workspace action bar) opens the cancellation dialog with the **13 REASON_BLOCK** picker. Submitting calls `requestCancellation` → enters Step 1 of the workflow above.
+### 5. Retry / queue behavior
 
-### 2. Cancellation panel restored & extended
-- `src/components/admin/CancellationPanel.tsx` rewritten as a stage-aware card mounted in the workspace right rail.
-- Always visible. Shows current step (1–7), live countdown to next cron action, the REASON_BLOCK used, and the *next manual action* button that's valid for the current step:
-  - Step 2 → "Customer Argued · Send Concern Reply" / "Customer Agreed · Resume"
-  - Step 4 → "Send Refund Decision" / "Customer Agreed · Resume"
-  - Step 6 → "Acknowledge Customer Reply"
-  - Any step before 6 → "Revert Workflow"
-- Mini timeline inside the card lists Email A–G as they fire with sent-at IST.
+- Immediate send stays the default (per your earlier preference).
+- On SMTP failure → row marked `failed`, automatic retry up to 3× with exponential backoff (1m / 5m / 30m) via existing cron route.
+- After 3 failures → `dlq` + super-admin notification.
 
-### 3. Unified Customer Journey strip (the "one view")
-- New component `src/components/admin/workspace/CustomerJourneyMap.tsx` shown as the top block of the **Overview** tab.
-- Three lanes: Happy Path, External Delay, Cancellation. Each lane is a horizontal stepper with `STAGE_META` colors, timestamps in IST, and a "Next: …" line.
-- Stage data merged from: `application.fulfillment_status`, `application.workflow_status`, `application.closure_stage`, `application.external_delay_*`.
-- Clicking a step deep-links to the relevant tab (e.g. cancellation step → Workflow tab → CancellationPanel highlighted).
+## Secrets you'll need to provide
 
-### 4. Workflow Timeline already exists — just wire it
-- `WorkflowTimelinePanel` is the canonical event log. Every new cancellation event (`cancellation_requested`, `concern_reply_sent`, `refund_reviewed`, `ticket_closed`, `acknowledged`) is inserted into `workflow_events`, so the timeline shows the same story as the strip. No new component for this.
+After approving, I'll trigger a secure form for:
 
-### 5. Customer fields you asked for earlier
-- `CustomerProfileCard.tsx`: add **State** and **Language** rows (from `customer.state/language`, fallback to `lead.state/language`).
-- Right-rail mini-card: append `State · Language` line under the email.
+1. `ZOHO_SMTP_USER` — the Zoho mailbox you want to send from
+2. `ZOHO_SMTP_PASS` — Zoho **App Password** (Zoho → My Account → Security → App Passwords → Generate)
 
----
+Host/port/from-name have safe defaults; override only if you use Zoho Mail Pro / a different region.
 
-## Files
+## Files touched
 
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` (new — the unified strip)
-- `src/components/admin/workspace/CustomerProfileCard.tsx` (add State/Language)
-- `src/components/admin/workspace/WorkspaceShell.tsx` (mount strip + cancellation panel in right rail, mini-card line)
-- `src/components/admin/CancellationPanel.tsx` (rewrite to stage-aware card with manual-action buttons)
-- `src/components/admin/FulfillmentStatusUpdater.tsx` (remove direct `cancelled`, add Cancel Order trigger that opens the dialog)
-- `src/lib/crm/cancellation.functions.ts` (already extended in previous plan: `requestCancellation` with reasonCode, `sendConcernReply`, `sendRefundDecision`, `acknowledgePostClosure`, `customerAgreedResume`)
-- `src/routes/api/public/cron/closure-workflow.ts` (24h advance for new stages — covered in previous plan)
-- `src/routes/admin.orders.$orderId.tsx` (select `closure_stage`, `closure_next_at`, `closure_reason_code`, `cancellation_requested_at`, `external_delay_*` and pass to shell)
-- Migration: extend `closure_stage` values + add `closure_reason_code`, `cancel_wait_hours` (covered in previous plan)
+- `src/lib/emails/emails.server.ts` — swap delivery to nodemailer/Zoho SMTP, write to `email_send_log`.
+- `src/lib/emails/zoho-smtp.server.ts` — new helper (transporter, retry, logging).
+- `src/routes/admin.emails.tsx` — new tracking dashboard.
+- `src/components/admin/EmailLogTable.tsx`, `EmailDetailDrawer.tsx` — UI.
+- `src/routes/api/public/cron/email-retry.ts` — retry sweeper (every 5 min).
+- Sidebar: add "Email Logs" under the existing admin section.
+- `package.json` — add `nodemailer` + `@types/nodemailer`.
 
-No other functionality touched. Refund money-movement, invoices, fulfillment updater, lead status engine, and unrelated email templates remain unchanged.
+## Out of scope (ask if you want these too)
 
----
-
-## Diagram
-
-<lov-artifact url="/__l5e/documents/Order_Journey_Map.mmd" mime_type="text/vnd.mermaid"></lov-artifact>
+- Routing Supabase **auth** emails (password reset / magic link) through Zoho SMTP.
+- Inbound bounce-mailbox polling.
+- Open / click tracking pixels (Zoho SMTP doesn't expose these natively; would need a tracking redirect service).
