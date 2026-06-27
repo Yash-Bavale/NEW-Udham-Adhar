@@ -64,7 +64,7 @@ export function CustomerJourneyMap({
     verification_pending: stageMeta?.verification_pending?.at,
     application_submitted: stageMeta?.application_submitted?.at,
     under_processing: stageMeta?.under_processing?.at,
-    completed: stageMeta?.completed?.at ?? application?.certificate_uploaded_at,
+    completed: stageMeta?.completed?.at ?? application?.certificate_uploaded_at ?? (application as any)?.fulfilled_at,
   };
 
   const lastCompletedIdx = HAPPY_STEPS.reduce(
