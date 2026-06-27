@@ -64,8 +64,10 @@ function groupFieldsBySection(serviceCode: string | null): SectionGroup[] {
 
 export function FormSubmissionPanel({
   applicationId,
+  isLocked = false,
 }: {
   applicationId: string;
+  isLocked?: boolean;
 }) {
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
@@ -89,6 +91,7 @@ export function FormSubmissionPanel({
 
   const handleResend = async () => {
     if (!data?.lead?.id) return;
+    if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
     setResending(true);
     try {
       const res = await resendFn({ data: { leadId: data.lead.id } });
@@ -250,7 +253,7 @@ export function FormSubmissionPanel({
             </Button>
           )}
           {formLink && (
-            <Button size="sm" variant="outline" onClick={handleCopy} className="h-8 text-xs">
+            <Button size="sm" variant="outline" onClick={handleCopy} disabled={isLocked} className="h-8 text-xs">
               <Copy className="size-3.5 mr-1.5" /> Copy link
             </Button>
           )}
@@ -259,8 +262,9 @@ export function FormSubmissionPanel({
               size="sm"
               variant="outline"
               onClick={handleResend}
-              disabled={resending}
+              disabled={resending || isLocked}
               className="h-8 text-xs"
+              title={isLocked ? "Order is completed — form link is disabled" : undefined}
             >
               {resending ? (
                 <Loader2 className="size-3.5 mr-1.5 animate-spin" />
@@ -272,6 +276,12 @@ export function FormSubmissionPanel({
           )}
         </div>
       </div>
+
+      {isLocked && (
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs text-slate-600">
+          This order is closed (completed or cancelled). The customer form link is disabled and won't be resent.
+        </div>
+      )}
 
       {/* Body */}
       {!submission ? (

@@ -445,6 +445,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         .update({
           application_status: "completed",
           fulfilled_at: now,
+          certificate_uploaded_at: now,
+          certificate_number: certNumber,
           documents_deleted_reason: "completed",
         } as never)
         .eq("id", data.orderId);
@@ -551,32 +553,38 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
       if (recipientEmail && certificateUrl) {
-        await admin.from("email_queue").insert({
-          template_code: "certificate_delivery",
-          to_email: recipientEmail,
-          to_name: recipientName,
-          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
-          body_html: buildCertificateEmailHtml({
-            recipientName,
-            serviceName,
-            certificateNumber: certNumber,
-            certificateUrl,
-            completionNotes,
-            orderCode: app.application_code ?? "",
-          }),
-          lead_id: app.lead_id,
-          application_id: data.orderId,
-          variables: {
-            customer_name: recipientName,
-            service_name: serviceName,
-            certificate_number: certNumber,
-            certificate_url: certificateUrl,
-            completion_notes: completionNotes ?? "",
-            order_code: app.application_code ?? "",
-            ...(certAttachment ? { __attachments: [certAttachment] } : {}),
-          },
-          created_by: context.userId,
-        } as never);
+        const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+        try {
+          await enqueueEmailInternal({
+            templateCode: "certificate_delivery",
+            toEmail: recipientEmail,
+            toName: recipientName,
+            subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+            bodyHtml: buildCertificateEmailHtml({
+              recipientName,
+              serviceName,
+              certificateNumber: certNumber,
+              certificateUrl,
+              completionNotes,
+              orderCode: app.application_code ?? "",
+            }),
+            leadId: app.lead_id,
+            applicationId: data.orderId,
+            variables: {
+              customer_name: recipientName,
+              service_name: serviceName,
+              certificate_number: certNumber,
+              certificate_url: certificateUrl,
+              completion_notes: completionNotes ?? "",
+              order_code: app.application_code ?? "",
+            },
+            attachments: certAttachment
+              ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
+              : undefined,
+          });
+        } catch (e) {
+          console.error("[fulfillment.complete] certificate email failed:", e);
+        }
       }
 
 
@@ -678,32 +686,36 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       throw new Error("No email address on file for this customer — cannot resend certificate.");
     }
 
-    await admin.from("email_queue").insert({
-      template_code: "certificate_delivery",
-      to_email: recipientEmail,
-      to_name: recipientName,
-      subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
-      body_html: buildCertificateEmailHtml({
-        recipientName,
-        serviceName,
-        certificateNumber: cert.certificate_number ?? "",
-        certificateUrl: signed.signedUrl,
-        completionNotes: null,
-        orderCode: app?.application_code ?? "",
-        resend: true,
-      }),
-      lead_id: cert.lead_id,
-      application_id: data.orderId,
-      variables: {
-        customer_name: recipientName,
-        service_name: serviceName,
-        certificate_number: cert.certificate_number,
-        certificate_url: signed.signedUrl,
-        resend: true,
-        ...(resendAttachment ? { __attachments: [resendAttachment] } : {}),
-      },
-      created_by: context.userId,
-    } as never);
+    {
+      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      await enqueueEmailInternal({
+        templateCode: "certificate_delivery",
+        toEmail: recipientEmail,
+        toName: recipientName,
+        subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
+        bodyHtml: buildCertificateEmailHtml({
+          recipientName,
+          serviceName,
+          certificateNumber: cert.certificate_number ?? "",
+          certificateUrl: signed.signedUrl,
+          completionNotes: null,
+          orderCode: app?.application_code ?? "",
+          resend: true,
+        }),
+        leadId: cert.lead_id,
+        applicationId: data.orderId,
+        variables: {
+          customer_name: recipientName,
+          service_name: serviceName,
+          certificate_number: cert.certificate_number,
+          certificate_url: signed.signedUrl,
+          resend: true,
+        },
+        attachments: resendAttachment
+          ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
+          : undefined,
+      });
+    }
 
 
     const { staff_name, staff_role } = await getStaff(context.userId);

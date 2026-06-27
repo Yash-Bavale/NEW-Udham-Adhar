@@ -281,7 +281,7 @@ export function OrderWorkflowPanel({
       </div>
 
       {/* CARD 3 — PAUSE / CANCEL ESCAPE HATCHES (only in happy path) */}
-      {lane === "happy" && (
+      {lane === "happy" && current !== "completed" && current !== "cancelled" && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
           <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-600 mb-3">Need to pause or cancel?</div>
           <div className="flex flex-wrap gap-2">
