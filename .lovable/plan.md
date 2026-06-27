@@ -1,41 +1,68 @@
-## Goal
-Make the Super Admin dashboard the single executive dashboard for admin + super_admin, with a professional shadcn UI and a global IST date-range filter (Today / Yesterday / 7d / 30d / This month / Custom). All KPIs, trends, top services, workflow, email queue and activity recompute against the selected range. New day rolls over at 00:00 IST.
+# Udyam SEO Recovery Implementation Plan
 
-## Scope
-- Route: `/admin/dashboard` (executive) becomes the new UI. `/admin/super` keeps the same component (super-admin gate). Landing in `admin.index.tsx` for `admin` continues to go to `/admin/dashboard`; super_admin to `/admin/super`. Same component, role-gated wrapper.
-- Old `admin.dashboard.tsx` (759 lines, ops-style cards) is replaced.
+Scope is **public website only** (marketing pages + SEO). No CRM, admin, payment, workflow, or backend logic is touched. Existing layouts (`SiteShell`, `Header`, `Footer`, `LeadForm`, `DisclaimerBar`) stay as-is — we only edit their content/props and add new content blocks.
 
-## Backend (`src/lib/crm/super-admin.functions.ts`)
-1. Convert `getSuperAdminOverview` to accept an input range:
-   `{ preset: "today"|"yesterday"|"7d"|"30d"|"mtd"|"custom"; fromIso?: string; toIso?: string }`.
-2. Add `istDayBoundaries(preset, from, to)` helper that computes `[startUtc, endUtc]` from IST midnights (using `Asia/Kolkata` offset, no deps). All Supabase queries use these bounds instead of `Date.now()-N*86_400_000`.
-3. Rewrite KPIs against the range:
-   - `leadsInRange`, `leadsPrevRange` (for delta), `paymentsInRange`, `paymentsPrevRange`, `revenueInRange`.
-   - `openApplications`, `documentsPending`, `certificatesInRange`, `emailQueueDepth`, `totalCustomers`, `activeStaff`, `repeatedLeads`, `conversionRateInRange`.
-   - Workflow counts (externalDelay, onHold, refundPending, remindersDue, closedInRange).
-3. Trend series: bucket per IST day across the range (1d buckets if ≤62 days, weekly buckets if longer). Return `days` as `YYYY-MM-DD` IST keys.
-4. Allow admin OR super_admin (relax `requireSuper` to `requireAdminOrSuper`) so executive dashboard works for both. Sensitive admin actions (`processEmailQueueNow`, `seedMissingEmailTemplates`) stay super_admin only.
+---
 
-## Frontend (new `src/routes/admin.super.tsx`, lighter rewrite, then re-use)
-1. Replace dark gradient theme with a clean shadcn light/dark surface: `Card`, `Tabs`, `Button`, `Badge`, `Select`, `Popover`, `Calendar`, `Skeleton`, `ScrollArea`, `Separator`. Keep recharts.
-2. Header row: title + live IST clock + `DateRangePicker` (shadcn Popover + Calendar `mode="range"`) + preset Tabs (Today / Yesterday / 7d / 30d / MTD / Custom). State is URL-synced via `validateSearch` (preset, from, to).
-3. 12 KPI cards in a responsive grid with sparkline + delta vs previous equal-length window.
-4. Sections: Revenue & Leads trend (combined Bar+Line), Top Services, Workflow Health, Email Queue status, Recent Activity (ScrollArea), System Alerts. All consume range data.
-5. All dates rendered via existing `formatIST` from `@/lib/datetime`. Live clock ticks every 60s.
-6. Replace `admin.dashboard.tsx` body to render the same `<SuperAdminDashboard range={...} />` component (extracted to `src/components/admin/SuperAdminDashboard.tsx`). Super-admin route adds the override actions panel; admin route hides it.
+## Phase 1 — CRITICAL fixes (sitewide)
 
-## Files
-- edit `src/lib/crm/super-admin.functions.ts` — range input, IST bucketing, gate change
-- add `src/components/admin/SuperAdminDashboard.tsx` — shared shadcn UI
-- add `src/components/admin/DateRangePicker.tsx` — shadcn popover+calendar
-- rewrite `src/routes/admin.super.tsx` — thin wrapper (super_admin gate + admin actions)
-- rewrite `src/routes/admin.dashboard.tsx` — thin wrapper (admin/super_admin gate, no admin actions)
-- keep `src/routes/admin.index.tsx` landing logic unchanged
+1. **Prominent disclaimer banner** above header on every public route.
+  - Update `src/components/site/DisclaimerBar.tsx` to render an amber/yellow banner with the verbatim copy from §3.2: "Business Help Services is a private registration consultancy. We are not affiliated with… The official government portal for Udyam registration is udyamregistration.gov.in."
+  - Ensure it sits above `Header` inside `SiteShell` and is visible on load (no JS gating). Admin routes unaffected.
+2. **robots.txt** — confirm `GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended` are not blocked (current file allows all; no change needed, just verify).
 
-## IST rules
-- Day boundary: `00:00 Asia/Kolkata` → equivalent UTC via fixed +05:30 offset.
-- "Today" = current IST day; "Yesterday" = previous IST day; "7d/30d" = trailing N IST days including today; "MTD" = 1st IST of current month → now.
-- All chart x-axis labels and tooltips use `formatIST`.
+## Phase 2 — Homepage rewrite (`src/routes/index.tsx`)
 
-## Out of scope
-No data-model changes, no new tables, no role changes. Email queue actions and existing super-admin overrides keep current behavior.
+Replace marketing copy only; keep `LeadForm`, hero map, layout structure intact.
+
+- **Meta**: title → `"Udyam Registration Assistance | MSME Certificate Help — Business Help Services"`; description → §3.1 copy; H1 (visible English) → `"Udyam Registration & MSME Certificate Services"`.
+- **TLDR block** (§3.3): 3 paragraphs of crawlable HTML right below the form, keyword in first 40 words.
+- **How It Works** (§3.4): 6 numbered steps.
+- **Why Choose Us** (§3.5): paragraph + 5 bullets.
+- **FAQ section** (§3.6): 8 Q&A pairs, **answers visible by default** (open Accordion or plain `<details open>` / static markup) so crawlers see them. Keep current accordion component but default open or render as static `<dl>`.
+- **Served States** (§3.7).
+- **JSON-LD**: replace current `@graph` with Organization (§6.1 with phone/address/sameAs) + FAQPage (§6.2, 4-question minimum from doc).
+
+## Phase 3 — Existing service pages rewrite
+
+Update content + meta + add Service & BreadcrumbList JSON-LD on:
+
+- `src/routes/new-udyam-registration.tsx` — §4.1 (TLDR, eligibility, documents, process steps, mistakes, E-E-A-T, 4 FAQs).
+- `src/routes/download-udyam-certificate.tsx` — §4.2.
+- `src/routes/update-udyam-certificate.tsx` — §4.3.
+- `src/routes/migrate-udyog-aadhaar-to-udyam.tsx` — §4.4.
+
+Each: update title/meta/H1 from doc table; render FAQs as crawlable HTML; inject Service + BreadcrumbList JSON-LD via `head().scripts`.
+
+## Phase 4 — New / replaced pages
+
+1. `**/verify-udyam-certificate**` — new route file `src/routes/verify-udyam-certificate.tsx` with §5.1 content + Service + Breadcrumb + FAQPage JSON-LD.
+2. `**/msme-registration-fee**` — route exists; replace body with §5.2 content + schema.
+3. `**/udyam-registration-process**` — new route file with §5.3 content + HowTo schema (§6.4) + Breadcrumb. (Existing `msme-registration-process.tsx` is kept and internally links to the canonical new page.)
+
+All three reuse `ServicePageLayout` / `ArticlePageLayout` so visual style matches existing pages.
+
+## Phase 5 — Schema helper
+
+Add `src/lib/seo/jsonld.ts` exporting small builders (`orgSchema`, `faqSchema(items)`, `serviceSchema({name,url,description})`, `howToSchema(steps)`, `breadcrumbSchema(items)`) so each route's `head().scripts` stays one-liner and consistent.
+
+## Phase 6 — Sitemap
+
+Update `src/routes/sitemap.xml.ts` (or static `public/sitemap.xml`) to include the three target URLs (`/verify-udyam-certificate`, `/msme-registration-fee`, `/udyam-registration-process`) if not already present. No other changes.
+
+---
+
+## Out of scope (explicit)
+
+- No changes to admin/CRM, payments, emails, workflows, or DB schema.
+- No deletion of the 100+ existing variant routes — they continue to absorb typo/variant traffic.
+- No visual redesign; reuses existing layout components and tokens.
+- No new dependencies.
+
+## Verification
+
+- `bun run typecheck` clean.
+- Spot-check `/`, `/new-udyam-registration`, `/download-udyam-certificate`, `/update-udyam-certificate`, `/migrate-udyog-aadhaar-to-udyam`, `/verify-udyam-certificate`, `/msme-registration-fee`, `/udyam-registration-process` render with disclaimer banner, visible FAQs, JSON-LD in `<head>`.
+- Validate one JSON-LD block with Rich Results Test post-publish.
+
+## do it in phase 1 + phase 2 the phase 3 + phase 4 + phase 5
