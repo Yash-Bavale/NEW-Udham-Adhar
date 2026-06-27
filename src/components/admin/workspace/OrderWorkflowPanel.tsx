@@ -15,6 +15,7 @@ import {
   listWorkflowEvents, listWorkflowReminders, resumeOrder,
   markCustomerReplied, appendWorkflowEvent, cancelWorkflowReminder,
 } from "@/lib/crm/workflow.functions";
+import { resumeCancelledOrder } from "@/lib/crm/cancellation.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import {
   FULFILLMENT_STAGES, FULFILLMENT_LABEL, FULFILLMENT_BADGE,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/crm/fulfillment-transitions";
 import { formatIST } from "@/lib/datetime";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
+import { useRole } from "@/hooks/useRole";
 
 type Lane = "happy" | "delay" | "cancellation";
 
