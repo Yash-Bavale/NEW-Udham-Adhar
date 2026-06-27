@@ -251,3 +251,77 @@ export const listEmailLogs = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { rows: rows ?? [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
   });
+
+// ── Send test by template (per-template end-to-end verification) ──
+const TestTplInput = z.object({
+  code: z.string().trim().min(1).max(80),
+  toEmail: z.string().email(),
+  variablesJson: z.string().max(10_000).optional(),
+});
+
+export const sendTestTemplateEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => TestTplInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: tpl, error } = await supabase
+      .from("email_templates")
+      .select("code, subject, body_html, body_text, variables, is_enabled")
+      .eq("code", data.code)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!tpl) throw new Error(`Template '${data.code}' not found`);
+
+    // Build variables: user overrides merged onto auto-generated samples.
+    const sampleFor = (k: string): string => {
+      const lk = k.toLowerCase();
+      if (lk.includes("email")) return data.toEmail;
+      if (lk.includes("name")) return "Sample Customer";
+      if (lk.includes("phone") || lk.includes("mobile")) return "9876543210";
+      if (lk.includes("amount") || lk.includes("price") || lk.includes("total")) return "₹1,499";
+      if (lk.includes("date") || lk.includes("time")) return new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+      if (lk.includes("order") || lk.includes("application")) return "AP-2026-000000";
+      if (lk.includes("invoice")) return "UA-2026-000000";
+      if (lk.includes("transaction") || lk.includes("txn") || lk.includes("reference")) return "TXN-TEST-1234567890";
+      if (lk.includes("url") || lk.includes("link")) return "https://udyamadhar.in";
+      if (lk.includes("service")) return "Download Udyam Certificate";
+      if (lk.includes("certificate")) return "UDYAM-XX-00-0000000";
+      if (lk.includes("reason")) return "Sample reason for testing";
+      return `[Sample ${k}]`;
+    };
+    const auto: Record<string, unknown> = {};
+    for (const v of (tpl.variables ?? []) as string[]) auto[v] = sampleFor(v);
+
+    let overrides: Record<string, unknown> = {};
+    if (data.variablesJson?.trim()) {
+      try {
+        const parsed = JSON.parse(data.variablesJson);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          overrides = parsed as Record<string, unknown>;
+        } else throw new Error("Variables JSON must be an object");
+      } catch (e) {
+        throw new Error(`Invalid variables JSON: ${(e as Error).message}`);
+      }
+    }
+    const variables = { ...auto, ...overrides };
+
+    const { enqueueFromTemplateInternal, processQueueInternal } = await import("./emails.server");
+    // Temporarily allow disabled templates for testing by setting enable=true in memory only.
+    if (!tpl.is_enabled) {
+      // enqueueFromTemplateInternal would no-op for disabled templates; bypass with raw render.
+      const { renderTemplate } = await import("./smtp.server");
+      const { enqueueEmailInternal } = await import("./emails.server");
+      await enqueueEmailInternal({
+        templateCode: tpl.code,
+        toEmail: data.toEmail,
+        subject: `[TEST] ${renderTemplate(tpl.subject, variables)}`,
+        bodyHtml: renderTemplate(tpl.body_html, variables),
+        bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
+        variables,
+      });
+    } else {
+      await enqueueFromTemplateInternal(tpl.code, data.toEmail, variables);
+    }
+    const result = await processQueueInternal(5);
+    return { ok: true, template: tpl.code, variablesUsed: variables, ...result };
+  });
