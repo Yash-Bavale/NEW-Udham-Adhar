@@ -1,50 +1,50 @@
-## Goal
-Replace the cluttered Workflow tab with one simple, linear status manager. No duplicated panels, no hidden dropdowns, no parallel "journey map + workflow + timeline" stacks competing for attention.
+## Final design — Order Status panel
 
-## What's wrong today
-- Three things show the same info: `CustomerJourneyMap`, `StageStepper` (top), and `OrderWorkflowPanel` chips.
-- "Under Processing / Government Portal Pending" chips, "Manual status override" accordion, and action buttons (External Delay / Customer Replied / Resume / Refund / Close) all live side-by-side with no clear primary action.
-- No obvious "change status to X" control — user has to hunt.
-- Scheduled reminders + timeline + action buttons crammed into one card.
+### 1. Simpler wording (drop "Advance to")
+Use the verb the team already says out loud:
 
-## New Workflow tab (single panel, top → bottom)
+- Primary CTA: **"Mark as {Next Stage} →"** (e.g. "Mark as Application Submitted →")
+- Helper line: "Next step in this order."
+- Lane chip: keep "Happy Path / External Delay / Cancellation" — short and clear.
+
+For the completed step the CTA reads **"Mark as Completed →"** and still opens the Completion Gate dialog.
+
+### 2. Add a Revert option (the missing piece)
+Backward moves are real — wrong button taps, premature status updates, customer asked to redo docs. Senior PM call: surface it, don't hide it.
+
+**UI** — to the right of the primary button:
+```
+[ Mark as Application Submitted → ]   [ ↶ Revert to Documents Received ]
+```
+- Shown only when there is a previous stage (i.e. current ≠ first stage).
+- Secondary visual weight (outline button, slate), so it never competes with the forward action.
+- Click opens a small confirm dialog: "Revert this order back to {previous}? A note will be added to the activity log." with an optional reason textarea.
+- Permission: any staff can revert one step backward; the action is always logged with actor name + reason.
+
+**Backend** — extend `updateFulfillmentStatus`:
+- Add an optional `allowBackward: boolean` flag in the input schema.
+- When `true`, accept a transition to the immediately previous stage in `FULFILLMENT_STAGES` (one step only — no jumping multiple stages back, no reverting from `completed`, no reverting once `cancelled`).
+- Always write a `status_change` event with `note` = the revert reason so it shows up in the timeline.
+
+No DB migration needed — `fulfillment_status` already accepts every stage value; the only gate is the server-side transitions map.
+
+### 3. Final Order Status card layout
 
 ```
-┌─ ORDER STATUS ────────────────────────────────────────────┐
-│  Current: ● Payment Done           Lane: Happy Path        │
-│  Since 26 Jun 2026, 05:58 pm IST                           │
-│                                                            │
-│  [ ← Move Back ]    [ Advance to: Order Received → ]       │
-└────────────────────────────────────────────────────────────┘
-
-┌─ STAGE MAP (read-only progress) ──────────────────────────┐
-│  ✓ Lead → ✓ Payment → ● Order Received → ○ Form → ○ Docs   │
-│  → ○ Verification → ○ Submitted → ○ Processing → ○ Done    │
-└────────────────────────────────────────────────────────────┘
-
-┌─ NEED TO PAUSE OR CANCEL? ────────────────────────────────┐
-│  [ Mark External Delay ]  [ Start Cancellation ]           │
-│  (only these two switch lanes; everything else is linear)  │
-└────────────────────────────────────────────────────────────┘
-
-┌─ TIMELINE & REMINDERS (collapsed by default) ─────────────┐
-│  ▸ 4 reminders · 3 events                                  │
-└────────────────────────────────────────────────────────────┘
+ORDER STATUS
+[ Verification Pending ]   ● Happy Path
+─────────────────────────────────────────────────────────
+[ Mark as Application Submitted → ]   [ ↶ Revert to Documents Received ]
+Next step in this order.
 ```
 
-When lane = External Delay → top card swaps to: current reason, [Customer Replied] [Resume Order] [Close Order].
-When lane = Cancellation → top card swaps to the 7-step closure stepper with one contextual CTA (Send Policy / Mark Replied / Force Close), matching current closure_stage.
+- Delay lane: unchanged (Customer Replied / Resume Order / Close Order).
+- Cancellation lane: unchanged (renders `CancellationPanel`).
+- Stage Map, Pause/Cancel card, and collapsible Timeline & reminders: unchanged.
 
-## Removals
-- Delete `CustomerJourneyMap` from the tab (its info merges into Stage Map + lane badge).
-- Delete the duplicate `StageStepper` at top of Workflow tab (keep only the one inside Order Status panel).
-- Delete "Manual status override" disclosure — replaced by explicit Advance/Move Back buttons that walk the canonical stage list.
-- Collapse Scheduled Reminders + Timeline into one collapsible "History" section.
+### Files
+- `src/lib/crm/orders-v2.functions.ts` — extend `updateFulfillmentStatus` to allow a single-step backward move with reason logging.
+- `src/components/admin/workspace/OrderWorkflowPanel.tsx` — rename CTA to "Mark as …", add the Revert button + confirm dialog, wire to the server fn.
 
-## Files
-- Rewrite `src/components/admin/workspace/OrderWorkflowPanel.tsx` as the single panel above (three stacked cards, lane-aware top card).
-- Edit `src/components/admin/workspace/WorkspaceShell.tsx`: Workflow tab renders only `<OrderWorkflowPanel />`. Remove `CustomerJourneyMap` import + render from this tab.
-- No backend changes. Reuses existing `advanceStage`, `setExternalDelay`, `resumeOrder`, cancellation functions, and `closure_stage`.
-
-## Result
-One panel, one current status, one primary action ("Advance"), two clearly-labeled escape hatches (Delay / Cancel), history tucked away. No dropdown hunting, no duplicate stage visualizations.
+### Result
+One forward verb everyone understands, an explicit one-click way back, the rest of the panel unchanged. No clutter, no hidden dropdown, no inprofessional dead-ends.
