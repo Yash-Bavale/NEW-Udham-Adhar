@@ -9,11 +9,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { StageStepper } from "./StageStepper";
 import { CustomerProfileCard } from "./CustomerProfileCard";
+import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
 import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel";
+import { CancellationPanel } from "@/components/admin/CancellationPanel";
 import { ProcessingChecklist } from "@/components/admin/ProcessingChecklist";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
