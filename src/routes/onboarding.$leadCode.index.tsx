@@ -73,12 +73,28 @@ function OnboardingDetailsPage() {
 
   const initial: Record<string, string> = {};
   const existing = (data.submission?.form_data ?? {}) as Record<string, unknown>;
+  const schemaKeys = new Set(activeSchema.fields.map((f) => f.key));
   for (const f of activeSchema.fields) {
     const v = existing[f.key];
     initial[f.key] = v === undefined || v === null ? "" : String(v);
   }
-  initial.applicant_name ||= data.lead.name ?? "";
-  initial.aadhaar_mobile ||= data.lead.mobile ?? "";
+  if (schemaKeys.has("applicant_name")) initial.applicant_name ||= data.lead.name ?? "";
+  // Only prefill aadhaar_mobile when the active schema actually collects it
+  // (New Udyam). Other services have their own `registered_mobile` field and
+  // should not have a stray `aadhaar_mobile` saved to form_data.
+  if (schemaKeys.has("aadhaar_mobile")) initial.aadhaar_mobile ||= data.lead.mobile ?? "";
+
+  // Strip UI-only `section_*` separator keys before persistence.
+  const cleanPayload = (values: Record<string, unknown>): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(values ?? {})) {
+      const def = activeSchema.fields.find((f) => f.key === k);
+      if (def?.type === "section") continue;
+      if (k.startsWith("section_")) continue;
+      out[k] = v;
+    }
+    return out;
+  };
 
   const hasRequiredDocs = (data.schema.documents ?? []).some((d) => d.required);
   const hasStage2 = isCorrectPan;
@@ -127,14 +143,14 @@ function OnboardingDetailsPage() {
             : "Details submitted successfully. Finalising…"
         }
         onSaveDraft={async (values) => {
-          await submitFn({ data: { leadCode, data: values, draft: true } });
+          await submitFn({ data: { leadCode, data: cleanPayload(values), draft: true } });
         }}
         onSubmit={async (values) => {
           if (submitting) return;
           setSubmitting(true);
           try {
             const finalSubmit = isFinalFormStage;
-            await submitFn({ data: { leadCode, data: values, draft: !finalSubmit } });
+            await submitFn({ data: { leadCode, data: cleanPayload(values), draft: !finalSubmit } });
             if (finalSubmit) toast.success("Details submitted successfully");
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
