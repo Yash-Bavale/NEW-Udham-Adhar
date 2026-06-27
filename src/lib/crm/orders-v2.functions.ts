@@ -414,10 +414,13 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
     }
 
-    // Update fulfillment status (trigger logs `status_change` event).
-    const upd: Record<string, unknown> = { fulfillment_status: target };
-    const { error: upErr } = await admin.from("applications").update(upd as never).eq("id", data.orderId);
-    if (upErr) throw new Error(upErr.message);
+    // Update normal stage changes immediately. Completion is handled below only
+    // after the certificate email has actually been accepted by SMTP.
+    if (target !== "completed") {
+      const upd: Record<string, unknown> = { fulfillment_status: target };
+      const { error: upErr } = await admin.from("applications").update(upd as never).eq("id", data.orderId);
+      if (upErr) throw new Error(upErr.message);
+    }
 
     const { staff_name, staff_role } = await getStaff(context.userId);
 
@@ -438,18 +441,6 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       const certNumber = data.certificateNumber!.trim();
       const completionNotes = data.completionNotes?.trim() || null;
       const now = new Date().toISOString();
-
-      // Mark application_status completed too (for legacy consumers) and set fulfilled_at.
-      await admin
-        .from("applications")
-        .update({
-          application_status: "completed",
-          fulfilled_at: now,
-          certificate_uploaded_at: now,
-          certificate_number: certNumber,
-          documents_deleted_reason: "completed",
-        } as never)
-        .eq("id", data.orderId);
 
       // Lookup the uploaded certificate document so we can mirror it into
       // the `certificates` table (single source of truth for history & resend).
@@ -481,27 +472,6 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         } else {
           certificateId = (certRow as { id: string }).id;
         }
-      }
-
-      // Wipe other docs via the existing edge function.
-      try {
-        await admin.functions.invoke("delete-order-documents", {
-          body: {
-            application_id: data.orderId,
-            reason: "completed",
-            keep_document_id: data.certificateDocumentId,
-          },
-        });
-      } catch (e) {
-        console.error("delete-order-documents invocation failed:", e);
-      }
-
-      // Close the parent lead (trigger logs lead_status_change automatically).
-      if (app.lead_id) {
-        await admin
-          .from("leads")
-          .update({ lead_status_v2: "closed" } as never)
-          .eq("id", app.lead_id);
       }
 
       // Build certificate delivery email — signed URL valid 7 days.
@@ -552,39 +522,94 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         }
       }
 
+      if (!recipientEmail) {
+        throw new Error("Customer has no email on file — certificate email was not sent and order was not completed.");
+      }
+      if (!certificateUrl) {
+        throw new Error("Could not generate certificate download link — certificate email was not sent and order was not completed.");
+      }
+
       if (recipientEmail && certificateUrl) {
         const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
-        try {
-          await enqueueEmailInternal({
-            templateCode: "certificate_delivery",
-            toEmail: recipientEmail,
-            toName: recipientName,
-            subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
-            bodyHtml: buildCertificateEmailHtml({
-              recipientName,
-              serviceName,
-              certificateNumber: certNumber,
-              certificateUrl,
-              completionNotes,
-              orderCode: app.application_code ?? "",
-            }),
-            leadId: app.lead_id,
-            applicationId: data.orderId,
-            variables: {
-              customer_name: recipientName,
-              service_name: serviceName,
-              certificate_number: certNumber,
-              certificate_url: certificateUrl,
-              completion_notes: completionNotes ?? "",
-              order_code: app.application_code ?? "",
-            },
-            attachments: certAttachment
-              ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
-              : undefined,
-          });
-        } catch (e) {
-          console.error("[fulfillment.complete] certificate email failed:", e);
-        }
+        await enqueueEmailInternal({
+          templateCode: "certificate_delivery",
+          toEmail: recipientEmail,
+          toName: recipientName,
+          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+          bodyHtml: buildCertificateEmailHtml({
+            recipientName,
+            serviceName,
+            certificateNumber: certNumber,
+            certificateUrl,
+            completionNotes,
+            orderCode: app.application_code ?? "",
+          }),
+          leadId: app.lead_id,
+          applicationId: data.orderId,
+          variables: {
+            customer_name: recipientName,
+            service_name: serviceName,
+            certificate_number: certNumber,
+            certificate_url: certificateUrl,
+            completion_notes: completionNotes ?? "",
+            order_code: app.application_code ?? "",
+          },
+          attachments: certAttachment
+            ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
+            : undefined,
+          requireImmediateSuccess: true,
+        });
+      }
+
+      // Mark application completed only after certificate email send succeeds.
+      await admin
+        .from("applications")
+        .update({
+          fulfillment_status: target,
+          application_status: "completed",
+          fulfilled_at: now,
+          certificate_uploaded_at: now,
+          certificate_number: certNumber,
+          documents_deleted_at: now,
+          documents_deleted_reason: "completed",
+        } as never)
+        .eq("id", data.orderId);
+
+      if (certificateId) {
+        await admin
+          .from("certificates")
+          .update({ delivered_at: now } as never)
+          .eq("id", certificateId);
+      }
+
+      // Wipe other docs, but never delete the just-uploaded certificate file.
+      // This is intentionally done here instead of relying on the Edge
+      // Function deployment, so completion cannot accidentally remove the
+      // certificate before/after delivery.
+      try {
+        const { data: docs } = await admin
+          .from("documents")
+          .select("id, file_path, doc_type")
+          .eq("application_id", data.orderId);
+        const removable = (docs ?? []).filter((d: any) => {
+          if (d.id === data.certificateDocumentId) return false;
+          if (String(d.doc_type ?? "").toLowerCase() === "certificate") return false;
+          return true;
+        });
+        const paths = removable.map((d: any) => d.file_path).filter(Boolean);
+        if (paths.length) await admin.storage.from("documents").remove(paths);
+        const ids = removable.map((d: any) => d.id).filter(Boolean);
+        if (ids.length) await admin.from("documents").delete().in("id", ids);
+      } catch (e) {
+        console.error("completed order document cleanup failed:", e);
+      }
+
+      // Close the parent lead (trigger logs lead_status_change automatically).
+      if (app.lead_id) {
+        await admin
+          .from("leads")
+          .update({ lead_status_v2: "closed" } as never)
+          .eq("id", app.lead_id);
       }
 
 
@@ -596,7 +621,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         new_value: "completed",
         note:
           `Application completed. Certificate ${certNumber}` +
-          (recipientEmail ? ` queued to ${recipientEmail}` : " (no email on file)") +
+          ` sent to ${recipientEmail}` +
           (completionNotes ? `. Notes: ${completionNotes}` : "."),
         created_by: context.userId,
         staff_name,
@@ -714,8 +739,14 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
         attachments: resendAttachment
           ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
           : undefined,
+        requireImmediateSuccess: true,
       });
     }
+
+    await admin
+      .from("certificates")
+      .update({ delivered_at: new Date().toISOString() } as never)
+      .eq("id", cert.id);
 
 
     const { staff_name, staff_role } = await getStaff(context.userId);

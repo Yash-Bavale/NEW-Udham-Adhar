@@ -45,6 +45,7 @@ export async function enqueueEmailInternal(input: {
   applicationId?: string | null;
   delaySeconds?: number;
   attachments?: EmailAttachment[];
+  requireImmediateSuccess?: boolean;
 }) {
   const variables: Record<string, unknown> = { ...(input.variables ?? {}) };
   if (input.attachments && input.attachments.length > 0) {
@@ -76,15 +77,33 @@ export async function enqueueEmailInternal(input: {
     .single();
   if (error) throw new Error(error.message);
 
+  const baseResult = {
+    queueId: (inserted?.id as string | undefined) ?? null,
+    scheduled: Boolean(scheduled),
+    sent: false,
+  };
+
   // Send immediately unless explicitly scheduled for the future.
   if (!scheduled && inserted?.id) {
     try {
-      await sendQueueRowById(inserted.id as string);
-    } catch {
+      const sendResult = await sendQueueRowById(inserted.id as string);
+      const skipped = Boolean((sendResult as { skipped?: boolean })?.skipped);
+      const sent = Boolean((sendResult as { ok?: boolean })?.ok && !skipped);
+      if (!sent && input.requireImmediateSuccess) {
+        const message = skipped
+          ? "Email template is disabled — email was not sent."
+          : (sendResult as { error?: string })?.error || "Email was queued but not sent.";
+        throw new Error(message);
+      }
+      return { ...baseResult, sent, sendResult };
+    } catch (e) {
+      if (input.requireImmediateSuccess) throw e;
       // Failures are already recorded on the row by sendQueueRowById; the
       // background processor (if any) will retry per backoff policy.
     }
   }
+
+  return baseResult;
 }
 
 
