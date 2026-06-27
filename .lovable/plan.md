@@ -1,65 +1,50 @@
-
-## Problem
-
-The **Workflow** tab on the order workspace currently stacks three independent panels that overlap in purpose and confuse the operator:
-
-1. **Fulfillment Status** — "Move to" dropdown + Update Status (from `FulfillmentStatusUpdater`)
-2. **Cancellation & Refund Workflow** — red "Start cancellation workflow" card (from `CancellationPanel`)
-3. **Workflow Timeline** — Note / External Delay / Customer Replied / Resume / Refund / Close buttons + scheduled reminders + event log (from `WorkflowTimelinePanel`)
-
-Three boxes, three "primary" buttons, two places that change order state, and the cancellation card sits between the status dropdown and the action buttons that already include "Close Order" and "Refund Request". The operator cannot tell which control to use.
-
 ## Goal
+Replace the cluttered Workflow tab with one simple, linear status manager. No duplicated panels, no hidden dropdowns, no parallel "journey map + workflow + timeline" stacks competing for attention.
 
-One **Order Workflow** panel inside the Workflow tab that wires fulfillment progress, external delay, customer reply, and cancellation/refund into a single flow driven by the current order stage.
+## What's wrong today
+- Three things show the same info: `CustomerJourneyMap`, `StageStepper` (top), and `OrderWorkflowPanel` chips.
+- "Under Processing / Government Portal Pending" chips, "Manual status override" accordion, and action buttons (External Delay / Customer Replied / Resume / Refund / Close) all live side-by-side with no clear primary action.
+- No obvious "change status to X" control — user has to hunt.
+- Scheduled reminders + timeline + action buttons crammed into one card.
 
-## Unified panel layout
+## New Workflow tab (single panel, top → bottom)
 
-```text
-┌─ Order Workflow ──────────────────────────────────────────┐
-│ Stage chip:  Under Processing  •  External Dependency     │
-│ Sub-stage:   (none | external_delay | pending_closure …)  │
-│                                                           │
-│ [ Primary action row — stage-aware, ONE CTA ]             │
-│   happy path        → Advance to <next fulfillment stage> │
-│   external_delay    → Customer Replied  /  Resume Order   │
-│   pending_closure   → Send Concern Reply  /  Force Close  │
-│   active order      → Start Cancellation                  │
-│                                                           │
-│ [ Secondary actions — collapsed in a "More" menu ]        │
-│   Add Note · Refund Request · External Delay · Close      │
-│                                                           │
-│ ── Scheduled reminders (if any) ──────────────────────    │
-│ ── Activity timeline (events) ────────────────────────    │
-└───────────────────────────────────────────────────────────┘
+```
+┌─ ORDER STATUS ────────────────────────────────────────────┐
+│  Current: ● Payment Done           Lane: Happy Path        │
+│  Since 26 Jun 2026, 05:58 pm IST                           │
+│                                                            │
+│  [ ← Move Back ]    [ Advance to: Order Received → ]       │
+└────────────────────────────────────────────────────────────┘
+
+┌─ STAGE MAP (read-only progress) ──────────────────────────┐
+│  ✓ Lead → ✓ Payment → ● Order Received → ○ Form → ○ Docs   │
+│  → ○ Verification → ○ Submitted → ○ Processing → ○ Done    │
+└────────────────────────────────────────────────────────────┘
+
+┌─ NEED TO PAUSE OR CANCEL? ────────────────────────────────┐
+│  [ Mark External Delay ]  [ Start Cancellation ]           │
+│  (only these two switch lanes; everything else is linear)  │
+└────────────────────────────────────────────────────────────┘
+
+┌─ TIMELINE & REMINDERS (collapsed by default) ─────────────┐
+│  ▸ 4 reminders · 3 events                                  │
+└────────────────────────────────────────────────────────────┘
 ```
 
-Above the panel, the existing **CustomerJourneyMap** stays as the read-only three-lane visual (Happy / Delay / Cancellation) so the operator sees where they are before acting.
+When lane = External Delay → top card swaps to: current reason, [Customer Replied] [Resume Order] [Close Order].
+When lane = Cancellation → top card swaps to the 7-step closure stepper with one contextual CTA (Send Policy / Mark Replied / Force Close), matching current closure_stage.
 
-## Stage → primary CTA mapping
+## Removals
+- Delete `CustomerJourneyMap` from the tab (its info merges into Stage Map + lane badge).
+- Delete the duplicate `StageStepper` at top of Workflow tab (keep only the one inside Order Status panel).
+- Delete "Manual status override" disclosure — replaced by explicit Advance/Move Back buttons that walk the canonical stage list.
+- Collapse Scheduled Reminders + Timeline into one collapsible "History" section.
 
-| Order state                              | Primary CTA shown            | Secondary actions available           |
-| ---------------------------------------- | ---------------------------- | ------------------------------------- |
-| Active, no delay, no cancellation        | `Advance to <next stage>`    | External Delay · Start Cancellation · Note |
-| `workflow_status = external_delay`       | `Customer Replied` + `Resume Order` | Note · Start Cancellation            |
-| `closure_stage = cancellation_requested` | `Send 24h follow-up` (auto)  | Customer Replied · Note               |
-| `closure_stage = pending_closure`        | `Send Concern Reply` / `Force Close` | Note                              |
-| `closure_stage = closed`                 | (read-only)                  | Reopen (admin)                        |
-| `fulfillment_status = completed`         | (read-only completion card)  | —                                     |
+## Files
+- Rewrite `src/components/admin/workspace/OrderWorkflowPanel.tsx` as the single panel above (three stacked cards, lane-aware top card).
+- Edit `src/components/admin/workspace/WorkspaceShell.tsx`: Workflow tab renders only `<OrderWorkflowPanel />`. Remove `CustomerJourneyMap` import + render from this tab.
+- No backend changes. Reuses existing `advanceStage`, `setExternalDelay`, `resumeOrder`, cancellation functions, and `closure_stage`.
 
-The "Move to" status dropdown is hidden in normal flow; it's tucked under "More → Manual status override" for super-admins only so it stops competing with the stage-aware CTA.
-
-## Files to change
-
-- `src/components/admin/workspace/WorkspaceShell.tsx`
-  Replace the three stacked components in the `workflow` TabsContent with a single `<OrderWorkflowPanel … />`, keep `<CustomerJourneyMap />` above it.
-- `src/components/admin/workspace/OrderWorkflowPanel.tsx` *(new)*
-  Owns the unified UI. Internally composes the existing logic by re-using the hooks/handlers from `FulfillmentStatusUpdater`, `CancellationPanel`, and `WorkflowTimelinePanel` (advanceFulfillment, setExternalDelay, customerReplied, resumeOrder, startCancellation, sendConcernReply, forceClose, addNote, refundRequest). No business-logic rewrites — only UI consolidation and stage-aware CTA selection.
-- `src/components/admin/FulfillmentStatusUpdater.tsx`, `CancellationPanel.tsx`, `WorkflowTimelinePanel.tsx`
-  Kept as-is for now (still imported by other routes/tests). Workspace stops rendering them directly.
-
-## Out of scope
-
-- No changes to server functions (`workflow.functions.ts`, `cancellation.functions.ts`), email templates, reminders, or DB schema.
-- No changes to other tabs (Overview, Customer, Form & Docs, Emails, Activity).
-- CustomerJourneyMap visual stays unchanged.
+## Result
+One panel, one current status, one primary action ("Advance"), two clearly-labeled escape hatches (Delay / Cancel), history tucked away. No dropdown hunting, no duplicate stage visualizations.
