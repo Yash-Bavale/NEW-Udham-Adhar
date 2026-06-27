@@ -292,18 +292,18 @@ export const sendTestTemplateEmail = createServerFn({ method: "POST" })
     const auto: Record<string, string> = {};
     for (const v of (tpl.variables ?? []) as string[]) auto[v] = sampleFor(v);
 
-    let overrides: Record<string, unknown> = {};
+    let overrides: Record<string, string> = {};
     if (data.variablesJson?.trim()) {
       try {
         const parsed = JSON.parse(data.variablesJson);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          overrides = parsed as Record<string, unknown>;
+          for (const [k, v] of Object.entries(parsed)) overrides[k] = String(v ?? "");
         } else throw new Error("Variables JSON must be an object");
       } catch (e) {
         throw new Error(`Invalid variables JSON: ${(e as Error).message}`);
       }
     }
-    const variables = { ...auto, ...overrides };
+    const variables: Record<string, string> = { ...auto, ...overrides };
 
     const { enqueueFromTemplateInternal, processQueueInternal } = await import("./emails.server");
     // Temporarily allow disabled templates for testing by setting enable=true in memory only.
