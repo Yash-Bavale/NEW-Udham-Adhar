@@ -91,6 +91,7 @@ export function FormSubmissionPanel({
 
   const handleResend = async () => {
     if (!data?.lead?.id) return;
+    if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
     setResending(true);
     try {
       const res = await resendFn({ data: { leadId: data.lead.id } });
