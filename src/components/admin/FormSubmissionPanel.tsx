@@ -197,11 +197,16 @@ export function FormSubmissionPanel({
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {submission ? (
-                <>Submitted {formatIST(submission.submitted_at ?? submission.updated_at)}</>
+                isDraft ? (
+                  <>Auto-saved draft at {formatIST(submission.updated_at)} — customer has NOT pressed Submit.</>
+                ) : (
+                  <>Submitted {formatIST(submission.submitted_at ?? submission.updated_at)}</>
+                )
               ) : (
                 <>Customer hasn't submitted the service form yet.</>
               )}
             </p>
+
           </div>
           {statusPill}
         </div>
