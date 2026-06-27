@@ -27,9 +27,14 @@ const HIGH_PRIORITY = new Set<string>([
   "/udyam-registration",
   "/udyam-aadhar-registration",
   "/msme-registration",
+  "/new-udyam-registration",
   "/download-udyam-certificate",
   "/print-udyam-certificate",
   "/update-udyam-certificate",
+  "/migrate-udyog-aadhaar-to-udyam",
+  "/verify-udyam-certificate",
+  "/udyam-registration-process",
+  "/msme-registration-fee",
 ]);
 
 function isExcluded(p: string): boolean {
