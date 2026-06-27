@@ -141,6 +141,23 @@ export function OrderWorkflowPanel({
     onSuccess: () => { toast.success("Customer reply logged."); refresh(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+  const resumeCancelMut = useMutation({
+    mutationFn: async () =>
+      fnResumeCancelled({
+        data: {
+          applicationId,
+          toStatus: resumeTarget as any,
+          note: resumeNote.trim() || undefined,
+        },
+      }),
+    onSuccess: () => {
+      toast.success(`Order resumed → ${FULFILLMENT_LABEL[resumeTarget]}`);
+      setResumeCancelOpen(false);
+      setResumeNote("");
+      refresh();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
 
   return (
     <div className="space-y-4">
