@@ -87,7 +87,7 @@ function DashboardTab() {
 
       <Section title="Recent send attempts">
         <div className="mb-2 text-xs text-slate-500">
-          Provider: <span className="font-medium text-emerald-700">Zoho Mail (SMTP)</span> · sender <code className="font-mono">{process.env.ZOHO_SMTP_USER ?? "your Zoho mailbox"}</code>
+          Provider: <span className="font-medium text-emerald-700">Zoho Mail (SMTP)</span> · every send is logged in <code className="font-mono">email_send_log</code>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
