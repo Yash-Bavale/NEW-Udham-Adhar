@@ -1,8 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate } from "./smtp.server";
-import { sendLovableEmail } from "@lovable.dev/email-js";
-
-const LOVABLE_SENDER_DOMAIN = "notify.mail.businesshelpservices.com";
+import { sendViaZoho } from "./zoho-smtp.server";
 
 /** Strip HTML → plain-text fallback. Lovable email API rejects empty `text`. */
 function htmlToPlainText(html: string | null | undefined): string {
