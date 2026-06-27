@@ -553,32 +553,38 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
       if (recipientEmail && certificateUrl) {
-        await admin.from("email_queue").insert({
-          template_code: "certificate_delivery",
-          to_email: recipientEmail,
-          to_name: recipientName,
-          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
-          body_html: buildCertificateEmailHtml({
-            recipientName,
-            serviceName,
-            certificateNumber: certNumber,
-            certificateUrl,
-            completionNotes,
-            orderCode: app.application_code ?? "",
-          }),
-          lead_id: app.lead_id,
-          application_id: data.orderId,
-          variables: {
-            customer_name: recipientName,
-            service_name: serviceName,
-            certificate_number: certNumber,
-            certificate_url: certificateUrl,
-            completion_notes: completionNotes ?? "",
-            order_code: app.application_code ?? "",
-            ...(certAttachment ? { __attachments: [certAttachment] } : {}),
-          },
-          created_by: context.userId,
-        } as never);
+        const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+        try {
+          await enqueueEmailInternal({
+            templateCode: "certificate_delivery",
+            toEmail: recipientEmail,
+            toName: recipientName,
+            subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+            bodyHtml: buildCertificateEmailHtml({
+              recipientName,
+              serviceName,
+              certificateNumber: certNumber,
+              certificateUrl,
+              completionNotes,
+              orderCode: app.application_code ?? "",
+            }),
+            leadId: app.lead_id,
+            applicationId: data.orderId,
+            variables: {
+              customer_name: recipientName,
+              service_name: serviceName,
+              certificate_number: certNumber,
+              certificate_url: certificateUrl,
+              completion_notes: completionNotes ?? "",
+              order_code: app.application_code ?? "",
+            },
+            attachments: certAttachment
+              ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
+              : undefined,
+          });
+        } catch (e) {
+          console.error("[fulfillment.complete] certificate email failed:", e);
+        }
       }
 
 
