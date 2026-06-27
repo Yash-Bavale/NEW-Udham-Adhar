@@ -1,50 +1,41 @@
-## Final design — Order Status panel
+## Goal
+Make the Super Admin dashboard the single executive dashboard for admin + super_admin, with a professional shadcn UI and a global IST date-range filter (Today / Yesterday / 7d / 30d / This month / Custom). All KPIs, trends, top services, workflow, email queue and activity recompute against the selected range. New day rolls over at 00:00 IST.
 
-### 1. Simpler wording (drop "Advance to")
-Use the verb the team already says out loud:
+## Scope
+- Route: `/admin/dashboard` (executive) becomes the new UI. `/admin/super` keeps the same component (super-admin gate). Landing in `admin.index.tsx` for `admin` continues to go to `/admin/dashboard`; super_admin to `/admin/super`. Same component, role-gated wrapper.
+- Old `admin.dashboard.tsx` (759 lines, ops-style cards) is replaced.
 
-- Primary CTA: **"Mark as {Next Stage} →"** (e.g. "Mark as Application Submitted →")
-- Helper line: "Next step in this order."
-- Lane chip: keep "Happy Path / External Delay / Cancellation" — short and clear.
+## Backend (`src/lib/crm/super-admin.functions.ts`)
+1. Convert `getSuperAdminOverview` to accept an input range:
+   `{ preset: "today"|"yesterday"|"7d"|"30d"|"mtd"|"custom"; fromIso?: string; toIso?: string }`.
+2. Add `istDayBoundaries(preset, from, to)` helper that computes `[startUtc, endUtc]` from IST midnights (using `Asia/Kolkata` offset, no deps). All Supabase queries use these bounds instead of `Date.now()-N*86_400_000`.
+3. Rewrite KPIs against the range:
+   - `leadsInRange`, `leadsPrevRange` (for delta), `paymentsInRange`, `paymentsPrevRange`, `revenueInRange`.
+   - `openApplications`, `documentsPending`, `certificatesInRange`, `emailQueueDepth`, `totalCustomers`, `activeStaff`, `repeatedLeads`, `conversionRateInRange`.
+   - Workflow counts (externalDelay, onHold, refundPending, remindersDue, closedInRange).
+3. Trend series: bucket per IST day across the range (1d buckets if ≤62 days, weekly buckets if longer). Return `days` as `YYYY-MM-DD` IST keys.
+4. Allow admin OR super_admin (relax `requireSuper` to `requireAdminOrSuper`) so executive dashboard works for both. Sensitive admin actions (`processEmailQueueNow`, `seedMissingEmailTemplates`) stay super_admin only.
 
-For the completed step the CTA reads **"Mark as Completed →"** and still opens the Completion Gate dialog.
+## Frontend (new `src/routes/admin.super.tsx`, lighter rewrite, then re-use)
+1. Replace dark gradient theme with a clean shadcn light/dark surface: `Card`, `Tabs`, `Button`, `Badge`, `Select`, `Popover`, `Calendar`, `Skeleton`, `ScrollArea`, `Separator`. Keep recharts.
+2. Header row: title + live IST clock + `DateRangePicker` (shadcn Popover + Calendar `mode="range"`) + preset Tabs (Today / Yesterday / 7d / 30d / MTD / Custom). State is URL-synced via `validateSearch` (preset, from, to).
+3. 12 KPI cards in a responsive grid with sparkline + delta vs previous equal-length window.
+4. Sections: Revenue & Leads trend (combined Bar+Line), Top Services, Workflow Health, Email Queue status, Recent Activity (ScrollArea), System Alerts. All consume range data.
+5. All dates rendered via existing `formatIST` from `@/lib/datetime`. Live clock ticks every 60s.
+6. Replace `admin.dashboard.tsx` body to render the same `<SuperAdminDashboard range={...} />` component (extracted to `src/components/admin/SuperAdminDashboard.tsx`). Super-admin route adds the override actions panel; admin route hides it.
 
-### 2. Add a Revert option (the missing piece)
-Backward moves are real — wrong button taps, premature status updates, customer asked to redo docs. Senior PM call: surface it, don't hide it.
+## Files
+- edit `src/lib/crm/super-admin.functions.ts` — range input, IST bucketing, gate change
+- add `src/components/admin/SuperAdminDashboard.tsx` — shared shadcn UI
+- add `src/components/admin/DateRangePicker.tsx` — shadcn popover+calendar
+- rewrite `src/routes/admin.super.tsx` — thin wrapper (super_admin gate + admin actions)
+- rewrite `src/routes/admin.dashboard.tsx` — thin wrapper (admin/super_admin gate, no admin actions)
+- keep `src/routes/admin.index.tsx` landing logic unchanged
 
-**UI** — to the right of the primary button:
-```
-[ Mark as Application Submitted → ]   [ ↶ Revert to Documents Received ]
-```
-- Shown only when there is a previous stage (i.e. current ≠ first stage).
-- Secondary visual weight (outline button, slate), so it never competes with the forward action.
-- Click opens a small confirm dialog: "Revert this order back to {previous}? A note will be added to the activity log." with an optional reason textarea.
-- Permission: any staff can revert one step backward; the action is always logged with actor name + reason.
+## IST rules
+- Day boundary: `00:00 Asia/Kolkata` → equivalent UTC via fixed +05:30 offset.
+- "Today" = current IST day; "Yesterday" = previous IST day; "7d/30d" = trailing N IST days including today; "MTD" = 1st IST of current month → now.
+- All chart x-axis labels and tooltips use `formatIST`.
 
-**Backend** — extend `updateFulfillmentStatus`:
-- Add an optional `allowBackward: boolean` flag in the input schema.
-- When `true`, accept a transition to the immediately previous stage in `FULFILLMENT_STAGES` (one step only — no jumping multiple stages back, no reverting from `completed`, no reverting once `cancelled`).
-- Always write a `status_change` event with `note` = the revert reason so it shows up in the timeline.
-
-No DB migration needed — `fulfillment_status` already accepts every stage value; the only gate is the server-side transitions map.
-
-### 3. Final Order Status card layout
-
-```
-ORDER STATUS
-[ Verification Pending ]   ● Happy Path
-─────────────────────────────────────────────────────────
-[ Mark as Application Submitted → ]   [ ↶ Revert to Documents Received ]
-Next step in this order.
-```
-
-- Delay lane: unchanged (Customer Replied / Resume Order / Close Order).
-- Cancellation lane: unchanged (renders `CancellationPanel`).
-- Stage Map, Pause/Cancel card, and collapsible Timeline & reminders: unchanged.
-
-### Files
-- `src/lib/crm/orders-v2.functions.ts` — extend `updateFulfillmentStatus` to allow a single-step backward move with reason logging.
-- `src/components/admin/workspace/OrderWorkflowPanel.tsx` — rename CTA to "Mark as …", add the Revert button + confirm dialog, wire to the server fn.
-
-### Result
-One forward verb everyone understands, an explicit one-click way back, the rest of the panel unchanged. No clutter, no hidden dropdown, no inprofessional dead-ends.
+## Out of scope
+No data-model changes, no new tables, no role changes. Email queue actions and existing super-admin overrides keep current behavior.
