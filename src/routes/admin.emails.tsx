@@ -405,6 +405,24 @@ function TemplatesTab() {
                         await dupFn({ data: { id: t.id } });
                         await qc.invalidateQueries({ queryKey: ["admin.emails.templates"] });
                       }} className="text-xs text-slate-600 hover:underline">Duplicate</button>
+                      <button
+                        disabled={rowBusy === t.code}
+                        onClick={async () => {
+                          const to = window.prompt(`Send a test of "${t.name}" to which email?`, testTo || "");
+                          if (!to) return;
+                          setRowBusy(t.code);
+                          setRowMsg(null);
+                          try {
+                            const m = await runTest(t.code, to);
+                            setRowMsg(`✓ ${m}`);
+                            setTestTo(to);
+                            await qc.invalidateQueries({ queryKey: ["admin.emails.logs"] });
+                            await qc.invalidateQueries({ queryKey: ["admin.emails.dash"] });
+                          } catch (e) { setRowMsg(`✗ ${t.code}: ${(e as Error).message}`); }
+                          finally { setRowBusy(null); }
+                        }}
+                        className="text-xs text-emerald-700 hover:underline disabled:opacity-40"
+                      >{rowBusy === t.code ? "Sending…" : "Send test"}</button>
                       {!t.is_system && (
                         <button onClick={async () => {
                           if (!confirm(`Delete template "${t.name}"?`)) return;
