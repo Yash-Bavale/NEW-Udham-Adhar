@@ -229,7 +229,7 @@ export function OrderWorkflowPanel({
         onOpenChange={setCertOpen}
         orderId={applicationId}
         busy={busy}
-        onConfirm={(p) => advance(p)}
+        onConfirm={(p: { certificateDocumentId: string; certificateNumber: string; completionNotes?: string }) => advance(p)}
       />
     </div>
   );
