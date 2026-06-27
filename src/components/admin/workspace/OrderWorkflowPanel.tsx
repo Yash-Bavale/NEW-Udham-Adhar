@@ -73,13 +73,21 @@ export function OrderWorkflowPanel({
 
   const allowed = getAllowedFulfillmentTransitions(current);
   const nextStage = allowed[0] ?? null; // canonical forward step
+  const curIdx = FULFILLMENT_STAGES.indexOf(current);
+  const previousStage =
+    curIdx > 0 && current !== "completed" && current !== "cancelled"
+      ? FULFILLMENT_STAGES[curIdx - 1]
+      : null;
+
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertReason, setRevertReason] = useState("");
 
   const advance = async (extra?: { certificateDocumentId?: string; certificateNumber?: string; completionNotes?: string }) => {
     if (!nextStage) return;
     setBusy(true);
     try {
       await updateFn({ data: { orderId: applicationId, toStatus: nextStage, ...extra } });
-      toast.success(`Status → ${FULFILLMENT_LABEL[nextStage]}`);
+      toast.success(`Moved to ${FULFILLMENT_LABEL[nextStage]}`);
       setCertOpen(false);
       refresh();
     } catch (e: any) {
@@ -88,6 +96,32 @@ export function OrderWorkflowPanel({
       setBusy(false);
     }
   };
+
+  const revert = async () => {
+    if (!previousStage) return;
+    setBusy(true);
+    try {
+      await updateFn({
+        data: {
+          orderId: applicationId,
+          toStatus: previousStage,
+          allowBackward: true,
+          note: revertReason.trim()
+            ? `Reverted to ${FULFILLMENT_LABEL[previousStage]} — ${revertReason.trim()}`
+            : `Reverted to ${FULFILLMENT_LABEL[previousStage]}`,
+        },
+      });
+      toast.success(`Reverted to ${FULFILLMENT_LABEL[previousStage]}`);
+      setRevertOpen(false);
+      setRevertReason("");
+      refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Revert failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   const resumeMut = useMutation({
     mutationFn: async () => fnResume({ data: { applicationId } }),
