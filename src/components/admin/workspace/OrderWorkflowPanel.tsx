@@ -278,7 +278,41 @@ export function OrderWorkflowPanel({
         busy={busy}
         onConfirm={(p: { certificateDocumentId: string; certificateNumber: string; completionNotes?: string }) => advance(p)}
       />
+
+      {revertOpen && previousStage && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border bg-white p-5 shadow-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <Undo2 className="size-4 text-slate-600" />
+              <div className="font-semibold text-slate-900">Revert order stage</div>
+            </div>
+            <div className="text-sm text-slate-600 mb-3">
+              Move this order back from <b>{FULFILLMENT_LABEL[current]}</b> to{" "}
+              <b>{FULFILLMENT_LABEL[previousStage]}</b>. A note will be added to the activity log.
+            </div>
+            <label className="text-xs font-semibold text-slate-600">Reason (optional)</label>
+            <textarea
+              value={revertReason}
+              onChange={(e) => setRevertReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Documents need to be re-verified"
+              className="mt-1 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { setRevertOpen(false); setRevertReason(""); }}
+                disabled={busy}
+                className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
+              <button onClick={revert} disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-60">
+                {busy && <Loader2 className="size-3 animate-spin" />}
+                Revert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
 
