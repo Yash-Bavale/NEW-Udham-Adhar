@@ -95,8 +95,12 @@ export function OrderWorkflowPanel({
     if (!nextStage) return;
     setBusy(true);
     try {
-      await updateFn({ data: { orderId: applicationId, toStatus: nextStage, ...extra } });
-      toast.success(`Moved to ${FULFILLMENT_LABEL[nextStage]}`);
+      const res = await updateFn({ data: { orderId: applicationId, toStatus: nextStage, ...extra } });
+      if (nextStage === "completed" && (res as any)?.emailQueuedTo) {
+        toast.success(`Completed — certificate email sent to ${(res as any).emailQueuedTo}`);
+      } else {
+        toast.success(`Moved to ${FULFILLMENT_LABEL[nextStage]}`);
+      }
       setCertOpen(false);
       refresh();
     } catch (e: any) {

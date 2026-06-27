@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-  let payload: { application_id?: string; reason?: string } = {};
+  let payload: { application_id?: string; reason?: string; keep_document_id?: string } = {};
   try {
     payload = await req.json();
   } catch {
@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
   }
   const applicationId = payload.application_id;
   const reason = payload.reason ?? "refund";
+  const keepDocumentId = payload.keep_document_id ?? null;
   if (!applicationId) return new Response("application_id required", { status: 400 });
 
   const supabase = createClient(
@@ -42,7 +43,11 @@ Deno.serve(async (req) => {
       headers: { "content-type": "application/json" },
     });
   }
-  const toDelete = docs ?? [];
+  const toDelete = (docs ?? []).filter((d: any) => {
+    if (keepDocumentId && d.id === keepDocumentId) return false;
+    if (String(d.doc_type ?? "").toLowerCase() === "certificate") return false;
+    return true;
+  });
   const paths = toDelete.map((d: any) => d.file_path).filter(Boolean);
   const ids = toDelete.map((d: any) => d.id);
 

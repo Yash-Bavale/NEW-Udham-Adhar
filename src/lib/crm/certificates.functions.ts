@@ -134,26 +134,14 @@ export const deliverCertificate = createServerFn({ method: "POST" })
       .from("documents")
       .createSignedUrl(cert.file_path, 60 * 60 * 24 * 7);
 
-    await (await getAdmin())
-      .from("certificates")
-      .update({ delivered_at: new Date().toISOString() })
-      .eq("id", data.certificateId);
-
-    if (app?.id) {
-      const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
-      // Cascade: certificate delivered → certificate_uploaded → certificate_ready → completed
-      for (const next of ["certificate_uploaded", "certificate_ready", "completed"] as const) {
-        const tr = await transitionStatusSystem({
-          applicationId: app.id,
-          toStatus: next,
-          reason: `Certificate delivered (${next})`,
-          force: true,
-        });
-        if (!tr.ok) console.warn("[certificates] cascade step skipped:", next, tr.reason);
-      }
+    if (!lead?.email) {
+      throw new Error("No email address on file for this customer — certificate was not delivered.");
+    }
+    if (!signed?.signedUrl) {
+      throw new Error("Could not generate certificate download link — certificate was not delivered.");
     }
 
-    if (lead?.email && signed?.signedUrl) {
+    if (lead.email && signed.signedUrl) {
       // Try to attach the actual file (PDF/JPG/PNG) to the email.
       let attachment: { filename: string; content_type: string; content_base64: string } | null = null;
       try {
@@ -194,20 +182,43 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
           <p style="font-size:12px;color:#999">Order: ${app?.application_code ?? "—"}</p>
         </div>`;
-      await (await getAdmin()).from("email_queue").insert({
-        to_email: lead.email,
-        to_name: lead.name,
+      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      await enqueueEmailInternal({
+        templateCode: "certificate_delivery",
+        toEmail: lead.email,
+        toName: lead.name,
         subject,
-        body_html: html,
-        template_code: "certificate-delivered",
-        lead_id: lead.id,
-        application_id: app?.id ?? null,
+        bodyHtml: html,
+        leadId: lead.id,
+        applicationId: app?.id ?? null,
         variables: {
           certificateId: cert.id,
-          ...(attachment ? { __attachments: [attachment] } : {}),
+          certificate_number: cert.certificate_number ?? "",
+          certificate_url: signed.signedUrl,
+          order_code: app?.application_code ?? "",
         },
-        created_by: user.id,
+        attachments: attachment ? [attachment] : undefined,
+        requireImmediateSuccess: true,
       });
+    }
+
+    await (await getAdmin())
+      .from("certificates")
+      .update({ delivered_at: new Date().toISOString() })
+      .eq("id", data.certificateId);
+
+    if (app?.id) {
+      const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
+      // Cascade only after the certificate email has actually been accepted.
+      for (const next of ["certificate_uploaded", "certificate_ready", "completed"] as const) {
+        const tr = await transitionStatusSystem({
+          applicationId: app.id,
+          toStatus: next,
+          reason: `Certificate delivered (${next})`,
+          force: true,
+        });
+        if (!tr.ok) console.warn("[certificates] cascade step skipped:", next, tr.reason);
+      }
     }
 
 
