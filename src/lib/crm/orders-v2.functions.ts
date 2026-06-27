@@ -364,6 +364,9 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         orderId: z.string().uuid(),
         toStatus: z.string(),
         note: z.string().max(2000).optional(),
+        // Allow a single-step backward move (revert). One stage only,
+        // never from `completed` or `cancelled`.
+        allowBackward: z.boolean().optional(),
         // Required when transitioning to `completed`
         certificateDocumentId: z.string().uuid().optional(),
         certificateNumber: z.string().trim().min(1).max(120).optional(),
@@ -387,9 +390,20 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
     if (current === target) return { ok: true, noop: true };
 
     const allowed = getAllowedFulfillmentTransitions(current);
-    if (!allowed.includes(target)) {
+    const curIdx = FULFILLMENT_STAGES.indexOf(current);
+    const tgtIdx = FULFILLMENT_STAGES.indexOf(target);
+    const isOneStepBack =
+      data.allowBackward === true &&
+      curIdx > 0 &&
+      tgtIdx === curIdx - 1 &&
+      current !== "completed" &&
+      current !== "cancelled" &&
+      target !== "cancelled";
+
+    if (!allowed.includes(target) && !isOneStepBack) {
       throw new Error(`Invalid transition: ${current} → ${target}`);
     }
+
 
     if (target === "completed") {
       if (!data.certificateDocumentId) {

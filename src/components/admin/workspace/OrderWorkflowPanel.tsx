@@ -4,8 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, AlertTriangle, Ban, ArrowRight, Check,
-  RotateCcw, MessageSquare, History, Bell, Clock, X, Plus, Loader2,
+  RotateCcw, MessageSquare, History, Bell, Clock, X, Plus, Loader2, Undo2,
 } from "lucide-react";
+
 
 import { CancellationPanel } from "@/components/admin/CancellationPanel";
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
@@ -72,13 +73,21 @@ export function OrderWorkflowPanel({
 
   const allowed = getAllowedFulfillmentTransitions(current);
   const nextStage = allowed[0] ?? null; // canonical forward step
+  const curIdx = FULFILLMENT_STAGES.indexOf(current);
+  const previousStage =
+    curIdx > 0 && current !== "completed" && current !== "cancelled"
+      ? FULFILLMENT_STAGES[curIdx - 1]
+      : null;
+
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertReason, setRevertReason] = useState("");
 
   const advance = async (extra?: { certificateDocumentId?: string; certificateNumber?: string; completionNotes?: string }) => {
     if (!nextStage) return;
     setBusy(true);
     try {
       await updateFn({ data: { orderId: applicationId, toStatus: nextStage, ...extra } });
-      toast.success(`Status → ${FULFILLMENT_LABEL[nextStage]}`);
+      toast.success(`Moved to ${FULFILLMENT_LABEL[nextStage]}`);
       setCertOpen(false);
       refresh();
     } catch (e: any) {
@@ -87,6 +96,32 @@ export function OrderWorkflowPanel({
       setBusy(false);
     }
   };
+
+  const revert = async () => {
+    if (!previousStage) return;
+    setBusy(true);
+    try {
+      await updateFn({
+        data: {
+          orderId: applicationId,
+          toStatus: previousStage,
+          allowBackward: true,
+          note: revertReason.trim()
+            ? `Reverted to ${FULFILLMENT_LABEL[previousStage]} — ${revertReason.trim()}`
+            : `Reverted to ${FULFILLMENT_LABEL[previousStage]}`,
+        },
+      });
+      toast.success(`Reverted to ${FULFILLMENT_LABEL[previousStage]}`);
+      setRevertOpen(false);
+      setRevertReason("");
+      refresh();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Revert failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   const resumeMut = useMutation({
     mutationFn: async () => fnResume({ data: { applicationId } }),
@@ -116,32 +151,44 @@ export function OrderWorkflowPanel({
         </div>
 
         {lane === "happy" && (
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 space-y-2">
             {!nextStage ? (
               <div className="text-sm text-slate-500 italic flex items-center gap-2">
-                <Check className="size-4 text-emerald-600" /> Terminal status — no further transitions.
+                <Check className="size-4 text-emerald-600" /> Order completed — no further stages.
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    if (nextStage === "completed") setCertOpen(true);
-                    else advance();
-                  }}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow-md transition disabled:opacity-60"
-                >
-                  {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                  Advance to {FULFILLMENT_LABEL[nextStage]}
-                </button>
-                <div className="text-xs text-slate-500">
-                  Next step in the order flow. Use the buttons below to pause or cancel.
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (nextStage === "completed") setCertOpen(true);
+                      else advance();
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:shadow-md transition disabled:opacity-60"
+                  >
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+                    Mark as {FULFILLMENT_LABEL[nextStage]}
+                  </button>
+                  {previousStage && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setRevertOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      title={`Revert to ${FULFILLMENT_LABEL[previousStage]}`}
+                    >
+                      <Undo2 className="size-4" /> Revert to {FULFILLMENT_LABEL[previousStage]}
+                    </button>
+                  )}
                 </div>
-              </div>
+                <div className="text-xs text-slate-500">Next step in this order.</div>
+              </>
             )}
           </div>
         )}
+
 
         {lane === "delay" && (
           <div className="px-5 py-4 space-y-3">
@@ -231,7 +278,41 @@ export function OrderWorkflowPanel({
         busy={busy}
         onConfirm={(p: { certificateDocumentId: string; certificateNumber: string; completionNotes?: string }) => advance(p)}
       />
+
+      {revertOpen && previousStage && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border bg-white p-5 shadow-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <Undo2 className="size-4 text-slate-600" />
+              <div className="font-semibold text-slate-900">Revert order stage</div>
+            </div>
+            <div className="text-sm text-slate-600 mb-3">
+              Move this order back from <b>{FULFILLMENT_LABEL[current]}</b> to{" "}
+              <b>{FULFILLMENT_LABEL[previousStage]}</b>. A note will be added to the activity log.
+            </div>
+            <label className="text-xs font-semibold text-slate-600">Reason (optional)</label>
+            <textarea
+              value={revertReason}
+              onChange={(e) => setRevertReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Documents need to be re-verified"
+              className="mt-1 w-full rounded-md border bg-white px-2 py-1.5 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => { setRevertOpen(false); setRevertReason(""); }}
+                disabled={busy}
+                className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
+              <button onClick={revert} disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-60">
+                {busy && <Loader2 className="size-3 animate-spin" />}
+                Revert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 }
 
