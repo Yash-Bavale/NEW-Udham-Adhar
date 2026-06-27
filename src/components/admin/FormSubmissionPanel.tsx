@@ -133,17 +133,31 @@ export function FormSubmissionPanel({
   const serviceLabel: string =
     (service?.service_name as string) || (lead?.service as string) || serviceCode || "Service";
 
+  const isDraft = !!submission && (submission.status !== "submitted" || !submission.submitted_at);
+
+  // Resolve full schema once so we know which fields are required.
+  const fullSchema = serviceCode ? getSchema(serviceCode) : null;
+  const requiredFields = (fullSchema?.fields ?? []).filter(
+    (f: any) => f.required && f.type !== "section",
+  );
+  const requiredKeys = new Set(requiredFields.map((f: any) => f.key));
+  const isBlank = (v: any) =>
+    v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+  const missingRequiredFields = submission
+    ? requiredFields.filter((f: any) => isBlank((submission.form_data ?? {})[f.key]))
+    : requiredFields;
+
   // Build a "submitted" status pill
   const statusPill = submission ? (
     <span
       className={
         "text-[11px] rounded-full px-2 py-0.5 font-medium border " +
-        (submission.status === "submitted"
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-          : "bg-amber-50 text-amber-700 border-amber-200")
+        (isDraft
+          ? "bg-amber-100 text-amber-800 border-amber-300"
+          : "bg-emerald-50 text-emerald-700 border-emerald-200")
       }
     >
-      {submission.status}
+      {isDraft ? "DRAFT — not submitted" : "submitted"}
     </span>
   ) : (
     <span className="text-[11px] rounded-full px-2 py-0.5 font-medium border bg-slate-100 text-slate-600 border-slate-200">
@@ -169,6 +183,7 @@ export function FormSubmissionPanel({
   const missingRequired = matchedRequired.filter(
     (r: any) => r.required && !uploadedByType.has(r.key),
   );
+
 
   return (
     <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
