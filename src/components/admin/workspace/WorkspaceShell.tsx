@@ -13,9 +13,7 @@ import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
-import { FulfillmentStatusUpdater } from "@/components/admin/FulfillmentStatusUpdater";
-import { WorkflowTimelinePanel } from "@/components/admin/WorkflowTimelinePanel";
-import { CancellationPanel } from "@/components/admin/CancellationPanel";
+import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
 import { ProcessingChecklist } from "@/components/admin/ProcessingChecklist";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { StageActionsPanel } from "@/components/admin/StageActionsPanel";
@@ -235,19 +233,33 @@ export function WorkspaceShell(p: Props) {
             </TabsContent>
 
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
-              {!p.showConsultationPanel && (
-                <FulfillmentStatusUpdater orderId={application.id} current={current} />
-              )}
-              <CancellationPanel
-                applicationId={application.id}
+              <CustomerJourneyMap
+                application={application}
+                paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
+                stageMeta={stageMeta}
+                workflowStatus={(application as any).workflow_status}
                 closureStage={(application as any).closure_stage}
                 closureNextAt={(application as any).closure_next_at}
-                cancellationRequestedAt={(application as any).cancellation_requested_at}
-                reasonCode={(application as any).closure_reason_code}
-                reasonText={(application as any).closure_reason_text}
+                closureReasonLabel={(application as any).closure_reason_code}
               />
-              <WorkflowTimelinePanel applicationId={application.id} workflowStatus={(application as any).workflow_status} />
+              {p.showConsultationPanel ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+                  This is a <b>Talk-to-Expert</b> order. The post-payment service workflow appears here once you select the customer's service in the <b>Overview</b> tab and the second payment is received.
+                </div>
+              ) : (
+                <OrderWorkflowPanel
+                  applicationId={application.id}
+                  current={current}
+                  workflowStatus={(application as any).workflow_status}
+                  closureStage={(application as any).closure_stage}
+                  closureNextAt={(application as any).closure_next_at}
+                  cancellationRequestedAt={(application as any).cancellation_requested_at}
+                  reasonCode={(application as any).closure_reason_code}
+                  reasonText={(application as any).closure_reason_text}
+                />
+              )}
             </TabsContent>
+
 
             <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
               {lead?.id ? (
