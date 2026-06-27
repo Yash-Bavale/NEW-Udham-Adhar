@@ -233,15 +233,6 @@ export function WorkspaceShell(p: Props) {
             </TabsContent>
 
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
-              <CustomerJourneyMap
-                application={application}
-                paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
-                stageMeta={stageMeta}
-                workflowStatus={(application as any).workflow_status}
-                closureStage={(application as any).closure_stage}
-                closureNextAt={(application as any).closure_next_at}
-                closureReasonLabel={(application as any).closure_reason_code}
-              />
               {p.showConsultationPanel ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
                   This is a <b>Talk-to-Expert</b> order. The post-payment service workflow appears here once you select the customer's service in the <b>Overview</b> tab and the second payment is received.
@@ -259,6 +250,7 @@ export function WorkspaceShell(p: Props) {
                 />
               )}
             </TabsContent>
+
 
 
             <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
