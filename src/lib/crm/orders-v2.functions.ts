@@ -445,6 +445,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         .update({
           application_status: "completed",
           fulfilled_at: now,
+          certificate_uploaded_at: now,
+          certificate_number: certNumber,
           documents_deleted_reason: "completed",
         } as never)
         .eq("id", data.orderId);
