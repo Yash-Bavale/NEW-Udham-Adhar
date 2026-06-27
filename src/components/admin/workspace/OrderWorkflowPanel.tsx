@@ -242,7 +242,7 @@ export function OrderWorkflowPanel({
         )}
 
         {lane === "cancellation" && (
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 space-y-3">
             <CancellationPanel
               applicationId={applicationId}
               closureStage={closureStage}
@@ -251,9 +251,27 @@ export function OrderWorkflowPanel({
               reasonCode={reasonCode}
               reasonText={reasonText}
             />
+            {isSuperAdmin && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-emerald-900">
+                  <div className="font-semibold">Super-admin override</div>
+                  <div className="text-emerald-800/80">
+                    Resume this cancelled order. Closure workflow will be cleared and pending reminders cancelled.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResumeCancelOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:shadow-md"
+                >
+                  <RotateCcw className="size-4" /> Resume Cancelled Order
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
+
 
       {/* CARD 2 — STAGE MAP */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
