@@ -3,7 +3,7 @@
 export const SERVICES = [
   { slug: "new-udyam-registration", label: "New Udyam Registration", price: 99 },
   { slug: "update-udyam-certificate", label: "Update Udyam Certificate", price: 99 },
-  { slug: "download-udyam-certificate", label: "Udyam Registration Certificate Download", price: 99 },
+  { slug: "download-udyam-certificate", label: "Download Udyam Certificate", price: 99 },
   { slug: "migrate-udyog-aadhaar-to-udyam", label: "Udyog Aadhaar to Udyam Migration", price: 99 },
   { slug: "forgot-mobile-email", label: "Forgot Registered Mobile / Email", price: 99 },
   { slug: "correct-pan-aadhaar", label: "Correct PAN / Aadhaar Name in Udyam", price: 99 },
