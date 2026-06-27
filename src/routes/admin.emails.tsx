@@ -13,6 +13,7 @@ import {
   duplicateEmailTemplate,
   deleteEmailTemplate,
   listEmailLogs,
+  sendTestTemplateEmail,
 } from "@/lib/emails/emails.functions";
 
 export const Route = createFileRoute("/admin/emails")({ component: EmailsPage });
