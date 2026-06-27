@@ -177,7 +177,9 @@ export function FormSubmissionPanel({
         <div className="flex items-center gap-3 min-w-0">
           <FileText className="size-4 text-slate-600 shrink-0" />
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-slate-800">Form Submission</h3>
+            <h3 className="text-sm font-semibold text-slate-800 break-words">
+              Form Submission · <span className="text-slate-600">{serviceLabel}</span>
+            </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {submission ? (
                 <>Submitted {formatIST(submission.submitted_at ?? submission.updated_at)}</>
