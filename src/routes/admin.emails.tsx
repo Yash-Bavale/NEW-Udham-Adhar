@@ -87,7 +87,7 @@ function DashboardTab() {
 
       <Section title="Recent send attempts">
         <div className="mb-2 text-xs text-slate-500">
-          Provider: <span className="font-medium text-emerald-700">Lovable Emails</span> · sender domain <code className="font-mono">notify.businesshelpservices.com</code>
+          Provider: <span className="font-medium text-emerald-700">Zoho Mail (SMTP)</span> · every send is logged in <code className="font-mono">email_send_log</code>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -148,8 +148,12 @@ function SmtpTab() {
     <div className="space-y-4">
       <Section title="Provider">
         <p className="text-sm text-slate-700">
-          Emails are sent via <b>Lovable Emails</b> from <code className="font-mono">notify.businesshelpservices.com</code>.
-          No SMTP credentials are required. To change the verified sender domain, contact support.
+          Emails are now sent via <b>Zoho Mail (SMTP)</b> using the mailbox configured in the
+          <code className="mx-1 font-mono">ZOHO_SMTP_USER</code> secret. Update host / port / credentials in
+          the project secrets (<code className="font-mono">ZOHO_SMTP_HOST</code>,
+          <code className="font-mono"> ZOHO_SMTP_PORT</code>,
+          <code className="font-mono"> ZOHO_SMTP_PASS</code>) — no change is required here.
+          The fields below only control the visible <i>From name</i> and <i>Reply-To</i> on outgoing mail.
         </p>
       </Section>
 
