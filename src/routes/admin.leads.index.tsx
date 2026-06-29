@@ -353,6 +353,14 @@ function LeadsPage() {
                     ? "var(--admin-surface-2)"
                     : stale ? "rgba(251, 191, 36, 0.08)" : undefined;
                   return (
+                    <Fragment key={l.id}>
+                    {showSep && (
+                      <tr>
+                        <td colSpan={12} className="px-4 py-1.5 bg-slate-900 text-white text-[11px] uppercase tracking-wider font-semibold">
+                          {istDayLabel(l.created_at)}
+                        </td>
+                      </tr>
+                    )}
                     <tr
                       key={l.id}
                       onClick={(e) => {
