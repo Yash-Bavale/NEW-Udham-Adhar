@@ -107,15 +107,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [{ rel: "stylesheet", href: appCss }],
     scripts: [
-      {
-        src: "https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM",
-        async: true,
-      },
-      {
-        children:
-          "window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-62JC7PRPMM');",
-      },
+      // GA is loaded lazily on idle from RootComponent to keep the critical
+      // path light (PageSpeed/Core Web Vitals).
     ],
+
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -156,6 +151,30 @@ function RootComponent() {
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
+  // Lazy-load Google Analytics on idle so it doesn't compete with the LCP.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (document.getElementById("ga4-script")) return;
+    const load = () => {
+      if (document.getElementById("ga4-script")) return;
+      const s = document.createElement("script");
+      s.id = "ga4-script";
+      s.async = true;
+      s.src = "https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM";
+      document.head.appendChild(s);
+      const w = window as unknown as { dataLayer?: unknown[] };
+      w.dataLayer = w.dataLayer || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function gtag(...args: any[]) { (w.dataLayer as unknown[]).push(args); }
+      gtag("js", new Date());
+      gtag("config", "G-62JC7PRPMM");
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    if (typeof ric === "function") ric(load);
+    else setTimeout(load, 1500);
+  }, []);
+
 
   return (
     <QueryClientProvider client={queryClient}>
