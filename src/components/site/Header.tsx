@@ -64,8 +64,10 @@ export function Header() {
     setLang(readStoredLang());
   }, []);
 
-  // Bootstrap Google Translate widget once
-  useEffect(() => {
+  // Lazy-bootstrap Google Translate: only when needed (returning user with a
+  // non-English stored language, OR after the user interacts with the picker).
+  // Avoids a ~hundreds-of-KB script on every fresh visit.
+  function ensureTranslateScript() {
     if (typeof window === "undefined") return;
     if (document.getElementById("google-translate-script")) return;
     window.googleTranslateElementInit = () => {
@@ -78,7 +80,6 @@ export function Header() {
         },
         "google_translate_element",
       );
-      // Re-apply stored language after widget mounts
       const stored = readStoredLang();
       if (stored && stored !== "en") {
         const tryApply = (n = 0) => {
@@ -94,7 +95,16 @@ export function Header() {
       "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     s.async = true;
     document.body.appendChild(s);
+  }
+
+  // Only bootstrap on mount if the visitor already has a non-English language
+  // selected from a previous visit.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = readStoredLang();
+    if (stored && stored !== "en") ensureTranslateScript();
   }, []);
+
 
   // Re-apply translation after each SPA route change
   useEffect(() => {
@@ -126,10 +136,13 @@ export function Header() {
       window.location.reload();
       return;
     }
+    // Ensure the translate script is loaded (lazy on first user interaction).
+    ensureTranslateScript();
     if (!applyLang(code)) {
       // Widget not ready yet — full reload picks up the cookie
       window.location.reload();
     }
+
   };
 
   const handleTitleClick = () => {

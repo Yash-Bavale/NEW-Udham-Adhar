@@ -86,6 +86,7 @@ const FACTS: [string, string][] = [
 ];
 
 export const Route = createFileRoute("/")({
+
   head: () => ({
     meta: [
       { title: HOMEPAGE_TITLE },
@@ -94,7 +95,16 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: HOMEPAGE_DESC },
       { property: "og:url", content: "https://udyamadhar.in/" },
     ],
-    links: [{ rel: "canonical", href: "https://udyamadhar.in/" }],
+    links: [
+      { rel: "canonical", href: "https://udyamadhar.in/" },
+      // Preload the LCP image so the browser fetches it before React mounts.
+      {
+        rel: "preload",
+        as: "image",
+        href: certImg.url,
+        fetchpriority: "high",
+      },
+    ],
     scripts: [
       jsonLdScript(orgSchema()),
       jsonLdScript(faqSchema(FAQS)),
@@ -114,6 +124,7 @@ export const Route = createFileRoute("/")({
   }),
   component: HomePage,
 });
+
 
 function HomePage() {
   useEffect(() => {
@@ -142,10 +153,13 @@ function HomePage() {
             <img
               src={certImg.url}
               alt="Sample Udyam Certificate"
+              width={1200}
+              height={849}
               className="w-full h-auto rounded-md border border-border"
               loading="eager"
               fetchPriority="high"
             />
+
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Note: Sample Udyam Certificate shown for reference purposes only.
             </p>
