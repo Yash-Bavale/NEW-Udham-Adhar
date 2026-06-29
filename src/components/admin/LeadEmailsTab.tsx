@@ -79,8 +79,16 @@ export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadSer
 
   if (isLoading) return <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
-  const history = [...(data?.logs || []), ...(data?.queue || [])].sort(
-    (a, b) => new Date(b.created_at || b.sent_at || 0).getTime() - new Date(a.created_at || a.sent_at || 0).getTime()
+  // Dedupe: every successful send creates a row in BOTH email_queue and email_logs.
+  // Prefer the email_logs row (it has the final sent status); key by queue_id when present.
+  const dedupMap = new Map<string, any>();
+  for (const q of (data?.queue || [])) dedupMap.set(`q:${q.id}`, q);
+  for (const l of (data?.logs || [])) {
+    const key = l.queue_id ? `q:${l.queue_id}` : `l:${l.id}`;
+    dedupMap.set(key, l);
+  }
+  const history = Array.from(dedupMap.values()).sort(
+    (a: any, b: any) => new Date(b.sent_at || b.created_at || 0).getTime() - new Date(a.sent_at || a.created_at || 0).getTime()
   );
 
   return (

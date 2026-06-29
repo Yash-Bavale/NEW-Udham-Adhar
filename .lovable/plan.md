@@ -1,49 +1,63 @@
-
 ## Goal
 
-Pass Core Web Vitals on mobile for `/` (and all marketing routes). Current: LCP 5.1s, FCP 5.1s, TTFB 4.2s. Target: TTFB <0.8s, LCP <2.5s.
+Fix three issues in the admin order workspace:
 
-## Root causes found in code
+1. Show customer **State** and **Language** on every order detail
+2. Stop the Email History from showing the same email twice
+3. Fix empty-variable templates (specifically the "Send Form Link" email — the link is rendered as empty text because variable names don't match)
 
-1. **TTFB 4.2s** — every request is SSR'd by the Cloudflare Worker. The homepage SSR pulls in the Footer, which calls `useServerFn(listPublicSeoPages)` on mount (no impact on SSR HTML itself but adds JS payload). More importantly, no prerender is configured, so each visit re-renders.
-2. **LCP image not preloaded** — `udyam-sample-certificate.webp` (~130 KB, remote `/__l5e/...` URL) is the LCP candidate. It has `fetchPriority="high"` on the `<img>`, but the browser discovers it only after the React tree mounts. No `<link rel="preload">` in the route head.
-3. **Render-blocking 3rd party JS** — `translate.google.com/translate_a/element.js` is appended to `<body>` in `Header`'s `useEffect`, but it's heavy (~hundreds of KB) and runs on every page load even when the user never opens the language dropdown. GA `gtag.js` also fires immediately.
-4. **Footer fetch on mount** — every page (including `/`) calls `listPublicSeoPages` server fn at mount, just to populate the gated SEO tree that only renders after a password unlock.
+---
 
-## Fix plan
+## 1) Show State & Language
 
-### 1. Preload the LCP image (biggest single LCP win)
-- In `src/routes/index.tsx` `head().links`, add:
-  - `{ rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" }`
-- Keep the existing `loading="eager" fetchPriority="high"` on the `<img>`.
+**File:** `src/components/admin/workspace/CustomerProfileCard.tsx`
 
-### 2. Prerender marketing routes (TTFB win)
-- Add `prerender: { enabled: true }` to the `Route` config of static marketing pages so they're served as static HTML from the edge:
-  - `/`, `/about-us`, `/about`, `/contact`, `/faqs`, all `wp/*` SEO landing routes, all legal pages (`/privacy-policy`, `/terms-conditions`, `/disclaimer`, …), and all `seo-*` landing slugs that render from a `?raw` HTML import.
-- Skip prerender for any route that needs per-request data (`/admin/*`, `/processing/$leadCode`, payment flows). Verify by checking each route's `loader`.
+- Split current  State" into rows: **State** (so State is always prominent even when city is missing).
+- Add a **Language** field reading `customer.language ?? lead.language ?? "English"` with a `Languages` icon.
+- Show both with a clear label so support knows what language to communicate in.
 
-### 3. Lazy-load Google Translate
-- In `src/components/site/Header.tsx`, remove the auto-bootstrap `useEffect` that injects `translate.google.com/element.js` on mount.
-- Inject the script only when the user opens the language `<select>` for the first time (e.g. `onFocus` / `onPointerDown` handler), or if `readStoredLang()` is non-English on hydration (so previously translated users still see translation). Most visitors will never trigger it.
+No data-layer changes needed — `customers.language` already exists.
 
-### 4. Defer GA `gtag.js` to idle
-- In `src/routes/__root.tsx`, keep GA but move it out of `head().scripts`. Add a tiny `useEffect` in `RootComponent` that, on `requestIdleCallback` (fallback `setTimeout(..., 1500)`), creates the gtag `<script>` and runs the inline init. This removes ~40 KB from the critical path while keeping analytics.
+---
 
-### 5. Defer Footer SEO-pages fetch
-- In `src/components/site/Footer.tsx`, only call `loadSeoPages()` after the user expands the SEO tree (i.e. after `unlocked` becomes true). Until then, render nothing under the gate. Removes one server-fn round-trip from every page load.
+## 2) Email History double-row fix
 
-### 6. Quick wins on the same pass
-- Add `rel="preconnect"` for `https://www.googletagmanager.com` only when GA is about to load (skip if we lazy-load GA).
-- Verify the homepage `<img>` has explicit `width` / `height` attributes (avoid CLS during preload). The cert image currently has `w-full h-auto` only — add intrinsic `width={1200} height={849}` (or correct ratio) so the browser reserves space.
+**File:** `src/components/admin/LeadEmailsTab.tsx`
 
-## Out of scope (do not touch this turn)
+Today the list merges `email_queue` rows AND `email_logs` rows. Every successful send produces one row in each → duplicates.
 
-- CRM/admin code, design tokens, copy, content, business logic.
-- Any data model or migration changes.
+Fix: deduplicate the merged history. Prefer the `email_logs` row when a matching `queue_id` exists; otherwise keep the `email_queue` row. Use a `Map` keyed by `queue_id || id`, with logs overwriting queue rows.
 
-## Verification
+This removes the visual duplicate without losing the queued/failed rows that don't yet have a log entry.
 
-After deploy, re-run PageSpeed on `https://udyamadhar.in/` (mobile). Expect:
-- TTFB drops from 4.2s → <0.8s (prerendered HTML served from edge).
-- LCP drops to <2.5s (preloaded image + no render-blocking GTranslate).
-- FCP tracks LCP improvement.
+---
+
+## 3) "Send Form Link" email has no link
+
+**Root cause:** `resendFormLink` in `src/lib/crm/submissions-admin.functions.ts` passes camelCase variables (`name`, `service`, `formLink`) but the `welcome_and_form_link` template uses snake_case placeholders (`{{customer_name}}`, `{{service_name}}`, `{{form_link}}`). `renderTemplate` replaces unknown vars with empty strings → the `<a href="">` link disappears and only static text is sent.
+
+**Fix:** in `resendFormLink`, pass both snake_case keys (matching the template) and keep camelCase as aliases for safety:
+
+```ts
+{
+  customer_name: lead.name ?? "",
+  service_name: lead.service ?? "",
+  form_link: formLink,
+  order_number: lead.lead_code ?? "",
+  // legacy aliases
+  name: lead.name ?? "", service: lead.service ?? "", formLink, leadCode: lead.lead_code ?? "",
+}
+```
+
+Also audit the other camelCase-only call sites against snake_case templates and fix the same way:
+
+- `emails-admin.functions.ts` `sendLeadEmail` → ensure both `customer_name`/`customerName`, `order_number`/`orderNumber`, `form_link`/`formLink` are provided in `finalVars` defaults so any template renders.
+- Add a small `withBothCases(vars)` helper in `emails.server.ts` that auto-mirrors snake↔camel keys before render, so future mismatches don't drop variables silently. Wire it into `enqueueFromTemplateInternal` before `renderTemplate`.
+
+---
+
+## Out of scope
+
+- No DB schema or template edits (templates already correct snake_case).
+- No changes to the email send pipeline / SMTP layer.
+- No UI changes outside the Customer profile card and Emails tab list.

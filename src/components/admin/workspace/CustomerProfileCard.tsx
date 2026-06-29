@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Phone, Mail, MessageCircle, User2, ExternalLink, Calendar, Tag, MapPin } from "lucide-react";
+import { Phone, Mail, MessageCircle, User2, ExternalLink, Calendar, Tag, MapPin, Languages } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 interface Props {
@@ -18,11 +18,16 @@ export function CustomerProfileCard({ customer, lead }: Props) {
   const waPhone = mobile ? String(mobile).replace(/\D/g, "") : "";
   const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
 
+  const langCode = (customer?.language ?? lead?.language ?? "en") as string;
+  const langLabel = ({ en: "English", hi: "हिन्दी (Hindi)", mr: "मराठी (Marathi)", gu: "ગુજરાતી (Gujarati)", ta: "தமிழ் (Tamil)", te: "తెలుగు (Telugu)", kn: "ಕನ್ನಡ (Kannada)", ml: "മലയാളം (Malayalam)", bn: "বাংলা (Bengali)", pa: "ਪੰਜਾਬੀ (Punjabi)", or: "ଓଡ଼ିଆ (Odia)", ur: "اردو (Urdu)" } as Record<string, string>)[langCode] ?? langCode;
+
   const fields: Array<{ k: string; v: any; icon?: any }> = [
     { k: "Service", v: lead?.service, icon: Tag },
     { k: "Lead Code", v: lead?.lead_code },
     { k: "Source", v: lead?.lead_source ?? lead?.source },
-    { k: "City / State", v: [lead?.city, lead?.state].filter(Boolean).join(", "), icon: MapPin },
+    { k: "State", v: lead?.state ?? customer?.state, icon: MapPin },
+    { k: "City", v: lead?.city },
+    { k: "Preferred Language", v: langLabel, icon: Languages },
     { k: "Created", v: lead?.created_at ? formatIST(lead.created_at) : null, icon: Calendar },
     { k: "Lead Status", v: lead?.lead_status_v2 ?? lead?.status },
     { k: "Repeats", v: lead?.repeat_count ? `×${lead.repeat_count}` : null },
