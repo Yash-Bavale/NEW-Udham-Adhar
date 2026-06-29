@@ -391,6 +391,9 @@ async function sendQueueRow(row: QueueRow) {
 // (immediate-send already covers the happy path).
 
 export async function processQueueInternal(limit = 20) {
+  // First, rescue any rows stuck in `sending` so they re-enter the rotation.
+  await recoverStuckSendingRows(15);
+
   const { data: rows, error } = await supabaseAdmin
     .from("email_queue")
     .select("id")
