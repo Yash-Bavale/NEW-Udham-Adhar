@@ -402,7 +402,14 @@ function NotificationsBell() {
   }, []);
   const { data } = useQuery<{ count: number }>({
     queryKey: ["notifications", "unread-count"],
-    queryFn: () => fetchCount(),
+    queryFn: async () => {
+      try {
+        return await fetchCount();
+      } catch {
+        // Swallow transient 401s during sign-in/out so the bell doesn't blank the page.
+        return { count: 0 };
+      }
+    },
     refetchInterval: 60_000,
     enabled: hasSession,
     retry: false,
