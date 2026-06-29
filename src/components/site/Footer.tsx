@@ -112,7 +112,7 @@ export function Footer() {
           <h4 className="text-2xl font-bold font-display leading-tight">
             MSME / Udyog Aadhaar
           </h4>
-          <SeoTree pages={pages} loading={loading} loadError={loadError} />
+          <SeoTree pages={pages} loading={loading} loadError={loadError} onUnlock={fetchPagesIfNeeded} />
         </div>
 
         {/* Col 3: Useful Links */}
@@ -179,11 +179,14 @@ function SeoTree({
   pages,
   loading,
   loadError,
+  onUnlock,
 }: {
   pages: SeoPageRow[] | null;
   loading: boolean;
   loadError: boolean;
+  onUnlock: () => void;
 }) {
+
   const expandedAll = () =>
     Object.fromEntries(CATEGORIES.filter((c) => !c.isHome).map((c) => [c.key, true]));
   const [mounted, setMounted] = useState(false);
@@ -200,9 +203,12 @@ function SeoTree({
       if (window.sessionStorage.getItem("udyam_footer_unlock") === "1") {
         setUnlocked(true);
         setExpanded(expandedAll());
+        onUnlock();
       }
     } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
 
   const grouped = useMemo(() => {
