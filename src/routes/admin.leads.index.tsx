@@ -342,7 +342,10 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((l: any) => {
+                {rows.map((l: any, idx: number) => {
+                  const dKey = istDateKey(l.created_at);
+                  const prevKey = idx > 0 ? istDateKey((rows as any[])[idx - 1].created_at) : "";
+                  const showSep = dKey && dKey !== prevKey;
                   const checked = selected.has(l.id);
                   const ageMs = Date.now() - new Date(l.created_at).getTime();
                   const stale = !l.assigned_to && ageMs > 24 * 60 * 60 * 1000;
