@@ -81,7 +81,9 @@ export function Footer() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  // Only fetch the (heavy) SEO page list once the gated SEO tree is unlocked.
+  // Avoids one server-fn round-trip on every page load for every visitor.
+  const fetchPagesIfNeeded = () => {
     if (pages !== null || loading) return;
     setLoading(true);
     setLoadError(false);
@@ -92,7 +94,8 @@ export function Footer() {
         setPages([]);
       })
       .finally(() => setLoading(false));
-  }, [loadSeoPages, loading, pages]);
+  };
+
 
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
