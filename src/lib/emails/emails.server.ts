@@ -112,7 +112,7 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   variables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[] },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean },
 ) {
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
@@ -121,7 +121,12 @@ export async function enqueueFromTemplateInternal(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!tpl) throw new Error(`Email template '${code}' not found.`);
-  if (!tpl.is_enabled) return;
+  if (!tpl.is_enabled) {
+    if (opts?.requireImmediateSuccess) {
+      throw new Error(`Email template '${code}' is disabled — email was not sent.`);
+    }
+    return;
+  }
 
   return enqueueEmailInternal({
     templateCode: code,
@@ -135,7 +140,29 @@ export async function enqueueFromTemplateInternal(
     applicationId: opts?.applicationId ?? null,
     delaySeconds: opts?.delaySeconds,
     attachments: opts?.attachments,
+    requireImmediateSuccess: opts?.requireImmediateSuccess,
   });
+}
+
+/**
+ * Recover rows stranded in `status='sending'` (e.g. transport crashed mid-send,
+ * or an old run hit a 4xx that wasn't reclassified). Flips them back to
+ * `queued` with cleared `next_attempt_at` so the batch processor picks them up.
+ */
+export async function recoverStuckSendingRows(olderThanMinutes = 15) {
+  const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("email_queue")
+    .update({ status: "queued", next_attempt_at: new Date().toISOString(), last_error: "auto-recovered from stuck sending" } as never)
+    .eq("status", "sending")
+    .is("sent_at", null)
+    .lt("created_at", cutoff)
+    .select("id");
+  if (error) {
+    console.error("[emails] recoverStuckSendingRows failed", error);
+    return { recovered: 0 };
+  }
+  return { recovered: data?.length ?? 0 };
 }
 
 
@@ -364,6 +391,9 @@ async function sendQueueRow(row: QueueRow) {
 // (immediate-send already covers the happy path).
 
 export async function processQueueInternal(limit = 20) {
+  // First, rescue any rows stuck in `sending` so they re-enter the rotation.
+  await recoverStuckSendingRows(15);
+
   const { data: rows, error } = await supabaseAdmin
     .from("email_queue")
     .select("id")

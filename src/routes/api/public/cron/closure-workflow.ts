@@ -65,6 +65,39 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
         let advanced = 0;
         let failed = 0;
 
+        const writeAudit = async (
+          app: any,
+          fromStage: string,
+          toStage: string,
+          templateCode: string,
+          extra?: Record<string, unknown>,
+        ) => {
+          await Promise.all([
+            supabaseAdmin.from("activity_logs").insert({
+              lead_id: app.lead_id,
+              application_id: app.id,
+              user_id: null,
+              activity_type: "cancellation_auto_advanced",
+              activity_description: `Cancellation workflow auto-advanced: ${fromStage} → ${toStage} (email: ${templateCode})`,
+            } as never),
+            supabaseAdmin.from("workflow_events").insert({
+              application_id: app.id,
+              lead_id: app.lead_id,
+              event_type: "closure_auto_advanced",
+              title: `Cancellation workflow: ${fromStage} → ${toStage}`,
+              description: `Auto-advanced by 24h timer. Email '${templateCode}' delivered.`,
+              customer_visible: true,
+              is_system: true,
+              metadata: {
+                from_stage: fromStage,
+                to_stage: toStage,
+                template_code: templateCode,
+                ...(extra ?? {}),
+              },
+            } as never),
+          ]);
+        };
+
         for (const app of due ?? []) {
           try {
             const { data: lead } = await supabaseAdmin
@@ -96,15 +129,28 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
               }),
             };
 
-            if (app.closure_stage === "request_received") {
-              if (lead?.email) {
-                await enqueueFromTemplateInternal(
-                  "cancel-closure-confirmation",
-                  lead.email,
-                  baseVars,
-                  { toName: lead.name ?? undefined, leadId: app.lead_id },
+            const fromStage = String(app.closure_stage);
+
+            if (fromStage === "request_received") {
+              if (!lead?.email) {
+                console.error(
+                  "[closure-workflow] no email on lead — skipping",
+                  { applicationId: app.id },
                 );
+                failed++;
+                continue;
               }
+              await enqueueFromTemplateInternal(
+                "cancel-closure-confirmation",
+                lead.email,
+                baseVars,
+                {
+                  toName: lead.name ?? undefined,
+                  leadId: app.lead_id,
+                  applicationId: app.id,
+                  requireImmediateSuccess: true,
+                },
+              );
               await supabaseAdmin
                 .from("applications")
                 .update({
@@ -114,16 +160,24 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
                   fulfillment_status: "cancelled",
                 } as never)
                 .eq("id", app.id);
+              await writeAudit(app, fromStage, "closed", "cancel-closure-confirmation", {
+                application_status: "cancelled",
+                fulfillment_status: "cancelled",
+              });
               advanced++;
-            } else if (app.closure_stage === "concern_reply_sent") {
-              if (lead?.email) {
-                await enqueueFromTemplateInternal(
-                  "cancel-ticket-closed",
-                  lead.email,
-                  baseVars,
-                  { toName: lead.name ?? undefined, leadId: app.lead_id },
-                );
-              }
+            } else if (fromStage === "concern_reply_sent") {
+              if (!lead?.email) { failed++; continue; }
+              await enqueueFromTemplateInternal(
+                "cancel-ticket-closed",
+                lead.email,
+                baseVars,
+                {
+                  toName: lead.name ?? undefined,
+                  leadId: app.lead_id,
+                  applicationId: app.id,
+                  requireImmediateSuccess: true,
+                },
+              );
               await supabaseAdmin
                 .from("applications")
                 .update({
@@ -131,16 +185,21 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
                   closure_next_at: null,
                 } as never)
                 .eq("id", app.id);
+              await writeAudit(app, fromStage, "final_ticket_closed", "cancel-ticket-closed");
               advanced++;
-            } else if (app.closure_stage === "refund_reviewed") {
-              if (lead?.email) {
-                await enqueueFromTemplateInternal(
-                  "cancel-ticket-closed-final",
-                  lead.email,
-                  baseVars,
-                  { toName: lead.name ?? undefined, leadId: app.lead_id },
-                );
-              }
+            } else if (fromStage === "refund_reviewed") {
+              if (!lead?.email) { failed++; continue; }
+              await enqueueFromTemplateInternal(
+                "cancel-ticket-closed-final",
+                lead.email,
+                baseVars,
+                {
+                  toName: lead.name ?? undefined,
+                  leadId: app.lead_id,
+                  applicationId: app.id,
+                  requireImmediateSuccess: true,
+                },
+              );
               await supabaseAdmin
                 .from("applications")
                 .update({
@@ -148,12 +207,15 @@ export const Route = createFileRoute("/api/public/cron/closure-workflow")({
                   closure_next_at: null,
                 } as never)
                 .eq("id", app.id);
+              await writeAudit(app, fromStage, "closed", "cancel-ticket-closed-final");
               advanced++;
             }
           } catch (e) {
             console.error("[closure-workflow] failed", {
               applicationId: app.id,
-              e,
+              applicationCode: (app as any).application_code,
+              stage: app.closure_stage,
+              error: e instanceof Error ? e.message : String(e),
             });
             failed++;
           }

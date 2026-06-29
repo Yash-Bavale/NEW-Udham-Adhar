@@ -125,6 +125,40 @@ export const requestCancellation = createServerFn({ method: "POST" })
       .maybeSingle();
     const reasonBlock = (rr?.description as string) || (rr?.label as string) || data.reasonText || "";
 
+    // ─ Send Step 1 FIRST. Only advance closure_stage if delivery succeeded;
+    //   otherwise the workflow silently starts with no email to the customer.
+    if (!lead?.email) {
+      throw new Error("Customer has no email on file — cannot start cancellation workflow.");
+    }
+    try {
+      await enqueueFromTemplateInternal(
+        "cancel-action-required",
+        lead.email,
+        {
+          customer_name: lead.name ?? "",
+          order_number: app.application_code ?? "",
+          service_name: lead.service ?? "",
+          reason_block: reasonBlock,
+        },
+        {
+          toName: lead.name ?? undefined,
+          leadId: app.lead_id ?? undefined,
+          applicationId: app.id,
+          requireImmediateSuccess: true,
+        },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown send error";
+      await logActivity(
+        app.id,
+        app.lead_id,
+        context.userId,
+        "cancellation_step1_failed",
+        `Step 1 email failed — cancellation NOT started (${msg})`,
+      );
+      throw new Error(`Step 1 email failed to send: ${msg}. Cancellation workflow was not started.`);
+    }
+
     const { error: updErr } = await supabaseAdmin
       .from("applications")
       .update({
@@ -142,26 +176,24 @@ export const requestCancellation = createServerFn({ method: "POST" })
       app.lead_id,
       context.userId,
       "cancellation_requested",
-      `Cancellation requested (${data.reasonCode})${data.reasonText ? `: ${data.reasonText}` : ""}`,
+      `Cancellation requested (${data.reasonCode})${data.reasonText ? `: ${data.reasonText}` : ""} — Step 1 email sent`,
     );
 
-    if (lead?.email) {
-      try {
-        await enqueueFromTemplateInternal(
-          "cancel-action-required",
-          lead.email,
-          {
-            customer_name: lead.name ?? "",
-            order_number: app.application_code ?? "",
-            service_name: lead.service ?? "",
-            reason_block: reasonBlock,
-          },
-          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined },
-        );
-      } catch (e) {
-        console.error("[cancellation] step1 email failed", e);
-      }
-    }
+    await supabaseAdmin.from("workflow_events").insert({
+      application_id: app.id,
+      lead_id: app.lead_id,
+      event_type: "cancellation_step1_sent",
+      title: "Cancellation requested — Step 1 email sent",
+      description: `Reason: ${rr?.label ?? data.reasonCode}. Order will auto-close in ${waitHours}h unless reverted.`,
+      customer_visible: true,
+      actor_id: context.userId,
+      is_system: false,
+      metadata: {
+        reason_code: data.reasonCode,
+        template_code: "cancel-action-required",
+        next_stage_at: hoursFromNow(waitHours),
+      },
+    } as never);
 
     return { ok: true, closureNextAt: hoursFromNow(waitHours) };
   });
