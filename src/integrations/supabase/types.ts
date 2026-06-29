@@ -253,7 +253,9 @@ export type Database = {
         Row: {
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
+          assigned_at: string | null
           assigned_to: string | null
+          auto_assigned: boolean
           cancellation_requested_at: string | null
           certificate_number: string | null
           certificate_uploaded_at: string | null
@@ -293,7 +295,9 @@ export type Database = {
         Insert: {
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
+          assigned_at?: string | null
           assigned_to?: string | null
+          auto_assigned?: boolean
           cancellation_requested_at?: string | null
           certificate_number?: string | null
           certificate_uploaded_at?: string | null
@@ -335,7 +339,9 @@ export type Database = {
         Update: {
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
+          assigned_at?: string | null
           assigned_to?: string | null
+          auto_assigned?: boolean
           cancellation_requested_at?: string | null
           certificate_number?: string | null
           certificate_uploaded_at?: string | null

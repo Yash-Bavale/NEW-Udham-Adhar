@@ -28,6 +28,34 @@ export function formatIST(
   });
 }
 
+/** Returns YYYY-MM-DD in IST for grouping rows by day. */
+export function istDateKey(value: string | number | Date | null | undefined): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** Human label for an IST date key: "Today", "Yesterday", or e.g. "Mon, 29 Jun 2026". */
+export function istDayLabel(value: string | number | Date | null | undefined): string {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const key = istDateKey(d);
+  const todayKey = istDateKey(new Date());
+  const yKey = istDateKey(new Date(Date.now() - 86400000));
+  const base = d.toLocaleDateString("en-IN", {
+    timeZone: IST, weekday: "short", day: "2-digit", month: "short", year: "numeric",
+  });
+  if (key === todayKey) return `${base} · Today`;
+  if (key === yKey) return `${base} · Yesterday`;
+  return base;
+}
+
 export function relativeIST(value: string | number | Date | null | undefined): string {
   if (!value) return "—";
   const d = value instanceof Date ? value : new Date(value);

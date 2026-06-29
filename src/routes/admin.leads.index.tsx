@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar, Users as UsersIcon } from "lucide-react";
-import { formatIST } from "@/lib/datetime";
+import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead,
@@ -342,7 +342,10 @@ function LeadsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((l: any) => {
+                {rows.map((l: any, idx: number) => {
+                  const dKey = istDateKey(l.created_at);
+                  const prevKey = idx > 0 ? istDateKey((rows as any[])[idx - 1].created_at) : "";
+                  const showSep = dKey && dKey !== prevKey;
                   const checked = selected.has(l.id);
                   const ageMs = Date.now() - new Date(l.created_at).getTime();
                   const stale = !l.assigned_to && ageMs > 24 * 60 * 60 * 1000;
@@ -350,6 +353,14 @@ function LeadsPage() {
                     ? "var(--admin-surface-2)"
                     : stale ? "rgba(251, 191, 36, 0.08)" : undefined;
                   return (
+                    <Fragment key={l.id}>
+                    {showSep && (
+                      <tr>
+                        <td colSpan={12} className="px-4 py-1.5 bg-slate-900 text-white text-[11px] uppercase tracking-wider font-semibold">
+                          {istDayLabel(l.created_at)}
+                        </td>
+                      </tr>
+                    )}
                     <tr
                       key={l.id}
                       onClick={(e) => {
@@ -421,6 +432,7 @@ function LeadsPage() {
                         </Link>
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 })}
                 {rows.length === 0 && (
