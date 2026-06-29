@@ -86,9 +86,7 @@ const FACTS: [string, string][] = [
 ];
 
 export const Route = createFileRoute("/")({
-  // Prerender the homepage at build time → static HTML served from edge,
-  // eliminating per-request SSR latency (TTFB win).
-  prerender: { enabled: true },
+
   head: () => ({
     meta: [
       { title: HOMEPAGE_TITLE },
