@@ -284,6 +284,8 @@ function SeoTree({
       setShowPwd(false);
       setPwd("");
       setPwdError(false);
+      onUnlock();
+
     } else {
       setPwdError(true);
       setPwd("");
