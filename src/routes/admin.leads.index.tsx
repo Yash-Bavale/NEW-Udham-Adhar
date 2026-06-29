@@ -432,6 +432,7 @@ function LeadsPage() {
                         </Link>
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 })}
                 {rows.length === 0 && (
