@@ -392,9 +392,15 @@ export const resendFormLink = createServerFn({ method: "POST" })
       "welcome_and_form_link",
       lead.email,
       {
-        name: lead.name ?? "",
+        // snake_case keys match the welcome_and_form_link template placeholders
+        customer_name: lead.name ?? "Customer",
+        service_name: lead.service ?? "your service",
+        form_link: formLink,
+        order_number: lead.lead_code ?? "",
+        // legacy camelCase aliases kept for older templates
+        name: lead.name ?? "Customer",
         leadCode: lead.lead_code ?? "",
-        service: lead.service ?? "",
+        service: lead.service ?? "your service",
         formLink,
         mobile: lead.mobile ?? "",
       },
