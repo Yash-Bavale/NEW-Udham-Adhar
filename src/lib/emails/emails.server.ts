@@ -107,13 +107,36 @@ export async function enqueueEmailInternal(input: {
 }
 
 
+/**
+ * Mirror snake_case ↔ camelCase keys so templates render no matter which
+ * convention the caller passed. Existing keys win; we only add aliases when
+ * the alias slot is empty/undefined.
+ */
+function withBothCases(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  const toCamel = (k: string) => k.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
+  const toSnake = (k: string) => k.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+  for (const [k, v] of Object.entries(input)) {
+    if (v === undefined || v === null || v === "") continue;
+    if (k.includes("_")) {
+      const camel = toCamel(k);
+      if (out[camel] === undefined || out[camel] === null || out[camel] === "") out[camel] = v;
+    } else if (/[A-Z]/.test(k)) {
+      const snake = toSnake(k);
+      if (out[snake] === undefined || out[snake] === null || out[snake] === "") out[snake] = v;
+    }
+  }
+  return out;
+}
+
 /** Enqueue using a template code; pulls subject/body from email_templates. */
 export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
-  variables: Record<string, unknown>,
+  rawVariables: Record<string, unknown>,
   opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean },
 ) {
+  const variables = withBothCases(rawVariables);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled")
