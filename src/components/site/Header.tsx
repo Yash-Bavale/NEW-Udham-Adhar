@@ -136,10 +136,13 @@ export function Header() {
       window.location.reload();
       return;
     }
+    // Ensure the translate script is loaded (lazy on first user interaction).
+    ensureTranslateScript();
     if (!applyLang(code)) {
       // Widget not ready yet — full reload picks up the cookie
       window.location.reload();
     }
+
   };
 
   const handleTitleClick = () => {
