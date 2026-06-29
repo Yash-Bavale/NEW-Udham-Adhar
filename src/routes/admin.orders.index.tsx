@@ -200,40 +200,55 @@ function OrdersListPage() {
               {!isLoading && rows.length === 0 && (
                 <tr><td colSpan={10} className="text-center py-10 text-slate-500 italic">No orders match.</td></tr>
               )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t hover:bg-slate-50/60 transition-colors">
-                  <td className="px-3 py-2 font-mono text-xs text-slate-700">{r.application_code}</td>
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-slate-800">{r.customer_name}</div>
-                    {r.customer_mobile && <div className="text-[10px] text-slate-500">{r.customer_mobile}</div>}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700 text-xs">{r.service_name ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    {(r as any).stage ? (
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_BADGE_CLASS[(r as any).stage as OrderStage]}`}>
-                        {STAGE_META[(r as any).stage as OrderStage].label}
+              {rows.map((r, idx) => {
+                const dKey = istDateKey(r.created_at);
+                const prevKey = idx > 0 ? istDateKey((rows as any[])[idx - 1].created_at) : "";
+                const showSep = dKey && dKey !== prevKey;
+                const sepCols = hideMoney ? 8 : 10;
+                return (
+                <Fragment key={r.id}>
+                  {showSep && (
+                    <tr>
+                      <td colSpan={sepCols} className="px-3 py-1.5 bg-slate-900 text-white text-[11px] uppercase tracking-wider font-semibold">
+                        {istDayLabel(r.created_at)}
+                      </td>
+                    </tr>
+                  )}
+                  <tr className="border-t hover:bg-slate-50/60 transition-colors">
+                    <td className="px-3 py-2 font-mono text-xs text-slate-700">{r.application_code}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-slate-800">{r.customer_name}</div>
+                      {r.customer_mobile && <div className="text-[10px] text-slate-500">{r.customer_mobile}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700 text-xs">{r.service_name ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      {(r as any).stage ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STAGE_BADGE_CLASS[(r as any).stage as OrderStage]}`}>
+                          {STAGE_META[(r as any).stage as OrderStage].label}
+                        </span>
+                      ) : <span className="text-slate-400 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${FULFILLMENT_BADGE[r.fulfillment_status]}`}>
+                        {FULFILLMENT_LABEL[r.fulfillment_status]}
                       </span>
-                    ) : <span className="text-slate-400 text-xs">—</span>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${FULFILLMENT_BADGE[r.fulfillment_status]}`}>
-                      {FULFILLMENT_LABEL[r.fulfillment_status]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
-                  {!hideMoney && <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>}
-                  {!hideMoney && <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{r.payment_status}</Badge></td>}
-                  <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
-                    <div>{formatIST(r.created_at, { dateOnly: true })}</div>
-                    <div className="text-[10px] text-slate-400">{formatIST(r.created_at, { timeOnly: true })} IST</div>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Link to="/admin/orders/$orderId" params={{ orderId: r.id }} className="text-blue-600 hover:underline text-xs inline-flex items-center gap-1">
-                      <Eye className="size-3" /> View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700 text-xs">{r.assigned_name ?? <span className="text-slate-400">Unassigned</span>}</td>
+                    {!hideMoney && <td className="px-3 py-2 text-right font-medium">₹{r.total_amount.toLocaleString("en-IN")}</td>}
+                    {!hideMoney && <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{r.payment_status}</Badge></td>}
+                    <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
+                      <div>{formatIST(r.created_at, { dateOnly: true })}</div>
+                      <div className="text-[10px] text-slate-400">{formatIST(r.created_at, { timeOnly: true })} IST</div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Link to="/admin/orders/$orderId" params={{ orderId: r.id }} className="text-blue-600 hover:underline text-xs inline-flex items-center gap-1">
+                        <Eye className="size-3" /> View
+                      </Link>
+                    </td>
+                  </tr>
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
