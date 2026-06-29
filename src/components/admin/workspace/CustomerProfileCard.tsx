@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Phone, Mail, MessageCircle, User2, ExternalLink, Calendar, Tag, MapPin } from "lucide-react";
+import { Phone, Mail, MessageCircle, User2, ExternalLink, Calendar, Tag, MapPin, Languages } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 interface Props {
