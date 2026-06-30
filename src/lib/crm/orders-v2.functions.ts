@@ -717,7 +717,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
         templateCode: "certificate_delivery",
         toEmail: recipientEmail,
         toName: recipientName,
-        subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
+        subject: `Your Order No. ${app?.application_code ?? ""} has been completed`,
         bodyHtml: buildCertificateEmailHtml({
           recipientName,
           serviceName,
