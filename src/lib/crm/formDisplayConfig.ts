@@ -4,6 +4,8 @@
 // `path` is a JSON-pointer-style dot path into the submission `payload`.
 // Use `mask: "aadhaar"` / `mask: "account"` to gate sensitive values behind a Reveal action.
 
+import { formatDateDMY } from "@/lib/datetime";
+
 export type FieldMask = "aadhaar" | "account" | "pan";
 
 export interface FieldDef {
