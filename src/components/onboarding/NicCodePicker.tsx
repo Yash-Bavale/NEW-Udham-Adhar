@@ -130,10 +130,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
               </div>
             )}
             {trimmed.map((r) => {
-              const display =
-                digits === 2 ? r.division ?? r.code.slice(0, 2)
-                : digits === 4 ? r.group_code ?? r.code.slice(0, 4)
-                : r.code;
+              const display = codeFor(r);
               const selected = value.startsWith(`${display} `);
               return (
                 <button
