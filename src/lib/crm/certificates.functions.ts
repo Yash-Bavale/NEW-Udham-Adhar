@@ -166,22 +166,46 @@ export const deliverCertificate = createServerFn({ method: "POST" })
         console.warn("[certificate.deliver] attachment skipped: download failed", e);
       }
 
-      const subject = `Your Udyam Certificate is ready — Order ${app?.application_code ?? ""}`;
-      const html = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px">
-          <h2 style="color:#0f3460">Your certificate is ready</h2>
-          <p>Dear ${lead.name},</p>
-          <p>Your Udyam Registration certificate has been issued and is ready to download.</p>
-          <p>The certificate is also attached to this email as a file.</p>
-          <p style="text-align:center;margin:32px 0">
-            <a href="${signed.signedUrl}" style="background:#0f3460;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600">
-              Download Certificate
-            </a>
-          </p>
-          <p style="font-size:12px;color:#666">Link valid for 7 days. Save the file locally for future reference.</p>
-          <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-          <p style="font-size:12px;color:#999">Order: ${app?.application_code ?? "—"}</p>
-        </div>`;
+      const orderId = (app?.application_code ?? "").toString();
+      const customerName = (lead.name ?? "Customer").toString();
+      const esc = (s: string) => s
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      const subject = `Your Order No. ${orderId} has been completed`;
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Order Completed</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.08)">
+        <tr><td style="background:#0f3460;color:#ffffff;padding:22px 32px;font-size:20px;font-weight:700">Order Completed</td></tr>
+        <tr><td style="padding:24px 32px 8px 32px;font-size:14px;line-height:1.65">
+          <p style="margin:0 0 12px 0">Dear ${esc(customerName)},</p>
+          <p style="margin:0 0 12px 0">Greetings from Business Help Services.</p>
+          <p style="margin:0 0 12px 0">We are pleased to inform you that your <strong>Order/Application No. ${esc(orderId)}</strong> for UDYAM-related consultancy and assistance services has been processed/completed.</p>
+          <p style="margin:0 0 12px 0">Please find the relevant document/certificate attached to this email for your reference and records.</p>
+          <p style="margin:0 0 12px 0">Kindly review the attached document carefully and contact us through written communication in case any clarification or assistance is required.</p>
+          <p style="margin:0 0 6px 0">For any support regarding this order, please contact:</p>
+          <p style="margin:0 0 12px 0"><strong>Team Business Help Services</strong></p>
+          <p style="margin:0 0 12px 0">Kindly mention your <strong>Order/Application Number</strong> in all future communications for quicker assistance and verification.</p>
+          <p style="margin:0 0 12px 0;color:#475569;font-size:13px">In case no response, objection, or discrepancy is reported by the User within a reasonable period after this communication, the service/delivery may be treated as completed for operational and record purposes.</p>
+          <p style="margin:0 0 16px 0">We thank you for choosing our services and appreciate the opportunity to assist you.</p>
+          <p style="margin:0 0 4px 0">Warm Regards,</p>
+          <p style="margin:0 0 16px 0"><strong>Team Business Help Services</strong></p>
+        </td></tr>
+        <tr><td style="padding:0 32px 24px 32px;text-align:center">
+          <a href="${signed.signedUrl}" style="background:#0f3460;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px">Download Certificate</a>
+          <p style="margin:10px 0 0 0;font-size:11px;color:#94a3b8">The download link is valid for 7 days. The certificate is also attached to this email.</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;font-size:12px;color:#475569;line-height:1.6">
+          📧 <a href="mailto:help@businesshelpservices.com" style="color:#0f3460;text-decoration:none">help@businesshelpservices.com</a><br/>
+          🌐 <a href="https://udyamadhar.in" style="color:#0f3460;text-decoration:none">https://udyamadhar.in</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
       const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
       await enqueueEmailInternal({
         templateCode: "certificate_delivery",

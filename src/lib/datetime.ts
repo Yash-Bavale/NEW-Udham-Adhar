@@ -71,3 +71,25 @@ export function relativeIST(value: string | number | Date | null | undefined): s
   if (day < 7) return `${day}d ago`;
   return formatIST(d, { dateOnly: true });
 }
+
+/**
+ * Format a date as DD/MM/YYYY in IST.
+ * Tolerates malformed inputs like "12021-08-31" (recovers as 31/08/2021)
+ * by trimming to the last 10 chars when year is out of plausible range.
+ */
+export function formatDateDMY(value: string | number | Date | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  let d = value instanceof Date ? value : new Date(value as any);
+  // Recovery: legacy bad records like "12021-08-31" parse as year 12021 → use last 10 chars
+  if (typeof value === "string" && (Number.isNaN(d.getTime()) || d.getUTCFullYear() > 9999 || d.getUTCFullYear() < 1900)) {
+    const tail = value.trim().slice(-10);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tail);
+    if (m) d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00+05:30`);
+  }
+  if (Number.isNaN(d.getTime())) return typeof value === "string" ? value : "—";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST, day: "2-digit", month: "2-digit", year: "numeric",
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("day")}/${get("month")}/${get("year")}`;
+}

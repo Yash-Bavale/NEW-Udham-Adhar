@@ -57,13 +57,20 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
     };
   }, [q, open, activity, fetchNic]);
 
+  // Always derive display code from r.code (the full 5-digit class code) so
+  // we don't lose trailing zeros for divisions/groups stored as numeric in the DB
+  // (e.g. group_code "783" instead of "7830").
+  const codeFor = (r: NicResult): string =>
+    digits === 2 ? r.code.slice(0, 2)
+    : digits === 4 ? r.code.slice(0, 4)
+    : r.code;
+
   const trimmed = useMemo(() => {
     if (digits === 5) return results;
     const seen = new Set<string>();
     const out: NicResult[] = [];
     for (const r of results) {
-      const key =
-        digits === 2 ? r.division ?? r.code.slice(0, 2) : r.group_code ?? r.code.slice(0, 4);
+      const key = codeFor(r);
       if (!key || seen.has(key)) continue;
       seen.add(key);
       out.push(r);
@@ -72,11 +79,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
   }, [results, digits]);
 
   function pick(r: NicResult) {
-    const code =
-      digits === 2 ? r.division ?? r.code.slice(0, 2)
-      : digits === 4 ? r.group_code ?? r.code.slice(0, 4)
-      : r.code;
-    onChange(`${code} — ${r.description}`);
+    onChange(`${codeFor(r)} — ${r.description}`);
     setOpen(false);
   }
 
@@ -127,10 +130,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
               </div>
             )}
             {trimmed.map((r) => {
-              const display =
-                digits === 2 ? r.division ?? r.code.slice(0, 2)
-                : digits === 4 ? r.group_code ?? r.code.slice(0, 4)
-                : r.code;
+              const display = codeFor(r);
               const selected = value.startsWith(`${display} `);
               return (
                 <button

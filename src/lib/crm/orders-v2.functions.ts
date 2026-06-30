@@ -535,7 +535,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           templateCode: "certificate_delivery",
           toEmail: recipientEmail,
           toName: recipientName,
-          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+          subject: `Your Order No. ${app.application_code ?? ""} has been completed`,
           bodyHtml: buildCertificateEmailHtml({
             recipientName,
             serviceName,
@@ -717,7 +717,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
         templateCode: "certificate_delivery",
         toEmail: recipientEmail,
         toName: recipientName,
-        subject: `[Resent] Your ${serviceName} certificate — ${cert.certificate_number ?? ""}`,
+        subject: `Your Order No. ${app?.application_code ?? ""} has been completed`,
         bodyHtml: buildCertificateEmailHtml({
           recipientName,
           serviceName,
@@ -773,36 +773,79 @@ function buildCertificateEmailHtml(opts: {
   orderCode: string;
   resend?: boolean;
 }): string {
-  const notesBlock = opts.completionNotes
-    ? `<p style="margin:16px 0 0 0;padding:12px;background:#f8fafc;border-left:3px solid #0f3460;color:#334155;font-size:13px">
-         <strong>Note from our team:</strong><br/>${escapeHtml(opts.completionNotes)}
-       </p>`
-    : "";
+  const orderId = escapeHtml(opts.orderCode || "—");
+  const customerName = escapeHtml(opts.recipientName);
   const resendBanner = opts.resend
-    ? `<p style="margin:0 0 16px 0;padding:10px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;color:#92400e;font-size:12px">
-         This is a fresh copy of your certificate, sent again at your request.
-       </p>`
+    ? `<tr><td style="padding:0 32px 12px 32px">
+         <div style="padding:10px 14px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;color:#92400e;font-size:12px;font-family:Arial,sans-serif">
+           This is a fresh copy of your certificate, sent again at your request.
+         </div>
+       </td></tr>`
     : "";
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#0f172a">
-      ${resendBanner}
-      <h2 style="color:#0f3460;margin:0 0 12px 0">Your ${escapeHtml(opts.serviceName)} is complete</h2>
-      <p>Dear ${escapeHtml(opts.recipientName)},</p>
-      <p>Congratulations — your application has been successfully processed.</p>
-      <p style="margin:16px 0 8px 0"><strong>Certificate / Document Number:</strong><br/>
-        <span style="font-family:monospace;font-size:15px;color:#0f3460">${escapeHtml(opts.certificateNumber)}</span>
-      </p>
-      <p style="text-align:center;margin:28px 0">
-        <a href="${opts.certificateUrl}"
-           style="background:#0f3460;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
-          Download Certificate
-        </a>
-      </p>
-      <p style="font-size:12px;color:#64748b;margin:0">This download link is valid for 7 days. Save the file locally for future reference.</p>
-      ${notesBlock}
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
-      <p style="font-size:12px;color:#94a3b8;margin:0">Order: ${escapeHtml(opts.orderCode || "—")}</p>
-    </div>`;
+  const notesBlock = opts.completionNotes
+    ? `<tr><td style="padding:0 32px 16px 32px">
+         <div style="padding:12px 14px;background:#f8fafc;border-left:3px solid #0f3460;color:#334155;font-size:13px;font-family:Arial,sans-serif;line-height:1.55">
+           <strong>Note from our team:</strong><br/>${escapeHtml(opts.completionNotes)}
+         </div>
+       </td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Order Completed</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.08)">
+        <tr><td style="background:#0f3460;color:#ffffff;padding:22px 32px;font-size:20px;font-weight:700;letter-spacing:0.2px">
+          Order Completed
+        </td></tr>
+        ${resendBanner}
+        <tr><td style="padding:24px 32px 8px 32px;font-size:14px;line-height:1.65;color:#0f172a">
+          <p style="margin:0 0 12px 0">Dear ${customerName},</p>
+          <p style="margin:0 0 12px 0">Greetings from Business Help Services.</p>
+          <p style="margin:0 0 12px 0">
+            We are pleased to inform you that your <strong>Order/Application No. ${orderId}</strong>
+            for UDYAM-related consultancy and assistance services has been processed/completed.
+          </p>
+          <p style="margin:0 0 12px 0">
+            Please find the relevant document/certificate attached to this email for your reference and records.
+          </p>
+          <p style="margin:0 0 12px 0">
+            Kindly review the attached document carefully and contact us through written communication in case any clarification or assistance is required.
+          </p>
+          <p style="margin:0 0 6px 0">For any support regarding this order, please contact:</p>
+          <p style="margin:0 0 12px 0"><strong>Team Business Help Services</strong></p>
+          <p style="margin:0 0 12px 0">
+            Kindly mention your <strong>Order/Application Number</strong> in all future communications for quicker assistance and verification.
+          </p>
+          <p style="margin:0 0 12px 0;color:#475569;font-size:13px">
+            In case no response, objection, or discrepancy is reported by the User within a reasonable period after this communication, the service/delivery may be treated as completed for operational and record purposes.
+          </p>
+          <p style="margin:0 0 16px 0">We thank you for choosing our services and appreciate the opportunity to assist you.</p>
+          <p style="margin:0 0 4px 0">Warm Regards,</p>
+          <p style="margin:0 0 16px 0"><strong>Team Business Help Services</strong></p>
+        </td></tr>
+        ${notesBlock}
+        <tr><td style="padding:0 32px 24px 32px">
+          <div style="text-align:center;margin:8px 0 4px 0">
+            <a href="${opts.certificateUrl}"
+               style="background:#0f3460;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px">
+              Download Certificate
+            </a>
+          </div>
+          <p style="margin:10px 0 0 0;font-size:11px;color:#94a3b8;text-align:center">
+            The download link is valid for 7 days. The certificate is also attached to this email.
+          </p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;font-size:12px;color:#475569;line-height:1.6">
+          📧 <a href="mailto:help@businesshelpservices.com" style="color:#0f3460;text-decoration:none">help@businesshelpservices.com</a><br/>
+          🌐 <a href="https://udyamadhar.in" style="color:#0f3460;text-decoration:none">https://udyamadhar.in</a>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
 }
 
 function escapeHtml(input: string): string {

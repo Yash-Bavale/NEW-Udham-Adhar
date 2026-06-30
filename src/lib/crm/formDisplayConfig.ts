@@ -4,13 +4,15 @@
 // `path` is a JSON-pointer-style dot path into the submission `payload`.
 // Use `mask: "aadhaar"` / `mask: "account"` to gate sensitive values behind a Reveal action.
 
+import { formatDateDMY } from "@/lib/datetime";
+
 export type FieldMask = "aadhaar" | "account" | "pan";
 
 export interface FieldDef {
   label: string;
   path: string;
   mask?: FieldMask;
-  format?: "currency" | "date" | "yesno" | "uppercase";
+  format?: "currency" | "date" | "yesno" | "uppercase" | "nic2" | "nic4" | "nic5";
 }
 
 export interface SectionDef {
@@ -91,9 +93,9 @@ const NEW_UDYAM: ServiceFormDisplay = {
     {
       title: "NIC Codes",
       fields: [
-        { label: "2-Digit NIC", path: "nic.two_digit" },
-        { label: "4-Digit NIC", path: "nic.four_digit" },
-        { label: "5-Digit NIC", path: "nic.five_digit" },
+        { label: "2-Digit NIC", path: "nic.two_digit", format: "nic2" },
+        { label: "4-Digit NIC", path: "nic.four_digit", format: "nic4" },
+        { label: "5-Digit NIC", path: "nic.five_digit", format: "nic5" },
       ],
     },
     {
@@ -217,17 +219,35 @@ export function formatValue(raw: unknown, format?: FieldDef["format"]): string {
       return `₹${n.toLocaleString("en-IN")}`;
     }
     case "date": {
-      const d = new Date(String(raw));
-      if (Number.isNaN(d.getTime())) return String(raw);
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      // DD/MM/YYYY in IST with recovery for legacy bad values like "12021-08-31".
+      return formatDateDMY(raw as any);
     }
     case "yesno":
       return raw === true || raw === "true" || raw === "yes" || raw === 1 ? "Yes" : "No";
     case "uppercase":
       return String(raw).toUpperCase();
+    case "nic2":
+      return padNicCode(String(raw), 2);
+    case "nic4":
+      return padNicCode(String(raw), 4);
+    case "nic5":
+      return padNicCode(String(raw), 5);
     default:
       return String(raw);
   }
+}
+
+/**
+ * Pad the leading numeric code segment of a NIC value to `digits` digits with
+ * trailing zeros. Handles "783 — Description" → "7830 — Description" for
+ * legacy submissions where the DB group_code dropped a trailing zero.
+ */
+function padNicCode(raw: string, digits: 2 | 4 | 5): string {
+  const m = /^\s*(\d+)(\s*[—\-:]\s*.*)?$/.exec(raw);
+  if (!m) return raw;
+  const code = m[1].length >= digits ? m[1].slice(0, digits) : m[1].padEnd(digits, "0");
+  const rest = m[2] ?? "";
+  return `${code}${rest}`;
 }
 
 export function maskValue(raw: unknown, _mask: FieldMask): string {
