@@ -1,66 +1,59 @@
-## Goal
-1. Auto-assign **orders** (applications) to employees using the existing round-robin assignment pool (today only leads are auto-assigned).
-2. Add a visible **dark day-separator row** between dates in the Leads and Orders lists so a day's activity is easy to scan.
+## 1. Certificate delivery email — "Order Completed" template
 
-Nothing else changes — same UI, same columns, same filters.
+In `src/lib/crm/certificates.functions.ts` (and the matching call in `src/lib/crm/orders-v2.functions.ts` that re-uses `certificate_delivery`):
 
----
+- New subject: `Your Order No. {orderCode} has been completed`.
+- Replace the inline HTML with a Zoho-styled template that mirrors the verbatim copy you provided:
+  - Header bar: **Order Completed**.
+  - Body opens "Dear {Customer Name}, Greetings from Business Help Services."
+  - Confirmation that Order/Application No. **{orderCode}** for UDYAM-related consultancy & assistance services has been processed/completed.
+  - Line: *"Please find the relevant document/certificate attached to this email for your reference and records."*
+  - Review/clarification paragraph + contact block (Team Business Help Services, help@businesshelpservices.com, https://udyamadhar.in).
+  - Reminder to quote the Order/Application Number in future communications.
+  - Deemed-completion clause ("In case no response... within a reasonable period...").
+  - Warm regards sign-off and footer with email + website.
+- Keep the existing certificate attachment logic (PDF/JPG/PNG ≤9 MB) and the secondary "Download Certificate" button as a fallback in case the attachment is stripped.
+- Apply the same template in `orders-v2.functions.ts` so the auto-send on completion uses the new copy.
 
-## Part 1 — Auto-assign orders
+## 2. Global date format → DD/MM/YYYY (IST)
 
-### How it works today
-- `assignment_pool` + `lead_assignment_config` + `auto_assign_lead()` trigger already round-robin **leads** by service.
-- `applications.assigned_to` exists but is only set manually (or inherited from the lead). New orders created when a lead converts/pays often stay unassigned, or the assignee doesn't match the active pool rotation.
+Single source of truth in `src/lib/datetime.ts`:
 
-### Change (DB migration)
-Add a sibling trigger function `auto_assign_application()` that mirrors the lead logic and fires `BEFORE INSERT` on `public.applications`:
+- Add `formatDateDMY(value)` that:
+  - Accepts `Date | string | number`.
+  - Hard-fails on malformed values like `"12021-08-31"` (year > 9999) and tries `slice(-10)` recovery so the legacy bad record renders as `31/08/2021` instead of `01/01/+12021`.
+  - Returns `DD/MM/YYYY` in `Asia/Kolkata`.
 
-- Skip if `NEW.assigned_to IS NOT NULL`.
-- Honour the same global switch (`lead_assignment_config.is_active` where `service_id IS NULL`) — one toggle controls both leads and orders, which matches the existing Lead Assignment UI.
-- Pick the next pool member using the same ordering used for leads (service-specific first, then global; `last_assigned_at NULLS FIRST`, then `total_assigned`).
-- If the parent lead is already assigned to an active pool member for that service, inherit that assignee (so lead-owner stays on the order) **without** advancing the rotation. Otherwise pick the next pool member and bump `last_assigned_at` / `total_assigned`.
-- Stamp `assigned_at = now()` and `auto_assigned = true` (add the `auto_assigned boolean default false` column to `applications` if missing) so the existing application-event logger records it.
+Wire-through (UI only, no business logic changes):
 
-Also add a small audit log row to `application_events` (`event_type = 'assignment_change'`) when the trigger assigns — matches the lead pattern in `log_lead_auto_assignment()`.
+- `src/lib/crm/formDisplayConfig.ts` → `formatValue` `case "date"` uses `formatDateDMY`.
+- Replace ad-hoc `toLocaleDateString("en-IN", { day:"2-digit", month:"short" ...})` calls across admin screens with `formatDateDMY` (sweep `src/components/admin/**` and `src/routes/admin.*`). I'll grep and update every hit in one pass.
+- Day-separator label in lead/order tables keeps the weekday but switches the date part to DD/MM/YYYY.
 
-No code changes are required in the React app — the existing Orders list already shows `assigned_name`, and the Lead Assignment UI (`LeadAssignmentTab.tsx`) already controls the pool.
+## 3. NIC 4-digit truncation ("783" → "7830")
 
-### Acceptance
-- Toggle "Round-Robin Auto-Assignment" ON → new paid orders show an assignee immediately in `/admin/orders`.
-- Toggle OFF → new orders stay Unassigned.
-- An order whose parent lead is already owned by an active pool member keeps that owner.
-- Pool stats (`last_assigned_at`, `total_assigned`) advance only when the trigger actually picks a new owner.
+Root cause: `NicCodePicker.pick()` saves `group_code` from the DB, and Postgres `nic_codes.group_code` drops trailing zeros for some rows, so "7830" stores as "783".
 
----
+Fix in `src/components/onboarding/NicCodePicker.tsx`:
 
-## Part 2 — Day separator rows in lists
+- When `digits === 4`, build the display code from `r.code.slice(0, 4)` (which is always 4 chars) rather than relying on `group_code`. Same hardening for `digits === 2` (use `code.slice(0,2)`).
+- Apply identical logic in the dropdown row render so the suggestion list matches what gets saved.
 
-Add a thin full-width separator `<tr>` rendered whenever the IST calendar date of the current row differs from the previous row's IST date. The list is already sorted newest-first, so the separator naturally appears at each new day boundary.
+Backfill (read-only display fix is enough — the form submission text is rendered as stored):
 
-### Files to edit
-- `src/routes/admin.orders.index.tsx` — inside the `rows.map(...)` at line ~203, track `lastDateKey` and emit a separator row before the order row when the IST date changes. `colSpan` matches the header (10 normally, 8 when `hideMoney`).
-- `src/routes/admin.leads.index.tsx` — same pattern inside the `rows.map(...)` at line ~345. `colSpan` matches the leads table header column count.
+- Add a tiny normaliser in `formDisplayConfig.ts` for the `nic.two_digit` / `nic.four_digit` paths that pads the leading code segment with trailing zeros up to N digits before the `—`. This corrects already-saved submissions in CRM without rewriting the DB.
 
-### Separator row design
-```text
-┌───────────────────────────────────────────────┐
-│  ▎ Mon, 29 Jun 2026 IST                       │  ← dark slate-900 bar, white text, sticky-looking
-└───────────────────────────────────────────────┘
-```
-- Background `bg-slate-900` (dark line as requested), text white, 11px uppercase tracking-wide.
-- Left padding aligned with the first column; date formatted via existing `formatIST(date, { dateOnly: true })` with weekday prepended.
-- Today's row gets a small "Today" pill on the right; Yesterday gets "Yesterday".
-- Pure presentational — no change to filters, sorting, pagination, counts, or row data.
+## 4. Verification
 
-### Acceptance
-- Scrolling the Orders or Leads table shows one dark bar at every IST date change.
-- No bar appears above the very first row of the page (optional — only between days).
-- Toggling money columns in Orders keeps the bar full width (correct `colSpan`).
-- No regression in row striping, hover, selection, or bulk-bar behaviour.
+- Re-render the "New Udyam Registration" form panel for the order in the screenshot and confirm:
+  - Date of Incorporation shows `31/08/2021` (recovered from the malformed `12021-08-31`).
+  - 4-Digit NIC shows `7830 — Human resources provision and management of human resources functions`.
+- Trigger a test completion to confirm the new certificate email subject/body and that the certificate file is still attached.
 
----
-
-## Out of scope
-- No changes to the assignment UI, role rules, or pool ordering algorithm.
-- No changes to lead auto-assignment behaviour.
-- No re-assignment of historical orders — trigger fires only on new inserts.
+### Files touched
+- `src/lib/crm/certificates.functions.ts`
+- `src/lib/crm/orders-v2.functions.ts`
+- `src/lib/datetime.ts`
+- `src/lib/crm/formDisplayConfig.ts`
+- `src/components/onboarding/NicCodePicker.tsx`
+- Sweep of admin date renderers under `src/components/admin/**` and `src/routes/admin.*`
