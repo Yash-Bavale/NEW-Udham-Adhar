@@ -12,7 +12,7 @@ export interface FieldDef {
   label: string;
   path: string;
   mask?: FieldMask;
-  format?: "currency" | "date" | "yesno" | "uppercase";
+  format?: "currency" | "date" | "yesno" | "uppercase" | "nic2" | "nic4" | "nic5";
 }
 
 export interface SectionDef {
