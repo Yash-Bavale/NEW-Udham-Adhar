@@ -217,9 +217,10 @@ export function formatValue(raw: unknown, format?: FieldDef["format"]): string {
       return `₹${n.toLocaleString("en-IN")}`;
     }
     case "date": {
-      const d = new Date(String(raw));
-      if (Number.isNaN(d.getTime())) return String(raw);
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      // DD/MM/YYYY in IST with recovery for legacy bad values like "12021-08-31".
+      // Lazy import to avoid circular deps.
+      const { formatDateDMY } = require("@/lib/datetime") as typeof import("@/lib/datetime");
+      return formatDateDMY(raw as any);
     }
     case "yesno":
       return raw === true || raw === "true" || raw === "yes" || raw === 1 ? "Yes" : "No";
