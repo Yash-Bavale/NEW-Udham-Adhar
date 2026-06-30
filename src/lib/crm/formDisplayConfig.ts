@@ -93,9 +93,9 @@ const NEW_UDYAM: ServiceFormDisplay = {
     {
       title: "NIC Codes",
       fields: [
-        { label: "2-Digit NIC", path: "nic.two_digit" },
-        { label: "4-Digit NIC", path: "nic.four_digit" },
-        { label: "5-Digit NIC", path: "nic.five_digit" },
+        { label: "2-Digit NIC", path: "nic.two_digit", format: "nic2" },
+        { label: "4-Digit NIC", path: "nic.four_digit", format: "nic4" },
+        { label: "5-Digit NIC", path: "nic.five_digit", format: "nic5" },
       ],
     },
     {
