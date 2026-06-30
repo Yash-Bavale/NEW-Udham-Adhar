@@ -535,7 +535,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           templateCode: "certificate_delivery",
           toEmail: recipientEmail,
           toName: recipientName,
-          subject: `Your ${serviceName} is complete — Certificate ${certNumber}`,
+          subject: `Your Order No. ${app.application_code ?? ""} has been completed`,
           bodyHtml: buildCertificateEmailHtml({
             recipientName,
             serviceName,
