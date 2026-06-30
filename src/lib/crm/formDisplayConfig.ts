@@ -226,9 +226,28 @@ export function formatValue(raw: unknown, format?: FieldDef["format"]): string {
       return raw === true || raw === "true" || raw === "yes" || raw === 1 ? "Yes" : "No";
     case "uppercase":
       return String(raw).toUpperCase();
+    case "nic2":
+      return padNicCode(String(raw), 2);
+    case "nic4":
+      return padNicCode(String(raw), 4);
+    case "nic5":
+      return padNicCode(String(raw), 5);
     default:
       return String(raw);
   }
+}
+
+/**
+ * Pad the leading numeric code segment of a NIC value to `digits` digits with
+ * trailing zeros. Handles "783 — Description" → "7830 — Description" for
+ * legacy submissions where the DB group_code dropped a trailing zero.
+ */
+function padNicCode(raw: string, digits: 2 | 4 | 5): string {
+  const m = /^\s*(\d+)(\s*[—\-:]\s*.*)?$/.exec(raw);
+  if (!m) return raw;
+  const code = m[1].length >= digits ? m[1].slice(0, digits) : m[1].padEnd(digits, "0");
+  const rest = m[2] ?? "";
+  return `${code}${rest}`;
 }
 
 export function maskValue(raw: unknown, _mask: FieldMask): string {
