@@ -220,8 +220,6 @@ export function formatValue(raw: unknown, format?: FieldDef["format"]): string {
     }
     case "date": {
       // DD/MM/YYYY in IST with recovery for legacy bad values like "12021-08-31".
-      // Lazy import to avoid circular deps.
-      const { formatDateDMY } = require("@/lib/datetime") as typeof import("@/lib/datetime");
       return formatDateDMY(raw as any);
     }
     case "yesno":
