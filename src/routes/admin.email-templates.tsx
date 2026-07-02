@@ -392,10 +392,12 @@ function PreviewDialog({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
           <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Subject</div>
           <div className="text-sm">{render(tpl.subject)}</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <div
-            className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: render(tpl.body_html) }}
+        <div className="flex-1 overflow-hidden p-0">
+          <iframe
+            title="Email template preview"
+            sandbox=""
+            srcDoc={render(tpl.body_html)}
+            className="w-full h-full min-h-[500px] border-0 bg-white"
           />
         </div>
       </div>
