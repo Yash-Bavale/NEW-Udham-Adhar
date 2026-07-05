@@ -1,16 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
-  FileText, Workflow, Activity, LifeBuoy, Check,
+  FileText, Workflow, Activity, LifeBuoy, Check, ChevronDown,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-import { CustomerJourneyMap } from "./CustomerJourneyMap";
-import { TabStatusHeader } from "./TabStatusHeader";
+import { EmployeeWorkflowMap } from "./EmployeeWorkflowMap";
+import { OrderFormInline } from "./OrderFormInline";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -79,6 +79,27 @@ export function WorkspaceShell(p: Props) {
     setTab("workflow");
     setPendingActionKey(key);
   }, []);
+
+  // Timestamps for the workflow diagram — extracted from application + stageMeta + status history events.
+  const statusHistory = useMemo<OrderStatus[]>(() => {
+    const evs = (events ?? []) as any[];
+    return evs
+      .filter((e) => e?.event_type === "order_status_changed" || e?.event_type === "status_changed")
+      .map((e) => (e?.new_status ?? e?.metadata?.new_status ?? null) as OrderStatus | null)
+      .filter(Boolean) as OrderStatus[];
+  }, [events]);
+
+  const workflowTimestamps = useMemo<Record<string, string | null | undefined>>(() => ({
+    consultation_done:      application?.consultation_done_at ?? application?.form_submitted_at ?? null,
+    waiting_customer_info:  stageMeta?.waiting_customer_info?.at ?? application?.form_link_sent_at,
+    info_received:          stageMeta?.info_received?.at ?? application?.form_submitted_at,
+    in_processing:          stageMeta?.in_processing?.at ?? application?.processing_started_at,
+    submitted_to_govt:      stageMeta?.submitted_to_govt?.at ?? application?.submitted_to_govt_at,
+    our_side_delay:         stageMeta?.our_side_delay?.at,
+    customer_hold:          stageMeta?.customer_hold?.at,
+    start_processing:       stageMeta?.info_received?.at,
+    completed:              stageMeta?.completed?.at ?? application?.fulfilled_at,
+  }), [application, stageMeta]);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
@@ -254,9 +275,28 @@ export function WorkspaceShell(p: Props) {
           </div>
         </div>
 
-        {/* Status-driven employee actions — single source of truth */}
-        {orderStatus && !p.showConsultationPanel && (
-          <div className="mt-4">
+      </section>
+
+      {/* Employee Workflow — past · current · next in one diagram */}
+      <EmployeeWorkflowMap
+        orderStatus={orderStatus}
+        history={statusHistory}
+        closureReasonCode={(application as any).closure_reason_code}
+        timestamps={workflowTimestamps}
+        onAction={handlePrimaryStep}
+      />
+
+      {/* Full status action grid — tucked under a disclosure for edge cases */}
+      {orderStatus && !p.showConsultationPanel && (
+        <details className="rounded-2xl border border-slate-200 bg-white shadow-sm group">
+          <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between hover:bg-slate-50/60 rounded-2xl">
+            <span className="text-sm font-semibold text-slate-700">All status actions</span>
+            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+              refunds · manual reminders · close order
+              <ChevronDown className="size-3.5 transition group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="border-t border-slate-100 p-4">
             <EmployeeActionPanel
               orderId={p.orderId}
               status={orderStatus}
@@ -264,24 +304,9 @@ export function WorkspaceShell(p: Props) {
               onOpenActionHandled={() => setPendingActionKey(null)}
             />
           </div>
-        )}
-      </section>
+        </details>
+      )}
 
-      {/* Customer Journey */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-4">
-          Customer Journey
-        </div>
-        <CustomerJourneyMap
-          application={application}
-          paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
-          stageMeta={stageMeta}
-          workflowStatus={(application as any).workflow_status}
-          closureStage={(application as any).closure_stage}
-          closureNextAt={(application as any).closure_next_at}
-          closureReasonLabel={(application as any).closure_reason_code}
-        />
-      </section>
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
@@ -314,14 +339,6 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
           {/* Main */}
           <div className="min-w-0 space-y-5">
-            {/* Sticky "where are we + what's next" strip for every tab. */}
-            <TabStatusHeader
-              applicationCode={application.application_code}
-              orderStatus={orderStatus}
-              stage={p.stage}
-              updatedAt={application.updated_at ?? application.created_at}
-              onPrimaryAction={handlePrimaryStep}
-            />
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {p.showConsultationPanel ? (
                 <ConvertConsultationPanel
@@ -334,6 +351,8 @@ export function WorkspaceShell(p: Props) {
                 />
               ) : (
                 <>
+                  {/* Autosaved customer form + docs — always visible in the workflow tab */}
+                  <OrderFormInline applicationId={application.id} onAction={handlePrimaryStep} />
                   {p.notesNode}
                   <OrderWorkflowPanel
                     applicationId={application.id}
