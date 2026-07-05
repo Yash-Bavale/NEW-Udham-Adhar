@@ -30,7 +30,7 @@ import {
 import { Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
-export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadService: string }) {
+export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string; leadService: string; orderId?: string }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listLeadEmails);
   const sendFn = useServerFn(sendLeadEmail);
@@ -70,6 +70,7 @@ export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadSer
       toast.success("Email queued for delivery");
       setSendOpen(false);
       qc.invalidateQueries({ queryKey: ["admin.lead.emails", leadId] });
+      if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send email");
     } finally {

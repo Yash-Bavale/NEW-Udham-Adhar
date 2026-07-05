@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -65,10 +65,14 @@ function groupFieldsBySection(serviceCode: string | null): SectionGroup[] {
 export function FormSubmissionPanel({
   applicationId,
   isLocked = false,
+  orderId,
 }: {
   applicationId: string;
   isLocked?: boolean;
+  /** When provided, sending / resending the form link refreshes the workspace. */
+  orderId?: string;
 }) {
+  const qc = useQueryClient();
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
   const urlFn = useServerFn(getDocumentSignedUrl);
@@ -96,6 +100,8 @@ export function FormSubmissionPanel({
     try {
       const res = await resendFn({ data: { leadId: data.lead.id } });
       toast.success(`Form link sent to ${res.email}`);
+      qc.invalidateQueries({ queryKey: ["admin.formSubmission", applicationId] });
+      if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to send");
     } finally {

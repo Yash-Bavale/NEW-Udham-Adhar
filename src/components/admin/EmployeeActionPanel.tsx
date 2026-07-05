@@ -5,24 +5,11 @@
  * Each button calls one atomic server fn that combines transition + email +
  * scheduler side-effects.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Send,
-  PlayCircle,
-  PauseCircle,
-  Timer,
-  Landmark,
-  Award,
-  CheckCircle2,
-  BadgeDollarSign,
-  RotateCcw,
-  XCircle,
-  Bell,
-  AlertTriangle,
-} from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,54 +44,16 @@ import {
   closeOrderManual,
   sendManualReminder,
 } from "@/lib/orders/order-actions.functions";
+import {
+  REFUND_ELIGIBLE_STATUSES,
+  STATUS_ACTIONS,
+  STATUS_ACTION_META,
+  type StatusActionKey,
+} from "@/lib/orders/order-actions-map";
 
-// ─────────────────────────── Action map per status ───────────────────────────
-
-type ActionKey =
-  | "send_form_link"
-  | "manual_reminder"
-  | "customer_delay"
-  | "our_delay"
-  | "start_processing"
-  | "submitted_to_govt"
-  | "certificate_issued"
-  | "complete"
-  | "request_refund"
-  | "reopen"
-  | "close_manual";
-
-const ALL_ACTIONS: Record<ActionKey, { label: string; icon: any; tone: "primary" | "warn" | "danger" | "muted" }> = {
-  send_form_link: { label: "Send / Resend Form Link", icon: Send, tone: "primary" },
-  manual_reminder: { label: "Send Manual Reminder", icon: Bell, tone: "muted" },
-  customer_delay: { label: "Customer-Side Delay", icon: PauseCircle, tone: "warn" },
-  our_delay: { label: "Our-Side Delay", icon: Timer, tone: "warn" },
-  start_processing: { label: "Start Processing", icon: PlayCircle, tone: "primary" },
-  submitted_to_govt: { label: "Mark Submitted to Govt", icon: Landmark, tone: "primary" },
-  certificate_issued: { label: "Mark Certificate Issued", icon: Award, tone: "primary" },
-  complete: { label: "Complete Order", icon: CheckCircle2, tone: "primary" },
-  request_refund: { label: "Request Refund", icon: BadgeDollarSign, tone: "danger" },
-  reopen: { label: "Reopen Order", icon: RotateCcw, tone: "muted" },
-  close_manual: { label: "Close Order", icon: XCircle, tone: "danger" },
-};
-
-/** Which buttons appear for each status. Actions filtered further by role. */
-const ACTIONS_BY_STATUS: Record<OrderStatus, ActionKey[]> = {
-  NEW_ORDER: ["send_form_link", "customer_delay", "close_manual"],
-  WAITING_CUSTOMER_INFO: ["send_form_link", "manual_reminder", "customer_delay", "close_manual"],
-  INFO_RECEIVED: ["start_processing", "our_delay", "customer_delay"],
-  IN_PROCESSING: ["our_delay", "customer_delay", "submitted_to_govt"],
-  CUSTOMER_HOLD: ["send_form_link", "manual_reminder", "start_processing", "close_manual"],
-  OUR_SIDE_DELAY: ["start_processing", "submitted_to_govt", "our_delay"],
-  SUBMITTED_TO_GOVT: ["certificate_issued", "our_delay"],
-  CERTIFICATE_ISSUED: ["complete"],
-  COMPLETED: ["reopen"],
-  HIGH_PRIORITY: ["start_processing", "submitted_to_govt", "our_delay", "customer_delay"],
-  REFUND_REQUESTED: [],
-  REFUND_APPROVED: [],
-  REFUND_PROCESSED: ["close_manual"],
-  CLOSED: ["reopen"],
-  REOPENED: ["send_form_link", "start_processing", "customer_delay"],
-};
+// Local alias so we don't rename the whole file.
+type ActionKey = StatusActionKey;
+const ALL_ACTIONS = STATUS_ACTION_META;
 
 const TONE_CLASSES: Record<string, string> = {
   primary: "bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:opacity-90",
@@ -118,26 +67,39 @@ const TONE_CLASSES: Record<string, string> = {
 export function EmployeeActionPanel({
   orderId,
   status,
+  openActionKey,
+  onOpenActionHandled,
 }: {
   orderId: string;
   status: OrderStatus;
+  /** External trigger (from TabStatusHeader "next step" button). */
+  openActionKey?: ActionKey | null;
+  onOpenActionHandled?: () => void;
 }) {
   const qc = useQueryClient();
   const role = useRole();
   const [openAction, setOpenAction] = useState<ActionKey | null>(null);
 
   const actions = useMemo(() => {
-    const base = ACTIONS_BY_STATUS[status] ?? [];
-    // Refunds gated to super_admin.
+    const base = STATUS_ACTIONS[status] ?? [];
     if (!role.has("super_admin")) {
       return base.filter((a) => a !== "request_refund" && a !== "reopen");
     }
-    // Add refund entry for statuses where it makes sense.
-    const canRefund = ["IN_PROCESSING", "SUBMITTED_TO_GOVT", "CUSTOMER_HOLD", "OUR_SIDE_DELAY", "HIGH_PRIORITY"].includes(
-      status,
-    );
+    const canRefund = REFUND_ELIGIBLE_STATUSES.includes(status);
     return canRefund && !base.includes("request_refund") ? [...base, "request_refund" as ActionKey] : base;
   }, [status, role]);
+
+  // Honor external "open this action" requests (from TabStatusHeader).
+  useEffect(() => {
+    if (openActionKey && actions.includes(openActionKey)) {
+      setOpenAction(openActionKey);
+      onOpenActionHandled?.();
+    } else if (openActionKey) {
+      // Requested action isn't available in this status — nudge the user.
+      toast.error(`"${STATUS_ACTION_META[openActionKey].label}" isn't available in this status.`);
+      onOpenActionHandled?.();
+    }
+  }, [openActionKey, actions, onOpenActionHandled]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
 

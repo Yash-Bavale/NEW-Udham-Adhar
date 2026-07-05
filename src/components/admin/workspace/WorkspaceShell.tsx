@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
   FileText, Workflow, Activity, LifeBuoy, Check,
@@ -9,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
+import { TabStatusHeader } from "./TabStatusHeader";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -20,6 +22,12 @@ import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
+import {
+  QUICK_ACTIONS,
+  tabAvailability,
+  type StatusActionKey,
+  type WorkspaceTabId,
+} from "@/lib/orders/order-actions-map";
 import { formatIST, relativeIST } from "@/lib/datetime";
 
 interface Props {
@@ -37,25 +45,6 @@ interface Props {
   notesNode: React.ReactNode;
 }
 
-/** Which tabs are useful in which order_status. Missing = enabled everywhere. */
-function tabAvailability(status: OrderStatus | null, hasLead: boolean, showConsultation: boolean) {
-  const locked = status === "CLOSED" || status === "REFUND_PROCESSED";
-  return {
-    workflow: { enabled: true,           reason: "" },
-    form:     {
-      enabled: !showConsultation && !!status && status !== "NEW_ORDER",
-      reason: showConsultation
-        ? "Available after service is picked and second payment is received"
-        : status === "NEW_ORDER"
-          ? "Send the form link from Employee Workflow first"
-          : "",
-    },
-    emails:   { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
-    activity: { enabled: true, reason: "" },
-    support:  { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
-  } as const;
-}
-
 const TAB_DEFS = [
   { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
   { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
@@ -63,10 +52,12 @@ const TAB_DEFS = [
   { id: "activity" as const, label: "Timeline",          icon: Activity },
   { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
 ];
-type TabId = typeof TAB_DEFS[number]["id"];
+type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
+  const [pendingActionKey, setPendingActionKey] = useState<StatusActionKey | null>(null);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -77,6 +68,17 @@ export function WorkspaceShell(p: Props) {
   useEffect(() => {
     if (!availability[tab].enabled) setTab("workflow");
   }, [availability, tab]);
+
+  const invalidateOrder = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] }),
+    [qc, p.orderId],
+  );
+
+  /** Route the "next step" button (in TabStatusHeader) to the workflow tab + open dialog. */
+  const handlePrimaryStep = useCallback((key: StatusActionKey) => {
+    setTab("workflow");
+    setPendingActionKey(key);
+  }, []);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
@@ -105,6 +107,36 @@ export function WorkspaceShell(p: Props) {
     ?? "Unassigned";
 
   const copy = (v: string) => { navigator.clipboard.writeText(v); toast.success("Copied"); };
+
+  /**
+   * Central handler for every header quick tile. Always fires a toast so
+   * employees get instant feedback, disabled tiles show WHY they're disabled,
+   * and system actions (print / copy) confirm success.
+   */
+  const runQuickAction = useCallback(
+    (
+      key: string,
+      built: { disabledReason?: string | null; toastInfo?: string; toastSuccess?: string },
+      exec: () => void,
+    ) => {
+      if (built.disabledReason) {
+        toast.error(built.disabledReason);
+        return;
+      }
+      if (built.toastInfo) toast(built.toastInfo);
+      exec();
+      if (built.toastSuccess) toast.success(built.toastSuccess);
+    },
+    [],
+  );
+
+  const quickCtx = {
+    mobile: cMobile,
+    email: cEmail,
+    leadId: lead?.id ?? null,
+    waUrl,
+    applicationCode: application.application_code,
+  };
 
   const paymentPillCls =
     paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" :
@@ -178,15 +210,46 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Unified action area: contact + status-driven actions */}
+          {/* Unified action area — every tile is map-driven and always toasts. */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
-            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Contact</div>
-            <div className="grid grid-cols-5 gap-1.5">
-              <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
-              <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
-              <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
-              <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
-              <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {QUICK_ACTIONS.map((spec) => {
+                const built = spec.build(quickCtx);
+                const disabled = !!built.disabledReason;
+                const onClick = () => {
+                  if (spec.key === "print") {
+                    runQuickAction(spec.key, built, () => window.print());
+                  } else if (spec.key === "copy_code") {
+                    runQuickAction(spec.key, built, () =>
+                      navigator.clipboard.writeText(quickCtx.applicationCode),
+                    );
+                  } else {
+                    // Contact / link tiles: navigate manually so we can toast first.
+                    runQuickAction(spec.key, built, () => {
+                      if (built.to) {
+                        window.location.assign(built.to);
+                      } else if (built.href) {
+                        if (built.external) {
+                          window.open(built.href, "_blank", "noopener,noreferrer");
+                        } else {
+                          window.location.assign(built.href);
+                        }
+                      }
+                    });
+                  }
+                };
+                return (
+                  <QuickTile
+                    key={spec.key}
+                    icon={spec.icon}
+                    label={spec.label}
+                    tint={spec.tint}
+                    disabled={disabled}
+                    onClick={onClick}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
@@ -194,7 +257,12 @@ export function WorkspaceShell(p: Props) {
         {/* Status-driven employee actions — single source of truth */}
         {orderStatus && !p.showConsultationPanel && (
           <div className="mt-4">
-            <EmployeeActionPanel orderId={p.orderId} status={orderStatus} />
+            <EmployeeActionPanel
+              orderId={p.orderId}
+              status={orderStatus}
+              openActionKey={pendingActionKey}
+              onOpenActionHandled={() => setPendingActionKey(null)}
+            />
           </div>
         )}
       </section>
@@ -246,6 +314,14 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
           {/* Main */}
           <div className="min-w-0 space-y-5">
+            {/* Sticky "where are we + what's next" strip for every tab. */}
+            <TabStatusHeader
+              applicationCode={application.application_code}
+              orderStatus={orderStatus}
+              stage={p.stage}
+              updatedAt={application.updated_at ?? application.created_at}
+              onPrimaryAction={handlePrimaryStep}
+            />
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {p.showConsultationPanel ? (
                 <ConvertConsultationPanel
@@ -279,7 +355,7 @@ export function WorkspaceShell(p: Props) {
                   This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
                 </div>
               ) : (
-                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} />
+                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
               )}
               <OrderDocumentsPanel
                 orderId={p.orderId}
@@ -292,7 +368,7 @@ export function WorkspaceShell(p: Props) {
 
             <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
               {lead?.id ? (
-                <LeadEmailsTab leadId={lead.id} leadService={svcName} />
+                <LeadEmailsTab leadId={lead.id} leadService={svcName} orderId={p.orderId} />
               ) : (
                 <div className="rounded-2xl border bg-white p-6 text-sm text-slate-500">No lead linked.</div>
               )}
@@ -393,28 +469,28 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
 }
 
 function QuickTile({
-  href, to, onClick, icon: Icon, label, tint, external,
+  onClick, icon: Icon, label, tint, disabled = false,
 }: {
-  href?: string | null; to?: string | null; onClick?: () => void;
-  icon: any; label: string; tint: "emerald" | "sky" | "violet" | "slate"; external?: boolean;
+  onClick?: () => void;
+  icon: any; label: string; tint: "emerald" | "sky" | "violet" | "slate";
+  disabled?: boolean;
 }) {
-  const disabled = !href && !to && !onClick;
   const tintMap = {
     emerald: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100",
     sky:     "text-sky-600 bg-sky-50 hover:bg-sky-100",
     violet:  "text-violet-600 bg-violet-50 hover:bg-violet-100",
     slate:   "text-slate-600 bg-slate-100 hover:bg-slate-200",
   };
-  const inner = (
-    <>
+  // Note: we do NOT disable the button — it stays clickable so runQuickAction can
+  // fire the "why disabled" toast. Visual affordance is dimmed instead.
+  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg transition ${disabled ? "opacity-50" : ""}`;
+  return (
+    <button type="button" onClick={onClick} className={cls} aria-disabled={disabled}>
       <span className={`w-9 h-9 grid place-items-center rounded-lg ${tintMap[tint]}`}>
         <Icon className="w-4 h-4" />
       </span>
       <span className="text-[11px] font-medium text-slate-600 mt-1">{label}</span>
-    </>
+    </button>
   );
-  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg ${disabled ? "opacity-40 pointer-events-none" : ""}`;
-  if (to && !disabled) return <Link to={to} className={cls}>{inner}</Link>;
-  if (href && !disabled) return <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className={cls}>{inner}</a>;
-  return <button type="button" onClick={onClick} disabled={disabled} className={cls}>{inner}</button>;
 }
+
