@@ -125,6 +125,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   // ── Side-effects on match ──────────────────────────────────────────────
   if (matched?.applicationId) {
     await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
+    await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     await openOrAppendTicket({
       applicationId: matched.applicationId,
       customerId: matched.customerId,
