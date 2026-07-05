@@ -65,10 +65,14 @@ function groupFieldsBySection(serviceCode: string | null): SectionGroup[] {
 export function FormSubmissionPanel({
   applicationId,
   isLocked = false,
+  orderId,
 }: {
   applicationId: string;
   isLocked?: boolean;
+  /** When provided, sending / resending the form link refreshes the workspace. */
+  orderId?: string;
 }) {
+  const qc = useQueryClient();
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
   const urlFn = useServerFn(getDocumentSignedUrl);
