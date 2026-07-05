@@ -43,13 +43,13 @@ The plan follows the PRD's 9 phases but front-loads foundations (status engine, 
 - ✅ BHS v2 template registry (E001–E012) in `src/lib/emails/bhs-templates.ts`, mapping to existing template codes + 5 new disabled system templates (`bhs_e003_customer_delay`, `bhs_e005_manual_reminder`, `bhs_e007_feedback`, `bhs_e010_ticket_autoclose`, `bhs_e012_submitted_to_govt`).
 - ✅ E001 already auto-fires from PayU webhook via `order_confirmation` template.
 
-## Phase 3 — Scheduler 2 (Customer-Side Delay, 24h business time)
+## Phase 3 — Scheduler 2 (Customer-Side Delay, 24h business time) ✅
 
-- Table `order_schedulers` per PRD, with `remaining_seconds` (business-seconds), `paused_by_ticket_id`.
-- Fire logic uses `addBusinessSeconds(started_at, 24*3600, cfg)` → stored as `fires_at` wall-clock. Recomputed on resume.
-- New cron route `/api/public/cron/schedulers-tick` (every 1 min). Anon-key auth. Fires E004 + `→ CLOSED` when due.
-- Pause/resume/cancel APIs used by ticket lifecycle.
-- Employee action **"Customer Side Delay"** opens reason picker → sends E003 → starts scheduler.
+- ✅ `order_schedulers` schema in place from Phase 0 (business-seconds fields, pause/resume/stop columns).
+- ✅ `src/lib/scheduling/schedulers.server.ts` — `startCustomerClosureScheduler`, `pauseScheduler`, `resumeScheduler`, `cancelScheduler`, `cancelAllForOrder`, `fireDueSchedulers` (uses `addBusinessSeconds` / `businessSecondsBetween`).
+- ✅ Cron route `POST /api/public/cron/schedulers-tick` (anon-key auth). Fires E004 + transitions order → `CLOSED` when due, only if order still in `WAITING_CUSTOMER_INFO / CUSTOMER_HOLD / NEW_ORDER`.
+- ✅ pg_cron job `schedulers-tick` scheduled every minute.
+- ✅ `customerSideDelay` server fn in `src/lib/orders/order-actions.functions.ts` — one-shot: `transition_order_status → CUSTOMER_HOLD` + queue E003 + start Scheduler 2.
 
 ## Phase 4 — Scheduler 3 (Our-Side Delay reminder engine)
 
