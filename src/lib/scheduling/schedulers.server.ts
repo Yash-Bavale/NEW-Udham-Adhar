@@ -14,9 +14,23 @@ import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 
 export const SCHEDULER_CUSTOMER_CLOSURE = "customer_closure_24h" as const;
 export const SCHEDULER_OUR_SIDE_REMINDER = "our_side_reminder" as const;
+export const SCHEDULER_TICKET_AUTOCLOSE = "ticket_autoclose_24h" as const;
 const DEFAULT_CLOSURE_SECONDS = 24 * 3600;
 const DEFAULT_REMINDER_INTERVAL_SECONDS = 2 * 3600; // 2 business hours
 const REMINDER_ESCALATION_THRESHOLD = 3;
+const DEFAULT_TICKET_AUTOCLOSE_SECONDS = 24 * 3600;
+
+/** Encode/decode ticket_id inside order_schedulers.remarks for ticket schedulers. */
+const TICKET_TAG_PREFIX = "ticket:";
+function encodeTicketRemarks(ticketId: string, note?: string | null) {
+  return note ? `${TICKET_TAG_PREFIX}${ticketId}|${note}` : `${TICKET_TAG_PREFIX}${ticketId}`;
+}
+function decodeTicketId(remarks: string | null): string | null {
+  if (!remarks || !remarks.startsWith(TICKET_TAG_PREFIX)) return null;
+  const rest = remarks.slice(TICKET_TAG_PREFIX.length);
+  const pipe = rest.indexOf("|");
+  return pipe >= 0 ? rest.slice(0, pipe) : rest;
+}
 
 /** Read the single-row business hours config; fall back to defaults. */
 export async function readBusinessHoursConfig(): Promise<BusinessHoursConfig> {
