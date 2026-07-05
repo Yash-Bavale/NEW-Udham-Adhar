@@ -4,6 +4,7 @@ import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail,
 import { SectionCard } from "@/components/admin/ui";
 import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
 import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
+import { BusinessHoursTab } from "@/components/admin/BusinessHoursTab";
 import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/settings")({
