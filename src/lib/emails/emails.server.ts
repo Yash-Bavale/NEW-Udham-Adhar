@@ -383,7 +383,15 @@ async function sendQueueRow(row: QueueRow) {
         attempt,
         lead_id: row.lead_id,
         application_id: row.application_id,
-      }),
+        customer_id: sentCustomerId,
+        direction: "outgoing",
+        message_id: sentMessageId,
+        in_reply_to: sentInReplyTo,
+        references_header: sentReferences,
+        from_email: sentFromEmail,
+        body_html: row.body_html,
+        body_text: row.body_text,
+      } as never),
     ];
     if (row.application_id) {
       writes.push(
