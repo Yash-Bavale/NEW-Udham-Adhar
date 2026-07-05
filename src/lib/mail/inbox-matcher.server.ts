@@ -14,7 +14,11 @@ import {
   type ZohoHeaders,
   type ZohoMessageListItem,
 } from "@/lib/mail/zoho-inbox.server";
-import { pauseScheduler, SCHEDULER_CUSTOMER_CLOSURE } from "@/lib/scheduling/schedulers.server";
+import {
+  pauseScheduler,
+  cancelTicketAutocloseForOrder,
+  SCHEDULER_CUSTOMER_CLOSURE,
+} from "@/lib/scheduling/schedulers.server";
 
 export type PollResult = {
   fetched: number;
