@@ -15,10 +15,12 @@ import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 export const SCHEDULER_CUSTOMER_CLOSURE = "customer_closure_24h" as const;
 export const SCHEDULER_OUR_SIDE_REMINDER = "our_side_reminder" as const;
 export const SCHEDULER_TICKET_AUTOCLOSE = "ticket_autoclose_24h" as const;
+export const SCHEDULER_FEEDBACK_FOLLOWUP = "feedback_followup" as const;
 const DEFAULT_CLOSURE_SECONDS = 24 * 3600;
 const DEFAULT_REMINDER_INTERVAL_SECONDS = 2 * 3600; // 2 business hours
 const REMINDER_ESCALATION_THRESHOLD = 3;
 const DEFAULT_TICKET_AUTOCLOSE_SECONDS = 24 * 3600;
+const DEFAULT_FEEDBACK_FOLLOWUP_SECONDS = 24 * 3600; // 24 business hours post-completion
 
 /** Encode/decode ticket_id inside order_schedulers.remarks for ticket schedulers. */
 const TICKET_TAG_PREFIX = "ticket:";
