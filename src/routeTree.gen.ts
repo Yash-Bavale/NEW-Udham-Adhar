@@ -249,6 +249,7 @@ import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/publi
 import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api/public/cron/workflow-reminders'
 import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/public/cron/schedulers-tick'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
+import { Route as ApiPublicCronPollZohoInboxRouteImport } from './routes/api/public/cron/poll-zoho-inbox'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicCronClosureWorkflowRouteImport } from './routes/api/public/cron/closure-workflow'
@@ -1502,6 +1503,12 @@ const ApiPublicCronProcessEmailsRoute =
     path: '/api/public/cron/process-emails',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronPollZohoInboxRoute =
+  ApiPublicCronPollZohoInboxRouteImport.update({
+    id: '/api/public/cron/poll-zoho-inbox',
+    path: '/api/public/cron/poll-zoho-inbox',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronOnboardingRemindersRoute =
   ApiPublicCronOnboardingRemindersRouteImport.update({
     id: '/api/public/cron/onboarding-reminders',
@@ -1763,6 +1770,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
@@ -2006,6 +2014,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
@@ -2253,6 +2262,7 @@ export interface FileRoutesById {
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
@@ -2501,6 +2511,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
@@ -2744,6 +2755,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
@@ -2990,6 +3002,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
@@ -3192,6 +3205,7 @@ export interface RootRouteChildren {
   ApiPublicCronClosureWorkflowRoute: typeof ApiPublicCronClosureWorkflowRoute
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
+  ApiPublicCronPollZohoInboxRoute: typeof ApiPublicCronPollZohoInboxRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicCronSchedulersTickRoute: typeof ApiPublicCronSchedulersTickRoute
   ApiPublicCronWorkflowRemindersRoute: typeof ApiPublicCronWorkflowRemindersRoute
@@ -4885,6 +4899,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronProcessEmailsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/poll-zoho-inbox': {
+      id: '/api/public/cron/poll-zoho-inbox'
+      path: '/api/public/cron/poll-zoho-inbox'
+      fullPath: '/api/public/cron/poll-zoho-inbox'
+      preLoaderRoute: typeof ApiPublicCronPollZohoInboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/onboarding-reminders': {
       id: '/api/public/cron/onboarding-reminders'
       path: '/api/public/cron/onboarding-reminders'
@@ -5297,6 +5318,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronClosureWorkflowRoute: ApiPublicCronClosureWorkflowRoute,
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
+  ApiPublicCronPollZohoInboxRoute: ApiPublicCronPollZohoInboxRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicCronSchedulersTickRoute: ApiPublicCronSchedulersTickRoute,
   ApiPublicCronWorkflowRemindersRoute: ApiPublicCronWorkflowRemindersRoute,
