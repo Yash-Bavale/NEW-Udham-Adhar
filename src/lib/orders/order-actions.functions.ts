@@ -301,7 +301,9 @@ export const completeOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "COMPLETED");
-    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    const { cancelAllForOrder, startFeedbackFollowupScheduler } = await import(
+      "@/lib/scheduling/schedulers.server"
+    );
     await cancelAllForOrder(data.orderId, "completed");
     let emailQueued = false;
     if (customer?.primary_email) {
@@ -315,6 +317,15 @@ export const completeOrder = createServerFn({ method: "POST" })
         },
         { applicationId: order.id, leadId: order.lead_id },
       );
+    }
+    // Arm E007 feedback follow-up (24 business hours post-completion).
+    try {
+      await startFeedbackFollowupScheduler({
+        applicationId: data.orderId,
+        createdBy: context.userId,
+      });
+    } catch (e) {
+      console.error("[completeOrder] feedback follow-up scheduler failed", e);
     }
     return { ok: true, order: updated, emailQueued };
   });
