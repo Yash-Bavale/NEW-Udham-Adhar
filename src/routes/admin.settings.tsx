@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail } from "lucide-react";
+import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail, Clock } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
 import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
+import { BusinessHoursTab } from "@/components/admin/BusinessHoursTab";
 import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
 
 export const Route = createFileRoute("/admin/settings")({
@@ -11,10 +12,11 @@ export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
 });
 
-type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
+type Tab = "company" | "hours" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
+  { id: "hours", label: "Business Hours", icon: Clock },
   { id: "statuses", label: "Status Master", icon: ListChecks },
   { id: "templates", label: "Email Templates", icon: Mail },
   { id: "reasons", label: "Reason Library", icon: BookOpen },
@@ -70,6 +72,7 @@ function SettingsPage() {
       </div>
 
       {tab === "company" && <CompanyTab />}
+      {tab === "hours" && <BusinessHoursTab />}
       {tab === "statuses" && <StatusesTab />}
       {tab === "templates" && <TemplatesTab />}
       {tab === "reasons" && <ReasonLibraryTab />}

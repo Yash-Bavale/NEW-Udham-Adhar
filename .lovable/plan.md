@@ -1,164 +1,127 @@
-# System Overview Document — Plan
+# BHS CRM v2 — Implementation Plan
 
-I'll generate a single markdown file at `/mnt/documents/system-overview.md` (downloadable) capturing the current state of the app so you can plan new flows, features, and changes against it.
+Aligns the app with the v2 PRD (Email + Support + Journey). Adds two things on top of the PRD:
 
-## Discovery approach
+1. **Office-hours-aware schedulers** — all internal timers (24h closure, 2h reminders, 30-min auto-start, ticket auto-close) count only during business hours. Window defaults to **10:00–18:00 IST, Mon–Sat**, and is editable by Super Admin from Settings.
+2. **Redesigned Order Workspace** — one screen an employee can drive an order from start to finish, with a Journey Strip, exception banner, contextual action panel, email thread, and ticket panel.
 
-Before writing, I'll audit these areas in parallel:
+The plan follows the PRD's 9 phases but front-loads foundations (status engine, office hours, workspace shell) so every later phase builds on a stable base.
 
-1. **Routes tree** — `src/routes/` (public site, admin, onboarding, api/public, auth)
-2. **Admin workspace** — `src/components/admin/*` (shell, sidebar, dashboards, order workspace, panels, dialogs)
-3. **Server functions** — `src/lib/crm/*.functions.ts`, `src/lib/applications/*`, `src/lib/payments/*`, `src/lib/emails/*`, `src/lib/finance/*`, `src/lib/onboarding/*`
-4. **Stage/workflow engines** — `fulfillment-transitions.ts`, `lead-transitions.ts`, `status-engine.ts`, `computeOrderStage.ts`, `workflow-*.functions.ts`
-5. **Roles & access** — `src/lib/roles.ts`, `useRole.ts`, `has_role` / `has_any_staff_role` RPCs
-6. **Database** — table list already known (54 tables); I'll group them by domain
-7. **Edge functions** — `supabase/functions/*` (only `delete-order-documents` exists)
-8. **Public API routes** — `src/routes/api/public/*` (webhooks, cron, payment callbacks)
-9. **Integrations** — Supabase, payment gateways (Razorpay, PayU, CCAvenue), SMTP (Zoho), Lovable AI
+---
 
-## Document structure
+## Phase 0 — Foundations (office hours + workspace shell)
 
-```
-# Udyam Ops OS — System Overview
+**DB (migration)**
 
-## 1. Executive Summary
-   - Product purpose, stack (TanStack Start + Supabase + Cloudflare Worker)
-   - Two audiences: public site visitors + internal CRM staff
+- `business_hours_config` (single-row): `tz` (default `Asia/Kolkata`), `open_time` (10:00), `close_time` (18:00), `working_days` (`[1,2,3,4,5,6]` Mon–Sat), `holidays` (date[]), `updated_by`, `updated_at`.
+- `app_settings` (key/value JSONB) for future toggles.
+- RLS: read for any staff role (`has_any_staff_role`), write for `super_admin` only.
 
-## 2. Architecture
-   - Frontend: TanStack Start SSR, file-based routes
-   - Backend: createServerFn (app logic), server routes (webhooks/cron), 1 edge fn
-   - Data: Supabase Postgres with RLS + user_roles
-   - Auth: Supabase Auth (staff email/password)
+**Helpers**
 
-## 3. Public Website (Customer-facing)
-   - Route inventory (/, /about-us, /faqs, /services/*, /download-certificate, etc.)
-   - Lead capture forms → leads table
-   - Onboarding flow (/onboarding, /apply) → onboarding_submissions
-   - Payment flows (/payment*, /processing, /success)
-   - Complaint intake (/complaint)
-   - SEO: sitemap.xml, robots.txt, JSON-LD, head metadata
+- `src/lib/scheduling/business-hours.ts` — pure functions: `isBusinessHour(date, cfg)`, `nextBusinessInstant(date, cfg)`, `addBusinessSeconds(from, seconds, cfg)`, `businessSecondsBetween(a, b, cfg)`. Used by every scheduler.
+- Server fn `getBusinessHoursConfig` (cached 60s) + `updateBusinessHoursConfig` (super_admin).
 
-## 4. Roles & Access Model
-   - Roles: super_admin, admin, manager, executive, operations, support, accounts, finance
-   - `has_role()` / `has_any_staff_role()` RPCs
-   - Module access matrix from `roles.ts` (who sees what, money-hiding rules)
+**UI**
 
-## 5. Admin Workspace
-   - Shell layout (AdminShell, sidebar, command palette, keyboard shortcuts, notifications)
-   - Role-based landing (`/admin` → dashboard/finance/my-work)
-   - Sections:
-     • Dashboard (Executive + Super Admin)
-     • My Work (employee inbox)
-     • Leads (list, detail, bulk ops, assignment, saved filters)
-     • Orders/Applications (workspace, stages, documents, payments)
-     • Customers
-     • Complaints & Support Tickets
-     • Tasks & Follow-ups
-     • Finance (invoices, GST report, settlements, refunds)
-     • Emails (templates, queue, logs, bulk send)
-     • Settings (services, workflows, automation rules, reason library,
-       assignment pool, SMTP, gateways, SEO pages/articles, users)
-     • Activity Log & Audit Log
+- **Settings → Business Hours** tab: edit window, days, holidays. Live preview: "Next fire at …".
+- **Workspace shell rewrite** (`OrderWorkspacePage`): 3-column layout — left rail (Customer, Order meta), center (Journey Strip + Exception Banner + Contextual Action Panel + Email Thread), right (Tickets, Timeline, Documents). Replaces current `WorkspaceShell`.
 
-## 6. Lead Lifecycle
-   - Sources → leads table
-   - Statuses & transitions (`lead-transitions.ts`)
-   - Auto-assignment (assignment_pool, round-robin config)
-   - Conversion → order/application
+## Phase 1 — Order Status Engine
 
-## 7. Order / Fulfillment Workflow
-   - Stages (from `fulfillment-transitions.ts`):
-     order_received → documents_received → verification_pending →
-     application_submitted → under_processing → completed (+ cancelled)
-   - Allowed transitions map + gates (certificate upload for completion)
-   - Cancellation & refund multi-stage workflow
-   - External delay handling
-   - Order workspace panels: journey, documents, payments, notes,
-     workflow, closure, invoice history
+- Migration adds `applications.order_status` (enum: 15 states from PRD), `priority`, `closure_reason_id`, `closure_remarks`, `certificate_uploaded_at`, `form_link_sent_at/_count`, `reopened_at/by`, `refund_requested_at/reason`.
+- New table `delay_reasons` seeded with 8 customer-side + 9 our-side codes.
+- SQL fn `transition_order_status(order_id, new_status, actor, reason_id, remarks)` — enforces the transition map, writes to `application_events`, returns updated row. Any illegal jump throws.
+- Backfill existing rows from current `fulfillment_status` → new `order_status`.
+- Server fns: `transitionOrder`, `listAllowedTransitions`, `getDelayReasons`.
 
-## 8. Employee Flow (Executive / Manager / Support / Operations)
-   - Landing on /admin/my-work
-   - Assigned leads/orders queue
-   - Actions: update status, upload docs, send emails, create tasks,
-     add notes, request refunds, close orders
-   - Money visibility rules per role
+## Phase 2 — Zoho SMTP + Email Registry
 
-## 9. Payments
-   - Gateways: Razorpay, PayU, CCAvenue (server + client functions)
-   - Payment links, initiate, webhooks
-   - Settlements + reconciliation
-   - Refund request workflow (executive → admin approval)
+- Add SMTP secrets (`ZOHO_SMTP_*`) via secret tool prompt to Super Admin.
+- Rewrite `zoho-smtp.server.ts` to always stamp `Message-ID`, `References`, `In-Reply-To`, `X-BHS-Order`, `X-BHS-Customer` headers.
+- Rebuild `email_logs` per PRD (adds `direction`, `template_code`, `message_id`, `in_reply_to`, `references_header`, `zoho_mail_uid`, `triggered_by`).
+- Seed **all 12 templates** (E001–E012) as React Email components in `src/lib/email-templates/`; register in `TEMPLATES`.
+- Queue worker: existing `process-emails` cron enhanced to send via Zoho SMTP, persist Message-ID, honor `is_enabled` per template.
+- E001 auto-fires from PayU webhook (already exists) → set status `WAITING_CUSTOMER_INFO`.
 
-## 10. Email System
-   - Templates (email_templates table + registry)
-   - Queue + send state + logs + suppression list
-   - Providers: Zoho SMTP + generic SMTP
-   - Unsubscribe tokens
-   - Bulk email dialog
+## Phase 3 — Scheduler 2 (Customer-Side Delay, 24h business time)
 
-## 11. Documents & Certificates
-   - Uploads to Supabase storage
-   - Document review workflow
-   - Certificate generation & delivery
+- Table `order_schedulers` per PRD, with `remaining_seconds` (business-seconds), `paused_by_ticket_id`.
+- Fire logic uses `addBusinessSeconds(started_at, 24*3600, cfg)` → stored as `fires_at` wall-clock. Recomputed on resume.
+- New cron route `/api/public/cron/schedulers-tick` (every 1 min). Anon-key auth. Fires E004 + `→ CLOSED` when due.
+- Pause/resume/cancel APIs used by ticket lifecycle.
+- Employee action **"Customer Side Delay"** opens reason picker → sends E003 → starts scheduler.
 
-## 12. Automation & Workflow Engine
-   - workflow_automation_rules
-   - workflow_reminders (SLA/follow-up)
-   - workflow_closure_reasons, workflow_delay_reasons
-   - Cron endpoint: /api/public/cron/closure-workflow
+## Phase 4 — Scheduler 3 (Our-Side Delay reminder engine)
 
-## 13. Public API & Webhooks
-   - Inventory of /api/public/* routes
-   - Payment gateway webhooks
-   - Cron endpoints
+- Table `order_reminders` per PRD.
+- Same cron tick handles reminder firing during business hours only.
+- Rules: 30-min grace to pick an option (business-time) → auto-start 2h reminders; 3 unattended reminders → `HIGH_PRIORITY`; manual reminder past due → notification + priority.
+- Action panel exposes the 3 sub-options (Manual / Auto 2h / Stop-with-reason).
 
-## 14. Edge Functions
-   - `delete-order-documents` (the only one — storage cleanup)
-   - Note: everything else is TanStack server functions, not edge fns
+## Phase 5 — Employee Action Panel (Order Workspace)
 
-## 15. Database Schema (grouped)
-   - Identity: profiles, user_roles
-   - CRM: leads, customers, applications, complaints, tasks, follow_ups
-   - Fulfillment: documents, certificates, application_events,
-     application_status_history, application_links
-   - Finance: invoices, invoice_events, payments, payment_links,
-     payment_settlements, refund_requests, gateway_settlements
-   - Email: email_templates, email_queue, email_logs, email_send_log,
-     email_send_state, email_unsubscribe_tokens, suppressed_emails
-   - Workflow: workflow_settings, workflow_automation_rules,
-     workflow_reminders, workflow_events, workflow_closure_reasons,
-     workflow_delay_reasons, service_workflows
-   - Config: services, service_form_schemas, payment_gateways, smtp_settings,
-     nic_codes, pdf_templates, assignment_pool, lead_assignment_config
-   - Content/SEO: seo_pages
-   - Audit: audit_log, audit_logs, activity_logs, analytics_events,
-     webhook_error_log
-   - Support: support_tickets, ticket_replies, notifications
-   - Notes: lead_notes, customer_notes, saved_lead_filters,
-     onboarding_submissions
+Contextual panel that shows only the buttons legal for `order_status` (Part 7 of PRD):
 
-## 16. Integrations
-   - Supabase (DB, Auth, Storage, Realtime)
-   - Lovable AI Gateway (if used)
-   - Payment gateways
-   - Zoho SMTP
+- `Send/Resend Form Link` (E002), `Start Processing`, `Customer/Our Side Delay`, `Mark Submitted to Govt` (E012), `Upload Certificate`, `Complete Order` (E006 + docs purge), `Request Refund`, `Reopen Order`, `Close Order (manual)`.
+- Each button → `transitionOrder` + email queue + scheduler side-effects, wrapped in a single server fn per action for atomicity.
+- Refund actions gated to `super_admin` (`Approve`, `Reject`, `Mark Processed` → E011).
 
-## 17. Known Constraints & Conventions
-   - Realtime channels prefixed `user:<auth.uid()>:...`
-   - RLS on all public tables
-   - Role storage in user_roles only (never on profiles)
-   - Admin subtree uses `ssr: false`
-   - Public routes must be SSR + shareable head metadata
+## Phase 6 — Zoho Incoming Mail (IMAP alternative)
 
-## 18. Suggested Areas for New Flows / Improvements
-   - (placeholder section for you to fill in)
-```
+Cloudflare Workers cannot open raw IMAP sockets, so the PRD's IMAP poller cannot run inside the app. Options:
 
-## Deliverable
+- **A. Use Zoho Mail REST API** from a TSS cron route `/api/public/cron/poll-zoho-inbox` (every 2 min). Needs a one-time OAuth setup (`ZOHO_MAIL_CLIENT_ID/SECRET/REFRESH_TOKEN`). Recommended.
+- **B. Deploy a single Supabase Edge Function `poll-zoho-inbox**` that uses IMAP libs; keep everything else in TSS. Simpler if OAuth setup is a blocker.
 
-- File: `/mnt/documents/system-overview.md`
-- Emitted as `<presentation-artifact>` so you can download/preview immediately
-- No code changes to the project
+Either poller: dedupes by `zoho_mail_uid`, matches order via `In-Reply-To/References` → `email_logs.message_id`, else via `X-BHS-Order`, else by `from_email` + most-recent active order. Adds row to `email_logs (direction=incoming)`; opens/updates ticket; **pauses Scheduler 2** if active.
 
-Shall I proceed?
+I'll ask which option before wiring credentials.
+
+## Phase 7 — Support Tickets
+
+- Extend `support_tickets` with `source`, `type`, `email_thread_id`, `auto_close_at`, `order_closure_paused`, `paused_scheduler_id`.
+- Auto-ticket creators for 5 conditions (new email, contact form, complaint form, email reply, internal).
+- Ticket detail: threaded replies (incoming + outgoing emails inline), 3 close buttons:
+  1. Close – No Action (no email)
+  2. Close with Reply (sends E008/E009 + arms 24h business-time auto-close → E010)
+  3. Close and Restart Order (cancels Scheduler 2, order → `REOPENED`, resends E002 if needed)
+
+## Phase 8 — Notifications
+
+- Table `notifications` per PRD; RLS to owner.
+- Emitters wired to the 10 events in Part 10.
+- Bell UI in `AdminShell` top bar (unread count, panel, deep links). Realtime channel `user:<uid>:notifications`.
+
+## Phase 9 — Journey UI polish + QA
+
+- **Journey Strip** (6-stage happy path) + **Exception Banner** (Customer Hold / Our Delay / High Priority / Refund / Closed / Reopened) below it. Each stage shows timestamp; exception banner shows scheduler countdown in **business hours remaining** (e.g. "closes in 17h 32m business time").
+- **Email Thread** panel — WhatsApp-style bubbles, direction-colored, template chip, expandable body, "Compose custom email" and "Send template" actions.
+- End-to-end scripted tests via Playwright against localhost for the 6 PRD scenarios.
+
+---
+
+## Office-hours behavior summary
+
+
+| Timer                                | Counts during          | Storage                                                                  |
+| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------ |
+| Scheduler 2 — 24h closure            | Business hours only    | `remaining_seconds` in business-seconds; `fires_at` recomputed on resume |
+| Scheduler 3 — 2h auto reminder       | Business hours only    | interval in business-seconds                                             |
+| Scheduler 3 — 30-min grace           | Business hours only    | derived from `OUR_SIDE_DELAY` timestamp                                  |
+| Ticket auto-close (24h post-reply)   | Business hours only    | `auto_close_at` recomputed                                               |
+| Manual reminder (specific date/time) | Wall clock (as chosen) | as entered                                                               |
+
+
+Super Admin edits window from **Settings → Business Hours**; changes apply to new firings; in-flight `remaining_seconds` are preserved.
+
+## Delivery order & sizing
+
+Phases 0–2 in the first build cycle (foundations + email spine). Then 3–5 (schedulers + action panel). Then 6–7 (incoming mail + tickets). Then 8–9 (notifications + polish). Each phase is shippable independently.
+
+## Open decisions I need before starting Phase 6
+
+- **Incoming mail transport**: Zoho Mail REST API 
+- **Zoho SMTP credentials**: I will request them via the secret tool when Phase 2 starts.
+
+Everything else follows the PRD verbatim.
