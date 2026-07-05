@@ -261,7 +261,9 @@ export type Database = {
           certificate_uploaded_at: string | null
           closure_next_at: string | null
           closure_reason_code: string | null
+          closure_reason_id: string | null
           closure_reason_text: string | null
+          closure_remarks: string | null
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
           customer_id: string | null
@@ -269,6 +271,8 @@ export type Database = {
           document_status: string
           documents_deleted_at: string | null
           documents_deleted_reason: string | null
+          form_link_sent_at: string | null
+          form_link_sent_count: number
           form_status: string
           form_submitted_at: string | null
           fulfilled_at: string | null
@@ -279,12 +283,17 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           lead_id: string
+          order_status: string | null
+          priority: string | null
           refund_approved_at: string | null
           refund_approved_by: string | null
           refund_gateway_ref: string | null
           refund_processed_at: string | null
           refund_reason: string | null
           refund_requested_at: string | null
+          refund_requested_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
           service_id: string | null
           updated_at: string
           workflow_delay_reason: string | null
@@ -303,7 +312,9 @@ export type Database = {
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_reason_code?: string | null
+          closure_reason_id?: string | null
           closure_reason_text?: string | null
+          closure_remarks?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
@@ -311,6 +322,8 @@ export type Database = {
           document_status?: string
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
+          form_link_sent_at?: string | null
+          form_link_sent_count?: number
           form_status?: string
           form_submitted_at?: string | null
           fulfilled_at?: string | null
@@ -321,12 +334,17 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           lead_id: string
+          order_status?: string | null
+          priority?: string | null
           refund_approved_at?: string | null
           refund_approved_by?: string | null
           refund_gateway_ref?: string | null
           refund_processed_at?: string | null
           refund_reason?: string | null
           refund_requested_at?: string | null
+          refund_requested_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           service_id?: string | null
           updated_at?: string
           workflow_delay_reason?: string | null
@@ -347,7 +365,9 @@ export type Database = {
           certificate_uploaded_at?: string | null
           closure_next_at?: string | null
           closure_reason_code?: string | null
+          closure_reason_id?: string | null
           closure_reason_text?: string | null
+          closure_remarks?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
           customer_id?: string | null
@@ -355,6 +375,8 @@ export type Database = {
           document_status?: string
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
+          form_link_sent_at?: string | null
+          form_link_sent_count?: number
           form_status?: string
           form_submitted_at?: string | null
           fulfilled_at?: string | null
@@ -365,12 +387,17 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           lead_id?: string
+          order_status?: string | null
+          priority?: string | null
           refund_approved_at?: string | null
           refund_approved_by?: string | null
           refund_gateway_ref?: string | null
           refund_processed_at?: string | null
           refund_reason?: string | null
           refund_requested_at?: string | null
+          refund_requested_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           service_id?: string | null
           updated_at?: string
           workflow_delay_reason?: string | null
@@ -381,6 +408,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_closure_reason_id_fkey"
+            columns: ["closure_reason_id"]
+            isOneToOne: false
+            referencedRelation: "delay_reasons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "applications_customer_id_fkey"
             columns: ["customer_id"]
@@ -551,6 +585,39 @@ export type Database = {
           new_value?: Json | null
           old_value?: Json | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      business_hours_config: {
+        Row: {
+          close_time: string
+          holidays: string[]
+          id: number
+          open_time: string
+          timezone: string
+          updated_at: string
+          updated_by: string | null
+          working_days: number[]
+        }
+        Insert: {
+          close_time?: string
+          holidays?: string[]
+          id?: number
+          open_time?: string
+          timezone?: string
+          updated_at?: string
+          updated_by?: string | null
+          working_days?: number[]
+        }
+        Update: {
+          close_time?: string
+          holidays?: string[]
+          id?: number
+          open_time?: string
+          timezone?: string
+          updated_at?: string
+          updated_by?: string | null
+          working_days?: number[]
         }
         Relationships: []
       }
@@ -846,6 +913,36 @@ export type Database = {
           total_applications?: number
           udyam_number?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      delay_reasons: {
+        Row: {
+          category: string
+          code: string
+          id: string
+          is_active: boolean
+          label: string
+          requires_remarks: boolean
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          code: string
+          id?: string
+          is_active?: boolean
+          label: string
+          requires_remarks?: boolean
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          code?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          requires_remarks?: boolean
+          sort_order?: number
         }
         Relationships: []
       }
@@ -1825,6 +1922,157 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      order_reminders: {
+        Row: {
+          application_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          interval_business_seconds: number | null
+          is_active: boolean
+          last_fired_at: string | null
+          remind_at: string | null
+          reminder_type: string
+          scheduler_id: string | null
+          stop_reason: string | null
+          stopped_at: string | null
+          times_fired: number
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_business_seconds?: number | null
+          is_active?: boolean
+          last_fired_at?: string | null
+          remind_at?: string | null
+          reminder_type: string
+          scheduler_id?: string | null
+          stop_reason?: string | null
+          stopped_at?: string | null
+          times_fired?: number
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          interval_business_seconds?: number | null
+          is_active?: boolean
+          last_fired_at?: string | null
+          remind_at?: string | null
+          reminder_type?: string
+          scheduler_id?: string | null
+          stop_reason?: string | null
+          stopped_at?: string | null
+          times_fired?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_reminders_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_reminders_scheduler_id_fkey"
+            columns: ["scheduler_id"]
+            isOneToOne: false
+            referencedRelation: "order_schedulers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_schedulers: {
+        Row: {
+          application_id: string
+          business_seconds_remaining: number | null
+          business_seconds_total: number | null
+          created_at: string
+          created_by: string | null
+          fires_at: string | null
+          id: string
+          paused_at: string | null
+          paused_by_ticket_id: string | null
+          reason_id: string | null
+          remarks: string | null
+          resumed_at: string | null
+          scheduler_type: string
+          started_at: string
+          status: string
+          stop_reason: string | null
+          stop_triggered_by: string | null
+          stopped_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          business_seconds_remaining?: number | null
+          business_seconds_total?: number | null
+          created_at?: string
+          created_by?: string | null
+          fires_at?: string | null
+          id?: string
+          paused_at?: string | null
+          paused_by_ticket_id?: string | null
+          reason_id?: string | null
+          remarks?: string | null
+          resumed_at?: string | null
+          scheduler_type: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          stop_triggered_by?: string | null
+          stopped_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          business_seconds_remaining?: number | null
+          business_seconds_total?: number | null
+          created_at?: string
+          created_by?: string | null
+          fires_at?: string | null
+          id?: string
+          paused_at?: string | null
+          paused_by_ticket_id?: string | null
+          reason_id?: string | null
+          remarks?: string | null
+          resumed_at?: string | null
+          scheduler_type?: string
+          started_at?: string
+          status?: string
+          stop_reason?: string | null
+          stop_triggered_by?: string | null
+          stopped_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_schedulers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_schedulers_paused_by_ticket_id_fkey"
+            columns: ["paused_by_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_schedulers_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "delay_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_gateways: {
         Row: {
