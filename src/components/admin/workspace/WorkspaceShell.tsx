@@ -355,7 +355,7 @@ export function WorkspaceShell(p: Props) {
                   This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
                 </div>
               ) : (
-                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} />
+                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
               )}
               <OrderDocumentsPanel
                 orderId={p.orderId}
