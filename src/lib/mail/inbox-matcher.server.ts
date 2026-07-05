@@ -233,7 +233,7 @@ async function openOrAppendTicket(input: {
     .from("support_tickets")
     .select("id")
     .eq("application_id", input.applicationId)
-    .in("status", ["open", "in_progress", "pending"])
+    .in("status", ["open", "in_progress", "waiting_customer"])
     .gte("created_at", cutoff)
     .order("created_at", { ascending: false })
     .limit(1)
