@@ -106,6 +106,7 @@ function OrderDetailPage() {
       canComplete={!role.has("support")}
       notesNode={
         <div className="space-y-4">
+          <ExceptionBanner orderId={orderId} />
           {application?.order_status && (
             <EmployeeActionPanel orderId={orderId} status={application.order_status as OrderStatus} />
           )}
