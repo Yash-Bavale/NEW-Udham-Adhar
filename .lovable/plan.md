@@ -1,126 +1,106 @@
-# BHS CRM v2 — Implementation Plan
 
-Aligns the app with the v2 PRD (Email + Support + Journey). Adds two things on top of the PRD:
+# Orders + Workspace + Notifications UI Refresh
 
-1. **Office-hours-aware schedulers** — all internal timers (24h closure, 2h reminders, 30-min auto-start, ticket auto-close) count only during business hours. Window defaults to **10:00–18:00 IST, Mon–Sat**, and is editable by Super Admin from Settings.
-2. **Redesigned Order Workspace** — one screen an employee can drive an order from start to finish, with a Journey Strip, exception banner, contextual action panel, email thread, and ticket panel.
+Scope is **frontend only** — no schema, no server-fn signature changes. All existing queries (`listOrders`, `getOrderExceptionState`, `OrderWorkflowPanel` actions, notifications feed) stay wired as-is. We rebuild the presentation to match the two reference screenshots (customer journey strip + employee workflow tree).
 
-The plan follows the PRD's 9 phases but front-loads foundations (status engine, office hours, workspace shell) so every later phase builds on a stable base.
+## 1. Orders list — `/admin/orders` (index)
 
----
+Replace the current dense table with a two-layer layout:
 
-## Phase 0 — Foundations (office hours + workspace shell)
+**Top bar**
+- Segmented tabs: `Current` · `Pending` · `Cancelled` · `Closed` · `All` (shadcn `Tabs`, count badges)
+- Right side: search input, service filter, assignee filter, date-range, `+ New Order`
+- Below tabs: 4 KPI mini-cards (Active, Awaiting Customer, Overdue SLA, Closed today)
 
-**DB (migration)**
+**Order rows** — shadcn `Card` list (not a raw table), each row shows:
+- Left: order # + copy, customer name, service pill
+- Middle: **compact 7-dot journey strip** (Lead → Payment → Consultation → Form → Verification → Govt Portal → Certificate → Completed) with current dot highlighted — reused from reference image #1
+- Right: status chip, assignee avatar, "last updated Xh ago", chevron
+- Row hover shows quick actions (Open, Call, WhatsApp, Schedule follow-up)
 
-- `business_hours_config` (single-row): `tz` (default `Asia/Kolkata`), `open_time` (10:00), `close_time` (18:00), `working_days` (`[1,2,3,4,5,6]` Mon–Sat), `holidays` (date[]), `updated_by`, `updated_at`.
-- `app_settings` (key/value JSONB) for future toggles.
-- RLS: read for any staff role (`has_any_staff_role`), write for `super_admin` only.
+Tab filter maps to existing status buckets:
+- Current = active non-exception
+- Pending = `WAITING_CUSTOMER_INFO`, `CUSTOMER_HOLD`, `OUR_SIDE_DELAY`
+- Cancelled = `CANCELLED` / `REJECTED`
+- Closed = `CLOSED` / `COMPLETED`
 
-**Helpers**
+## 2. Order Workspace — `/admin/orders/$orderId`
 
-- `src/lib/scheduling/business-hours.ts` — pure functions: `isBusinessHour(date, cfg)`, `nextBusinessInstant(date, cfg)`, `addBusinessSeconds(from, seconds, cfg)`, `businessSecondsBetween(a, b, cfg)`. Used by every scheduler.
-- Server fn `getBusinessHoursConfig` (cached 60s) + `updateBusinessHoursConfig` (super_admin).
+Rebuild `WorkspaceShell` layout to mirror reference image #1:
 
-**UI**
+**Header card**
+- Back to Orders · Order # (copy) · Payment status chip · Order status chip · Created timestamp + relative
+- Contact grid (Name, Email, Language, Selected Service | Mobile, State, Source, Lead Code)
+- Right-side quick-action tiles: Call / WhatsApp / Email / Open Lead / Print (icon buttons in soft-tinted squares)
+- Top-right primary: `+ Schedule Follow-up`
 
-- **Settings → Business Hours** tab: edit window, days, holidays. Live preview: "Next fire at …".
-- **Workspace shell rewrite** (`OrderWorkspacePage`): 3-column layout — left rail (Customer, Order meta), center (Journey Strip + Exception Banner + Contextual Action Panel + Email Thread), right (Tickets, Timeline, Documents). Replaces current `WorkspaceShell`.
+**Customer Journey strip** (full-width card)
+- 8 stages with icon + label, connector lines, current stage pulsing with "Current Stage" pill
+- Completed = filled primary, current = ring + pulse, upcoming = muted
+- Reuse `CustomerJourneyMap` visuals but restyle to match reference
 
-## Phase 1 — Order Status Engine ✅
+**Tabs row**: Employee Workflow · Forms & Docs · Emails · Timeline / Activity Log · Internal Help / Support Ticket
 
-- ✅ `order_status_enum` (15 states) created; `applications.order_status` converted from text → enum, backfilled from `fulfillment_status`, defaults to `NEW_ORDER`.
-- ✅ `delay_reasons` already seeded from Phase 0 (17 rows).
-- ✅ SQL fns `allowed_order_transitions(from)` and `transition_order_status(order, new, reason, remarks, force)` — enforce transition map, log to `application_events`, `force=true` restricted to super_admin.
-- ✅ Server fns in `src/lib/orders/order-status.functions.ts`: `transitionOrder`, `listAllowedTransitions`, `getDelayReasons`, plus `ORDER_STATUS_LABELS`.
+**Employee Workflow tab (main redesign — reference image #2)**
+Two-column: left = workflow, right = Order Summary + Quick Notes.
 
-## Phase 2 — Zoho SMTP + Email Registry ✅
+Left column — **visual decision tree** (`OrderWorkflowPanel` restyled):
+1. Current Status chip + "View Workflow Guide" button (opens `Sheet` with the full flowchart from reference #2)
+2. **Next Action** grid — 4 tinted action cards (green/amber/blue/purple) with icon, title, description, arrow:
+   - Application Submitted
+   - Information Incomplete
+   - Service Delay – Our Side
+   - Service Delay – Customer Side
+3. On click, expand inline into the sub-branch (e.g. Information Incomplete → Reminder Sent → Customer Submitted → Application Submitted / Auto Close) rendered as a vertical mini-stepper so the employee sees exactly where they are and what's next
+4. Existing `ExceptionBanner` sits above the action grid when in an exception state (kept, restyled to match tint system)
 
-- ✅ Zoho SMTP credentials already present (`ZOHO_SMTP_HOST/PORT/USER/PASS`, `ZOHO_FROM_NAME`).
-- ✅ `zoho-smtp.server.ts` rewritten to auto-generate a stable `Message-ID`, stamp `In-Reply-To`, `References`, `X-BHS-Order`, `X-BHS-Customer`, `X-BHS-Template`, `X-BHS-Queue-Id` on every outbound.
-- ✅ `email_logs` extended with `direction`, `message_id` (unique), `in_reply_to`, `references_header`, `zoho_mail_uid` (unique), `triggered_by`, `from_email`, `body_html`, `body_text`, `customer_id` + matching indexes for incoming-mail matching.
-- ✅ `sendQueueRow` now looks up `customer_id`, forwards threading headers, and persists `message_id` + body into `email_logs`.
-- ✅ BHS v2 template registry (E001–E012) in `src/lib/emails/bhs-templates.ts`, mapping to existing template codes + 5 new disabled system templates (`bhs_e003_customer_delay`, `bhs_e005_manual_reminder`, `bhs_e007_feedback`, `bhs_e010_ticket_autoclose`, `bhs_e012_submitted_to_govt`).
-- ✅ E001 already auto-fires from PayU webhook via `order_confirmation` template.
+Right column — sticky `Order Summary` (Total, Paid, Due, Assigned To, Last Updated, Next Follow-up) + `Quick Notes` textarea with inline save.
 
-## Phase 3 — Scheduler 2 (Customer-Side Delay, 24h business time) ✅
+**Other tabs**: keep current data, just restyle to shadcn cards + consistent spacing.
 
-- ✅ `order_schedulers` schema in place from Phase 0 (business-seconds fields, pause/resume/stop columns).
-- ✅ `src/lib/scheduling/schedulers.server.ts` — `startCustomerClosureScheduler`, `pauseScheduler`, `resumeScheduler`, `cancelScheduler`, `cancelAllForOrder`, `fireDueSchedulers` (uses `addBusinessSeconds` / `businessSecondsBetween`).
-- ✅ Cron route `POST /api/public/cron/schedulers-tick` (anon-key auth). Fires E004 + transitions order → `CLOSED` when due, only if order still in `WAITING_CUSTOMER_INFO / CUSTOMER_HOLD / NEW_ORDER`.
-- ✅ pg_cron job `schedulers-tick` scheduled every minute.
-- ✅ `customerSideDelay` server fn in `src/lib/orders/order-actions.functions.ts` — one-shot: `transition_order_status → CUSTOMER_HOLD` + queue E003 + start Scheduler 2.
+## 3. Notifications — `/admin/notifications`
 
-## Phase 4 — Scheduler 3 (Our-Side Delay reminder engine) ✅
+Redesign the bell page:
+- Header: title + `Mark all as read` + filter tabs (All · Mentions · Assignments · SLA · System)
+- Grouped by day (`Today`, `Yesterday`, older date headings)
+- Each item = `Card` row: colored dot (severity), icon, title, one-line context, order # link, relative time, action buttons (Open, Snooze, Dismiss)
+- Unread rows get subtle left border + tinted background
+- Empty state illustration
 
-- ✅ `startOurSideReminder(mode: grace|auto|manual)` added to `schedulers.server.ts`. Uses `order_reminders` table for counter + audit; supersedes any active reminder scheduler per order.
-- ✅ `fireDueSchedulers` extended with `fireOurSideReminder`: increments `times_fired`, drops a `notifications` row to the assignee, reschedules next business-time fire for `auto`, converts `grace` → `auto` after firing, one-shot for `manual`.
-- ✅ Auto-escalates order → `HIGH_PRIORITY` after 3 unattended reminders.
-- ✅ Loop auto-stops when order leaves `OUR_SIDE_DELAY / HIGH_PRIORITY`.
-- ✅ `ourSideDelay` server fn in `order-actions.functions.ts` — one-shot: transition to `OUR_SIDE_DELAY` + arm reminder loop (or `stop` for reason-only).
-- ✅ Existing `/api/public/cron/schedulers-tick` handles the new type automatically.
+Bell dropdown (`NotificationsBell`) restyled to match: same grouped list, "See all" footer link.
 
-## Phase 5 — Employee Action Panel (Order Workspace) ✅
+## 4. Design system touches
 
-- ✅ 9 new atomic action fns in `src/lib/orders/order-actions.functions.ts`: `sendFormLink` (E002), `sendManualReminder` (E005), `startProcessing`, `markSubmittedToGovt` (E012), `markCertificateIssued`, `completeOrder` (E006), `requestRefund`, `reopenOrder` (force), `closeOrderManual`. Each combines `transition_order_status` RPC + templated email + scheduler cleanup atomically.
-- ✅ `src/components/admin/EmployeeActionPanel.tsx` — contextual button grid keyed off `order_status` (per PRD Part 7). Refund/Reopen gated to `super_admin`. Each button opens a lightweight dialog with the required inputs (reason picker, reminder mode, govt ref, remarks) and posts via TanStack Query mutation, invalidating the order query on success.
-- ✅ Wired into `admin.orders.$orderId.tsx` above the internal notes card so employees can drive the order end-to-end from one screen.
+- Soft tinted status pills using existing semantic tokens (`--primary`, `--success`, `--warning`, `--destructive`, `--muted`) — no hardcoded hex
+- Add utility tokens in `src/styles.css`: `--tint-success`, `--tint-warning`, `--tint-info`, `--tint-danger`, `--tint-purple` (bg + fg pairs) for the workflow action cards and quick-action tiles
+- Consistent card radius (`rounded-xl`), 1px border, subtle shadow on hover only
+- Icons from `lucide-react` (already used)
+- Motion: `framer-motion` fade/slide on tab switch + stage-dot pulse (already installed)
 
-## Phase 6 — Zoho Incoming Mail (IMAP alternative)
+## Files touched
 
-Cloudflare Workers cannot open raw IMAP sockets, so the PRD's IMAP poller cannot run inside the app. Options:
+Edited:
+- `src/routes/admin.orders.index.tsx` — new tabs + card list + KPI strip
+- `src/routes/admin.orders.$orderId.tsx` — new header + journey strip placement
+- `src/components/admin/workspace/WorkspaceShell.tsx` — layout rework, tabs
+- `src/components/admin/workspace/OrderWorkflowPanel.tsx` — action-card grid + inline sub-stepper + Workflow Guide sheet
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — restyle to reference
+- `src/components/admin/workspace/ExceptionBanner.tsx` — tint system alignment
+- `src/routes/admin.notifications.tsx` — grouped card list
+- `src/components/admin/NotificationsBell.tsx` (if present) — matching dropdown
+- `src/styles.css` — tint tokens
 
-- **A. Use Zoho Mail REST API** from a TSS cron route `/api/public/cron/poll-zoho-inbox` (every 2 min). Needs a one-time OAuth setup (`ZOHO_MAIL_CLIENT_ID/SECRET/REFRESH_TOKEN`). Recommended.
-- **B. Deploy a single Supabase Edge Function `poll-zoho-inbox**` that uses IMAP libs; keep everything else in TSS. Simpler if OAuth setup is a blocker.
+New:
+- `src/components/admin/orders/OrderRowCard.tsx`
+- `src/components/admin/orders/OrdersKpiStrip.tsx`
+- `src/components/admin/orders/OrdersTabs.tsx`
+- `src/components/admin/workspace/WorkflowActionCard.tsx`
+- `src/components/admin/workspace/WorkflowGuideSheet.tsx`
+- `src/components/admin/workspace/QuickActionTile.tsx`
+- `src/components/admin/notifications/NotificationCard.tsx`
 
-Either poller: dedupes by `zoho_mail_uid`, matches order via `In-Reply-To/References` → `email_logs.message_id`, else via `X-BHS-Order`, else by `from_email` + most-recent active order. Adds row to `email_logs (direction=incoming)`; opens/updates ticket; **pauses Scheduler 2** if active.
+## Out of scope
 
-I'll ask which option before wiring credentials.
-
-## Phase 7 — Support Tickets
-
-- Extend `support_tickets` with `source`, `type`, `email_thread_id`, `auto_close_at`, `order_closure_paused`, `paused_scheduler_id`.
-- Auto-ticket creators for 5 conditions (new email, contact form, complaint form, email reply, internal).
-- Ticket detail: threaded replies (incoming + outgoing emails inline), 3 close buttons:
-  1. Close – No Action (no email)
-  2. Close with Reply (sends E008/E009 + arms 24h business-time auto-close → E010)
-  3. Close and Restart Order (cancels Scheduler 2, order → `REOPENED`, resends E002 if needed)
-
-## Phase 8 — Notifications
-
-- Table `notifications` per PRD; RLS to owner.
-- Emitters wired to the 10 events in Part 10.
-- Bell UI in `AdminShell` top bar (unread count, panel, deep links). Realtime channel `user:<uid>:notifications`.
-
-## Phase 9 — Journey UI polish + QA
-
-- **Journey Strip** (6-stage happy path) + **Exception Banner** (Customer Hold / Our Delay / High Priority / Refund / Closed / Reopened) below it. Each stage shows timestamp; exception banner shows scheduler countdown in **business hours remaining** (e.g. "closes in 17h 32m business time").
-- **Email Thread** panel — WhatsApp-style bubbles, direction-colored, template chip, expandable body, "Compose custom email" and "Send template" actions.
-- End-to-end scripted tests via Playwright against localhost for the 6 PRD scenarios.
-
----
-
-## Office-hours behavior summary
-
-
-| Timer                                | Counts during          | Storage                                                                  |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------ |
-| Scheduler 2 — 24h closure            | Business hours only    | `remaining_seconds` in business-seconds; `fires_at` recomputed on resume |
-| Scheduler 3 — 2h auto reminder       | Business hours only    | interval in business-seconds                                             |
-| Scheduler 3 — 30-min grace           | Business hours only    | derived from `OUR_SIDE_DELAY` timestamp                                  |
-| Ticket auto-close (24h post-reply)   | Business hours only    | `auto_close_at` recomputed                                               |
-| Manual reminder (specific date/time) | Wall clock (as chosen) | as entered                                                               |
-
-
-Super Admin edits window from **Settings → Business Hours**; changes apply to new firings; in-flight `remaining_seconds` are preserved.
-
-## Delivery order & sizing
-
-Phases 0–2 in the first build cycle (foundations + email spine). Then 3–5 (schedulers + action panel). Then 6–7 (incoming mail + tickets). Then 8–9 (notifications + polish). Each phase is shippable independently.
-
-## Open decisions I need before starting Phase 6
-
-- **Incoming mail transport**: Zoho Mail REST API 
-- **Zoho SMTP credentials**: I will request them via the secret tool when Phase 2 starts.
-
-Everything else follows the PRD verbatim.
+- No changes to server functions, DB, RLS, or notification/scheduler logic
+- No new statuses or workflow transitions — only visualising what's already there
+- Other admin routes untouched
