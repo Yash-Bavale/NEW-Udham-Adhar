@@ -368,7 +368,7 @@ export function WorkspaceShell(p: Props) {
 
             <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
               {lead?.id ? (
-                <LeadEmailsTab leadId={lead.id} leadService={svcName} />
+                <LeadEmailsTab leadId={lead.id} leadService={svcName} orderId={p.orderId} />
               ) : (
                 <div className="rounded-2xl border bg-white p-6 text-sm text-slate-500">No lead linked.</div>
               )}
