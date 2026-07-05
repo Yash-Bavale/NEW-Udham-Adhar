@@ -1,106 +1,71 @@
+## Goal
+Make the order workspace behave as one coherent surface: every quick action, tab, and status hint reads from a single map; every tab shows employees where the order stands; every action fires a toast and refreshes the workspace.
 
-# Orders + Workspace + Notifications UI Refresh
+## 1. Single source of truth — `orderActionsMap.ts`
 
-Scope is **frontend only** — no schema, no server-fn signature changes. All existing queries (`listOrders`, `getOrderExceptionState`, `OrderWorkflowPanel` actions, notifications feed) stay wired as-is. We rebuild the presentation to match the two reference screenshots (customer journey strip + employee workflow tree).
+New file: `src/lib/orders/order-actions-map.ts`. Exports:
 
-## 1. Orders list — `/admin/orders` (index)
+- `QUICK_ACTIONS` — array of `{ id, label, icon, tint, kind: "contact" | "link" | "system", build(ctx): { href?, onClick?, disabled, disabledReason }, toast: { info?, success? } }` for Call, WhatsApp, Email, Open Lead, Print, Copy Order No.
+- `STATUS_ACTIONS: Record<OrderStatus, ActionKey[]>` — the existing per-status button set (moved out of `EmployeeActionPanel`).
+- `TAB_AVAILABILITY(status, hasLead, showConsultation)` — the current `tabAvailability()` logic, moved here.
+- `NEXT_STEP_HINT: Record<OrderStatus, { headline, hint, primaryActionKey }>` — the one-line "next step" copy per status used by the compact tab header (e.g. `WAITING_CUSTOMER_INFO` → "Waiting for customer info · Send reminder if 24h+ has passed").
+- Enum-typed so TS catches any missing status.
 
-Replace the current dense table with a two-layer layout:
+`EmployeeActionPanel` and `WorkspaceShell` both import from this file — no more duplicated arrays.
 
-**Top bar**
-- Segmented tabs: `Current` · `Pending` · `Cancelled` · `Closed` · `All` (shadcn `Tabs`, count badges)
-- Right side: search input, service filter, assignee filter, date-range, `+ New Order`
-- Below tabs: 4 KPI mini-cards (Active, Awaiting Customer, Overdue SLA, Closed today)
+## 2. Compact "Current status + next step" tab header
 
-**Order rows** — shadcn `Card` list (not a raw table), each row shows:
-- Left: order # + copy, customer name, service pill
-- Middle: **compact 7-dot journey strip** (Lead → Payment → Consultation → Form → Verification → Govt Portal → Certificate → Completed) with current dot highlighted — reused from reference image #1
-- Right: status chip, assignee avatar, "last updated Xh ago", chevron
-- Row hover shows quick actions (Open, Call, WhatsApp, Schedule follow-up)
+New file: `src/components/admin/workspace/TabStatusHeader.tsx`. One row, ~48px tall:
 
-Tab filter maps to existing status buckets:
-- Current = active non-exception
-- Pending = `WAITING_CUSTOMER_INFO`, `CUSTOMER_HOLD`, `OUR_SIDE_DELAY`
-- Cancelled = `CANCELLED` / `REJECTED`
-- Closed = `CLOSED` / `COMPLETED`
+```text
+[● status pill]  Order BHS-2026-000125  ·  Next: Send form link to customer  ·  in state 4h 12m  →  [primary action btn]
+```
 
-## 2. Order Workspace — `/admin/orders/$orderId`
+- Status pill uses `STAGE_META` tone (same as header card).
+- Copy comes from `NEXT_STEP_HINT[orderStatus]`.
+- Primary action button (when defined) fires the same handler as the header's Employee Action Panel — reuses the map, no duplicate dialogs; opens the same `ActionDialog` via a shared `useOrderActionDialog()` hook lifted out of `EmployeeActionPanel`.
+- Rendered as the first child inside every `TabsContent` (Employee Workflow, Forms & Docs, Emails, Timeline, Support) so employees never lose context when they tab-hop.
 
-Rebuild `WorkspaceShell` layout to mirror reference image #1:
+## 3. Toasts + auto-refresh for every quick action
 
-**Header card**
-- Back to Orders · Order # (copy) · Payment status chip · Order status chip · Created timestamp + relative
-- Contact grid (Name, Email, Language, Selected Service | Mobile, State, Source, Lead Code)
-- Right-side quick-action tiles: Call / WhatsApp / Email / Open Lead / Print (icon buttons in soft-tinted squares)
-- Top-right primary: `+ Schedule Follow-up`
+Wrap the 5 header quick tiles in a `runQuickAction(actionKey)` helper inside `WorkspaceShell`:
 
-**Customer Journey strip** (full-width card)
-- 8 stages with icon + label, connector lines, current stage pulsing with "Current Stage" pill
-- Completed = filled primary, current = ring + pulse, upcoming = muted
-- Reuse `CustomerJourneyMap` visuals but restyle to match reference
+| Action    | Toast on trigger                     | Refresh workspace?           |
+|-----------|--------------------------------------|------------------------------|
+| Call      | `toast("Opening dialer…")`           | no                           |
+| WhatsApp  | `toast("Opening WhatsApp…")`         | no                           |
+| Email     | `toast("Opening mail client…")`      | no                           |
+| Open Lead | `toast("Opening lead…")`             | no                           |
+| Print     | `toast.success("Print dialog opened")`| no                          |
+| Copy code | already toasts — unchanged           | no                           |
 
-**Tabs row**: Employee Workflow · Forms & Docs · Emails · Timeline / Activity Log · Internal Help / Support Ticket
+Disabled tiles show `toast.error(disabledReason)` on click instead of failing silently (e.g. "No mobile on file").
 
-**Employee Workflow tab (main redesign — reference image #2)**
-Two-column: left = workflow, right = Order Summary + Quick Notes.
+Every server-touching action (Employee Actions, document upload/delete, email send, form-link resend, assignee change, request-docs) already toasts inside its own mutation; add a shared `onChanged` callback so they also call `queryClient.invalidateQueries({ queryKey: ["admin.order", orderId] })`. Threaded via new optional `onChanged?: () => void` props on:
+- `OrderDocumentsPanel` (upload, delete)
+- `FormSubmissionPanel` (send/resend form link)
+- `LeadEmailsTab` (email sent)
+- `EmployeeActionPanel` (already invalidates via existing `onDone` — keep, but route through the same helper)
 
-Left column — **visual decision tree** (`OrderWorkflowPanel` restyled):
-1. Current Status chip + "View Workflow Guide" button (opens `Sheet` with the full flowchart from reference #2)
-2. **Next Action** grid — 4 tinted action cards (green/amber/blue/purple) with icon, title, description, arrow:
-   - Application Submitted
-   - Information Incomplete
-   - Service Delay – Our Side
-   - Service Delay – Customer Side
-3. On click, expand inline into the sub-branch (e.g. Information Incomplete → Reminder Sent → Customer Submitted → Application Submitted / Auto Close) rendered as a vertical mini-stepper so the employee sees exactly where they are and what's next
-4. Existing `ExceptionBanner` sits above the action grid when in an exception state (kept, restyled to match tint system)
+`WorkspaceShell` passes one `invalidate = () => qc.invalidateQueries({ queryKey: ["admin.order", orderId] })` down to all of them.
 
-Right column — sticky `Order Summary` (Total, Paid, Due, Assigned To, Last Updated, Next Follow-up) + `Quick Notes` textarea with inline save.
+## 4. Files touched
 
-**Other tabs**: keep current data, just restyle to shadcn cards + consistent spacing.
+**New**
+- `src/lib/orders/order-actions-map.ts`
+- `src/components/admin/workspace/TabStatusHeader.tsx`
+- `src/components/admin/workspace/useOrderActionDialog.ts` (extracted from `EmployeeActionPanel`, so both the panel and `TabStatusHeader` open the same dialog)
 
-## 3. Notifications — `/admin/notifications`
+**Edited**
+- `src/components/admin/workspace/WorkspaceShell.tsx` — consume the map, wrap quick tiles with toast helper, mount `TabStatusHeader` inside every `TabsContent`, pass `onChanged` down.
+- `src/components/admin/EmployeeActionPanel.tsx` — drop local `ACTIONS_BY_STATUS`, import from map; extract dialog into the shared hook.
+- `src/components/admin/OrderDocumentsPanel.tsx`, `src/components/admin/FormSubmissionPanel.tsx`, `src/components/admin/LeadEmailsTab.tsx` — accept `onChanged`, call after success.
 
-Redesign the bell page:
-- Header: title + `Mark all as read` + filter tabs (All · Mentions · Assignments · SLA · System)
-- Grouped by day (`Today`, `Yesterday`, older date headings)
-- Each item = `Card` row: colored dot (severity), icon, title, one-line context, order # link, relative time, action buttons (Open, Snooze, Dismiss)
-- Unread rows get subtle left border + tinted background
-- Empty state illustration
+**No backend changes.** No new server functions. All existing handlers (`sendFormLink`, `startProcessing`, `queueDocumentReminder`, etc.) stay as-is.
 
-Bell dropdown (`NotificationsBell`) restyled to match: same grouped list, "See all" footer link.
+## 5. Acceptance
 
-## 4. Design system touches
-
-- Soft tinted status pills using existing semantic tokens (`--primary`, `--success`, `--warning`, `--destructive`, `--muted`) — no hardcoded hex
-- Add utility tokens in `src/styles.css`: `--tint-success`, `--tint-warning`, `--tint-info`, `--tint-danger`, `--tint-purple` (bg + fg pairs) for the workflow action cards and quick-action tiles
-- Consistent card radius (`rounded-xl`), 1px border, subtle shadow on hover only
-- Icons from `lucide-react` (already used)
-- Motion: `framer-motion` fade/slide on tab switch + stage-dot pulse (already installed)
-
-## Files touched
-
-Edited:
-- `src/routes/admin.orders.index.tsx` — new tabs + card list + KPI strip
-- `src/routes/admin.orders.$orderId.tsx` — new header + journey strip placement
-- `src/components/admin/workspace/WorkspaceShell.tsx` — layout rework, tabs
-- `src/components/admin/workspace/OrderWorkflowPanel.tsx` — action-card grid + inline sub-stepper + Workflow Guide sheet
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — restyle to reference
-- `src/components/admin/workspace/ExceptionBanner.tsx` — tint system alignment
-- `src/routes/admin.notifications.tsx` — grouped card list
-- `src/components/admin/NotificationsBell.tsx` (if present) — matching dropdown
-- `src/styles.css` — tint tokens
-
-New:
-- `src/components/admin/orders/OrderRowCard.tsx`
-- `src/components/admin/orders/OrdersKpiStrip.tsx`
-- `src/components/admin/orders/OrdersTabs.tsx`
-- `src/components/admin/workspace/WorkflowActionCard.tsx`
-- `src/components/admin/workspace/WorkflowGuideSheet.tsx`
-- `src/components/admin/workspace/QuickActionTile.tsx`
-- `src/components/admin/notifications/NotificationCard.tsx`
-
-## Out of scope
-
-- No changes to server functions, DB, RLS, or notification/scheduler logic
-- No new statuses or workflow transitions — only visualising what's already there
-- Other admin routes untouched
+- Deleting the array in `WorkspaceShell` or `EmployeeActionPanel` no longer breaks anything — both read from `order-actions-map.ts`.
+- Switching tabs always shows the current status pill + next-step line at the top.
+- Clicking any header tile (including disabled ones) shows a toast within 100 ms.
+- After uploading a doc / sending an email / running any status action, the header pill, journey map, and Order Summary update without a page reload.
