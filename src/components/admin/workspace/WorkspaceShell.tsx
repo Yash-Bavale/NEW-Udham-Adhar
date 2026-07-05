@@ -108,6 +108,36 @@ export function WorkspaceShell(p: Props) {
 
   const copy = (v: string) => { navigator.clipboard.writeText(v); toast.success("Copied"); };
 
+  /**
+   * Central handler for every header quick tile. Always fires a toast so
+   * employees get instant feedback, disabled tiles show WHY they're disabled,
+   * and system actions (print / copy) confirm success.
+   */
+  const runQuickAction = useCallback(
+    (
+      key: string,
+      built: { disabledReason?: string | null; toastInfo?: string; toastSuccess?: string },
+      exec: () => void,
+    ) => {
+      if (built.disabledReason) {
+        toast.error(built.disabledReason);
+        return;
+      }
+      if (built.toastInfo) toast(built.toastInfo);
+      exec();
+      if (built.toastSuccess) toast.success(built.toastSuccess);
+    },
+    [],
+  );
+
+  const quickCtx = {
+    mobile: cMobile,
+    email: cEmail,
+    leadId: lead?.id ?? null,
+    waUrl,
+    applicationCode: application.application_code,
+  };
+
   const paymentPillCls =
     paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" :
     paymentStatus === "Refunded" || paymentStatus === "Failed" ? "bg-rose-50 text-rose-700 ring-rose-200" :
