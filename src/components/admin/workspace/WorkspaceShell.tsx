@@ -99,7 +99,7 @@ export function WorkspaceShell(p: Props) {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Orders
         </Link>
-        <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} />
+        <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Schedule Follow-up" />
       </div>
 
       {/* Header card */}
