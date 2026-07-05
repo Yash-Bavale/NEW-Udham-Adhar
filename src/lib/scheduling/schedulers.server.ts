@@ -14,9 +14,23 @@ import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 
 export const SCHEDULER_CUSTOMER_CLOSURE = "customer_closure_24h" as const;
 export const SCHEDULER_OUR_SIDE_REMINDER = "our_side_reminder" as const;
+export const SCHEDULER_TICKET_AUTOCLOSE = "ticket_autoclose_24h" as const;
 const DEFAULT_CLOSURE_SECONDS = 24 * 3600;
 const DEFAULT_REMINDER_INTERVAL_SECONDS = 2 * 3600; // 2 business hours
 const REMINDER_ESCALATION_THRESHOLD = 3;
+const DEFAULT_TICKET_AUTOCLOSE_SECONDS = 24 * 3600;
+
+/** Encode/decode ticket_id inside order_schedulers.remarks for ticket schedulers. */
+const TICKET_TAG_PREFIX = "ticket:";
+function encodeTicketRemarks(ticketId: string, note?: string | null) {
+  return note ? `${TICKET_TAG_PREFIX}${ticketId}|${note}` : `${TICKET_TAG_PREFIX}${ticketId}`;
+}
+function decodeTicketId(remarks: string | null): string | null {
+  if (!remarks || !remarks.startsWith(TICKET_TAG_PREFIX)) return null;
+  const rest = remarks.slice(TICKET_TAG_PREFIX.length);
+  const pipe = rest.indexOf("|");
+  return pipe >= 0 ? rest.slice(0, pipe) : rest;
+}
 
 /** Read the single-row business hours config; fall back to defaults. */
 export async function readBusinessHoursConfig(): Promise<BusinessHoursConfig> {
@@ -202,8 +216,10 @@ export async function fireDueSchedulers(now = new Date()) {
       } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER) {
         await fireOurSideReminder(s.id, s.application_id);
         fired++;
+      } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
+        await fireTicketAutoclose(s);
+        fired++;
       } else {
-        // Unknown scheduler type — mark stopped to avoid tight-loop.
         await supabaseAdmin
           .from("order_schedulers")
           .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type" } as never)
@@ -497,3 +513,182 @@ async function fireCustomerClosure(s: {
     } as never)
     .eq("id", s.id);
 }
+
+// ─────────────────────── Scheduler 6 — Ticket Auto-Close ───────────────────────
+// Armed when support staff sends a public reply on a ticket. Fires 24 business
+// hours later → sends E010 auto-close notice and closes the ticket. Cancelled
+// automatically when the customer replies (inbox matcher calls
+// `cancelTicketAutocloseForOrder`).
+
+/** Arm the 24-business-hour ticket auto-close timer. Cancels any prior active one. */
+export async function startTicketAutocloseScheduler(input: {
+  ticketId: string;
+  applicationId: string;
+  totalSeconds?: number;
+  createdBy?: string | null;
+  note?: string | null;
+}) {
+  const cfg = await readBusinessHoursConfig();
+  const total = input.totalSeconds ?? DEFAULT_TICKET_AUTOCLOSE_SECONDS;
+  const now = new Date();
+  const firesAt = addBusinessSeconds(now, total, cfg);
+
+  // Cancel any prior autoclose for this exact ticket.
+  await supabaseAdmin
+    .from("order_schedulers")
+    .update({
+      status: "cancelled",
+      stopped_at: now.toISOString(),
+      stop_reason: "superseded",
+      stop_triggered_by: "system",
+      updated_at: now.toISOString(),
+    } as never)
+    .eq("application_id", input.applicationId)
+    .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
+    .like("remarks", `${TICKET_TAG_PREFIX}${input.ticketId}%`)
+    .in("status", ["active", "paused"]);
+
+  const { data, error } = await supabaseAdmin
+    .from("order_schedulers")
+    .insert({
+      application_id: input.applicationId,
+      scheduler_type: SCHEDULER_TICKET_AUTOCLOSE,
+      status: "active",
+      started_at: now.toISOString(),
+      fires_at: firesAt.toISOString(),
+      business_seconds_total: total,
+      business_seconds_remaining: total,
+      remarks: encodeTicketRemarks(input.ticketId, input.note ?? null),
+      created_by: input.createdBy ?? null,
+    } as never)
+    .select("id, fires_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** Cancel ticket auto-close timers for a specific ticket (customer replied / closed manually). */
+export async function cancelTicketAutocloseByTicket(ticketId: string, reason = "customer_replied") {
+  const now = new Date();
+  await supabaseAdmin
+    .from("order_schedulers")
+    .update({
+      status: "cancelled",
+      stopped_at: now.toISOString(),
+      stop_reason: reason,
+      stop_triggered_by: "system",
+      updated_at: now.toISOString(),
+    } as never)
+    .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
+    .like("remarks", `${TICKET_TAG_PREFIX}${ticketId}%`)
+    .in("status", ["active", "paused"]);
+}
+
+/** Cancel every active ticket auto-close on an order (customer replied inbound). */
+export async function cancelTicketAutocloseForOrder(applicationId: string, reason = "customer_replied") {
+  const now = new Date();
+  await supabaseAdmin
+    .from("order_schedulers")
+    .update({
+      status: "cancelled",
+      stopped_at: now.toISOString(),
+      stop_reason: reason,
+      stop_triggered_by: "system",
+      updated_at: now.toISOString(),
+    } as never)
+    .eq("application_id", applicationId)
+    .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
+    .in("status", ["active", "paused"]);
+}
+
+async function fireTicketAutoclose(s: {
+  id: string;
+  application_id: string;
+  reason_id: string | null;
+  remarks: string | null;
+}) {
+  const ticketId = decodeTicketId(s.remarks);
+  const now = new Date();
+
+  const markStopped = async (reason: string) => {
+    await supabaseAdmin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: now.toISOString(),
+        stop_reason: reason,
+        stop_triggered_by: "cron",
+        updated_at: now.toISOString(),
+      } as never)
+      .eq("id", s.id);
+  };
+
+  if (!ticketId) {
+    await markStopped("ticket_id_missing");
+    return;
+  }
+
+  const { data: ticket } = await supabaseAdmin
+    .from("support_tickets")
+    .select("id, status, subject, customer_id, application_id")
+    .eq("id", ticketId)
+    .maybeSingle();
+  const t = ticket as {
+    id: string;
+    status: string | null;
+    subject: string;
+    customer_id: string | null;
+    application_id: string | null;
+  } | null;
+
+  // If ticket already closed or customer replied → skip.
+  if (!t || t.status === "closed" || t.status === "resolved") {
+    await markStopped("ticket_moved_on");
+    return;
+  }
+
+  // Close the ticket.
+  await supabaseAdmin
+    .from("support_tickets")
+    .update({
+      status: "closed",
+      resolved_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    } as never)
+    .eq("id", ticketId);
+
+  await supabaseAdmin.from("ticket_replies").insert({
+    ticket_id: ticketId,
+    reply_text: "Auto-closed by system after 24 business hours of no customer reply.",
+    is_internal: true,
+  } as never);
+
+  // Send E010 auto-close notice to customer.
+  if (t.customer_id) {
+    const { data: cust } = await supabaseAdmin
+      .from("customers")
+      .select("primary_email, name")
+      .eq("id", t.customer_id)
+      .maybeSingle();
+    const c = cust as { primary_email: string | null; name: string | null } | null;
+    if (c?.primary_email) {
+      try {
+        await enqueueFromTemplateInternal(
+          BHS_EMAILS.E010_TICKET_AUTOCLOSE,
+          c.primary_email,
+          {
+            customerName: c.name || "Customer",
+            ticketSubject: t.subject,
+            fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+          },
+          { applicationId: t.application_id ?? undefined },
+        );
+      } catch (e) {
+        console.error("[schedulers] E010 enqueue failed", e);
+      }
+    }
+  }
+
+  await markStopped("auto_fired");
+}
+
