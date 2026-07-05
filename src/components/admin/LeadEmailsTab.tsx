@@ -70,6 +70,7 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
       toast.success("Email queued for delivery");
       setSendOpen(false);
       qc.invalidateQueries({ queryKey: ["admin.lead.emails", leadId] });
+      if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send email");
     } finally {
