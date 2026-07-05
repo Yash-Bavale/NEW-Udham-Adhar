@@ -251,6 +251,7 @@ import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/pu
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 import { Route as ApiPublicCronPollZohoInboxRouteImport } from './routes/api/public/cron/poll-zoho-inbox'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
+import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicCronClosureWorkflowRouteImport } from './routes/api/public/cron/closure-workflow'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
@@ -1515,6 +1516,12 @@ const ApiPublicCronOnboardingRemindersRoute =
     path: '/api/public/cron/onboarding-reminders',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronDailyDigestRoute =
+  ApiPublicCronDailyDigestRouteImport.update({
+    id: '/api/public/cron/daily-digest',
+    path: '/api/public/cron/daily-digest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronComplaintsSlaRoute =
   ApiPublicCronComplaintsSlaRouteImport.update({
     id: '/api/public/cron/complaints-sla',
@@ -1769,6 +1776,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
+  '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
@@ -2013,6 +2021,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
+  '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
@@ -2261,6 +2270,7 @@ export interface FileRoutesById {
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
+  '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
@@ -2510,6 +2520,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
+    | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
@@ -2754,6 +2765,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
+    | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
@@ -3001,6 +3013,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
+    | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
@@ -3204,6 +3217,7 @@ export interface RootRouteChildren {
   ApiPublicAdminRegenerateInvoicesRoute: typeof ApiPublicAdminRegenerateInvoicesRoute
   ApiPublicCronClosureWorkflowRoute: typeof ApiPublicCronClosureWorkflowRoute
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
+  ApiPublicCronDailyDigestRoute: typeof ApiPublicCronDailyDigestRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronPollZohoInboxRoute: typeof ApiPublicCronPollZohoInboxRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
@@ -4913,6 +4927,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronOnboardingRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/daily-digest': {
+      id: '/api/public/cron/daily-digest'
+      path: '/api/public/cron/daily-digest'
+      fullPath: '/api/public/cron/daily-digest'
+      preLoaderRoute: typeof ApiPublicCronDailyDigestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/complaints-sla': {
       id: '/api/public/cron/complaints-sla'
       path: '/api/public/cron/complaints-sla'
@@ -5317,6 +5338,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicAdminRegenerateInvoicesRoute: ApiPublicAdminRegenerateInvoicesRoute,
   ApiPublicCronClosureWorkflowRoute: ApiPublicCronClosureWorkflowRoute,
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
+  ApiPublicCronDailyDigestRoute: ApiPublicCronDailyDigestRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronPollZohoInboxRoute: ApiPublicCronPollZohoInboxRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
