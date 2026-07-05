@@ -150,3 +150,245 @@ export const ourSideDelay = createServerFn({ method: "POST" })
       scheduler: { id: scheduler?.id, firesAt: scheduler?.fires_at },
     };
   });
+
+// ─────────────────────── Shared helper: fetch order + customer ───────────────────────
+
+async function loadOrderContext(supabase: any, orderId: string) {
+  const { data: order, error } = await supabase
+    .from("applications")
+    .select("id, lead_id, customer_id, order_status, application_code, service_code")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!order) throw new Error("Order not found");
+  let customer: { primary_email: string | null; name: string | null } | null = null;
+  if (order.customer_id) {
+    const { data: c } = await supabase
+      .from("customers")
+      .select("primary_email, name")
+      .eq("id", order.customer_id)
+      .maybeSingle();
+    customer = c as any;
+  }
+  return { order, customer };
+}
+
+async function queueTemplateEmail(
+  templateCode: string,
+  to: string,
+  vars: Record<string, unknown>,
+  refs: { applicationId: string; leadId?: string | null },
+) {
+  const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+  try {
+    await enqueueFromTemplateInternal(templateCode, to, vars, {
+      applicationId: refs.applicationId,
+      leadId: refs.leadId ?? undefined,
+    });
+    return true;
+  } catch (e) {
+    console.error(`[order-actions] enqueue ${templateCode} failed`, e);
+    return false;
+  }
+}
+
+async function transition(
+  supabase: any,
+  orderId: string,
+  newStatus: string,
+  extras: { reasonId?: string | null; remarks?: string | null; force?: boolean } = {},
+) {
+  const { data, error } = await supabase.rpc("transition_order_status", {
+    _order_id: orderId,
+    _new_status: newStatus,
+    _reason_id: extras.reasonId ?? undefined,
+    _remarks: extras.remarks ?? undefined,
+    _force: extras.force ?? false,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// ─────────────────────── Send / Resend Form Link (E002) ───────────────────────
+
+export const sendFormLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ orderId: z.string().uuid(), transitionToWaiting: z.boolean().default(true) }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
+    let emailQueued = false;
+    if (customer?.primary_email) {
+      const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
+      emailQueued = await queueTemplateEmail(
+        "welcome_and_form_link",
+        customer.primary_email,
+        {
+          customerName: customer.name || "Customer",
+          orderNumber: order.application_code || order.id.slice(0, 8),
+          formLink: link,
+          fromName,
+        },
+        { applicationId: order.id, leadId: order.lead_id },
+      );
+    }
+    let updated = order;
+    if (data.transitionToWaiting && order.order_status === "NEW_ORDER") {
+      updated = await transition(context.supabase, order.id, "WAITING_CUSTOMER_INFO");
+    }
+    return { ok: true, order: updated, emailQueued };
+  });
+
+// ─────────────────────── Start Processing ───────────────────────
+
+export const startProcessing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ orderId: z.string().uuid() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING");
+    // Cancel any active waiting/reminder schedulers.
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(data.orderId, "started_processing");
+    return { ok: true, order: updated };
+  });
+
+// ─────────────────────── Mark Submitted to Govt (E012) ───────────────────────
+
+export const markSubmittedToGovt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ orderId: z.string().uuid(), referenceNumber: z.string().max(200).optional() }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const updated = await transition(context.supabase, data.orderId, "SUBMITTED_TO_GOVT", {
+      remarks: data.referenceNumber ? `Ref: ${data.referenceNumber}` : null,
+    });
+    let emailQueued = false;
+    if (customer?.primary_email) {
+      emailQueued = await queueTemplateEmail(
+        "bhs_e012_submitted_to_govt",
+        customer.primary_email,
+        {
+          customerName: customer.name || "Customer",
+          orderNumber: order.application_code || order.id.slice(0, 8),
+          referenceNumber: data.referenceNumber || "",
+          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+        },
+        { applicationId: order.id, leadId: order.lead_id },
+      );
+    }
+    return { ok: true, order: updated, emailQueued };
+  });
+
+// ─────────────────────── Mark Certificate Issued ───────────────────────
+
+export const markCertificateIssued = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ orderId: z.string().uuid() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const updated = await transition(context.supabase, data.orderId, "CERTIFICATE_ISSUED");
+    return { ok: true, order: updated };
+  });
+
+// ─────────────────────── Complete Order (E006) ───────────────────────
+
+export const completeOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ orderId: z.string().uuid() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const updated = await transition(context.supabase, data.orderId, "COMPLETED");
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(data.orderId, "completed");
+    let emailQueued = false;
+    if (customer?.primary_email) {
+      emailQueued = await queueTemplateEmail(
+        "order_completed",
+        customer.primary_email,
+        {
+          customerName: customer.name || "Customer",
+          orderNumber: order.application_code || order.id.slice(0, 8),
+          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+        },
+        { applicationId: order.id, leadId: order.lead_id },
+      );
+    }
+    return { ok: true, order: updated, emailQueued };
+  });
+
+// ─────────────────────── Request Refund ───────────────────────
+
+export const requestRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ orderId: z.string().uuid(), reason: z.string().min(3).max(2000) }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const updated = await transition(context.supabase, data.orderId, "REFUND_REQUESTED", {
+      remarks: data.reason,
+    });
+    return { ok: true, order: updated };
+  });
+
+// ─────────────────────── Reopen Order ───────────────────────
+
+export const reopenOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ orderId: z.string().uuid(), remarks: z.string().max(2000).optional() }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const updated = await transition(context.supabase, data.orderId, "REOPENED", {
+      remarks: data.remarks ?? null,
+      force: true,
+    });
+    return { ok: true, order: updated };
+  });
+
+// ─────────────────────── Close Order (manual) ───────────────────────
+
+export const closeOrderManual = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      reasonId: z.string().uuid().optional(),
+      remarks: z.string().max(2000).optional(),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const updated = await transition(context.supabase, data.orderId, "CLOSED", {
+      reasonId: data.reasonId ?? null,
+      remarks: data.remarks ?? null,
+    });
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(data.orderId, "manually_closed");
+    return { ok: true, order: updated };
+  });
+
+// ─────────────────────── Send Manual Reminder (E005) ───────────────────────
+
+export const sendManualReminder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ orderId: z.string().uuid(), note: z.string().max(1000).optional() }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    if (!customer?.primary_email) return { ok: false, reason: "no_email" };
+    const emailQueued = await queueTemplateEmail(
+      "bhs_e005_manual_reminder",
+      customer.primary_email,
+      {
+        customerName: customer.name || "Customer",
+        orderNumber: order.application_code || order.id.slice(0, 8),
+        message: data.note || "",
+        fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+      },
+      { applicationId: order.id, leadId: order.lead_id },
+    );
+    return { ok: emailQueued };
+  });
