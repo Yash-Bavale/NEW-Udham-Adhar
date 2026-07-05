@@ -697,3 +697,119 @@ async function fireTicketAutoclose(s: {
   await markStopped("auto_fired");
 }
 
+// ─────────────────────── Scheduler 7 — Feedback Follow-up (E007) ───────────────────────
+
+/** Arm a post-completion feedback follow-up (default: 24 business hours). */
+export async function startFeedbackFollowupScheduler(input: {
+  applicationId: string;
+  totalSeconds?: number;
+  createdBy?: string | null;
+}) {
+  const cfg = await readBusinessHoursConfig();
+  const total = input.totalSeconds ?? DEFAULT_FEEDBACK_FOLLOWUP_SECONDS;
+  const now = new Date();
+  const firesAt = addBusinessSeconds(now, total, cfg);
+
+  await supabaseAdmin
+    .from("order_schedulers")
+    .update({
+      status: "cancelled",
+      stopped_at: now.toISOString(),
+      stop_reason: "superseded",
+      stop_triggered_by: "system",
+      updated_at: now.toISOString(),
+    } as never)
+    .eq("application_id", input.applicationId)
+    .eq("scheduler_type", SCHEDULER_FEEDBACK_FOLLOWUP)
+    .in("status", ["active", "paused"]);
+
+  const { data, error } = await supabaseAdmin
+    .from("order_schedulers")
+    .insert({
+      application_id: input.applicationId,
+      scheduler_type: SCHEDULER_FEEDBACK_FOLLOWUP,
+      status: "active",
+      started_at: now.toISOString(),
+      fires_at: firesAt.toISOString(),
+      business_seconds_total: total,
+      business_seconds_remaining: total,
+      created_by: input.createdBy ?? null,
+    } as never)
+    .select("id, fires_at")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function fireFeedbackFollowup(s: {
+  id: string;
+  application_id: string;
+  reason_id: string | null;
+  remarks: string | null;
+}) {
+  const now = new Date();
+  const markStopped = async (reason: string) => {
+    await supabaseAdmin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: now.toISOString(),
+        stop_reason: reason,
+        stop_triggered_by: "cron",
+        updated_at: now.toISOString(),
+      } as never)
+      .eq("id", s.id);
+  };
+
+  const { data: order } = await supabaseAdmin
+    .from("applications")
+    .select("id, lead_id, customer_id, order_status, application_code")
+    .eq("id", s.application_id)
+    .maybeSingle();
+  const o = order as {
+    id: string;
+    lead_id: string | null;
+    customer_id: string | null;
+    order_status: string | null;
+    application_code: string | null;
+  } | null;
+
+  if (!o) {
+    await markStopped("order_missing");
+    return;
+  }
+  const validStates = ["COMPLETED", "CERTIFICATE_ISSUED"];
+  if (!validStates.includes(o.order_status || "")) {
+    await markStopped("order_moved_on");
+    return;
+  }
+
+  if (o.customer_id) {
+    const { data: cust } = await supabaseAdmin
+      .from("customers")
+      .select("primary_email, name")
+      .eq("id", o.customer_id)
+      .maybeSingle();
+    const c = cust as { primary_email: string | null; name: string | null } | null;
+    if (c?.primary_email) {
+      try {
+        await enqueueFromTemplateInternal(
+          BHS_EMAILS.E007_FEEDBACK,
+          c.primary_email,
+          {
+            customerName: c.name || "Customer",
+            orderNumber: o.application_code || o.id.slice(0, 8),
+            fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+          },
+          { applicationId: o.id, leadId: o.lead_id ?? undefined },
+        );
+      } catch (e) {
+        console.error("[schedulers] E007 enqueue failed", e);
+      }
+    }
+  }
+
+  await markStopped("auto_fired");
+}
+
+
