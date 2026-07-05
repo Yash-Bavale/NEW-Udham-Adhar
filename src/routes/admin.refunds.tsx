@@ -64,39 +64,45 @@ function RefundsPage() {
   };
 
   const approve = useMutation({
-    mutationFn: async () =>
-      fnApprove({
+    mutationFn: async () => {
+      if (!active) throw new Error("No refund selected");
+      return fnApprove({
         data: {
           orderId: active.application_id,
           amount: Number(amount),
           adminNotes: notes || undefined,
         },
-      }),
+      });
+    },
     onSuccess: () => { toast.success("Refund approved"); invalidate(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
   const reject = useMutation({
-    mutationFn: async () =>
-      fnReject({
+    mutationFn: async () => {
+      if (!active) throw new Error("No refund selected");
+      return fnReject({
         data: {
           orderId: active.application_id,
           reason: notes || "Rejected by admin",
         },
-      }),
+      });
+    },
     onSuccess: () => { toast.success("Refund rejected"); invalidate(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
   const process = useMutation({
-    mutationFn: async () =>
-      fnProcess({
+    mutationFn: async () => {
+      if (!active) throw new Error("No refund selected");
+      return fnProcess({
         data: {
           orderId: active.application_id,
           amount: Number(amount),
           paymentReference: paymentRef,
         },
-      }),
+      });
+    },
     onSuccess: () => { toast.success("Refund processed & customer notified"); invalidate(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
