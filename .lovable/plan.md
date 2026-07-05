@@ -51,12 +51,14 @@ The plan follows the PRD's 9 phases but front-loads foundations (status engine, 
 - ✅ pg_cron job `schedulers-tick` scheduled every minute.
 - ✅ `customerSideDelay` server fn in `src/lib/orders/order-actions.functions.ts` — one-shot: `transition_order_status → CUSTOMER_HOLD` + queue E003 + start Scheduler 2.
 
-## Phase 4 — Scheduler 3 (Our-Side Delay reminder engine)
+## Phase 4 — Scheduler 3 (Our-Side Delay reminder engine) ✅
 
-- Table `order_reminders` per PRD.
-- Same cron tick handles reminder firing during business hours only.
-- Rules: 30-min grace to pick an option (business-time) → auto-start 2h reminders; 3 unattended reminders → `HIGH_PRIORITY`; manual reminder past due → notification + priority.
-- Action panel exposes the 3 sub-options (Manual / Auto 2h / Stop-with-reason).
+- ✅ `startOurSideReminder(mode: grace|auto|manual)` added to `schedulers.server.ts`. Uses `order_reminders` table for counter + audit; supersedes any active reminder scheduler per order.
+- ✅ `fireDueSchedulers` extended with `fireOurSideReminder`: increments `times_fired`, drops a `notifications` row to the assignee, reschedules next business-time fire for `auto`, converts `grace` → `auto` after firing, one-shot for `manual`.
+- ✅ Auto-escalates order → `HIGH_PRIORITY` after 3 unattended reminders.
+- ✅ Loop auto-stops when order leaves `OUR_SIDE_DELAY / HIGH_PRIORITY`.
+- ✅ `ourSideDelay` server fn in `order-actions.functions.ts` — one-shot: transition to `OUR_SIDE_DELAY` + arm reminder loop (or `stop` for reason-only).
+- ✅ Existing `/api/public/cron/schedulers-tick` handles the new type automatically.
 
 ## Phase 5 — Employee Action Panel (Order Workspace)
 
