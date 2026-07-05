@@ -87,6 +87,21 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
           }))
         : undefined;
 
+    const messageId = angleWrap(input.messageId || generateMessageId(user));
+    const threadHeaders: Record<string, string> = { "Message-ID": messageId };
+    if (input.inReplyTo) threadHeaders["In-Reply-To"] = angleWrap(input.inReplyTo);
+    if (input.references) {
+      threadHeaders["References"] = input.references
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(angleWrap)
+        .join(" ");
+    }
+    if (input.orderId) threadHeaders["X-BHS-Order"] = input.orderId;
+    if (input.customerId) threadHeaders["X-BHS-Customer"] = input.customerId;
+    if (input.templateCode) threadHeaders["X-BHS-Template"] = input.templateCode;
+    if (input.queueId) threadHeaders["X-BHS-Queue-Id"] = input.queueId;
+
     const info = await transporter.sendMail({
       from: `"${fromName.replace(/"/g, "'")}" <${user}>`,
       to: input.to,
@@ -95,12 +110,13 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
       html: input.html,
       text: input.text || undefined,
       attachments: atts,
-      headers: input.headers,
+      headers: { ...threadHeaders, ...(input.headers || {}) },
+      messageId, // nodemailer respects this and mirrors into the header
     });
 
     return {
       ok: true,
-      messageId: info.messageId,
+      messageId: info.messageId || messageId,
       response: info.response,
     };
   } catch (e) {
