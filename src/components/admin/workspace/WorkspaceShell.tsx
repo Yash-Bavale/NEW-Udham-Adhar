@@ -275,9 +275,28 @@ export function WorkspaceShell(p: Props) {
           </div>
         </div>
 
-        {/* Status-driven employee actions — single source of truth */}
-        {orderStatus && !p.showConsultationPanel && (
-          <div className="mt-4">
+      </section>
+
+      {/* Employee Workflow — past · current · next in one diagram */}
+      <EmployeeWorkflowMap
+        orderStatus={orderStatus}
+        history={statusHistory}
+        closureReasonCode={(application as any).closure_reason_code}
+        timestamps={workflowTimestamps}
+        onAction={handlePrimaryStep}
+      />
+
+      {/* Full status action grid — tucked under a disclosure for edge cases */}
+      {orderStatus && !p.showConsultationPanel && (
+        <details className="rounded-2xl border border-slate-200 bg-white shadow-sm group">
+          <summary className="cursor-pointer list-none px-5 py-3 flex items-center justify-between hover:bg-slate-50/60 rounded-2xl">
+            <span className="text-sm font-semibold text-slate-700">All status actions</span>
+            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+              refunds · manual reminders · close order
+              <ChevronDown className="size-3.5 transition group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="border-t border-slate-100 p-4">
             <EmployeeActionPanel
               orderId={p.orderId}
               status={orderStatus}
@@ -285,24 +304,9 @@ export function WorkspaceShell(p: Props) {
               onOpenActionHandled={() => setPendingActionKey(null)}
             />
           </div>
-        )}
-      </section>
+        </details>
+      )}
 
-      {/* Customer Journey */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-4">
-          Customer Journey
-        </div>
-        <CustomerJourneyMap
-          application={application}
-          paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
-          stageMeta={stageMeta}
-          workflowStatus={(application as any).workflow_status}
-          closureStage={(application as any).closure_stage}
-          closureNextAt={(application as any).closure_next_at}
-          closureReasonLabel={(application as any).closure_reason_code}
-        />
-      </section>
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
