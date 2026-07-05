@@ -20,6 +20,14 @@ export type ZohoSendInput = {
   replyTo?: string | null;
   attachments?: ZohoAttachment[];
   headers?: Record<string, string>;
+  /** Threading + BHS trace headers — used by incoming-mail matching. */
+  messageId?: string;         // Full <local@domain> Message-ID; auto-generated if missing.
+  inReplyTo?: string | null;  // <parent-message-id>
+  references?: string | null; // space-separated list of <ids>
+  orderId?: string | null;
+  customerId?: string | null;
+  templateCode?: string | null;
+  queueId?: string | null;
 };
 
 export type ZohoSendResult = {
@@ -28,6 +36,18 @@ export type ZohoSendResult = {
   response?: string;
   error?: string;
 };
+
+function angleWrap(id: string): string {
+  const t = id.trim();
+  if (!t) return t;
+  return t.startsWith("<") ? t : `<${t.replace(/[<>\s]/g, "")}>`;
+}
+
+function generateMessageId(user: string): string {
+  const domain = (user.split("@")[1] || "udyamadhar.in").trim();
+  const rnd = Math.random().toString(36).slice(2, 10);
+  return `<bhs.${Date.now()}.${rnd}@${domain}>`;
+}
 
 let cachedTransporter: Transporter | null = null;
 
