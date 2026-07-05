@@ -13,9 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 import { WorkspaceShell } from "@/components/admin/workspace/WorkspaceShell";
+import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
 import { computeOrderStage, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { isConvertedConsultationLead, isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 import { useRole } from "@/hooks/useRole";
+import type { OrderStatus } from "@/lib/orders/order-status.functions";
 
 export const Route = createFileRoute("/admin/orders/$orderId")({ component: OrderDetailPage });
 
@@ -101,7 +103,14 @@ function OrderDetailPage() {
       showConsultationPanel={showConsultationPanel}
       consultationMode={consultationMode}
       canComplete={!role.has("support")}
-      notesNode={<InternalNotes orderId={orderId} />}
+      notesNode={
+        <div className="space-y-4">
+          {application?.order_status && (
+            <EmployeeActionPanel orderId={orderId} status={application.order_status as OrderStatus} />
+          )}
+          <InternalNotes orderId={orderId} />
+        </div>
+      }
     />
   );
 }
