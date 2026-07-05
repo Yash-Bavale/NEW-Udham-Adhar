@@ -33,13 +33,14 @@ function rowToConfig(row: any): BusinessHoursConfig {
 export const getBusinessHoursConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("business_hours_config" as any)
+    const { data, error } = await (context.supabase as any)
+      .from("business_hours_config")
       .select("*")
       .eq("id", 1)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return { config: rowToConfig(data), updatedAt: data?.updated_at ?? null };
+    const row: any = data;
+    return { config: rowToConfig(row), updatedAt: row?.updated_at ?? null };
   });
 
 export const updateBusinessHoursConfig = createServerFn({ method: "POST" })
