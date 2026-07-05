@@ -12,10 +12,11 @@ export const Route = createFileRoute("/admin/settings")({
   component: SettingsPage,
 });
 
-type Tab = "company" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
+type Tab = "company" | "hours" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
+  { id: "hours", label: "Business Hours", icon: Clock },
   { id: "statuses", label: "Status Master", icon: ListChecks },
   { id: "templates", label: "Email Templates", icon: Mail },
   { id: "reasons", label: "Reason Library", icon: BookOpen },
