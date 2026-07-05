@@ -153,7 +153,7 @@ export function WorkspaceShell(p: Props) {
             <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
             <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
             <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
-            <QuickTile to={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
+            <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
             <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
           </div>
         </div>
