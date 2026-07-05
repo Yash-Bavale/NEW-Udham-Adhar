@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
   FileText, Workflow, Activity, LifeBuoy, Check,
@@ -9,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
+import { TabStatusHeader } from "./TabStatusHeader";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -20,6 +22,12 @@ import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
+import {
+  QUICK_ACTIONS,
+  tabAvailability,
+  type StatusActionKey,
+  type WorkspaceTabId,
+} from "@/lib/orders/order-actions-map";
 import { formatIST, relativeIST } from "@/lib/datetime";
 
 interface Props {
@@ -37,25 +45,6 @@ interface Props {
   notesNode: React.ReactNode;
 }
 
-/** Which tabs are useful in which order_status. Missing = enabled everywhere. */
-function tabAvailability(status: OrderStatus | null, hasLead: boolean, showConsultation: boolean) {
-  const locked = status === "CLOSED" || status === "REFUND_PROCESSED";
-  return {
-    workflow: { enabled: true,           reason: "" },
-    form:     {
-      enabled: !showConsultation && !!status && status !== "NEW_ORDER",
-      reason: showConsultation
-        ? "Available after service is picked and second payment is received"
-        : status === "NEW_ORDER"
-          ? "Send the form link from Employee Workflow first"
-          : "",
-    },
-    emails:   { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
-    activity: { enabled: true, reason: "" },
-    support:  { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
-  } as const;
-}
-
 const TAB_DEFS = [
   { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
   { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
@@ -63,10 +52,12 @@ const TAB_DEFS = [
   { id: "activity" as const, label: "Timeline",          icon: Activity },
   { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
 ];
-type TabId = typeof TAB_DEFS[number]["id"];
+type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
+  const [pendingActionKey, setPendingActionKey] = useState<StatusActionKey | null>(null);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -77,6 +68,17 @@ export function WorkspaceShell(p: Props) {
   useEffect(() => {
     if (!availability[tab].enabled) setTab("workflow");
   }, [availability, tab]);
+
+  const invalidateOrder = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] }),
+    [qc, p.orderId],
+  );
+
+  /** Route the "next step" button (in TabStatusHeader) to the workflow tab + open dialog. */
+  const handlePrimaryStep = useCallback((key: StatusActionKey) => {
+    setTab("workflow");
+    setPendingActionKey(key);
+  }, []);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
