@@ -283,7 +283,7 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           lead_id: string
-          order_status: string | null
+          order_status: Database["public"]["Enums"]["order_status_enum"]
           priority: string | null
           refund_approved_at: string | null
           refund_approved_by: string | null
@@ -334,7 +334,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           lead_id: string
-          order_status?: string | null
+          order_status?: Database["public"]["Enums"]["order_status_enum"]
           priority?: string | null
           refund_approved_at?: string | null
           refund_approved_by?: string | null
@@ -387,7 +387,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           lead_id?: string
-          order_status?: string | null
+          order_status?: Database["public"]["Enums"]["order_status_enum"]
           priority?: string | null
           refund_approved_at?: string | null
           refund_approved_by?: string | null
@@ -3361,6 +3361,10 @@ export type Database = {
       }
     }
     Functions: {
+      allowed_order_transitions: {
+        Args: { _from: Database["public"]["Enums"]["order_status_enum"] }
+        Returns: Database["public"]["Enums"]["order_status_enum"][]
+      }
       current_user_is_admin: { Args: never; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -3424,6 +3428,72 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      transition_order_status: {
+        Args: {
+          _force?: boolean
+          _new_status: Database["public"]["Enums"]["order_status_enum"]
+          _order_id: string
+          _reason_id?: string
+          _remarks?: string
+        }
+        Returns: {
+          application_code: string | null
+          application_status: Database["public"]["Enums"]["application_status"]
+          assigned_at: string | null
+          assigned_to: string | null
+          auto_assigned: boolean
+          cancellation_requested_at: string | null
+          certificate_number: string | null
+          certificate_uploaded_at: string | null
+          closure_next_at: string | null
+          closure_reason_code: string | null
+          closure_reason_id: string | null
+          closure_reason_text: string | null
+          closure_remarks: string | null
+          closure_stage: Database["public"]["Enums"]["closure_stage"]
+          created_at: string
+          customer_id: string | null
+          deleted_at: string | null
+          document_status: string
+          documents_deleted_at: string | null
+          documents_deleted_reason: string | null
+          form_link_sent_at: string | null
+          form_link_sent_count: number
+          form_status: string
+          form_submitted_at: string | null
+          fulfilled_at: string | null
+          fulfillment_status:
+            | Database["public"]["Enums"]["fulfillment_status_enum"]
+            | null
+          govt_portals_selected: Json | null
+          id: string
+          is_deleted: boolean | null
+          lead_id: string
+          order_status: Database["public"]["Enums"]["order_status_enum"]
+          priority: string | null
+          refund_approved_at: string | null
+          refund_approved_by: string | null
+          refund_gateway_ref: string | null
+          refund_processed_at: string | null
+          refund_reason: string | null
+          refund_requested_at: string | null
+          refund_requested_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          service_id: string | null
+          updated_at: string
+          workflow_delay_reason: string | null
+          workflow_expected_review_at: string | null
+          workflow_priority: string | null
+          workflow_status: Database["public"]["Enums"]["workflow_status"] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "applications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role:
@@ -3510,6 +3580,22 @@ export type Database = {
         | "refunded"
         | "closed"
         | "closed_refunded"
+      order_status_enum:
+        | "NEW_ORDER"
+        | "WAITING_CUSTOMER_INFO"
+        | "INFO_RECEIVED"
+        | "IN_PROCESSING"
+        | "CUSTOMER_HOLD"
+        | "OUR_SIDE_DELAY"
+        | "SUBMITTED_TO_GOVT"
+        | "CERTIFICATE_ISSUED"
+        | "COMPLETED"
+        | "HIGH_PRIORITY"
+        | "REFUND_REQUESTED"
+        | "REFUND_APPROVED"
+        | "REFUND_PROCESSED"
+        | "CLOSED"
+        | "REOPENED"
       payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
       payment_status_enum:
         | "pending"
@@ -3779,6 +3865,23 @@ export const Constants = {
         "refunded",
         "closed",
         "closed_refunded",
+      ],
+      order_status_enum: [
+        "NEW_ORDER",
+        "WAITING_CUSTOMER_INFO",
+        "INFO_RECEIVED",
+        "IN_PROCESSING",
+        "CUSTOMER_HOLD",
+        "OUR_SIDE_DELAY",
+        "SUBMITTED_TO_GOVT",
+        "CERTIFICATE_ISSUED",
+        "COMPLETED",
+        "HIGH_PRIORITY",
+        "REFUND_REQUESTED",
+        "REFUND_APPROVED",
+        "REFUND_PROCESSED",
+        "CLOSED",
+        "REOPENED",
       ],
       payment_status: ["created", "attempted", "paid", "failed", "refunded"],
       payment_status_enum: [
