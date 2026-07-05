@@ -247,6 +247,7 @@ import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/w
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
 import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api/public/cron/workflow-reminders'
+import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/public/cron/schedulers-tick'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
@@ -1489,6 +1490,12 @@ const ApiPublicCronWorkflowRemindersRoute =
     path: '/api/public/cron/workflow-reminders',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronSchedulersTickRoute =
+  ApiPublicCronSchedulersTickRouteImport.update({
+    id: '/api/public/cron/schedulers-tick',
+    path: '/api/public/cron/schedulers-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronProcessEmailsRoute =
   ApiPublicCronProcessEmailsRouteImport.update({
     id: '/api/public/cron/process-emails',
@@ -1757,6 +1764,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -1999,6 +2007,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -2245,6 +2254,7 @@ export interface FileRoutesById {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
+  '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -2492,6 +2502,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
@@ -2734,6 +2745,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
@@ -2979,6 +2991,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/onboarding-reminders'
     | '/api/public/cron/process-emails'
+    | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
@@ -3180,6 +3193,7 @@ export interface RootRouteChildren {
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
+  ApiPublicCronSchedulersTickRoute: typeof ApiPublicCronSchedulersTickRoute
   ApiPublicCronWorkflowRemindersRoute: typeof ApiPublicCronWorkflowRemindersRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
@@ -4857,6 +4871,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronWorkflowRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/schedulers-tick': {
+      id: '/api/public/cron/schedulers-tick'
+      path: '/api/public/cron/schedulers-tick'
+      fullPath: '/api/public/cron/schedulers-tick'
+      preLoaderRoute: typeof ApiPublicCronSchedulersTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/process-emails': {
       id: '/api/public/cron/process-emails'
       path: '/api/public/cron/process-emails'
@@ -5277,6 +5298,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
+  ApiPublicCronSchedulersTickRoute: ApiPublicCronSchedulersTickRoute,
   ApiPublicCronWorkflowRemindersRoute: ApiPublicCronWorkflowRemindersRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,
