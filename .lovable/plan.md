@@ -1,37 +1,164 @@
-## Current state (verified)
+# System Overview Document — Plan
 
-- SSR is already enabled for every public page. TanStack Start server-renders HTML on each request; I confirmed `https://udyamadhar.in/` returns fully rendered HTML with content (title, meta, body text) — Google crawls it as content, not as a blank shell.
-- Only `/admin` and `/unauthorized` opt out of SSR (`ssr: false`) — intentional; admin pages must stay client-only.
-- `src/routes/sitemap[.]xml.ts` already auto-generates from the current route tree + enabled `seo_pages` rows on every request.
+I'll generate a single markdown file at `/mnt/documents/system-overview.md` (downloadable) capturing the current state of the app so you can plan new flows, features, and changes against it.
 
-Nothing about SSR itself needs code changes — the pages already return real content HTML that ranks on Google. What I'll do is a verification + sitemap freshness pass so you're certain.
+## Discovery approach
 
-## Plan
+Before writing, I'll audit these areas in parallel:
 
-1. **Audit public routes for CSR leaks** — grep every `src/routes/*.tsx` (excluding `admin.*`, `api/`, `email/`, `apply.*`, `app.$token`, `onboarding`, `payment*`, `processing`, `success`) for patterns that would hide content from crawlers:
-   - `useEffect`-only data fetch with no loader
-   - `<ClientOnly>` wrapping primary content
-   - `typeof window` gates around main copy
-   - `dangerouslySetInnerHTML` fed by a client-only fetch
-   Fix any leak by moving the fetch into the route `loader` (SSR) or unwrapping content out of `ClientOnly`.
+1. **Routes tree** — `src/routes/` (public site, admin, onboarding, api/public, auth)
+2. **Admin workspace** — `src/components/admin/*` (shell, sidebar, dashboards, order workspace, panels, dialogs)
+3. **Server functions** — `src/lib/crm/*.functions.ts`, `src/lib/applications/*`, `src/lib/payments/*`, `src/lib/emails/*`, `src/lib/finance/*`, `src/lib/onboarding/*`
+4. **Stage/workflow engines** — `fulfillment-transitions.ts`, `lead-transitions.ts`, `status-engine.ts`, `computeOrderStage.ts`, `workflow-*.functions.ts`
+5. **Roles & access** — `src/lib/roles.ts`, `useRole.ts`, `has_role` / `has_any_staff_role` RPCs
+6. **Database** — table list already known (54 tables); I'll group them by domain
+7. **Edge functions** — `supabase/functions/*` (only `delete-order-documents` exists)
+8. **Public API routes** — `src/routes/api/public/*` (webhooks, cron, payment callbacks)
+9. **Integrations** — Supabase, payment gateways (Razorpay, PayU, CCAvenue), SMTP (Zoho), Lovable AI
 
-2. **Verify SSR output** — curl 4–5 representative pages (`/`, `/about-us`, `/udyam-registration`, `/download-udyam-certificate`, one `/services/...` and one `/apply.$leadCode.summary` if public) and confirm the response body already contains the visible headings/paragraphs before JS runs.
+## Document structure
 
-3. **Refresh sitemap** — the sitemap route auto-picks up new routes, but I'll:
-   - Re-check `EXCLUDED_PREFIXES` matches current admin/internal routes (add any new ones).
-   - Confirm the SEO pages query returns all enabled rows.
-   - Hit `/sitemap.xml` after deploy and count URLs vs. actual public routes.
+```
+# Udyam Ops OS — System Overview
 
-4. **Sanity-check `robots.txt`** — confirm it allows `/` and points to `/sitemap.xml`.
+## 1. Executive Summary
+   - Product purpose, stack (TanStack Start + Supabase + Cloudflare Worker)
+   - Two audiences: public site visitors + internal CRM staff
 
-## Files touched
+## 2. Architecture
+   - Frontend: TanStack Start SSR, file-based routes
+   - Backend: createServerFn (app logic), server routes (webhooks/cron), 1 edge fn
+   - Data: Supabase Postgres with RLS + user_roles
+   - Auth: Supabase Auth (staff email/password)
 
-- `src/routes/sitemap[.]xml.ts` — only if excluded prefixes need updating
-- Any public route file with a CSR leak found in step 1 (expected: zero or a few)
-- `public/robots.txt` — only if the `Sitemap:` line is missing
+## 3. Public Website (Customer-facing)
+   - Route inventory (/, /about-us, /faqs, /services/*, /download-certificate, etc.)
+   - Lead capture forms → leads table
+   - Onboarding flow (/onboarding, /apply) → onboarding_submissions
+   - Payment flows (/payment*, /processing, /success)
+   - Complaint intake (/complaint)
+   - SEO: sitemap.xml, robots.txt, JSON-LD, head metadata
 
-No framework/vite config changes; no new dependencies.
+## 4. Roles & Access Model
+   - Roles: super_admin, admin, manager, executive, operations, support, accounts, finance
+   - `has_role()` / `has_any_staff_role()` RPCs
+   - Module access matrix from `roles.ts` (who sees what, money-hiding rules)
 
-## Note
+## 5. Admin Workspace
+   - Shell layout (AdminShell, sidebar, command palette, keyboard shortcuts, notifications)
+   - Role-based landing (`/admin` → dashboard/finance/my-work)
+   - Sections:
+     • Dashboard (Executive + Super Admin)
+     • My Work (employee inbox)
+     • Leads (list, detail, bulk ops, assignment, saved filters)
+     • Orders/Applications (workspace, stages, documents, payments)
+     • Customers
+     • Complaints & Support Tickets
+     • Tasks & Follow-ups
+     • Finance (invoices, GST report, settlements, refunds)
+     • Emails (templates, queue, logs, bulk send)
+     • Settings (services, workflows, automation rules, reason library,
+       assignment pool, SMTP, gateways, SEO pages/articles, users)
+     • Activity Log & Audit Log
 
-"Instant" Google ranking isn't something SSR alone controls — Google still has to crawl, index, and evaluate signals (backlinks, content quality, page experience). SSR guarantees the content is *visible* to the crawler on first fetch, which is already the case here.
+## 6. Lead Lifecycle
+   - Sources → leads table
+   - Statuses & transitions (`lead-transitions.ts`)
+   - Auto-assignment (assignment_pool, round-robin config)
+   - Conversion → order/application
+
+## 7. Order / Fulfillment Workflow
+   - Stages (from `fulfillment-transitions.ts`):
+     order_received → documents_received → verification_pending →
+     application_submitted → under_processing → completed (+ cancelled)
+   - Allowed transitions map + gates (certificate upload for completion)
+   - Cancellation & refund multi-stage workflow
+   - External delay handling
+   - Order workspace panels: journey, documents, payments, notes,
+     workflow, closure, invoice history
+
+## 8. Employee Flow (Executive / Manager / Support / Operations)
+   - Landing on /admin/my-work
+   - Assigned leads/orders queue
+   - Actions: update status, upload docs, send emails, create tasks,
+     add notes, request refunds, close orders
+   - Money visibility rules per role
+
+## 9. Payments
+   - Gateways: Razorpay, PayU, CCAvenue (server + client functions)
+   - Payment links, initiate, webhooks
+   - Settlements + reconciliation
+   - Refund request workflow (executive → admin approval)
+
+## 10. Email System
+   - Templates (email_templates table + registry)
+   - Queue + send state + logs + suppression list
+   - Providers: Zoho SMTP + generic SMTP
+   - Unsubscribe tokens
+   - Bulk email dialog
+
+## 11. Documents & Certificates
+   - Uploads to Supabase storage
+   - Document review workflow
+   - Certificate generation & delivery
+
+## 12. Automation & Workflow Engine
+   - workflow_automation_rules
+   - workflow_reminders (SLA/follow-up)
+   - workflow_closure_reasons, workflow_delay_reasons
+   - Cron endpoint: /api/public/cron/closure-workflow
+
+## 13. Public API & Webhooks
+   - Inventory of /api/public/* routes
+   - Payment gateway webhooks
+   - Cron endpoints
+
+## 14. Edge Functions
+   - `delete-order-documents` (the only one — storage cleanup)
+   - Note: everything else is TanStack server functions, not edge fns
+
+## 15. Database Schema (grouped)
+   - Identity: profiles, user_roles
+   - CRM: leads, customers, applications, complaints, tasks, follow_ups
+   - Fulfillment: documents, certificates, application_events,
+     application_status_history, application_links
+   - Finance: invoices, invoice_events, payments, payment_links,
+     payment_settlements, refund_requests, gateway_settlements
+   - Email: email_templates, email_queue, email_logs, email_send_log,
+     email_send_state, email_unsubscribe_tokens, suppressed_emails
+   - Workflow: workflow_settings, workflow_automation_rules,
+     workflow_reminders, workflow_events, workflow_closure_reasons,
+     workflow_delay_reasons, service_workflows
+   - Config: services, service_form_schemas, payment_gateways, smtp_settings,
+     nic_codes, pdf_templates, assignment_pool, lead_assignment_config
+   - Content/SEO: seo_pages
+   - Audit: audit_log, audit_logs, activity_logs, analytics_events,
+     webhook_error_log
+   - Support: support_tickets, ticket_replies, notifications
+   - Notes: lead_notes, customer_notes, saved_lead_filters,
+     onboarding_submissions
+
+## 16. Integrations
+   - Supabase (DB, Auth, Storage, Realtime)
+   - Lovable AI Gateway (if used)
+   - Payment gateways
+   - Zoho SMTP
+
+## 17. Known Constraints & Conventions
+   - Realtime channels prefixed `user:<auth.uid()>:...`
+   - RLS on all public tables
+   - Role storage in user_roles only (never on profiles)
+   - Admin subtree uses `ssr: false`
+   - Public routes must be SSR + shareable head metadata
+
+## 18. Suggested Areas for New Flows / Improvements
+   - (placeholder section for you to fill in)
+```
+
+## Deliverable
+
+- File: `/mnt/documents/system-overview.md`
+- Emitted as `<presentation-artifact>` so you can download/preview immediately
+- No code changes to the project
+
+Shall I proceed?
