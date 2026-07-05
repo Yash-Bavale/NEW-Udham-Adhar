@@ -56,8 +56,8 @@ export const updateBusinessHoursConfig = createServerFn({ method: "POST" })
       throw new Error("Open time must be earlier than close time.");
     }
 
-    const { error } = await context.supabase
-      .from("business_hours_config" as any)
+    const { error } = await (context.supabase as any)
+      .from("business_hours_config")
       .upsert({
         id: 1,
         timezone: data.timezone,
