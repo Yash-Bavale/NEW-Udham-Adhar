@@ -330,19 +330,171 @@ export const completeOrder = createServerFn({ method: "POST" })
     return { ok: true, order: updated, emailQueued };
   });
 
-// ─────────────────────── Request Refund ───────────────────────
+// ─────────────────────── Refund Lifecycle (E011) ───────────────────────
 
+/** Customer / staff files a refund request → REFUND_REQUESTED + refund_requests row. */
 export const requestRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
-    z.object({ orderId: z.string().uuid(), reason: z.string().min(3).max(2000) }).parse(raw),
+    z.object({
+      orderId: z.string().uuid(),
+      reason: z.string().min(3).max(2000),
+      amount: z.number().positive().optional(),
+    }).parse(raw),
   )
   .handler(async ({ data, context }) => {
     const updated = await transition(context.supabase, data.orderId, "REFUND_REQUESTED", {
       remarks: data.reason,
     });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const app = updated as Record<string, unknown>;
+    await supabaseAdmin.from("refund_requests").insert({
+      application_id: data.orderId,
+      lead_id: (app.lead_id as string | null) ?? null,
+      reason: data.reason,
+      status: "pending",
+      refund_amount: data.amount ?? null,
+      created_by: context.userId,
+    } as never);
     return { ok: true, order: updated };
   });
+
+/** Admin approves refund → REFUND_APPROVED. Requires admin role. */
+export const approveRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      amount: z.number().positive(),
+      adminNotes: z.string().max(2000).optional(),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden: admin required");
+    const updated = await transition(context.supabase, data.orderId, "REFUND_APPROVED", {
+      remarks: data.adminNotes ?? null,
+    });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        status: "approved",
+        refund_amount: data.amount,
+        admin_notes: data.adminNotes ?? null,
+        reviewer_id: context.userId,
+        decided_at: new Date().toISOString(),
+      } as never)
+      .eq("application_id", data.orderId)
+      .eq("status", "pending");
+    return { ok: true, order: updated };
+  });
+
+/** Admin rejects refund → back to previous status (kept as REFUND_REQUESTED, note only). */
+export const rejectRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      reason: z.string().min(3).max(2000),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden: admin required");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        status: "rejected",
+        admin_notes: data.reason,
+        reviewer_id: context.userId,
+        decided_at: new Date().toISOString(),
+      } as never)
+      .eq("application_id", data.orderId)
+      .eq("status", "pending");
+    // Move order back to IN_PROCESSING (force — REFUND_REQUESTED can't reach it normally).
+    const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING", {
+      remarks: `Refund rejected: ${data.reason}`,
+      force: true,
+    });
+    return { ok: true, order: updated };
+  });
+
+/**
+ * Mark refund processed → REFUND_PROCESSED, send E011, auto-close order.
+ * Records payment reference in admin_notes.
+ */
+export const markRefundProcessed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      amount: z.number().positive(),
+      paymentReference: z.string().min(1).max(200),
+      processedOn: z.string().datetime().optional(),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (!isAdmin) throw new Error("Forbidden: admin required");
+
+    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
+      remarks: `Refund of ₹${data.amount} processed. Ref: ${data.paymentReference}`,
+    });
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const processedAt = data.processedOn ?? new Date().toISOString();
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        admin_notes: `PROCESSED @ ${processedAt} | Ref: ${data.paymentReference} | Amount: ₹${data.amount}`,
+        refund_amount: data.amount,
+      } as never)
+      .eq("application_id", data.orderId)
+      .eq("status", "approved");
+
+    let emailQueued = false;
+    if (customer?.primary_email) {
+      emailQueued = await queueTemplateEmail(
+        "refund_processed_confirmation",
+        customer.primary_email,
+        {
+          customerName: customer.name || "Customer",
+          orderNumber: order.application_code || order.id.slice(0, 8),
+          refundAmount: `₹${data.amount.toFixed(2)}`,
+          paymentReference: data.paymentReference,
+          processedOn: processedAt.slice(0, 10),
+          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+        },
+        { applicationId: order.id, leadId: order.lead_id },
+      );
+    }
+
+    // Auto-close after processing.
+    try {
+      await transition(context.supabase, data.orderId, "CLOSED", {
+        remarks: "Auto-closed after refund processed",
+      });
+      const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+      await cancelAllForOrder(data.orderId, "refund_processed");
+    } catch (e) {
+      console.error("[markRefundProcessed] auto-close failed", e);
+    }
+
+    return { ok: true, order: updated, emailQueued };
+  });
+
 
 // ─────────────────────── Reopen Order ───────────────────────
 
