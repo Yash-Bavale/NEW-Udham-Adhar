@@ -72,6 +72,7 @@ function SettingsPage() {
       </div>
 
       {tab === "company" && <CompanyTab />}
+      {tab === "hours" && <BusinessHoursTab />}
       {tab === "statuses" && <StatusesTab />}
       {tab === "templates" && <TemplatesTab />}
       {tab === "reasons" && <ReasonLibraryTab />}
