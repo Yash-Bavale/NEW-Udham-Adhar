@@ -178,15 +178,25 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Quick actions */}
-          <div className="grid grid-cols-5 gap-1.5 rounded-xl bg-slate-50/60 border border-slate-100 p-2 h-fit">
-            <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
-            <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
-            <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
-            <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
-            <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+          {/* Unified action area: contact + status-driven actions */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Contact</div>
+            <div className="grid grid-cols-5 gap-1.5">
+              <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
+              <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
+              <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
+              <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
+              <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+            </div>
           </div>
         </div>
+
+        {/* Status-driven employee actions — single source of truth */}
+        {orderStatus && !p.showConsultationPanel && (
+          <div className="mt-4">
+            <EmployeeActionPanel orderId={p.orderId} status={orderStatus} />
+          </div>
+        )}
       </section>
 
       {/* Customer Journey */}
