@@ -328,6 +328,11 @@ async function sendQueueRow(row: QueueRow) {
     if (res.ok) {
       smtpResponse = `[zoho] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
       ok = true;
+      sentMessageId = res.messageId ?? null;
+      sentInReplyTo = parentMessageId;
+      sentReferences = referencesHeader ?? null;
+      sentCustomerId = customerId;
+      sentFromEmail = (process.env.ZOHO_SMTP_USER || "").trim() || null;
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
