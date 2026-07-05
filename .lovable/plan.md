@@ -27,13 +27,12 @@ The plan follows the PRD's 9 phases but front-loads foundations (status engine, 
 - **Settings → Business Hours** tab: edit window, days, holidays. Live preview: "Next fire at …".
 - **Workspace shell rewrite** (`OrderWorkspacePage`): 3-column layout — left rail (Customer, Order meta), center (Journey Strip + Exception Banner + Contextual Action Panel + Email Thread), right (Tickets, Timeline, Documents). Replaces current `WorkspaceShell`.
 
-## Phase 1 — Order Status Engine
+## Phase 1 — Order Status Engine ✅
 
-- Migration adds `applications.order_status` (enum: 15 states from PRD), `priority`, `closure_reason_id`, `closure_remarks`, `certificate_uploaded_at`, `form_link_sent_at/_count`, `reopened_at/by`, `refund_requested_at/reason`.
-- New table `delay_reasons` seeded with 8 customer-side + 9 our-side codes.
-- SQL fn `transition_order_status(order_id, new_status, actor, reason_id, remarks)` — enforces the transition map, writes to `application_events`, returns updated row. Any illegal jump throws.
-- Backfill existing rows from current `fulfillment_status` → new `order_status`.
-- Server fns: `transitionOrder`, `listAllowedTransitions`, `getDelayReasons`.
+- ✅ `order_status_enum` (15 states) created; `applications.order_status` converted from text → enum, backfilled from `fulfillment_status`, defaults to `NEW_ORDER`.
+- ✅ `delay_reasons` already seeded from Phase 0 (17 rows).
+- ✅ SQL fns `allowed_order_transitions(from)` and `transition_order_status(order, new, reason, remarks, force)` — enforce transition map, log to `application_events`, `force=true` restricted to super_admin.
+- ✅ Server fns in `src/lib/orders/order-status.functions.ts`: `transitionOrder`, `listAllowedTransitions`, `getDelayReasons`, plus `ORDER_STATUS_LABELS`.
 
 ## Phase 2 — Zoho SMTP + Email Registry
 
