@@ -100,6 +100,8 @@ export function FormSubmissionPanel({
     try {
       const res = await resendFn({ data: { leadId: data.lead.id } });
       toast.success(`Form link sent to ${res.email}`);
+      qc.invalidateQueries({ queryKey: ["admin.formSubmission", applicationId] });
+      if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to send");
     } finally {
