@@ -80,6 +80,27 @@ export function WorkspaceShell(p: Props) {
     setPendingActionKey(key);
   }, []);
 
+  // Timestamps for the workflow diagram — extracted from application + stageMeta + status history events.
+  const statusHistory = useMemo<OrderStatus[]>(() => {
+    const evs = (events ?? []) as any[];
+    return evs
+      .filter((e) => e?.event_type === "order_status_changed" || e?.event_type === "status_changed")
+      .map((e) => (e?.new_status ?? e?.metadata?.new_status ?? null) as OrderStatus | null)
+      .filter(Boolean) as OrderStatus[];
+  }, [events]);
+
+  const workflowTimestamps = useMemo<Record<string, string | null | undefined>>(() => ({
+    consultation_done:      application?.consultation_done_at ?? application?.form_submitted_at ?? null,
+    waiting_customer_info:  stageMeta?.waiting_customer_info?.at ?? application?.form_link_sent_at,
+    info_received:          stageMeta?.info_received?.at ?? application?.form_submitted_at,
+    in_processing:          stageMeta?.in_processing?.at ?? application?.processing_started_at,
+    submitted_to_govt:      stageMeta?.submitted_to_govt?.at ?? application?.submitted_to_govt_at,
+    our_side_delay:         stageMeta?.our_side_delay?.at,
+    customer_hold:          stageMeta?.customer_hold?.at,
+    start_processing:       stageMeta?.info_received?.at,
+    completed:              stageMeta?.completed?.at ?? application?.fulfilled_at,
+  }), [application, stageMeta]);
+
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
   const cEmail = customer?.primary_email ?? lead?.email ?? null;
