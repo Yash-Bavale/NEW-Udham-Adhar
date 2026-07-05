@@ -216,8 +216,10 @@ export async function fireDueSchedulers(now = new Date()) {
       } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER) {
         await fireOurSideReminder(s.id, s.application_id);
         fired++;
+      } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
+        await fireTicketAutoclose(s);
+        fired++;
       } else {
-        // Unknown scheduler type — mark stopped to avoid tight-loop.
         await supabaseAdmin
           .from("order_schedulers")
           .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type" } as never)
