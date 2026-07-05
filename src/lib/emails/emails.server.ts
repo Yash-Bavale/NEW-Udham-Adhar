@@ -264,6 +264,11 @@ async function sendQueueRow(row: QueueRow) {
   let smtpResponse: string | null = null;
   let lastError: string | null = null;
   let ok = false;
+  let sentMessageId: string | null = null;
+  let sentInReplyTo: string | null = null;
+  let sentReferences: string | null = null;
+  let sentCustomerId: string | null = null;
+  let sentFromEmail: string | null = null;
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
