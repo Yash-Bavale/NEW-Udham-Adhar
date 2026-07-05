@@ -66,10 +66,17 @@ const TAB_DEFS = [
 type TabId = typeof TAB_DEFS[number]["id"];
 
 export function WorkspaceShell(p: Props) {
-  const [tab, setTab] = useState("workflow");
+  const [tab, setTab] = useState<TabId>("workflow");
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
+  const orderStatus = (application.order_status ?? null) as OrderStatus | null;
   const meta = STAGE_META[p.stage];
+  const availability = tabAvailability(orderStatus, !!lead?.id, p.showConsultationPanel);
+
+  // If the active tab becomes unavailable (status changed), fall back to Workflow.
+  useEffect(() => {
+    if (!availability[tab].enabled) setTab("workflow");
+  }, [availability, tab]);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
