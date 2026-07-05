@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
   FileText, Workflow, Activity, LifeBuoy, Check,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
@@ -15,8 +16,10 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
+import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import { formatIST, relativeIST } from "@/lib/datetime";
 
 interface Props {
@@ -34,19 +37,46 @@ interface Props {
   notesNode: React.ReactNode;
 }
 
-const TABS = [
-  { id: "workflow", label: "Employee Workflow", icon: Workflow },
-  { id: "form",     label: "Forms & Docs",      icon: FileText },
-  { id: "emails",   label: "Emails",            icon: Mail },
-  { id: "activity", label: "Timeline",          icon: Activity },
-  { id: "support",  label: "Support Ticket",    icon: LifeBuoy },
+/** Which tabs are useful in which order_status. Missing = enabled everywhere. */
+function tabAvailability(status: OrderStatus | null, hasLead: boolean, showConsultation: boolean) {
+  const locked = status === "CLOSED" || status === "REFUND_PROCESSED";
+  return {
+    workflow: { enabled: true,           reason: "" },
+    form:     {
+      enabled: !showConsultation && !!status && status !== "NEW_ORDER",
+      reason: showConsultation
+        ? "Available after service is picked and second payment is received"
+        : status === "NEW_ORDER"
+          ? "Send the form link from Employee Workflow first"
+          : "",
+    },
+    emails:   { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
+    activity: { enabled: true, reason: "" },
+    support:  { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
+  } as const;
+}
+
+const TAB_DEFS = [
+  { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
+  { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
+  { id: "emails"   as const, label: "Emails",            icon: Mail },
+  { id: "activity" as const, label: "Timeline",          icon: Activity },
+  { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
 ];
+type TabId = typeof TAB_DEFS[number]["id"];
 
 export function WorkspaceShell(p: Props) {
-  const [tab, setTab] = useState("workflow");
+  const [tab, setTab] = useState<TabId>("workflow");
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
+  const orderStatus = (application.order_status ?? null) as OrderStatus | null;
   const meta = STAGE_META[p.stage];
+  const availability = tabAvailability(orderStatus, !!lead?.id, p.showConsultationPanel);
+
+  // If the active tab becomes unavailable (status changed), fall back to Workflow.
+  useEffect(() => {
+    if (!availability[tab].enabled) setTab("workflow");
+  }, [availability, tab]);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
@@ -148,15 +178,25 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Quick actions */}
-          <div className="grid grid-cols-5 gap-1.5 rounded-xl bg-slate-50/60 border border-slate-100 p-2 h-fit">
-            <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
-            <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
-            <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
-            <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
-            <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+          {/* Unified action area: contact + status-driven actions */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Contact</div>
+            <div className="grid grid-cols-5 gap-1.5">
+              <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
+              <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
+              <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
+              <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
+              <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+            </div>
           </div>
         </div>
+
+        {/* Status-driven employee actions — single source of truth */}
+        {orderStatus && !p.showConsultationPanel && (
+          <div className="mt-4">
+            <EmployeeActionPanel orderId={p.orderId} status={orderStatus} />
+          </div>
+        )}
       </section>
 
       {/* Customer Journey */}
@@ -176,21 +216,31 @@ export function WorkspaceShell(p: Props) {
       </section>
 
       {/* Tabs */}
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
         <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            return (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-              >
-                <Icon className="size-4" />
-                {t.label}
-              </TabsTrigger>
-            );
-          })}
+          <TooltipProvider delayDuration={200}>
+            {TAB_DEFS.map((t) => {
+              const Icon = t.icon;
+              const state = availability[t.id];
+              const trigger = (
+                <TabsTrigger
+                  key={t.id}
+                  value={t.id}
+                  disabled={!state.enabled}
+                  className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Icon className="size-4" />
+                  {t.label}
+                </TabsTrigger>
+              );
+              return !state.enabled && state.reason ? (
+                <Tooltip key={t.id}>
+                  <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
+                  <TooltipContent>{state.reason}</TooltipContent>
+                </Tooltip>
+              ) : trigger;
+            })}
+          </TooltipProvider>
         </TabsList>
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
