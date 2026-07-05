@@ -111,38 +111,37 @@ export function resolveActiveLane(
 /** Status → progress index within a lane (0 = head, higher = deeper). */
 function laneProgress(lane: LaneKey, status: OrderStatus | null): number {
   if (!status) return -1;
-  const table: Record<string, number> = {
-    // shared endpoints
-    COMPLETED: 99, CLOSED: 99, REFUND_PROCESSED: 99,
-  };
-  if (status in table) return table[status];
-  switch (lane) {
-    case "A":
-      return {
-        INFO_RECEIVED: 0, IN_PROCESSING: 1,
-        SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
-        HIGH_PRIORITY: 1, OUR_SIDE_DELAY: 1,
-      }[status] ?? -1;
-    case "B":
-      return {
-        WAITING_CUSTOMER_INFO: 0, CUSTOMER_HOLD: 0,
-        INFO_RECEIVED: 1, IN_PROCESSING: 2,
-        SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
-      }[status] ?? -1;
-    case "C":
-      return {
-        OUR_SIDE_DELAY: 0,
-        IN_PROCESSING: 2, SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
-      }[status] ?? -1;
-    case "D":
-      return {
-        CUSTOMER_HOLD: 0,
-        INFO_RECEIVED: 1, IN_PROCESSING: 2,
-        SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
-      }[status] ?? -1;
-    default:
-      return -1;
-  }
+  if (status === "COMPLETED" || status === "CLOSED" || status === "REFUND_PROCESSED") return 99;
+  const lookup: Partial<Record<OrderStatus, number>> = (() => {
+    switch (lane) {
+      case "A":
+        return {
+          INFO_RECEIVED: 0, IN_PROCESSING: 1,
+          SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
+          HIGH_PRIORITY: 1, OUR_SIDE_DELAY: 1,
+        };
+      case "B":
+        return {
+          WAITING_CUSTOMER_INFO: 0, CUSTOMER_HOLD: 0,
+          INFO_RECEIVED: 1, IN_PROCESSING: 2,
+          SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
+        };
+      case "C":
+        return {
+          OUR_SIDE_DELAY: 0,
+          IN_PROCESSING: 2, SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
+        };
+      case "D":
+        return {
+          CUSTOMER_HOLD: 0,
+          INFO_RECEIVED: 1, IN_PROCESSING: 2,
+          SUBMITTED_TO_GOVT: 3, CERTIFICATE_ISSUED: 4,
+        };
+      default:
+        return {};
+    }
+  })();
+  return lookup[status] ?? -1;
 }
 
 export interface ResolvedDiagram {
