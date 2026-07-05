@@ -461,28 +461,28 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
 }
 
 function QuickTile({
-  href, to, onClick, icon: Icon, label, tint, external,
+  onClick, icon: Icon, label, tint, disabled = false,
 }: {
-  href?: string | null; to?: string | null; onClick?: () => void;
-  icon: any; label: string; tint: "emerald" | "sky" | "violet" | "slate"; external?: boolean;
+  onClick?: () => void;
+  icon: any; label: string; tint: "emerald" | "sky" | "violet" | "slate";
+  disabled?: boolean;
 }) {
-  const disabled = !href && !to && !onClick;
   const tintMap = {
     emerald: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100",
     sky:     "text-sky-600 bg-sky-50 hover:bg-sky-100",
     violet:  "text-violet-600 bg-violet-50 hover:bg-violet-100",
     slate:   "text-slate-600 bg-slate-100 hover:bg-slate-200",
   };
-  const inner = (
-    <>
+  // Note: we do NOT disable the button — it stays clickable so runQuickAction can
+  // fire the "why disabled" toast. Visual affordance is dimmed instead.
+  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg transition ${disabled ? "opacity-50" : ""}`;
+  return (
+    <button type="button" onClick={onClick} className={cls} aria-disabled={disabled}>
       <span className={`w-9 h-9 grid place-items-center rounded-lg ${tintMap[tint]}`}>
         <Icon className="w-4 h-4" />
       </span>
       <span className="text-[11px] font-medium text-slate-600 mt-1">{label}</span>
-    </>
+    </button>
   );
-  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg ${disabled ? "opacity-40 pointer-events-none" : ""}`;
-  if (to && !disabled) return <Link to={to} className={cls}>{inner}</Link>;
-  if (href && !disabled) return <a href={href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className={cls}>{inner}</a>;
-  return <button type="button" onClick={onClick} disabled={disabled} className={cls}>{inner}</button>;
 }
+
