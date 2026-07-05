@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail } from "lucide-react";
+import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail, Clock } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
 import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
