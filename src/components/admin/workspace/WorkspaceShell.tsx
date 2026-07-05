@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
   FileText, Workflow, Activity, LifeBuoy, Check,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
@@ -15,8 +16,10 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
+import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import { formatIST, relativeIST } from "@/lib/datetime";
 
 interface Props {
@@ -34,13 +37,33 @@ interface Props {
   notesNode: React.ReactNode;
 }
 
-const TABS = [
-  { id: "workflow", label: "Employee Workflow", icon: Workflow },
-  { id: "form",     label: "Forms & Docs",      icon: FileText },
-  { id: "emails",   label: "Emails",            icon: Mail },
-  { id: "activity", label: "Timeline",          icon: Activity },
-  { id: "support",  label: "Support Ticket",    icon: LifeBuoy },
+/** Which tabs are useful in which order_status. Missing = enabled everywhere. */
+function tabAvailability(status: OrderStatus | null, hasLead: boolean, showConsultation: boolean) {
+  const locked = status === "CLOSED" || status === "REFUND_PROCESSED";
+  return {
+    workflow: { enabled: true,           reason: "" },
+    form:     {
+      enabled: !showConsultation && !!status && status !== "NEW_ORDER",
+      reason: showConsultation
+        ? "Available after service is picked and second payment is received"
+        : status === "NEW_ORDER"
+          ? "Send the form link from Employee Workflow first"
+          : "",
+    },
+    emails:   { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
+    activity: { enabled: true, reason: "" },
+    support:  { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
+  } as const;
+}
+
+const TAB_DEFS = [
+  { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
+  { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
+  { id: "emails"   as const, label: "Emails",            icon: Mail },
+  { id: "activity" as const, label: "Timeline",          icon: Activity },
+  { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
 ];
+type TabId = typeof TAB_DEFS[number]["id"];
 
 export function WorkspaceShell(p: Props) {
   const [tab, setTab] = useState("workflow");
