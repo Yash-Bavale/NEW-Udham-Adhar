@@ -34,14 +34,14 @@ The plan follows the PRD's 9 phases but front-loads foundations (status engine, 
 - ✅ SQL fns `allowed_order_transitions(from)` and `transition_order_status(order, new, reason, remarks, force)` — enforce transition map, log to `application_events`, `force=true` restricted to super_admin.
 - ✅ Server fns in `src/lib/orders/order-status.functions.ts`: `transitionOrder`, `listAllowedTransitions`, `getDelayReasons`, plus `ORDER_STATUS_LABELS`.
 
-## Phase 2 — Zoho SMTP + Email Registry
+## Phase 2 — Zoho SMTP + Email Registry ✅
 
-- Add SMTP secrets (`ZOHO_SMTP_*`) via secret tool prompt to Super Admin.
-- Rewrite `zoho-smtp.server.ts` to always stamp `Message-ID`, `References`, `In-Reply-To`, `X-BHS-Order`, `X-BHS-Customer` headers.
-- Rebuild `email_logs` per PRD (adds `direction`, `template_code`, `message_id`, `in_reply_to`, `references_header`, `zoho_mail_uid`, `triggered_by`).
-- Seed **all 12 templates** (E001–E012) as React Email components in `src/lib/email-templates/`; register in `TEMPLATES`.
-- Queue worker: existing `process-emails` cron enhanced to send via Zoho SMTP, persist Message-ID, honor `is_enabled` per template.
-- E001 auto-fires from PayU webhook (already exists) → set status `WAITING_CUSTOMER_INFO`.
+- ✅ Zoho SMTP credentials already present (`ZOHO_SMTP_HOST/PORT/USER/PASS`, `ZOHO_FROM_NAME`).
+- ✅ `zoho-smtp.server.ts` rewritten to auto-generate a stable `Message-ID`, stamp `In-Reply-To`, `References`, `X-BHS-Order`, `X-BHS-Customer`, `X-BHS-Template`, `X-BHS-Queue-Id` on every outbound.
+- ✅ `email_logs` extended with `direction`, `message_id` (unique), `in_reply_to`, `references_header`, `zoho_mail_uid` (unique), `triggered_by`, `from_email`, `body_html`, `body_text`, `customer_id` + matching indexes for incoming-mail matching.
+- ✅ `sendQueueRow` now looks up `customer_id`, forwards threading headers, and persists `message_id` + body into `email_logs`.
+- ✅ BHS v2 template registry (E001–E012) in `src/lib/emails/bhs-templates.ts`, mapping to existing template codes + 5 new disabled system templates (`bhs_e003_customer_delay`, `bhs_e005_manual_reminder`, `bhs_e007_feedback`, `bhs_e010_ticket_autoclose`, `bhs_e012_submitted_to_govt`).
+- ✅ E001 already auto-fires from PayU webhook via `order_confirmation` template.
 
 ## Phase 3 — Scheduler 2 (Customer-Side Delay, 24h business time)
 
