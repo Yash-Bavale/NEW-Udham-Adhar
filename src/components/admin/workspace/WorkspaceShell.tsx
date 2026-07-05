@@ -210,15 +210,46 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Unified action area: contact + status-driven actions */}
+          {/* Unified action area — every tile is map-driven and always toasts. */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
-            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Contact</div>
-            <div className="grid grid-cols-5 gap-1.5">
-              <QuickTile href={cMobile ? `tel:${cMobile}` : null}   icon={Phone}        label="Call"      tint="emerald" />
-              <QuickTile href={waUrl}                                icon={MessageCircle} label="WhatsApp"  tint="emerald" external />
-              <QuickTile href={cEmail ? `mailto:${cEmail}` : null}  icon={Mail}          label="Email"     tint="sky" />
-              <QuickTile href={lead?.id ? `/admin/leads/${lead.id}` : null} icon={User2}   label="Open Lead" tint="violet" />
-              <QuickTile onClick={() => window.print()}              icon={Printer}       label="Print"     tint="slate" />
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {QUICK_ACTIONS.map((spec) => {
+                const built = spec.build(quickCtx);
+                const disabled = !!built.disabledReason;
+                const onClick = () => {
+                  if (spec.key === "print") {
+                    runQuickAction(spec.key, built, () => window.print());
+                  } else if (spec.key === "copy_code") {
+                    runQuickAction(spec.key, built, () =>
+                      navigator.clipboard.writeText(quickCtx.applicationCode),
+                    );
+                  } else {
+                    // Contact / link tiles: navigate manually so we can toast first.
+                    runQuickAction(spec.key, built, () => {
+                      if (built.to) {
+                        window.location.assign(built.to);
+                      } else if (built.href) {
+                        if (built.external) {
+                          window.open(built.href, "_blank", "noopener,noreferrer");
+                        } else {
+                          window.location.assign(built.href);
+                        }
+                      }
+                    });
+                  }
+                };
+                return (
+                  <QuickTile
+                    key={spec.key}
+                    icon={spec.icon}
+                    label={spec.label}
+                    tint={spec.tint}
+                    disabled={disabled}
+                    onClick={onClick}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
@@ -226,7 +257,12 @@ export function WorkspaceShell(p: Props) {
         {/* Status-driven employee actions — single source of truth */}
         {orderStatus && !p.showConsultationPanel && (
           <div className="mt-4">
-            <EmployeeActionPanel orderId={p.orderId} status={orderStatus} />
+            <EmployeeActionPanel
+              orderId={p.orderId}
+              status={orderStatus}
+              openActionKey={pendingActionKey}
+              onOpenActionHandled={() => setPendingActionKey(null)}
+            />
           </div>
         )}
       </section>
