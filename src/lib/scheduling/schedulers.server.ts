@@ -13,7 +13,10 @@ import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 
 export const SCHEDULER_CUSTOMER_CLOSURE = "customer_closure_24h" as const;
+export const SCHEDULER_OUR_SIDE_REMINDER = "our_side_reminder" as const;
 const DEFAULT_CLOSURE_SECONDS = 24 * 3600;
+const DEFAULT_REMINDER_INTERVAL_SECONDS = 2 * 3600; // 2 business hours
+const REMINDER_ESCALATION_THRESHOLD = 3;
 
 /** Read the single-row business hours config; fall back to defaults. */
 export async function readBusinessHoursConfig(): Promise<BusinessHoursConfig> {
