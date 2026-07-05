@@ -5,7 +5,6 @@ import {
   FileText, Workflow, Activity, LifeBuoy, Check,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
