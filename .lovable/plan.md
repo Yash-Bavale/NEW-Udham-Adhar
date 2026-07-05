@@ -60,13 +60,11 @@ The plan follows the PRD's 9 phases but front-loads foundations (status engine, 
 - ✅ `ourSideDelay` server fn in `order-actions.functions.ts` — one-shot: transition to `OUR_SIDE_DELAY` + arm reminder loop (or `stop` for reason-only).
 - ✅ Existing `/api/public/cron/schedulers-tick` handles the new type automatically.
 
-## Phase 5 — Employee Action Panel (Order Workspace)
+## Phase 5 — Employee Action Panel (Order Workspace) ✅
 
-Contextual panel that shows only the buttons legal for `order_status` (Part 7 of PRD):
-
-- `Send/Resend Form Link` (E002), `Start Processing`, `Customer/Our Side Delay`, `Mark Submitted to Govt` (E012), `Upload Certificate`, `Complete Order` (E006 + docs purge), `Request Refund`, `Reopen Order`, `Close Order (manual)`.
-- Each button → `transitionOrder` + email queue + scheduler side-effects, wrapped in a single server fn per action for atomicity.
-- Refund actions gated to `super_admin` (`Approve`, `Reject`, `Mark Processed` → E011).
+- ✅ 9 new atomic action fns in `src/lib/orders/order-actions.functions.ts`: `sendFormLink` (E002), `sendManualReminder` (E005), `startProcessing`, `markSubmittedToGovt` (E012), `markCertificateIssued`, `completeOrder` (E006), `requestRefund`, `reopenOrder` (force), `closeOrderManual`. Each combines `transition_order_status` RPC + templated email + scheduler cleanup atomically.
+- ✅ `src/components/admin/EmployeeActionPanel.tsx` — contextual button grid keyed off `order_status` (per PRD Part 7). Refund/Reopen gated to `super_admin`. Each button opens a lightweight dialog with the required inputs (reason picker, reminder mode, govt ref, remarks) and posts via TanStack Query mutation, invalidating the order query on success.
+- ✅ Wired into `admin.orders.$orderId.tsx` above the internal notes card so employees can drive the order end-to-end from one screen.
 
 ## Phase 6 — Zoho Incoming Mail (IMAP alternative)
 
