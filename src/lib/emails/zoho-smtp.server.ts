@@ -20,6 +20,14 @@ export type ZohoSendInput = {
   replyTo?: string | null;
   attachments?: ZohoAttachment[];
   headers?: Record<string, string>;
+  /** Threading + BHS trace headers — used by incoming-mail matching. */
+  messageId?: string;         // Full <local@domain> Message-ID; auto-generated if missing.
+  inReplyTo?: string | null;  // <parent-message-id>
+  references?: string | null; // space-separated list of <ids>
+  orderId?: string | null;
+  customerId?: string | null;
+  templateCode?: string | null;
+  queueId?: string | null;
 };
 
 export type ZohoSendResult = {
@@ -28,6 +36,18 @@ export type ZohoSendResult = {
   response?: string;
   error?: string;
 };
+
+function angleWrap(id: string): string {
+  const t = id.trim();
+  if (!t) return t;
+  return t.startsWith("<") ? t : `<${t.replace(/[<>\s]/g, "")}>`;
+}
+
+function generateMessageId(user: string): string {
+  const domain = (user.split("@")[1] || "udyamadhar.in").trim();
+  const rnd = Math.random().toString(36).slice(2, 10);
+  return `<bhs.${Date.now()}.${rnd}@${domain}>`;
+}
 
 let cachedTransporter: Transporter | null = null;
 
@@ -67,6 +87,21 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
           }))
         : undefined;
 
+    const messageId = angleWrap(input.messageId || generateMessageId(user));
+    const threadHeaders: Record<string, string> = { "Message-ID": messageId };
+    if (input.inReplyTo) threadHeaders["In-Reply-To"] = angleWrap(input.inReplyTo);
+    if (input.references) {
+      threadHeaders["References"] = input.references
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(angleWrap)
+        .join(" ");
+    }
+    if (input.orderId) threadHeaders["X-BHS-Order"] = input.orderId;
+    if (input.customerId) threadHeaders["X-BHS-Customer"] = input.customerId;
+    if (input.templateCode) threadHeaders["X-BHS-Template"] = input.templateCode;
+    if (input.queueId) threadHeaders["X-BHS-Queue-Id"] = input.queueId;
+
     const info = await transporter.sendMail({
       from: `"${fromName.replace(/"/g, "'")}" <${user}>`,
       to: input.to,
@@ -75,12 +110,13 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
       html: input.html,
       text: input.text || undefined,
       attachments: atts,
-      headers: input.headers,
+      headers: { ...threadHeaders, ...(input.headers || {}) },
+      messageId, // nodemailer respects this and mirrors into the header
     });
 
     return {
       ok: true,
-      messageId: info.messageId,
+      messageId: info.messageId || messageId,
       response: info.response,
     };
   } catch (e) {

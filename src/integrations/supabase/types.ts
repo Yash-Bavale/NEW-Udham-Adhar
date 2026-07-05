@@ -1021,47 +1021,77 @@ export type Database = {
         Row: {
           application_id: string | null
           attempt: number
+          body_html: string | null
+          body_text: string | null
           created_at: string
+          customer_id: string | null
+          direction: string
           error_message: string | null
+          from_email: string | null
           id: string
+          in_reply_to: string | null
           lead_id: string | null
+          message_id: string | null
           queue_id: string | null
+          references_header: string | null
           sent_at: string
           smtp_response: string | null
           status: Database["public"]["Enums"]["email_log_status"]
           subject: string
           template_code: string | null
           to_email: string
+          triggered_by: string | null
+          zoho_mail_uid: string | null
         }
         Insert: {
           application_id?: string | null
           attempt?: number
+          body_html?: string | null
+          body_text?: string | null
           created_at?: string
+          customer_id?: string | null
+          direction?: string
           error_message?: string | null
+          from_email?: string | null
           id?: string
+          in_reply_to?: string | null
           lead_id?: string | null
+          message_id?: string | null
           queue_id?: string | null
+          references_header?: string | null
           sent_at?: string
           smtp_response?: string | null
           status: Database["public"]["Enums"]["email_log_status"]
           subject: string
           template_code?: string | null
           to_email: string
+          triggered_by?: string | null
+          zoho_mail_uid?: string | null
         }
         Update: {
           application_id?: string | null
           attempt?: number
+          body_html?: string | null
+          body_text?: string | null
           created_at?: string
+          customer_id?: string | null
+          direction?: string
           error_message?: string | null
+          from_email?: string | null
           id?: string
+          in_reply_to?: string | null
           lead_id?: string | null
+          message_id?: string | null
           queue_id?: string | null
+          references_header?: string | null
           sent_at?: string
           smtp_response?: string | null
           status?: Database["public"]["Enums"]["email_log_status"]
           subject?: string
           template_code?: string | null
           to_email?: string
+          triggered_by?: string | null
+          zoho_mail_uid?: string | null
         }
         Relationships: [
           {

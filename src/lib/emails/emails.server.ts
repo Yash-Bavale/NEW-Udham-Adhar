@@ -264,6 +264,11 @@ async function sendQueueRow(row: QueueRow) {
   let smtpResponse: string | null = null;
   let lastError: string | null = null;
   let ok = false;
+  let sentMessageId: string | null = null;
+  let sentInReplyTo: string | null = null;
+  let sentReferences: string | null = null;
+  let sentCustomerId: string | null = null;
+  let sentFromEmail: string | null = null;
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
@@ -278,6 +283,25 @@ async function sendQueueRow(row: QueueRow) {
       row.subject ||
       " ";
 
+    // Resolve customer_id for threading + look up parent thread if this is a reply.
+    let customerId: string | null = null;
+    if (row.application_id) {
+      const { data: app } = await supabaseAdmin
+        .from("applications")
+        .select("customer_id")
+        .eq("id", row.application_id)
+        .maybeSingle();
+      customerId = (app?.customer_id as string | undefined) ?? null;
+    }
+    const parentMessageId =
+      typeof (variables as { __in_reply_to?: string }).__in_reply_to === "string"
+        ? ((variables as { __in_reply_to?: string }).__in_reply_to as string)
+        : null;
+    const referencesHeader =
+      typeof (variables as { __references?: string }).__references === "string"
+        ? ((variables as { __references?: string }).__references as string)
+        : parentMessageId;
+
     const res = await sendViaZoho({
       to: recipient,
       subject: row.subject,
@@ -290,9 +314,13 @@ async function sendQueueRow(row: QueueRow) {
         content_base64: a.content_base64,
         content_type: a.content_type,
       })) : undefined,
+      inReplyTo: parentMessageId,
+      references: referencesHeader,
+      orderId: row.application_id,
+      customerId,
+      templateCode: row.template_code,
+      queueId: row.id,
       headers: {
-        "X-BHS-Queue-Id": row.id,
-        "X-BHS-Template": row.template_code ?? "ad_hoc",
         "X-BHS-Attempt": String(attempt),
       },
     });
@@ -300,6 +328,11 @@ async function sendQueueRow(row: QueueRow) {
     if (res.ok) {
       smtpResponse = `[zoho] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
       ok = true;
+      sentMessageId = res.messageId ?? null;
+      sentInReplyTo = parentMessageId;
+      sentReferences = referencesHeader ?? null;
+      sentCustomerId = customerId;
+      sentFromEmail = (process.env.ZOHO_SMTP_USER || "").trim() || null;
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
@@ -350,7 +383,15 @@ async function sendQueueRow(row: QueueRow) {
         attempt,
         lead_id: row.lead_id,
         application_id: row.application_id,
-      }),
+        customer_id: sentCustomerId,
+        direction: "outgoing",
+        message_id: sentMessageId,
+        in_reply_to: sentInReplyTo,
+        references_header: sentReferences,
+        from_email: sentFromEmail,
+        body_html: row.body_html,
+        body_text: row.body_text,
+      } as never),
     ];
     if (row.application_id) {
       writes.push(
