@@ -96,3 +96,57 @@ export const customerSideDelay = createServerFn({ method: "POST" })
       scheduler: { id: scheduler?.id, firesAt: scheduler?.fires_at },
     };
   });
+
+// ─────────────────────── Our-Side Delay (Scheduler 3) ───────────────────────
+
+const OurSideDelayInput = z.object({
+  orderId: z.string().uuid(),
+  reasonId: z.string().uuid(),
+  remarks: z.string().max(2000).optional().nullable(),
+  /** grace = 30-min business-time hold before auto reminders kick in.
+   *  auto  = start recurring 2h business-time reminders immediately.
+   *  manual = one-shot reminder at explicit remindAt.
+   *  stop  = transition without arming any reminder (reason is enough). */
+  mode: z.enum(["grace", "auto", "manual", "stop"]),
+  intervalSeconds: z.number().int().min(300).max(24 * 3600).optional(),
+  remindAt: z.string().datetime().optional(),
+});
+
+/**
+ * Our-Side Delay: order → OUR_SIDE_DELAY + optionally arm reminder loop.
+ * No customer email is sent (per PRD — this is internal accountability only).
+ */
+export const ourSideDelay = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => OurSideDelayInput.parse(raw))
+  .handler(async ({ data, context }) => {
+    const { data: updated, error: tErr } = await context.supabase.rpc("transition_order_status", {
+      _order_id: data.orderId,
+      _new_status: "OUR_SIDE_DELAY",
+      _reason_id: data.reasonId,
+      _remarks: data.remarks ?? undefined,
+      _force: false,
+    });
+    if (tErr) throw new Error(tErr.message);
+
+    if (data.mode === "stop") {
+      return { ok: true, order: updated, scheduler: null };
+    }
+
+    const { startOurSideReminder } = await import("@/lib/scheduling/schedulers.server");
+    const scheduler = await startOurSideReminder({
+      applicationId: data.orderId,
+      mode: data.mode,
+      intervalSeconds: data.intervalSeconds,
+      remindAt: data.remindAt ? new Date(data.remindAt) : undefined,
+      reasonId: data.reasonId,
+      remarks: data.remarks ?? null,
+      createdBy: context.userId,
+    });
+
+    return {
+      ok: true,
+      order: updated,
+      scheduler: { id: scheduler?.id, firesAt: scheduler?.fires_at },
+    };
+  });
