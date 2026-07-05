@@ -30,7 +30,7 @@ import {
 import { Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
-export function LeadEmailsTab({ leadId, leadService }: { leadId: string; leadService: string }) {
+export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string; leadService: string; orderId?: string }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listLeadEmails);
   const sendFn = useServerFn(sendLeadEmail);
