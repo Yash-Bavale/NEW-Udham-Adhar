@@ -221,6 +221,9 @@ export async function fireDueSchedulers(now = new Date()) {
       } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
         await fireTicketAutoclose(s);
         fired++;
+      } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP) {
+        await fireFeedbackFollowup(s);
+        fired++;
       } else {
         await supabaseAdmin
           .from("order_schedulers")
