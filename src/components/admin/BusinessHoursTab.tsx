@@ -94,15 +94,12 @@ export function BusinessHoursTab() {
 
   return (
     <div className="space-y-4">
-      <SectionCard
-        title={
-          <span className="flex items-center gap-2">
-            <Clock className="size-4 text-indigo-600" />
-            Office Hours (drives all internal schedulers)
-          </span>
-        }
-      >
+      <SectionCard title="Office Hours (drives all internal schedulers)">
         <div className="p-4 space-y-4">
+          <div className="flex items-center gap-2 -mt-1 text-xs text-indigo-700">
+            <Clock className="size-4" />
+            <span>Applied to every internal timer (24h closure, 2h reminder, ticket auto-close).</span>
+          </div>
           {!isSuper && (
             <div className="flex items-start gap-2 rounded border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <Info className="size-4 shrink-0 mt-0.5" />
