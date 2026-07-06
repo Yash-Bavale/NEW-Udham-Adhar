@@ -2786,16 +2786,22 @@ export type Database = {
         Row: {
           application_id: string | null
           assigned_to: string | null
+          closed_at: string | null
           created_at: string | null
           customer_id: string | null
           description: string | null
+          first_response_at: string | null
           id: string
+          last_customer_message_at: string | null
+          last_staff_message_at: string | null
           priority: Database["public"]["Enums"]["priority_enum"] | null
           resolved_at: string | null
           resolved_by: string | null
           service_id: string | null
+          source: string
           status: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject: string
+          ticket_email: string | null
           ticket_number: string | null
           ticket_state: Database["public"]["Enums"]["support_ticket_state"]
           updated_at: string | null
@@ -2803,16 +2809,22 @@ export type Database = {
         Insert: {
           application_id?: string | null
           assigned_to?: string | null
+          closed_at?: string | null
           created_at?: string | null
           customer_id?: string | null
           description?: string | null
+          first_response_at?: string | null
           id?: string
+          last_customer_message_at?: string | null
+          last_staff_message_at?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
           resolved_at?: string | null
           resolved_by?: string | null
           service_id?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject: string
+          ticket_email?: string | null
           ticket_number?: string | null
           ticket_state?: Database["public"]["Enums"]["support_ticket_state"]
           updated_at?: string | null
@@ -2820,16 +2832,22 @@ export type Database = {
         Update: {
           application_id?: string | null
           assigned_to?: string | null
+          closed_at?: string | null
           created_at?: string | null
           customer_id?: string | null
           description?: string | null
+          first_response_at?: string | null
           id?: string
+          last_customer_message_at?: string | null
+          last_staff_message_at?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
           resolved_at?: string | null
           resolved_by?: string | null
           service_id?: string | null
+          source?: string
           status?: Database["public"]["Enums"]["ticket_status_enum"] | null
           subject?: string
+          ticket_email?: string | null
           ticket_number?: string | null
           ticket_state?: Database["public"]["Enums"]["support_ticket_state"]
           updated_at?: string | null
@@ -2976,6 +2994,11 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          direction: string
+          email_in_reply_to: string | null
+          email_message_id: string | null
+          email_send_log_id: string | null
+          emailed_at: string | null
           id: string
           is_internal: boolean | null
           reply_text: string
@@ -2984,6 +3007,11 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          direction?: string
+          email_in_reply_to?: string | null
+          email_message_id?: string | null
+          email_send_log_id?: string | null
+          emailed_at?: string | null
           id?: string
           is_internal?: boolean | null
           reply_text: string
@@ -2992,6 +3020,11 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
+          direction?: string
+          email_in_reply_to?: string | null
+          email_message_id?: string | null
+          email_send_log_id?: string | null
+          emailed_at?: string | null
           id?: string
           is_internal?: boolean | null
           reply_text?: string
@@ -3634,7 +3667,7 @@ export type Database = {
         | "refunded"
         | "cancelled"
         | "failed"
-      priority_enum: "high" | "medium" | "low"
+      priority_enum: "high" | "medium" | "low" | "urgent"
       refund_request_status:
         | "pending"
         | "approved"
@@ -3922,7 +3955,7 @@ export const Constants = {
         "cancelled",
         "failed",
       ],
-      priority_enum: ["high", "medium", "low"],
+      priority_enum: ["high", "medium", "low", "urgent"],
       refund_request_status: [
         "pending",
         "approved",
