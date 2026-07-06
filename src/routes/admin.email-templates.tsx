@@ -248,8 +248,16 @@ function EmailTemplatesPage() {
                               </span>
                             </div>
                           </td>
+                          <td className="px-3 py-2">
+                            <DispatchToggle
+                              tpl={t}
+                              disabled={!canToggle}
+                              onChanged={() => qc.invalidateQueries({ queryKey: ["admin.email-templates"] })}
+                            />
+                          </td>
                           <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
                           <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
+
                           <td className="px-3 py-2 text-right whitespace-nowrap">
                             <button
                               onClick={() => setPreviewing(t)}
