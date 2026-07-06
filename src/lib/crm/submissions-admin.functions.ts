@@ -404,7 +404,7 @@ export const resendFormLink = createServerFn({ method: "POST" })
         formLink,
         mobile: lead.mobile ?? "",
       },
-      { toName: lead.name ?? undefined, leadId: lead.id },
+      { toName: lead.name ?? undefined, leadId: lead.id, trigger: "manual" },
     );
 
     await supabaseAdmin.from("activity_logs").insert({

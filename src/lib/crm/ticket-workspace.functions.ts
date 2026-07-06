@@ -92,7 +92,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       customerId
         ? admin
             .from("complaints")
-            .select("id, complaint_number, subject, status, severity, created_at")
+            .select("id, complaint_number, description, status, severity, created_at")
             .eq("customer_id", customerId)
             .order("created_at", { ascending: false })
             .limit(10)
@@ -108,7 +108,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       applicationId
         ? admin
             .from("payments")
-            .select("id, amount, status, gateway, paid_at, created_at")
+            .select("id, amount, status, gateway_name, payment_date, created_at")
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(10)
@@ -116,7 +116,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       applicationId
         ? admin
             .from("invoices")
-            .select("id, invoice_number, total_amount, status, created_at")
+            .select("id, invoice_number, total_amount, delivery_status, created_at")
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(5)

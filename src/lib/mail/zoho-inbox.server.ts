@@ -21,10 +21,12 @@ function requireEnv(name: string): string {
  *  numeric value we trust it; otherwise (empty or an email address) we call
  *  /api/accounts and pick the account whose primary email matches, falling
  *  back to the first account. Cached per-worker. */
-async function resolveAccountId(): Promise<string> {
-  if (accountIdCache) return accountIdCache;
+async function resolveAccountId(forceRefresh = false): Promise<string> {
+  if (accountIdCache && !forceRefresh) return accountIdCache;
   const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
-  if (raw && /^\d+$/.test(raw)) {
+  // If env holds a numeric id, trust it — but only until a call proves it stale
+  // (see zohoFetch's 404 handling, which forces a refresh via /api/accounts).
+  if (raw && /^\d+$/.test(raw) && !forceRefresh) {
     accountIdCache = raw;
     return raw;
   }
@@ -39,7 +41,7 @@ async function resolveAccountId(): Promise<string> {
   const list = j?.data ?? [];
   if (list.length === 0) throw new Error("Zoho: no mail accounts on this token");
   const wanted = raw.toLowerCase();
-  const match = wanted
+  const match = wanted && !/^\d+$/.test(raw)
     ? list.find(
         (a) =>
           (a.primaryEmailAddress || "").toLowerCase() === wanted ||
@@ -123,12 +125,26 @@ export type ZohoHeaders = {
   [k: string]: string | undefined;
 };
 
-/** Find the Inbox folder ID for this account. */
+/** Find the Inbox folder ID for this account. Retries with a refreshed
+ *  account id if the initial one 404s (env var stale or account rotated). */
 export async function getInboxFolderId(): Promise<string> {
-  const accountId = await resolveAccountId();
-  const data = await zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
-    `/api/accounts/${accountId}/folders`,
-  );
+  const call = async (accountId: string) =>
+    zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
+      `/api/accounts/${accountId}/folders`,
+    );
+  let accountId = await resolveAccountId();
+  let data: { data: Array<{ folderId: string; folderName: string; folderType?: string }> };
+  try {
+    data = await call(accountId);
+  } catch (e) {
+    if (String((e as Error).message || "").includes(" 404")) {
+      accountIdCache = null;
+      accountId = await resolveAccountId(true);
+      data = await call(accountId);
+    } else {
+      throw e;
+    }
+  }
   const folders = data?.data ?? [];
   const inbox = folders.find((f) => f.folderType === "Inbox" || /inbox/i.test(f.folderName));
   if (!inbox) throw new Error("Zoho: Inbox folder not found");
@@ -137,8 +153,8 @@ export async function getInboxFolderId(): Promise<string> {
 
 /** List recent messages in Inbox (most recent first). */
 export async function listInboxMessages(limit = 50): Promise<ZohoMessageListItem[]> {
-  const accountId = await resolveAccountId();
   const folderId = await getInboxFolderId();
+  const accountId = await resolveAccountId();
   const data = await zohoFetch<{ data: ZohoMessageListItem[] }>(
     `/api/accounts/${accountId}/messages/view?folderId=${folderId}&start=1&limit=${limit}&sortBy=date&sortorder=false`,
   );
