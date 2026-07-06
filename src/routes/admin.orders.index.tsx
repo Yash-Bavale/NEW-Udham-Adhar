@@ -328,9 +328,21 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
 
           {/* Status + amount */}
           <div className="flex flex-col items-end gap-1 md:w-[140px]">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${stageTone}`}>
-              {meta?.label ?? stage}
-            </span>
+            <div className="flex items-center gap-1">
+              {isPriority && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+                  ● Priority
+                </span>
+              )}
+              {isOnHold && !isPriority && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                  On hold
+                </span>
+              )}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${stageTone}`}>
+                {meta?.label ?? stage}
+              </span>
+            </div>
             {!hideMoney && (
               <div className="text-sm font-semibold text-slate-900">
                 ₹{Number(order.total_amount ?? 0).toLocaleString("en-IN")}
