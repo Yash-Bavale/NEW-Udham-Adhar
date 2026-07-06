@@ -430,36 +430,6 @@ function LaneBadge({ lane }: { lane: Lane }) {
   );
 }
 
-function StageMap({ current }: { current: FulfillmentStatus }) {
-  const idx = stageIndex(current);
-  return (
-    <ol className="flex flex-wrap items-center gap-y-3">
-      {FULFILLMENT_STAGES.map((s, i) => {
-        const done = i < idx;
-        const active = i === idx;
-        return (
-          <li key={s} className="flex items-center">
-            <div className="flex items-center gap-2">
-              <span className={`flex size-7 items-center justify-center rounded-full text-xs font-bold border-2 ${
-                done ? "bg-emerald-500 border-emerald-500 text-white" :
-                active ? "bg-indigo-600 border-indigo-600 text-white shadow-md" :
-                "bg-white border-slate-300 text-slate-400"
-              }`}>
-                {done ? <Check className="size-3.5" /> : i + 1}
-              </span>
-              <span className={`text-xs font-medium ${
-                done ? "text-emerald-700" : active ? "text-indigo-700 font-bold" : "text-slate-500"
-              }`}>{FULFILLMENT_LABEL[s]}</span>
-            </div>
-            {i < FULFILLMENT_STAGES.length - 1 && (
-              <div className={`mx-2 h-0.5 w-6 ${i < idx ? "bg-emerald-400" : "bg-slate-200"}`} />
-            )}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 function HistorySection({ applicationId, onRefresh }: { applicationId: string; onRefresh: () => void }) {
   const fnEvents = useServerFn(listWorkflowEvents);
