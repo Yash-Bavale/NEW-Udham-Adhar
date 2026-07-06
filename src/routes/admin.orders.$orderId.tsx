@@ -79,14 +79,6 @@ function OrderDetailPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
-  const requestDocs = async () => {
-    if (!lead?.id) { toast.error("No lead linked"); return; }
-    try {
-      await reminderFn({ data: { leadId: lead.id } });
-      toast.success("Reminder queued");
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-  };
-
   return (
     <WorkspaceShell
       orderId={orderId}
@@ -94,7 +86,6 @@ function OrderDetailPage() {
       hideAmount={hideAmount}
       staff={staffData?.profiles ?? []}
       onAssign={setAssignee}
-      onRequestDocs={requestDocs}
       stage={stage}
       timestamps={timestamps}
       showConsultationPanel={showConsultationPanel}
