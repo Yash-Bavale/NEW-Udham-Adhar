@@ -184,7 +184,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               const issued = invoiceRow?.issued_at ? new Date(invoiceRow.issued_at) : new Date();
               try {
                 await enqueueFromTemplateInternal(
-                  "payment_success",
+                  "order_confirmation",
                   leadRow.email,
                   {
                     name: leadRow.name ?? "",
@@ -225,7 +225,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
 
                 await markInvoiceEmailedByPayment(payment.id, {
                   recipient: leadRow.email,
-                  template: "payment_success",
+                  template: "order_confirmation",
                   attachmentFilename: invoiceAttachment?.filename ?? null,
                   success: true,
                   actorLabel: "ccavenue-webhook",
@@ -233,7 +233,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
               } catch (e) {
                 await markInvoiceEmailedByPayment(payment.id, {
                   recipient: leadRow.email,
-                  template: "payment_success",
+                  template: "order_confirmation",
                   attachmentFilename: invoiceAttachment?.filename ?? null,
                   success: false,
                   error: e instanceof Error ? e.message : String(e),
@@ -242,7 +242,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
                 throw e;
               }
             }
-          } catch (e) { console.error("[ccavenue] payment_success email enqueue failed", e); }
+          } catch (e) { console.error("[ccavenue] order_confirmation email enqueue failed", e); }
 
 
           return isBrowser

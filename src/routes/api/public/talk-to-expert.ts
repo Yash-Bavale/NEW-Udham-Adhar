@@ -90,7 +90,7 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
         const adminTo = process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
         const origin = new URL(request.url).origin;
         try {
-          const { enqueueFromTemplateInternal, enqueueEmailInternal } = await import(
+          const { enqueueEmailInternal } = await import(
             "@/lib/emails/emails.server"
           );
           await enqueueEmailInternal({
@@ -99,16 +99,13 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
             bodyHtml: `<p><b>${parsed.name}</b> (${parsed.email}, +91 ${parsed.mobile}) booked a ₹${TOTAL} expert consultation.</p><p><b>Problem:</b><br/>${parsed.problem.replace(/\n/g, "<br/>")}</p><p><a href="${origin}/admin/leads/${leadId}">Open in CRM</a></p>`,
             leadId,
           });
-          await enqueueFromTemplateInternal(
-            "contact_acknowledgement",
-            parsed.email,
-            {
-              name: parsed.name,
-              service: "Expert Consultation",
-              total_amount: String(TOTAL),
-            },
-            { toName: parsed.name, leadId },
-          ).catch(() => undefined);
+          await enqueueEmailInternal({
+            toEmail: parsed.email,
+            toName: parsed.name,
+            subject: "We received your expert consultation request",
+            bodyHtml: `<p>Hi ${parsed.name},</p><p>We received your expert consultation request. Our team will contact you shortly.</p>`,
+            leadId,
+          }).catch(() => undefined);
         } catch {
           // ignore email backend issues
         }

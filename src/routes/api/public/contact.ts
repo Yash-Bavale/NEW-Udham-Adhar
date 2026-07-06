@@ -115,25 +115,25 @@ export const Route = createFileRoute("/api/public/contact")({
         };
 
         try {
-          const { enqueueFromTemplateInternal, enqueueEmailInternal } = await import(
+          const { enqueueEmailInternal } = await import(
             "@/lib/emails/emails.server"
           );
           await Promise.all([
-            enqueueFromTemplateInternal("contact_acknowledgement", parsed.email, variables, {
+            enqueueEmailInternal({
+              toEmail: parsed.email,
               toName: parsed.name,
+              subject: "We received your enquiry",
+              bodyHtml: `<p>Hi ${parsed.name},</p><p>We received your enquiry and our team will contact you shortly.</p>`,
               leadId,
             }),
-            enqueueFromTemplateInternal("admin_new_lead", adminTo, variables, {
-              leadId,
-            }).catch(async () => {
-              // Template might be disabled; fall back to a minimal inline email
+            (async () => {
               await enqueueEmailInternal({
                 toEmail: adminTo,
                 subject: `New lead: ${parsed.name}`,
                 bodyHtml: `<p>New contact form submission from <b>${parsed.name}</b> (${parsed.email}, +91 ${parsed.mobile}).</p><p>${parsed.message}</p>`,
                 leadId,
               });
-            }),
+            })(),
           ]);
         } catch {
           // Email queue failures must not break the user flow

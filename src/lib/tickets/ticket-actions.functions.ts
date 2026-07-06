@@ -2,8 +2,7 @@
  * Support-ticket atomic actions — email-driven flow.
  *
  * - replyToTicket           → public/internal staff reply. Public replies email
- *                             the customer via `ticket_reply` template with
- *                             threaded Message-ID / In-Reply-To / References
+ *                             the customer inline with threaded headers
  *                             headers so Gmail/Outlook show one conversation.
  * - closeTicketWithReply    → E008 email + close (cancellation flow)
  * - closeTicketFinal        → E009 email + close (cancellation flow)
@@ -160,25 +159,26 @@ export const replyToTicket = createServerFn({ method: "POST" })
     const thread = await loadThreadHeaders(ticket.id);
 
     try {
-      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-      const result = await enqueueFromTemplateInternal(
-        "ticket_reply",
-        recipient,
-        {
+      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      const ticketNumber = ticket.ticket_number ?? ticket.id.slice(0, 8);
+      const result = await enqueueEmailInternal({
+        templateCode: null,
+        toEmail: recipient,
+        toName: cust.name,
+        subject: `Re: [#${ticketNumber}] ${ticket.subject}`,
+        bodyHtml: `<p>Hi ${cust.name || "Customer"},</p><div>${data.message.replace(/\n/g, "<br/>")}</div><p>Regards,<br/>${actorName} · Business Help Services</p>`,
+        bodyText: `Hi ${cust.name || "Customer"},\n\n${data.message}\n\nRegards,\n${actorName} · Business Help Services`,
+        variables: {
           customerName: cust.name,
           replyMessage: data.message,
-          ticketNumber: ticket.ticket_number ?? ticket.id.slice(0, 8),
+          ticketNumber,
           ticketSubject: ticket.subject,
           fromName: `${actorName} · Business Help Services`,
-          // Threading hints picked up by emails.server.ts → sendViaZoho
           __in_reply_to: thread.inReplyTo,
           __references: thread.references,
         },
-        {
-          toName: cust.name,
-          applicationId: ticket.application_id ?? undefined,
-        },
-      );
+        applicationId: ticket.application_id ?? undefined,
+      });
 
       // Best-effort: look up the outbound Message-ID from email_logs by queue_id
       // and stash it on the ticket_replies row so the next reply can chain.

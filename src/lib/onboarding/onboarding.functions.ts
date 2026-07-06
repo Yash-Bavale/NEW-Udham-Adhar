@@ -228,14 +228,6 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         adminUrl: `https://${process.env.PUBLIC_SITE_HOST ?? "udyamadhar.in"}/admin/leads`,
       };
 
-      if (lead.email) {
-        await enqueueFromTemplateInternal("onboarding_complete", lead.email, baseVars, {
-          toName: lead.name ?? undefined,
-          leadId: lead.id,
-          applicationId: app?.id ?? undefined,
-        }).catch((e) => console.error("onboarding_complete enqueue failed:", e));
-      }
-
       const { data: smtp } = await supabaseAdmin
         .from("smtp_settings")
         .select("reply_to")
@@ -244,10 +236,14 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         .maybeSingle();
       const adminTo = smtp?.reply_to ?? DEFAULT_ADMIN_EMAIL;
 
-      await enqueueFromTemplateInternal("admin_onboarding_submitted", adminTo, baseVars, {
+      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      await enqueueEmailInternal({
+        toEmail: adminTo,
+        subject: `Onboarding submitted: ${lead.lead_code ?? lead.name ?? "Lead"}`,
+        bodyHtml: `<p>Customer onboarding was submitted.</p><p><b>Name:</b> ${lead.name ?? ""}<br/><b>Lead:</b> ${lead.lead_code ?? ""}<br/><b>Service:</b> ${lead.service ?? ""}<br/><b>Documents:</b> ${docCount ?? 0}</p>`,
         leadId: lead.id,
         applicationId: app?.id ?? undefined,
-      }).catch((e) => console.error("admin_onboarding_submitted enqueue failed:", e));
+      }).catch((e: unknown) => console.error("admin onboarding notification failed:", e));
     }
 
     return { ok: true };

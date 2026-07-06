@@ -532,7 +532,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       if (recipientEmail && certificateUrl) {
         const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
         await enqueueEmailInternal({
-          templateCode: "certificate_delivery",
+          templateCode: "order_completed",
           toEmail: recipientEmail,
           toName: recipientName,
           subject: `Your Order No. ${app.application_code ?? ""} has been completed`,
@@ -714,7 +714,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     {
       const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
       await enqueueEmailInternal({
-        templateCode: "certificate_delivery",
+        templateCode: "order_completed",
         toEmail: recipientEmail,
         toName: recipientName,
         subject: `Your Order No. ${app?.application_code ?? ""} has been completed`,
