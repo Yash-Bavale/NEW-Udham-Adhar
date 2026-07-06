@@ -176,6 +176,23 @@ export const createTicket = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
 
+    // Dedup: reuse existing open ticket for the same order unless overridden.
+    if (data.applicationId && !data.allowDuplicate) {
+      const { data: existing } = await admin
+        .from("support_tickets")
+        .select("id, ticket_number")
+        .eq("application_id", data.applicationId)
+        .in("status", ["open", "in_progress", "waiting_customer"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const ex = existing as { id: string; ticket_number: string | null } | null;
+      if (ex) {
+        return { id: ex.id, ticket_number: ex.ticket_number ?? "", reused: true as const };
+      }
+    }
+
+
     // Enforce "registered email only" — resolve and snapshot the customer's email up-front.
     const { data: cust } = await admin
       .from("customers")
