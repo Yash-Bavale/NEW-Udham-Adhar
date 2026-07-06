@@ -286,3 +286,79 @@ function StatusIcon({ status }: { status: string }) {
       return <Badge variant="outline">{status}</Badge>;
   }
 }
+
+function ManualTemplateSender({ leadId, orderId }: { leadId: string; orderId?: string }) {
+  const qc = useQueryClient();
+  const listTpl = useServerFn(listEmailTemplates);
+  const sendTpl = useServerFn(sendOrderTemplateEmail);
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["admin.email-templates.picker"],
+    queryFn: () => listTpl({ data: {} as never }),
+    enabled: open,
+  });
+  const rows = ((data?.rows as any[]) ?? []).filter((r) => r.is_enabled);
+
+  const submit = async () => {
+    if (!code) return;
+    setBusy(true);
+    try {
+      await sendTpl({ data: { leadId, templateCode: code } });
+      toast.success("Email queued for delivery");
+      setOpen(false);
+      setCode("");
+      qc.invalidateQueries({ queryKey: ["admin.lead.emails", leadId] });
+      if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to send");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="gap-2 ml-2">
+          <Mail className="w-4 h-4" /> Send Template
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Send a template to this customer</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-3">
+          <label className="text-sm font-medium">Template</label>
+          <Select value={code} onValueChange={setCode}>
+            <SelectTrigger><SelectValue placeholder="Choose a template…" /></SelectTrigger>
+            <SelectContent className="max-h-80">
+              {rows.map((r: any) => (
+                <SelectItem key={r.code} value={r.code}>
+                  <span className="flex items-center gap-2">
+                    {r.sr_no != null && <span className="font-mono text-[10px] text-slate-500">#{r.sr_no}</span>}
+                    <span>{r.name}</span>
+                    <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${r.dispatch_mode === "manual" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>
+                      {r.dispatch_mode === "manual" ? "Manual" : "Auto"}
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Manual-dispatch templates are never sent automatically. Use this to send them (or any other template) with this order's context filled in.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || !code}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+            Send now
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
