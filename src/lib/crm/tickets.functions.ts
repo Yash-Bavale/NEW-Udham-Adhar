@@ -141,6 +141,22 @@ export const getTicket = createServerFn({ method: "POST" })
     };
   });
 
+export const checkOpenTicketForOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ applicationId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: row } = await admin
+      .from("support_tickets")
+      .select("id, ticket_number, subject, status")
+      .eq("application_id", data.applicationId)
+      .in("status", ["open", "in_progress", "waiting_customer"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return row ?? null;
+  });
+
 export const createTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -153,6 +169,7 @@ export const createTicket = createServerFn({ method: "POST" })
         customerId: z.string().uuid(),
         applicationId: z.string().uuid().nullable().optional(),
         source: z.enum(["staff", "email_inbound", "web"]).default("staff"),
+        allowDuplicate: z.boolean().default(false),
       })
       .parse(i)
   )
