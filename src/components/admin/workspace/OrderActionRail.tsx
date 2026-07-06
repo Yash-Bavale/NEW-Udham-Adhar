@@ -96,9 +96,14 @@ export function OrderActionRail(p: Props) {
   const [resumeTarget, setResumeTarget] = useState<FulfillmentStatus>("order_received");
   const [resumeNote, setResumeNote] = useState("");
 
+  // Every action MUST invalidate every query key the Timeline / Journey /
+  // Exception banner reads, so the whole page snaps to server truth on click.
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.order", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["admin.order.notes", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["admin.order.recipient", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["order-detail-v2", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["order-exception-state", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-events", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-reminders", p.applicationId] });
   };

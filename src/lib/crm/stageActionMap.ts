@@ -29,10 +29,14 @@ export interface StageActionSpec {
 }
 
 /**
- * Every OrderStage MUST have an entry here — no empty states.
- * Aligned with the All Mail Auto Flow doc.
+ * Every OrderStage MUST have an entry — no empty states.
+ * Aligned with the DB `fulfillment_status_enum`
+ *   (order_received → documents_received → verification_pending →
+ *    application_submitted → under_processing → completed / cancelled)
+ * and the All-Mail Auto-Flow doc for pre-fulfillment stages.
  */
 export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
+  // ── Customer-side (pre-fulfillment) ───────────────────────────────
   lead_received: {
     hint: "Lead has not paid yet. Send or resend the payment link from the lead page.",
     primary: "Open Lead — Send Payment Link",
@@ -46,53 +50,64 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     exceptions: ["mark_uninterested", "cancel_refund"],
   },
   payment_done: {
-    hint: "Payment received. Move to documents once the customer submits the form.",
-    primary: "Mark Documents Received",
-    primaryKind: "advance_fulfillment",
-    exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
+    hint: "Payment received. Waiting for the customer to submit the service form.",
+    primary: null,
+    primaryKind: "none",
+    exceptions: ["our_side_delay", "customer_hold", "cancel_refund"],
   },
   consultation_pending: {
     hint: "Consultation lead — convert to a paid order once the customer picks a service.",
-    primary: "Convert Consultation",
+    primary: "Open Consultation Panel",
     primaryKind: "open_consultation_tab",
     exceptions: ["mark_uninterested", "cancel_refund"],
   },
+
+  // ── Employee-side (fulfillment lifecycle) ─────────────────────────
+  // form_submitted → fulfillment_status = order_received. Next: documents_received.
   form_submitted: {
-    hint: "Customer form submitted. Verify documents and move forward.",
+    hint: "Customer form submitted. Confirm documents to start fulfillment.",
     primary: "Mark Documents Received",
     primaryKind: "advance_fulfillment",
     exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
   },
+  // in_progress → fulfillment_status = documents_received. Next: verification_pending.
   in_progress: {
     hint: "Documents received. Send for verification.",
     primary: "Move to Verification",
     primaryKind: "advance_fulfillment",
     exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
   },
+  // under_review → fulfillment_status = verification_pending. Next: application_submitted.
   under_review: {
     hint: "Verify all fields and documents, then submit to the government portal.",
     primary: "Submit to Govt Portal",
     primaryKind: "advance_fulfillment",
     exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
   },
+  // submitted_to_govt → fulfillment_status = application_submitted. Next: under_processing.
   submitted_to_govt: {
     hint: "Submitted to Govt. Move to processing once the portal acknowledges.",
     primary: "Move to Under Processing",
     primaryKind: "advance_fulfillment",
     exceptions: ["our_side_delay", "customer_hold", "cancel_refund"],
   },
+  // under_processing → fulfillment_status = under_processing. Next: completed (via cert gate).
   under_processing: {
     hint: "Portal is processing. Upload the certificate when it arrives.",
     primary: "Mark Certificate Issued",
     primaryKind: "complete_with_cert",
     exceptions: ["our_side_delay", "customer_hold", "cancel_refund"],
   },
+  // certificate_ready → cert uploaded but fulfillment still under_processing.
+  // Completing still runs through the gate (needs certificate number confirmation).
   certificate_ready: {
-    hint: "Certificate uploaded. Complete the order to email it to the customer.",
+    hint: "Certificate uploaded. Confirm and complete to email it to the customer.",
     primary: "Complete & Send Certificate",
-    primaryKind: "advance_fulfillment",
+    primaryKind: "complete_with_cert",
     exceptions: ["our_side_delay", "cancel_refund"],
   },
+
+  // ── Terminal / exception ──────────────────────────────────────────
   completed: {
     hint: "Order completed. Certificate delivered.",
     primary: null,
