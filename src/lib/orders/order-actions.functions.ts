@@ -89,6 +89,17 @@ export const customerSideDelay = createServerFn({ method: "POST" })
       createdBy: context.userId,
     });
 
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: orderCode,
+        assigned_to: (app?.assigned_to as string | null) ?? null,
+      },
+      kind: "customer_hold_started",
+      title: `${orderCode} moved to Customer Hold`,
+      body: `24h auto-close timer started. Reason: ${reason?.label ?? "Awaiting customer information"}.`,
+    });
+
     return {
       ok: true,
       order: updated,
