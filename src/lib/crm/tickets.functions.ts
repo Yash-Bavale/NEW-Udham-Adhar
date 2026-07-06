@@ -152,11 +152,26 @@ export const createTicket = createServerFn({ method: "POST" })
         assignedTo: z.string().uuid().nullable().optional(),
         customerId: z.string().uuid(),
         applicationId: z.string().uuid().nullable().optional(),
+        source: z.enum(["staff", "email_inbound", "web"]).default("staff"),
       })
       .parse(i)
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+
+    // Enforce "registered email only" — resolve and snapshot the customer's email up-front.
+    const { data: cust } = await admin
+      .from("customers")
+      .select("name, primary_email")
+      .eq("id", data.customerId)
+      .maybeSingle();
+    const custRow = cust as { name: string | null; primary_email: string | null } | null;
+    const ticketEmail = custRow?.primary_email?.trim().toLowerCase() || null;
+    if (!ticketEmail) {
+      throw new Error(
+        "Customer has no registered email address on file. Add an email to the customer profile before opening a ticket."
+      );
+    }
 
     let serviceId: string | null = null;
     if (data.applicationId) {
@@ -179,6 +194,8 @@ export const createTicket = createServerFn({ method: "POST" })
         application_id: data.applicationId ?? null,
         service_id: serviceId,
         status: "open",
+        ticket_email: ticketEmail,
+        source: data.source,
       } as never)
       .select("id, ticket_number")
       .single();
@@ -194,32 +211,31 @@ export const createTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Best-effort email enqueue (template optional)
+    // Send ticket_created confirmation. Non-fatal on failure — ticket stays created.
     try {
-      const { data: cust } = await admin
-        .from("customers")
-        .select("name, primary_email")
-        .eq("id", data.customerId)
-        .maybeSingle();
-      if (cust?.primary_email) {
-        const m = await import("@/lib/emails/emails.server");
-        await m.enqueueFromTemplateInternal(
-          "ticket_created",
-          cust.primary_email,
-          {
-            customer_name: cust.name ?? "",
-            ticket_number: ins!.ticket_number,
-            subject: data.subject,
-          },
-          { toName: cust.name ?? undefined, applicationId: data.applicationId ?? undefined }
-        );
-      }
-    } catch {
-      // template missing or send failure — non-fatal
+      const m = await import("@/lib/emails/emails.server");
+      await m.enqueueFromTemplateInternal(
+        "ticket_created",
+        ticketEmail,
+        {
+          customerName: custRow?.name ?? "",
+          ticketNumber: ins!.ticket_number,
+          ticketSubject: data.subject,
+          ticketPriority: data.priority,
+          fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
+        },
+        {
+          toName: custRow?.name ?? undefined,
+          applicationId: data.applicationId ?? undefined,
+        },
+      );
+    } catch (e) {
+      console.error("[tickets] ticket_created email failed", e);
     }
 
     return { id: ins!.id, ticket_number: ins!.ticket_number };
   });
+
 
 export const updateTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
