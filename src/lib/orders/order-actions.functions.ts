@@ -399,6 +399,12 @@ export const completeOrder = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[completeOrder] feedback follow-up scheduler failed", e);
     }
+    await notifyOrderEvent({
+      order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+      kind: "order_completed",
+      title: `${order.application_code || order.id.slice(0, 8)} completed`,
+      body: "Delivery email sent to customer.",
+    });
     return { ok: true, order: updated, emailQueued };
   });
 
