@@ -156,17 +156,6 @@ function TicketsPage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-            <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={10}>
-                    <TableSkeleton rows={6} cols={10} />
-                  </td>
-                </tr>
-              )}
-              {!isLoading && (data?.tickets ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={10}>
 
             </thead>
             <tbody>
