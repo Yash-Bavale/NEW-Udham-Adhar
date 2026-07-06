@@ -257,13 +257,13 @@ async function matchTicket(input: {
         .eq("id", row.ticket_id)
         .maybeSingle();
       if (t) {
-        const r = t as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null; lead_id: string | null };
+        const r = t as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
         return {
           ticketId: r.id,
           ticketEmail: r.ticket_email,
           applicationId: r.application_id,
           customerId: r.customer_id,
-          leadId: r.lead_id,
+          leadId: null,
         };
       }
     }
