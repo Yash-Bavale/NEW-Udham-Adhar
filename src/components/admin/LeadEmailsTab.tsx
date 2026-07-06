@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { listLeadEmails, sendLeadEmail } from "@/lib/crm/emails-admin.functions";
+import { listEmailTemplates, sendOrderTemplateEmail } from "@/lib/emails/emails.functions";
+
 import {
   Table,
   TableBody,
