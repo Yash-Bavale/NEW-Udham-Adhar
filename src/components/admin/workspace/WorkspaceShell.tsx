@@ -249,6 +249,22 @@ export function WorkspaceShell(p: Props) {
             (OrderWorkflowPanel). This card is header info only. */}
       </section>
 
+      {/* ── EMPLOYEE ACTIONS (single source of truth) ── */}
+      <OrderActionRail
+        applicationId={application.id}
+        leadId={lead?.id ?? null}
+        stage={p.stage}
+        current={current}
+        workflowStatus={(application as any).workflow_status}
+        closureStage={(application as any).closure_stage}
+        closureNextAt={(application as any).closure_next_at}
+        cancellationRequestedAt={(application as any).cancellation_requested_at}
+        reasonCode={(application as any).closure_reason_code}
+        reasonText={(application as any).closure_reason_text}
+        updatedAt={application.updated_at ?? application.created_at}
+        onSwitchTab={(id) => setTab(id)}
+      />
+
       {/* Customer Journey */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
         <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-4">
