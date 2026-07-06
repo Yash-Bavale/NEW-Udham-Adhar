@@ -202,7 +202,7 @@ export async function cancelAllForOrder(applicationId: string, reason = "order_s
 export async function fireDueSchedulers(now = new Date()) {
   const { data: due, error } = await supabaseAdmin
     .from("order_schedulers")
-    .select("id, application_id, scheduler_type, reason_id, remarks")
+    .select("id, application_id, ticket_id, scheduler_type, reason_id, remarks")
     .eq("status", "active")
     .lte("fires_at", now.toISOString())
     .limit(50);
@@ -210,24 +210,24 @@ export async function fireDueSchedulers(now = new Date()) {
   if (!due || due.length === 0) return { fired: 0 };
 
   let fired = 0;
-  for (const s of due as Array<{ id: string; application_id: string; scheduler_type: string; reason_id: string | null; remarks: string | null }>) {
+  for (const s of due as Array<{ id: string; application_id: string | null; ticket_id: string | null; scheduler_type: string; reason_id: string | null; remarks: string | null }>) {
     try {
-      if (s.scheduler_type === SCHEDULER_CUSTOMER_CLOSURE) {
-        await fireCustomerClosure(s);
+      if (s.scheduler_type === SCHEDULER_CUSTOMER_CLOSURE && s.application_id) {
+        await fireCustomerClosure({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
-      } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER) {
+      } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER && s.application_id) {
         await fireOurSideReminder(s.id, s.application_id);
         fired++;
       } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
-        await fireTicketAutoclose(s);
+        await fireTicketAutoclose({ id: s.id, ticket_id: s.ticket_id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
-      } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP) {
-        await fireFeedbackFollowup(s);
+      } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP && s.application_id) {
+        await fireFeedbackFollowup({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
       } else {
         await supabaseAdmin
           .from("order_schedulers")
-          .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type" } as never)
+          .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type_or_missing_app" } as never)
           .eq("id", s.id);
       }
     } catch (e) {
@@ -528,7 +528,7 @@ async function fireCustomerClosure(s: {
 /** Arm the 24-business-hour ticket auto-close timer. Cancels any prior active one. */
 export async function startTicketAutocloseScheduler(input: {
   ticketId: string;
-  applicationId: string;
+  applicationId?: string | null;
   totalSeconds?: number;
   createdBy?: string | null;
   note?: string | null;
@@ -548,15 +548,15 @@ export async function startTicketAutocloseScheduler(input: {
       stop_triggered_by: "system",
       updated_at: now.toISOString(),
     } as never)
-    .eq("application_id", input.applicationId)
     .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
-    .like("remarks", `${TICKET_TAG_PREFIX}${input.ticketId}%`)
+    .eq("ticket_id", input.ticketId)
     .in("status", ["active", "paused"]);
 
   const { data, error } = await supabaseAdmin
     .from("order_schedulers")
     .insert({
-      application_id: input.applicationId,
+      application_id: input.applicationId ?? null,
+      ticket_id: input.ticketId,
       scheduler_type: SCHEDULER_TICKET_AUTOCLOSE,
       status: "active",
       started_at: now.toISOString(),
@@ -585,9 +585,10 @@ export async function cancelTicketAutocloseByTicket(ticketId: string, reason = "
       updated_at: now.toISOString(),
     } as never)
     .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
-    .like("remarks", `${TICKET_TAG_PREFIX}${ticketId}%`)
+    .eq("ticket_id", ticketId)
     .in("status", ["active", "paused"]);
 }
+
 
 /** Cancel every active ticket auto-close on an order (customer replied inbound). */
 export async function cancelTicketAutocloseForOrder(applicationId: string, reason = "customer_replied") {
@@ -608,11 +609,12 @@ export async function cancelTicketAutocloseForOrder(applicationId: string, reaso
 
 async function fireTicketAutoclose(s: {
   id: string;
-  application_id: string;
+  ticket_id: string | null;
+  application_id: string | null;
   reason_id: string | null;
   remarks: string | null;
 }) {
-  const ticketId = decodeTicketId(s.remarks);
+  const ticketId = s.ticket_id ?? decodeTicketId(s.remarks);
   const now = new Date();
 
   const markStopped = async (reason: string) => {

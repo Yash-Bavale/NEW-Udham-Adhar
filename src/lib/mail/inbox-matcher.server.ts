@@ -136,6 +136,8 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       receivedAt,
     });
 
+    const { cancelTicketAutocloseByTicket: cancelByTicket } = await import("@/lib/scheduling/schedulers.server");
+    await cancelByTicket(ticketMatch.ticketId, "customer_replied").catch(() => {});
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
       await pauseActiveCustomerScheduler(ticketMatch.applicationId, null).catch(() => {});

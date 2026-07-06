@@ -621,6 +621,42 @@ export type Database = {
         }
         Relationships: []
       }
+      canned_responses: {
+        Row: {
+          body: string
+          category: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       certificates: {
         Row: {
           application_id: string
@@ -2086,7 +2122,7 @@ export type Database = {
       }
       order_schedulers: {
         Row: {
-          application_id: string
+          application_id: string | null
           business_seconds_remaining: number | null
           business_seconds_total: number | null
           created_at: string
@@ -2104,10 +2140,11 @@ export type Database = {
           stop_reason: string | null
           stop_triggered_by: string | null
           stopped_at: string | null
+          ticket_id: string | null
           updated_at: string
         }
         Insert: {
-          application_id: string
+          application_id?: string | null
           business_seconds_remaining?: number | null
           business_seconds_total?: number | null
           created_at?: string
@@ -2125,10 +2162,11 @@ export type Database = {
           stop_reason?: string | null
           stop_triggered_by?: string | null
           stopped_at?: string | null
+          ticket_id?: string | null
           updated_at?: string
         }
         Update: {
-          application_id?: string
+          application_id?: string | null
           business_seconds_remaining?: number | null
           business_seconds_total?: number | null
           created_at?: string
@@ -2146,6 +2184,7 @@ export type Database = {
           stop_reason?: string | null
           stop_triggered_by?: string | null
           stopped_at?: string | null
+          ticket_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2168,6 +2207,13 @@ export type Database = {
             columns: ["reason_id"]
             isOneToOne: false
             referencedRelation: "delay_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_schedulers_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
         ]

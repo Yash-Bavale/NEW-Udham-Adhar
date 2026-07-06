@@ -126,12 +126,12 @@ export const replyToTicket = createServerFn({ method: "POST" })
     if (!ticket.first_response_at) patch.first_response_at = now;
     await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
 
-    // Arm ticket-autoclose only when we have an application context.
-    if (data.armAutoclose && ticket.application_id) {
+    // Arm ticket-autoclose (works for both order-linked and standalone tickets).
+    if (data.armAutoclose) {
       const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
       await startTicketAutocloseScheduler({
         ticketId: ticket.id,
-        applicationId: ticket.application_id,
+        applicationId: ticket.application_id ?? null,
         createdBy: context.userId,
       });
     }

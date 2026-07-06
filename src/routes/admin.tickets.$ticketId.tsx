@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send, Sparkles } from "lucide-react";
 import { getTicket, updateTicket, replyToTicket, type TicketStatus } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
+import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { SectionCard } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/tickets/$ticketId")({
@@ -48,9 +49,16 @@ function TicketDetailPage() {
     queryFn: () => staffFn(),
     staleTime: 60_000,
   });
+  const cannedFn = useServerFn(listCannedResponses);
+  const { data: canned } = useQuery({
+    queryKey: ["canned-responses", "active"],
+    queryFn: () => cannedFn({ data: { activeOnly: true } }),
+    staleTime: 60_000,
+  });
 
   const [reply, setReply] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const [showCanned, setShowCanned] = useState(false);
 
   const updMut = useMutation({
     mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null }) =>
@@ -357,6 +365,44 @@ function TicketDetailPage() {
                 >
                   Internal Note
                 </button>
+                {canned && canned.length > 0 && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowCanned((v) => !v)}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1"
+                      style={{ color: "var(--admin-fg-muted)", border: "1px dashed var(--admin-border)" }}
+                    >
+                      <Sparkles className="size-3" /> Canned
+                    </button>
+                    {showCanned && (
+                      <div
+                        className="absolute left-0 top-full z-10 mt-1 max-h-64 w-72 overflow-auto rounded-md border p-1 shadow-lg"
+                        style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+                      >
+                        {canned.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setReply((prev) => (prev ? prev + "\n\n" + c.body : c.body));
+                              setShowCanned(false);
+                            }}
+                            className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-black/5"
+                            style={{ color: "var(--admin-fg)" }}
+                          >
+                            <div className="font-medium">{c.title}</div>
+                            {c.category && (
+                              <div className="text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>
+                                {c.category}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </label>
               <button
                 type="button"
