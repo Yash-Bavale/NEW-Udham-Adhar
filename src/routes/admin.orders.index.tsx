@@ -389,27 +389,30 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
             </div>
           </div>
 
-          {/* Quick actions (hover) */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Quick actions — always visible so they're usable on touch and
+              during triage; the arrow still hints at row navigation. */}
+          <div className="flex items-center gap-1">
             {order.customer_mobile && (
               <button
-                onClick={(e) => { e.preventDefault(); window.location.href = `tel:${order.customer_mobile}`; }}
-                className="size-8 rounded-lg grid place-items-center hover:bg-sky-50 text-sky-600"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${order.customer_mobile}`; }}
+                className="size-8 rounded-lg grid place-items-center bg-sky-50 hover:bg-sky-100 text-sky-600 ring-1 ring-sky-100"
                 title="Call"
+                aria-label="Call customer"
               >
                 <Phone className="size-3.5" />
               </button>
             )}
             {waUrl && (
               <button
-                onClick={(e) => { e.preventDefault(); window.open(waUrl, "_blank"); }}
-                className="size-8 rounded-lg grid place-items-center hover:bg-emerald-50 text-emerald-600"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(waUrl, "_blank"); }}
+                className="size-8 rounded-lg grid place-items-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 ring-1 ring-emerald-100"
                 title="WhatsApp"
+                aria-label="Message on WhatsApp"
               >
                 <MessageCircle className="size-3.5" />
               </button>
             )}
-            <ArrowRight className="size-4 text-slate-400 ml-1" />
+            <ArrowRight className="size-4 text-slate-400 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
 
