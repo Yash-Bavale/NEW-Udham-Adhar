@@ -116,7 +116,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       applicationId
         ? admin
             .from("invoices")
-            .select("id, invoice_number, total_amount, status, created_at")
+            .select("id, invoice_number, total_amount, delivery_status, created_at")
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(5)
