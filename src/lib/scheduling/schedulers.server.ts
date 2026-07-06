@@ -492,7 +492,7 @@ async function fireCustomerClosure(s: {
   if (cust?.primary_email) {
     try {
       await enqueueFromTemplateInternal(
-        BHS_EMAILS.E004_ORDER_AUTO_CLOSED,
+        BHS_EMAILS.E006_ORDER_CLOSED,
         cust.primary_email as string,
         {
           customerName: (cust.name as string) || "Customer",
@@ -670,7 +670,7 @@ async function fireTicketAutoclose(s: {
     is_internal: true,
   } as never);
 
-  // Send E010 auto-close notice to customer.
+  // Send final ticket-closed notice to customer (E010 = support_ticket_closed_final).
   if (t.customer_id) {
     const { data: cust } = await supabaseAdmin
       .from("customers")
@@ -681,7 +681,7 @@ async function fireTicketAutoclose(s: {
     if (c?.primary_email) {
       try {
         await enqueueFromTemplateInternal(
-          BHS_EMAILS.E010_TICKET_AUTOCLOSE,
+          BHS_EMAILS.E010_TICKET_CLOSED_FINAL,
           c.primary_email,
           {
             customerName: c.name || "Customer",
@@ -691,7 +691,7 @@ async function fireTicketAutoclose(s: {
           { applicationId: t.application_id ?? undefined },
         );
       } catch (e) {
-        console.error("[schedulers] E010 enqueue failed", e);
+        console.error("[schedulers] ticket auto-close email enqueue failed", e);
       }
     }
   }
@@ -786,30 +786,9 @@ async function fireFeedbackFollowup(s: {
     return;
   }
 
-  if (o.customer_id) {
-    const { data: cust } = await supabaseAdmin
-      .from("customers")
-      .select("primary_email, name")
-      .eq("id", o.customer_id)
-      .maybeSingle();
-    const c = cust as { primary_email: string | null; name: string | null } | null;
-    if (c?.primary_email) {
-      try {
-        await enqueueFromTemplateInternal(
-          BHS_EMAILS.E007_FEEDBACK,
-          c.primary_email,
-          {
-            customerName: c.name || "Customer",
-            orderNumber: o.application_code || o.id.slice(0, 8),
-            fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
-          },
-          { applicationId: o.id, leadId: o.lead_id ?? undefined },
-        );
-      } catch (e) {
-        console.error("[schedulers] E007 enqueue failed", e);
-      }
-    }
-  }
+  // Feedback template was removed from the BHS 12-template set. Scheduler still
+  // fires (for future reactivation) but no customer email is sent.
+  void o.customer_id;
 
   await markStopped("auto_fired");
 }

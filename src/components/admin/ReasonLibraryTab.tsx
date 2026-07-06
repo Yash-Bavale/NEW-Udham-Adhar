@@ -138,7 +138,7 @@ function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: 
           label,
           description: description || null,
           side,
-          emailTemplateCode: side === "customer" ? "bhs_e003_customer_delay" : null,
+          emailTemplateCode: side === "customer" ? "bhs_e003_customer_delay" : "bhs_e004_our_side_delay",
           sortOrder,
           isActive,
         },

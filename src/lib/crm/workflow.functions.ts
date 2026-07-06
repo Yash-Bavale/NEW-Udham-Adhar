@@ -165,7 +165,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       .maybeSingle();
     const side: "customer" | "internal" = ((reasonRow as { side?: string } | null)?.side === "internal") ? "internal" : "customer";
     const reasonBlock = ((reasonRow as { description?: string } | null)?.description) || data.reasonLabel;
-    const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || "bhs_e003_customer_delay";
+    const defaultTplForSide = side === "internal" ? "bhs_e004_our_side_delay" : "bhs_e003_customer_delay";
+    const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || defaultTplForSide;
 
     const expectedReviewIso = new Date(data.expectedReviewAt).toISOString();
 
@@ -279,7 +280,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         }
       }
     } else {
-      // ── Internal / our-side: assignee + review reminder only. No customer email. ──
+      // ── Internal / our-side: notify customer with E005 hold intimation + assignee review reminder ──
       const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
       await admin.from("workflow_reminders").insert({
         application_id: app.id,
@@ -305,6 +306,32 @@ export const setExternalDelay = createServerFn({ method: "POST" })
           kind: "workflow_internal_delay",
           link_to: `/admin/orders/${app.id}`,
         } as never);
+      }
+
+      // Send our-side delay hold intimation email to customer (E005).
+      if (lead?.email) {
+        try {
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+          await enqueueFromTemplateInternal(
+            customerTplCode,
+            lead.email,
+            {
+              customer_name: lead.name ?? "Customer",
+              order_id: app.application_code ?? "",
+              order_number: app.application_code ?? "",
+              service_name: lead.service ?? "",
+              reason: data.reasonLabel,
+              reason_block: reasonBlock,
+              date: new Date().toLocaleDateString("en-IN"),
+              company_name: COMPANY_NAME,
+              support_email: SUPPORT_EMAIL,
+            },
+            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+          );
+        } catch (e) {
+          console.error("[workflow] our-side delay email failed", e);
+        }
       }
     }
 

@@ -65,7 +65,7 @@ export const customerSideDelay = createServerFn({ method: "POST" })
       if (cust?.primary_email) {
         try {
           await enqueueFromTemplateInternal(
-            BHS_EMAILS.E003_CUSTOMER_DELAY,
+            BHS_EMAILS.E004_CUSTOMER_DELAY,
             cust.primary_email as string,
             {
               customerName: (cust.name as string) || "Customer",
