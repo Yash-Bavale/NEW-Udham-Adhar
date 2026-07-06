@@ -348,6 +348,8 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       assignedStaff: (staffRes as any).data ?? null,
       workflowStages,
       stageMeta,
+      orderTickets: (orderTicketsRes as any).data ?? [],
+      customerTickets: (customerTicketsRes as any).data ?? [],
     };
   });
 
