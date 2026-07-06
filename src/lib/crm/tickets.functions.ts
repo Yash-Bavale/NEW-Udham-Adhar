@@ -246,20 +246,26 @@ export const updateTicket = createServerFn({ method: "POST" })
         status: z.enum(TICKET_STATUSES).optional(),
         priority: z.enum(PRIORITIES).optional(),
         assignedTo: z.string().uuid().nullable().optional(),
+        resolutionNote: z.string().trim().max(2000).optional(),
       })
       .parse(i)
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+    const now = new Date().toISOString();
     const patch: Record<string, unknown> = {};
     if (data.status) {
       patch.status = data.status;
       if (data.status === "resolved") {
-        patch.resolved_at = new Date().toISOString();
+        patch.resolved_at = now;
         patch.resolved_by = context.userId;
+      } else if (data.status === "closed") {
+        patch.closed_at = now;
       } else {
+        // Re-opening clears resolution timestamps
         patch.resolved_at = null;
         patch.resolved_by = null;
+        patch.closed_at = null;
       }
     }
     if (data.priority) patch.priority = data.priority;
@@ -271,7 +277,9 @@ export const updateTicket = createServerFn({ method: "POST" })
       .from("support_tickets")
       .update(patch as never)
       .eq("id", data.id)
-      .select("application_id, customer_id, ticket_number, status")
+      .select(
+        "application_id, customer_id, ticket_number, ticket_email, subject, status"
+      )
       .single();
     if (error) throw new Error(error.message);
 
@@ -285,8 +293,51 @@ export const updateTicket = createServerFn({ method: "POST" })
         created_by: context.userId,
       } as never);
     }
+
+    // Send ticket_resolved email when transitioning to resolved.
+    if (data.status === "resolved") {
+      // Cancel any armed auto-close scheduler
+      try {
+        const { cancelTicketAutocloseByTicket } = await import(
+          "@/lib/scheduling/schedulers.server"
+        );
+        await cancelTicketAutocloseByTicket(data.id, "resolved_by_staff");
+      } catch { /* non-fatal */ }
+
+      const recipient = (row as any).ticket_email as string | null;
+      if (recipient) {
+        try {
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { data: cust } = await admin
+            .from("customers")
+            .select("name")
+            .eq("id", row.customer_id!)
+            .maybeSingle();
+          await enqueueFromTemplateInternal(
+            "ticket_resolved",
+            recipient,
+            {
+              customerName: (cust as { name?: string | null } | null)?.name ?? "",
+              ticketNumber: row.ticket_number ?? "",
+              ticketSubject: (row as any).subject ?? "",
+              resolutionNote:
+                data.resolutionNote ||
+                "Our team has completed the requested action for this ticket.",
+              fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
+            },
+            {
+              applicationId: row.application_id ?? undefined,
+            },
+          );
+        } catch (e) {
+          console.error("[tickets] ticket_resolved email failed", e);
+        }
+      }
+    }
+
     return { ok: true };
   });
+
 
 // replyToTicket now lives in `@/lib/tickets/ticket-actions.functions` and is re-exported at the top of this file.
 
