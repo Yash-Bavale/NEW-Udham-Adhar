@@ -1,158 +1,127 @@
-# Ticket System v2 — Email-Driven, Global-Standard
+# Consolidate Order Workspace — Single Source of Truth for Actions
 
-Modeled on Zendesk / Freshdesk / HelpScout basics:
+## The problem (from the screenshots)
 
-- Every ticket is a conversation thread with **one canonical customer email** (the same address that received the order confirmation + invoice).
-- Every staff reply → email to that address, with `Reply-To` and threading headers so the customer can just hit "Reply" in Gmail/Outlook.
-- Every customer reply → lands back on the same ticket automatically (inbound email parser).
-- Customer can also open the ticket in a signed link - no dont give this option.
-- No customer login, no separate portal password.
+The order page currently shows the **same set of workflow actions in 3–4 places**:
 
----
+- Top summary card → "Employee Actions" row with Submitted-to-Govt / Mark Certificate Issued / Our-Side Delay / Request Refund
+- Employee Workflow tab header → another "Mark Certificate Issued" button
+- "Order Status" section → Mark as Under Processing / Revert to Verification Pending
+- Right sidebar → Request Documents
+- "Need to pause or cancel?" → Mark External Delay / Start Cancellation
+- Customer Journey pipeline (visual only)
 
-## 1) Rules — "Registered email only"
+They're not synchronized: some derive state from `order_status`, some from `application_status`, some from stage flags. Employees get confused about which button is the "real" one, and clicking them in the wrong order desyncs the automation (schedulers, emails E001–E005).
 
-- **Ticket recipient = `customers.primary_email**` at the moment of creation, snapshotted onto the ticket row (`ticket_email`) so later profile edits don't redirect the thread.
-- Staff **cannot type an arbitrary recipient**. AddTicketDialog resolves the customer → shows their locked email → warns if the customer has no email on file.
-- Inbound replies are accepted **only** if `From:` matches `ticket_email` (case-insensitive). Anything else → quarantined for manual review, never auto-attached.
-- Same address is what receives order confirmation and invoice today (already wired via `sendTransactionalEmail(recipientEmail = customers.primary_email)`), so the customer sees one consistent thread.
+## The target model (from `All_Mail_Auto_Flow_System.docx`)
 
----
+One order = one linear stage machine driven by **Customer Journey**:
 
-## 2) Global-standard workflow (what changes vs today)
+```text
+Lead → Payment → Consultation → Form → Verification → Govt Portal → Certificate → Completed
+```
 
-**Statuses** (drop `in_progress`, use industry-standard set):
-`open → pending (waiting on us) → waiting_customer → resolved → closed`
+Every stage has exactly **one primary action** (advance) plus optional **exception actions** (Our-Side Delay, Customer-Side Delay, Request Docs, Cancel/Refund). Emails E001–E005 and the 3 schedulers are triggered by these stage transitions — never by ad-hoc buttons.
 
-- `open` = new / unassigned
-- `pending` = assigned, we owe a reply
-- `waiting_customer` = we've replied, waiting on customer
-- `resolved` = closed with option to reopen within 7 days
-- `closed` = final; reopening creates a new linked ticket
+## Plan
 
-**Priorities**: low / normal / high / urgent (unchanged names, add `urgent`).
+### 1. Single ActionRail component (new)
 
-**SLA (first response + resolution)** per priority, business-hours aware (reuse existing `business-hours` module):
+`src/components/admin/workspace/OrderActionRail.tsx` — the ONLY place staff click to move the order forward.
 
-- urgent 1h / 4h · high 4h / 1 business day · normal 1 bd / 3 bd · low 2 bd / 5 bd
-- Store `first_response_due_at`, `resolution_due_at`; badge turns amber at 80%, red on breach.
+Layout:
 
-**Auto-assign**: reuse `assignment_pool` round-robin scoped to a `support` role bucket.
+```text
+┌─ CURRENT STAGE ────────────────────────────────────┐
+│  Submitted to Govt  ·  updated 26 Jun 2026        │
+│  Next: Mark the certificate issued when it arrives │
+│                                                    │
+│  [ Primary → Mark Certificate Issued        ]     │  ← 1 primary
+│                                                    │
+│  Exceptions:  ⚠ Our-Side Delay   ⏸ Customer Hold │  ← contextual
+│               📄 Request Docs   ✖ Cancel/Refund   │
+└────────────────────────────────────────────────────┘
+```
 
-**Auto-close**: `waiting_customer` for 3 business days with no inbound → `resolved`; `resolved` for 7 days → `closed`. Reuses Scheduler 6 pattern; remove today's "only if application_id" restriction.
+Rules:
+- Primary button = the single "advance to next stage" action for the current stage, derived from `computeOrderStage`.
+- Exception buttons only render if allowed by `allowed_order_transitions` for the current status.
+- Every click calls one server fn (`transition_order_status` or the corresponding stage-specific fn) and the panel re-derives from server state — no local optimistic UI drift.
 
-**Reopen**: customer replies to a resolved/closed ticket → auto-reopens to `pending` and re-assigns to last agent.
+### 2. Delete duplicate action UIs
 
-**CSAT**: after `resolved` email, single line "How did we do? 👍 👎" → captures rating on click via signed link.
+Remove these action clusters entirely (keeping only display bits where noted):
 
----
+| File | What to remove |
+|------|----------------|
+| Top summary card ("Employee Actions" row in `WorkspaceShell.tsx`) | Entire button strip — Submitted to Govt / Mark Certificate Issued / Our-Side Delay / Request Refund |
+| `OrderWorkflowPanel.tsx` header pill | The extra "Mark Certificate Issued" button next to "updated …" |
+| `OrderWorkflowPanel.tsx` "Order Status" block | Mark as Under Processing / Revert to Verification Pending |
+| `OrderWorkflowPanel.tsx` "Need to pause or cancel?" | Mark External Delay / Start Cancellation |
+| Right sidebar in `WorkspaceShell.tsx` | Standalone Request Documents button |
+| `EmployeeActionPanel.tsx`, `StageActionsPanel.tsx` | Delete both files — replaced by ActionRail |
 
-## 3) Email flow (the core of the rebuild)
+Kept as read-only display:
+- Order summary card (order no, payment status, customer, quick contact icons)
+- Customer Journey pipeline (visual stage indicator only, non-clickable)
+- Stage Map inside Workflow tab → merged into the Journey; single visual, not two
 
-**Outbound (every message the customer sees)**
+### 3. Align stage machine with the automation doc
 
-- Sent from `support@<sender-domain>` via zoho Emails queue.
-- Subject convention: `[#TKT-YYYYMMDD-0001] <original subject>` — the bracketed token is how inbound matching finds the ticket.
-- Headers: `Message-ID`, `In-Reply-To`, `References` chained per reply → shows as a single Gmail/Outlook thread.
-- `Reply-To: support+<ticketId>@<inbound-domain>` — belt + suspenders alongside the subject token.
-- Templates (React Email, registered in `registry.ts`):
-  1. `ticket-created` — confirmation, ticket number, expected response time (from SLA).
-  2. `ticket-reply` — the staff reply text, quoted previous message, CTA "View conversation" (signed link).
-  3. `ticket-resolved` — resolution summary + CSAT thumbs + "Reply to reopen".
-  4. `ticket-autoclose-warning` — sent 24h before auto-close from `waiting_customer`.
+Introduce a single source-of-truth mapping in `src/lib/crm/computeOrderStage.ts`:
 
-**Inbound (customer hits Reply)**
+```text
+Stage            | Primary action              | Auto emails / schedulers
+-----------------|-----------------------------|--------------------------
+payment_done     | (auto) Send E001            | E001 + start 5-min timer
+awaiting_form    | Request Docs (manual)       | E002 + Incomplete-info scheduler
+form_submitted   | Start Processing            | stop Incomplete-info scheduler
+under_review     | Mark Verification Done      | —
+in_progress      | Submit to Govt              | —
+submitted_to_govt| Mark Certificate Issued     | —
+certificate_ready| Complete Order              | E-Completed + stop all schedulers
+completed        | (locked, Reopen only)       | —
+```
 
-- New public route `POST /api/public/webhooks/inbound-email` receives the parsed email (webhook from Mailgun/Postmark/Zoho — pick one below).
-- Match order: `Reply-To` token → subject `[#…]` token → `In-Reply-To` header lookup → sender-email fuzzy match to open tickets.
-- Verify `from == ticket_email`, strip quoted history (standard `EmailReplyParser`-style trim), attach as a public `ticket_replies` row, flip status to `pending`, notify assignee.
-- Unknown sender or no ticket match → row in `inbound_email_quarantine` for staff to triage; never auto-creates a new ticket to avoid spam.
+Exception actions available on all in-flight stages:
+- Our-Side Delay → E005 + Reminder scheduler (Manual / Auto 2h / Stop)
+- Customer-Side Delay → E003 + External-delay scheduler → auto E004 after 8h
+- Cancel / Refund → transition_order_status → REFUND_REQUESTED
 
-**Inbound provider** (must pick one — see Open Decisions):
+### 4. Sync UI ↔ automation
 
-- **Zoho Mail** — already integrated in this project (`src/lib/mail/zoho-inbox.server.ts`). Cheapest, zero new secrets. Preferred.
-- **Postmark inbound** — cleanest webhook, best parsing. Costs ~$1.25/1000.
-- **Mailgun routes** — works, decent parsing.
+- All buttons flow through `transition_order_status()` (server) so `order_status`, `application_status`, and the Customer Journey stage always match.
+- The ActionRail subscribes to the `admin.order` query only; a successful transition triggers `queryClient.invalidateQueries` and the whole panel + journey pipeline re-renders from one server payload — no split state.
+- Remove the `Revert to Verification Pending` button (super-admin only; move to a "…" menu behind role gate to keep normal UI clean).
 
----
+### 5. Tabs cleanup
 
-## 4) UI changes
+Employee Workflow tab becomes:
 
-**Admin list `/admin/tickets**`
+```text
+[ ActionRail ]           ← single action surface
+[ Internal Note ]        ← keep
+[ Timeline & Reminders ] ← keep (read-only audit trail)
+```
 
-- Add SLA column with countdown chip, "Breached" filter, priority filter incl. urgent.
-- Bulk actions: assign, close, change priority.
+Drop the redundant "Order Status" and "Stage Map" blocks inside this tab — both were duplicating the Customer Journey pipeline shown on the summary above.
 
-**Admin detail `/admin/tickets/$ticketId**`
+## Files touched
 
-- Header: recipient email (locked, with "same as invoice" hint), SLA countdown, source chip (web / email / staff).
-- Thread: gmail-style, staff avatar left / customer right, "Emailed to &nbsp; at 14:22" chip under every public reply, internal notes in amber.
-- Composer: default Public Reply; visible preview of what the customer will receive; Ctrl+Enter to send.
-- Canned responses picker (new tiny `canned_responses` table, staff-editable).
-- Right rail: customer card (name, email, phone, all orders), linked order shortcut, activity log.
+- **New**: `src/components/admin/workspace/OrderActionRail.tsx`
+- **Edit**: `src/components/admin/workspace/WorkspaceShell.tsx` (drop top action strip + sidebar Request Docs)
+- **Edit**: `src/components/admin/workspace/OrderWorkflowPanel.tsx` (drop header button, Order Status block, pause/cancel block, Stage Map)
+- **Edit**: `src/lib/crm/computeOrderStage.ts` (expose `primaryAction(stage)` + `exceptionActions(stage, status)`)
+- **Delete**: `src/components/admin/EmployeeActionPanel.tsx`, `src/components/admin/StageActionsPanel.tsx`
+- **Keep as-is**: `ExternalDelayDialog.tsx`, `order-actions.functions.ts`, `schedulers.server.ts` — ActionRail calls into these unchanged.
 
-**Order & Lead workspace**
+## Non-goals for this pass
 
-- Replace placeholder "Support Ticket" tab with a real list of tickets for that customer/order + "Raise Ticket" button (customer + order pre-filled, email locked).
+- No schema changes.
+- No email template changes (E001–E005 already wired).
+- Reopen / Refund detail flows unchanged — ActionRail only re-exposes them in one place.
+- Bulk-order screens untouched.
 
-**Customer-facing (no login)**
+## Confirmation asked
 
-- `/support/t/<signedToken>` — public read-only thread + reply box. Token embedded in every outbound email's "View conversation" button. Uses narrow anon RLS keyed by signed token, never exposes internal notes. - i dont want this feature customer should reply to our mail only through their email 
-
----
-
-## 5) Schema changes (single migration)
-
-Add to `support_tickets`:
-
-- `ticket_email TEXT NOT NULL` (snapshot of recipient)
-- `source TEXT` — `web | email_inbound | staff`
-- `priority` extend with `urgent`
-- `first_response_due_at`, `resolution_due_at`, `first_response_at`, `resolved_at` (last one exists), `closed_at`
-- `assignee_last_active_at`
-- `last_customer_message_at`, `last_staff_message_at`
-- `csat_score SMALLINT`, `csat_at`
-
-Add to `ticket_replies`:
-
-- `direction TEXT` — `outbound | inbound | note`
-- `email_message_id TEXT` (RFC Message-ID for threading)
-- `email_in_reply_to TEXT`
-- `email_send_log_id UUID` (link to `email_send_log`)
-
-New tables:
-
-- `canned_responses (id, title, body, is_shared, created_by)`
-- `inbound_email_quarantine (id, from_email, subject, raw, reason, created_at, resolved_by, resolved_at)`
-
-Drop the dead `ticket_state` column + `escalated` enum value.
-
-Grants + RLS: staff-full via `has_any_staff_role`; add narrow `TO anon` SELECT policy on the customer thread view keyed by a signed-token RPC (no direct anon table access).
-
----
-
-## 6) Rollout order
-
-**M1 — Foundation (schema + email out)**
-Migration, ticket_email snapshot, three React Email templates, wire `createTicket`/`replyToTicket`/`updateTicket→resolved` to send them, consolidate the two duplicate `replyToTicket` server fns into one. Employees immediately see "customer was emailed" chips.
-
-**M2 — Inbound + threading**
-Pick provider (see Open Decisions), add `/api/public/webhooks/inbound-email`, subject/Reply-To token matching, quarantine table, auto-reopen. This is where it becomes a real ticket system.
-
-**M3 — SLA, auto-close, auto-assign, canned responses**
-Business-hour SLAs, warning + auto-close scheduler for all tickets (not just order-linked), assignment pool, canned responses picker.
-
-**M4 — Customer-visible signed-link thread + CSAT**
-Public `/support/t/<token>` page, CSAT capture, unified inbox tab on order/lead workspaces.
-
-**M5 — Cleanup**
-Drop dead `ticket_state` / `escalated`, remove placeholder tab, wire in-app bell notifications for assignee.
-
----
-
-## 7) Open decisions — please confirm before build
-
-- **Inbound provider**: Zoho (already connected, cheapest) .
-- **From address**: `help@businesshelpservices.com` same we using to send mails now   
-**CSAT**: include in M4, or skip entirely?
-- **Signed-link customer page (M4)**: build now or defer until inbound email is proven stable in M2/M3? = dont build it 
+Approve this and I'll implement the ActionRail + deletions in one pass, then verify by loading the order page and walking a lead → completed transition.
