@@ -434,6 +434,17 @@ export const requestRefund = createServerFn({ method: "POST" })
       refund_amount: data.amount ?? null,
       created_by: context.userId,
     } as never);
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app.application_code as string | null) ?? null,
+        assigned_to: (app.assigned_to as string | null) ?? null,
+      },
+      kind: "refund_requested",
+      title: `Refund requested on ${(app.application_code as string) || data.orderId.slice(0, 8)}`,
+      body: `Reason: ${data.reason.slice(0, 200)}${data.amount ? ` · Amount: ₹${data.amount}` : ""}`,
+      alsoRoles: ["super_admin", "finance", "admin"],
+    });
     return { ok: true, order: updated };
   });
 
