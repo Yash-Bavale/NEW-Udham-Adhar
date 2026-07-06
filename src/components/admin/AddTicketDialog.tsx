@@ -399,8 +399,8 @@ function Combo({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  options: { id: string; label: string; sub?: string }[];
-  onPick: (id: string, label: string) => void;
+  options: { id: string; label: string; sub?: string; meta?: Record<string, unknown> }[];
+  onPick: (id: string, label: string, meta?: Record<string, unknown>) => void;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -425,7 +425,7 @@ function Combo({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault();
-                onPick(o.id, o.label);
+                onPick(o.id, o.label, o.meta);
                 onChange("");
               }}
               className="block w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--admin-surface-2)]"
