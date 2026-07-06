@@ -129,6 +129,102 @@ function withBothCases(input: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
+/**
+ * Best-effort backfill of common customer/order/executive placeholders used by
+ * the standard BHS templates. Only fills in keys the caller hasn't already
+ * provided (non-empty). Never throws — any lookup failure is ignored so email
+ * sending continues.
+ */
+async function backfillCommonVariables(
+  vars: Record<string, unknown>,
+  leadId?: string | null,
+  applicationId?: string | null,
+): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = { ...vars };
+  const missing = (k: string) => {
+    const v = out[k];
+    return v === undefined || v === null || v === "";
+  };
+  if (!leadId && !applicationId) return out;
+  try {
+    let lead: { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null } | null = null;
+    let app: { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null } | null = null;
+
+    if (applicationId) {
+      const { data } = await supabaseAdmin
+        .from("applications")
+        .select("id, application_code, lead_id, assigned_to, created_at")
+        .eq("id", applicationId)
+        .maybeSingle();
+      app = (data as typeof app) ?? null;
+      if (app?.lead_id && !leadId) leadId = app.lead_id;
+    }
+    if (leadId) {
+      const { data } = await supabaseAdmin
+        .from("leads")
+        .select("id, lead_code, name, email, mobile, service, assigned_to, created_at")
+        .eq("id", leadId)
+        .maybeSingle();
+      lead = (data as typeof lead) ?? null;
+    }
+
+    if (missing("customer_name") && lead?.name) out.customer_name = lead.name;
+    if (missing("customer_email") && lead?.email) out.customer_email = lead.email;
+    if (missing("customer_mobile") && lead?.mobile) out.customer_mobile = lead.mobile;
+    if (missing("service_name") && lead?.service) out.service_name = lead.service;
+    if (missing("order_number")) out.order_number = app?.application_code ?? lead?.lead_code ?? "";
+    const created = app?.created_at ?? lead?.created_at ?? null;
+    if (missing("order_created_at") && created) {
+      out.order_created_at = new Date(created).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+    }
+
+    // Executive name via assigned_to → profiles
+    const assignedTo = app?.assigned_to ?? lead?.assigned_to ?? null;
+    if (missing("executive_name") && assignedTo) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("display_name, full_name, email")
+        .eq("id", assignedTo)
+        .maybeSingle();
+      const name = (prof as { display_name?: string; full_name?: string; email?: string } | null);
+      out.executive_name = name?.display_name || name?.full_name || name?.email || "Support Team";
+    }
+    if (missing("executive_name")) out.executive_name = "Support Team";
+
+    // Invoice number (latest invoice for this app/lead)
+    if (missing("invoice_number")) {
+      let inv: { invoice_number?: string | null } | null = null;
+      if (applicationId) {
+        const { data } = await supabaseAdmin
+          .from("invoices")
+          .select("invoice_number, issued_at")
+          .eq("application_id", applicationId)
+          .order("issued_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        inv = (data as typeof inv) ?? null;
+      }
+      if (!inv && leadId) {
+        const { data } = await supabaseAdmin
+          .from("invoices")
+          .select("invoice_number, issued_at")
+          .eq("lead_id", leadId)
+          .order("issued_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        inv = (data as typeof inv) ?? null;
+      }
+      if (inv?.invoice_number) out.invoice_number = inv.invoice_number;
+    }
+  } catch (e) {
+    console.warn("[emails] backfillCommonVariables failed (non-fatal)", e);
+  }
+  return out;
+}
+
 /** Enqueue using a template code; pulls subject/body from email_templates. */
 export async function enqueueFromTemplateInternal(
   code: string,
@@ -136,7 +232,8 @@ export async function enqueueFromTemplateInternal(
   rawVariables: Record<string, unknown>,
   opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual" },
 ) {
-  const variables = withBothCases(rawVariables);
+  const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
+  const variables = withBothCases(enriched);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled, dispatch_mode")
@@ -144,6 +241,7 @@ export async function enqueueFromTemplateInternal(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!tpl) throw new Error(`Email template '${code}' not found.`);
+
   if (!tpl.is_enabled) {
     if (opts?.requireImmediateSuccess) {
       throw new Error(`Email template '${code}' is disabled — email was not sent.`);
