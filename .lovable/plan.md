@@ -1,106 +1,71 @@
 ## Goal
-Rebuild the workspace's "Customer Journey" as a full **Employee Workflow diagram** that matches the attached reference: three tiers (Consultation → After Consultation → Final Status) with four branching lanes. Every node is one of Past / Current / Next — Past nodes show green with timestamp, Current pulses, Next nodes are click-to-advance buttons. The customer's autosaved form + documents live inside the workspace, always visible.
+Make the order workspace behave as one coherent surface: every quick action, tab, and status hint reads from a single map; every tab shows employees where the order stands; every action fires a toast and refreshes the workspace.
 
-## 1. New EmployeeWorkflowMap component
+## 1. Single source of truth — `orderActionsMap.ts`
 
-Replace `CustomerJourneyMap.tsx` with `EmployeeWorkflowMap.tsx` structured as three horizontal tiers.
+New file: `src/lib/orders/order-actions-map.ts`. Exports:
+
+- `QUICK_ACTIONS` — array of `{ id, label, icon, tint, kind: "contact" | "link" | "system", build(ctx): { href?, onClick?, disabled, disabledReason }, toast: { info?, success? } }` for Call, WhatsApp, Email, Open Lead, Print, Copy Order No.
+- `STATUS_ACTIONS: Record<OrderStatus, ActionKey[]>` — the existing per-status button set (moved out of `EmployeeActionPanel`).
+- `TAB_AVAILABILITY(status, hasLead, showConsultation)` — the current `tabAvailability()` logic, moved here.
+- `NEXT_STEP_HINT: Record<OrderStatus, { headline, hint, primaryActionKey }>` — the one-line "next step" copy per status used by the compact tab header (e.g. `WAITING_CUSTOMER_INFO` → "Waiting for customer info · Send reminder if 24h+ has passed").
+- Enum-typed so TS catches any missing status.
+
+`EmployeeActionPanel` and `WorkspaceShell` both import from this file — no more duplicated arrays.
+
+## 2. Compact "Current status + next step" tab header
+
+New file: `src/components/admin/workspace/TabStatusHeader.tsx`. One row, ~48px tall:
 
 ```text
-Tier 1 — CONSULTATION
-  [Initial Customer Interaction]  → button: "Consultation Completed"
-
-Tier 2 — AFTER CONSULTATION (Change Status)
-  4 lane heads (buttons when Current, chips when Past):
-    A. Application Submitted   →  Application Process lane
-    B. Information Incomplete  →  Information Incomplete lane
-    C. Service Delay - Our Side
-    D. Service Delay - Customer Side
-
-  Lane A (green):
-    Pending Government Portal → Schedule Follow-up →
-      Government Response Received → { Order Completed | Rejected }
-  Lane B (amber):
-    Information Incomplete (Email/WhatsApp/Reminder Sent)
-    → Customer Submitted Information → Application Submitted
-    …OR… Auto Close Order (No Response)
-  Lane C (blue):
-    Service Delay - Our Side → Schedule Follow-up
-    → Continue Processing → Application Submitted
-  Lane D (purple):
-    Service Delay - Customer Side (Reminder Sent)
-    → { Customer Responded → Continue Processing → Application Submitted
-      | Auto Close Order (No Response) }
-
-Tier 3 — FINAL STATUS
-  Order Completed  ·  Rejected  ·  Auto Closed
+[● status pill]  Order BHS-2026-000125  ·  Next: Send form link to customer  ·  in state 4h 12m  →  [primary action btn]
 ```
 
-### Node states (single visual language)
+- Status pill uses `STAGE_META` tone (same as header card).
+- Copy comes from `NEXT_STEP_HINT[orderStatus]`.
+- Primary action button (when defined) fires the same handler as the header's Employee Action Panel — reuses the map, no duplicate dialogs; opens the same `ActionDialog` via a shared `useOrderActionDialog()` hook lifted out of `EmployeeActionPanel`.
+- Rendered as the first child inside every `TabsContent` (Employee Workflow, Forms & Docs, Emails, Timeline, Support) so employees never lose context when they tab-hop.
 
-- **Past** — solid tinted card (lane color) + green check + `formatIST` timestamp under the label.
-- **Current** — same card + pulse ring + "Current" pill.
-- **Next** — outlined card rendered as a Button; on click fires the mapped action from `order-actions-map.ts`. Disabled when not legal (with tooltip reason).
-- **Blocked / Skipped** — muted gray, no hover state.
+## 3. Toasts + auto-refresh for every quick action
 
-### Status → node mapping (drives Past/Current/Next)
+Wrap the 5 header quick tiles in a `runQuickAction(actionKey)` helper inside `WorkspaceShell`:
 
-Add a single `WORKFLOW_NODES` table in `src/lib/orders/employee-workflow-map.ts`:
+| Action    | Toast on trigger                     | Refresh workspace?           |
+|-----------|--------------------------------------|------------------------------|
+| Call      | `toast("Opening dialer…")`           | no                           |
+| WhatsApp  | `toast("Opening WhatsApp…")`         | no                           |
+| Email     | `toast("Opening mail client…")`      | no                           |
+| Open Lead | `toast("Opening lead…")`             | no                           |
+| Print     | `toast.success("Print dialog opened")`| no                          |
+| Copy code | already toasts — unchanged           | no                           |
 
-| Node id                 | Lane | Reached when order_status ∈             | Action key (Next)       |
-|-------------------------|------|-----------------------------------------|-------------------------|
-| consultation            | root | any (past once order_status set)        | send_form_link          |
-| after_consult.appA      | A    | INFO_RECEIVED, IN_PROCESSING, …         | start_processing        |
-| after_consult.infoB     | B    | WAITING_CUSTOMER_INFO                   | manual_reminder         |
-| after_consult.ourC      | C    | OUR_SIDE_DELAY                          | our_delay               |
-| after_consult.custD     | D    | CUSTOMER_HOLD                           | customer_delay          |
-| A.pending_govt          | A    | IN_PROCESSING                           | submitted_to_govt       |
-| A.schedule_followup     | A    | IN_PROCESSING (with pending follow-up)  | (opens AddTaskDialog)   |
-| A.govt_response         | A    | SUBMITTED_TO_GOVT                       | certificate_issued      |
-| A.order_completed       | end  | COMPLETED                               | —                       |
-| A.rejected              | end  | CLOSED (rejected reason)                | —                       |
-| B.customer_submitted    | B    | INFO_RECEIVED                           | start_processing        |
-| B.application_submitted | B    | SUBMITTED_TO_GOVT                       | certificate_issued      |
-| B.auto_close            | B    | CLOSED (no_response reason)             | —                       |
-| C/D similar             | …    | mirror A                                |                         |
-| final.auto_closed       | end  | CLOSED (auto reason)                    | —                       |
+Disabled tiles show `toast.error(disabledReason)` on click instead of failing silently (e.g. "No mobile on file").
 
-Reached-timestamps come from the `stageMeta` / `application` fields already loaded in `WorkspaceShell` (`form_submitted_at`, `stageMeta.application_submitted.at`, etc.) plus a small extra fetch of the last few `order_events` for lane branching (INFO_RECEIVED entered via Lane A vs B).
+Every server-touching action (Employee Actions, document upload/delete, email send, form-link resend, assignee change, request-docs) already toasts inside its own mutation; add a shared `onChanged` callback so they also call `queryClient.invalidateQueries({ queryKey: ["admin.order", orderId] })`. Threaded via new optional `onChanged?: () => void` props on:
+- `OrderDocumentsPanel` (upload, delete)
+- `FormSubmissionPanel` (send/resend form link)
+- `LeadEmailsTab` (email sent)
+- `EmployeeActionPanel` (already invalidates via existing `onDone` — keep, but route through the same helper)
 
-### Handler wiring
-
-Each "Next" button calls `onAction(key)` → `WorkspaceShell.handlePrimaryStep(key)` → sets `pendingActionKey` on the (still-mounted) `EmployeeActionPanel`, which auto-opens its existing dialog. No new server functions.
-
-## 2. Layout in WorkspaceShell
-
-Replace the current "Customer Journey" section with the new full-width `EmployeeWorkflowMap`. Drop `TabStatusHeader` (its info is now on the Current node). Keep `EmployeeActionPanel` mounted but hidden inside a `<details>` labelled **"All status actions"** below the workflow — fallback for edge actions (refunds, close manual, etc.).
-
-## 3. Autosaved form + docs inline
-
-Add `src/components/admin/workspace/OrderFormInline.tsx`:
-
-- Reuses `getFormSubmissionForApplication` (already used by `FormSubmissionPanel`) and `groupFields()` copied from `LeadFormSubmissionInline`.
-- Renders: submission status pill + submitted-at, grouped autosaved fields (2-column key/value), uploaded documents list with Preview / Download buttons, missing-required-doc chips, and — when no submission yet — an empty state with a "Send form link" button that calls `onAction("send_form_link")`.
-
-Mount it in `WorkspaceShell` inside the **Employee Workflow** tab, directly under the `EmployeeWorkflowMap`, so form data is visible without switching tabs. The dedicated "Forms & Docs" tab keeps the fuller `FormSubmissionPanel` + `OrderDocumentsPanel` for upload/manage flows.
+`WorkspaceShell` passes one `invalidate = () => qc.invalidateQueries({ queryKey: ["admin.order", orderId] })` down to all of them.
 
 ## 4. Files touched
 
 **New**
-- `src/lib/orders/employee-workflow-map.ts` — the node table + `resolveNodeState(orderStatus, timestamps, events)` helper.
-- `src/components/admin/workspace/EmployeeWorkflowMap.tsx` — the diagram (three tiers, four lanes).
-- `src/components/admin/workspace/OrderFormInline.tsx` — inline autosaved form + docs viewer.
+- `src/lib/orders/order-actions-map.ts`
+- `src/components/admin/workspace/TabStatusHeader.tsx`
+- `src/components/admin/workspace/useOrderActionDialog.ts` (extracted from `EmployeeActionPanel`, so both the panel and `TabStatusHeader` open the same dialog)
 
 **Edited**
-- `src/components/admin/workspace/WorkspaceShell.tsx` — swap `CustomerJourneyMap` → `EmployeeWorkflowMap`, remove `TabStatusHeader`, wrap `EmployeeActionPanel` in the collapsible, mount `OrderFormInline` in the workflow tab.
-- `src/lib/orders/order-actions-map.ts` — no logic change, but export a small `LANE_TONE` map (green/amber/blue/purple) that both the diagram and the shell use.
+- `src/components/admin/workspace/WorkspaceShell.tsx` — consume the map, wrap quick tiles with toast helper, mount `TabStatusHeader` inside every `TabsContent`, pass `onChanged` down.
+- `src/components/admin/EmployeeActionPanel.tsx` — drop local `ACTIONS_BY_STATUS`, import from map; extract dialog into the shared hook.
+- `src/components/admin/OrderDocumentsPanel.tsx`, `src/components/admin/FormSubmissionPanel.tsx`, `src/components/admin/LeadEmailsTab.tsx` — accept `onChanged`, call after success.
 
-**Removed** — `src/components/admin/workspace/CustomerJourneyMap.tsx` (replaced) and `src/components/admin/workspace/TabStatusHeader.tsx` (redundant).
-
-**No** backend, RLS, edge-function, or server-fn changes.
+**No backend changes.** No new server functions. All existing handlers (`sendFormLink`, `startProcessing`, `queueDocumentReminder`, etc.) stay as-is.
 
 ## 5. Acceptance
 
-- The workspace shows a single Employee Workflow diagram identical in structure to the reference: Consultation → 4 branching lanes → Final Status.
-- Past nodes show a green tick + timestamp; Current node pulses; Next nodes are clickable buttons that open the correct action dialog.
-- Autosaved form fields + uploaded docs are visible on the Employee Workflow tab without switching tabs.
-- The old status pill strip and standalone Employee Actions grid are gone from the primary view; the full action set is one click away under "All status actions".
+- Deleting the array in `WorkspaceShell` or `EmployeeActionPanel` no longer breaks anything — both read from `order-actions-map.ts`.
+- Switching tabs always shows the current status pill + next-step line at the top.
+- Clicking any header tile (including disabled ones) shows a toast within 100 ms.
+- After uploading a doc / sending an email / running any status action, the header pill, journey map, and Order Summary update without a page reload.
