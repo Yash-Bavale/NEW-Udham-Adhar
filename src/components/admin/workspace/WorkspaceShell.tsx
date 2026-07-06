@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
-  FileText, Workflow, Activity, LifeBuoy, Check,
+  ArrowLeft, Copy, Phone, Mail, User2,
+  FileText, Workflow, Activity, LifeBuoy,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
