@@ -217,6 +217,7 @@ import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
 import { Route as AdminCertificatesRouteImport } from './routes/admin.certificates'
+import { Route as AdminCannedResponsesRouteImport } from './routes/admin.canned-responses'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
@@ -1330,6 +1331,11 @@ const AdminCertificatesRoute = AdminCertificatesRouteImport.update({
   path: '/certificates',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCannedResponsesRoute = AdminCannedResponsesRouteImport.update({
+  id: '/canned-responses',
+  path: '/canned-responses',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -1716,6 +1722,7 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
@@ -1963,6 +1970,7 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
@@ -2210,6 +2218,7 @@ export interface FileRoutesById {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
@@ -2460,6 +2469,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
+    | '/admin/canned-responses'
     | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/customers'
@@ -2707,6 +2717,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
+    | '/admin/canned-responses'
     | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/customers'
@@ -2953,6 +2964,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
+    | '/admin/canned-responses'
     | '/admin/certificates'
     | '/admin/complaints'
     | '/admin/customers'
@@ -4689,6 +4701,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCertificatesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/canned-responses': {
+      id: '/admin/canned-responses'
+      path: '/canned-responses'
+      fullPath: '/admin/canned-responses'
+      preLoaderRoute: typeof AdminCannedResponsesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/audit': {
       id: '/admin/audit'
       path: '/audit'
@@ -5074,6 +5093,7 @@ interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
   AdminAuditRoute: typeof AdminAuditRoute
+  AdminCannedResponsesRoute: typeof AdminCannedResponsesRoute
   AdminCertificatesRoute: typeof AdminCertificatesRoute
   AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
@@ -5110,6 +5130,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminApplicationsRoute: AdminApplicationsRouteWithChildren,
   AdminAuditRoute: AdminAuditRoute,
+  AdminCannedResponsesRoute: AdminCannedResponsesRoute,
   AdminCertificatesRoute: AdminCertificatesRoute,
   AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
   AdminCustomersRoute: AdminCustomersRouteWithChildren,
