@@ -63,7 +63,9 @@ type Tpl = {
   category: string | null;
   flow_id: string | null;
   sr_no: number | null;
+  dispatch_mode: "auto" | "manual" | null;
 };
+
 
 function formatIST(iso: string | null | undefined): string {
   if (!iso) return "—";
