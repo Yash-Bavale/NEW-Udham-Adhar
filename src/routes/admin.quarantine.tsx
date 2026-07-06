@@ -121,6 +121,26 @@ function QuarantinePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const createTicket = useMutation({
+    mutationFn: (id: string) => createFn({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Ticket ${r.ticketNumber} created`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pollNow = useMutation({
+    mutationFn: () => pollFn(),
+    onSuccess: (r) => {
+      toast.success(
+        `Polled inbox — fetched ${r.fetched}, new ${r.new}, matched ${r.matched}, unmatched ${r.unmatched}`,
+      );
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const rows = data ?? [];
 
   return (
@@ -134,10 +154,51 @@ function QuarantinePage() {
             Inbound emails that couldn't be safely attached to a ticket. Review and approve, re-run matching, or discard.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => pollNow.mutate()}
+            disabled={pollNow.isPending}
+          >
+            {pollNow.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Mail className="h-4 w-4 mr-2" />
+            )}
+            Poll inbox now
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
+
+      <SectionCard>
+        <div className="p-4 text-xs leading-relaxed">
+          <div className="font-medium mb-2 text-sm">How inbound emails become tickets</div>
+          <pre className="whitespace-pre text-[11px] font-mono text-muted-foreground overflow-x-auto">
+{`help@businesshelpservices.com  (Zoho Mail)
+    │  polled every 2 min via /api/public/cron/poll-zoho-inbox
+    ▼
+new UID?  ── no ──► skip
+    │ yes
+    ▼
+match by In-Reply-To header
+    │ hit ─► append inbound reply on existing ticket
+    │ miss
+    ▼
+match by sender → most recent open ticket for that customer
+    │ hit ─► append inbound reply
+    │ miss
+    ▼
+sender is a known customer / lead?
+    │ yes ─► open a NEW ticket (source = email_inbound)
+    │ no  ─► lands here in Quarantine  →  Create ticket / Attach / Discard`}
+          </pre>
+        </div>
+      </SectionCard>
+
 
       <Tabs value={scope} onValueChange={(v) => setScope(v as typeof scope)}>
         <TabsList>
