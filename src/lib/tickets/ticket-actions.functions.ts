@@ -177,16 +177,23 @@ export const replyToTicket = createServerFn({ method: "POST" })
       actorName = p?.display_name || p?.full_name || p?.email?.split("@")[0] || "Support";
     } catch { /* non-fatal */ }
 
-    const thread = await loadThreadHeaders(ticket.id);
+    const thread = await loadThreadHeaders(ticket.id, ticket.application_id ?? null);
 
     try {
       const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
       const ticketNumber = ticket.ticket_number ?? ticket.id.slice(0, 8);
+      // Prefer the order's canonical thread subject so Gmail groups replies with
+      // the customer's original conversation. Fall back to ticket subject.
+      const threadedSubject = thread.threadSubject
+        ? (thread.threadSubject.toLowerCase().startsWith("re:")
+            ? thread.threadSubject
+            : `Re: ${thread.threadSubject}`)
+        : `Re: [#${ticketNumber}] ${ticket.subject}`;
       const result = await enqueueEmailInternal({
         templateCode: null,
         toEmail: recipient,
         toName: cust.name,
-        subject: `Re: [#${ticketNumber}] ${ticket.subject}`,
+        subject: threadedSubject,
         bodyHtml: `<p>Hi ${cust.name || "Customer"},</p><div>${data.message.replace(/\n/g, "<br/>")}</div><p>Regards,<br/>${actorName} · Business Help Services</p>`,
         bodyText: `Hi ${cust.name || "Customer"},\n\n${data.message}\n\nRegards,\n${actorName} · Business Help Services`,
         variables: {
