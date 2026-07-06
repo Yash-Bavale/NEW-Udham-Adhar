@@ -320,6 +320,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
     return { ok: true, side };
   });
+
+export const resumeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
