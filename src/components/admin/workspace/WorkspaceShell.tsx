@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
+import { OrderActionRail } from "./OrderActionRail";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -247,6 +248,22 @@ export function WorkspaceShell(p: Props) {
         {/* Employee actions live in one place only — inside the Employee Workflow tab
             (OrderWorkflowPanel). This card is header info only. */}
       </section>
+
+      {/* ── EMPLOYEE ACTIONS (single source of truth) ── */}
+      <OrderActionRail
+        applicationId={application.id}
+        leadId={lead?.id ?? null}
+        stage={p.stage}
+        current={current}
+        workflowStatus={(application as any).workflow_status}
+        closureStage={(application as any).closure_stage}
+        closureNextAt={(application as any).closure_next_at}
+        cancellationRequestedAt={(application as any).cancellation_requested_at}
+        reasonCode={(application as any).closure_reason_code}
+        reasonText={(application as any).closure_reason_text}
+        updatedAt={application.updated_at ?? application.created_at}
+        onSwitchTab={(id) => setTab(id)}
+      />
 
       {/* Customer Journey */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
