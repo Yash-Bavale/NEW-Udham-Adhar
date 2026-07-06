@@ -225,10 +225,12 @@ sender is a known customer / lead?
                     onRerun={() => rerun.mutate(row.id)}
                     onApprove={(ticketId) => approve.mutate({ id: row.id, ticketId })}
                     onDiscard={(reason) => discard.mutate({ id: row.id, reason })}
+                    onCreateTicket={() => createTicket.mutate(row.id)}
                     busy={
                       (rerun.isPending && rerun.variables === row.id) ||
                       (approve.isPending && approve.variables?.id === row.id) ||
-                      (discard.isPending && discard.variables?.id === row.id)
+                      (discard.isPending && discard.variables?.id === row.id) ||
+                      (createTicket.isPending && createTicket.variables === row.id)
                     }
                   />
                 ))}
@@ -246,12 +248,14 @@ function QuarantineItem({
   onRerun,
   onApprove,
   onDiscard,
+  onCreateTicket,
   busy,
 }: {
   row: QuarantineRow;
   onRerun: () => void;
   onApprove: (ticketId?: string) => void;
   onDiscard: (reason?: string) => void;
+  onCreateTicket: () => void;
   busy: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
