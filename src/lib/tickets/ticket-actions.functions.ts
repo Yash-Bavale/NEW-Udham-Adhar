@@ -264,7 +264,7 @@ export const closeTicketWithReply = createServerFn({ method: "POST" })
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       try {
         await enqueueFromTemplateInternal(
-          BHS_EMAILS.E008_TICKET_CLOSED_REPLY,
+          BHS_EMAILS.E009_TICKET_RESOLVED,
           recipient,
           {
             customerName: cust.name,
