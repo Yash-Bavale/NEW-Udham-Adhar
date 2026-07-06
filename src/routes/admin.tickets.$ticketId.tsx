@@ -22,6 +22,7 @@ import { resolveTicketAndResumeOrder } from "@/lib/tickets/ticket-actions.functi
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { cleanEmailBody } from "@/lib/mail/thread-clean";
 
 export const Route = createFileRoute("/admin/tickets/$ticketId")({
   head: () => ({
