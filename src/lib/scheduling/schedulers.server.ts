@@ -786,30 +786,9 @@ async function fireFeedbackFollowup(s: {
     return;
   }
 
-  if (o.customer_id) {
-    const { data: cust } = await supabaseAdmin
-      .from("customers")
-      .select("primary_email, name")
-      .eq("id", o.customer_id)
-      .maybeSingle();
-    const c = cust as { primary_email: string | null; name: string | null } | null;
-    if (c?.primary_email) {
-      try {
-        await enqueueFromTemplateInternal(
-          BHS_EMAILS.E007_FEEDBACK,
-          c.primary_email,
-          {
-            customerName: c.name || "Customer",
-            orderNumber: o.application_code || o.id.slice(0, 8),
-            fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
-          },
-          { applicationId: o.id, leadId: o.lead_id ?? undefined },
-        );
-      } catch (e) {
-        console.error("[schedulers] E007 enqueue failed", e);
-      }
-    }
-  }
+  // Feedback template was removed from the BHS 12-template set. Scheduler still
+  // fires (for future reactivation) but no customer email is sent.
+  void o.customer_id;
 
   await markStopped("auto_fired");
 }
