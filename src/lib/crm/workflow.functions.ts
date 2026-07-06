@@ -171,7 +171,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
     // Derive workflow_status from the reason side; the client-provided `kind` is ignored
     // to guarantee UI and backend stay in sync with the reason's classification.
-    const workflowStatus = side === "internal" ? "government_portal_pending" : "pending_customer_response";
+    const workflowStatus = side === "internal" ? "government_portal_pending" : "waiting_for_customer";
 
     const { error: updErr } = await admin
       .from("applications")
