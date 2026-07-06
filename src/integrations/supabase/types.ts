@@ -271,6 +271,8 @@ export type Database = {
           document_status: string
           documents_deleted_at: string | null
           documents_deleted_reason: string | null
+          email_thread_message_id: string | null
+          email_thread_subject: string | null
           form_link_sent_at: string | null
           form_link_sent_count: number
           form_status: string
@@ -322,6 +324,8 @@ export type Database = {
           document_status?: string
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
+          email_thread_message_id?: string | null
+          email_thread_subject?: string | null
           form_link_sent_at?: string | null
           form_link_sent_count?: number
           form_status?: string
@@ -375,6 +379,8 @@ export type Database = {
           document_status?: string
           documents_deleted_at?: string | null
           documents_deleted_reason?: string | null
+          email_thread_message_id?: string | null
+          email_thread_subject?: string | null
           form_link_sent_at?: string | null
           form_link_sent_count?: number
           form_status?: string
@@ -3652,6 +3658,8 @@ export type Database = {
           document_status: string
           documents_deleted_at: string | null
           documents_deleted_reason: string | null
+          email_thread_message_id: string | null
+          email_thread_subject: string | null
           form_link_sent_at: string | null
           form_link_sent_count: number
           form_status: string
