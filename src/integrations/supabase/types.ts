@@ -3291,9 +3291,11 @@ export type Database = {
           code: string
           created_at: string
           description: string | null
+          email_template_code: string | null
           id: string
           is_active: boolean
           label: string
+          side: string
           sort_order: number
           updated_at: string
         }
@@ -3301,9 +3303,11 @@ export type Database = {
           code: string
           created_at?: string
           description?: string | null
+          email_template_code?: string | null
           id?: string
           is_active?: boolean
           label: string
+          side?: string
           sort_order?: number
           updated_at?: string
         }
@@ -3311,9 +3315,11 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string | null
+          email_template_code?: string | null
           id?: string
           is_active?: boolean
           label?: string
+          side?: string
           sort_order?: number
           updated_at?: string
         }
