@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Loader2, Lock, Send } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send } from "lucide-react";
 import { getTicket, updateTicket, replyToTicket, type TicketStatus } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { SectionCard } from "@/components/admin/ui";
@@ -64,9 +64,20 @@ function TicketDetailPage() {
 
   const replyMut = useMutation({
     mutationFn: () =>
-      replyFn({ data: { ticketId, text: reply.trim(), isInternal } }),
-    onSuccess: () => {
+      replyFn({
+        data: { ticketId, message: reply.trim(), isInternal },
+      }),
+    onSuccess: (res: any) => {
       setReply("");
+      if (isInternal) {
+        toast.success("Internal note added");
+      } else if (res?.emailed) {
+        toast.success(`Reply sent to ${res.recipient}`);
+      } else if (res?.reason === "no_recipient_email") {
+        toast.warning("Reply saved, but customer has no email on file — nothing was sent.");
+      } else {
+        toast.warning("Reply saved but email failed to send. Check the email queue.");
+      }
       qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Reply failed"),
@@ -166,6 +177,34 @@ function TicketDetailPage() {
                 </span>
               )}
             </div>
+
+            {/* Locked recipient email — this is where every reply lands */}
+            <div
+              className="mt-3 inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+              style={{
+                borderColor: (ticket as any).ticket_email ? "var(--admin-border)" : "rgba(220,38,38,0.4)",
+                background: (ticket as any).ticket_email ? "var(--admin-surface-2)" : "rgba(220,38,38,0.06)",
+                color: (ticket as any).ticket_email ? "var(--admin-fg)" : "#b91c1c",
+              }}
+              title="This is the customer's registered email — same address that receives order confirmations and invoices. Locked to prevent typos."
+            >
+              {(ticket as any).ticket_email ? (
+                <MailCheck className="size-3.5" style={{ color: "#15803d" }} />
+              ) : (
+                <MailX className="size-3.5" />
+              )}
+              <span className="font-medium">
+                {(ticket as any).ticket_email ?? "No customer email on file — replies will not be delivered."}
+              </span>
+              {(ticket as any).ticket_email && (
+                <span
+                  className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                  style={{ background: "rgba(15,118,110,0.14)", color: "#0f766e" }}
+                >
+                  same as invoice
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -250,6 +289,23 @@ function TicketDetailPage() {
                     style={{ background: "rgba(217,119,6,0.18)", color: "#b45309" }}
                   >
                     <Lock className="size-2.5" /> Internal Note
+                  </span>
+                )}
+                {r.direction === "inbound" && (
+                  <span
+                    className="ml-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ background: "rgba(2,132,199,0.14)", color: "#0369a1" }}
+                  >
+                    <Mail className="size-2.5" /> Inbound Email
+                  </span>
+                )}
+                {!r.is_internal && r.direction !== "inbound" && r.emailed_at && (ticket as any).ticket_email && (
+                  <span
+                    className="ml-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ background: "rgba(22,163,74,0.14)", color: "#15803d" }}
+                    title={`Delivered to ${(ticket as any).ticket_email}`}
+                  >
+                    <MailCheck className="size-2.5" /> Emailed to customer
                   </span>
                 )}
               </header>

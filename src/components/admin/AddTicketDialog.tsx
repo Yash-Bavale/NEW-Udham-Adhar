@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Lock, MailCheck, MailX, Plus, X } from "lucide-react";
 import { createTicket, searchCustomerOptions } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment, searchOrderOptions } from "@/lib/crm/tasks.functions";
 
@@ -86,10 +86,11 @@ function Body({
 
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
+  const [priority, setPriority] = useState<"urgent" | "high" | "medium" | "low">("medium");
   const [assignedTo, setAssignedTo] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(defaultCustomerId);
   const [customerLabel, setCustomerLabel] = useState<string | null>(defaultCustomerLabel);
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [custQ, setCustQ] = useState("");
   const [orderId, setOrderId] = useState<string | null>(defaultApplicationId);
   const [orderLabel, setOrderLabel] = useState<string | null>(defaultApplicationLabel);
@@ -137,6 +138,8 @@ function Body({
     const errs: FieldErrors = {};
     if (subject.trim().length < 3) errs.subject = "Subject is required (min 3 chars).";
     if (!customerId) errs.customerId = "Customer is required.";
+    else if (!customerEmail)
+      errs.customerId = "This customer has no email on file. Add an email to the customer profile first.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -180,6 +183,7 @@ function Body({
                 onClear={() => {
                   setCustomerId(null);
                   setCustomerLabel(null);
+                  setCustomerEmail(null);
                   setOrderId(null);
                   setOrderLabel(null);
                 }}
@@ -193,14 +197,43 @@ function Body({
                   id: r.id,
                   label: `${r.customer_code ?? ""} — ${r.name ?? "—"}`,
                   sub: [r.primary_mobile, r.primary_email].filter(Boolean).join(" · "),
+                  meta: { email: r.primary_email ?? null },
                 }))}
-                onPick={(id, label) => {
+                onPick={(id, label, meta) => {
                   setCustomerId(id);
                   setCustomerLabel(label);
+                  setCustomerEmail((meta?.email ?? null) as string | null);
                 }}
               />
             )}
           </Field>
+
+          {/* Locked ticket recipient — the customer's registered email */}
+          {customerId && (
+            <div
+              className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+              style={{
+                borderColor: customerEmail ? "var(--admin-border)" : "rgba(220,38,38,0.4)",
+                background: customerEmail ? "var(--admin-surface-2)" : "rgba(220,38,38,0.06)",
+                color: customerEmail ? "var(--admin-fg)" : "#b91c1c",
+              }}
+            >
+              {customerEmail ? (
+                <MailCheck className="size-3.5" style={{ color: "#15803d" }} />
+              ) : (
+                <MailX className="size-3.5" />
+              )}
+              <span className="flex-1">
+                <span className="mr-1 uppercase tracking-wide text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>
+                  Sends to
+                </span>
+                <span className="font-medium">
+                  {customerEmail ?? "No email on file — please add one to the customer profile."}
+                </span>
+              </span>
+              <Lock className="size-3" style={{ color: "var(--admin-fg-muted)" }} />
+            </div>
+          )}
 
           <Field label="Linked Order (optional)">
             {orderId && orderLabel ? (
@@ -257,6 +290,7 @@ function Body({
                 className="w-full rounded border bg-transparent px-2 py-1.5 text-sm"
                 style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
               >
+                <option value="urgent">Urgent</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
@@ -368,8 +402,8 @@ function Combo({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  options: { id: string; label: string; sub?: string }[];
-  onPick: (id: string, label: string) => void;
+  options: { id: string; label: string; sub?: string; meta?: Record<string, unknown> }[];
+  onPick: (id: string, label: string, meta?: Record<string, unknown>) => void;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -394,7 +428,7 @@ function Combo({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault();
-                onPick(o.id, o.label);
+                onPick(o.id, o.label, o.meta);
                 onChange("");
               }}
               className="block w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--admin-surface-2)]"

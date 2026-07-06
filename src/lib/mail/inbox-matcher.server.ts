@@ -256,7 +256,9 @@ async function openOrAppendTicket(input: {
         subject: input.subject.slice(0, 250),
         description: input.body.slice(0, 2000),
         status: "open",
-        priority: "normal",
+        priority: "medium",
+        source: "email_inbound",
+        ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
       } as never)
       .select("id")
       .single();
@@ -271,7 +273,18 @@ async function openOrAppendTicket(input: {
     ticket_id: ticketId,
     reply_text: `From: ${input.fromEmail || "unknown"}\n\n${input.body.slice(0, 4000)}`,
     is_internal: false,
+    direction: "inbound",
   } as never);
+
+  // Update ticket state: customer replied → move to open + timestamp
+  await supabaseAdmin
+    .from("support_tickets")
+    .update({
+      status: "open",
+      last_customer_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", ticketId);
 }
 
 function stripHtml(html: string | null): string {

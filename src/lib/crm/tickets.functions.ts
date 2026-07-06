@@ -8,9 +8,12 @@ async function getAdmin() {
 }
 
 const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "resolved", "closed"] as const;
-const PRIORITIES = ["high", "medium", "low"] as const;
+const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 export type TicketPriority = (typeof PRIORITIES)[number];
+
+// Re-export the emailing reply from ticket-actions so the UI has a single source of truth.
+export { replyToTicket } from "@/lib/tickets/ticket-actions.functions";
 
 export const listTickets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -94,7 +97,7 @@ export const getTicket = createServerFn({ method: "POST" })
     const { data: row, error } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile), applications(id, application_code), services(service_name)"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile), applications(id, application_code), services(service_name)"
       )
       .eq("id", data.id)
       .maybeSingle();
@@ -103,7 +106,7 @@ export const getTicket = createServerFn({ method: "POST" })
 
     const { data: replies } = await admin
       .from("ticket_replies")
-      .select("id, reply_text, is_internal, created_by, created_at")
+      .select("id, reply_text, is_internal, created_by, created_at, direction, emailed_at, email_message_id")
       .eq("ticket_id", data.id)
       .order("created_at", { ascending: true });
 
@@ -149,11 +152,26 @@ export const createTicket = createServerFn({ method: "POST" })
         assignedTo: z.string().uuid().nullable().optional(),
         customerId: z.string().uuid(),
         applicationId: z.string().uuid().nullable().optional(),
+        source: z.enum(["staff", "email_inbound", "web"]).default("staff"),
       })
       .parse(i)
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+
+    // Enforce "registered email only" — resolve and snapshot the customer's email up-front.
+    const { data: cust } = await admin
+      .from("customers")
+      .select("name, primary_email")
+      .eq("id", data.customerId)
+      .maybeSingle();
+    const custRow = cust as { name: string | null; primary_email: string | null } | null;
+    const ticketEmail = custRow?.primary_email?.trim().toLowerCase() || null;
+    if (!ticketEmail) {
+      throw new Error(
+        "Customer has no registered email address on file. Add an email to the customer profile before opening a ticket."
+      );
+    }
 
     let serviceId: string | null = null;
     if (data.applicationId) {
@@ -176,6 +194,8 @@ export const createTicket = createServerFn({ method: "POST" })
         application_id: data.applicationId ?? null,
         service_id: serviceId,
         status: "open",
+        ticket_email: ticketEmail,
+        source: data.source,
       } as never)
       .select("id, ticket_number")
       .single();
@@ -191,32 +211,31 @@ export const createTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Best-effort email enqueue (template optional)
+    // Send ticket_created confirmation. Non-fatal on failure — ticket stays created.
     try {
-      const { data: cust } = await admin
-        .from("customers")
-        .select("name, primary_email")
-        .eq("id", data.customerId)
-        .maybeSingle();
-      if (cust?.primary_email) {
-        const m = await import("@/lib/emails/emails.server");
-        await m.enqueueFromTemplateInternal(
-          "ticket_created",
-          cust.primary_email,
-          {
-            customer_name: cust.name ?? "",
-            ticket_number: ins!.ticket_number,
-            subject: data.subject,
-          },
-          { toName: cust.name ?? undefined, applicationId: data.applicationId ?? undefined }
-        );
-      }
-    } catch {
-      // template missing or send failure — non-fatal
+      const m = await import("@/lib/emails/emails.server");
+      await m.enqueueFromTemplateInternal(
+        "ticket_created",
+        ticketEmail,
+        {
+          customerName: custRow?.name ?? "",
+          ticketNumber: ins!.ticket_number,
+          ticketSubject: data.subject,
+          ticketPriority: data.priority,
+          fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
+        },
+        {
+          toName: custRow?.name ?? undefined,
+          applicationId: data.applicationId ?? undefined,
+        },
+      );
+    } catch (e) {
+      console.error("[tickets] ticket_created email failed", e);
     }
 
     return { id: ins!.id, ticket_number: ins!.ticket_number };
   });
+
 
 export const updateTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -227,20 +246,26 @@ export const updateTicket = createServerFn({ method: "POST" })
         status: z.enum(TICKET_STATUSES).optional(),
         priority: z.enum(PRIORITIES).optional(),
         assignedTo: z.string().uuid().nullable().optional(),
+        resolutionNote: z.string().trim().max(2000).optional(),
       })
       .parse(i)
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+    const now = new Date().toISOString();
     const patch: Record<string, unknown> = {};
     if (data.status) {
       patch.status = data.status;
       if (data.status === "resolved") {
-        patch.resolved_at = new Date().toISOString();
+        patch.resolved_at = now;
         patch.resolved_by = context.userId;
+      } else if (data.status === "closed") {
+        patch.closed_at = now;
       } else {
+        // Re-opening clears resolution timestamps
         patch.resolved_at = null;
         patch.resolved_by = null;
+        patch.closed_at = null;
       }
     }
     if (data.priority) patch.priority = data.priority;
@@ -252,7 +277,9 @@ export const updateTicket = createServerFn({ method: "POST" })
       .from("support_tickets")
       .update(patch as never)
       .eq("id", data.id)
-      .select("application_id, customer_id, ticket_number, status")
+      .select(
+        "application_id, customer_id, ticket_number, ticket_email, subject, status"
+      )
       .single();
     if (error) throw new Error(error.message);
 
@@ -266,40 +293,54 @@ export const updateTicket = createServerFn({ method: "POST" })
         created_by: context.userId,
       } as never);
     }
-    return { ok: true };
-  });
 
-export const replyToTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        ticketId: z.string().uuid(),
-        text: z.string().trim().min(1).max(5000),
-        isInternal: z.boolean().default(false),
-      })
-      .parse(i)
-  )
-  .handler(async ({ data, context }) => {
-    const admin = await getAdmin();
-    const { error } = await admin.from("ticket_replies").insert({
-      ticket_id: data.ticketId,
-      reply_text: data.text,
-      is_internal: data.isInternal,
-      created_by: context.userId,
-    } as never);
-    if (error) throw new Error(error.message);
+    // Send ticket_resolved email when transitioning to resolved.
+    if (data.status === "resolved") {
+      // Cancel any armed auto-close scheduler
+      try {
+        const { cancelTicketAutocloseByTicket } = await import(
+          "@/lib/scheduling/schedulers.server"
+        );
+        await cancelTicketAutocloseByTicket(data.id, "resolved_by_staff");
+      } catch { /* non-fatal */ }
 
-    // If staff sent a customer reply, move ticket to in_progress (if currently open).
-    if (!data.isInternal) {
-      await admin
-        .from("support_tickets")
-        .update({ status: "in_progress" } as never)
-        .eq("id", data.ticketId)
-        .eq("status", "open");
+      const recipient = (row as any).ticket_email as string | null;
+      if (recipient) {
+        try {
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { data: cust } = await admin
+            .from("customers")
+            .select("name")
+            .eq("id", row.customer_id!)
+            .maybeSingle();
+          await enqueueFromTemplateInternal(
+            "ticket_resolved",
+            recipient,
+            {
+              customerName: (cust as { name?: string | null } | null)?.name ?? "",
+              ticketNumber: row.ticket_number ?? "",
+              ticketSubject: (row as any).subject ?? "",
+              resolutionNote:
+                data.resolutionNote ||
+                "Our team has completed the requested action for this ticket.",
+              fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
+            },
+            {
+              applicationId: row.application_id ?? undefined,
+            },
+          );
+        } catch (e) {
+          console.error("[tickets] ticket_resolved email failed", e);
+        }
+      }
     }
+
     return { ok: true };
   });
+
+
+// replyToTicket now lives in `@/lib/tickets/ticket-actions.functions` and is re-exported at the top of this file.
+
 
 export const searchCustomerOptions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
