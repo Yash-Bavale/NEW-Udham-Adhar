@@ -111,9 +111,10 @@ export function ExternalDelayDialog({
               onChange={(e) => setReasonCode(e.target.value)}
               className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
             >
-              {reasons?.reasons.map((r) => (
+              {filteredReasons.map((r) => (
                 <option key={r.code} value={r.code}>{r.label}</option>
               ))}
+              {filteredReasons.length === 0 && <option value="">No reasons configured for this side</option>}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
