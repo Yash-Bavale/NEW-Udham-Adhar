@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Pencil, Eye, X, Search, ChevronDown, ChevronRight } from "lucide-react";
-import { listEmailTemplates, saveEmailTemplate, toggleEmailTemplate } from "@/lib/emails/emails.functions";
+import { listEmailTemplates, saveEmailTemplate, toggleEmailTemplate, setEmailTemplateDispatchMode } from "@/lib/emails/emails.functions";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,9 @@ type Tpl = {
   category: string | null;
   flow_id: string | null;
   sr_no: number | null;
+  dispatch_mode: "auto" | "manual" | null;
 };
+
 
 function formatIST(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -204,6 +206,8 @@ function EmailTemplatesPage() {
                         <th className="text-left px-3 py-2 font-medium">Name</th>
                         <th className="text-left px-3 py-2 font-medium">Subject</th>
                         <th className="text-left px-3 py-2 font-medium">Status</th>
+                        <th className="text-left px-3 py-2 font-medium">Dispatch</th>
+
                         <th className="text-left px-3 py-2 font-medium">Last Sent</th>
                         <th className="text-right px-3 py-2 font-medium">Sent</th>
                         <th className="text-right px-3 py-2 font-medium">Actions</th>
@@ -244,8 +248,16 @@ function EmailTemplatesPage() {
                               </span>
                             </div>
                           </td>
+                          <td className="px-3 py-2">
+                            <DispatchToggle
+                              tpl={t}
+                              disabled={!canToggle}
+                              onChanged={() => qc.invalidateQueries({ queryKey: ["admin.email-templates"] })}
+                            />
+                          </td>
                           <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
                           <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
+
                           <td className="px-3 py-2 text-right whitespace-nowrap">
                             <button
                               onClick={() => setPreviewing(t)}
@@ -321,6 +333,40 @@ function DisableConfirmDialog({ tpl, onClose, onConfirmed }: { tpl: Tpl; onClose
     </Dialog>
   );
 }
+
+function DispatchToggle({ tpl, disabled, onChanged }: { tpl: Tpl; disabled: boolean; onChanged: () => void }) {
+  const setMode = useServerFn(setEmailTemplateDispatchMode);
+  const [busy, setBusy] = useState(false);
+  const mode: "auto" | "manual" = tpl.dispatch_mode ?? "auto";
+  const toggle = async () => {
+    if (disabled || busy) return;
+    const next = mode === "auto" ? "manual" : "auto";
+    setBusy(true);
+    try {
+      await setMode({ data: { code: tpl.code, dispatch_mode: next } });
+      toast.success(`${tpl.name}: ${next === "auto" ? "Automated" : "Manual only"}`);
+      onChanged();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  const isAuto = mode === "auto";
+  return (
+    <button
+      onClick={toggle}
+      disabled={disabled || busy}
+      title={isAuto ? "Sent automatically by the system" : "Employee must send manually"}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+        isAuto
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+      } disabled:opacity-50`}
+    >
+      <span className={`size-1.5 rounded-full ${isAuto ? "bg-emerald-500" : "bg-amber-500"}`} />
+      {isAuto ? "Automated" : "Manual"}
+    </button>
+  );
+}
+
 
 function EditorDrawer({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
   const save = useServerFn(saveEmailTemplate);

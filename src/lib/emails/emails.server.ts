@@ -134,12 +134,12 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   rawVariables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual" },
 ) {
   const variables = withBothCases(rawVariables);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
-    .select("subject, body_html, body_text, is_enabled")
+    .select("subject, body_html, body_text, is_enabled, dispatch_mode")
     .eq("code", code)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -147,6 +147,16 @@ export async function enqueueFromTemplateInternal(
   if (!tpl.is_enabled) {
     if (opts?.requireImmediateSuccess) {
       throw new Error(`Email template '${code}' is disabled — email was not sent.`);
+    }
+    return;
+  }
+  // Dispatch-mode gate: an "auto" trigger is skipped for manual-mode templates.
+  // Manual trigger (from admin UI) always bypasses this gate.
+  const trigger = opts?.trigger ?? "auto";
+  const mode = (tpl as { dispatch_mode?: string }).dispatch_mode ?? "auto";
+  if (trigger === "auto" && mode === "manual") {
+    if (opts?.requireImmediateSuccess) {
+      throw new Error(`Email template '${code}' is set to manual dispatch — automation skipped.`);
     }
     return;
   }
@@ -166,6 +176,7 @@ export async function enqueueFromTemplateInternal(
     requireImmediateSuccess: opts?.requireImmediateSuccess,
   });
 }
+
 
 /**
  * Recover rows stranded in `status='sending'` (e.g. transport crashed mid-send,

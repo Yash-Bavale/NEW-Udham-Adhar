@@ -115,7 +115,7 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no")
+      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no, dispatch_mode")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
@@ -150,6 +150,97 @@ export const toggleEmailTemplate = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setEmailTemplateDispatchMode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      code: z.string().min(1),
+      dispatch_mode: z.enum(["auto", "manual"]),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isAdmin }, { data: isSuper }] = await Promise.all([
+      supabase.rpc("has_role", { _user_id: userId, _role: "admin" }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "super_admin" }),
+    ]);
+    if (!isAdmin && !isSuper) throw new Error("Forbidden");
+    const { error } = await supabase
+      .from("email_templates")
+      .update({ dispatch_mode: data.dispatch_mode } as never)
+      .eq("code", data.code);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/**
+ * Manually send a template email for a given order/lead. Bypasses dispatch_mode
+ * gate (that's the whole point of a manual send) but still honors is_enabled.
+ * Used from the workspace when an employee chooses to send a customer email.
+ */
+export const sendOrderTemplateEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({
+      leadId: z.string().uuid(),
+      templateCode: z.string().min(1).max(80),
+    }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
+      .eq("id", data.leadId)
+      .maybeSingle();
+    if (leadErr) throw new Error(leadErr.message);
+    if (!lead?.email) throw new Error("Lead has no email address on file.");
+
+    const { data: app } = await supabase
+      .from("applications")
+      .select("id, application_code")
+      .eq("lead_id", data.leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const appOrigin = process.env.APP_BASE_URL || process.env.SUPABASE_URL || "";
+    const onboardingUrl = lead.lead_code ? `${appOrigin}/onboarding/${encodeURIComponent(lead.lead_code)}` : "";
+    const vars = {
+      customer_name: lead.name ?? "",
+      name: lead.name ?? "",
+      customer_email: lead.email,
+      customer_mobile: lead.mobile ?? "",
+      order_number: lead.lead_code ?? "",
+      lead_code: lead.lead_code ?? "",
+      service_name: lead.service ?? "",
+      service: lead.service ?? "",
+      form_link: onboardingUrl,
+      onboarding_url: onboardingUrl,
+      service_fee: Number(lead.base_amount ?? 0).toFixed(2),
+      gst_amount: Number(lead.gst_amount ?? 0).toFixed(2),
+      total_amount: Number(lead.total_amount ?? 0).toFixed(2),
+      support_email: "help@businesshelpservices.com",
+    };
+
+    const { enqueueFromTemplateInternal, processQueueInternal } = await import("./emails.server");
+    await enqueueFromTemplateInternal(
+      data.templateCode,
+      lead.email,
+      vars,
+      {
+        toName: lead.name ?? undefined,
+        leadId: lead.id,
+        applicationId: app?.id ?? undefined,
+        trigger: "manual",
+        requireImmediateSuccess: true,
+      },
+    );
+    const result = await processQueueInternal(5);
+    return { ok: true, template: data.templateCode, ...result };
+  });
+
+
 const TemplateInput = z.object({
   id: z.string().uuid().optional(),
   code: z.string().trim().min(2).max(80).regex(/^[a-z0-9_]+$/, "code must be lowercase a-z, 0-9, _"),
@@ -160,7 +251,9 @@ const TemplateInput = z.object({
   description: z.string().max(500).nullable().optional(),
   variables: z.array(z.string().max(60)).max(50).default([]),
   is_enabled: z.boolean().default(true),
+  dispatch_mode: z.enum(["auto", "manual"]).optional(),
 });
+
 
 export const saveEmailTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
