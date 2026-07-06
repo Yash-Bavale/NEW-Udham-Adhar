@@ -277,6 +277,41 @@ function Body({
             )}
           </Field>
 
+          {orderId && existingOpen && (
+            <div
+              className="rounded-md border p-2.5 text-xs"
+              style={{
+                borderColor: "rgba(217,119,6,0.4)",
+                background: "rgba(217,119,6,0.06)",
+                color: "#92400e",
+              }}
+            >
+              <div className="font-medium">
+                Open ticket already exists for this order
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <Link
+                  to="/admin/tickets/$ticketId"
+                  params={{ ticketId: (existingOpen as any).id }}
+                  onClick={onClose}
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium underline"
+                  style={{ color: "#b45309" }}
+                >
+                  {(existingOpen as any).ticket_number} · {(existingOpen as any).subject}
+                </Link>
+              </div>
+              <label className="mt-2 flex items-center gap-1.5 text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={allowDuplicate}
+                  onChange={(e) => setAllowDuplicate(e.target.checked)}
+                />
+                Create additional ticket anyway (audited)
+              </label>
+            </div>
+          )}
+
+
           <Field label="Subject" required error={errors.subject}>
             <input
               value={subject}
