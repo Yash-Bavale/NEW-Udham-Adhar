@@ -80,6 +80,8 @@ function QuarantinePage() {
   const rerunFn = useServerFn(rerunQuarantineMatch);
   const approveFn = useServerFn(approveQuarantine);
   const discardFn = useServerFn(discardQuarantine);
+  const createFn = useServerFn(createTicketFromQuarantine);
+  const pollFn = useServerFn(pollInboxNow);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["quarantine", scope],
