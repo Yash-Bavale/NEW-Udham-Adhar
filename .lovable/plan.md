@@ -1,87 +1,106 @@
-
 ## Goal
 
-Put the **Employee Actions** block back where the screenshot shows it (directly under the header card, above Customer Journey), but as the **single source of truth** — the exact layout from the earlier plan mockup, covering **every** lifecycle stage from `computeOrderStage`, with the Timeline auto-syncing on every action.
+Bring the DB-backed `email_templates` into 1:1 alignment with the two source docs the user uploaded:
 
-## What went wrong last pass
+- `All_Mail_Draft_Template.docx` + the 12 HTML files in `Emails_Templates.zip` — the canonical **content** (subject + body) and order (SR 1-12).
+- `All_Mail_Auto_Flow_System-2.docx` — the canonical **flow** (E001-E006 + which stage each email fires at).
 
-- Removed the top "Employee Actions" strip entirely. Employees lost the at-a-glance action surface.
-- Kept actions only inside the Workflow tab and only for `FULFILLMENT_STAGES` (7 stages), so pre-fulfillment stages (`lead_received`, `payment_pending`, `payment_done`, `consultation_pending`) had no action mapping.
-- Exception row didn't match the mockup (missing Customer Hold, Request Docs).
-- Timeline in the tab wasn't invalidated on every action → out of sync until refresh.
+Then reorganise the `/admin/email-templates` page so employees can navigate by **category** and see **SR numbers**.
 
-## New layout (matches earlier mockup)
+---
 
-Rendered in `WorkspaceShell` between the Header card and Customer Journey:
+## 1. Canonical template map (source of truth going forward)
 
-```text
-┌─ EMPLOYEE ACTIONS ────────────────────────────────────────────┐
-│ CURRENT STAGE: Submitted to Govt · updated 26 Jun 2026        │
-│ Next: Mark the certificate issued when it arrives             │
-│                                                               │
-│ [  →  Mark Certificate Issued  ]                  ← 1 primary │
-│                                                               │
-│ Exceptions:  ⚠ Our-Side Delay   ⏸ Customer Hold               │
-│              📎 Request Docs    ✕ Cancel/Refund   ← contextual│
-└───────────────────────────────────────────────────────────────┘
-```
+| SR | Flow ID | Category | Template code (DB) | Final Subject | HTML source |
+|----|---------|----------|--------------------|---------------|-------------|
+| 1  | E001 | Onboarding & Payment | `order_confirmation` | `Order Confirmation & Tax Invoice – Order No. {{order_number}}` | `01-welcome-mail-tax-invoice.html` |
+| 2  | E006 | Fulfillment | `order_completed` | `Your Order {{order_number}} Has Been Completed` | `02-order-completed-mail.html` |
+| 3  | E002 | Onboarding & Payment | `welcome_and_form_link` | `Action Required: Submit Required Information/Documents – Order No. {{order_number}}` | `03-incomplete-information-link-mail.html` |
+| 4  | E003 | Delay & Hold | `cancel-action-required` | `Action Required – Your Order is Temporarily On Hold – Order No. {{order_number}}` | `04-order-closure-intimation-customer-side-reason.html` |
+| 5  | E005 | Delay & Hold | `service_processing_update` | `Update Regarding Your Order – Temporary Processing Hold – Order No. {{order_number}}` | `05-order-closure-intimation-our-side-reason.html` |
+| 6  | E004 | Closure | `order_closure_confirmation` | `Order Closed – Order No. {{order_number}}` | `06-order-closure-mail.html` |
+| 7  | E006-C | Consultation | `consultation_service_converted` | `Your Order {{order_number}} Has Been Completed` | `07-talk-to-expert-consultation-completed-mail.html` |
+| 8  | — | Support / Tickets | `ticket_reply` | `Update Regarding Your Support Request – Ticket No. {{ticket_number}}` | `08-ticket-reply-mail-with-reason.html` |
+| 9  | — | Support / Tickets | `ticket_resolved` | `Your Support Request Has Been Successfully Resolved – Ticket No. {{ticket_number}}` | `09-ticket-reply-mail-consultation-support-completed.html` |
+| 10 | — | Support / Tickets | `support_ticket_closed_final` | `Your Support Ticket Has Been Closed – Ticket No. {{ticket_number}}` | `10-ticket-closed-mail.html` |
+| 11 | — | Refunds | `refund_processed_confirmation` | `Refund Request Approved – Order No. {{order_number}}` | `11-refund-accepted-mail.html` |
+| 12 | E-GOVT | Fulfillment | `bhs_e012_submitted_to_govt` | `Update on Your Order – Application Submitted (Order No. {{order_number}})` | `12-government-application-submitted-pending-mail.html` |
 
-Rules
-- **One primary** button per stage. Clicking it drives the canonical forward transition (or opens the required gate dialog, e.g. certificate upload).
-- **Exceptions** are contextual: only render the ones valid for the current stage/lane.
-- **Revert** stays super-admin-only, shown as a small text link in the header row.
-- Delay / cancellation lanes replace the primary with lane-specific CTAs (Resume Order, Customer Replied, Close/Refund) — same card, same position.
+**Placeholder normalisation** applied to every HTML while migrating:
 
-## Stage → primary + exceptions map (single source of truth)
+- `[Order No.]` / `[Order/Application No.]` → `{{order_number}}`
+- `[Customer Name]` → `{{customer_name}}`
+- `[Customer Email]` → `{{customer_email}}`
+- `[Customer Mobile]` → `{{customer_mobile}}`
+- `[Service Name]` → `{{service_name}}`
+- `[Invoice No.]` → `{{invoice_number}}`
+- `[Payment Reference No.]` → `{{payment_reference}}`
+- `[DD/MM/YYYY HH:MM AM/PM]` inside Order Created → `{{order_created_at}}`; inside Payment → `{{payment_date}}`; inside Invoice → `{{invoice_date}}`; inside Consultation → `{{consultation_at}}`
+- `[Ticket No.]` → `{{ticket_number}}`
+- `[EMPLOYEE_REPLY_BLOCK]` → `{{employee_reply}}`
+- `[EMPLOYEE_REMARKS]` → `{{employee_remarks}}`
+- `[Refund Reference No.]` → `{{refund_gateway_ref}}`
+- `[Amount]` / `[GST Amount]` / `[Total Amount]` → `{{service_fee}}` / `{{gst_amount}}` / `{{total_amount}}`
+- Footer links (`Terms & Conditions`, `Privacy Policy`, …) are turned into real `<a href="https://udyamadhar.in/…">` tags.
 
-New file `src/lib/crm/stageActionMap.ts` keyed by `OrderStage` (from `computeOrderStage`), so **every** stage has an entry:
+---
 
-| Stage | Primary | Exceptions |
-|---|---|---|
-| `lead_received` | Send Payment Link | Mark Uninterested |
-| `payment_pending` | Resend Payment Link | Mark Uninterested, Cancel |
-| `payment_done` | Start Consultation / Mark Documents Received | Our-Side Delay, Customer Hold, Cancel |
-| `consultation_pending` | Convert Consultation → Order | Reschedule, Mark Uninterested |
-| `form_submitted` → `order_received` | Mark Documents Received | Request Docs, Our-Side Delay, Customer Hold, Cancel |
-| `under_review` (`verification_pending`) | Mark Verified & Ready to Submit | Request Docs, Our-Side Delay, Customer Hold, Cancel |
-| `in_progress` (`documents_received`) | Move to Verification | Request Docs, Our-Side Delay, Customer Hold, Cancel |
-| `submitted_to_govt` (`application_submitted`) | Move to Under Processing | Our-Side Delay, Customer Hold, Cancel |
-| `under_processing` | Mark Certificate Issued (opens gate) | Our-Side Delay, Customer Hold, Cancel |
-| `certificate_ready` | Complete & Send Certificate | Our-Side Delay, Cancel |
-| `completed` | — (read-only "Order completed") | Revert (super-admin) |
-| `uninterested` / `refund_requested` / `refunded` | Resume Order (super-admin) | — |
+## 2. Database change — `email_templates.category`
 
-Every primary action calls an existing server fn (`updateFulfillmentStatus`, `convertConsultation`, `sendPaymentLink`, `resumeOrder`, etc.) — no new backend endpoints.
+One idempotent migration:
 
-## Files
+1. `ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS category TEXT;`
+2. `ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS flow_id TEXT;`  (stores `E001`…`E006`, nullable)
+3. `ALTER TABLE public.email_templates ADD COLUMN IF NOT EXISTS sr_no INT;`     (stable 1-N per category)
+4. `UPDATE` every row above with its `subject`, `body_html`, `category`, `flow_id`, `sr_no`.
+5. Backfill `category` for all remaining rows (`admin_*`, `bhs_*`, `complaint_*`, `workflow_*`, `cancel-*`, `refund_*`, `lead_*`, `onboarding_*`, `contact_*`, `document_*`, `payment_*`) using a WHEN…THEN table so nothing is left un-categorised. Rows without an explicit SR get an auto SR from row_number within their category.
+6. Categories used (fixed enum-style list, kept in code and in the migration):
+   - `Onboarding & Payment`
+   - `Fulfillment`
+   - `Delay & Hold`
+   - `Closure`
+   - `Consultation`
+   - `Support / Tickets`
+   - `Refunds`
+   - `Complaints`
+   - `Internal / Admin`
+   - `Workflow Automation`
 
-### New
-- `src/components/admin/workspace/OrderActionRail.tsx` — the single card shown in the screenshot. Reads `OrderStage`, renders primary + exceptions from the stage map, owns delay/cancellation lane switching, opens existing dialogs (`CompletionGateDialogStandalone`, `ExternalDelayDialog`, `CloseOrderDialog`, customer-hold dialog, request-docs dialog).
-- `src/lib/crm/stageActionMap.ts` — pure stage→actions map (table above) + helper `getStageActions(stage, current, lane)`.
+Grants already exist on `email_templates`; no policy changes.
 
-### Edited
-- `src/components/admin/workspace/WorkspaceShell.tsx` — mount `<OrderActionRail />` between the header card and Customer Journey (the exact slot the user circled in the screenshot). Pass `stage`, `current`, `workflowStatus`, `closureStage`, etc.
-- `src/components/admin/workspace/OrderWorkflowPanel.tsx` — **remove** Card 1 (Order Status + primary/exceptions) so the Rail is the only place with these buttons. Keep only: Internal Note editor + Timeline & Reminders section. This is what fills the Workflow tab.
-- `src/routes/admin.orders.$orderId.tsx` — re-wire `onRequestDocs` and pass `stage`/timestamps into `WorkspaceShell` so the Rail can invalidate the same queries.
+---
 
-### Timeline sync
-On every action success, `OrderActionRail` calls one shared `refresh()` that invalidates:
-- `["admin.order", orderId]`
-- `["order-detail-v2", orderId]`
-- `["workflow-events", orderId]` (drives the Timeline tab + collapsed Timeline in Workflow tab)
-- `["workflow-reminders", orderId]`
+## 3. Admin UI — `/admin/email-templates` grouping
 
-The existing `UnifiedTimeline` and Workflow-tab history section already read those keys, so they refresh live after any Rail click.
+Refactor `src/routes/admin.email-templates.tsx`:
 
-## Not changing
+- Load templates once, then group by `category`.
+- Render one collapsible section per category with:
+  - Category header + count badge + a "Enable all / Disable all" toggle (admin only).
+  - Table columns: `SR`, `Flow`, `Code`, `Name`, `Subject`, `Status`, `Last Sent`, `Sent`, `Actions`.
+  - `SR` is `sr_no`, monospaced. `Flow` shows the `E00x` chip (empty when none).
+- Add top-of-page search that filters across name / code / subject and auto-expands matching categories.
+- Add a left "Categories" nav rail (sticky) with jump-to-anchor links so navigating between the 10 groups is one click.
+- No change to Preview / Edit / Disable dialogs (existing behaviour keeps working).
+- `listEmailTemplates` server fn already returns `*`; extend its `Tpl` type on the client to include `category`, `flow_id`, `sr_no`.
 
-- Database, email templates, schedulers, automation rules — untouched.
-- `computeOrderStage`, `FULFILLMENT_TRANSITIONS`, CustomerJourneyMap — untouched (Rail consumes them).
-- Quick Actions tile grid (Call / WhatsApp / Email / Open Lead / Print / Copy) — stays in the header card; it's contact tooling, not workflow.
+---
 
-## Verification
+## 4. Files touched
 
-1. Open a `submitted_to_govt` order → Rail shows "Mark Certificate Issued" + 4 exceptions, matches screenshot exactly.
-2. Click primary → toast + stage advances + Customer Journey pill + Timeline entry all update in the same render.
-3. Open a `lead_received` and `consultation_pending` order → each shows its own primary from the map (no empty state).
-4. Trigger Our-Side Delay → lane switches to delay, primary becomes "Resume Order", Timeline logs the pause reason.
+- `supabase/migrations/2026xxxx_email_templates_sync_and_categories.sql` (new — the only DB change).
+- `src/routes/admin.email-templates.tsx` (grouped view + SR/flow columns + search + side nav).
+- `src/lib/emails/emails.functions.ts` (widen `saveEmailTemplate` input to allow updating `category`, `flow_id`, `sr_no`; leave defaults intact for backwards compat).
+- `src/lib/email-templates/registry.ts` — unchanged; the React registry is only for the Lovable transactional route and is not the source of truth for these DB templates.
+
+## 5. Verification
+
+1. Run the migration; re-run `SELECT code, category, sr_no, flow_id, subject FROM email_templates ORDER BY category, sr_no` and confirm all 12 SR rows have the exact subjects from the source doc.
+2. Open `/admin/email-templates` — 10 category sections render, SR 1-12 visible under their categories, Flow chips show for E001-E006 rows.
+3. Click **Preview** on SR 1 (`order_confirmation`) → renders the uploaded HTML with sample data, subject matches the doc exactly.
+4. Trigger a test send from a lead workspace using each of the 12 codes and confirm the delivered subject line matches the table above (via the Emails tab body-expanded view added earlier).
+
+## Out of scope (ask before doing)
+
+- Adding brand-new template rows that aren't in the 12 sources (e.g. auto-generated feedback E007).
+- Rewriting the automation triggers (`workflow-reminders`, `closure-workflow`) — this plan only aligns content + UI. Trigger wiring already sends the correct codes.
