@@ -157,13 +157,26 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       .eq("id", app.lead_id!)
       .maybeSingle();
 
+    // Load the full reason row (side + optional template override).
+    const { data: reasonRow } = await admin
+      .from("workflow_delay_reasons")
+      .select("code,label,description,side,email_template_code")
+      .eq("code", data.reasonCode)
+      .maybeSingle();
+    const side: "customer" | "internal" = ((reasonRow as { side?: string } | null)?.side === "internal") ? "internal" : "customer";
+    const reasonBlock = ((reasonRow as { description?: string } | null)?.description) || data.reasonLabel;
+    const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || "bhs_e003_customer_delay";
+
     const expectedReviewIso = new Date(data.expectedReviewAt).toISOString();
 
-    // 1) Update application
+    // Derive workflow_status from the reason side; the client-provided `kind` is ignored
+    // to guarantee UI and backend stay in sync with the reason's classification.
+    const workflowStatus = side === "internal" ? "government_portal_pending" : "pending_customer_response";
+
     const { error: updErr } = await admin
       .from("applications")
       .update({
-        workflow_status: data.kind,
+        workflow_status: workflowStatus,
         workflow_delay_reason: data.reasonCode,
         workflow_expected_review_at: expectedReviewIso,
         workflow_priority: data.priority,
@@ -171,12 +184,12 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       .eq("id", app.id);
     if (updErr) throw new Error(updErr.message);
 
-    // 2) Timeline events (internal + customer-visible if note provided)
+    // Timeline events (internal always; customer-visible only for customer-side w/ note).
     const events: any[] = [{
       application_id: app.id,
       lead_id: app.lead_id,
-      event_type: "external_delay",
-      title: `External delay — ${data.reasonLabel}`,
+      event_type: side === "internal" ? "internal_delay" : "external_delay",
+      title: `${side === "internal" ? "Internal / our-side delay" : "Customer-side delay"} — ${data.reasonLabel}`,
       description: data.internalNote ?? null,
       customer_visible: false,
       actor_id: context.userId,
@@ -184,12 +197,12 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       is_system: false,
       metadata: {
         reason_code: data.reasonCode,
+        side,
         priority: data.priority,
         expected_review_at: expectedReviewIso,
-        kind: data.kind,
       },
     }];
-    if (data.customerNote && data.customerNote.trim()) {
+    if (side === "customer" && data.customerNote && data.customerNote.trim()) {
       events.push({
         application_id: app.id,
         lead_id: app.lead_id,
@@ -205,59 +218,31 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     }
     await admin.from("workflow_events").insert(events as never);
 
-    // 3) Schedule 24-hour review follow-up reminder (assigned to executive)
-    const dueAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-    await admin.from("workflow_reminders").insert({
-      application_id: app.id,
-      lead_id: app.lead_id,
-      kind: "custom",
-      template_code: null,
-      due_at: dueAt,
-      assigned_to: lead?.assigned_to ?? null,
-      status: "pending",
-      payload: { type: "review_external_delay", reason: data.reasonCode },
-      created_by: context.userId,
-    } as never);
+    if (side === "customer") {
+      // ── Customer-side: 1st intimation email now + auto-closure in 8 business hours ──
+      const { addBusinessSeconds, DEFAULT_BUSINESS_HOURS } = await import("@/lib/scheduling/business-hours");
+      let cfg = DEFAULT_BUSINESS_HOURS;
+      try {
+        const { data: bh } = await admin.from("business_hours_config").select("*").limit(1).maybeSingle();
+        if (bh) {
+          cfg = {
+            timezone: (bh as any).timezone ?? cfg.timezone,
+            openTime: (bh as any).open_time ?? cfg.openTime,
+            closeTime: (bh as any).close_time ?? cfg.closeTime,
+            workingDays: (bh as any).working_days ?? cfg.workingDays,
+            holidays: (bh as any).holidays ?? cfg.holidays,
+          } as typeof cfg;
+        }
+      } catch { /* fall back to defaults */ }
 
-    // Distinguish "denied service / pending closure" reasons from pure external/technical delays.
-    // Denied reasons route to the order_pending_closure email + 24h auto-closure follow-up.
-    // Other reasons keep the existing 3/5/7-day processing-update cadence and use service_processing_update.
-    const DENIED_CLOSURE_REASONS = new Set([
-      "government_platform_assumption",
-      "change_of_mind",
-      "user_does_not_wish_to_proceed",
-      "otp_not_provided",
-      "change_in_service_requirement",
-      "incorrect_information",
-      "documents_missing",
-      "customer_non_responsive",
-      "eligibility_issue",
-      "service_already_started",
-    ]);
-    const isDeniedReason = DENIED_CLOSURE_REASONS.has(data.reasonCode);
+      const closureDueAt = addBusinessSeconds(new Date(), 8 * 3600, cfg).toISOString();
 
-    // Fetch the full reason description (used as {{reason_block}} in the new templates).
-    let reasonBlock = data.reasonLabel;
-    try {
-      const { data: rr } = await admin
-        .from("workflow_delay_reasons")
-        .select("description")
-        .eq("code", data.reasonCode)
-        .maybeSingle();
-      if (rr?.description) reasonBlock = rr.description as string;
-    } catch {
-      /* ignore — fall back to reasonLabel */
-    }
-
-    if (isDeniedReason) {
-      // Schedule 24-hour auto-closure follow-up (will fire order_closure_confirmation + close order).
-      const followupDue = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
       await admin.from("workflow_reminders").insert({
         application_id: app.id,
         lead_id: app.lead_id,
         kind: "pending_closure_followup",
         template_code: "order_closure_confirmation",
-        due_at: followupDue,
+        due_at: closureDueAt,
         assigned_to: lead?.assigned_to ?? null,
         status: "pending",
         payload: {
@@ -267,66 +252,74 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         },
         created_by: context.userId,
       } as never);
+
+      if (lead?.email) {
+        try {
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+          await enqueueFromTemplateInternal(
+            customerTplCode,
+            lead.email,
+            {
+              customer_name: lead.name ?? "Customer",
+              order_id: app.application_code ?? "",
+              order_number: app.application_code ?? "",
+              service_name: lead.service ?? "",
+              reason: data.reasonLabel,
+              reason_block: reasonBlock,
+              date: new Date().toLocaleDateString("en-IN"),
+              company_name: COMPANY_NAME,
+              support_email: SUPPORT_EMAIL,
+              customer_note: data.customerNote ?? "",
+            },
+            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+          );
+        } catch (e) {
+          console.error("[workflow] customer-side delay email failed", e);
+        }
+      }
     } else {
-      // Standard external/technical delay → keep 3/5/7 day cadence.
-      const threeDays = new Date(Date.now() + 3 * 86400 * 1000).toISOString();
+      // ── Internal / our-side: no customer email; notify assignee + review reminder ──
+      const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
       await admin.from("workflow_reminders").insert({
         application_id: app.id,
         lead_id: app.lead_id,
-        kind: "followup_3d",
-        template_code: "workflow_processing_update_3d",
-        due_at: threeDays,
+        kind: "internal_review",
+        template_code: null,
+        due_at: dueAt,
         assigned_to: lead?.assigned_to ?? null,
         status: "pending",
-        payload: { reason: data.reasonLabel, reason_block: reasonBlock, customer_email: lead?.email ?? null },
+        payload: {
+          reason: data.reasonLabel,
+          reason_block: reasonBlock,
+          reason_code: data.reasonCode,
+        },
         created_by: context.userId,
       } as never);
-    }
 
-    // 5) Immediate customer email — denied = "Order Pending Closure", else generic Service Processing Update.
-    if (lead?.email) {
-      try {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-        const tplCode = isDeniedReason ? "order_pending_closure" : "service_processing_update";
-        await enqueueFromTemplateInternal(
-          tplCode,
-          lead.email,
-          {
-            customer_name: lead.name ?? "Customer",
-            order_id: app.application_code ?? "",
-            order_number: app.application_code ?? "",
-            service_name: lead.service ?? "",
-            reason: data.reasonLabel,
-            reason_block: reasonBlock,
-            date: new Date().toLocaleDateString("en-IN"),
-            company_name: COMPANY_NAME,
-            support_email: SUPPORT_EMAIL,
-            customer_note: data.customerNote ?? "",
-          },
-          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id },
-        );
-      } catch (e) {
-        console.error("[workflow] delay-notice email failed", e);
+      if (lead?.assigned_to) {
+        await admin.from("notifications").insert({
+          user_id: lead.assigned_to,
+          title: `Internal delay logged — ${data.reasonLabel}`,
+          body: `Order ${app.application_code ?? ""} paused for internal reason. Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
+          kind: "workflow_internal_delay",
+          link_to: `/admin/orders/${app.id}`,
+        } as never);
       }
     }
-
-
 
     await writeAudit({
       supabase: context.supabase,
       entityType: "application",
       entityId: app.id,
-      action: "workflow_external_delay",
+      action: side === "internal" ? "workflow_internal_delay" : "workflow_external_delay",
       oldValue: { workflow_status: app.workflow_status },
-      newValue: { workflow_status: data.kind, reason: data.reasonCode },
+      newValue: { workflow_status: workflowStatus, reason: data.reasonCode, side },
       actorId: context.userId,
     });
 
-    return { ok: true };
+    return { ok: true, side };
   });
-
-export const resumeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z.object({
