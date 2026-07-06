@@ -202,7 +202,7 @@ export async function cancelAllForOrder(applicationId: string, reason = "order_s
 export async function fireDueSchedulers(now = new Date()) {
   const { data: due, error } = await supabaseAdmin
     .from("order_schedulers")
-    .select("id, application_id, scheduler_type, reason_id, remarks")
+    .select("id, application_id, ticket_id, scheduler_type, reason_id, remarks")
     .eq("status", "active")
     .lte("fires_at", now.toISOString())
     .limit(50);
@@ -210,7 +210,7 @@ export async function fireDueSchedulers(now = new Date()) {
   if (!due || due.length === 0) return { fired: 0 };
 
   let fired = 0;
-  for (const s of due as Array<{ id: string; application_id: string; scheduler_type: string; reason_id: string | null; remarks: string | null }>) {
+  for (const s of due as Array<{ id: string; application_id: string | null; ticket_id: string | null; scheduler_type: string; reason_id: string | null; remarks: string | null }>) {
     try {
       if (s.scheduler_type === SCHEDULER_CUSTOMER_CLOSURE) {
         await fireCustomerClosure(s);
