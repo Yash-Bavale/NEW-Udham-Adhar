@@ -26,7 +26,6 @@ function OrderDetailPage() {
   const detailFn = useServerFn(getOrderDetailV2);
   const staffFn = useServerFn(listStaff);
   const assignFn = useServerFn(updateOrderAssignee);
-  const reminderFn = useServerFn(queueDocumentReminder);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.order", orderId],
