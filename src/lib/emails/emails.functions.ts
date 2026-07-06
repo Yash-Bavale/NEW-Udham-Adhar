@@ -155,7 +155,7 @@ const TemplateInput = z.object({
   code: z.string().trim().min(2).max(80).regex(/^[a-z0-9_]+$/, "code must be lowercase a-z, 0-9, _"),
   name: z.string().trim().min(2).max(120),
   subject: z.string().trim().min(2).max(200),
-  body_html: z.string().min(2).max(50_000),
+  body_html: z.string().min(2).max(120_000),
   body_text: z.string().max(50_000).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
   variables: z.array(z.string().max(60)).max(50).default([]),
