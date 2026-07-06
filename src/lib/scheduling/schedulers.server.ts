@@ -212,22 +212,22 @@ export async function fireDueSchedulers(now = new Date()) {
   let fired = 0;
   for (const s of due as Array<{ id: string; application_id: string | null; ticket_id: string | null; scheduler_type: string; reason_id: string | null; remarks: string | null }>) {
     try {
-      if (s.scheduler_type === SCHEDULER_CUSTOMER_CLOSURE) {
-        await fireCustomerClosure(s);
+      if (s.scheduler_type === SCHEDULER_CUSTOMER_CLOSURE && s.application_id) {
+        await fireCustomerClosure({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
-      } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER) {
+      } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER && s.application_id) {
         await fireOurSideReminder(s.id, s.application_id);
         fired++;
       } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
-        await fireTicketAutoclose(s);
+        await fireTicketAutoclose({ id: s.id, ticket_id: s.ticket_id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
-      } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP) {
-        await fireFeedbackFollowup(s);
+      } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP && s.application_id) {
+        await fireFeedbackFollowup({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
       } else {
         await supabaseAdmin
           .from("order_schedulers")
-          .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type" } as never)
+          .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type_or_missing_app" } as never)
           .eq("id", s.id);
       }
     } catch (e) {
