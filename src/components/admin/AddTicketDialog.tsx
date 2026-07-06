@@ -3,8 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, MailCheck, MailX, Plus, X } from "lucide-react";
-import { createTicket, searchCustomerOptions } from "@/lib/crm/tickets.functions";
+import { createTicket, searchCustomerOptions, checkOpenTicketForOrder } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment, searchOrderOptions } from "@/lib/crm/tasks.functions";
+import { Link } from "@tanstack/react-router";
 
 type Props = {
   open?: boolean;
@@ -96,6 +97,14 @@ function Body({
   const [orderLabel, setOrderLabel] = useState<string | null>(defaultApplicationLabel);
   const [orderQ, setOrderQ] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [allowDuplicate, setAllowDuplicate] = useState(false);
+
+  const checkDupFn = useServerFn(checkOpenTicketForOrder);
+  const { data: existingOpen } = useQuery({
+    queryKey: ["ticket-dup", orderId],
+    queryFn: () => checkDupFn({ data: { applicationId: orderId! } }),
+    enabled: !!orderId,
+  });
 
   const { data: staffData } = useQuery({
     queryKey: ["staff-assign"],
@@ -123,16 +132,22 @@ function Body({
           assignedTo: assignedTo || null,
           customerId: customerId!,
           applicationId: orderId,
+          allowDuplicate,
         },
       }),
-    onSuccess: (res) => {
-      toast.success(`Ticket ${res.ticket_number} created`);
+    onSuccess: (res: any) => {
+      if (res?.reused) {
+        toast.success(`Reusing existing open ticket ${res.ticket_number}`);
+      } else {
+        toast.success(`Ticket ${res.ticket_number} created`);
+      }
       qc.invalidateQueries({ queryKey: ["tickets-list"] });
       onCreated?.(res.id);
       onClose();
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to create ticket"),
   });
+
 
   function validate() {
     const errs: FieldErrors = {};
@@ -262,6 +277,41 @@ function Body({
             )}
           </Field>
 
+          {orderId && existingOpen && (
+            <div
+              className="rounded-md border p-2.5 text-xs"
+              style={{
+                borderColor: "rgba(217,119,6,0.4)",
+                background: "rgba(217,119,6,0.06)",
+                color: "#92400e",
+              }}
+            >
+              <div className="font-medium">
+                Open ticket already exists for this order
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <Link
+                  to="/admin/tickets/$ticketId"
+                  params={{ ticketId: (existingOpen as any).id }}
+                  onClick={onClose}
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium underline"
+                  style={{ color: "#b45309" }}
+                >
+                  {(existingOpen as any).ticket_number} · {(existingOpen as any).subject}
+                </Link>
+              </div>
+              <label className="mt-2 flex items-center gap-1.5 text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={allowDuplicate}
+                  onChange={(e) => setAllowDuplicate(e.target.checked)}
+                />
+                Create additional ticket anyway (audited)
+              </label>
+            </div>
+          )}
+
+
           <Field label="Subject" required error={errors.subject}>
             <input
               value={subject}
@@ -328,7 +378,7 @@ function Body({
           </button>
           <button
             type="button"
-            disabled={mut.isPending}
+            disabled={mut.isPending || (!!existingOpen && !allowDuplicate)}
             onClick={() => {
               if (validate()) mut.mutate();
             }}
@@ -336,8 +386,9 @@ function Body({
             style={{ background: "var(--admin-accent)", color: "var(--admin-accent-fg)" }}
           >
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
-            Create Ticket
+            {existingOpen && !allowDuplicate ? "Open existing ticket instead" : "Create Ticket"}
           </button>
+
         </footer>
       </div>
     </div>

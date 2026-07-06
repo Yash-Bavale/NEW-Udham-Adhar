@@ -3,8 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send, Sparkles } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send, Sparkles, PlayCircle, CheckCircle2, RotateCcw, XCircle, Package } from "lucide-react";
 import { getTicket, updateTicket, replyToTicket, type TicketStatus } from "@/lib/crm/tickets.functions";
+import { getTicketOrderContext, resolveTicketAndResumeOrder } from "@/lib/tickets/ticket-actions.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { SectionCard } from "@/components/admin/ui";
@@ -39,6 +40,8 @@ function TicketDetailPage() {
   const updFn = useServerFn(updateTicket);
   const replyFn = useServerFn(replyToTicket);
   const staffFn = useServerFn(listStaffForAssignment);
+  const orderCtxFn = useServerFn(getTicketOrderContext);
+  const resumeFn = useServerFn(resolveTicketAndResumeOrder);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ticket", ticketId],
@@ -61,7 +64,7 @@ function TicketDetailPage() {
   const [showCanned, setShowCanned] = useState(false);
 
   const updMut = useMutation({
-    mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null }) =>
+    mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null; priority?: "urgent" | "high" | "medium" | "low" }) =>
       updFn({ data: { id: ticketId, ...patch } }),
     onSuccess: () => {
       toast.success("Ticket updated");
@@ -69,6 +72,29 @@ function TicketDetailPage() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
+
+  const applicationId = (data as any)?.ticket?.application_id ?? null;
+  const { data: orderCtx } = useQuery({
+    queryKey: ["ticket-order-ctx", applicationId],
+    queryFn: () => orderCtxFn({ data: { orderId: applicationId! } }),
+    enabled: !!applicationId,
+  });
+
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumeTo, setResumeTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
+  const [resumeNote, setResumeNote] = useState("");
+  const resumeMut = useMutation({
+    mutationFn: () => resumeFn({ data: { ticketId, resumeTo, note: resumeNote.trim() || undefined } }),
+    onSuccess: (res: any) => {
+      setResumeOpen(false);
+      setResumeNote("");
+      toast.success(`Ticket resolved · order resumed → ${res.resumeTo.replace(/_/g, " ")}`);
+      qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
+      qc.invalidateQueries({ queryKey: ["ticket-order-ctx", applicationId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Resume failed"),
+  });
+
 
   const replyMut = useMutation({
     mutationFn: () =>
@@ -259,9 +285,206 @@ function TicketDetailPage() {
                 ))}
               </select>
             </label>
+            <label className="block text-xs">
+              <span
+                className="text-[11px] font-medium uppercase tracking-wide"
+                style={{ color: "var(--admin-fg-muted)" }}
+              >
+                Priority
+              </span>
+              <select
+                value={(ticket as any).priority ?? "medium"}
+                onChange={(e) => updMut.mutate({ priority: e.target.value as any })}
+                className="mt-1 w-full rounded border bg-transparent px-2 py-1.5 text-sm"
+                style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              >
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
           </div>
         </div>
       </SectionCard>
+
+      {applicationId && orderCtx && (
+        <SectionCard title="Linked Order">
+          <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto]">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <Package className="size-4" style={{ color: "var(--admin-fg-muted)" }} />
+              <Link
+                to="/admin/orders/$orderId"
+                params={{ orderId: applicationId }}
+                className="font-mono text-xs"
+                style={{ color: "var(--admin-accent)" }}
+              >
+                {orderCtx.application_code ?? applicationId.slice(0, 8)}
+              </Link>
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)" }}
+              >
+                {(orderCtx.order_status ?? "—").replace(/_/g, " ")}
+              </span>
+              <span className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                {orderCtx.service_name ?? ""} · {orderCtx.customer_name ?? ""}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(ticket.status === "open" || ticket.status === "in_progress" || ticket.status === "waiting_customer") &&
+                (orderCtx.order_status === "CUSTOMER_HOLD" || orderCtx.order_status === "OUR_SIDE_DELAY") && (
+                  <button
+                    type="button"
+                    onClick={() => setResumeOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                    style={{ background: "#15803d", color: "#fff" }}
+                  >
+                    <PlayCircle className="size-3.5" /> Resolve & Resume Order
+                  </button>
+                )}
+              {ticket.status !== "closed" && ticket.status !== "resolved" && (
+                <button
+                  type="button"
+                  onClick={() => updMut.mutate({ status: "resolved" })}
+                  className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                  style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)", border: "1px solid var(--admin-border)" }}
+                >
+                  <CheckCircle2 className="size-3.5" /> Resolve
+                </button>
+              )}
+              {ticket.status !== "closed" && (
+                <button
+                  type="button"
+                  onClick={() => updMut.mutate({ status: "closed" })}
+                  className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                  style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)", border: "1px solid var(--admin-border)" }}
+                >
+                  <XCircle className="size-3.5" /> Close
+                </button>
+              )}
+              {(ticket.status === "closed" || ticket.status === "resolved") && (
+                <button
+                  type="button"
+                  onClick={() => updMut.mutate({ status: "open" })}
+                  className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                  style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)", border: "1px solid var(--admin-border)" }}
+                >
+                  <RotateCcw className="size-3.5" /> Reopen
+                </button>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {!applicationId && (
+        <SectionCard>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+            <span className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+              Ticket actions:
+            </span>
+            {ticket.status !== "closed" && ticket.status !== "resolved" && (
+              <button
+                type="button"
+                onClick={() => updMut.mutate({ status: "resolved" })}
+                className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                style={{ background: "#15803d", color: "#fff" }}
+              >
+                <CheckCircle2 className="size-3.5" /> Resolve
+              </button>
+            )}
+            {ticket.status !== "closed" && (
+              <button
+                type="button"
+                onClick={() => updMut.mutate({ status: "closed" })}
+                className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)", border: "1px solid var(--admin-border)" }}
+              >
+                <XCircle className="size-3.5" /> Close
+              </button>
+            )}
+            {(ticket.status === "closed" || ticket.status === "resolved") && (
+              <button
+                type="button"
+                onClick={() => updMut.mutate({ status: "open" })}
+                className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium"
+                style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg)", border: "1px solid var(--admin-border)" }}
+              >
+                <RotateCcw className="size-3.5" /> Reopen
+              </button>
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      {resumeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setResumeOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border p-4 shadow-lg"
+            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-medium" style={{ color: "var(--admin-fg)" }}>
+              Resolve ticket and resume order
+            </h3>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+              This marks the ticket resolved and moves the linked order out of hold.
+            </p>
+            <label className="mt-3 block text-xs">
+              <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                Resume order to
+              </span>
+              <select
+                value={resumeTo}
+                onChange={(e) => setResumeTo(e.target.value as any)}
+                className="mt-1 w-full rounded border bg-transparent px-2 py-1.5 text-sm"
+                style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              >
+                <option value="IN_PROCESSING">In Processing</option>
+                <option value="SUBMITTED_TO_GOVT">Submitted to Govt</option>
+              </select>
+            </label>
+            <label className="mt-3 block text-xs">
+              <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                Note (optional)
+              </span>
+              <textarea
+                value={resumeNote}
+                onChange={(e) => setResumeNote(e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded border bg-transparent px-2 py-1.5 text-sm"
+                style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              />
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setResumeOpen(false)}
+                className="rounded px-3 py-1.5 text-xs"
+                style={{ color: "var(--admin-fg-muted)" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={resumeMut.isPending}
+                onClick={() => resumeMut.mutate()}
+                className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                style={{ background: "#15803d", color: "#fff" }}
+              >
+                {resumeMut.isPending ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-3" />}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <SectionCard title="Conversation">
         <div className="space-y-3 px-4 py-4">

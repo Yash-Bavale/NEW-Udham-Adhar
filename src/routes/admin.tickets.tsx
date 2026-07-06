@@ -145,6 +145,7 @@ function TicketsPage() {
                 style={{ color: "var(--admin-fg-muted)" }}
               >
                 <th className="px-4 py-2">Ticket No</th>
+                <th className="px-4 py-2">Order</th>
                 <th className="px-4 py-2">Customer</th>
                 <th className="px-4 py-2">Service</th>
                 <th className="px-4 py-2">Subject</th>
@@ -158,18 +159,19 @@ function TicketsPage() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={9}>
-                    <TableSkeleton rows={6} cols={9} />
+                  <td colSpan={10}>
+                    <TableSkeleton rows={6} cols={10} />
                   </td>
                 </tr>
               )}
               {!isLoading && (data?.tickets ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <Empty />
                   </td>
                 </tr>
               )}
+
               {!isLoading &&
                 (data?.tickets ?? []).map((t, i) => {
                   const sc = STATUS_COLOR[t.status];
@@ -184,6 +186,19 @@ function TicketsPage() {
                       }}
                     >
                       <td className="px-4 py-2.5 font-mono text-xs">{t.ticket_number ?? "—"}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs">
+                        {t.application_id && t.application_code ? (
+                          <Link
+                            to="/admin/orders/$orderId"
+                            params={{ orderId: t.application_id }}
+                            style={{ color: "var(--admin-accent)" }}
+                          >
+                            {t.application_code}
+                          </Link>
+                        ) : (
+                          <span style={{ color: "var(--admin-fg-muted)" }}>—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2.5">
                         {t.customer_id ? (
                           <Link
