@@ -60,7 +60,7 @@ export function ExternalDelayDialog({
       });
     },
     onSuccess: () => {
-      toast.success("External delay logged — customer notified, follow-ups scheduled.");
+      toast.success(side === "customer" ? "Customer notified — auto-closure scheduled." : "Internal delay logged — assignee notified.");
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
