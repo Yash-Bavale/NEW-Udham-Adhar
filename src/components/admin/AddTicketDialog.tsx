@@ -132,16 +132,22 @@ function Body({
           assignedTo: assignedTo || null,
           customerId: customerId!,
           applicationId: orderId,
+          allowDuplicate,
         },
       }),
-    onSuccess: (res) => {
-      toast.success(`Ticket ${res.ticket_number} created`);
+    onSuccess: (res: any) => {
+      if (res?.reused) {
+        toast.success(`Reusing existing open ticket ${res.ticket_number}`);
+      } else {
+        toast.success(`Ticket ${res.ticket_number} created`);
+      }
       qc.invalidateQueries({ queryKey: ["tickets-list"] });
       onCreated?.(res.id);
       onClose();
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to create ticket"),
   });
+
 
   function validate() {
     const errs: FieldErrors = {};
