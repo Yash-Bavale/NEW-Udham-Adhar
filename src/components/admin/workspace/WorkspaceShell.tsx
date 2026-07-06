@@ -411,15 +411,8 @@ export function WorkspaceShell(p: Props) {
                 <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
                 <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
               </dl>
-            </div>
-
-            <button
-              onClick={p.onRequestDocs}
-              className="w-full rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50 text-indigo-700 text-sm font-semibold py-3 transition"
-            >
-              <Check className="w-4 h-4 inline mr-1.5" /> Request Documents
-            </button>
-          </aside>
+          </div>
+        </aside>
         </div>
       </Tabs>
     </div>
