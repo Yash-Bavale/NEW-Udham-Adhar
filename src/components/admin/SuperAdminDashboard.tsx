@@ -240,6 +240,8 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
         sub="queued + failed" tone={k.emailQueueDepth > 0 ? "warn" : "default"} />
       <KpiCard icon={<UserCheck className="size-4" />} label="Customers" value={fmtN(k.totalCustomers)}
         sub="lifetime" />
+      <KpiCard icon={<Users className="size-4" />} label="Duplicate Leads" value={fmtN(k.repeatedLeads)}
+        sub="same mobile or email" tone={k.repeatedLeads > 0 ? "warn" : "default"} />
       <KpiCard icon={<Briefcase className="size-4" />} label="Active Staff" value={fmtN(k.activeStaff)}
         sub="with role" />
       <KpiCard icon={<AlertTriangle className="size-4" />} label="Webhook Errors (24h)" value={fmtN(data.webhookFailures24h)}

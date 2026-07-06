@@ -385,11 +385,39 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
   );
 }
 
+const MUTE_KEY = "bhs.notif.muted";
+function playChime() {
+  try {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(MUTE_KEY) === "1") return;
+    const AC: typeof AudioContext | undefined =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.09);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.36);
+    osc.onended = () => ctx.close().catch(() => {});
+  } catch { /* ignore */ }
+}
+
 function NotificationsBell() {
   const fetchCount = useServerFn(getUnreadNotificationCount);
   const qc = useQueryClient();
   const [hasSession, setHasSession] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const lastCountRef = useRef<number>(0);
+  const primedRef = useRef<boolean>(false);
   useEffect(() => {
+    if (typeof window !== "undefined") setMuted(localStorage.getItem(MUTE_KEY) === "1");
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (active) setHasSession(!!data.session);
@@ -421,22 +449,49 @@ function NotificationsBell() {
     qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
   });
   const count = data?.count ?? 0;
+
+  // Chime on count increase (after initial prime so mount doesn't ring).
+  useEffect(() => {
+    if (!primedRef.current) {
+      primedRef.current = true;
+      lastCountRef.current = count;
+      return;
+    }
+    if (count > lastCountRef.current) playChime();
+    lastCountRef.current = count;
+  }, [count]);
+
   return (
-    <Link
-      to="/admin/notifications"
-      className="relative rounded-md p-2 hover:bg-[var(--admin-surface-2)] transition-colors"
-      aria-label="Notifications"
-    >
-      <Bell className="size-4" />
-      {count > 0 && (
-        <span
-          className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
-          style={{ background: "var(--admin-danger)", color: "white" }}
-        >
-          {count > 99 ? "99+" : count}
-        </span>
-      )}
-    </Link>
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => {
+          const next = !muted;
+          setMuted(next);
+          try { localStorage.setItem(MUTE_KEY, next ? "1" : "0"); } catch {}
+        }}
+        className="rounded-md p-1.5 hover:bg-[var(--admin-surface-2)] transition-colors text-[10px]"
+        style={{ color: "var(--admin-fg-muted)" }}
+        aria-label={muted ? "Unmute notifications" : "Mute notifications"}
+        title={muted ? "Notification sound muted — click to unmute" : "Mute notification sound"}
+      >
+        {muted ? "🔕" : "🔔"}
+      </button>
+      <Link
+        to="/admin/notifications"
+        className="relative rounded-md p-2 hover:bg-[var(--admin-surface-2)] transition-colors"
+        aria-label="Notifications"
+      >
+        <Bell className="size-4" />
+        {count > 0 && (
+          <span
+            className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+            style={{ background: "var(--admin-danger)", color: "white" }}
+          >
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </Link>
+    </div>
   );
 }
 

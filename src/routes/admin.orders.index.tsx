@@ -237,11 +237,24 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const b = bucketOf(stage);
+  const orderStatus = String(order.order_status ?? "").toUpperCase();
+  const workflowStatus = String(order.workflow_status ?? "");
+  const isPriority = orderStatus === "HIGH_PRIORITY";
+  const isOnHold = workflowStatus === "government_portal_pending" || workflowStatus === "external_dependency" || orderStatus === "OUR_SIDE_DELAY" || orderStatus === "CUSTOMER_HOLD";
+  const isNew = orderStatus === "NEW_ORDER" || stage === "lead_received";
   const stageTone =
     b === "cancelled" ? "bg-rose-50 text-rose-700 border-rose-200"
     : b === "closed" && stage === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
     : b === "pending" ? "bg-amber-50 text-amber-700 border-amber-200"
     : "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+  // Left accent bar + optional pulsing badge for priority orders.
+  const accentClass =
+    isPriority ? "border-l-4 border-l-rose-500"
+    : isOnHold ? "border-l-4 border-l-orange-400"
+    : isNew ? "border-l-4 border-l-sky-400"
+    : b === "current" ? "border-l-4 border-l-indigo-300"
+    : "";
 
   const waPhone = order.customer_mobile ? String(order.customer_mobile).replace(/\D/g, "") : "";
   const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
@@ -258,7 +271,7 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
       params={{ orderId: order.id }}
       className="block group"
     >
-      <Card className="p-4 hover:shadow-md hover:border-slate-300 transition-all">
+      <Card className={`p-4 hover:shadow-md hover:border-slate-300 transition-all ${accentClass} ${isPriority ? "ring-1 ring-rose-200" : ""}`}>
         <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
           {/* Customer + code */}
           <div className="flex items-center gap-3 min-w-0 md:w-[260px]">
@@ -315,9 +328,21 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
 
           {/* Status + amount */}
           <div className="flex flex-col items-end gap-1 md:w-[140px]">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${stageTone}`}>
-              {meta?.label ?? stage}
-            </span>
+            <div className="flex items-center gap-1">
+              {isPriority && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+                  ● Priority
+                </span>
+              )}
+              {isOnHold && !isPriority && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                  On hold
+                </span>
+              )}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${stageTone}`}>
+                {meta?.label ?? stage}
+              </span>
+            </div>
             {!hideMoney && (
               <div className="text-sm font-semibold text-slate-900">
                 ₹{Number(order.total_amount ?? 0).toLocaleString("en-IN")}
