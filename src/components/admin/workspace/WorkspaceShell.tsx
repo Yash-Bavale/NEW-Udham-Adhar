@@ -271,9 +271,8 @@ export function WorkspaceShell(p: Props) {
           Customer Journey
         </div>
         <CustomerJourneyMap
-          application={application}
-          paymentSuccessfulAt={(p.data as any).paymentSuccessfulAt}
-          stageMeta={stageMeta}
+          stage={p.stage}
+          isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
           workflowStatus={(application as any).workflow_status}
           closureStage={(application as any).closure_stage}
           closureNextAt={(application as any).closure_next_at}
