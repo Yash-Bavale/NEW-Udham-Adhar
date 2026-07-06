@@ -13,7 +13,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
-import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
+import {
+  getUnreadNotificationCount,
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type Notification,
+} from "@/lib/crm/notifications.functions";
+import { useMutation } from "@tanstack/react-query";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
@@ -410,6 +417,7 @@ function playChime() {
 }
 
 function NotificationsBell() {
+  const navigate = useNavigate();
   const fetchCount = useServerFn(getUnreadNotificationCount);
   const qc = useQueryClient();
   const [hasSession, setHasSession] = useState(false);
@@ -461,8 +469,63 @@ function NotificationsBell() {
     lastCountRef.current = count;
   }, [count]);
 
+  // Dropdown panel state + recent list
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const fetchList = useServerFn(listMyNotifications);
+  const markRead = useServerFn(markNotificationRead);
+  const markAll = useServerFn(markAllNotificationsRead);
+  const { data: listData, refetch: refetchList } = useQuery<{ rows: Notification[] }>({
+    queryKey: ["notifications", "recent"],
+    queryFn: () => fetchList({ data: { limit: 10 } }),
+    enabled: hasSession && open,
+    staleTime: 15_000,
+  });
+  const recent = listData?.rows ?? [];
+
+  const markOneMut = useMutation({
+    mutationFn: (id: string) => markRead({ data: { id } }),
+    onSuccess: () => {
+      refetchList();
+      qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+  });
+  const markAllMut = useMutation({
+    mutationFn: () => markAll(),
+    onSuccess: () => {
+      refetchList();
+      qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+  });
+
+  function relative(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  }
+
   return (
-    <div className="flex items-center gap-1">
+    <div ref={wrapRef} className="relative flex items-center gap-1">
       <button
         onClick={() => {
           const next = !muted;
@@ -476,10 +539,11 @@ function NotificationsBell() {
       >
         {muted ? "🔕" : "🔔"}
       </button>
-      <Link
-        to="/admin/notifications"
+      <button
+        onClick={() => setOpen((o) => !o)}
         className="relative rounded-md p-2 hover:bg-[var(--admin-surface-2)] transition-colors"
         aria-label="Notifications"
+        aria-expanded={open}
       >
         <Bell className="size-4" />
         {count > 0 && (
@@ -490,7 +554,75 @@ function NotificationsBell() {
             {count > 99 ? "99+" : count}
           </span>
         )}
-      </Link>
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 w-[380px] rounded-lg border shadow-xl z-50 overflow-hidden"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "var(--admin-border)" }}>
+            <div className="text-sm font-semibold" style={{ color: "var(--admin-fg)" }}>
+              Notifications {count > 0 && <span className="ml-1 text-[11px] font-medium text-indigo-600">({count} new)</span>}
+            </div>
+            <button
+              onClick={() => markAllMut.mutate()}
+              disabled={count === 0 || markAllMut.isPending}
+              className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Mark all read
+            </button>
+          </div>
+
+          <div className="max-h-[440px] overflow-y-auto">
+            {recent.length === 0 ? (
+              <div className="px-4 py-10 text-center text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                You're all caught up.
+              </div>
+            ) : (
+              <ul className="divide-y" style={{ borderColor: "var(--admin-border)" }}>
+                {recent.map((n) => {
+                  const unread = !n.read_at;
+                  return (
+                    <li
+                      key={n.id}
+                      className={`px-3 py-2.5 hover:bg-[var(--admin-surface-2)] transition-colors cursor-pointer ${unread ? "bg-indigo-50/40" : ""}`}
+                      onClick={() => {
+                        if (unread) markOneMut.mutate(n.id);
+                        if (n.href) {
+                          setOpen(false);
+                          navigate({ to: n.href });
+                        }
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        {unread && <span className="mt-1.5 size-1.5 rounded-full bg-indigo-500 shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <div className="text-[13px] font-medium truncate" style={{ color: "var(--admin-fg)" }}>{n.title}</div>
+                            <div className="ml-auto text-[10px] shrink-0" style={{ color: "var(--admin-fg-muted)" }}>{relative(n.created_at)}</div>
+                          </div>
+                          {n.body && <div className="text-[11px] mt-0.5 line-clamp-2" style={{ color: "var(--admin-fg-muted)" }}>{n.body}</div>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="px-3 py-2 border-t text-center" style={{ borderColor: "var(--admin-border)" }}>
+            <Link
+              to="/admin/notifications"
+              onClick={() => setOpen(false)}
+              className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              View all notifications →
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

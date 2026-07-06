@@ -237,6 +237,7 @@ import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin
 import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
 import { Route as AdminOrdersOrderIdRouteImport } from './routes/admin.orders.$orderId'
 import { Route as AdminLeadsLeadIdRouteImport } from './routes/admin.leads.$leadId'
+import { Route as AdminHelpEmailMatrixRouteImport } from './routes/admin.help.email-matrix'
 import { Route as AdminFinanceSettlementsRouteImport } from './routes/admin.finance.settlements'
 import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
@@ -1435,6 +1436,11 @@ const AdminLeadsLeadIdRoute = AdminLeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => AdminLeadsRoute,
 } as any)
+const AdminHelpEmailMatrixRoute = AdminHelpEmailMatrixRouteImport.update({
+  id: '/help/email-matrix',
+  path: '/help/email-matrix',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFinanceSettlementsRoute = AdminFinanceSettlementsRouteImport.update({
   id: '/settlements',
   path: '/settlements',
@@ -1771,6 +1777,7 @@ export interface FileRoutesByFullPath {
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
+  '/admin/help/email-matrix': typeof AdminHelpEmailMatrixRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
@@ -2018,6 +2025,7 @@ export interface FileRoutesByTo {
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
+  '/admin/help/email-matrix': typeof AdminHelpEmailMatrixRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
@@ -2269,6 +2277,7 @@ export interface FileRoutesById {
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
   '/admin/finance/gst': typeof AdminFinanceGstRoute
   '/admin/finance/settlements': typeof AdminFinanceSettlementsRoute
+  '/admin/help/email-matrix': typeof AdminHelpEmailMatrixRoute
   '/admin/leads/$leadId': typeof AdminLeadsLeadIdRoute
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
@@ -2521,6 +2530,7 @@ export interface FileRouteTypes {
     | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
+    | '/admin/help/email-matrix'
     | '/admin/leads/$leadId'
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
@@ -2768,6 +2778,7 @@ export interface FileRouteTypes {
     | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
+    | '/admin/help/email-matrix'
     | '/admin/leads/$leadId'
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
@@ -3018,6 +3029,7 @@ export interface FileRouteTypes {
     | '/admin/customers/$customerId'
     | '/admin/finance/gst'
     | '/admin/finance/settlements'
+    | '/admin/help/email-matrix'
     | '/admin/leads/$leadId'
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
@@ -4853,6 +4865,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeadsLeadIdRouteImport
       parentRoute: typeof AdminLeadsRoute
     }
+    '/admin/help/email-matrix': {
+      id: '/admin/help/email-matrix'
+      path: '/help/email-matrix'
+      fullPath: '/admin/help/email-matrix'
+      preLoaderRoute: typeof AdminHelpEmailMatrixRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/finance/settlements': {
       id: '/admin/finance/settlements'
       path: '/settlements'
@@ -5131,6 +5150,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
   AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
   AdminTicketsIndexRoute: typeof AdminTicketsIndexRoute
 }
@@ -5170,6 +5190,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
   AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
   AdminTicketsIndexRoute: AdminTicketsIndexRoute,
 }
