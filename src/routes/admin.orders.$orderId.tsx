@@ -7,7 +7,6 @@ import { MessageSquare, StickyNote } from "lucide-react";
 
 import { getOrderDetailV2, updateOrderAssignee, addOrderNoteV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
-import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
