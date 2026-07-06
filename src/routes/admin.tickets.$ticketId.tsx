@@ -559,6 +559,20 @@ function ToolbarBtn({ onClick, icon, label, primary, success, iconOnly }: { onCl
   );
 }
 
+function MoreItem({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-slate-50"
+      style={{ color: "var(--admin-fg)" }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CENTER — Thread
 // ═══════════════════════════════════════════════════════════════
