@@ -69,6 +69,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints" },
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets" },
       { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets" },
+      { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets" },
       { to: "/admin/services", label: "Services", icon: Briefcase, requireAnyRole: ADMIN_ROLES },
     ],
   },
