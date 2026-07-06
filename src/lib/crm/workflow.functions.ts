@@ -67,11 +67,11 @@ export const listDelayReasons = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const { data, error } = await admin
       .from("workflow_delay_reasons")
-      .select("code,label,description")
+      .select("code,label,description,side,email_template_code")
       .eq("is_active", true)
       .order("sort_order");
     if (error) throw new Error(error.message);
-    return { reasons: data ?? [] };
+    return { reasons: (data ?? []) as Array<{ code: string; label: string; description: string | null; side: "customer" | "internal"; email_template_code: string | null }> };
   });
 
 export const listClosureReasons = createServerFn({ method: "GET" })
