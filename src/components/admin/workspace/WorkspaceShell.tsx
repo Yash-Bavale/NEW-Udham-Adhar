@@ -253,18 +253,8 @@ export function WorkspaceShell(p: Props) {
             </div>
           </div>
         </div>
-
-        {/* Status-driven employee actions — single source of truth */}
-        {orderStatus && !p.showConsultationPanel && (
-          <div className="mt-4">
-            <EmployeeActionPanel
-              orderId={p.orderId}
-              status={orderStatus}
-              openActionKey={pendingActionKey}
-              onOpenActionHandled={() => setPendingActionKey(null)}
-            />
-          </div>
-        )}
+        {/* Employee actions live in one place only — inside the Employee Workflow tab
+            (OrderWorkflowPanel). This card is header info only. */}
       </section>
 
       {/* Customer Journey */}
