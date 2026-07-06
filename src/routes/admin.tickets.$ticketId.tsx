@@ -49,9 +49,16 @@ function TicketDetailPage() {
     queryFn: () => staffFn(),
     staleTime: 60_000,
   });
+  const cannedFn = useServerFn(listCannedResponses);
+  const { data: canned } = useQuery({
+    queryKey: ["canned-responses", "active"],
+    queryFn: () => cannedFn({ data: { activeOnly: true } }),
+    staleTime: 60_000,
+  });
 
   const [reply, setReply] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const [showCanned, setShowCanned] = useState(false);
 
   const updMut = useMutation({
     mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null }) =>
