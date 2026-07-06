@@ -147,7 +147,9 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <ManualTemplateSender leadId={leadId} orderId={orderId} />
       </div>
+
 
       <div className="border rounded-md overflow-hidden">
         <Table>
