@@ -296,6 +296,14 @@ export const sendFormLink = createServerFn({ method: "POST" })
     if (data.transitionToWaiting && order.order_status === "NEW_ORDER") {
       updated = await transition(context.supabase, order.id, "WAITING_CUSTOMER_INFO");
     }
+    if (emailQueued) {
+      await notifyOrderEvent({
+        order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+        kind: "form_link_sent",
+        title: `Form link sent for ${order.application_code || order.id.slice(0, 8)}`,
+        body: `Delivered to ${customer?.primary_email}.`,
+      });
+    }
     return { ok: true, order: updated, emailQueued };
   });
 
