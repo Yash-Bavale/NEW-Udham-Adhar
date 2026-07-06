@@ -93,7 +93,27 @@ function OrdersListPage() {
   });
 
   const allRows = (data?.rows ?? []) as any[];
-  const rows = bucket === "all" ? allRows : allRows.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
+  const filtered = bucket === "all" ? allRows : allRows.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
+
+  // Sort so the orders that need immediate action rise to the top:
+  //   1. HIGH_PRIORITY   → red pulsing
+  //   2. On hold (OUR_SIDE_DELAY / CUSTOMER_HOLD / external dependency)
+  //   3. Brand-new orders (NEW_ORDER / lead_received)
+  //   4. Everything else, most recently updated first
+  const rowRank = (r: any) => {
+    const s = String(r.order_status ?? "").toUpperCase();
+    const w = String(r.workflow_status ?? "");
+    if (s === "HIGH_PRIORITY") return 0;
+    if (s === "OUR_SIDE_DELAY" || s === "CUSTOMER_HOLD" || w === "government_portal_pending" || w === "external_dependency") return 1;
+    if (s === "NEW_ORDER" || r.stage === "lead_received") return 2;
+    return 3;
+  };
+  const rows = [...filtered].sort((a, b) => {
+    const ra = rowRank(a), rb = rowRank(b);
+    if (ra !== rb) return ra - rb;
+    return new Date(b.updated_at ?? b.created_at ?? 0).getTime() - new Date(a.updated_at ?? a.created_at ?? 0).getTime();
+  });
+
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / 50));
 
@@ -369,27 +389,30 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
             </div>
           </div>
 
-          {/* Quick actions (hover) */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Quick actions — always visible so they're usable on touch and
+              during triage; the arrow still hints at row navigation. */}
+          <div className="flex items-center gap-1">
             {order.customer_mobile && (
               <button
-                onClick={(e) => { e.preventDefault(); window.location.href = `tel:${order.customer_mobile}`; }}
-                className="size-8 rounded-lg grid place-items-center hover:bg-sky-50 text-sky-600"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${order.customer_mobile}`; }}
+                className="size-8 rounded-lg grid place-items-center bg-sky-50 hover:bg-sky-100 text-sky-600 ring-1 ring-sky-100"
                 title="Call"
+                aria-label="Call customer"
               >
                 <Phone className="size-3.5" />
               </button>
             )}
             {waUrl && (
               <button
-                onClick={(e) => { e.preventDefault(); window.open(waUrl, "_blank"); }}
-                className="size-8 rounded-lg grid place-items-center hover:bg-emerald-50 text-emerald-600"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(waUrl, "_blank"); }}
+                className="size-8 rounded-lg grid place-items-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 ring-1 ring-emerald-100"
                 title="WhatsApp"
+                aria-label="Message on WhatsApp"
               >
                 <MessageCircle className="size-3.5" />
               </button>
             )}
-            <ArrowRight className="size-4 text-slate-400 ml-1" />
+            <ArrowRight className="size-4 text-slate-400 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
 

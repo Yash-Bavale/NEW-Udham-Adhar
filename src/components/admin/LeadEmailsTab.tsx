@@ -88,11 +88,19 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
 
   // Dedupe: every successful send creates a row in BOTH email_queue and email_logs.
   // Prefer the email_logs row (it has the final sent status); key by queue_id when present.
+  // If the log row is missing body_html/body_text (older rows), backfill from the queue row
+  // so the inline preview renders instead of showing "No body captured".
+  const queueById = new Map<string, any>();
+  for (const q of (data?.queue || [])) queueById.set(q.id, q);
   const dedupMap = new Map<string, any>();
   for (const q of (data?.queue || [])) dedupMap.set(`q:${q.id}`, q);
   for (const l of (data?.logs || [])) {
     const key = l.queue_id ? `q:${l.queue_id}` : `l:${l.id}`;
-    dedupMap.set(key, l);
+    const q = l.queue_id ? queueById.get(l.queue_id) : null;
+    const merged = q
+      ? { ...l, body_html: l.body_html ?? q.body_html, body_text: l.body_text ?? q.body_text }
+      : l;
+    dedupMap.set(key, merged);
   }
   const history = Array.from(dedupMap.values()).sort(
     (a: any, b: any) => new Date(b.sent_at || b.created_at || 0).getTime() - new Date(a.sent_at || a.created_at || 0).getTime()
@@ -183,7 +191,13 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
 
 function EmailRow({ item }: { item: any }) {
   const [open, setOpen] = useState(false);
-  const err = item.error_message || item.last_error || item.smtp_response;
+  // Only surface a "delivery error" when the send actually failed. SMTP
+  // responses like "250 Message received" are success acknowledgements from
+  // Zoho and should not be shown as an error, even though they land in the
+  // `smtp_response` column.
+  const isFailure = ["failed", "bounced", "dlq"].includes(String(item.status || "").toLowerCase());
+  const err = isFailure ? (item.error_message || item.last_error || item.smtp_response) : null;
+  const providerNote = !isFailure && item.smtp_response ? String(item.smtp_response) : null;
   const bodyHtml = item.body_html as string | null | undefined;
   const bodyText = item.body_text as string | null | undefined;
   return (
@@ -220,6 +234,13 @@ function EmailRow({ item }: { item: any }) {
                     <AlertCircle className="w-3.5 h-3.5" /> Delivery error
                   </div>
                   <pre className="text-[11px] text-rose-900 whitespace-pre-wrap font-mono">{err}</pre>
+                </div>
+              )}
+
+              {providerNote && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2">
+                  <div className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 mb-0.5">Provider response</div>
+                  <pre className="text-[11px] text-emerald-900 whitespace-pre-wrap font-mono">{providerNote}</pre>
                 </div>
               )}
 
