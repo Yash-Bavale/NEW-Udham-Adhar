@@ -13,7 +13,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
-import { getUnreadNotificationCount } from "@/lib/crm/notifications.functions";
+import {
+  getUnreadNotificationCount,
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type Notification,
+} from "@/lib/crm/notifications.functions";
+import { useMutation } from "@tanstack/react-query";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
