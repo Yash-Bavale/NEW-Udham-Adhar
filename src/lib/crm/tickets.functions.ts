@@ -272,37 +272,8 @@ export const updateTicket = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const replyToTicket = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        ticketId: z.string().uuid(),
-        text: z.string().trim().min(1).max(5000),
-        isInternal: z.boolean().default(false),
-      })
-      .parse(i)
-  )
-  .handler(async ({ data, context }) => {
-    const admin = await getAdmin();
-    const { error } = await admin.from("ticket_replies").insert({
-      ticket_id: data.ticketId,
-      reply_text: data.text,
-      is_internal: data.isInternal,
-      created_by: context.userId,
-    } as never);
-    if (error) throw new Error(error.message);
+// replyToTicket now lives in `@/lib/tickets/ticket-actions.functions` and is re-exported at the top of this file.
 
-    // If staff sent a customer reply, move ticket to in_progress (if currently open).
-    if (!data.isInternal) {
-      await admin
-        .from("support_tickets")
-        .update({ status: "in_progress" } as never)
-        .eq("id", data.ticketId)
-        .eq("status", "open");
-    }
-    return { ok: true };
-  });
 
 export const searchCustomerOptions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
