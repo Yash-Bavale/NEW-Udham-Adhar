@@ -177,6 +177,34 @@ function TicketDetailPage() {
                 </span>
               )}
             </div>
+
+            {/* Locked recipient email — this is where every reply lands */}
+            <div
+              className="mt-3 inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+              style={{
+                borderColor: (ticket as any).ticket_email ? "var(--admin-border)" : "rgba(220,38,38,0.4)",
+                background: (ticket as any).ticket_email ? "var(--admin-surface-2)" : "rgba(220,38,38,0.06)",
+                color: (ticket as any).ticket_email ? "var(--admin-fg)" : "#b91c1c",
+              }}
+              title="This is the customer's registered email — same address that receives order confirmations and invoices. Locked to prevent typos."
+            >
+              {(ticket as any).ticket_email ? (
+                <MailCheck className="size-3.5" style={{ color: "#15803d" }} />
+              ) : (
+                <MailX className="size-3.5" />
+              )}
+              <span className="font-medium">
+                {(ticket as any).ticket_email ?? "No customer email on file — replies will not be delivered."}
+              </span>
+              {(ticket as any).ticket_email && (
+                <span
+                  className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                  style={{ background: "rgba(15,118,110,0.14)", color: "#0f766e" }}
+                >
+                  same as invoice
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
