@@ -271,3 +271,100 @@ export const searchTicketsForQuarantine = createServerFn({ method: "POST" })
       ticket_email: string | null;
     }>;
   });
+
+// ─── CREATE A NEW TICKET FROM A QUARANTINED EMAIL ─────────────────────
+// Use case: inbound email from an unknown sender (or one we couldn't safely
+// attach) that should still become a support ticket. Optionally links to a
+// customer / application.
+const CreateFromQuarantineInput = z.object({
+  id: z.string().uuid(),
+  customerId: z.string().uuid().optional(),
+  applicationId: z.string().uuid().optional(),
+});
+
+export const createTicketFromQuarantine = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => CreateFromQuarantineInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+
+    const { data: row } = await admin
+      .from("inbound_email_quarantine")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    const q = row as QuarantineRow | null;
+    if (!q) throw new Error("Quarantine row not found");
+    if (q.reviewed_at) throw new Error("This message is already reviewed.");
+
+    // Best-effort customer resolution when caller didn't pass one.
+    let customerId = data.customerId ?? null;
+    if (!customerId && q.from_email) {
+      const { data: cust } = await admin
+        .from("customers")
+        .select("id")
+        .eq("primary_email", q.from_email.toLowerCase())
+        .limit(1)
+        .maybeSingle();
+      customerId = (cust as { id: string } | null)?.id ?? null;
+    }
+
+    const subject = (q.subject || "(no subject)").slice(0, 240);
+    const bodyText = q.body_text ?? "";
+
+    const { data: created, error: tErr } = await admin
+      .from("support_tickets")
+      .insert({
+        subject,
+        description: bodyText.slice(0, 4000),
+        source: "email_inbound",
+        status: "open",
+        ticket_state: "open",
+        customer_id: customerId,
+        application_id: data.applicationId ?? null,
+        ticket_email: q.from_email,
+        last_customer_message_at: q.received_at,
+      } as never)
+      .select("id, ticket_number")
+      .single();
+    if (tErr) throw new Error(tErr.message);
+    const t = created as { id: string; ticket_number: string };
+
+    // Snapshot the inbound message as the first reply on the new ticket.
+    await admin.from("ticket_replies").insert({
+      ticket_id: t.id,
+      reply_text: bodyText.slice(0, 8000),
+      is_internal: false,
+      direction: "inbound",
+      email_message_id: q.message_id,
+      email_in_reply_to: q.in_reply_to,
+    } as never);
+
+    // Log the incoming email itself.
+    await admin.from("email_logs").insert({
+      direction: "incoming",
+      status: "sent",
+      to_email: q.to_email,
+      from_email: q.from_email,
+      subject: q.subject,
+      body_html: q.body_html,
+      body_text: q.body_text,
+      message_id: q.message_id,
+      in_reply_to: q.in_reply_to,
+      zoho_mail_uid: q.zoho_mail_uid,
+      customer_id: customerId,
+      sent_at: q.received_at,
+    } as never);
+
+    await admin
+      .from("inbound_email_quarantine")
+      .update({
+        matched_ticket_id: t.id,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: context.userId,
+        review_action: "converted_to_ticket",
+      } as never)
+      .eq("id", q.id);
+
+    return { ok: true, ticketId: t.id, ticketNumber: t.ticket_number };
+  });
