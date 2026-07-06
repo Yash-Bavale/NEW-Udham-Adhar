@@ -123,36 +123,57 @@ function TicketsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
+      {/* Primary tabs — Active vs Closed */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b" style={{ borderColor: "var(--admin-border)" }}>
+        <div className="flex items-center gap-1">
+          {(["active", "closed", "all"] as View[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => { setView(v); setSubStatus("all"); setPage(1); }}
+              className="relative px-3 py-2 text-sm font-medium capitalize transition-colors"
+              style={{
+                color: view === v ? "var(--admin-accent)" : "var(--admin-fg-muted)",
+              }}
+            >
+              {v === "active" ? "Active" : v === "closed" ? "Closed & Resolved" : "All"}
+              {view === v && (
+                <span
+                  className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                  style={{ background: "var(--admin-accent)" }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="relative pb-2">
           <Search
             className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2"
             style={{ color: "var(--admin-fg-muted)" }}
           />
           <input
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
             placeholder="Search ticket number or subject"
             className="w-72 rounded-md border bg-transparent py-1.5 pl-8 pr-3 text-xs"
             style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
           />
         </div>
-        {STATUSES.map((s) => (
-          <FilterChip
-            key={s.value}
-            active={status === s.value}
-            onClick={() => {
-              setStatus(s.value);
-              setPage(1);
-            }}
-          >
-            {s.label}
-          </FilterChip>
-        ))}
       </div>
+
+      {/* Sub-filter chips (only for active/closed) */}
+      {view !== "all" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {SUB_FILTERS[view].map((s) => (
+            <FilterChip
+              key={s.value}
+              active={subStatus === s.value}
+              onClick={() => { setSubStatus(s.value); setPage(1); }}
+            >
+              {s.label}
+            </FilterChip>
+          ))}
+        </div>
+      )}
 
       <SectionCard>
         <div className="overflow-x-auto">
