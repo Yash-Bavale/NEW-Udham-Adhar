@@ -181,6 +181,7 @@ function Body({
                 onClear={() => {
                   setCustomerId(null);
                   setCustomerLabel(null);
+                  setCustomerEmail(null);
                   setOrderId(null);
                   setOrderLabel(null);
                 }}
@@ -194,14 +195,43 @@ function Body({
                   id: r.id,
                   label: `${r.customer_code ?? ""} — ${r.name ?? "—"}`,
                   sub: [r.primary_mobile, r.primary_email].filter(Boolean).join(" · "),
+                  meta: { email: r.primary_email ?? null },
                 }))}
-                onPick={(id, label) => {
+                onPick={(id, label, meta) => {
                   setCustomerId(id);
                   setCustomerLabel(label);
+                  setCustomerEmail((meta?.email ?? null) as string | null);
                 }}
               />
             )}
           </Field>
+
+          {/* Locked ticket recipient — the customer's registered email */}
+          {customerId && (
+            <div
+              className="flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+              style={{
+                borderColor: customerEmail ? "var(--admin-border)" : "rgba(220,38,38,0.4)",
+                background: customerEmail ? "var(--admin-surface-2)" : "rgba(220,38,38,0.06)",
+                color: customerEmail ? "var(--admin-fg)" : "#b91c1c",
+              }}
+            >
+              {customerEmail ? (
+                <MailCheck className="size-3.5" style={{ color: "#15803d" }} />
+              ) : (
+                <MailX className="size-3.5" />
+              )}
+              <span className="flex-1">
+                <span className="mr-1 uppercase tracking-wide text-[10px]" style={{ color: "var(--admin-fg-muted)" }}>
+                  Sends to
+                </span>
+                <span className="font-medium">
+                  {customerEmail ?? "No email on file — please add one to the customer profile."}
+                </span>
+              </span>
+              <Lock className="size-3" style={{ color: "var(--admin-fg-muted)" }} />
+            </div>
+          )}
 
           <Field label="Linked Order (optional)">
             {orderId && orderLabel ? (
