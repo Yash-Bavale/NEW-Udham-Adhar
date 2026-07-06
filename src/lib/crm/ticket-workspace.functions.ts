@@ -92,7 +92,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       customerId
         ? admin
             .from("complaints")
-            .select("id, complaint_number, subject, status, severity, created_at")
+            .select("id, complaint_number, description, status, severity, created_at")
             .eq("customer_id", customerId)
             .order("created_at", { ascending: false })
             .limit(10)
