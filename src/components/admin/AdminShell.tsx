@@ -417,6 +417,7 @@ function playChime() {
 }
 
 function NotificationsBell() {
+  const navigate = useNavigate();
   const fetchCount = useServerFn(getUnreadNotificationCount);
   const qc = useQueryClient();
   const [hasSession, setHasSession] = useState(false);
