@@ -97,6 +97,14 @@ function Body({
   const [orderLabel, setOrderLabel] = useState<string | null>(defaultApplicationLabel);
   const [orderQ, setOrderQ] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [allowDuplicate, setAllowDuplicate] = useState(false);
+
+  const checkDupFn = useServerFn(checkOpenTicketForOrder);
+  const { data: existingOpen } = useQuery({
+    queryKey: ["ticket-dup", orderId],
+    queryFn: () => checkDupFn({ data: { applicationId: orderId! } }),
+    enabled: !!orderId,
+  });
 
   const { data: staffData } = useQuery({
     queryKey: ["staff-assign"],
