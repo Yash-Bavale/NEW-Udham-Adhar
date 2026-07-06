@@ -118,8 +118,31 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                 } as never);
               }
 
+              // Internal-side delay review: notify assignee, do not email customer.
+              if (r.kind === "internal_review") {
+                const payload: any = r.payload ?? {};
+                if (r.assigned_to) {
+                  await supabaseAdmin.from("notifications").insert({
+                    user_id: r.assigned_to,
+                    title: `Internal delay review due — ${payload.reason ?? "review"}`,
+                    body: `Order ${app.application_code ?? ""} needs an internal review.`,
+                    kind: "workflow_internal_review",
+                    link_to: `/admin/orders/${app.id}`,
+                  } as never);
+                }
+                await supabaseAdmin.from("workflow_events").insert({
+                  application_id: app.id,
+                  lead_id: app.lead_id,
+                  event_type: "internal_review_due",
+                  title: "Internal delay review due",
+                  description: payload.reason ?? null,
+                  customer_visible: false,
+                  actor_name: "System",
+                  is_system: true,
+                  metadata: { reminder_id: r.id },
+                } as never);
+              }
 
-              // Reschedule next step in the 3/5/7 cadence
               const next = NEXT_KIND[r.kind as string];
               if (next) {
                 const dueAt = new Date(Date.now() + next.daysFromNow * 86400 * 1000).toISOString();
