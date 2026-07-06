@@ -283,7 +283,7 @@ export const createTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    return { id: ins!.id, ticket_number: ins!.ticket_number };
+    return { id: ins!.id, ticket_number: ins!.ticket_number, reused: false as const };
   });
 
 
