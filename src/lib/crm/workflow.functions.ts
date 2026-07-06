@@ -165,7 +165,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       .maybeSingle();
     const side: "customer" | "internal" = ((reasonRow as { side?: string } | null)?.side === "internal") ? "internal" : "customer";
     const reasonBlock = ((reasonRow as { description?: string } | null)?.description) || data.reasonLabel;
-    const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || "bhs_e003_customer_delay";
+    const defaultTplForSide = side === "internal" ? "bhs_e004_our_side_delay" : "bhs_e003_customer_delay";
+    const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || defaultTplForSide;
 
     const expectedReviewIso = new Date(data.expectedReviewAt).toISOString();
 
