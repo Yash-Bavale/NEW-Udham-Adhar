@@ -343,3 +343,90 @@ export const closeTicketFinal = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// ─────────────────────────── getTicketOrderContext ───────────────────────────
+
+export const getTicketOrderContext = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: row } = await admin
+      .from("applications")
+      .select(
+        "id, application_code, order_status, fulfillment_status, service_id, customer_id, services(service_name), customers(name, primary_email, primary_mobile)"
+      )
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!row) return null;
+    const r = row as any;
+    return {
+      id: r.id,
+      application_code: r.application_code as string | null,
+      order_status: r.order_status as string | null,
+      fulfillment_status: r.fulfillment_status as string | null,
+      service_name: r.services?.service_name ?? null,
+      customer_name: r.customers?.name ?? null,
+      customer_email: r.customers?.primary_email ?? null,
+      customer_mobile: r.customers?.primary_mobile ?? null,
+    };
+  });
+
+// ─────────────────────────── resolveTicketAndResumeOrder ───────────────────────────
+
+const ResumeInput = z.object({
+  ticketId: z.string().uuid(),
+  resumeTo: z.enum(["IN_PROCESSING", "SUBMITTED_TO_GOVT"]).default("IN_PROCESSING"),
+  note: z.string().max(1000).optional(),
+});
+
+export const resolveTicketAndResumeOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ResumeInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const ticket = await loadTicket(data.ticketId);
+    if (!ticket.application_id) {
+      throw new Error("This ticket is not linked to an order.");
+    }
+    const now = new Date().toISOString();
+
+    // Transition the order back to the requested resume state (SQL enforces map).
+    const { error: tErr } = await context.supabase.rpc("transition_order_status", {
+      _order_id: ticket.application_id,
+      _new_status: data.resumeTo,
+      _remarks: `Resumed from ticket ${ticket.ticket_number ?? ticket.id.slice(0, 8)}${data.note ? " — " + data.note : ""}`,
+    });
+    if (tErr) throw new Error(tErr.message);
+
+    // Mark ticket resolved.
+    await admin
+      .from("support_tickets")
+      .update({
+        status: "resolved",
+        resolved_at: now,
+        resolved_by: context.userId,
+        closed_at: now,
+        updated_at: now,
+      } as never)
+      .eq("id", ticket.id);
+
+    // Cancel any autoclose scheduler.
+    try {
+      const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+      await cancelTicketAutocloseByTicket(ticket.id, "resolved_and_resumed");
+    } catch { /* non-fatal */ }
+
+    // Audit event on the order.
+    await admin.from("application_events").insert({
+      application_id: ticket.application_id,
+      customer_id: ticket.customer_id,
+      event_type: "order_resumed_from_ticket",
+      new_value: data.resumeTo,
+      note: `Ticket ${ticket.ticket_number ?? ""} resolved · resumed → ${data.resumeTo}`,
+      created_by: context.userId,
+    } as never);
+
+    return { ok: true, resumeTo: data.resumeTo };
+  });
+
