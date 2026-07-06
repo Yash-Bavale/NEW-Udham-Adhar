@@ -101,19 +101,6 @@ export const Route = createFileRoute("/api/public/contact")({
 
 
         // Fire-and-forget enqueues — never block the user on email backend
-        const origin = new URL(request.url).origin;
-        const variables = {
-          name: parsed.name,
-          email: parsed.email,
-          mobile: parsed.mobile,
-          state: parsed.state,
-          language: parsed.language,
-          service: "Contact Enquiry",
-          lead_source: "Contact form",
-          message: parsed.message,
-          admin_url: `${origin}/admin/leads/${leadId}`,
-        };
-
         try {
           const { enqueueEmailInternal } = await import(
             "@/lib/emails/emails.server"

@@ -44,12 +44,6 @@ export const closeOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!app) throw new Error("Application not found");
 
-    const { data: lead } = await admin
-      .from("leads")
-      .select("name, email, service, lead_code")
-      .eq("id", app.lead_id!)
-      .maybeSingle();
-
     // Cancel reminders
     await admin
       .from("workflow_reminders")
