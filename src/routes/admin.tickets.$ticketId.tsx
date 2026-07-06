@@ -408,74 +408,114 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     toast.success("Link copied");
   };
 
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <>
-      <header className="sticky top-0 z-10 border-b px-5 py-3 backdrop-blur-md"
-        style={{ background: "rgba(255,255,255,0.85)", borderColor: "var(--admin-border)" }}
+      <header
+        className="sticky top-0 z-10 border-b backdrop-blur-md"
+        style={{ background: "rgba(255,255,255,0.9)", borderColor: "var(--admin-border)" }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--admin-fg-muted)" }}>
-                {t.ticket_number}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize"
-                style={{ background: sc.bg, color: sc.fg }}>
-                <span className="size-1.5 rounded-full" style={{ background: sc.ring }} />
-                {t.status.replace(/_/g, " ")}
-              </span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-medium capitalize" style={{ background: pc.bg, color: pc.fg }}>
-                {t.priority ?? "medium"}
-              </span>
-              {t.source && (
-                <span className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
-                  {t.source.replace(/_/g, " ")}
-                </span>
-              )}
-            </div>
-            <h1 className="mt-1 truncate text-lg font-semibold" style={{ color: "var(--admin-fg)" }}>
-              {t.subject}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-              <span className="inline-flex items-center gap-1"><Clock className="size-3" /> Created {formatIST(t.created_at)}</span>
-              {t.first_response_at && <span>· First reply {relTime(t.first_response_at)}</span>}
-              {t.ticket_email ? (
-                <span className="inline-flex items-center gap-1"><MailCheck className="size-3" style={{ color: "#15803d" }} /> {t.ticket_email}</span>
-              ) : (
-                <span className="inline-flex items-center gap-1" style={{ color: "#b91c1c" }}><MailX className="size-3" /> No customer email</span>
-              )}
-            </div>
-          </div>
-
-          {/* Quick action buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <ToolbarBtn onClick={() => { setComposerMode("reply"); focusReply(); }} icon={<MessageSquare className="size-3.5" />} label="Reply" primary />
-            <ToolbarBtn onClick={() => { setComposerMode("note"); focusReply(); }} icon={<StickyNote className="size-3.5" />} label="Note" />
-            <select
-              value={t.assigned_to ?? ""}
-              onChange={(e) => updMut.mutate({ assignedTo: e.target.value || null })}
-              className="rounded-md border bg-transparent px-2 py-1 text-[11px] outline-none"
-              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-              title="Assignee"
+        {/* Row 1 — Identity */}
+        <div className="px-5 pt-3 pb-2">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="font-mono tabular-nums" style={{ color: "var(--admin-fg-muted)" }}>
+              {t.ticket_number}
+            </span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium capitalize"
+              style={{ background: sc.bg, color: sc.fg }}
             >
-              <option value="">Unassigned</option>
-              {(staff?.staff ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {canResume && (
-              <ToolbarBtn onClick={() => setResumeOpen(true)} icon={<PlayCircle className="size-3.5" />} label="Resume Order" success />
+              <span className="size-1.5 rounded-full" style={{ background: sc.ring }} />
+              {t.status.replace(/_/g, " ")}
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 font-medium capitalize"
+              style={{ background: pc.bg, color: pc.fg }}
+            >
+              {t.priority ?? "medium"}
+            </span>
+            {t.source && (
+              <span
+                className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide"
+                style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}
+              >
+                {t.source.replace(/_/g, " ")}
+              </span>
             )}
-            {!["resolved", "closed"].includes(t.status) && (
-              <ToolbarBtn onClick={() => updMut.mutate({ status: "resolved" })} icon={<CheckCircle2 className="size-3.5" />} label="Resolve" />
+            <span className="ml-auto inline-flex items-center gap-1" style={{ color: "var(--admin-fg-muted)" }}>
+              <Clock className="size-3" /> {formatIST(t.created_at)}
+            </span>
+          </div>
+          <h1 className="mt-1.5 truncate text-[15px] font-semibold leading-tight" style={{ color: "var(--admin-fg)" }}>
+            {t.subject}
+          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+            {t.ticket_email ? (
+              <span className="inline-flex items-center gap-1">
+                <MailCheck className="size-3" style={{ color: "#15803d" }} /> {t.ticket_email}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1" style={{ color: "#b91c1c" }}>
+                <MailX className="size-3" /> No customer email
+              </span>
             )}
-            {t.status !== "closed" && (
-              <ToolbarBtn onClick={() => updMut.mutate({ status: "closed" })} icon={<XCircle className="size-3.5" />} label="Close" />
+            {t.first_response_at && <span>First reply {relTime(t.first_response_at)}</span>}
+          </div>
+        </div>
+
+        {/* Row 2 — Actions */}
+        <div className="flex items-center gap-1.5 border-t px-5 py-2" style={{ borderColor: "var(--admin-border)" }}>
+          <ToolbarBtn onClick={() => { setComposerMode("reply"); focusReply(); }} icon={<MessageSquare className="size-3.5" />} label="Reply" primary />
+          <ToolbarBtn onClick={() => { setComposerMode("note"); focusReply(); }} icon={<StickyNote className="size-3.5" />} label="Note" />
+
+          <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
+
+          <select
+            value={t.assigned_to ?? ""}
+            onChange={(e) => updMut.mutate({ assignedTo: e.target.value || null })}
+            className="max-w-[140px] rounded-md border bg-transparent px-2 py-1 text-[11px] outline-none"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+            title="Assignee"
+          >
+            <option value="">Unassigned</option>
+            {(staff?.staff ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+
+          {canResume && (
+            <ToolbarBtn onClick={() => setResumeOpen(true)} icon={<PlayCircle className="size-3.5" />} label="Resume Order" success />
+          )}
+          {!["resolved", "closed"].includes(t.status) && (
+            <ToolbarBtn onClick={() => updMut.mutate({ status: "resolved" })} icon={<CheckCircle2 className="size-3.5" />} label="Resolve" />
+          )}
+          {t.status !== "closed" && (
+            <ToolbarBtn onClick={() => updMut.mutate({ status: "closed" })} icon={<XCircle className="size-3.5" />} label="Close" />
+          )}
+          {(t.status === "closed" || t.status === "resolved") && (
+            <ToolbarBtn onClick={() => updMut.mutate({ status: "open" })} icon={<RotateCcw className="size-3.5" />} label="Reopen" />
+          )}
+
+          <div className="relative ml-auto">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              onBlur={() => setTimeout(() => setMoreOpen(false), 150)}
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium hover:bg-slate-50"
+              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}
+              title="More actions"
+            >
+              More
+            </button>
+            {moreOpen && (
+              <div
+                className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border bg-white py-1 shadow-lg"
+                style={{ borderColor: "var(--admin-border)" }}
+              >
+                <MoreItem onClick={() => updMut.mutate({ priority: "urgent" })} icon={<AlertTriangle className="size-3.5" style={{ color: "#dc2626" }} />} label="Escalate to urgent" />
+                <MoreItem onClick={copyLink} icon={<Copy className="size-3.5" />} label="Copy link" />
+                <MoreItem onClick={() => window.print()} icon={<Printer className="size-3.5" />} label="Print" />
+              </div>
             )}
-            {(t.status === "closed" || t.status === "resolved") && (
-              <ToolbarBtn onClick={() => updMut.mutate({ status: "open" })} icon={<RotateCcw className="size-3.5" />} label="Reopen" />
-            )}
-            <ToolbarBtn onClick={() => updMut.mutate({ priority: "urgent" })} icon={<AlertTriangle className="size-3.5" />} label="Escalate" />
-            <ToolbarBtn onClick={copyLink} icon={<Copy className="size-3.5" />} label="Copy" iconOnly />
-            <ToolbarBtn onClick={() => window.print()} icon={<Printer className="size-3.5" />} label="Print" iconOnly />
           </div>
         </div>
       </header>
