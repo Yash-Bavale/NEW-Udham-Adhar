@@ -528,7 +528,7 @@ async function fireCustomerClosure(s: {
 /** Arm the 24-business-hour ticket auto-close timer. Cancels any prior active one. */
 export async function startTicketAutocloseScheduler(input: {
   ticketId: string;
-  applicationId: string;
+  applicationId?: string | null;
   totalSeconds?: number;
   createdBy?: string | null;
   note?: string | null;
@@ -548,15 +548,15 @@ export async function startTicketAutocloseScheduler(input: {
       stop_triggered_by: "system",
       updated_at: now.toISOString(),
     } as never)
-    .eq("application_id", input.applicationId)
     .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
-    .like("remarks", `${TICKET_TAG_PREFIX}${input.ticketId}%`)
+    .eq("ticket_id", input.ticketId)
     .in("status", ["active", "paused"]);
 
   const { data, error } = await supabaseAdmin
     .from("order_schedulers")
     .insert({
-      application_id: input.applicationId,
+      application_id: input.applicationId ?? null,
+      ticket_id: input.ticketId,
       scheduler_type: SCHEDULER_TICKET_AUTOCLOSE,
       status: "active",
       started_at: now.toISOString(),
@@ -585,9 +585,10 @@ export async function cancelTicketAutocloseByTicket(ticketId: string, reason = "
       updated_at: now.toISOString(),
     } as never)
     .eq("scheduler_type", SCHEDULER_TICKET_AUTOCLOSE)
-    .like("remarks", `${TICKET_TAG_PREFIX}${ticketId}%`)
+    .eq("ticket_id", ticketId)
     .in("status", ["active", "paused"]);
 }
+
 
 /** Cancel every active ticket auto-close on an order (customer replied inbound). */
 export async function cancelTicketAutocloseForOrder(applicationId: string, reason = "customer_replied") {
