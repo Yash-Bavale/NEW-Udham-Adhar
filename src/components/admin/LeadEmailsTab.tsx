@@ -27,8 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import {
+  Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock,
+  ChevronDown, ChevronRight, AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
+
 
 export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string; leadService: string; orderId?: string }) {
   const qc = useQueryClient();
@@ -143,10 +147,11 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
         </Dialog>
       </div>
 
-      <div className="border rounded-md">
+      <div className="border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>Status</TableHead>
               <TableHead>Subject</TableHead>
               <TableHead>Recipient</TableHead>
@@ -156,29 +161,96 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
           <TableBody>
             {history.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   No emails sent yet.
                 </TableCell>
               </TableRow>
             ) : (
               history.map((item: any) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <StatusIcon status={item.status} />
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate font-medium">
-                    {item.subject}
-                  </TableCell>
-                  <TableCell className="text-xs">{item.to_email}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
-                  </TableCell>
-                </TableRow>
+                <EmailRow key={item.id} item={item} />
               ))
             )}
           </TableBody>
         </Table>
       </div>
+    </div>
+  );
+}
+
+function EmailRow({ item }: { item: any }) {
+  const [open, setOpen] = useState(false);
+  const err = item.error_message || item.last_error || item.smtp_response;
+  const bodyHtml = item.body_html as string | null | undefined;
+  const bodyText = item.body_text as string | null | undefined;
+  return (
+    <>
+      <TableRow className="cursor-pointer hover:bg-slate-50" onClick={() => setOpen((v) => !v)}>
+        <TableCell className="w-8">
+          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        </TableCell>
+        <TableCell><StatusIcon status={item.status} /></TableCell>
+        <TableCell className="max-w-xs truncate font-medium">{item.subject}</TableCell>
+        <TableCell className="text-xs">{item.to_email}</TableCell>
+        <TableCell className="text-xs text-muted-foreground">
+          {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
+        </TableCell>
+      </TableRow>
+      {open && (
+        <TableRow>
+          <TableCell colSpan={5} className="bg-slate-50/60 p-0">
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
+                <MetaCell label="From" value={item.from_email || "system default"} />
+                <MetaCell label="To" value={item.to_email} />
+                <MetaCell label="Template" value={item.template_code || "—"} mono />
+                <MetaCell label="Attempts" value={String(item.attempt ?? item.attempts ?? 1)} />
+                <MetaCell label="Message ID" value={item.message_id || "—"} mono />
+                <MetaCell label="Direction" value={item.direction || "outbound"} />
+                <MetaCell label="Queued" value={item.created_at ? new Date(item.created_at).toLocaleString("en-IN") : "—"} />
+                <MetaCell label="Sent" value={item.sent_at ? new Date(item.sent_at).toLocaleString("en-IN") : "—"} />
+              </div>
+
+              {err && (
+                <div className="rounded-md border border-rose-200 bg-rose-50 p-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700 mb-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> Delivery error
+                  </div>
+                  <pre className="text-[11px] text-rose-900 whitespace-pre-wrap font-mono">{err}</pre>
+                </div>
+              )}
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1.5">
+                  Email body
+                </div>
+                {bodyHtml ? (
+                  <div className="rounded-md border border-slate-200 bg-white overflow-hidden">
+                    <iframe
+                      title={`email-${item.id}`}
+                      srcDoc={bodyHtml}
+                      sandbox=""
+                      className="w-full min-h-[360px] bg-white"
+                    />
+                  </div>
+                ) : bodyText ? (
+                  <pre className="rounded-md border border-slate-200 bg-white p-3 text-[12px] whitespace-pre-wrap">{bodyText}</pre>
+                ) : (
+                  <div className="text-[12px] text-slate-500 italic">No body captured for this record.</div>
+                )}
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
+function MetaCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-wider font-bold text-slate-500 mb-0.5">{label}</div>
+      <div className={`text-[11px] text-slate-800 break-all ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );
 }

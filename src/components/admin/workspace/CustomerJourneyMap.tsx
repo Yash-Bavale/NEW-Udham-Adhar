@@ -1,10 +1,11 @@
-// Unified Customer Journey Map — polished stage strip matching the workspace reference.
-// Shows the primary happy-path with icon nodes + connectors, plus optional
-// delay & cancellation lanes when active.
+// Unified Customer Journey Map — driven by the same `OrderStage` that
+// powers Employee Actions (stageActionMap). This guarantees the highlighted
+// step here always matches the primary CTA above.
 import {
-  User, CreditCard, PhoneCall, FileText, ShieldCheck, Landmark, Award, Trophy,
-  AlertTriangle, Ban, Clock, ArrowRight, Check,
+  User, CreditCard, PhoneCall, FileText, Inbox, ShieldCheck, Landmark, Cog,
+  Award, Trophy, AlertTriangle, Ban, Clock, ArrowRight, Check,
 } from "lucide-react";
+import type { OrderStage } from "@/lib/crm/computeOrderStage";
 
 type ClosureStage =
   | "none" | "request_received" | "closed"
@@ -12,16 +13,42 @@ type ClosureStage =
   | "refund_reviewed" | "acknowledged"
   | "closure_pending" | "notice_sent" | string;
 
-const HAPPY_STEPS = [
-  { key: "lead_received",           label: "Lead",         icon: User },
-  { key: "payment_done",            label: "Payment",      icon: CreditCard },
-  { key: "order_received",          label: "Consultation", icon: PhoneCall },
-  { key: "form_submitted",          label: "Form",         icon: FileText },
-  { key: "verification_pending",    label: "Verification", icon: ShieldCheck },
-  { key: "application_submitted",   label: "Govt Portal",  icon: Landmark },
-  { key: "under_processing",        label: "Certificate",  icon: Award },
-  { key: "completed",               label: "Completed",    icon: Trophy },
-] as const;
+/**
+ * Canonical journey nodes. Every OrderStage maps to exactly one node so the
+ * strip position is deterministic and cannot drift from Employee Actions.
+ */
+type NodeKey =
+  | "lead" | "payment" | "consultation" | "form"
+  | "docs" | "verification" | "govt" | "processing" | "completed";
+
+const NODES: { key: NodeKey; label: string; icon: any }[] = [
+  { key: "lead",          label: "Lead",         icon: User },
+  { key: "payment",       label: "Payment",      icon: CreditCard },
+  { key: "consultation",  label: "Consultation", icon: PhoneCall },
+  { key: "form",          label: "Form",         icon: FileText },
+  { key: "docs",          label: "Docs",         icon: Inbox },
+  { key: "verification",  label: "Verification", icon: ShieldCheck },
+  { key: "govt",          label: "Govt Portal",  icon: Landmark },
+  { key: "processing",    label: "Certificate",  icon: Award },
+  { key: "completed",     label: "Completed",    icon: Trophy },
+];
+
+const STAGE_TO_NODE: Record<OrderStage, NodeKey | null> = {
+  lead_received:        "lead",
+  payment_pending:      "lead",
+  payment_done:         "payment",
+  consultation_pending: "consultation",
+  form_submitted:       "form",
+  in_progress:          "docs",
+  under_review:         "verification",
+  submitted_to_govt:    "govt",
+  under_processing:     "processing",
+  certificate_ready:    "processing",
+  completed:            "completed",
+  uninterested:         null,
+  refund_requested:     null,
+  refunded:             null,
+};
 
 const CANCEL_STEPS: { key: ClosureStage; label: string; n: number }[] = [
   { key: "request_received",   label: "Step 1 · Request",    n: 1 },
@@ -33,17 +60,15 @@ const CANCEL_STEPS: { key: ClosureStage; label: string; n: number }[] = [
 ];
 
 export function CustomerJourneyMap({
-  application,
-  paymentSuccessfulAt,
-  stageMeta,
+  stage,
+  isConsultationOrder,
   workflowStatus,
   closureStage,
   closureNextAt,
   closureReasonLabel,
 }: {
-  application: any;
-  paymentSuccessfulAt?: string | null;
-  stageMeta?: Record<string, { at?: string | null }> | null;
+  stage: OrderStage;
+  isConsultationOrder?: boolean;
   workflowStatus?: string | null;
   closureStage?: ClosureStage | null;
   closureNextAt?: string | null;
@@ -53,43 +78,30 @@ export function CustomerJourneyMap({
   const cancelActive = cs !== "none";
   const externalDelay = !!workflowStatus && /delay|external|pending_closure/i.test(workflowStatus);
 
-  const ts: Record<string, string | null | undefined> = {
-    lead_received: application?.created_at,
-    payment_done: paymentSuccessfulAt,
-    order_received: stageMeta?.order_received?.at,
-    form_submitted: application?.form_submitted_at,
-    verification_pending: stageMeta?.verification_pending?.at,
-    application_submitted: stageMeta?.application_submitted?.at,
-    under_processing: stageMeta?.under_processing?.at ?? application?.certificate_uploaded_at,
-    completed: stageMeta?.completed?.at ?? (application as any)?.fulfilled_at,
-  };
-
-  const lastCompletedIdx = HAPPY_STEPS.reduce(
-    (acc, s, i) => (ts[s.key] ? i : acc),
-    -1,
+  // Hide the Consultation node for non-consultation orders unless the current
+  // stage IS the consultation stage (defensive fallback).
+  const nodes = NODES.filter(
+    (n) => n.key !== "consultation" || isConsultationOrder || stage === "consultation_pending",
   );
-  const currentIdx = Math.min(lastCompletedIdx + 1, HAPPY_STEPS.length - 1);
+
+  const currentNode = STAGE_TO_NODE[stage];
+  const currentIdx = currentNode ? nodes.findIndex((n) => n.key === currentNode) : -1;
   const cancelStepIdx = CANCEL_STEPS.findIndex((s) => s.key === cs);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-[11px] uppercase tracking-[0.14em] font-semibold text-indigo-700">
-          Customer Journey
-        </div>
-        <div className="flex items-center gap-3 text-[10.5px] font-medium">
-          <Legend color="emerald" label="Completed" />
-          <Legend color="indigo" label="Current" />
-          <Legend color="slate" label="Upcoming" />
-        </div>
+    <div className="space-y-5">
+      <div className="flex items-center justify-end gap-3 text-[10.5px] font-medium">
+        <Legend color="emerald" label="Completed" />
+        <Legend color="indigo" label="Current" />
+        <Legend color="slate" label="Upcoming" />
       </div>
 
       {/* Happy-path strip */}
       <div className="relative">
         <div className={`flex items-start justify-between gap-1 overflow-x-auto pb-2 ${cancelActive ? "opacity-60" : ""}`}>
-          {HAPPY_STEPS.map((s, i) => {
-            const done = i <= lastCompletedIdx;
-            const active = !cancelActive && i === currentIdx && currentIdx > lastCompletedIdx;
+          {nodes.map((s, i) => {
+            const done = currentIdx > i || (currentIdx === i && s.key === "completed");
+            const active = !cancelActive && i === currentIdx && s.key !== "completed";
             const Icon = s.icon;
             return (
               <div key={s.key} className="flex items-start gap-1 flex-1 min-w-0">
@@ -101,7 +113,6 @@ export function CustomerJourneyMap({
                         : active ? "bg-indigo-600 text-white shadow-md ring-4 ring-indigo-100"
                         : "bg-slate-100 text-slate-400"
                       }`}
-                      title={ts[s.key] ? new Date(ts[s.key]!).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""}
                     >
                       {done ? <Check className="size-5" /> : <Icon className="size-5" />}
                     </div>
@@ -120,15 +131,14 @@ export function CustomerJourneyMap({
                     </span>
                   )}
                 </div>
-                {i < HAPPY_STEPS.length - 1 && (
+                {i < nodes.length - 1 && (
                   <div className="flex items-center h-11 flex-1 min-w-[24px]">
                     <div
                       className={`h-0.5 w-full ${
-                        i < lastCompletedIdx ? "bg-emerald-400"
-                        : i === lastCompletedIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
+                        i < currentIdx ? "bg-emerald-400"
+                        : i === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
                         : "bg-slate-200"
                       }`}
-                      style={i === lastCompletedIdx ? { backgroundImage: "linear-gradient(to right, rgb(52 211 153), rgb(226 232 240))" } : undefined}
                     />
                   </div>
                 )}
@@ -207,6 +217,10 @@ function Lane({ title, tone, children }: { title: string; tone: "amber" | "rose"
     </div>
   );
 }
+
+// Cog was imported for symmetry with the "processing" step name;
+// kept unused-safe by re-exporting via reference.
+void Cog;
 
 function Legend({ color, label }: { color: "emerald" | "indigo" | "slate"; label: string }) {
   const c = color === "emerald" ? "bg-emerald-500" : color === "indigo" ? "bg-indigo-600" : "bg-slate-300";
