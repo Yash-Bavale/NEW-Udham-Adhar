@@ -15,14 +15,28 @@ export const Route = createFileRoute("/admin/tickets/")({
   component: TicketsPage,
 });
 
-const STATUSES: { value: TicketStatus | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting_customer", label: "Waiting on Customer" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
-];
+type View = "active" | "closed" | "all";
+
+const VIEW_STATUSES: Record<View, TicketStatus[] | undefined> = {
+  active: ["open", "in_progress", "waiting_customer"],
+  closed: ["resolved", "closed"],
+  all: undefined,
+};
+
+const SUB_FILTERS: Record<View, { value: TicketStatus | "all"; label: string }[]> = {
+  active: [
+    { value: "all", label: "All Active" },
+    { value: "open", label: "Open" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "waiting_customer", label: "Waiting on Customer" },
+  ],
+  closed: [
+    { value: "all", label: "All Closed" },
+    { value: "resolved", label: "Resolved" },
+    { value: "closed", label: "Closed" },
+  ],
+  all: [],
+};
 
 const STATUS_COLOR: Record<TicketStatus, { bg: string; fg: string }> = {
   open: { bg: "rgba(2,132,199,0.12)", fg: "#0369a1" },
@@ -41,19 +55,23 @@ const PRIORITY_COLOR: Record<string, { bg: string; fg: string; label: string }> 
 function TicketsPage() {
   const role = useRole();
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<TicketStatus | "all">("all");
+  const [view, setView] = useState<View>("active");
+  const [subStatus, setSubStatus] = useState<TicketStatus | "all">("all");
   const [scope, setScope] = useState<"mine" | "all">("all");
   const [q, setQ] = useState("");
 
   const fn = useServerFn(listTickets);
+  const effectiveStatuses =
+    subStatus !== "all" ? [subStatus] : VIEW_STATUSES[view];
+
   const { data, isLoading } = useQuery({
-    queryKey: ["tickets-list", page, status, scope, q],
+    queryKey: ["tickets-list", page, view, subStatus, scope, q],
     queryFn: () =>
       fn({
         data: {
           page,
           pageSize: 25,
-          status: status === "all" ? undefined : status,
+          statuses: effectiveStatuses,
           scope,
           q,
         },
