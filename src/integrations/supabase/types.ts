@@ -1343,6 +1343,33 @@ export type Database = {
         }
         Relationships: []
       }
+      email_templates_stage: {
+        Row: {
+          body_b64: string
+          category: string
+          code: string
+          flow_id: string | null
+          sr_no: number
+          subject: string
+        }
+        Insert: {
+          body_b64: string
+          category: string
+          code: string
+          flow_id?: string | null
+          sr_no: number
+          subject: string
+        }
+        Update: {
+          body_b64?: string
+          category?: string
+          code?: string
+          flow_id?: string | null
+          sr_no?: number
+          subject?: string
+        }
+        Relationships: []
+      }
       email_unsubscribe_tokens: {
         Row: {
           created_at: string
