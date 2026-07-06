@@ -216,7 +216,7 @@ function TicketsPage() {
               {!isLoading &&
                 (data?.tickets ?? []).map((t, i) => {
                   const sc = STATUS_COLOR[t.status];
-                  const pc = PRIORITY_COLOR[t.priority];
+                  const pc = PRIORITY_COLOR[t.priority] ?? PRIORITY_FALLBACK;
                   return (
                     <tr
                       key={t.id}
