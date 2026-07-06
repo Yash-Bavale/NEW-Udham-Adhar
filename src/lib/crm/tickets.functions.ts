@@ -8,9 +8,12 @@ async function getAdmin() {
 }
 
 const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "resolved", "closed"] as const;
-const PRIORITIES = ["high", "medium", "low"] as const;
+const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 export type TicketPriority = (typeof PRIORITIES)[number];
+
+// Re-export the emailing reply from ticket-actions so the UI has a single source of truth.
+export { replyToTicket } from "@/lib/tickets/ticket-actions.functions";
 
 export const listTickets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
