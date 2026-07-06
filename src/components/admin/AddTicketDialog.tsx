@@ -290,6 +290,7 @@ function Body({
                 className="w-full rounded border bg-transparent px-2 py-1.5 text-sm"
                 style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
               >
+                <option value="urgent">Urgent</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
