@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Copy, Phone, MessageCircle, Mail, User2, Printer,
-  FileText, Workflow, Activity, LifeBuoy, Check,
+  ArrowLeft, Copy, Phone, Mail, User2,
+  FileText, Workflow, Activity, LifeBuoy,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,14 +18,13 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
-import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
+
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
   QUICK_ACTIONS,
   tabAvailability,
-  type StatusActionKey,
   type WorkspaceTabId,
 } from "@/lib/orders/order-actions-map";
 import { formatIST, relativeIST } from "@/lib/datetime";
@@ -36,7 +35,6 @@ interface Props {
   hideAmount: boolean;
   staff: any[];
   onAssign: (id: string | null) => void;
-  onRequestDocs: () => void;
   stage: OrderStage;
   timestamps: Partial<Record<OrderStage, string | null>>;
   showConsultationPanel: boolean;
@@ -57,7 +55,6 @@ type TabId = WorkspaceTabId;
 export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
-  const [pendingActionKey, setPendingActionKey] = useState<StatusActionKey | null>(null);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -73,12 +70,6 @@ export function WorkspaceShell(p: Props) {
     () => qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] }),
     [qc, p.orderId],
   );
-
-  /** Route the "next step" button (in TabStatusHeader) to the workflow tab + open dialog. */
-  const handlePrimaryStep = useCallback((key: StatusActionKey) => {
-    setTab("workflow");
-    setPendingActionKey(key);
-  }, []);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
@@ -253,18 +244,8 @@ export function WorkspaceShell(p: Props) {
             </div>
           </div>
         </div>
-
-        {/* Status-driven employee actions — single source of truth */}
-        {orderStatus && !p.showConsultationPanel && (
-          <div className="mt-4">
-            <EmployeeActionPanel
-              orderId={p.orderId}
-              status={orderStatus}
-              openActionKey={pendingActionKey}
-              onOpenActionHandled={() => setPendingActionKey(null)}
-            />
-          </div>
-        )}
+        {/* Employee actions live in one place only — inside the Employee Workflow tab
+            (OrderWorkflowPanel). This card is header info only. */}
       </section>
 
       {/* Customer Journey */}
@@ -314,13 +295,13 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
           {/* Main */}
           <div className="min-w-0 space-y-5">
-            {/* Sticky "where are we + what's next" strip for every tab. */}
+            {/* Sticky "where are we + what's next" strip for every tab. Display-only —
+                the single action surface lives inside the Employee Workflow tab. */}
             <TabStatusHeader
               applicationCode={application.application_code}
               orderStatus={orderStatus}
               stage={p.stage}
               updatedAt={application.updated_at ?? application.created_at}
-              onPrimaryAction={handlePrimaryStep}
             />
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {p.showConsultationPanel ? (
@@ -421,15 +402,8 @@ export function WorkspaceShell(p: Props) {
                 <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
                 <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
               </dl>
-            </div>
-
-            <button
-              onClick={p.onRequestDocs}
-              className="w-full rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50 text-indigo-700 text-sm font-semibold py-3 transition"
-            >
-              <Check className="w-4 h-4 inline mr-1.5" /> Request Documents
-            </button>
-          </aside>
+          </div>
+        </aside>
         </div>
       </Tabs>
     </div>

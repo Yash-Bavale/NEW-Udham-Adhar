@@ -7,7 +7,6 @@ import { MessageSquare, StickyNote } from "lucide-react";
 
 import { getOrderDetailV2, updateOrderAssignee, addOrderNoteV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
-import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -27,7 +26,6 @@ function OrderDetailPage() {
   const detailFn = useServerFn(getOrderDetailV2);
   const staffFn = useServerFn(listStaff);
   const assignFn = useServerFn(updateOrderAssignee);
-  const reminderFn = useServerFn(queueDocumentReminder);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.order", orderId],
@@ -81,14 +79,6 @@ function OrderDetailPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
-  const requestDocs = async () => {
-    if (!lead?.id) { toast.error("No lead linked"); return; }
-    try {
-      await reminderFn({ data: { leadId: lead.id } });
-      toast.success("Reminder queued");
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-  };
-
   return (
     <WorkspaceShell
       orderId={orderId}
@@ -96,7 +86,6 @@ function OrderDetailPage() {
       hideAmount={hideAmount}
       staff={staffData?.profiles ?? []}
       onAssign={setAssignee}
-      onRequestDocs={requestDocs}
       stage={stage}
       timestamps={timestamps}
       showConsultationPanel={showConsultationPanel}

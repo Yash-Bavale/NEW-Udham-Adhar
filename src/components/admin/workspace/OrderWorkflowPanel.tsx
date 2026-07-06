@@ -19,7 +19,7 @@ import { resumeCancelledOrder } from "@/lib/crm/cancellation.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import {
   FULFILLMENT_STAGES, FULFILLMENT_LABEL, FULFILLMENT_BADGE,
-  getAllowedFulfillmentTransitions, stageIndex, type FulfillmentStatus,
+  getAllowedFulfillmentTransitions, type FulfillmentStatus,
 } from "@/lib/crm/fulfillment-transitions";
 import { formatIST } from "@/lib/datetime";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
@@ -181,7 +181,7 @@ export function OrderWorkflowPanel({
         </div>
 
         {lane === "happy" && (
-          <div className="px-5 py-4 space-y-2">
+          <div className="px-5 py-4 space-y-3">
             {!nextStage ? (
               <div className="text-sm text-slate-500 italic flex items-center gap-2">
                 <Check className="size-4 text-emerald-600" /> Order completed — no further stages.
@@ -201,7 +201,7 @@ export function OrderWorkflowPanel({
                     {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
                     Mark as {FULFILLMENT_LABEL[nextStage]}
                   </button>
-                  {previousStage && (
+                  {isSuperAdmin && previousStage && (
                     <button
                       type="button"
                       disabled={busy}
@@ -209,11 +209,35 @@ export function OrderWorkflowPanel({
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                       title={`Revert to ${FULFILLMENT_LABEL[previousStage]}`}
                     >
-                      <Undo2 className="size-4" /> Revert to {FULFILLMENT_LABEL[previousStage]}
+                      <Undo2 className="size-4" /> Revert (Super-admin)
                     </button>
                   )}
                 </div>
-                <div className="text-xs text-slate-500">Next step in this order.</div>
+                <div className="text-xs text-slate-500">
+                  Next step in this order — drives the Customer Journey and automated emails.
+                </div>
+
+                {/* Exception actions live in the same card so employees always know
+                    all valid actions for the current stage in one place. */}
+                {current !== "completed" && current !== "cancelled" && (
+                  <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                    <button
+                      onClick={() => setDelayOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                    >
+                      <AlertTriangle className="size-3.5" /> Mark External Delay
+                    </button>
+                    <button
+                      onClick={() => setCloseOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50/60 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                    >
+                      <Ban className="size-3.5" /> Start Cancellation
+                    </button>
+                    <span className="ml-auto text-[11px] text-slate-400 self-center">
+                      Only actions that move the order off the Happy Path.
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -277,32 +301,10 @@ export function OrderWorkflowPanel({
         )}
       </div>
 
+      {/* Stage Map removed — Customer Journey (above the tabs) is the single visual
+          for stage progression. Duplicating it here made the surface cluttered. */}
 
-      {/* CARD 2 — STAGE MAP */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-700 mb-3">Stage Map</div>
-        <StageMap current={current} />
-      </div>
 
-      {/* CARD 3 — PAUSE / CANCEL ESCAPE HATCHES (only in happy path) */}
-      {lane === "happy" && current !== "completed" && current !== "cancelled" && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-          <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-600 mb-3">Need to pause or cancel?</div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setDelayOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50/60 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">
-              <AlertTriangle className="size-4" /> Mark External Delay
-            </button>
-            <button onClick={() => setCloseOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50/60 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100">
-              <Ban className="size-4" /> Start Cancellation
-            </button>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            These are the only two actions that move the order off the Happy Path.
-          </div>
-        </div>
-      )}
 
       {/* CARD 4 — HISTORY (collapsed) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -428,36 +430,6 @@ function LaneBadge({ lane }: { lane: Lane }) {
   );
 }
 
-function StageMap({ current }: { current: FulfillmentStatus }) {
-  const idx = stageIndex(current);
-  return (
-    <ol className="flex flex-wrap items-center gap-y-3">
-      {FULFILLMENT_STAGES.map((s, i) => {
-        const done = i < idx;
-        const active = i === idx;
-        return (
-          <li key={s} className="flex items-center">
-            <div className="flex items-center gap-2">
-              <span className={`flex size-7 items-center justify-center rounded-full text-xs font-bold border-2 ${
-                done ? "bg-emerald-500 border-emerald-500 text-white" :
-                active ? "bg-indigo-600 border-indigo-600 text-white shadow-md" :
-                "bg-white border-slate-300 text-slate-400"
-              }`}>
-                {done ? <Check className="size-3.5" /> : i + 1}
-              </span>
-              <span className={`text-xs font-medium ${
-                done ? "text-emerald-700" : active ? "text-indigo-700 font-bold" : "text-slate-500"
-              }`}>{FULFILLMENT_LABEL[s]}</span>
-            </div>
-            {i < FULFILLMENT_STAGES.length - 1 && (
-              <div className={`mx-2 h-0.5 w-6 ${i < idx ? "bg-emerald-400" : "bg-slate-200"}`} />
-            )}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 function HistorySection({ applicationId, onRefresh }: { applicationId: string; onRefresh: () => void }) {
   const fnEvents = useServerFn(listWorkflowEvents);
