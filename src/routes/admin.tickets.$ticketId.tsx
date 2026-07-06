@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send, Sparkles } from "lucide-react";
 import { getTicket, updateTicket, replyToTicket, type TicketStatus } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
+import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { SectionCard } from "@/components/admin/ui";
 
 export const Route = createFileRoute("/admin/tickets/$ticketId")({
