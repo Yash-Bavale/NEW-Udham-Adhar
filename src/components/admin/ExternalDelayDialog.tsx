@@ -76,7 +76,7 @@ export function ExternalDelayDialog({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-amber-500" />
-            <div className="font-semibold">Mark External Delay</div>
+            <div className="font-semibold">Mark Delay</div>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="size-4" />
@@ -84,15 +84,25 @@ export function ExternalDelayDialog({
         </div>
         <div className="space-y-3 text-sm">
           <div>
-            <label className="text-xs text-muted-foreground">Status</label>
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as never)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-            >
-              <option value="external_dependency">External Dependency</option>
-              <option value="government_portal_pending">Government Portal Pending</option>
-            </select>
+            <label className="text-xs text-muted-foreground">Delay type</label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSide("customer")}
+                className={`rounded-md border px-2 py-2 text-left ${side === "customer" ? "border-primary bg-primary/5" : "bg-background"}`}
+              >
+                <div className="font-medium">Customer-side</div>
+                <div className="text-[11px] text-muted-foreground">Sends notice + auto-closes after 8 business hours</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSide("internal")}
+                className={`rounded-md border px-2 py-2 text-left ${side === "internal" ? "border-primary bg-primary/5" : "bg-background"}`}
+              >
+                <div className="font-medium">Our-side (internal)</div>
+                <div className="text-[11px] text-muted-foreground">Notifies assignee. No customer email, no auto-closure</div>
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Reason</label>
