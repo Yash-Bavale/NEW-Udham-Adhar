@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Loader2, Lock, Send } from "lucide-react";
+import { ChevronLeft, Loader2, Lock, Mail, MailCheck, MailX, Send } from "lucide-react";
 import { getTicket, updateTicket, replyToTicket, type TicketStatus } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { SectionCard } from "@/components/admin/ui";
@@ -64,9 +64,20 @@ function TicketDetailPage() {
 
   const replyMut = useMutation({
     mutationFn: () =>
-      replyFn({ data: { ticketId, text: reply.trim(), isInternal } }),
-    onSuccess: () => {
+      replyFn({
+        data: { ticketId, message: reply.trim(), isInternal },
+      }),
+    onSuccess: (res: any) => {
       setReply("");
+      if (isInternal) {
+        toast.success("Internal note added");
+      } else if (res?.emailed) {
+        toast.success(`Reply sent to ${res.recipient}`);
+      } else if (res?.reason === "no_recipient_email") {
+        toast.warning("Reply saved, but customer has no email on file — nothing was sent.");
+      } else {
+        toast.warning("Reply saved but email failed to send. Check the email queue.");
+      }
       qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Reply failed"),
