@@ -162,7 +162,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         .from("payments")
         .select("amount, status")
         .eq("customer_id", customerId)
-        .in("status", ["captured", "success", "paid"]);
+        .in("status", ["paid"]);
       lifetimeValue = (pays ?? []).reduce((sum: number, p: any) => sum + Number(p.amount ?? 0), 0);
     }
 
