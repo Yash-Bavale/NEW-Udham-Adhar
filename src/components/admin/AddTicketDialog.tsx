@@ -86,10 +86,11 @@ function Body({
 
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
+  const [priority, setPriority] = useState<"urgent" | "high" | "medium" | "low">("medium");
   const [assignedTo, setAssignedTo] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(defaultCustomerId);
   const [customerLabel, setCustomerLabel] = useState<string | null>(defaultCustomerLabel);
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [custQ, setCustQ] = useState("");
   const [orderId, setOrderId] = useState<string | null>(defaultApplicationId);
   const [orderLabel, setOrderLabel] = useState<string | null>(defaultApplicationLabel);
