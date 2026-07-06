@@ -492,7 +492,7 @@ async function fireCustomerClosure(s: {
   if (cust?.primary_email) {
     try {
       await enqueueFromTemplateInternal(
-        BHS_EMAILS.E004_ORDER_AUTO_CLOSED,
+        BHS_EMAILS.E006_ORDER_CLOSED,
         cust.primary_email as string,
         {
           customerName: (cust.name as string) || "Customer",
