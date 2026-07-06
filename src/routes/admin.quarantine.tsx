@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Search,
   ExternalLink,
+  Ticket as TicketIcon,
 } from "lucide-react";
 import {
   listQuarantine,
