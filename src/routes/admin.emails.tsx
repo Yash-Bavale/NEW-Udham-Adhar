@@ -163,7 +163,10 @@ function SmtpTab() {
         <div className="grid md:grid-cols-2 gap-3">
           <Input label="From Email" value={eff.from_email} onChange={(v) => setForm({ ...eff, from_email: v })} />
           <Input label="From Name" value={eff.from_name} onChange={(v) => setForm({ ...eff, from_name: v })} />
-          <Input label="Reply-To" value={eff.reply_to} onChange={(v) => setForm({ ...eff, reply_to: v })} />
+          <div>
+            <Input label="Reply-To" value={eff.reply_to} onChange={(v) => setForm({ ...eff, reply_to: v })} />
+            <p className="mt-1 text-[11px] text-slate-500">Must be the mailbox connected to the Zoho poller (e.g. <code>help@businesshelpservices.com</code>) — replies here become support tickets automatically.</p>
+          </div>
           <Input label="Daily Quota" type="number" value={String(eff.daily_quota)} onChange={(v) => setForm({ ...eff, daily_quota: Number(v) })} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={eff.is_enabled} onChange={(e) => setForm({ ...eff, is_enabled: e.target.checked })} />
