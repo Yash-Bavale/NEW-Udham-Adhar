@@ -25,7 +25,6 @@ import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
   QUICK_ACTIONS,
   tabAvailability,
-  type StatusActionKey,
   type WorkspaceTabId,
 } from "@/lib/orders/order-actions-map";
 import { formatIST, relativeIST } from "@/lib/datetime";
@@ -36,7 +35,6 @@ interface Props {
   hideAmount: boolean;
   staff: any[];
   onAssign: (id: string | null) => void;
-  onRequestDocs: () => void;
   stage: OrderStage;
   timestamps: Partial<Record<OrderStage, string | null>>;
   showConsultationPanel: boolean;
