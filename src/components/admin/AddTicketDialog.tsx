@@ -378,7 +378,7 @@ function Body({
           </button>
           <button
             type="button"
-            disabled={mut.isPending}
+            disabled={mut.isPending || (!!existingOpen && !allowDuplicate)}
             onClick={() => {
               if (validate()) mut.mutate();
             }}
@@ -386,8 +386,9 @@ function Body({
             style={{ background: "var(--admin-accent)", color: "var(--admin-accent-fg)" }}
           >
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
-            Create Ticket
+            {existingOpen && !allowDuplicate ? "Open existing ticket instead" : "Create Ticket"}
           </button>
+
         </footer>
       </div>
     </div>
