@@ -27,6 +27,8 @@ export const listTickets = createServerFn({ method: "POST" })
         priority: z.enum(PRIORITIES).optional(),
         assignedTo: z.string().uuid().optional(),
         scope: z.enum(["mine", "all"]).default("all"),
+        sort: z.enum(["newest", "oldest", "updated", "unassigned"]).default("newest"),
+        unassignedOnly: z.boolean().default(false),
       })
       .parse(i ?? {})
   )
@@ -38,12 +40,20 @@ export const listTickets = createServerFn({ method: "POST" })
     let q = admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, status, priority, assigned_to, created_at, customer_id, application_id, service_id, customers(name, primary_mobile), applications(application_code), services(service_name)",
+        "id, ticket_number, subject, status, priority, assigned_to, created_at, updated_at, last_customer_message_at, last_staff_message_at, customer_id, application_id, service_id, customers(name, primary_mobile), applications(application_code), services(service_name)",
         { count: "exact" }
       )
-      .order("created_at", { ascending: false })
       .range(from, to);
 
+    if (data.sort === "oldest") q = q.order("created_at", { ascending: true });
+    else if (data.sort === "updated") q = q.order("updated_at", { ascending: false });
+    else if (data.sort === "unassigned")
+      q = q
+        .order("assigned_to", { ascending: true, nullsFirst: true })
+        .order("created_at", { ascending: false });
+    else q = q.order("created_at", { ascending: false });
+
+    if (data.unassignedOnly || data.sort === "unassigned") q = q.is("assigned_to", null);
     if (data.status) q = q.eq("status", data.status);
     if (data.priority) q = q.eq("priority", data.priority);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
@@ -79,6 +89,9 @@ export const listTickets = createServerFn({ method: "POST" })
       assigned_to: r.assigned_to,
       assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) ?? null : null,
       created_at: r.created_at,
+      updated_at: r.updated_at,
+      last_customer_message_at: r.last_customer_message_at,
+      last_staff_message_at: r.last_staff_message_at,
       customer_id: r.customer_id,
       customer_name: r.customers?.name ?? null,
       application_id: r.application_id,
