@@ -21,10 +21,12 @@ function requireEnv(name: string): string {
  *  numeric value we trust it; otherwise (empty or an email address) we call
  *  /api/accounts and pick the account whose primary email matches, falling
  *  back to the first account. Cached per-worker. */
-async function resolveAccountId(): Promise<string> {
-  if (accountIdCache) return accountIdCache;
+async function resolveAccountId(forceRefresh = false): Promise<string> {
+  if (accountIdCache && !forceRefresh) return accountIdCache;
   const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
-  if (raw && /^\d+$/.test(raw)) {
+  // If env holds a numeric id, trust it — but only until a call proves it stale
+  // (see zohoFetch's 404 handling, which forces a refresh via /api/accounts).
+  if (raw && /^\d+$/.test(raw) && !forceRefresh) {
     accountIdCache = raw;
     return raw;
   }
@@ -39,7 +41,7 @@ async function resolveAccountId(): Promise<string> {
   const list = j?.data ?? [];
   if (list.length === 0) throw new Error("Zoho: no mail accounts on this token");
   const wanted = raw.toLowerCase();
-  const match = wanted
+  const match = wanted && !/^\d+$/.test(raw)
     ? list.find(
         (a) =>
           (a.primaryEmailAddress || "").toLowerCase() === wanted ||
