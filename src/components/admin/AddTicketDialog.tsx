@@ -138,6 +138,8 @@ function Body({
     const errs: FieldErrors = {};
     if (subject.trim().length < 3) errs.subject = "Subject is required (min 3 chars).";
     if (!customerId) errs.customerId = "Customer is required.";
+    else if (!customerEmail)
+      errs.customerId = "This customer has no email on file. Add an email to the customer profile first.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
