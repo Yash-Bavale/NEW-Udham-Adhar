@@ -485,3 +485,112 @@ function QuickTile({
   );
 }
 
+// ─────────────────────────── Order Tickets Panel ───────────────────────────
+
+const TICKET_STATUS_TINT: Record<string, string> = {
+  open:              "bg-sky-50 text-sky-700 ring-sky-200",
+  in_progress:       "bg-amber-50 text-amber-700 ring-amber-200",
+  waiting_customer:  "bg-violet-50 text-violet-700 ring-violet-200",
+  resolved:          "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  closed:            "bg-slate-100 text-slate-600 ring-slate-200",
+};
+const TICKET_PRIORITY_TINT: Record<string, string> = {
+  urgent: "bg-rose-100 text-rose-700",
+  high:   "bg-orange-100 text-orange-700",
+  medium: "bg-amber-50 text-amber-700",
+  low:    "bg-slate-100 text-slate-600",
+};
+
+function OrderTicketsPanel({ orderTickets, customerTickets }: { orderTickets: any[]; customerTickets: any[] }) {
+  const openCount = orderTickets.filter((t) => ["open", "in_progress", "waiting_customer"].includes(t.status)).length;
+  const closedCount = orderTickets.length - openCount;
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <header className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <LifeBuoy className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-sm font-bold text-slate-900">Tickets for this order</h3>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
+              {orderTickets.length}
+            </span>
+            {openCount > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">
+                {openCount} open
+              </span>
+            )}
+            {closedCount > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
+                {closedCount} closed
+              </span>
+            )}
+          </div>
+        </header>
+        {orderTickets.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-slate-500">
+            No support tickets on this order yet.
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {orderTickets.map((t) => <TicketRow key={t.id} t={t} />)}
+          </ul>
+        )}
+      </section>
+
+      {customerTickets.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <header className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <User2 className="w-4 h-4 text-slate-500" />
+              <h3 className="text-sm font-bold text-slate-900">Other tickets from this customer</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
+                {customerTickets.length}
+              </span>
+            </div>
+          </header>
+          <ul className="divide-y divide-slate-100">
+            {customerTickets.map((t) => <TicketRow key={t.id} t={t} showOrderLink />)}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function TicketRow({ t, showOrderLink }: { t: any; showOrderLink?: boolean }) {
+  const statusCls = TICKET_STATUS_TINT[t.status] ?? "bg-slate-100 text-slate-600 ring-slate-200";
+  const prCls = TICKET_PRIORITY_TINT[t.priority] ?? "bg-slate-100 text-slate-600";
+  return (
+    <li>
+      <Link
+        to="/admin/tickets/$ticketId"
+        params={{ ticketId: t.id }}
+        className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-slate-50 transition"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px] text-slate-500">{t.ticket_number}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ring-1 uppercase font-semibold ${statusCls}`}>
+              {t.status.replace(/_/g, " ")}
+            </span>
+            {t.priority && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold ${prCls}`}>
+                {t.priority}
+              </span>
+            )}
+            {showOrderLink && t.application_id && (
+              <span className="text-[10px] text-slate-400">· other order</span>
+            )}
+          </div>
+          <div className="mt-0.5 text-sm text-slate-800 truncate">{t.subject}</div>
+        </div>
+        <div className="text-[11px] text-slate-400 whitespace-nowrap">
+          {relativeIST(t.created_at)}
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+
