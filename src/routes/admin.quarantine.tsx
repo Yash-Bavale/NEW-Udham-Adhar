@@ -341,6 +341,11 @@ function QuarantineItem({
           <Button size="sm" variant="outline" onClick={() => setAttachOpen(true)} disabled={busy}>
             <Search className="h-3.5 w-3.5 mr-1.5" /> Attach to different ticket
           </Button>
+          {!row.matched_ticket_id && (
+            <Button size="sm" variant="secondary" onClick={onCreateTicket} disabled={busy}>
+              <TicketIcon className="h-3.5 w-3.5 mr-1.5" /> Create new ticket
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => onDiscard("spam_or_noise")} disabled={busy}>
             <XCircle className="h-3.5 w-3.5 mr-1.5" /> Discard
           </Button>
