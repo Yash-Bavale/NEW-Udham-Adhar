@@ -26,9 +26,12 @@ export const listReasons = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, [...STAFF]);
     const admin = await getAdmin();
+    const select = data.table === "workflow_delay_reasons"
+      ? "id,code,label,description,is_active,sort_order,updated_at,side,email_template_code"
+      : "id,code,label,description,is_active,sort_order,updated_at";
     const { data: rows, error } = await admin
       .from(data.table)
-      .select("id,code,label,description,is_active,sort_order,updated_at")
+      .select(select)
       .order("sort_order")
       .order("label");
     if (error) throw new Error(error.message);
@@ -41,6 +44,8 @@ const ReasonInput = z.object({
   code: z.string().min(1).max(64).regex(/^[a-z0-9_]+$/, "lowercase letters / digits / underscore"),
   label: z.string().min(1).max(160),
   description: z.string().max(2000).optional().nullable(),
+  side: z.enum(["customer", "internal"]).optional(),
+  emailTemplateCode: z.string().max(160).optional().nullable(),
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(9999).default(100),
 });
@@ -51,13 +56,17 @@ export const upsertReason = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, [...ADMIN]);
     const admin = await getAdmin();
-    const payload = {
+    const payload: Record<string, unknown> = {
       code: data.code,
       label: data.label,
       description: data.description ?? null,
       is_active: data.isActive,
       sort_order: data.sortOrder,
     };
+    if (data.table === "workflow_delay_reasons") {
+      payload.side = data.side ?? "customer";
+      payload.email_template_code = payload.side === "customer" ? (data.emailTemplateCode || "bhs_e003_customer_delay") : null;
+    }
     if (data.id) {
       const { error } = await admin.from(data.table).update(payload as never).eq("id", data.id);
       if (error) throw new Error(error.message);

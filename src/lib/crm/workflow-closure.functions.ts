@@ -44,12 +44,6 @@ export const closeOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!app) throw new Error("Application not found");
 
-    const { data: lead } = await admin
-      .from("leads")
-      .select("name, email, service, lead_code")
-      .eq("id", app.lead_id!)
-      .maybeSingle();
-
     // Cancel reminders
     await admin
       .from("workflow_reminders")
@@ -74,28 +68,6 @@ export const closeOrder = createServerFn({ method: "POST" })
       is_system: false,
       metadata: { reason_code: data.reasonCode },
     } as never);
-
-    // Customer email
-    if (lead?.email) {
-      try {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-        await enqueueFromTemplateInternal(
-          "workflow_closure_notice",
-          lead.email,
-          {
-            customer_name: lead.name ?? "Customer",
-            order_id: app.application_code ?? "",
-            service_name: lead.service ?? "",
-            reason: data.reasonLabel,
-            date: new Date().toLocaleDateString("en-IN"),
-            company_name: COMPANY_NAME,
-            support_email: SUPPORT_EMAIL,
-          },
-          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id },
-        );
-      } catch (e) { console.error("[workflow] closure email failed", e); }
-    }
 
     await writeAudit({
       supabase: context.supabase,
@@ -170,28 +142,6 @@ export const createRefundRequest = createServerFn({ method: "POST" })
       is_system: false,
       metadata: { refund_request_id: row.id, amount: data.refundAmount ?? null },
     } as never);
-
-    // Email confirmation
-    const { data: lead } = await admin.from("leads").select("name, email, service").eq("id", app.lead_id!).maybeSingle();
-    if (lead?.email) {
-      try {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-        await enqueueFromTemplateInternal(
-          "workflow_refund_received",
-          lead.email,
-          {
-            customer_name: lead.name ?? "Customer",
-            order_id: app.application_code ?? "",
-            service_name: lead.service ?? "",
-            date: new Date().toLocaleDateString("en-IN"),
-            company_name: COMPANY_NAME,
-            support_email: SUPPORT_EMAIL,
-          },
-          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id },
-        );
-      } catch (e) { console.error("[workflow] refund-received email failed", e); }
-    }
 
     return { ok: true, id: row.id };
   });
@@ -270,37 +220,6 @@ export const decideRefundRequest = createServerFn({ method: "POST" })
       is_system: false,
       metadata: { refund_request_id: row.id },
     } as never);
-
-    // Email customer
-    const { data: lead } = await admin.from("leads").select("name,email,service").eq("id", row.lead_id!).maybeSingle();
-    const { data: app } = await admin.from("applications").select("application_code").eq("id", row.application_id).maybeSingle();
-    if (lead?.email) {
-      try {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-        const tplMap: Record<string, string> = {
-          approved: "workflow_refund_approved",
-          rejected: "workflow_refund_rejected",
-          info_needed: "workflow_refund_info_needed",
-          escalated: "workflow_refund_escalated",
-        };
-        await enqueueFromTemplateInternal(
-          tplMap[data.decision],
-          lead.email,
-          {
-            customer_name: lead.name ?? "Customer",
-            order_id: app?.application_code ?? "",
-            service_name: lead.service ?? "",
-            refund_amount: row.refund_amount ?? "",
-            admin_notes: data.adminNotes ?? "",
-            date: new Date().toLocaleDateString("en-IN"),
-            company_name: COMPANY_NAME,
-            support_email: SUPPORT_EMAIL,
-          },
-          { toName: lead.name ?? undefined, leadId: row.lead_id ?? undefined, applicationId: row.application_id },
-        );
-      } catch (e) { console.error("[workflow] refund-decision email failed", e); }
-    }
 
     await writeAudit({
       supabase: context.supabase,

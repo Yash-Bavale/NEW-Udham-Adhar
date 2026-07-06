@@ -249,28 +249,6 @@ export const createTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Send ticket_created confirmation. Non-fatal on failure — ticket stays created.
-    try {
-      const m = await import("@/lib/emails/emails.server");
-      await m.enqueueFromTemplateInternal(
-        "ticket_created",
-        ticketEmail,
-        {
-          customerName: custRow?.name ?? "",
-          ticketNumber: ins!.ticket_number,
-          ticketSubject: data.subject,
-          ticketPriority: data.priority,
-          fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
-        },
-        {
-          toName: custRow?.name ?? undefined,
-          applicationId: data.applicationId ?? undefined,
-        },
-      );
-    } catch (e) {
-      console.error("[tickets] ticket_created email failed", e);
-    }
-
     return { id: ins!.id, ticket_number: ins!.ticket_number };
   });
 
@@ -332,7 +310,7 @@ export const updateTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Send ticket_resolved email when transitioning to resolved.
+    // Close auto-close scheduler when transitioning to resolved.
     if (data.status === "resolved") {
       // Cancel any armed auto-close scheduler
       try {
@@ -342,35 +320,6 @@ export const updateTicket = createServerFn({ method: "POST" })
         await cancelTicketAutocloseByTicket(data.id, "resolved_by_staff");
       } catch { /* non-fatal */ }
 
-      const recipient = (row as any).ticket_email as string | null;
-      if (recipient) {
-        try {
-          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-          const { data: cust } = await admin
-            .from("customers")
-            .select("name")
-            .eq("id", row.customer_id!)
-            .maybeSingle();
-          await enqueueFromTemplateInternal(
-            "ticket_resolved",
-            recipient,
-            {
-              customerName: (cust as { name?: string | null } | null)?.name ?? "",
-              ticketNumber: row.ticket_number ?? "",
-              ticketSubject: (row as any).subject ?? "",
-              resolutionNote:
-                data.resolutionNote ||
-                "Our team has completed the requested action for this ticket.",
-              fromName: process.env.ZOHO_FROM_NAME || "Business Help Services Support",
-            },
-            {
-              applicationId: row.application_id ?? undefined,
-            },
-          );
-        } catch (e) {
-          console.error("[tickets] ticket_resolved email failed", e);
-        }
-      }
     }
 
     return { ok: true };

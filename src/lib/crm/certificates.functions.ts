@@ -208,7 +208,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
 </body></html>`;
       const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
       await enqueueEmailInternal({
-        templateCode: "certificate_delivery",
+        templateCode: "order_completed",
         toEmail: lead.email,
         toName: lead.name,
         subject,

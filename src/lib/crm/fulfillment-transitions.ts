@@ -41,8 +41,7 @@ export const FULFILLMENT_BADGE: Record<FulfillmentStatus, string> = {
 
 // Allowed forward transitions. Backward moves require an admin override
 // (server-side check by role). `completed` is gated by certificate upload.
-// `cancelled` is NEVER a direct dropdown choice — it is reached only through
-// the multi-stage Cancellation & Refund workflow (see CancellationPanel).
+// `cancelled` is not part of the standard forward path; use close/refund actions.
 export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatus[]> = {
   order_received:        ["documents_received"],
   documents_received:    ["verification_pending"],

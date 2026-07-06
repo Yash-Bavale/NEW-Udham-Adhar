@@ -22,8 +22,7 @@ const Input = z
   });
 
 /**
- * Queue a `docs_required_reminder` email to the customer and log an activity row.
- * Uses the canonical template code that is seeded in Phase 9 (Part I).
+ * Queue a manual reminder email to the customer and log an activity row.
  */
 export const queueDocumentReminder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -56,13 +55,13 @@ export const queueDocumentReminder = createServerFn({ method: "POST" })
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
       await enqueueFromTemplateInternal(
-        "docs_required_reminder",
+        "bhs_e005_manual_reminder",
         lead.email,
         {
           customer_name: lead.name ?? "Customer",
           service_name: lead.service ?? "your service",
           order_number: lead.lead_code ?? "",
-          document_checklist: "Please upload the pending documents to continue.",
+          message: "Please upload the pending documents to continue.",
         },
         { toName: lead.name ?? undefined, leadId: lead.id, applicationId: applicationId ?? undefined },
       );
@@ -72,7 +71,7 @@ export const queueDocumentReminder = createServerFn({ method: "POST" })
       // UI toast can guide the operator.
       throw new Error(
         msg.includes("not found")
-          ? "Reminder template 'docs_required_reminder' is missing. Seed templates from Super Admin → System."
+          ? "Manual reminder template is missing."
           : msg,
       );
     }

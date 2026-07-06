@@ -7,33 +7,39 @@ import { SectionCard } from "@/components/admin/ui";
 import { toast } from "sonner";
 
 type Table = "workflow_delay_reasons" | "workflow_closure_reasons";
+type View = "customer" | "internal" | "closure";
 
 export function ReasonLibraryTab() {
-  const [table, setTable] = useState<Table>("workflow_delay_reasons");
+  const [view, setView] = useState<View>("customer");
+  const table: Table = view === "closure" ? "workflow_closure_reasons" : "workflow_delay_reasons";
   return (
     <div className="space-y-3">
       <div className="flex gap-2 text-sm">
-        {(["workflow_delay_reasons", "workflow_closure_reasons"] as Table[]).map((t) => (
+        {([
+          ["customer", "Customer-side Delay"],
+          ["internal", "Our-side Delay"],
+          ["closure", "Closure Reasons"],
+        ] as const).map(([id, label]) => (
           <button
-            key={t}
-            onClick={() => setTable(t)}
+            key={id}
+            onClick={() => setView(id)}
             className="rounded-md px-3 py-1.5 border"
             style={{
-              background: table === t ? "var(--admin-primary)" : "var(--admin-surface)",
-              color: table === t ? "#fff" : "var(--admin-fg)",
+              background: view === id ? "var(--admin-primary)" : "var(--admin-surface)",
+              color: view === id ? "#fff" : "var(--admin-fg)",
               borderColor: "var(--admin-border)",
             }}
           >
-            {t === "workflow_delay_reasons" ? "Delay Reasons" : "Closure Reasons"}
+            {label}
           </button>
         ))}
       </div>
-      <ReasonTable table={table} />
+      <ReasonTable table={table} side={view === "closure" ? undefined : view} />
     </div>
   );
 }
 
-function ReasonTable({ table }: { table: Table }) {
+function ReasonTable({ table, side }: { table: Table; side?: "customer" | "internal" }) {
   const qc = useQueryClient();
   const fnList = useServerFn(listReasons);
   const fnDel = useServerFn(deleteReason);
@@ -44,6 +50,7 @@ function ReasonTable({ table }: { table: Table }) {
     queryKey: ["reason-library", table],
     queryFn: () => fnList({ data: { table } }),
   });
+  const rows = (data?.rows ?? []).filter((r: any) => !side || (r.side ?? "customer") === side);
 
   const del = useMutation({
     mutationFn: (id: string) => fnDel({ data: { table, id } }),
@@ -56,7 +63,7 @@ function ReasonTable({ table }: { table: Table }) {
 
   return (
     <SectionCard
-      title={table === "workflow_delay_reasons" ? "Delay Reasons" : "Closure Reasons"}
+      title={side === "customer" ? "Customer-side Delay Reasons" : side === "internal" ? "Our-side Delay Reasons" : "Closure Reasons"}
       action={
         <button
           onClick={() => { setEditing(null); setOpen(true); }}
@@ -82,7 +89,7 @@ function ReasonTable({ table }: { table: Table }) {
             </tr>
           </thead>
           <tbody>
-            {(data?.rows ?? []).map((r: any) => (
+            {rows.map((r: any) => (
               <tr key={r.id} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
                 <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
                 <td className="px-4 py-2">{r.label}</td>
@@ -101,18 +108,18 @@ function ReasonTable({ table }: { table: Table }) {
                 </td>
               </tr>
             ))}
-            {!data?.rows?.length && (
+            {!rows.length && (
               <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">No reasons yet.</td></tr>
             )}
           </tbody>
         </table>
       )}
-      {open && <ReasonDialog table={table} initial={editing} onClose={() => setOpen(false)} />}
+      {open && <ReasonDialog table={table} side={side} initial={editing} onClose={() => setOpen(false)} />}
     </SectionCard>
   );
 }
 
-function ReasonDialog({ table, initial, onClose }: { table: Table; initial: any | null; onClose: () => void }) {
+function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: "customer" | "internal"; initial: any | null; onClose: () => void }) {
   const qc = useQueryClient();
   const fn = useServerFn(upsertReason);
   const [code, setCode] = useState(initial?.code ?? "");
@@ -130,6 +137,8 @@ function ReasonDialog({ table, initial, onClose }: { table: Table; initial: any 
           code,
           label,
           description: description || null,
+          side,
+          emailTemplateCode: side === "customer" ? "bhs_e003_customer_delay" : null,
           sortOrder,
           isActive,
         },

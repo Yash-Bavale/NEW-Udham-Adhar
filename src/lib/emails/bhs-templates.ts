@@ -16,7 +16,7 @@ export const BHS_EMAILS = {
   E002_FORM_LINK: 'welcome_and_form_link',
   /** E003 — Customer-side delay notice (starts Scheduler 2). */
   E003_CUSTOMER_DELAY: 'bhs_e003_customer_delay',
-  /** E004 — Order auto-closed after 24 business hours of no reply. */
+  /** E004 — Order auto-closed after 8 business hours of no reply. */
   E004_ORDER_AUTO_CLOSED: 'order_closure_confirmation',
   /** E005 — Manual reminder from Employee Action Panel. */
   E005_MANUAL_REMINDER: 'bhs_e005_manual_reminder',

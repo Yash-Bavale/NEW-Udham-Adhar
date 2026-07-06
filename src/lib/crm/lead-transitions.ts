@@ -105,10 +105,6 @@ export const LEAD_STATUS_LABEL: Record<LeadStatusV2, string> = {
 // helper falls back to a stub when a row is missing in email_templates.
 export const LEAD_STATUS_EMAIL: Partial<Record<LeadStatusV2, string>> = {
   payment_successful: "order_confirmation",
-  welcome_mail_sent:  "welcome_and_form_link",
-  documents_pending:  "docs_required_reminder",
-  uninterested:       "customer_uninterested_reason_request",
-  under_process:      "service_started_notification",
   refunded:           "refund_processed_confirmation",
   closed_refunded:    "refund_processed_confirmation",
 };

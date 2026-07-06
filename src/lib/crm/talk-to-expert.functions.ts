@@ -185,22 +185,15 @@ export const sendConsultationPaymentLink = createServerFn({ method: "POST" })
     const total = Number((link as any).amount ?? lead.total_amount ?? 0);
     const paymentUrl = (link as any).payment_url as string;
 
-    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-    await enqueueFromTemplateInternal(
-      "consultation_service_converted",
-      lead.email,
-      {
-        customer_name: lead.name,
-        order_number: leadCode,
-        service: lead.service,
-        payment_url: paymentUrl,
-        total_amount: total.toFixed(2),
-        support_email: "help@businesshelpservices.com",
-        business_name: "Business Help Services",
-        website: "udyamadhar.in",
-      },
-      { toName: lead.name, leadId: lead.id },
-    );
+    const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+    await enqueueEmailInternal({
+      toEmail: lead.email,
+      toName: lead.name,
+      subject: `Payment link for ${lead.service ?? "your consultation"}`,
+      bodyHtml: `<p>Hi ${lead.name ?? "Customer"},</p><p>Your payment link is ready for <b>${lead.service ?? "your consultation"}</b>.</p><p><a href="${paymentUrl}">Pay ₹${total.toFixed(2)}</a></p><p>Order: ${leadCode}</p>`,
+      leadId: lead.id,
+      variables: { payment_url: paymentUrl, total_amount: total.toFixed(2) },
+    });
 
     await supabaseAdmin.from("activity_logs").insert({
       lead_id: lead.id,

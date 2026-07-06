@@ -335,7 +335,7 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
       await enqueueFromTemplateInternal(
-        "payment_success",
+        "order_confirmation",
         lead.email,
         {
           name: lead.name ?? "",
@@ -386,7 +386,7 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
         await logInvoiceEvent(inv.id, "emailed", {
           recipient: lead.email,
           attachment: attachment.filename,
-          template: "payment_success",
+          template: "order_confirmation",
         }, actor);
       }
 

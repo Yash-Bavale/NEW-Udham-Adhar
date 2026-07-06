@@ -253,7 +253,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
               await logWebhookError("payu", `invoice: ${e instanceof Error ? e.message : "unknown"}`, rawPayload);
             }
 
-            // 6. Send order_confirmation (with PDF attached) + welcome_and_form_link (30s delay).
+            // 6. Send E001 order confirmation with invoice PDF attached.
             try {
               const { data: leadRow } = await supabaseAdmin
                 .from("leads")
@@ -298,12 +298,10 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   support_email: "help@businesshelpservices.com",
                 };
 
-                // Payment success — immediate, with invoice PDF attached.
-                // Uses the enabled `payment_success` template (the Zoho-style
-                // "Order Confirmation & Tax Invoice" email customers expect).
+                // E001 — immediate order confirmation / receipt.
                 try {
                   await enqueueFromTemplateInternal(
-                    "payment_success",
+                    "order_confirmation",
                     leadRow.email,
                     commonVars,
                     {
@@ -317,7 +315,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
                   await markInvoiceEmailedByPayment(payment.id, {
                     recipient: leadRow.email,
-                    template: "payment_success",
+                    template: "order_confirmation",
                     attachmentFilename: invoiceAttachment?.filename ?? null,
                     success: true,
                     actorLabel: "payu-webhook",
@@ -326,7 +324,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   const { markInvoiceEmailedByPayment } = await import("@/lib/crm/invoices.functions");
                   await markInvoiceEmailedByPayment(payment.id, {
                     recipient: leadRow.email,
-                    template: "payment_success",
+                    template: "order_confirmation",
                     attachmentFilename: invoiceAttachment?.filename ?? null,
                     success: false,
                     error: e instanceof Error ? e.message : String(e),
@@ -334,21 +332,6 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   });
                   throw e;
                 }
-
-                // Welcome + form link — 30s later so it lands after the receipt.
-                await enqueueFromTemplateInternal(
-                  "welcome_and_form_link",
-                  leadRow.email,
-                  commonVars,
-                  { toName: leadRow.name ?? undefined, leadId: payment.lead_id, applicationId: applicationId ?? undefined, delaySeconds: 30 },
-                );
-
-
-
-                // 7. Advance lead to welcome_mail_sent now that the welcome email is queued.
-                await supabaseAdmin.from("leads")
-                  .update({ lead_status_v2: "welcome_mail_sent" } as any)
-                  .eq("id", payment.lead_id);
               }
             } catch (e) {
               console.error("[payu] post-payment email enqueue failed", e);

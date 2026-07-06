@@ -17,7 +17,6 @@ import {
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
-import { CancellationPanel } from "@/components/admin/CancellationPanel";
 
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import {
@@ -315,12 +314,12 @@ export function OrderActionRail(p: Props) {
 
       {lane === "cancellation" && (
         <div className="px-5 py-4 space-y-3">
-          <CancellationPanel
-            applicationId={p.applicationId}
-            closureStage={p.closureStage} closureNextAt={p.closureNextAt}
-            cancellationRequestedAt={p.cancellationRequestedAt}
-            reasonCode={p.reasonCode} reasonText={p.reasonText}
-          />
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+            <div className="font-semibold">Order is closed/cancelled</div>
+            <div className="mt-1 text-rose-800/80">
+              Use Support Ticket actions for customer replies, or Refund actions for refund processing.
+            </div>
+          </div>
           {isSuperAdmin && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs text-emerald-900">
@@ -339,8 +338,8 @@ export function OrderActionRail(p: Props) {
       )}
 
       {/* Dialogs */}
-      <ExternalDelayDialog applicationId={p.applicationId} open={delayOpen} onClose={() => { setDelayOpen(false); refresh(); }} />
-      <ExternalDelayDialog applicationId={p.applicationId} open={holdOpen} onClose={() => { setHoldOpen(false); refresh(); }} />
+      <ExternalDelayDialog applicationId={p.applicationId} initialSide="internal" open={delayOpen} onClose={() => { setDelayOpen(false); refresh(); }} />
+      <ExternalDelayDialog applicationId={p.applicationId} initialSide="customer" open={holdOpen} onClose={() => { setHoldOpen(false); refresh(); }} />
       <CloseOrderDialog applicationId={p.applicationId} open={closeOpen} onClose={() => { setCloseOpen(false); refresh(); }} />
       <CompletionGateDialogStandalone
         open={certOpen} onOpenChange={setCertOpen} orderId={p.applicationId} busy={busy}

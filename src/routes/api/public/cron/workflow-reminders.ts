@@ -30,8 +30,8 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
           let processed = 0;
           let sent = 0;
           const NEXT_KIND: Record<string, { kind: string; tplCode: string; daysFromNow: number } | null> = {
-            followup_3d: { kind: "followup_5d", tplCode: "workflow_processing_update_3d", daysFromNow: 2 },
-            followup_5d: { kind: "followup_7d", tplCode: "workflow_processing_update_3d", daysFromNow: 2 },
+            followup_3d: null,
+            followup_5d: null,
             followup_7d: null,
             custom: null,
             pending_closure_followup: null,
@@ -68,6 +68,13 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
 
               if (r.template_code && lead?.email) {
                 const payload: any = r.payload ?? {};
+                const allowedTemplates = new Set([
+                  "order_confirmation", "welcome_and_form_link", "bhs_e003_customer_delay",
+                  "order_closure_confirmation", "bhs_e005_manual_reminder", "order_completed",
+                  "bhs_e007_feedback", "support_ticket_closed", "support_ticket_closed_final",
+                  "bhs_e010_ticket_autoclose", "refund_processed_confirmation", "bhs_e012_submitted_to_govt",
+                ]);
+                if (!allowedTemplates.has(String(r.template_code))) continue;
                 await enqueueFromTemplateInternal(
                   r.template_code,
                   lead.email,

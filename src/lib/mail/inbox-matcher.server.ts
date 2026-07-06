@@ -97,8 +97,8 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   if (ticketMatch) {
     const senderOk =
       !!fromEmail &&
-      !!ticketMatch.ticketEmail &&
-      fromEmail.trim().toLowerCase() === ticketMatch.ticketEmail.trim().toLowerCase();
+      (!ticketMatch.ticketEmail ||
+        fromEmail.trim().toLowerCase() === ticketMatch.ticketEmail.trim().toLowerCase());
 
     if (!senderOk) {
       await supabaseAdmin.from("inbound_email_quarantine").insert({
@@ -155,7 +155,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     fromEmail,
   });
 
-  if (matched?.applicationId) result.matched += 1;
+  if (matched?.applicationId || matched?.customerId) result.matched += 1;
   else result.unmatched += 1;
 
   const { data: logRow, error: logErr } = await supabaseAdmin
@@ -182,15 +182,20 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
 
   if (logErr) throw new Error(logErr.message);
 
-  if (matched?.applicationId) {
-    await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
-    await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
+  if (matched?.applicationId || matched?.customerId) {
+    if (matched.applicationId) {
+      await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
+      await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
+    }
     await openOrAppendTicket({
       applicationId: matched.applicationId,
       customerId: matched.customerId,
+      leadId: matched.leadId,
       subject,
       body: bodyText,
       fromEmail,
+      messageId,
+      inReplyTo,
     });
   } else if (fromEmail) {
     await supabaseAdmin.from("inbound_email_quarantine").insert({
@@ -397,6 +402,30 @@ async function matchOrder(input: {
       // Customer known but no open order — still tag customer.
       return { applicationId: null, leadId: null, customerId };
     }
+
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("id, customer_id")
+      .ilike("email", input.fromEmail)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const leadRow = lead as { id: string; customer_id: string | null } | null;
+    if (leadRow?.id) {
+      const { data: app } = await supabaseAdmin
+        .from("applications")
+        .select("id, lead_id, customer_id, order_status, created_at")
+        .eq("lead_id", leadRow.id)
+        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (app) {
+        const r = app as { id: string; lead_id: string | null; customer_id: string | null };
+        return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id ?? leadRow.customer_id };
+      }
+      return { applicationId: null, leadId: leadRow.id, customerId: leadRow.customer_id };
+    }
   }
 
   return null;
@@ -419,23 +448,30 @@ async function pauseActiveCustomerScheduler(applicationId: string, ticketOrLogId
 }
 
 async function openOrAppendTicket(input: {
-  applicationId: string;
+  applicationId: string | null;
   customerId: string | null;
+  leadId?: string | null;
   subject: string;
   body: string;
   fromEmail: string | null;
+  messageId?: string | null;
+  inReplyTo?: string | null;
 }) {
   // Find any open ticket for this order in the last 30 days.
   const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-  const { data: existing } = await supabaseAdmin
+  let existingQuery = supabaseAdmin
     .from("support_tickets")
     .select("id")
-    .eq("application_id", input.applicationId)
     .in("status", ["open", "in_progress", "waiting_customer"])
     .gte("created_at", cutoff)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  existingQuery = input.applicationId
+    ? existingQuery.eq("application_id", input.applicationId)
+    : input.customerId
+      ? existingQuery.eq("customer_id", input.customerId).is("application_id", null)
+      : existingQuery.eq("ticket_email", input.fromEmail ?? "").is("application_id", null);
+  const { data: existing } = await existingQuery.maybeSingle();
 
   const ticket = existing as { id: string } | null;
   let ticketId = ticket?.id ?? null;
@@ -467,6 +503,8 @@ async function openOrAppendTicket(input: {
     reply_text: `From: ${input.fromEmail || "unknown"}\n\n${input.body.slice(0, 4000)}`,
     is_internal: false,
     direction: "inbound",
+    email_message_id: input.messageId ?? null,
+    email_in_reply_to: input.inReplyTo ?? null,
   } as never);
 
   // Update ticket state: customer replied → move to open + timestamp

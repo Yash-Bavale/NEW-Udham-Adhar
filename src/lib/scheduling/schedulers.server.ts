@@ -1,4 +1,4 @@
-// Scheduler engine (server-only). Powers Scheduler 2 (24h business-time closure)
+// Scheduler engine (server-only). Powers Scheduler 2 (8-business-hour closure)
 // and later Scheduler 3 (reminders). Uses office-hours math from
 // `src/lib/scheduling/business-hours.ts` and the `order_schedulers` table.
 
@@ -16,7 +16,7 @@ export const SCHEDULER_CUSTOMER_CLOSURE = "customer_closure_24h" as const;
 export const SCHEDULER_OUR_SIDE_REMINDER = "our_side_reminder" as const;
 export const SCHEDULER_TICKET_AUTOCLOSE = "ticket_autoclose_24h" as const;
 export const SCHEDULER_FEEDBACK_FOLLOWUP = "feedback_followup" as const;
-const DEFAULT_CLOSURE_SECONDS = 24 * 3600;
+const DEFAULT_CLOSURE_SECONDS = 8 * 3600;
 const DEFAULT_REMINDER_INTERVAL_SECONDS = 2 * 3600; // 2 business hours
 const REMINDER_ESCALATION_THRESHOLD = 3;
 const DEFAULT_TICKET_AUTOCLOSE_SECONDS = 24 * 3600;
@@ -53,7 +53,7 @@ export async function readBusinessHoursConfig(): Promise<BusinessHoursConfig> {
 }
 
 /**
- * Start Scheduler 2 (Customer-Side Delay → auto-close in 24 business hours).
+ * Start Scheduler 2 (Customer-Side Delay → auto-close in 8 business hours).
  * Cancels any existing active `customer_closure_24h` scheduler for the order first.
  */
 export async function startCustomerClosureScheduler(input: {
@@ -465,7 +465,7 @@ async function fireCustomerClosure(s: {
     .update({
       order_status: "CLOSED",
       closure_reason_id: s.reason_id,
-      closure_remarks: s.remarks ?? "Auto-closed after 24 business hours of no reply",
+      closure_remarks: s.remarks ?? "Auto-closed after 8 business hours of no reply",
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", s.application_id);
@@ -477,7 +477,7 @@ async function fireCustomerClosure(s: {
     event_type: "order_status_change",
     old_value: order.order_status as string,
     new_value: "CLOSED",
-    notes: "Scheduler 2 auto-close (24h business time)",
+    notes: "Scheduler 2 auto-close (8h business time)",
     staff_name: "System",
     staff_role: "system",
   } as never);
