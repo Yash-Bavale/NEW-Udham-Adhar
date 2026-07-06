@@ -115,7 +115,7 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no")
+      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no, dispatch_mode")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
