@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
+import { OrderActionRail } from "./OrderActionRail";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
