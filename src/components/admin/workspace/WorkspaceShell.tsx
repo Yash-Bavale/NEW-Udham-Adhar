@@ -381,9 +381,10 @@ export function WorkspaceShell(p: Props) {
             </TabsContent>
 
             <TabsContent value="support" className="mt-0 animate-fade-in">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-                Support tickets linked to this order will appear here.
-              </div>
+              <OrderTicketsPanel
+                orderTickets={p.data.orderTickets ?? []}
+                customerTickets={p.data.customerTickets ?? []}
+              />
             </TabsContent>
           </div>
 
