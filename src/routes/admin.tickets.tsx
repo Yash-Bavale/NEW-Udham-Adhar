@@ -145,6 +145,7 @@ function TicketsPage() {
                 style={{ color: "var(--admin-fg-muted)" }}
               >
                 <th className="px-4 py-2">Ticket No</th>
+                <th className="px-4 py-2">Order</th>
                 <th className="px-4 py-2">Customer</th>
                 <th className="px-4 py-2">Service</th>
                 <th className="px-4 py-2">Subject</th>
@@ -154,6 +155,19 @@ function TicketsPage() {
                 <th className="px-4 py-2">Created</th>
                 <th className="px-4 py-2"></th>
               </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={10}>
+                    <TableSkeleton rows={6} cols={10} />
+                  </td>
+                </tr>
+              )}
+              {!isLoading && (data?.tickets ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={10}>
+
             </thead>
             <tbody>
               {isLoading && (
