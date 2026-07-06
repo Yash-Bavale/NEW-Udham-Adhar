@@ -276,29 +276,20 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     const uniqueStaff = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
     const avgOrderValue = paidPayments > 0 ? Math.round(revenueCurrent / paidPayments) : 0;
 
-    // ---- Repeated leads (paginated, dedupe across mobile+email) ----
+    // ---- Repeated leads (same customer, filled the form more than once
+    // inside the selected range). We rely on the `is_duplicate` flag already
+    // maintained by src/lib/leads.functions.ts (dedupes by mobile OR email
+    // within 30 days) so the count reflects "same customer, multiple
+    // submissions" — not distinct rows in the leads table.
     let repeatedLeads = 0;
     {
-      const mobiles = new Map<string, number>();
-      const emails = new Map<string, number>();
-      const page = 1000;
-      for (let from = 0; from < 500_000; from += page) {
-        const { data, error } = await admin
-          .from("leads")
-          .select("mobile, email")
-          .range(from, from + page - 1);
-        if (error) break;
-        const rows = data ?? [];
-        for (const r of rows as Array<{ mobile: string | null; email: string | null }>) {
-          if (r.mobile) mobiles.set(r.mobile, (mobiles.get(r.mobile) ?? 0) + 1);
-          if (r.email) emails.set(r.email.toLowerCase(), (emails.get(r.email.toLowerCase()) ?? 0) + 1);
-        }
-        if (rows.length < page) break;
-      }
-      let dup = 0;
-      for (const n of mobiles.values()) if (n > 1) dup += n;
-      for (const n of emails.values()) if (n > 1) dup += n;
-      repeatedLeads = dup;
+      const { count } = await admin
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("is_duplicate", true)
+        .gte("created_at", startIso)
+        .lt("created_at", endIso);
+      repeatedLeads = count ?? 0;
     }
 
     return {
