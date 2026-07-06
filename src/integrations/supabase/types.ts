@@ -1281,6 +1281,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           disabled_reason: string | null
+          dispatch_mode: string
           flow_id: string | null
           id: string
           is_enabled: boolean
@@ -1304,6 +1305,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disabled_reason?: string | null
+          dispatch_mode?: string
           flow_id?: string | null
           id?: string
           is_enabled?: boolean
@@ -1327,6 +1329,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           disabled_reason?: string | null
+          dispatch_mode?: string
           flow_id?: string | null
           id?: string
           is_enabled?: boolean
