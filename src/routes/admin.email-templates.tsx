@@ -334,6 +334,40 @@ function DisableConfirmDialog({ tpl, onClose, onConfirmed }: { tpl: Tpl; onClose
   );
 }
 
+function DispatchToggle({ tpl, disabled, onChanged }: { tpl: Tpl; disabled: boolean; onChanged: () => void }) {
+  const setMode = useServerFn(setEmailTemplateDispatchMode);
+  const [busy, setBusy] = useState(false);
+  const mode: "auto" | "manual" = tpl.dispatch_mode ?? "auto";
+  const toggle = async () => {
+    if (disabled || busy) return;
+    const next = mode === "auto" ? "manual" : "auto";
+    setBusy(true);
+    try {
+      await setMode({ data: { code: tpl.code, dispatch_mode: next } });
+      toast.success(`${tpl.name}: ${next === "auto" ? "Automated" : "Manual only"}`);
+      onChanged();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  const isAuto = mode === "auto";
+  return (
+    <button
+      onClick={toggle}
+      disabled={disabled || busy}
+      title={isAuto ? "Sent automatically by the system" : "Employee must send manually"}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+        isAuto
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+      } disabled:opacity-50`}
+    >
+      <span className={`size-1.5 rounded-full ${isAuto ? "bg-emerald-500" : "bg-amber-500"}`} />
+      {isAuto ? "Automated" : "Manual"}
+    </button>
+  );
+}
+
+
 function EditorDrawer({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
   const save = useServerFn(saveEmailTemplate);
   const qc = useQueryClient();
