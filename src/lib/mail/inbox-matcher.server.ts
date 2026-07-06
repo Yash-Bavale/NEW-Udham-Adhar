@@ -226,7 +226,7 @@ async function matchTicket(input: {
     const ticketNumber = tokenMatch[1].toUpperCase();
     const { data } = await supabaseAdmin
       .from("support_tickets")
-      .select("id, ticket_email, application_id, customer_id, lead_id")
+      .select("id, ticket_email, application_id, customer_id")
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
     if (data) {
@@ -253,7 +253,7 @@ async function matchTicket(input: {
     if (row?.ticket_id) {
       const { data: t } = await supabaseAdmin
         .from("support_tickets")
-        .select("id, ticket_email, application_id, customer_id, lead_id")
+        .select("id, ticket_email, application_id, customer_id")
         .eq("id", row.ticket_id)
         .maybeSingle();
       if (t) {
