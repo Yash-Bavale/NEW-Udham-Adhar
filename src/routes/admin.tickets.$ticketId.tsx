@@ -291,6 +291,23 @@ function TicketDetailPage() {
                     <Lock className="size-2.5" /> Internal Note
                   </span>
                 )}
+                {r.direction === "inbound" && (
+                  <span
+                    className="ml-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ background: "rgba(2,132,199,0.14)", color: "#0369a1" }}
+                  >
+                    <Mail className="size-2.5" /> Inbound Email
+                  </span>
+                )}
+                {!r.is_internal && r.direction !== "inbound" && r.emailed_at && (ticket as any).ticket_email && (
+                  <span
+                    className="ml-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ background: "rgba(22,163,74,0.14)", color: "#15803d" }}
+                    title={`Delivered to ${(ticket as any).ticket_email}`}
+                  >
+                    <MailCheck className="size-2.5" /> Emailed to customer
+                  </span>
+                )}
               </header>
               <p
                 className="mt-1.5 whitespace-pre-line text-sm"
