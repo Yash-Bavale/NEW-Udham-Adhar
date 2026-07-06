@@ -40,6 +40,8 @@ function TicketDetailPage() {
   const updFn = useServerFn(updateTicket);
   const replyFn = useServerFn(replyToTicket);
   const staffFn = useServerFn(listStaffForAssignment);
+  const orderCtxFn = useServerFn(getTicketOrderContext);
+  const resumeFn = useServerFn(resolveTicketAndResumeOrder);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ticket", ticketId],
