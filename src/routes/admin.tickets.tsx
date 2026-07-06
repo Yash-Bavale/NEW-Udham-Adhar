@@ -156,23 +156,22 @@ function TicketsPage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-
-            </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={9}>
-                    <TableSkeleton rows={6} cols={9} />
+                  <td colSpan={10}>
+                    <TableSkeleton rows={6} cols={10} />
                   </td>
                 </tr>
               )}
               {!isLoading && (data?.tickets ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <Empty />
                   </td>
                 </tr>
               )}
+
               {!isLoading &&
                 (data?.tickets ?? []).map((t, i) => {
                   const sc = STATUS_COLOR[t.status];
