@@ -264,14 +264,49 @@ export async function enqueueFromTemplateInternal(
     return;
   }
 
+  let subject = renderTemplate(tpl.subject, variables);
+  const finalVars: Record<string, unknown> = { ...variables };
+
+  // Per-order threading: reuse Message-ID + subject from the first outbound mail
+  // for this application so Gmail/Outlook show ONE conversation.
+  if (opts?.applicationId) {
+    const { data: appRow } = await supabaseAdmin
+      .from("applications")
+      .select("email_thread_message_id, email_thread_subject")
+      .eq("id", opts.applicationId)
+      .maybeSingle();
+    const threadHead = (appRow as { email_thread_message_id?: string | null; email_thread_subject?: string | null } | null) ?? null;
+    if (threadHead?.email_thread_message_id) {
+      // Reply into existing thread — reuse subject and set In-Reply-To/References.
+      subject = threadHead.email_thread_subject
+        ? (threadHead.email_thread_subject.toLowerCase().startsWith("re:")
+            ? threadHead.email_thread_subject
+            : `Re: ${threadHead.email_thread_subject}`)
+        : `Re: ${subject}`;
+      finalVars.__in_reply_to = threadHead.email_thread_message_id;
+      finalVars.__references = threadHead.email_thread_message_id;
+    } else {
+      // First outbound on this order: mint a stable Message-ID and store it.
+      const mid = `<order.${opts.applicationId}.${Date.now()}@udyamadhar.in>`;
+      finalVars.__message_id = mid;
+      await supabaseAdmin
+        .from("applications")
+        .update({
+          email_thread_message_id: mid,
+          email_thread_subject: subject,
+        } as never)
+        .eq("id", opts.applicationId);
+    }
+  }
+
   return enqueueEmailInternal({
     templateCode: code,
     toEmail,
     toName: opts?.toName ?? null,
-    subject: renderTemplate(tpl.subject, variables),
+    subject,
     bodyHtml: renderTemplate(tpl.body_html, variables),
     bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
-    variables,
+    variables: finalVars,
     leadId: opts?.leadId ?? null,
     applicationId: opts?.applicationId ?? null,
     delaySeconds: opts?.delaySeconds,
