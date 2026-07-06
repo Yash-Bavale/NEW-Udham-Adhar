@@ -24,6 +24,7 @@ export const listTickets = createServerFn({ method: "POST" })
         pageSize: z.number().int().min(1).max(100).default(25),
         q: z.string().default(""),
         status: z.enum(TICKET_STATUSES).optional(),
+        statuses: z.array(z.enum(TICKET_STATUSES)).optional(),
         priority: z.enum(PRIORITIES).optional(),
         assignedTo: z.string().uuid().optional(),
         scope: z.enum(["mine", "all"]).default("all"),
