@@ -320,8 +320,8 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
         </span>
       </td>
       <td className="px-4 py-3 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
-        <div>{formatIST(order.created_at, "dd MMM yyyy")}</div>
-        <div className="text-slate-400">{formatIST(order.created_at, "hh:mm a")}</div>
+        <div>{formatIST(order.created_at, { dateOnly: true })}</div>
+        <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-right">
         <Link
