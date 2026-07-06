@@ -35,6 +35,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
             followup_7d: null,
             custom: null,
             pending_closure_followup: null,
+            internal_review: null,
           };
 
 
