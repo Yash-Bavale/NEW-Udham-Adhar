@@ -450,6 +450,10 @@ async function sendQueueRow(row: QueueRow) {
       typeof (variables as { __references?: string }).__references === "string"
         ? ((variables as { __references?: string }).__references as string)
         : parentMessageId;
+    const forcedMessageId =
+      typeof (variables as { __message_id?: string }).__message_id === "string"
+        ? ((variables as { __message_id?: string }).__message_id as string)
+        : undefined;
 
     const res = await sendViaZoho({
       to: recipient,
@@ -463,6 +467,7 @@ async function sendQueueRow(row: QueueRow) {
         content_base64: a.content_base64,
         content_type: a.content_type,
       })) : undefined,
+      messageId: forcedMessageId,
       inReplyTo: parentMessageId,
       references: referencesHeader,
       orderId: row.application_id,
