@@ -15,14 +15,28 @@ export const Route = createFileRoute("/admin/tickets/")({
   component: TicketsPage,
 });
 
-const STATUSES: { value: TicketStatus | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "open", label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting_customer", label: "Waiting on Customer" },
-  { value: "resolved", label: "Resolved" },
-  { value: "closed", label: "Closed" },
-];
+type View = "active" | "closed" | "all";
+
+const VIEW_STATUSES: Record<View, TicketStatus[] | undefined> = {
+  active: ["open", "in_progress", "waiting_customer"],
+  closed: ["resolved", "closed"],
+  all: undefined,
+};
+
+const SUB_FILTERS: Record<View, { value: TicketStatus | "all"; label: string }[]> = {
+  active: [
+    { value: "all", label: "All Active" },
+    { value: "open", label: "Open" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "waiting_customer", label: "Waiting on Customer" },
+  ],
+  closed: [
+    { value: "all", label: "All Closed" },
+    { value: "resolved", label: "Resolved" },
+    { value: "closed", label: "Closed" },
+  ],
+  all: [],
+};
 
 const STATUS_COLOR: Record<TicketStatus, { bg: string; fg: string }> = {
   open: { bg: "rgba(2,132,199,0.12)", fg: "#0369a1" },
@@ -41,19 +55,23 @@ const PRIORITY_COLOR: Record<string, { bg: string; fg: string; label: string }> 
 function TicketsPage() {
   const role = useRole();
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<TicketStatus | "all">("all");
+  const [view, setView] = useState<View>("active");
+  const [subStatus, setSubStatus] = useState<TicketStatus | "all">("all");
   const [scope, setScope] = useState<"mine" | "all">("all");
   const [q, setQ] = useState("");
 
   const fn = useServerFn(listTickets);
+  const effectiveStatuses =
+    subStatus !== "all" ? [subStatus] : VIEW_STATUSES[view];
+
   const { data, isLoading } = useQuery({
-    queryKey: ["tickets-list", page, status, scope, q],
+    queryKey: ["tickets-list", page, view, subStatus, scope, q],
     queryFn: () =>
       fn({
         data: {
           page,
           pageSize: 25,
-          status: status === "all" ? undefined : status,
+          statuses: effectiveStatuses,
           scope,
           q,
         },
@@ -105,36 +123,57 @@ function TicketsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
+      {/* Primary tabs — Active vs Closed */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b" style={{ borderColor: "var(--admin-border)" }}>
+        <div className="flex items-center gap-1">
+          {(["active", "closed", "all"] as View[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => { setView(v); setSubStatus("all"); setPage(1); }}
+              className="relative px-3 py-2 text-sm font-medium capitalize transition-colors"
+              style={{
+                color: view === v ? "var(--admin-accent)" : "var(--admin-fg-muted)",
+              }}
+            >
+              {v === "active" ? "Active" : v === "closed" ? "Closed & Resolved" : "All"}
+              {view === v && (
+                <span
+                  className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                  style={{ background: "var(--admin-accent)" }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="relative pb-2">
           <Search
             className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2"
             style={{ color: "var(--admin-fg-muted)" }}
           />
           <input
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
             placeholder="Search ticket number or subject"
             className="w-72 rounded-md border bg-transparent py-1.5 pl-8 pr-3 text-xs"
             style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
           />
         </div>
-        {STATUSES.map((s) => (
-          <FilterChip
-            key={s.value}
-            active={status === s.value}
-            onClick={() => {
-              setStatus(s.value);
-              setPage(1);
-            }}
-          >
-            {s.label}
-          </FilterChip>
-        ))}
       </div>
+
+      {/* Sub-filter chips (only for active/closed) */}
+      {view !== "all" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {SUB_FILTERS[view].map((s) => (
+            <FilterChip
+              key={s.value}
+              active={subStatus === s.value}
+              onClick={() => { setSubStatus(s.value); setPage(1); }}
+            >
+              {s.label}
+            </FilterChip>
+          ))}
+        </div>
+      )}
 
       <SectionCard>
         <div className="overflow-x-auto">
