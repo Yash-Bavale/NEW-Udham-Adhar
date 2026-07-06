@@ -108,7 +108,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       applicationId
         ? admin
             .from("payments")
-            .select("id, amount, status, gateway, paid_at, created_at")
+            .select("id, amount, status, gateway_name, paid_at, created_at")
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(10)
