@@ -9,12 +9,49 @@ const MAIL_HOST = `https://mail.zoho.${DC}`;
 
 type TokenCache = { token: string; expiresAt: number };
 let tokenCache: TokenCache | null = null;
+let accountIdCache: string | null = null;
 
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Zoho inbox: missing env ${name}`);
   return v.trim();
 }
+
+/** Resolve the numeric Zoho account ID. If ZOHO_MAIL_ACCOUNT_ID is set to a
+ *  numeric value we trust it; otherwise (empty or an email address) we call
+ *  /api/accounts and pick the account whose primary email matches, falling
+ *  back to the first account. Cached per-worker. */
+async function resolveAccountId(): Promise<string> {
+  if (accountIdCache) return accountIdCache;
+  const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
+  if (raw && /^\d+$/.test(raw)) {
+    accountIdCache = raw;
+    return raw;
+  }
+  const token = await getZohoAccessToken();
+  const res = await fetch(`${MAIL_HOST}/api/accounts`, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+  });
+  if (!res.ok) throw new Error(`Zoho GET /api/accounts failed: ${res.status}`);
+  const j = (await res.json()) as {
+    data?: Array<{ accountId?: string | number; primaryEmailAddress?: string; mailboxAddress?: string }>;
+  };
+  const list = j?.data ?? [];
+  if (list.length === 0) throw new Error("Zoho: no mail accounts on this token");
+  const wanted = raw.toLowerCase();
+  const match = wanted
+    ? list.find(
+        (a) =>
+          (a.primaryEmailAddress || "").toLowerCase() === wanted ||
+          (a.mailboxAddress || "").toLowerCase() === wanted,
+      )
+    : null;
+  const chosen = match ?? list[0];
+  if (!chosen?.accountId) throw new Error("Zoho: account has no accountId");
+  accountIdCache = String(chosen.accountId);
+  return accountIdCache;
+}
+
 
 /** Exchange refresh token for a 1h access token; cached in-memory per worker. */
 export async function getZohoAccessToken(): Promise<string> {
@@ -88,7 +125,7 @@ export type ZohoHeaders = {
 
 /** Find the Inbox folder ID for this account. */
 export async function getInboxFolderId(): Promise<string> {
-  const accountId = requireEnv("ZOHO_MAIL_ACCOUNT_ID");
+  const accountId = await resolveAccountId();
   const data = await zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
     `/api/accounts/${accountId}/folders`,
   );
@@ -100,7 +137,7 @@ export async function getInboxFolderId(): Promise<string> {
 
 /** List recent messages in Inbox (most recent first). */
 export async function listInboxMessages(limit = 50): Promise<ZohoMessageListItem[]> {
-  const accountId = requireEnv("ZOHO_MAIL_ACCOUNT_ID");
+  const accountId = await resolveAccountId();
   const folderId = await getInboxFolderId();
   const data = await zohoFetch<{ data: ZohoMessageListItem[] }>(
     `/api/accounts/${accountId}/messages/view?folderId=${folderId}&start=1&limit=${limit}&sortBy=date&sortorder=false`,
@@ -110,7 +147,7 @@ export async function listInboxMessages(limit = 50): Promise<ZohoMessageListItem
 
 /** Fetch the raw RFC-822 headers for a message as a lookup map. */
 export async function getMessageHeaders(messageId: string, folderId: string): Promise<ZohoHeaders> {
-  const accountId = requireEnv("ZOHO_MAIL_ACCOUNT_ID");
+  const accountId = await resolveAccountId();
   const data = await zohoFetch<{ data: string | Record<string, string> }>(
     `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/header`,
   );
@@ -140,7 +177,7 @@ export async function getMessageContent(
   messageId: string,
   folderId: string,
 ): Promise<{ html: string | null; text: string | null }> {
-  const accountId = requireEnv("ZOHO_MAIL_ACCOUNT_ID");
+  const accountId = await resolveAccountId();
   const data = await zohoFetch<{ data: { content?: string; contentType?: string } }>(
     `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/content`,
   );
