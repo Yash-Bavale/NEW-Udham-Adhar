@@ -55,7 +55,7 @@ export function ExternalDelayDialog({
           customerNote: customerNote || undefined,
           expectedReviewAt: expected,
           priority,
-          kind,
+          kind: side === "internal" ? "government_portal_pending" : "external_dependency",
         },
       });
     },
