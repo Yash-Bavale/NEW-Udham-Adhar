@@ -250,7 +250,6 @@ export const requestDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UploadReqInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await import("@/lib/forms/schema-loader.server");
     if (!ALLOWED_DOC_MIME.includes(data.mimeType.toLowerCase())) {
       throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
     }
@@ -282,7 +281,6 @@ export const confirmDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ConfirmInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await import("@/lib/forms/schema-loader.server");
     const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
 
     // Find any existing doc of same type to replace (keeps storage tidy)
@@ -326,7 +324,6 @@ export const listOnboardingForLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    await import("@/integrations/supabase/client.server");
     const { supabase } = context;
     const [subRes, docRes] = await Promise.all([
       supabase
@@ -375,7 +372,6 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
     }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await import("@/integrations/supabase/client.server");
     const { supabase, userId } = context;
     const verified = data.status === "approved";
     const { error } = await supabase
