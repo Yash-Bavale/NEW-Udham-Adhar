@@ -34,6 +34,9 @@ export function OrderWorkflowPanel({
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
+    qc.invalidateQueries({ queryKey: ["admin.order.notes", applicationId] });
+    qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
+    qc.invalidateQueries({ queryKey: ["order-exception-state", applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
   };
