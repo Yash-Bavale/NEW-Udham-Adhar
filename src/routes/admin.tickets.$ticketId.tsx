@@ -706,8 +706,16 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
   const border = isNote ? "#fde68a" : "var(--admin-border)";
 
   const [showQuoted, setShowQuoted] = useState(false);
-  const { visible, hidden } = useMemo(() => splitQuoted(bodyText, bodyHtml), [bodyText, bodyHtml]);
-  const safeHtml = useMemo(() => (visible.html ? DOMPurify.sanitize(visible.html, { ALLOWED_ATTR: ["href", "src", "alt", "title", "style"] }) : null), [visible.html]);
+  const cleaned = useMemo(() => cleanEmailBody({ html: bodyHtml, text: bodyText }), [bodyHtml, bodyText]);
+  const visibleSafeHtml = useMemo(
+    () => (cleaned.visibleHtml ? DOMPurify.sanitize(cleaned.visibleHtml, { ALLOWED_ATTR: ["href", "src", "alt", "title", "style", "target", "rel"] }) : null),
+    [cleaned.visibleHtml],
+  );
+  const hiddenSafeHtml = useMemo(
+    () => (cleaned.hiddenHtml ? DOMPurify.sanitize(cleaned.hiddenHtml, { ALLOWED_ATTR: ["href", "src", "alt", "title", "style", "target", "rel"] }) : null),
+    [cleaned.hiddenHtml],
+  );
+  const hasHidden = Boolean(hiddenSafeHtml || cleaned.hiddenText);
 
   return (
     <div className={`flex gap-3 ${isAgent ? "flex-row-reverse" : ""}`}>
@@ -729,17 +737,21 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
             {deliveryStatus && <span className="rounded bg-slate-100 px-1 text-[10px]">{deliveryStatus}</span>}
           </header>
           <div className="mt-2 text-sm leading-relaxed" style={{ color: "var(--admin-fg)" }}>
-            {safeHtml
-              ? <div className="prose prose-sm max-w-none [&_a]:text-blue-600" dangerouslySetInnerHTML={{ __html: safeHtml }} />
-              : <p className="whitespace-pre-wrap">{visible.text}</p>
+            {visibleSafeHtml
+              ? <div className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_p]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500" dangerouslySetInnerHTML={{ __html: visibleSafeHtml }} />
+              : <p className="whitespace-pre-wrap">{cleaned.visibleText}</p>
             }
-            {hidden && (
+            {hasHidden && (
               <>
                 <button type="button" onClick={() => setShowQuoted((v) => !v)} className="mt-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px]" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
                   <ChevronDown className={`size-3 transition-transform ${showQuoted ? "rotate-180" : ""}`} />
-                  {showQuoted ? "Hide" : "Show"} trimmed content
+                  {showQuoted ? "Hide" : "Show"} quoted history
                 </button>
-                {showQuoted && <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{hidden}</div>}
+                {showQuoted && (
+                  hiddenSafeHtml
+                    ? <div className="mt-2 border-l-2 pl-3 text-xs opacity-70 [&_a]:text-blue-600" style={{ borderColor: "var(--admin-border)" }} dangerouslySetInnerHTML={{ __html: hiddenSafeHtml }} />
+                    : <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{cleaned.hiddenText}</div>
+                )}
               </>
             )}
           </div>
@@ -747,17 +759,6 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
       </div>
     </div>
   );
-}
-
-function splitQuoted(text: string | null | undefined, html: string | null | undefined) {
-  if (html) return { visible: { html, text: null }, hidden: null as string | null };
-  if (!text) return { visible: { html: null, text: "" }, hidden: null };
-  const lines = text.split("\n");
-  const idx = lines.findIndex((l) => l.trim().startsWith(">") || /^On .+ wrote:$/i.test(l.trim()));
-  if (idx > 0 && idx < lines.length - 1) {
-    return { visible: { html: null, text: lines.slice(0, idx).join("\n").trimEnd() }, hidden: lines.slice(idx).join("\n") };
-  }
-  return { visible: { html: null, text }, hidden: null };
 }
 
 // ═══════════════════════════════════════════════════════════════
