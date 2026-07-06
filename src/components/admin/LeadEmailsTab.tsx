@@ -27,8 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import {
+  Mail, Send, History, Loader2, CheckCircle2, XCircle, Clock,
+  ChevronDown, ChevronRight, AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
+
 
 export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string; leadService: string; orderId?: string }) {
   const qc = useQueryClient();
