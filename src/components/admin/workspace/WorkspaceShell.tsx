@@ -297,13 +297,13 @@ export function WorkspaceShell(p: Props) {
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
           {/* Main */}
           <div className="min-w-0 space-y-5">
-            {/* Sticky "where are we + what's next" strip for every tab. */}
+            {/* Sticky "where are we + what's next" strip for every tab. Display-only —
+                the single action surface lives inside the Employee Workflow tab. */}
             <TabStatusHeader
               applicationCode={application.application_code}
               orderStatus={orderStatus}
               stage={p.stage}
               updatedAt={application.updated_at ?? application.created_at}
-              onPrimaryAction={handlePrimaryStep}
             />
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {p.showConsultationPanel ? (
