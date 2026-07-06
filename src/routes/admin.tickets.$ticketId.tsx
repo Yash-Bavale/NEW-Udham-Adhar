@@ -64,7 +64,7 @@ function TicketDetailPage() {
   const [showCanned, setShowCanned] = useState(false);
 
   const updMut = useMutation({
-    mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null }) =>
+    mutationFn: (patch: { status?: TicketStatus; assignedTo?: string | null; priority?: "urgent" | "high" | "medium" | "low" }) =>
       updFn({ data: { id: ticketId, ...patch } }),
     onSuccess: () => {
       toast.success("Ticket updated");
@@ -72,6 +72,29 @@ function TicketDetailPage() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
+
+  const applicationId = (data as any)?.ticket?.application_id ?? null;
+  const { data: orderCtx } = useQuery({
+    queryKey: ["ticket-order-ctx", applicationId],
+    queryFn: () => orderCtxFn({ data: { orderId: applicationId! } }),
+    enabled: !!applicationId,
+  });
+
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumeTo, setResumeTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
+  const [resumeNote, setResumeNote] = useState("");
+  const resumeMut = useMutation({
+    mutationFn: () => resumeFn({ data: { ticketId, resumeTo, note: resumeNote.trim() || undefined } }),
+    onSuccess: (res: any) => {
+      setResumeOpen(false);
+      setResumeNote("");
+      toast.success(`Ticket resolved · order resumed → ${res.resumeTo.replace(/_/g, " ")}`);
+      qc.invalidateQueries({ queryKey: ["ticket", ticketId] });
+      qc.invalidateQueries({ queryKey: ["ticket-order-ctx", applicationId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Resume failed"),
+  });
+
 
   const replyMut = useMutation({
     mutationFn: () =>
