@@ -57,7 +57,6 @@ type TabId = WorkspaceTabId;
 export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
-  const [pendingActionKey, setPendingActionKey] = useState<StatusActionKey | null>(null);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -73,12 +72,6 @@ export function WorkspaceShell(p: Props) {
     () => qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] }),
     [qc, p.orderId],
   );
-
-  /** Route the "next step" button (in TabStatusHeader) to the workflow tab + open dialog. */
-  const handlePrimaryStep = useCallback((key: StatusActionKey) => {
-    setTab("workflow");
-    setPendingActionKey(key);
-  }, []);
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
