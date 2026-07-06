@@ -190,7 +190,6 @@ import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AdminTicketsRouteImport } from './routes/admin.tickets'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
@@ -223,6 +222,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
+import { Route as AdminTicketsIndexRouteImport } from './routes/admin.tickets.index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin.orders.index'
 import { Route as AdminLeadsIndexRouteImport } from './routes/admin.leads.index'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
@@ -1197,11 +1197,6 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminTicketsRoute = AdminTicketsRouteImport.update({
-  id: '/tickets',
-  path: '/tickets',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminTasksRoute = AdminTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
@@ -1362,6 +1357,11 @@ const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   path: '/onboarding/$leadCode/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminTicketsIndexRoute = AdminTicketsIndexRouteImport.update({
+  id: '/tickets/',
+  path: '/tickets/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -1409,9 +1409,9 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminTicketsTicketIdRoute = AdminTicketsTicketIdRouteImport.update({
-  id: '/$ticketId',
-  path: '/$ticketId',
-  getParentRoute: () => AdminTicketsRoute,
+  id: '/tickets/$ticketId',
+  path: '/tickets/$ticketId',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSubmissionsSubmissionIdRoute =
   AdminSubmissionsSubmissionIdRouteImport.update({
@@ -1756,7 +1756,6 @@ export interface FileRoutesByFullPath {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -1786,6 +1785,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
@@ -2003,7 +2003,6 @@ export interface FileRoutesByTo {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -2033,6 +2032,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads': typeof AdminLeadsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
+  '/admin/tickets': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
@@ -2254,7 +2254,6 @@ export interface FileRoutesById {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
-  '/admin/tickets': typeof AdminTicketsRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
@@ -2284,6 +2283,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
@@ -2506,7 +2506,6 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
-    | '/admin/tickets'
     | '/admin/users'
     | '/admin/whatsapp-templates'
     | '/app/$token'
@@ -2536,6 +2535,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
     | '/admin/orders/'
+    | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
@@ -2753,7 +2753,6 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
-    | '/admin/tickets'
     | '/admin/users'
     | '/admin/whatsapp-templates'
     | '/app/$token'
@@ -2783,6 +2782,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads'
     | '/admin/orders'
+    | '/admin/tickets'
     | '/onboarding/$leadCode'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
@@ -3003,7 +3003,6 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
-    | '/admin/tickets'
     | '/admin/users'
     | '/admin/whatsapp-templates'
     | '/app/$token'
@@ -3033,6 +3032,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
     | '/admin/orders/'
+    | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/closure-workflow'
@@ -4524,13 +4524,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/tickets': {
-      id: '/admin/tickets'
-      path: '/tickets'
-      fullPath: '/admin/tickets'
-      preLoaderRoute: typeof AdminTicketsRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/tasks': {
       id: '/admin/tasks'
       path: '/tasks'
@@ -4755,6 +4748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingLeadCodeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/tickets/': {
+      id: '/admin/tickets/'
+      path: '/tickets'
+      fullPath: '/admin/tickets/'
+      preLoaderRoute: typeof AdminTicketsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders/': {
       id: '/admin/orders/'
       path: '/'
@@ -4820,10 +4820,10 @@ declare module '@tanstack/react-router' {
     }
     '/admin/tickets/$ticketId': {
       id: '/admin/tickets/$ticketId'
-      path: '/$ticketId'
+      path: '/tickets/$ticketId'
       fullPath: '/admin/tickets/$ticketId'
       preLoaderRoute: typeof AdminTicketsTicketIdRouteImport
-      parentRoute: typeof AdminTicketsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/submissions/$submissionId': {
       id: '/admin/submissions/$submissionId'
@@ -5096,18 +5096,6 @@ const AdminSubmissionsRouteChildren: AdminSubmissionsRouteChildren = {
 const AdminSubmissionsRouteWithChildren =
   AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
 
-interface AdminTicketsRouteChildren {
-  AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
-}
-
-const AdminTicketsRouteChildren: AdminTicketsRouteChildren = {
-  AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
-}
-
-const AdminTicketsRouteWithChildren = AdminTicketsRoute._addFileChildren(
-  AdminTicketsRouteChildren,
-)
-
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
@@ -5140,10 +5128,11 @@ interface AdminRouteChildren {
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
-  AdminTicketsRoute: typeof AdminTicketsRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
+  AdminTicketsIndexRoute: typeof AdminTicketsIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -5178,10 +5167,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
-  AdminTicketsRoute: AdminTicketsRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
+  AdminTicketsIndexRoute: AdminTicketsIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -5396,13 +5386,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

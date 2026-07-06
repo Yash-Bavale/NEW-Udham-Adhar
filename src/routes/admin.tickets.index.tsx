@@ -8,7 +8,7 @@ import { AddTicketDialog } from "@/components/admin/AddTicketDialog";
 import { SectionCard, TableSkeleton, FilterChip } from "@/components/admin/ui";
 import { useRole } from "@/hooks/useRole";
 
-export const Route = createFileRoute("/admin/tickets")({
+export const Route = createFileRoute("/admin/tickets/")({
   head: () => ({
     meta: [{ title: "Support Tickets — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }],
   }),
