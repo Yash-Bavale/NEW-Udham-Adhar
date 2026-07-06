@@ -156,7 +156,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_code")
+    .select("id, lead_id, customer_id, order_status, application_code, service_code, assigned_to")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -171,6 +171,36 @@ async function loadOrderContext(supabase: any, orderId: string) {
     customer = c as any;
   }
   return { order, customer };
+}
+
+/** Fire-and-forget: notify assignee (+ optional extra roles) about an order event. Never throws. */
+async function notifyOrderEvent(input: {
+  order: { id: string; application_code: string | null; assigned_to: string | null };
+  kind: string;
+  title: string;
+  body?: string;
+  alsoRoles?: string[]; // e.g. ["super_admin","finance"]
+}) {
+  try {
+    const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+    const href = `/admin/orders/${input.order.id}`;
+    const base = {
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      href,
+      entityKind: "order" as const,
+      entityId: input.order.id,
+    };
+    const targets: string[] = [];
+    if (input.order.assigned_to) targets.push(input.order.assigned_to);
+    if (targets.length > 0) await emitToUsers(targets, base);
+    for (const role of input.alsoRoles ?? []) {
+      await emitToRole(role, base);
+    }
+  } catch (e) {
+    console.warn("[notifyOrderEvent] failed:", e);
+  }
 }
 
 async function queueTemplateEmail(
