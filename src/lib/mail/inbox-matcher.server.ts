@@ -230,13 +230,13 @@ async function matchTicket(input: {
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
     if (data) {
-      const r = data as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null; lead_id: string | null };
+      const r = data as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
       return {
         ticketId: r.id,
         ticketEmail: r.ticket_email,
         applicationId: r.application_id,
         customerId: r.customer_id,
-        leadId: r.lead_id,
+        leadId: null,
       };
     }
   }
