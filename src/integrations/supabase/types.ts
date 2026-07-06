@@ -1275,11 +1275,13 @@ export type Database = {
         Row: {
           body_html: string
           body_text: string | null
+          category: string | null
           code: string
           created_at: string
           created_by: string | null
           description: string | null
           disabled_reason: string | null
+          flow_id: string | null
           id: string
           is_enabled: boolean
           is_system: boolean
@@ -1287,6 +1289,7 @@ export type Database = {
           last_toggled_at: string | null
           last_toggled_by: string | null
           name: string
+          sr_no: number | null
           subject: string
           total_sent: number
           updated_at: string
@@ -1295,11 +1298,13 @@ export type Database = {
         Insert: {
           body_html: string
           body_text?: string | null
+          category?: string | null
           code: string
           created_at?: string
           created_by?: string | null
           description?: string | null
           disabled_reason?: string | null
+          flow_id?: string | null
           id?: string
           is_enabled?: boolean
           is_system?: boolean
@@ -1307,6 +1312,7 @@ export type Database = {
           last_toggled_at?: string | null
           last_toggled_by?: string | null
           name: string
+          sr_no?: number | null
           subject: string
           total_sent?: number
           updated_at?: string
@@ -1315,11 +1321,13 @@ export type Database = {
         Update: {
           body_html?: string
           body_text?: string | null
+          category?: string | null
           code?: string
           created_at?: string
           created_by?: string | null
           description?: string | null
           disabled_reason?: string | null
+          flow_id?: string | null
           id?: string
           is_enabled?: boolean
           is_system?: boolean
@@ -1327,6 +1335,7 @@ export type Database = {
           last_toggled_at?: string | null
           last_toggled_by?: string | null
           name?: string
+          sr_no?: number | null
           subject?: string
           total_sent?: number
           updated_at?: string
