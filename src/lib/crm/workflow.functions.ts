@@ -279,7 +279,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         }
       }
     } else {
-      // ── Internal / our-side: no customer email; notify assignee + review reminder ──
+      // ── Internal / our-side: notify customer (informational) + assignee + review reminder ──
       const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
       await admin.from("workflow_reminders").insert({
         application_id: app.id,
@@ -296,6 +296,36 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         },
         created_by: context.userId,
       } as never);
+
+      // Best-effort informational email to the customer so they know we're actively
+      // working on it. Uses the reason's configured template if present, else the
+      // generic processing_update template. NO auto-closure follow-up.
+      if (lead?.email) {
+        try {
+          const internalTpl = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || "service_processing_update";
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+          await enqueueFromTemplateInternal(
+            internalTpl,
+            lead.email,
+            {
+              customer_name: lead.name ?? "Customer",
+              order_id: app.application_code ?? "",
+              order_number: app.application_code ?? "",
+              service_name: lead.service ?? "",
+              reason: data.reasonLabel,
+              reason_block: reasonBlock,
+              date: new Date().toLocaleDateString("en-IN"),
+              company_name: COMPANY_NAME,
+              support_email: SUPPORT_EMAIL,
+              customer_note: data.customerNote ?? "",
+            },
+            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+          );
+        } catch (e) {
+          console.error("[workflow] internal-delay customer email failed", e);
+        }
+      }
 
       if (lead?.assigned_to) {
         await admin.from("notifications").insert({
