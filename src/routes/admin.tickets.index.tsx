@@ -47,10 +47,12 @@ const STATUS_COLOR: Record<TicketStatus, { bg: string; fg: string }> = {
 };
 
 const PRIORITY_COLOR: Record<string, { bg: string; fg: string; label: string }> = {
+  urgent: { bg: "rgba(220,38,38,0.18)", fg: "#991b1b", label: "Urgent" },
   high: { bg: "rgba(220,38,38,0.12)", fg: "#b91c1c", label: "High" },
   medium: { bg: "rgba(217,119,6,0.12)", fg: "#b45309", label: "Medium" },
   low: { bg: "rgba(100,116,139,0.12)", fg: "#475569", label: "Low" },
 };
+const PRIORITY_FALLBACK = { bg: "rgba(100,116,139,0.12)", fg: "#475569", label: "—" };
 
 function TicketsPage() {
   const role = useRole();
