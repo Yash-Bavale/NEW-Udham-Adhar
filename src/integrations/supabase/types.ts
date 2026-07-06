@@ -1438,6 +1438,74 @@ export type Database = {
         }
         Relationships: []
       }
+      inbound_email_quarantine: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          created_at: string
+          from_email: string | null
+          id: string
+          in_reply_to: string | null
+          matched_ticket_email: string | null
+          matched_ticket_id: string | null
+          message_id: string | null
+          reason: string
+          received_at: string
+          review_action: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          subject: string | null
+          to_email: string | null
+          zoho_mail_uid: string | null
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          in_reply_to?: string | null
+          matched_ticket_email?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          reason: string
+          received_at?: string
+          review_action?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          subject?: string | null
+          to_email?: string | null
+          zoho_mail_uid?: string | null
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          in_reply_to?: string | null
+          matched_ticket_email?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          reason?: string
+          received_at?: string
+          review_action?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          subject?: string | null
+          to_email?: string | null
+          zoho_mail_uid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbound_email_quarantine_matched_ticket_id_fkey"
+            columns: ["matched_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_events: {
         Row: {
           actor_id: string | null

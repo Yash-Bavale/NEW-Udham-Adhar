@@ -82,8 +82,69 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   const fromEmail = extractEmail(headers.From) || extractEmail(msg.fromAddress);
   const toEmail = extractEmail(headers.To) || extractEmail(msg.toAddress) || "inbox@udyamadhar.in";
   const subject = headers.Subject || msg.subject || "(no subject)";
+  const receivedAt = msg.receivedTime
+    ? new Date(Number(msg.receivedTime)).toISOString()
+    : new Date().toISOString();
+  const bodyText = body.text || stripHtml(body.html) || "";
 
-  // ── Match order ────────────────────────────────────────────────────────
+  // ── Step 1: Try to match to an existing ticket (v2 flow) ───────────────
+  const ticketMatch = await matchTicket({
+    subject,
+    inReplyTo,
+    references,
+  });
+
+  if (ticketMatch) {
+    const senderOk =
+      !!fromEmail &&
+      !!ticketMatch.ticketEmail &&
+      fromEmail.trim().toLowerCase() === ticketMatch.ticketEmail.trim().toLowerCase();
+
+    if (!senderOk) {
+      await supabaseAdmin.from("inbound_email_quarantine").insert({
+        zoho_mail_uid: msg.messageId,
+        message_id: messageId,
+        in_reply_to: inReplyTo,
+        from_email: fromEmail,
+        to_email: toEmail,
+        subject,
+        body_text: bodyText.slice(0, 8000),
+        body_html: body.html,
+        reason: "sender_mismatch",
+        matched_ticket_id: ticketMatch.ticketId,
+        matched_ticket_email: ticketMatch.ticketEmail,
+        received_at: receivedAt,
+      } as never);
+      result.unmatched += 1;
+      return;
+    }
+
+    await appendReplyToTicket({
+      ticketId: ticketMatch.ticketId,
+      applicationId: ticketMatch.applicationId,
+      customerId: ticketMatch.customerId,
+      leadId: ticketMatch.leadId,
+      subject,
+      bodyText,
+      bodyHtml: body.html,
+      fromEmail,
+      toEmail,
+      messageId,
+      inReplyTo,
+      references,
+      zohoUid: msg.messageId,
+      receivedAt,
+    });
+
+    if (ticketMatch.applicationId) {
+      await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
+      await pauseActiveCustomerScheduler(ticketMatch.applicationId, null).catch(() => {});
+    }
+    result.matched += 1;
+    return;
+  }
+
+  // ── Step 2: Fall back to order-level match (legacy path) ───────────────
   const matched = await matchOrder({
     inReplyTo,
     references,
@@ -95,7 +156,6 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   if (matched?.applicationId) result.matched += 1;
   else result.unmatched += 1;
 
-  // ── Insert email_logs row ──────────────────────────────────────────────
   const { data: logRow, error: logErr } = await supabaseAdmin
     .from("email_logs")
     .insert({
@@ -113,16 +173,13 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       application_id: matched?.applicationId ?? null,
       lead_id: matched?.leadId ?? null,
       customer_id: matched?.customerId ?? null,
-      sent_at: msg.receivedTime
-        ? new Date(Number(msg.receivedTime)).toISOString()
-        : new Date().toISOString(),
+      sent_at: receivedAt,
     } as never)
     .select("id")
     .single();
 
   if (logErr) throw new Error(logErr.message);
 
-  // ── Side-effects on match ──────────────────────────────────────────────
   if (matched?.applicationId) {
     await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
     await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
@@ -130,10 +187,144 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       applicationId: matched.applicationId,
       customerId: matched.customerId,
       subject,
-      body: body.text || stripHtml(body.html) || "",
+      body: bodyText,
       fromEmail,
     });
+  } else if (fromEmail) {
+    await supabaseAdmin.from("inbound_email_quarantine").insert({
+      zoho_mail_uid: msg.messageId,
+      message_id: messageId,
+      in_reply_to: inReplyTo,
+      from_email: fromEmail,
+      to_email: toEmail,
+      subject,
+      body_text: bodyText.slice(0, 8000),
+      body_html: body.html,
+      reason: "no_match",
+      received_at: receivedAt,
+    } as never);
   }
+}
+
+// ─────────────────────────── Ticket Matching (v2) ───────────────────────
+
+type TicketMatch = {
+  ticketId: string;
+  ticketEmail: string | null;
+  applicationId: string | null;
+  customerId: string | null;
+  leadId: string | null;
+};
+
+async function matchTicket(input: {
+  subject: string;
+  inReplyTo: string | null;
+  references: string[];
+}): Promise<TicketMatch | null> {
+  const tokenMatch = input.subject.match(/\[#\s*(TKT-\d{8}-\d{3,6})\s*\]/i);
+  if (tokenMatch) {
+    const ticketNumber = tokenMatch[1].toUpperCase();
+    const { data } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id, ticket_email, application_id, customer_id")
+      .eq("ticket_number", ticketNumber)
+      .maybeSingle();
+    if (data) {
+      const r = data as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
+      return {
+        ticketId: r.id,
+        ticketEmail: r.ticket_email,
+        applicationId: r.application_id,
+        customerId: r.customer_id,
+        leadId: null,
+      };
+    }
+  }
+
+  const ids = [input.inReplyTo, ...input.references].filter(Boolean) as string[];
+  if (ids.length > 0) {
+    const { data } = await supabaseAdmin
+      .from("ticket_replies")
+      .select("ticket_id")
+      .in("email_message_id", ids)
+      .not("ticket_id", "is", null)
+      .limit(1);
+    const row = (data ?? [])[0] as { ticket_id: string } | undefined;
+    if (row?.ticket_id) {
+      const { data: t } = await supabaseAdmin
+        .from("support_tickets")
+        .select("id, ticket_email, application_id, customer_id")
+        .eq("id", row.ticket_id)
+        .maybeSingle();
+      if (t) {
+        const r = t as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
+        return {
+          ticketId: r.id,
+          ticketEmail: r.ticket_email,
+          applicationId: r.application_id,
+          customerId: r.customer_id,
+          leadId: null,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function appendReplyToTicket(input: {
+  ticketId: string;
+  applicationId: string | null;
+  customerId: string | null;
+  leadId: string | null;
+  subject: string;
+  bodyText: string;
+  bodyHtml: string | null;
+  fromEmail: string | null;
+  toEmail: string;
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
+  zohoUid: string;
+  receivedAt: string;
+}) {
+  await supabaseAdmin
+    .from("email_logs")
+    .insert({
+      direction: "incoming",
+      status: "sent",
+      to_email: input.toEmail,
+      from_email: input.fromEmail,
+      subject: input.subject,
+      body_html: input.bodyHtml,
+      body_text: input.bodyText,
+      message_id: input.messageId,
+      in_reply_to: input.inReplyTo,
+      references_header: input.references.join(" ") || null,
+      zoho_mail_uid: input.zohoUid,
+      application_id: input.applicationId,
+      lead_id: input.leadId,
+      customer_id: input.customerId,
+      sent_at: input.receivedAt,
+    } as never);
+
+  await supabaseAdmin.from("ticket_replies").insert({
+    ticket_id: input.ticketId,
+    reply_text: input.bodyText.slice(0, 8000),
+    is_internal: false,
+    direction: "inbound",
+    email_message_id: input.messageId,
+    email_in_reply_to: input.inReplyTo,
+  } as never);
+
+  await supabaseAdmin
+    .from("support_tickets")
+    .update({
+      status: "open",
+      last_customer_message_at: input.receivedAt,
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", input.ticketId);
 }
 
 // ─────────────────────────── Matching ───────────────────────────
