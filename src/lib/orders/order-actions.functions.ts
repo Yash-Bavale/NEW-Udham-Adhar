@@ -89,6 +89,17 @@ export const customerSideDelay = createServerFn({ method: "POST" })
       createdBy: context.userId,
     });
 
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: orderCode,
+        assigned_to: (app?.assigned_to as string | null) ?? null,
+      },
+      kind: "customer_hold_started",
+      title: `${orderCode} moved to Customer Hold`,
+      body: `24h auto-close timer started. Reason: ${reason?.label ?? "Awaiting customer information"}.`,
+    });
+
     return {
       ok: true,
       order: updated,
@@ -144,6 +155,23 @@ export const ourSideDelay = createServerFn({ method: "POST" })
       createdBy: context.userId,
     });
 
+    const app = updated as Record<string, unknown> | null;
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app?.application_code as string | null) ?? null,
+        assigned_to: (app?.assigned_to as string | null) ?? null,
+      },
+      kind: "our_side_delay_start",
+      title: `${(app?.application_code as string) ?? data.orderId.slice(0, 8)} — Our Side Delay armed`,
+      body:
+        data.mode === "auto"
+          ? "Recurring 2h business-time reminders started."
+          : data.mode === "manual"
+          ? `Manual reminder scheduled${data.remindAt ? ` for ${new Date(data.remindAt).toLocaleString("en-IN")}` : ""}.`
+          : "30-min grace period before auto-reminders kick in.",
+    });
+
     return {
       ok: true,
       order: updated,
@@ -156,7 +184,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_code")
+    .select("id, lead_id, customer_id, order_status, application_code, service_code, assigned_to")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -171,6 +199,36 @@ async function loadOrderContext(supabase: any, orderId: string) {
     customer = c as any;
   }
   return { order, customer };
+}
+
+/** Fire-and-forget: notify assignee (+ optional extra roles) about an order event. Never throws. */
+async function notifyOrderEvent(input: {
+  order: { id: string; application_code: string | null; assigned_to: string | null };
+  kind: string;
+  title: string;
+  body?: string;
+  alsoRoles?: string[]; // e.g. ["super_admin","finance"]
+}) {
+  try {
+    const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+    const href = `/admin/orders/${input.order.id}`;
+    const base = {
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      href,
+      entityKind: "order" as const,
+      entityId: input.order.id,
+    };
+    const targets: string[] = [];
+    if (input.order.assigned_to) targets.push(input.order.assigned_to);
+    if (targets.length > 0) await emitToUsers(targets, base);
+    for (const role of input.alsoRoles ?? []) {
+      await emitToRole(role, base);
+    }
+  } catch (e) {
+    console.warn("[notifyOrderEvent] failed:", e);
+  }
 }
 
 async function queueTemplateEmail(
@@ -238,6 +296,14 @@ export const sendFormLink = createServerFn({ method: "POST" })
     if (data.transitionToWaiting && order.order_status === "NEW_ORDER") {
       updated = await transition(context.supabase, order.id, "WAITING_CUSTOMER_INFO");
     }
+    if (emailQueued) {
+      await notifyOrderEvent({
+        order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+        kind: "form_link_sent",
+        title: `Form link sent for ${order.application_code || order.id.slice(0, 8)}`,
+        body: `Delivered to ${customer?.primary_email}.`,
+      });
+    }
     return { ok: true, order: updated, emailQueued };
   });
 
@@ -280,6 +346,12 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
         { applicationId: order.id, leadId: order.lead_id },
       );
     }
+    await notifyOrderEvent({
+      order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+      kind: "order_status_change",
+      title: `${order.application_code || order.id.slice(0, 8)} submitted to authority`,
+      body: data.referenceNumber ? `Ref: ${data.referenceNumber}` : undefined,
+    });
     return { ok: true, order: updated, emailQueued };
   });
 
@@ -327,6 +399,12 @@ export const completeOrder = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[completeOrder] feedback follow-up scheduler failed", e);
     }
+    await notifyOrderEvent({
+      order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+      kind: "order_completed",
+      title: `${order.application_code || order.id.slice(0, 8)} completed`,
+      body: "Delivery email sent to customer.",
+    });
     return { ok: true, order: updated, emailQueued };
   });
 
@@ -356,6 +434,17 @@ export const requestRefund = createServerFn({ method: "POST" })
       refund_amount: data.amount ?? null,
       created_by: context.userId,
     } as never);
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app.application_code as string | null) ?? null,
+        assigned_to: (app.assigned_to as string | null) ?? null,
+      },
+      kind: "refund_requested",
+      title: `Refund requested on ${(app.application_code as string) || data.orderId.slice(0, 8)}`,
+      body: `Reason: ${data.reason.slice(0, 200)}${data.amount ? ` · Amount: ₹${data.amount}` : ""}`,
+      alsoRoles: ["super_admin", "finance", "admin"],
+    });
     return { ok: true, order: updated };
   });
 
@@ -390,6 +479,18 @@ export const approveRefund = createServerFn({ method: "POST" })
       } as never)
       .eq("application_id", data.orderId)
       .eq("status", "pending");
+    const app2 = updated as Record<string, unknown> | null;
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app2?.application_code as string | null) ?? null,
+        assigned_to: (app2?.assigned_to as string | null) ?? null,
+      },
+      kind: "refund_approved",
+      title: `Refund approved on ${(app2?.application_code as string) || data.orderId.slice(0, 8)}`,
+      body: `₹${data.amount} approved. Awaiting payout.`,
+      alsoRoles: ["finance"],
+    });
     return { ok: true, order: updated };
   });
 
