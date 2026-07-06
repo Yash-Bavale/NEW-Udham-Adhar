@@ -65,7 +65,7 @@ export const upsertReason = createServerFn({ method: "POST" })
     };
     if (data.table === "workflow_delay_reasons") {
       payload.side = data.side ?? "customer";
-      payload.email_template_code = payload.side === "customer" ? (data.emailTemplateCode || "bhs_e003_customer_delay") : null;
+      payload.email_template_code = payload.side === "customer" ? (data.emailTemplateCode || "bhs_e003_customer_delay") : (data.emailTemplateCode || "bhs_e004_our_side_delay");
     }
     if (data.id) {
       const { error } = await admin.from(data.table).update(payload as never).eq("id", data.id);
