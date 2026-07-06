@@ -18,7 +18,7 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
-import { EmployeeActionPanel } from "@/components/admin/EmployeeActionPanel";
+
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
