@@ -199,7 +199,8 @@ async function backfillCommonVariables(
 
     // Invoice number (latest invoice for this app/lead)
     if (missing("invoice_number")) {
-      let inv: { invoice_number?: string | null } | null = null;
+      type InvRow = { invoice_number?: string | null };
+      let inv: InvRow | null = null;
       if (applicationId) {
         const { data } = await supabaseAdmin
           .from("invoices")
@@ -208,7 +209,7 @@ async function backfillCommonVariables(
           .order("issued_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        inv = (data as typeof inv) ?? null;
+        inv = (data as InvRow | null) ?? null;
       }
       if (!inv && leadId) {
         const { data } = await supabaseAdmin
@@ -218,10 +219,11 @@ async function backfillCommonVariables(
           .order("issued_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        inv = (data as typeof inv) ?? null;
+        inv = (data as InvRow | null) ?? null;
       }
       if (inv?.invoice_number) out.invoice_number = inv.invoice_number;
     }
+
   } catch (e) {
     console.warn("[emails] backfillCommonVariables failed (non-fatal)", e);
   }
