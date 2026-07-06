@@ -88,11 +88,19 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
 
   // Dedupe: every successful send creates a row in BOTH email_queue and email_logs.
   // Prefer the email_logs row (it has the final sent status); key by queue_id when present.
+  // If the log row is missing body_html/body_text (older rows), backfill from the queue row
+  // so the inline preview renders instead of showing "No body captured".
+  const queueById = new Map<string, any>();
+  for (const q of (data?.queue || [])) queueById.set(q.id, q);
   const dedupMap = new Map<string, any>();
   for (const q of (data?.queue || [])) dedupMap.set(`q:${q.id}`, q);
   for (const l of (data?.logs || [])) {
     const key = l.queue_id ? `q:${l.queue_id}` : `l:${l.id}`;
-    dedupMap.set(key, l);
+    const q = l.queue_id ? queueById.get(l.queue_id) : null;
+    const merged = q
+      ? { ...l, body_html: l.body_html ?? q.body_html, body_text: l.body_text ?? q.body_text }
+      : l;
+    dedupMap.set(key, merged);
   }
   const history = Array.from(dedupMap.values()).sort(
     (a: any, b: any) => new Date(b.sent_at || b.created_at || 0).getTime() - new Date(a.sent_at || a.created_at || 0).getTime()
