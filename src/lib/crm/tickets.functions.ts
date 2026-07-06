@@ -227,9 +227,15 @@ export const createTicket = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (autoAssignedPoolId) {
+      const { data: cur } = await admin
+        .from("assignment_pool")
+        .select("total_assigned")
+        .eq("id", autoAssignedPoolId)
+        .maybeSingle();
+      const curCount = ((cur as { total_assigned: number | null } | null)?.total_assigned ?? 0) + 1;
       await admin
         .from("assignment_pool")
-        .update({ last_assigned_at: new Date().toISOString(), total_assigned: (await admin.from("assignment_pool").select("total_assigned").eq("id", autoAssignedPoolId).maybeSingle()).data?.total_assigned ?? 0 } as never)
+        .update({ last_assigned_at: new Date().toISOString(), total_assigned: curCount } as never)
         .eq("id", autoAssignedPoolId);
     }
 
