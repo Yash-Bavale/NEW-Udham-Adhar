@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import { Pencil, Eye, X } from "lucide-react";
+import { Pencil, Eye, X, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { listEmailTemplates, saveEmailTemplate, toggleEmailTemplate } from "@/lib/emails/emails.functions";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -23,24 +23,27 @@ export const Route = createFileRoute("/admin/email-templates")({
 });
 
 const VARIABLES = [
-  "customer_name",
-  "order_number",
-  "service_name",
-  "invoice_url",
-  "form_link",
-  "document_checklist",
-  "complaint_number",
-  "refund_amount",
-  "refund_reason",
-  "refund_gateway_ref",
-  "rejection_reason",
-  "executive_name",
-  "followup_date",
-  "authority_name",
-  "authority_reference",
-  "expected_update_date",
-  "ticket_number",
-  "subject",
+  "customer_name","order_number","service_name","invoice_number","invoice_url","form_link",
+  "payment_reference","payment_date","order_created_at","invoice_date","consultation_at",
+  "customer_email","customer_mobile","service_fee","gst_amount","total_amount",
+  "document_checklist","document_name","complaint_number","refund_amount","refund_reason",
+  "refund_gateway_ref","rejection_reason","executive_name","followup_date","authority_name",
+  "authority_reference","expected_update_date","ticket_number","ticket_subject","employee_reply",
+  "employee_remarks","closure_reason","closure_date","reason","subject",
+];
+
+/** Fixed display order for category rails. */
+const CATEGORY_ORDER = [
+  "Onboarding & Payment",
+  "Fulfillment",
+  "Delay & Hold",
+  "Closure",
+  "Consultation",
+  "Support / Tickets",
+  "Refunds",
+  "Complaints",
+  "Internal / Admin",
+  "Workflow Automation",
 ];
 
 type Tpl = {
@@ -57,6 +60,9 @@ type Tpl = {
   updated_at: string;
   last_sent_at: string | null;
   total_sent: number;
+  category: string | null;
+  flow_id: string | null;
+  sr_no: number | null;
 };
 
 function formatIST(iso: string | null | undefined): string {
@@ -73,6 +79,10 @@ function formatIST(iso: string | null | undefined): string {
   } catch { return "—"; }
 }
 
+function slug(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
 function EmailTemplatesPage() {
   const role = useRole();
   const qc = useQueryClient();
@@ -85,83 +95,180 @@ function EmailTemplatesPage() {
   const [editing, setEditing] = useState<Tpl | null>(null);
   const [previewing, setPreviewing] = useState<Tpl | null>(null);
   const [disableTarget, setDisableTarget] = useState<Tpl | null>(null);
+  const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const canToggle = role.has("admin") || role.has("super_admin");
   const rows: Tpl[] = (data?.rows as Tpl[] | undefined) ?? [];
 
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [r.code, r.name, r.subject, r.flow_id ?? "", r.category ?? ""]
+        .some((s) => String(s).toLowerCase().includes(q)),
+    );
+  }, [rows, q]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Tpl[]>();
+    for (const r of filtered) {
+      const key = r.category ?? "Workflow Automation";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (a.sr_no ?? 999) - (b.sr_no ?? 999) || a.code.localeCompare(b.code));
+    }
+    // Return categories in fixed order, then any custom ones alphabetically.
+    const known = CATEGORY_ORDER.filter((c) => map.has(c));
+    const extra = [...map.keys()].filter((c) => !CATEGORY_ORDER.includes(c)).sort();
+    return [...known, ...extra].map((c) => ({ category: c, items: map.get(c) ?? [] }));
+  }, [filtered]);
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-medium tracking-tight">Email Templates</h1>
-        <p className="text-sm text-slate-500">
-          Manage system-wide transactional email templates. Use {"{{variable}}"} placeholders.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-medium tracking-tight">Email Templates</h1>
+          <p className="text-sm text-slate-500">
+            Grouped by lifecycle stage. SR numbers match the automation flow (E001–E006).
+            Use {"{{variable}}"} placeholders in subjects and bodies.
+          </p>
+        </div>
+        <div className="relative w-72">
+          <Search className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search code, name, subject, flow…"
+            className="w-full border rounded pl-8 pr-2 py-2 text-sm"
+          />
+        </div>
       </div>
 
-      <div className="rounded-md border bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr>
-              <th className="text-left px-3 py-2 font-medium">Code</th>
-              <th className="text-left px-3 py-2 font-medium">Name</th>
-              <th className="text-left px-3 py-2 font-medium">Subject</th>
-              <th className="text-left px-3 py-2 font-medium">Status</th>
-              <th className="text-left px-3 py-2 font-medium">Last Sent</th>
-              <th className="text-right px-3 py-2 font-medium">Sent</th>
-              <th className="text-right px-3 py-2 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {isLoading && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>
-            )}
-            {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">No templates yet.</td></tr>
-            )}
-            {rows.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50">
-                <td className="px-3 py-2 font-mono text-xs">{t.code}</td>
-                <td className="px-3 py-2">{t.name}</td>
-                <td className="px-3 py-2 text-slate-600 truncate max-w-[24rem]">{t.subject}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={t.is_enabled}
-                      disabled={!canToggle}
-                      onCheckedChange={async (v) => {
-                        if (!v) { setDisableTarget(t); return; }
-                        try {
-                          await toggleFn({ data: { code: t.code, enabled: true } });
-                          toast.success(`Enabled ${t.name}`);
-                          qc.invalidateQueries({ queryKey: ["admin.email-templates"] });
-                        } catch (e) { toast.error((e as Error).message); }
-                      }}
-                    />
-                    <span className="text-[11px]" style={{ color: t.is_enabled ? "#047857" : "#94a3b8" }}>
-                      {t.is_enabled ? "Enabled" : "Disabled"}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
-                <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
-                  <button
-                    onClick={() => setPreviewing(t)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100 mr-1"
-                  >
-                    <Eye className="size-3.5" /> Preview
-                  </button>
-                  <button
-                    onClick={() => setEditing(t)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100"
-                  >
-                    <Pencil className="size-3.5" /> Edit
-                  </button>
-                </td>
-              </tr>
+      <div className="grid grid-cols-[200px_1fr] gap-4">
+        {/* Side rail */}
+        <aside className="sticky top-4 self-start rounded-md border bg-white p-2 text-sm">
+          <div className="px-2 py-1 text-[11px] font-semibold uppercase text-slate-500">Categories</div>
+          <nav className="flex flex-col">
+            {grouped.map((g) => (
+              <a
+                key={g.category}
+                href={`#cat-${slug(g.category)}`}
+                className="flex items-center justify-between rounded px-2 py-1.5 hover:bg-slate-100"
+              >
+                <span className="truncate">{g.category}</span>
+                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                  {g.items.length}
+                </span>
+              </a>
             ))}
-          </tbody>
-        </table>
+          </nav>
+        </aside>
+
+        {/* Sections */}
+        <div className="space-y-6">
+          {isLoading && (
+            <div className="rounded-md border bg-white px-4 py-8 text-center text-sm text-slate-500">Loading…</div>
+          )}
+          {!isLoading && grouped.length === 0 && (
+            <div className="rounded-md border bg-white px-4 py-8 text-center text-sm text-slate-500">
+              No templates match "{search}".
+            </div>
+          )}
+          {grouped.map((g) => {
+            const open = !collapsed[g.category];
+            return (
+              <section key={g.category} id={`cat-${slug(g.category)}`} className="rounded-md border bg-white">
+                <button
+                  onClick={() => setCollapsed((c) => ({ ...c, [g.category]: open }))}
+                  className="flex w-full items-center justify-between border-b px-3 py-2 text-left hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-2">
+                    {open ? <ChevronDown className="size-4 text-slate-500" /> : <ChevronRight className="size-4 text-slate-500" />}
+                    <h2 className="text-sm font-semibold text-slate-800">{g.category}</h2>
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{g.items.length}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {g.items.filter((t) => t.is_enabled).length} enabled
+                  </span>
+                </button>
+                {open && (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="w-10 text-left px-3 py-2 font-medium">SR</th>
+                        <th className="w-16 text-left px-2 py-2 font-medium">Flow</th>
+                        <th className="text-left px-3 py-2 font-medium">Code</th>
+                        <th className="text-left px-3 py-2 font-medium">Name</th>
+                        <th className="text-left px-3 py-2 font-medium">Subject</th>
+                        <th className="text-left px-3 py-2 font-medium">Status</th>
+                        <th className="text-left px-3 py-2 font-medium">Last Sent</th>
+                        <th className="text-right px-3 py-2 font-medium">Sent</th>
+                        <th className="text-right px-3 py-2 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {g.items.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 font-mono text-xs text-slate-500">{t.sr_no ?? "—"}</td>
+                          <td className="px-2 py-2">
+                            {t.flow_id ? (
+                              <span className="rounded bg-indigo-50 text-indigo-700 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+                                {t.flow_id}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs">{t.code}</td>
+                          <td className="px-3 py-2">{t.name}</td>
+                          <td className="px-3 py-2 text-slate-600 truncate max-w-[22rem]">{t.subject}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={t.is_enabled}
+                                disabled={!canToggle}
+                                onCheckedChange={async (v) => {
+                                  if (!v) { setDisableTarget(t); return; }
+                                  try {
+                                    await toggleFn({ data: { code: t.code, enabled: true } });
+                                    toast.success(`Enabled ${t.name}`);
+                                    qc.invalidateQueries({ queryKey: ["admin.email-templates"] });
+                                  } catch (e) { toast.error((e as Error).message); }
+                                }}
+                              />
+                              <span className="text-[11px]" style={{ color: t.is_enabled ? "#047857" : "#94a3b8" }}>
+                                {t.is_enabled ? "Enabled" : "Disabled"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">{formatIST(t.last_sent_at)}</td>
+                          <td className="px-3 py-2 text-right text-xs">{t.total_sent ?? 0}</td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => setPreviewing(t)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100 mr-1"
+                            >
+                              <Eye className="size-3.5" /> Preview
+                            </button>
+                            <button
+                              onClick={() => setEditing(t)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100"
+                            >
+                              <Pencil className="size-3.5" /> Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
 
       {editing && <EditorDrawer tpl={editing} onClose={() => setEditing(null)} />}
@@ -227,10 +334,7 @@ function EditorDrawer({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
   const insertVar = (v: string) => {
     const el = bodyRef.current;
     const token = `{{${v}}}`;
-    if (!el) {
-      setBodyHtml((s) => s + token);
-      return;
-    }
+    if (!el) { setBodyHtml((s) => s + token); return; }
     const start = el.selectionStart ?? bodyHtml.length;
     const end = el.selectionEnd ?? bodyHtml.length;
     const next = bodyHtml.slice(0, start) + token + bodyHtml.slice(end);
@@ -276,7 +380,12 @@ function EditorDrawer({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
-            <div className="text-xs font-mono text-slate-500">{tpl.code}</div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="font-mono">{tpl.code}</span>
+              {tpl.sr_no != null && <span className="rounded bg-slate-100 px-1.5 py-0.5">SR {tpl.sr_no}</span>}
+              {tpl.flow_id && <span className="rounded bg-indigo-50 text-indigo-700 px-1.5 py-0.5">{tpl.flow_id}</span>}
+              {tpl.category && <span className="rounded bg-slate-100 px-1.5 py-0.5">{tpl.category}</span>}
+            </div>
             <div className="text-sm font-medium">Edit template</div>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-slate-100"><X className="size-4" /></button>
@@ -352,9 +461,21 @@ function PreviewDialog({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
       customer_name: "Rahul Sharma",
       order_number: "SMV000123",
       service_name: "New Udyam Registration",
+      invoice_number: "BHS-2026-000123",
       invoice_url: "https://example.com/invoice.pdf",
       form_link: "https://example.com/onboarding/UA-2026-000123",
+      payment_reference: "pay_abc123",
+      payment_date: "06-07-2026 11:03 AM",
+      order_created_at: "06-07-2026 11:02 AM",
+      invoice_date: "06-07-2026",
+      consultation_at: "07-07-2026 04:00 PM",
+      customer_email: "rahul@example.com",
+      customer_mobile: "+91-9876543210",
+      service_fee: "1,299",
+      gst_amount: "234",
+      total_amount: "1,533",
       document_checklist: "Aadhaar, PAN, Bank Proof",
+      document_name: "Udyam Registration Certificate",
       complaint_number: "CMP-000045",
       refund_amount: "1,499",
       refund_reason: "Service not required",
@@ -366,6 +487,12 @@ function PreviewDialog({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
       authority_reference: "REF/2026/00078",
       expected_update_date: "30 Jun 2026",
       ticket_number: "TKT-2026-00012",
+      ticket_subject: "Unable to download certificate",
+      employee_reply: "We have verified your Aadhaar details and re-submitted the request.",
+      employee_remarks: "Reissue certificate after portal downtime.",
+      closure_reason: "Customer requested cancellation",
+      closure_date: "06-07-2026",
+      reason: "Awaiting customer OTP",
       subject: "Unable to download certificate",
     }),
     [],
@@ -383,7 +510,11 @@ function PreviewDialog({ tpl, onClose }: { tpl: Tpl; onClose: () => void }) {
       >
         <div className="border-b px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-xs font-mono text-slate-500">{tpl.code}</div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="font-mono">{tpl.code}</span>
+              {tpl.sr_no != null && <span className="rounded bg-slate-100 px-1.5 py-0.5">SR {tpl.sr_no}</span>}
+              {tpl.flow_id && <span className="rounded bg-indigo-50 text-indigo-700 px-1.5 py-0.5">{tpl.flow_id}</span>}
+            </div>
             <div className="text-sm font-medium">{tpl.name}</div>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-slate-100"><X className="size-4" /></button>

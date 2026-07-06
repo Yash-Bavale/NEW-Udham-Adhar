@@ -115,7 +115,7 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("email_templates")
-      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent")
+      .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
@@ -155,7 +155,7 @@ const TemplateInput = z.object({
   code: z.string().trim().min(2).max(80).regex(/^[a-z0-9_]+$/, "code must be lowercase a-z, 0-9, _"),
   name: z.string().trim().min(2).max(120),
   subject: z.string().trim().min(2).max(200),
-  body_html: z.string().min(2).max(50_000),
+  body_html: z.string().min(2).max(120_000),
   body_text: z.string().max(50_000).nullable().optional(),
   description: z.string().max(500).nullable().optional(),
   variables: z.array(z.string().max(60)).max(50).default([]),
