@@ -151,21 +151,24 @@ export function ExternalDelayDialog({
               placeholder="Visible to the team only"
             />
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground flex items-center gap-1">
-              <MessageCircle className="size-3" /> Customer-visible note (optional — sent in the email)
-            </label>
-            <textarea
-              value={customerNote}
-              onChange={(e) => setCustomerNote(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-              placeholder="Will be included in the email to the customer"
-            />
-          </div>
+          {side === "customer" && (
+            <div>
+              <label className="text-xs text-muted-foreground flex items-center gap-1">
+                <MessageCircle className="size-3" /> Customer-visible note (optional — sent in the email)
+              </label>
+              <textarea
+                value={customerNote}
+                onChange={(e) => setCustomerNote(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
+                placeholder="Will be included in the email to the customer"
+              />
+            </div>
+          )}
           <div className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-            On save: order status updates, customer gets a delay notice email, a 24-hour review reminder is created,
-            and 3 / 5 / 7-day follow-up emails are scheduled automatically.
+            {side === "customer"
+              ? "On save: customer gets the delay notice email now, and the order auto-closes after 8 business hours if no reply. You can Resume anytime before that."
+              : "On save: no customer email is sent. The assignee is notified now and reminded again at the expected review date. Order stays paused until you Resume it."}
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
@@ -176,7 +179,7 @@ export function ExternalDelayDialog({
             className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground inline-flex items-center gap-2 disabled:opacity-50"
           >
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
-            Save & notify customer
+            {side === "customer" ? "Save & notify customer" : "Save & notify assignee"}
           </button>
         </div>
       </div>
