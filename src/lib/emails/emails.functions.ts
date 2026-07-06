@@ -251,7 +251,9 @@ const TemplateInput = z.object({
   description: z.string().max(500).nullable().optional(),
   variables: z.array(z.string().max(60)).max(50).default([]),
   is_enabled: z.boolean().default(true),
+  dispatch_mode: z.enum(["auto", "manual"]).optional(),
 });
+
 
 export const saveEmailTemplate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
