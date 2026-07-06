@@ -155,6 +155,23 @@ export const ourSideDelay = createServerFn({ method: "POST" })
       createdBy: context.userId,
     });
 
+    const app = updated as Record<string, unknown> | null;
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app?.application_code as string | null) ?? null,
+        assigned_to: (app?.assigned_to as string | null) ?? null,
+      },
+      kind: "our_side_delay_start",
+      title: `${(app?.application_code as string) ?? data.orderId.slice(0, 8)} — Our Side Delay armed`,
+      body:
+        data.mode === "auto"
+          ? "Recurring 2h business-time reminders started."
+          : data.mode === "manual"
+          ? `Manual reminder scheduled${data.remindAt ? ` for ${new Date(data.remindAt).toLocaleString("en-IN")}` : ""}.`
+          : "30-min grace period before auto-reminders kick in.",
+    });
+
     return {
       ok: true,
       order: updated,
