@@ -119,7 +119,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
               }
 
               // Internal-side delay review: notify assignee, do not email customer.
-              if (r.kind === "internal_review") {
+              if ((r.kind as string) === "internal_review") {
                 const payload: any = r.payload ?? {};
                 if (r.assigned_to) {
                   await supabaseAdmin.from("notifications").insert({
