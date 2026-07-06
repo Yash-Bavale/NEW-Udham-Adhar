@@ -256,7 +256,9 @@ async function openOrAppendTicket(input: {
         subject: input.subject.slice(0, 250),
         description: input.body.slice(0, 2000),
         status: "open",
-        priority: "normal",
+        priority: "medium",
+        source: "email_inbound",
+        ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
       } as never)
       .select("id")
       .single();
