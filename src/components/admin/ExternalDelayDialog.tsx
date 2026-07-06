@@ -24,6 +24,7 @@ export function ExternalDelayDialog({
     enabled: open,
   });
 
+  const [side, setSide] = useState<"customer" | "internal">("customer");
   const [reasonCode, setReasonCode] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
@@ -32,13 +33,14 @@ export function ExternalDelayDialog({
     return d.toISOString().slice(0, 10);
   });
   const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
-  const [kind, setKind] = useState<"external_dependency" | "government_portal_pending">("external_dependency");
+
+  const filteredReasons = (reasons?.reasons ?? []).filter((r: any) => (r.side ?? "customer") === side);
 
   useEffect(() => {
-    if (open && reasons?.reasons.length && !reasonCode) {
-      setReasonCode(reasons.reasons[0].code);
+    if (open && filteredReasons.length && !filteredReasons.find((r) => r.code === reasonCode)) {
+      setReasonCode(filteredReasons[0].code);
     }
-  }, [open, reasons, reasonCode]);
+  }, [open, reasons, side, reasonCode, filteredReasons]);
 
   const mut = useMutation({
     mutationFn: async () => {
