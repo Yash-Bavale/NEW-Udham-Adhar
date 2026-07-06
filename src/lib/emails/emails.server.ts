@@ -147,8 +147,10 @@ async function backfillCommonVariables(
   };
   if (!leadId && !applicationId) return out;
   try {
-    let lead: { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null } | null = null;
-    let app: { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null } | null = null;
+    type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
+    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null };
+    let lead: LeadRow | null = null;
+    let app: AppRow | null = null;
 
     if (applicationId) {
       const { data } = await supabaseAdmin
@@ -156,7 +158,7 @@ async function backfillCommonVariables(
         .select("id, application_code, lead_id, assigned_to, created_at")
         .eq("id", applicationId)
         .maybeSingle();
-      app = (data as typeof app) ?? null;
+      app = (data as AppRow | null) ?? null;
       if (app?.lead_id && !leadId) leadId = app.lead_id;
     }
     if (leadId) {
@@ -165,8 +167,9 @@ async function backfillCommonVariables(
         .select("id, lead_code, name, email, mobile, service, assigned_to, created_at")
         .eq("id", leadId)
         .maybeSingle();
-      lead = (data as typeof lead) ?? null;
+      lead = (data as LeadRow | null) ?? null;
     }
+
 
     if (missing("customer_name") && lead?.name) out.customer_name = lead.name;
     if (missing("customer_email") && lead?.email) out.customer_email = lead.email;
