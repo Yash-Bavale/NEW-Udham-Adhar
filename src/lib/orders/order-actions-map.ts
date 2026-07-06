@@ -285,13 +285,16 @@ export function tabAvailability(
   return {
     workflow: { enabled: true, reason: "" },
     form: {
-      enabled: !showConsultation && !!status && status !== "NEW_ORDER",
+      // Enable Forms & Docs whenever there's a lead and it's not a
+      // pre-payment consultation order. Panel itself handles empty/locked state.
+      enabled: !showConsultation && hasLead,
       reason: showConsultation
         ? "Available after service is picked and second payment is received"
-        : status === "NEW_ORDER"
-          ? "Send the form link from Employee Workflow first"
+        : !hasLead
+          ? "No lead linked to this order yet"
           : "",
     },
+
     emails: { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
     activity: { enabled: true, reason: "" },
     support: { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
