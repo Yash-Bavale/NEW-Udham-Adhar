@@ -609,11 +609,12 @@ export async function cancelTicketAutocloseForOrder(applicationId: string, reaso
 
 async function fireTicketAutoclose(s: {
   id: string;
-  application_id: string;
+  ticket_id: string | null;
+  application_id: string | null;
   reason_id: string | null;
   remarks: string | null;
 }) {
-  const ticketId = decodeTicketId(s.remarks);
+  const ticketId = s.ticket_id ?? decodeTicketId(s.remarks);
   const now = new Date();
 
   const markStopped = async (reason: string) => {
