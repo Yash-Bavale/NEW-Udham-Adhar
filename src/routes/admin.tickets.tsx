@@ -186,6 +186,19 @@ function TicketsPage() {
                       }}
                     >
                       <td className="px-4 py-2.5 font-mono text-xs">{t.ticket_number ?? "—"}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs">
+                        {t.application_id && t.application_code ? (
+                          <Link
+                            to="/admin/orders/$orderId"
+                            params={{ orderId: t.application_id }}
+                            style={{ color: "var(--admin-accent)" }}
+                          >
+                            {t.application_code}
+                          </Link>
+                        ) : (
+                          <span style={{ color: "var(--admin-fg-muted)" }}>—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2.5">
                         {t.customer_id ? (
                           <Link
