@@ -183,13 +183,38 @@ export const createTicket = createServerFn({ method: "POST" })
       serviceId = (app?.service_id as string | null) ?? null;
     }
 
+    // Auto-assign from assignment_pool round-robin when no explicit assignee.
+    let resolvedAssignee: string | null = data.assignedTo ?? null;
+    let autoAssignedPoolId: string | null = null;
+    if (!resolvedAssignee) {
+      const { data: poolRow } = await admin
+        .from("assignment_pool")
+        .select("id, user_id, service_id, last_assigned_at, total_assigned")
+        .eq("is_active", true)
+        .or(
+          serviceId
+            ? `service_id.eq.${serviceId},service_id.is.null`
+            : `service_id.is.null`
+        )
+        .order("service_id", { ascending: true, nullsFirst: false })
+        .order("last_assigned_at", { ascending: true, nullsFirst: true })
+        .order("total_assigned", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      const p = poolRow as { id: string; user_id: string } | null;
+      if (p) {
+        resolvedAssignee = p.user_id;
+        autoAssignedPoolId = p.id;
+      }
+    }
+
     const { data: ins, error } = await admin
       .from("support_tickets")
       .insert({
         subject: data.subject,
         description: data.description ?? null,
         priority: data.priority,
-        assigned_to: data.assignedTo ?? null,
+        assigned_to: resolvedAssignee,
         customer_id: data.customerId,
         application_id: data.applicationId ?? null,
         service_id: serviceId,
@@ -200,6 +225,13 @@ export const createTicket = createServerFn({ method: "POST" })
       .select("id, ticket_number")
       .single();
     if (error) throw new Error(error.message);
+
+    if (autoAssignedPoolId) {
+      await admin
+        .from("assignment_pool")
+        .update({ last_assigned_at: new Date().toISOString(), total_assigned: (await admin.from("assignment_pool").select("total_assigned").eq("id", autoAssignedPoolId).maybeSingle()).data?.total_assigned ?? 0 } as never)
+        .eq("id", autoAssignedPoolId);
+    }
 
     if (data.applicationId) {
       await admin.from("application_events").insert({
