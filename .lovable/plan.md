@@ -1,154 +1,142 @@
 
-## Enterprise Ticket Workspace — `/admin/tickets/$ticketId`
+# Plan: Threaded Emails, Full Status Engine, Scheduler 3, Notifications
 
-Rebuild the ticket detail page as a full-page, 3-column enterprise workspace (Zendesk/Linear/Intercom feel). Reuse existing CRM design tokens (bright, white cards, soft shadows, rounded, blue/emerald/orange accents — no dark theme). Ship in phases so we deliver a real, production-quality UI now and layer advanced features next.
-
-### Scope split
-
-**Phase 1 (this build) — full UI + all wiring on existing data**
-Everything below renders against data we already have (`support_tickets`, `ticket_replies`, `email_logs`, `applications`, `customers`, `documents`, `application_events`, `payments`, `invoices`, `notifications`, `tasks`, `follow_ups`, `order_schedulers`). No schema changes.
-
-**Phase 2 (follow-up, requires migrations)** — flagged clearly in UI as "coming soon" placeholders so we don't fake data:
-- Ticket followers / collaborators table
-- Ticket merging / splitting
-- Draft autosave table (server-side)
-- Presence ("another agent is replying") via Realtime Presence
-- CC/BCC storage columns on `ticket_replies`
-- Scheduled send queue
-- Pinned notes + color labels + mentions parsing table
-- SLA policy engine (right now we compute age from `created_at`/`first_response_at`)
-
-I'll call these out in the UI with subtle "Preview" badges — no fake buttons that do nothing.
+Big scope — grouped into 5 shippable phases so each phase is testable in isolation.
 
 ---
 
-### Layout (`src/routes/admin.tickets.$ticketId.tsx` — full rewrite)
+## Phase 1 — Email threading (one conversation per order)
 
-Full-page 3-column grid inside `AdminShell`:
+**Problem today:** every template (E001, E002, E003…) is enqueued as a fresh email → Gmail shows separate threads, customer replies land as new inbound messages, staff loses context.
+
+**Fix:**
+
+1. Add columns to `applications`:
+   - `email_thread_message_id text` — the RFC-822 `Message-ID` of the FIRST outbound mail (E001).
+   - `email_thread_subject text` — the normalised subject used on E001 ("Order AP-XXXX — <Service>").
+2. On enqueue (in `enqueueFromTemplateInternal`):
+   - If the order has no `email_thread_message_id`, generate one (`<order-{id}-{uuid}@udyamadhar.in>`), store it, use it as `Message-ID` on send.
+   - Otherwise reuse `email_thread_subject` (prefix `Re: `) and set `In-Reply-To` + `References` headers to that stored id.
+3. Extend `email_queue` / `email_logs` with `in_reply_to`, `references`, `message_id` (already partly present — verify and backfill).
+4. Update `zoho-smtp.server.ts` send call to pass these headers to Zoho Mail API.
+5. Inbound poll (`zoho-inbox.server.ts`) — when a reply arrives, match on `In-Reply-To`/`References` first (already partially done), fallback to order number in subject. Store as `email_logs` inbound row AND `ticket_replies` row (single source of truth for the workspace timeline).
+
+**Rendering fix (screenshot #1 shows raw quoted text):**
+
+- In `ticket-workspace.functions.ts` merge, add a `cleanedBody` field: strip the quoted history (`On <date>, <who> wrote:` and everything below, plus `>` prefixed lines) using a small parser in `src/lib/mail/thread-clean.ts`.
+- Store both `body_full` (for "show original") and `body_visible` (default render).
+- UI (`admin.tickets.$ticketId.tsx`): render `body_visible` as formatted HTML (sanitised via existing DOMPurify or add `isomorphic-dompurify`), with a "Show quoted history" disclosure.
+
+---
+
+## Phase 2 — Order workspace: show ALL tickets for that service/order
+
+In `getOrderDetailV2` (or the workspace loader used by `admin.orders.$orderId.tsx`), add a parallel query:
 
 ```
-┌─ Left 25% ──┬─ Center 50% ──────────────┬─ Right 25% ─┐
-│ Ticket list │ Header (sticky)           │ Details      │
-│ + filters   │ ─────────────────────────  │ Customer     │
-│ + search    │ Thread (scroll)           │ Order        │
-│ + sort      │ ─────────────────────────  │ Documents    │
-│             │ Reply composer (sticky)   │ Timeline     │
-│             │                           │ History      │
-└─────────────┴───────────────────────────┴──────────────┘
+support_tickets where application_id = :orderId OR customer_id = :customerId
+order by created_at desc
 ```
 
-Collapsible left & right rails (chevron toggles, persisted in `localStorage`). Below `lg` breakpoint → tabs (Conversation / Details / History).
+Return `{ orderTickets, customerTickets }`. Add a "Support Tickets" panel to `WorkspaceShell` right column with:
+- badge counts (open / closed)
+- clickable rows → `/admin/tickets/$ticketId`
+- inline "New ticket" button that pre-fills `application_id` + `customer_id`.
 
 ---
 
-### Left rail — `TicketListRail`
+## Phase 3 — Canonical status engine (E001–E012 + all schedulers)
 
-- Search input (debounced), filter chips (Status, Priority, Assignee, Customer, Order), sort dropdown (Newest/Oldest/Updated/Unassigned).
-- Uses existing `listTickets` server fn; add `sort` param + `unassigned` flag.
-- Each row: ticket number, subject, customer name, relative time, status + priority badges, unread dot when `last_customer_message_at > last_staff_message_at`.
-- Active row highlighted; clicking navigates via `<Link>` (instant, no reload — TanStack Router keeps left rail mounted).
-- Virtualized only if >200 rows (skip for now, use pageSize=50).
+### 3a. Enum & migration
 
-### Center — Conversation workspace
+Ensure `order_status_enum` contains every code from the master table (add missing):
+`ORDER_CREATED, WAITING_CUSTOMER_INFO, FORM_LINK_SENT, INFO_RECEIVED, UNDER_PROCESS, APPLICATION_SUBMITTED, CUSTOMER_SIDE_DELAY, OUR_SIDE_DELAY, HIGH_PRIORITY, REFUND_REQUESTED, REFUND_APPROVED, REFUNDED, COMPLETED, CLOSED, REOPENED`.
 
-**Sticky header card:**
-- Row 1: `TKT-…` · Subject (editable inline — reuses `updateTicket`).
-- Row 2: chips — Status (dropdown), Priority (dropdown), Assignee (popover w/ staff search), Customer link, Order link, SLA age, first-response age, source badge, ticket email.
-- Row 3: quick actions — Reply, Internal Note, Assign, Close, Reopen, Resolve & Resume Order (existing), Escalate (sets priority=urgent + event), Copy link, Print (window.print with print styles), Download (JSON export of thread), Merge (Phase 2 disabled w/ tooltip).
+Add to `applications`:
+- `reminder_mode text check in ('manual','auto_2h','stopped')`
+- `reminder_next_at timestamptz`
+- `reminder_stop_reason text`
+- `reminder_consecutive_missed int default 0`
 
-**Thread:**
-- Fetch `ticket_replies` + `email_logs` for the ticket, merge into a unified timeline sorted by `created_at`.
-- Message card variants by `direction`/`is_internal`/system:
-  - `customer_inbound` — left-aligned, blue avatar ring
-  - `staff_outbound` — right-aligned, emerald ring
-  - `internal_note` — amber background, "Internal" chip, not emailed
-  - `system` — muted pill row (status change, assignment, automation) rendered inline from `application_events` (`ticket_status_change`, `assignment_change`, `ticket_created`, `order_resumed_from_ticket`, `automation_triggered`).
-- Header per card: avatar (initials), name, role badge (Customer/Agent/System), email, timestamp (relative + absolute tooltip), delivery status pill from `email_logs.status` (queued/sent/delivered/bounced).
-- Body: sanitized HTML render (use `DOMPurify` — add dep) for `email_logs.body_html`, else plain text with `whitespace-pre-wrap`.
-- Quoted replies (`> ` blocks / `<blockquote>`) auto-collapsed with "Show trimmed content" toggle.
-- Attachments row from `email_logs.attachments` jsonb — icon per type (image/pdf/zip/other), filename, size, download link.
-- Long threads: collapse middle messages when >8, keep first + last 3 expanded.
+Rebuild RPC `allowed_order_transitions(_from)` + `transition_order_status(...)` to enforce the exact transition graph from the master table.
 
-**Sticky reply composer:**
-- Tabs: **Reply** / **Internal Note**.
-- Toolbar: Bold / Italic / Underline / Bullet / Numbered / Link (using `contentEditable` + `document.execCommand` — lightweight, no heavy editor dep).
-- Templates dropdown — pulls from `canned_responses` (existing table). Insertion replaces `{{customer_name}}`, `{{order_number}}`, `{{ticket_id}}`, `{{service_name}}` from loaded context.
-- Attachments: drag/drop + file picker → uploads to `documents` bucket under `tickets/{ticketId}/`, attaches URLs to reply metadata (stored in `email_logs.attachments`).
-- Emoji: native `<input type="text">` fallback via a small picker (12 common emojis inline — skip full picker dep).
-- Client-side draft autosave to `localStorage` every 5s keyed by `draft:ticket:<id>` (server-side draft table = Phase 2).
-- Send buttons: **Send**, **Send & Resolve**, **Send & Close**. Schedule Send = Phase 2 (disabled + tooltip).
-- CC/BCC inputs render, values passed to `replyToTicket` — currently ignored server-side (Phase 2 to persist); we surface a "CC preview only" hint until then. **Or** we can wire straight into the SMTP call now — I'll wire it into the outgoing email headers but not persist per-recipient rows.
+### 3b. Email template registry (single source of truth)
 
----
+Create `src/lib/email-templates/order-lifecycle.ts`:
 
-### Right rail — `TicketContextRail` (tabbed: Details / Customer / Order / History)
+```
+E001 order-welcome-invoice     auto  on ORDER_CREATED (PayU webhook)
+E002 order-form-link           manual (Send/Resend Form Link)
+E003 order-customer-hold       auto on transition → CUSTOMER_SIDE_DELAY
+E004 order-closed              auto on transition → CLOSED (Scheduler 2)
+E005 order-our-side-delay      auto on transition → OUR_SIDE_DELAY
+E006 order-completed           auto on transition → COMPLETED
+E007 consultation-completed    manual
+E008 ticket-reply              manual (from ticket workspace)
+E009 ticket-resolved           auto/manual on ticket resolve
+E010 ticket-closed             auto/manual on ticket close
+E011 refund-approved           auto on transition → REFUND_APPROVED
+E012 app-submitted             auto on transition → APPLICATION_SUBMITTED
+```
 
-**Details tab:** all ticket fields, SLA remaining (business-hours aware via existing `business-hours.ts`), created/updated, assignee with reassign popover, category (service_name), source.
+Wire the auto-sends inside `transition_order_status` RPC (or in a server-side after-hook in `src/lib/orders/order-actions.functions.ts`) so *the transition itself* enqueues the correct template. All sends go through the Phase-1 threaded enqueue.
 
-**Customer tab:** avatar (initials), name, email, phone, language, state, `customers.created_at` → "Customer since", counts computed via new server fn `getCustomerTicketStats({ customerId })`:
-- total orders (`applications` count)
-- open tickets, closed tickets
-- lifetime value (`SUM(payments.amount WHERE status='captured')`)
+### 3c. Order action panel
 
-**Order tab** (when `application_id`): order code, service, order_status, payment status (latest payment), invoice link (`invoices`), assigned executive (`applications.assigned_to`), certificate status (`certificates` presence), document status (count of documents by status), Open Order button. Reuses existing `getTicketOrderContext` — extended.
+Rewrite `src/lib/orders/order-actions-map.ts` from the master button table. Each entry:
+`{ label, allowedFromStatuses, requiredRole, confirm?: {reasonPicker|textbox|filePicker}, doAction }`.
 
-Documents section: list `documents` for the linked application. Preview (image inline / PDF via `<iframe>`), Download, Approve/Reject (reuse existing `document-review.functions.ts`). Replace + history = Phase 2.
+Render in `admin.orders.$orderId.tsx` right column — buttons that don't apply are hidden, not disabled-placeholder.
 
-**History tab:**
-- Activity timeline from `application_events` filtered by `application_id` OR ticket-related events → icon + actor + timestamp + description.
-- Previous tickets for this customer (link list), previous orders, complaints (`complaints`), refund history (`refund_requests`), notes (`customer_notes`), sent emails (`email_logs` by customer), automations (`workflow_events` filtered).
+### 3d. Schedulers
 
-### New server functions (`src/lib/crm/tickets.functions.ts` + one new file)
+- **Scheduler 2** — closure timer: pg_cron every 5 min → `/api/public/cron/close-stale-customer-hold` closes orders in `CUSTOMER_SIDE_DELAY` for >24h, sends E004, notifies employee+admin.
+- **Scheduler 3** — Our Side Delay reminders: pg_cron every 5 min → `/api/public/cron/our-side-reminders`:
+  - Manual mode: when `reminder_next_at <= now()` → notify employee, flip to `HIGH_PRIORITY` if still `OUR_SIDE_DELAY`.
+  - Auto 2h: fire notification every 2h; increment `reminder_consecutive_missed`; at 3 misses → `HIGH_PRIORITY` + notify Super Admin.
+  - No option chosen: 30 min after entering `OUR_SIDE_DELAY`, auto-start `auto_2h`, flip to `HIGH_PRIORITY`, notify Super Admin.
+- Stop conditions handled in `transition_order_status`: any move to `COMPLETED`, `REFUND_REQUESTED`, `CLOSED`, or explicit "Stop Reminders" clears reminder columns.
 
-- `getTicketWorkspace({ ticketId })` — single call returning: ticket, replies+emails merged, related events, order context, documents, customer stats, previous tickets/orders/complaints/refunds. One round trip = instant open.
-- `getCustomerTicketStats({ customerId })`
-- Extend `listTickets` with `sort` and `unassigned`.
-- Reuse existing: `updateTicket`, `replyToTicket`, `resolveTicketAndResumeOrder`, `checkOpenTicketForOrder`, `getTicketOrderContext`, canned responses fns, document review fns.
-
-### Realtime
-
-Subscribe (via existing `useRealtimeTable`) to:
-- `ticket_replies` filtered `ticket_id=eq.<id>`
-- `support_tickets` filtered `id=eq.<id>`
-- `email_logs` filtered by ticket
-- `application_events` filtered by application
-
-On any event → `queryClient.invalidateQueries(['ticket-workspace', id])`. Optimistic update on reply send (append pending card with spinner).
-
-Presence ("someone else is typing") = Phase 2 (needs presence channel wiring; deferred to avoid scope bloat).
-
-### Keyboard shortcuts
-
-Add local `useEffect` listener on the workspace: R = focus reply, N = switch to note tab, A = open assignee popover, C = close ticket, F = focus left search, Esc = navigate back to list. Skip when focus is in an input.
-
-### Files
-
-**New:**
-- `src/routes/admin.tickets.$ticketId.tsx` — rewritten
-- `src/components/admin/tickets/TicketListRail.tsx`
-- `src/components/admin/tickets/TicketHeader.tsx`
-- `src/components/admin/tickets/TicketThread.tsx`
-- `src/components/admin/tickets/MessageCard.tsx`
-- `src/components/admin/tickets/ReplyComposer.tsx`
-- `src/components/admin/tickets/TicketContextRail.tsx`
-- `src/components/admin/tickets/ActivityTimeline.tsx`
-- `src/components/admin/tickets/CustomerPanel.tsx`
-- `src/components/admin/tickets/OrderPanel.tsx`
-- `src/components/admin/tickets/DocumentsPanel.tsx`
-- `src/components/admin/tickets/HistoryPanel.tsx`
-- `src/components/admin/tickets/keyboard.ts`
-- `src/lib/crm/ticket-workspace.functions.ts`
-
-**Edited:**
-- `src/lib/crm/tickets.functions.ts` (add `getCustomerTicketStats`, extend `listTickets`)
-- `src/lib/tickets/ticket-actions.functions.ts` (accept CC/BCC + attachments in `replyToTicket`)
-
-**Dependency add:** `dompurify` + `@types/dompurify` for safe HTML rendering.
-
-### Explicitly out of scope (Phase 2)
-
-Merge/split tickets · Followers · Server-side drafts · Scheduled send · Presence/typing · Pinned notes · Color labels · Full mentions parsing · Table/Emoji-picker in editor · SLA policy engine · Certificate/verification status widgets (require new fields).
+Reminder UI: after clicking "Our Side Delay" the action panel opens a modal matching screenshot #2 (Manual date+time / Auto 2h / Stop+reason).
 
 ---
 
-Approve to build Phase 1.
+## Phase 4 — Notifications (bell + sound)
+
+Existing tables: `notifications` (already in schema).
+
+- Add helper `src/lib/notifications/emit.server.ts` with `emitNotification({userId, type, title, body, link})`.
+- Insert emits at every event row in the master notification table (new order assign, form submit, incoming email, scheduler-2 start, auto-close, ticket raised, reminder fires, escalation, HIGH_PRIORITY, refund requested).
+- Frontend: `src/hooks/useNotifications.ts` already exists — extend to:
+  - realtime channel `user:<auth.uid()>:notifications`
+  - unread count badge on bell in admin layout header
+  - dropdown panel listing latest 20, each linking to relevant order/ticket workspace
+  - play `/notification.mp3` (add asset) on new arrival if tab focused; browser Notification API if permission granted.
+
+---
+
+## Phase 5 — Docs page
+
+New route `/admin/help/email-matrix` — renders the E001–E012 matrix + status table + button matrix straight from the shared constants (`order-lifecycle.ts`, `order-actions-map.ts`) so it never drifts from code.
+
+---
+
+## Technical notes
+
+- All new server logic goes through `createServerFn` with `requireSupabaseAuth`; cron endpoints under `src/routes/api/public/cron/*` verify `apikey` header.
+- Every new `public.*` table gets `GRANT` + RLS + `has_role()` policies in the same migration.
+- Threading headers (`Message-ID`, `In-Reply-To`, `References`) must be preserved end-to-end: enqueue → Zoho send → stored in `email_logs.message_id` for future replies.
+- HTML sanitisation via `isomorphic-dompurify` (needs `bun add`).
+- No client-side role checks — everything gated server-side via `has_role`.
+
+---
+
+## Suggested build order (each phase is a separate turn)
+
+1. Phase 1 (threading + clean render) — biggest UX win, isolates SMTP changes.
+2. Phase 3a + 3b (enum, transitions, auto-emails) — foundation for everything else.
+3. Phase 3c + 3d (action panel + schedulers + reminder modal).
+4. Phase 4 (notifications).
+5. Phase 2 (tickets in order workspace) + Phase 5 (docs page) — smallest, ship last.
+
+Confirm and I'll start with Phase 1.
