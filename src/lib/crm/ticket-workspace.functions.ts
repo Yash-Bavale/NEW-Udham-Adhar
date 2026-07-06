@@ -97,11 +97,11 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(10)
         : Promise.resolve({ data: [] as any[], error: null }),
-      customerId
+      applicationId
         ? admin
             .from("refund_requests")
-            .select("id, amount, status, created_at, application_id")
-            .eq("customer_id", customerId)
+            .select("id, refund_amount, status, created_at, application_id")
+            .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(10)
         : Promise.resolve({ data: [] as any[], error: null }),
