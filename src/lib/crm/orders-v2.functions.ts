@@ -220,7 +220,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !app) throw new Error("Order not found");
 
-    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes] = await Promise.all([
+    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -252,6 +252,21 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       app.service_id
         ? admin.from("services").select("service_code").eq("id", app.service_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      admin
+        .from("support_tickets")
+        .select("id, ticket_number, subject, status, priority, created_at, updated_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      app.customer_id
+        ? admin
+            .from("support_tickets")
+            .select("id, ticket_number, subject, status, priority, application_id, created_at")
+            .eq("customer_id", app.customer_id)
+            .neq("application_id", data.orderId)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as any[] }),
     ]);
 
     // Look up service_workflows by service_code if present
