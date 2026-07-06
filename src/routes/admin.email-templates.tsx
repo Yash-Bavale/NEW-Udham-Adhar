@@ -206,6 +206,8 @@ function EmailTemplatesPage() {
                         <th className="text-left px-3 py-2 font-medium">Name</th>
                         <th className="text-left px-3 py-2 font-medium">Subject</th>
                         <th className="text-left px-3 py-2 font-medium">Status</th>
+                        <th className="text-left px-3 py-2 font-medium">Dispatch</th>
+
                         <th className="text-left px-3 py-2 font-medium">Last Sent</th>
                         <th className="text-right px-3 py-2 font-medium">Sent</th>
                         <th className="text-right px-3 py-2 font-medium">Actions</th>
