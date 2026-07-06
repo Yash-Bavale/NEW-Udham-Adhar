@@ -479,6 +479,18 @@ export const approveRefund = createServerFn({ method: "POST" })
       } as never)
       .eq("application_id", data.orderId)
       .eq("status", "pending");
+    const app2 = updated as Record<string, unknown> | null;
+    await notifyOrderEvent({
+      order: {
+        id: data.orderId,
+        application_code: (app2?.application_code as string | null) ?? null,
+        assigned_to: (app2?.assigned_to as string | null) ?? null,
+      },
+      kind: "refund_approved",
+      title: `Refund approved on ${(app2?.application_code as string) || data.orderId.slice(0, 8)}`,
+      body: `₹${data.amount} approved. Awaiting payout.`,
+      alsoRoles: ["finance"],
+    });
     return { ok: true, order: updated };
   });
 
