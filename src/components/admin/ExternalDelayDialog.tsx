@@ -9,10 +9,12 @@ export function ExternalDelayDialog({
   applicationId,
   open,
   onClose,
+  initialSide = "customer",
 }: {
   applicationId: string;
   open: boolean;
   onClose: () => void;
+  initialSide?: "customer" | "internal";
 }) {
   const qc = useQueryClient();
   const fnReasons = useServerFn(listDelayReasons);
@@ -24,7 +26,7 @@ export function ExternalDelayDialog({
     enabled: open,
   });
 
-  const [side, setSide] = useState<"customer" | "internal">("customer");
+  const [side, setSide] = useState<"customer" | "internal">(initialSide);
   const [reasonCode, setReasonCode] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
@@ -35,6 +37,10 @@ export function ExternalDelayDialog({
   const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
 
   const filteredReasons = (reasons?.reasons ?? []).filter((r: any) => (r.side ?? "customer") === side);
+
+  useEffect(() => {
+    if (open) setSide(initialSide);
+  }, [open, initialSide]);
 
   useEffect(() => {
     if (open && filteredReasons.length && !filteredReasons.find((r) => r.code === reasonCode)) {

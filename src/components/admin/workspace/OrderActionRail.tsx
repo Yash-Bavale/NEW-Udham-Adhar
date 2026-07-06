@@ -338,8 +338,8 @@ export function OrderActionRail(p: Props) {
       )}
 
       {/* Dialogs */}
-      <ExternalDelayDialog applicationId={p.applicationId} open={delayOpen} onClose={() => { setDelayOpen(false); refresh(); }} />
-      <ExternalDelayDialog applicationId={p.applicationId} open={holdOpen} onClose={() => { setHoldOpen(false); refresh(); }} />
+      <ExternalDelayDialog applicationId={p.applicationId} initialSide="internal" open={delayOpen} onClose={() => { setDelayOpen(false); refresh(); }} />
+      <ExternalDelayDialog applicationId={p.applicationId} initialSide="customer" open={holdOpen} onClose={() => { setHoldOpen(false); refresh(); }} />
       <CloseOrderDialog applicationId={p.applicationId} open={closeOpen} onClose={() => { setCloseOpen(false); refresh(); }} />
       <CompletionGateDialogStandalone
         open={certOpen} onOpenChange={setCertOpen} orderId={p.applicationId} busy={busy}
