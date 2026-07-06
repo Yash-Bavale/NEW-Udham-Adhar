@@ -19,7 +19,7 @@ import { resumeCancelledOrder } from "@/lib/crm/cancellation.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import {
   FULFILLMENT_STAGES, FULFILLMENT_LABEL, FULFILLMENT_BADGE,
-  getAllowedFulfillmentTransitions, stageIndex, type FulfillmentStatus,
+  getAllowedFulfillmentTransitions, type FulfillmentStatus,
 } from "@/lib/crm/fulfillment-transitions";
 import { formatIST } from "@/lib/datetime";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
