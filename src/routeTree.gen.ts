@@ -200,6 +200,7 @@ import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
+import { Route as AdminQuarantineRouteImport } from './routes/admin.quarantine'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
@@ -241,7 +242,6 @@ import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
 import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
 import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
-import { Route as AuthenticatedAdminQuarantineRouteImport } from './routes/_authenticated/admin.quarantine'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -1247,6 +1247,11 @@ const AdminRefundsRoute = AdminRefundsRouteImport.update({
   path: '/refunds',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminQuarantineRoute = AdminQuarantineRouteImport.update({
+  id: '/quarantine',
+  path: '/quarantine',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPipelineRoute = AdminPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
@@ -1457,12 +1462,6 @@ const AdminApplicationsApplicationIdRoute =
     id: '/$applicationId',
     path: '/$applicationId',
     getParentRoute: () => AdminApplicationsRoute,
-  } as any)
-const AuthenticatedAdminQuarantineRoute =
-  AuthenticatedAdminQuarantineRouteImport.update({
-    id: '/_authenticated/admin/quarantine',
-    path: '/admin/quarantine',
-    getParentRoute: () => rootRouteImport,
   } as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
@@ -1747,6 +1746,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/quarantine': typeof AdminQuarantineRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -1767,7 +1767,6 @@ export interface FileRoutesByFullPath {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
-  '/admin/quarantine': typeof AuthenticatedAdminQuarantineRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1994,6 +1993,7 @@ export interface FileRoutesByTo {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/quarantine': typeof AdminQuarantineRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -2014,7 +2014,6 @@ export interface FileRoutesByTo {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
-  '/admin/quarantine': typeof AuthenticatedAdminQuarantineRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -2245,6 +2244,7 @@ export interface FileRoutesById {
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
+  '/admin/quarantine': typeof AdminQuarantineRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
@@ -2265,7 +2265,6 @@ export interface FileRoutesById {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
-  '/_authenticated/admin/quarantine': typeof AuthenticatedAdminQuarantineRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -2497,6 +2496,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/quarantine'
     | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
@@ -2517,7 +2517,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
-    | '/admin/quarantine'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2744,6 +2743,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/quarantine'
     | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
@@ -2764,7 +2764,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin'
-    | '/admin/quarantine'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2994,6 +2993,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/payments'
     | '/admin/pipeline'
+    | '/admin/quarantine'
     | '/admin/refunds'
     | '/admin/reports'
     | '/admin/review'
@@ -3014,7 +3014,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
-    | '/_authenticated/admin/quarantine'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -3231,7 +3230,6 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
-  AuthenticatedAdminQuarantineRoute: typeof AuthenticatedAdminQuarantineRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
@@ -4596,6 +4594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRefundsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/quarantine': {
+      id: '/admin/quarantine'
+      path: '/quarantine'
+      fullPath: '/admin/quarantine'
+      preLoaderRoute: typeof AdminQuarantineRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pipeline': {
       id: '/admin/pipeline'
       path: '/pipeline'
@@ -4883,13 +4888,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApplicationsApplicationIdRouteImport
       parentRoute: typeof AdminApplicationsRoute
     }
-    '/_authenticated/admin/quarantine': {
-      id: '/_authenticated/admin/quarantine'
-      path: '/admin/quarantine'
-      fullPath: '/admin/quarantine'
-      preLoaderRoute: typeof AuthenticatedAdminQuarantineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
       path: '/lovable/email/transactional/send'
@@ -5132,6 +5130,7 @@ interface AdminRouteChildren {
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
+  AdminQuarantineRoute: typeof AdminQuarantineRoute
   AdminRefundsRoute: typeof AdminRefundsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminReviewRoute: typeof AdminReviewRoute
@@ -5169,6 +5168,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
+  AdminQuarantineRoute: AdminQuarantineRoute,
   AdminRefundsRoute: AdminRefundsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminReviewRoute: AdminReviewRoute,
@@ -5369,7 +5369,6 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
-  AuthenticatedAdminQuarantineRoute: AuthenticatedAdminQuarantineRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,

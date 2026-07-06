@@ -40,7 +40,7 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 
-export const Route = createFileRoute("/_authenticated/admin/quarantine")({
+export const Route = createFileRoute("/admin/quarantine")({
   head: () => ({
     meta: [
       { title: "Email Quarantine — Udyam Ops OS" },
