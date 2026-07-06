@@ -670,7 +670,7 @@ async function fireTicketAutoclose(s: {
     is_internal: true,
   } as never);
 
-  // Send E010 auto-close notice to customer.
+  // Send final ticket-closed notice to customer (E010 = support_ticket_closed_final).
   if (t.customer_id) {
     const { data: cust } = await supabaseAdmin
       .from("customers")
@@ -681,7 +681,7 @@ async function fireTicketAutoclose(s: {
     if (c?.primary_email) {
       try {
         await enqueueFromTemplateInternal(
-          BHS_EMAILS.E010_TICKET_AUTOCLOSE,
+          BHS_EMAILS.E010_TICKET_CLOSED_FINAL,
           c.primary_email,
           {
             customerName: c.name || "Customer",
@@ -691,7 +691,7 @@ async function fireTicketAutoclose(s: {
           { applicationId: t.application_id ?? undefined },
         );
       } catch (e) {
-        console.error("[schedulers] E010 enqueue failed", e);
+        console.error("[schedulers] ticket auto-close email enqueue failed", e);
       }
     }
   }
