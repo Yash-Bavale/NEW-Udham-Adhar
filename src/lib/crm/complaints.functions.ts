@@ -198,32 +198,6 @@ export const createComplaint = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Best-effort email enqueue (template optional)
-    try {
-      if ((lead as any)?.customer_id) {
-        const { data: cust } = await supabase
-          .from("customers")
-          .select("primary_email, name")
-          .eq("id", (lead as any).customer_id)
-          .maybeSingle();
-        if ((cust as any)?.primary_email) {
-          const m = await import("@/lib/emails/emails.server");
-          await m.enqueueFromTemplateInternal(
-            "complaint_filed",
-            (cust as any).primary_email,
-            {
-              customer_name: (cust as any).name ?? "",
-              complaint_number: inserted!.complaint_number,
-              authority_name: data.authority_name,
-            },
-            { toName: (cust as any).name ?? undefined, applicationId: data.application_id ?? undefined },
-          );
-        }
-      }
-    } catch {
-      // template missing — non-fatal
-    }
-
     return inserted;
   });
 
