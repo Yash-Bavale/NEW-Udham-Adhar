@@ -1,81 +1,53 @@
-# Support ticket + inbound email walkthrough
+## Ticket management upgrade — dedup by order, richer detail UI, close-and-resume
 
-## What actually exists today (state check)
+Tickets already exist (list at `/admin/tickets`, detail at `/admin/tickets/$ticketId`, `AddTicketDialog`, `createTicket`/`updateTicket`/`replyToTicket`, `application_id` FK, inbound email → ticket via `inbox-matcher.server.ts`). Gaps: no dedup per order, detail page lacks quick actions, no "close ticket + resume order" flow.
 
-Before changing anything I checked the DB — inbound → ticket wiring is **already running**:
+### 1. Dedup: one open ticket per order
 
-- `support_tickets`: **43** rows; latest 8 all created from `email_inbound` on 2–6 Jul.
-- `inbound_email_quarantine`: 11 rows `converted_to_ticket`, 9 `no_match` (all system senders: `mailer-daemon@mail.zoho.in`, `noreply@zohoaccounts.in`) — so the "no ticket ever created" perception is because the last few emails you replied with were either (a) filtered as system noise, or (b) the poll cron hasn't run since your last reply. We'll verify and force a run.
-- Ticket detail page already renders inbound vs outbound replies (`ticket_replies.direction`) with `email_message_id` threading — the thread UI exists at `/admin/tickets/{id}`.
-- Quarantine review UI exists at `/admin/quarantine`.
+Enforce in code, not schema (partial unique index would race with inbound email).
 
-So the plumbing works; what's missing is **visibility** (you can't see the poller status, or convert a `no_match` email into a ticket with one click) and a **live demonstration**.
+- **`createTicket`** (`src/lib/crm/tickets.functions.ts`): when `applicationId` is present, first query `support_tickets` for an existing row with the same `application_id` and `status IN ('open','in_progress','waiting_customer')`. If found, return that existing ticket id (with a `reused: true` flag) instead of inserting.
+- **`inbox-matcher.server.ts`** (inbound-email → new ticket branch): same lookup before insert — if the sender's most recent open ticket for the linked order exists, append an inbound `ticket_replies` row to it instead of creating a duplicate.
+- **`AddTicketDialog`**: when the user picks an order that already has an open ticket, show an inline banner "Open ticket TKT-… already exists for this order — Open it" (link) with the create button disabled unless the user ticks "Create additional ticket anyway" (audit-friendly override).
+- Toast on reuse: "Reusing existing open ticket TKT-…".
 
-## Plan
+### 2. Detail page (`admin.tickets.$ticketId.tsx`) — action rail + linked order card
 
-### 1. Verify + document the inbound pipeline
+Add a right-hand action rail and, when `application_id` is set, an order summary card.
 
-- Read `src/lib/mail/inbox-matcher.server.ts` and `zoho-inbox.server.ts` end-to-end and confirm:
-  - Poller endpoint: `POST /api/public/cron/poll-zoho-inbox` (guarded by anon/publishable/CRON_SECRET).
-  - Fetches unread mail from `help@businesshelpservices.com` via Zoho OAuth.
-  - Matches inbound to a ticket by: `In-Reply-To` header → existing `ticket_replies.email_message_id`; else by sender email → most recent open ticket for that customer; else creates a NEW ticket (`source='email_inbound'`) if sender is a known customer/lead; else quarantines as `no_match`.
-- Confirm pg_cron job `poll-zoho-inbox` is scheduled every 2 min and hitting the route (I'll query `cron.job` + `cron.job_run_details` through a SECURITY DEFINER helper since the `cron` schema is restricted).
+- **Order card** (only if linked): order code, current `order_status`, customer name, service, "Open order" link. Fetched via a new small server fn `getTicketOrderContext({ orderId })` returning `{ application_code, order_status, service_name, customer_name }`.
+- **Action rail** (buttons, each a mutation):
+  - Change status (existing dropdown, kept).
+  - Reassign (existing).
+  - Change priority (new — reuses `updateTicket` which already accepts `priority`).
+  - **Resolve & Resume Order** — visible only when `ticket.status !== 'closed'` AND `application_id` present AND linked order is in `CUSTOMER_HOLD` / `OUR_SIDE_DELAY`. Calls a new server fn `resolveTicketAndResumeOrder({ ticketId, resumeTo: 'IN_PROCESSING' })` that (a) sets ticket → `resolved`, (b) calls `transition_order_status` RPC to the chosen resume status, (c) inserts `application_events` row `event_type='order_resumed_from_ticket'`. Confirmation dialog with the resume-to selector (`IN_PROCESSING` default, `SUBMITTED_TO_GOVT` optional based on `allowed_order_transitions`).
+  - **Close ticket** — sets `closed`, cancels auto-close scheduler (already handled).
+  - **Reopen** — visible when status is `resolved` or `closed`.
+- **Reply composer improvements**: keep existing; add attachment count indicator if `email_logs` shows attachments (read-only, no upload change).
+- **Header pills**: SLA age (`created_at` → now), first-response age, last-customer-message age — small muted chips.
 
-### 2. Force a live poll now and generate a ticket
+### 3. New server function
 
-- Add an admin-only button "Poll inbox now" on `/admin/quarantine` (calls a `createServerFn` with `requireSupabaseAuth` + admin role check that invokes `pollZohoInbox(50)`).
-- You reply to any BHS email from a customer address, then click the button — a new ticket appears in `/admin/tickets`, and I'll open it with you to show the thread.
+`resolveTicketAndResumeOrder` in `src/lib/tickets/ticket-actions.functions.ts`:
+- Auth: `requireSupabaseAuth`.
+- Input: `{ ticketId: uuid, resumeTo: enum('IN_PROCESSING','SUBMITTED_TO_GOVT') }`.
+- Load ticket, verify `application_id`, verify current order status is a hold state.
+- Update ticket → `resolved` (mirrors `updateTicket`).
+- `context.supabase.rpc('transition_order_status', { _order_id, _new_status: resumeTo, _remarks: 'Resumed from ticket <TKT-…>' })`.
+- Cancel autoclose scheduler (existing helper).
+- Insert `application_events` row.
 
-### 3. Show the email thread on a ticket
+### 4. List page tweaks
 
-- On `/admin/tickets/{id}` the timeline already shows:
-  - Original inbound message (rendered from body_html, sender chip).
-  - Each outbound staff reply (with "Emailed" badge when `emailed_at` is set).
-  - Internal notes (Lock icon, not sent to customer).
-- I'll add a small **"Message headers"** popover per reply showing `email_message_id` / `email_in_reply_to` so you can see how threading is stitched.
+- New column "Order" showing `applications.application_code` as a link when present (already fetched by `listTickets`).
+- New filter chip "Linked to order" (client-side or add `hasOrder` param to `listTickets`).
 
-### 4. Improve the Quarantine tab (the "not tracked" ones)
+### 5. Files touched
 
-`no_match` rows are inbound emails to help@businesshelpservices.com from unknown senders (or system senders). Today they sit unreviewed. I'll add:
+Edits: `src/lib/crm/tickets.functions.ts`, `src/lib/tickets/ticket-actions.functions.ts`, `src/lib/mail/inbox-matcher.server.ts`, `src/components/admin/AddTicketDialog.tsx`, `src/routes/admin.tickets.tsx`, `src/routes/admin.tickets.$ticketId.tsx`. No DB migration needed.
 
-- Filter chips: All / No match / Converted.
-- Per-row actions:
-  - **Create ticket** — opens a dialog pre-filled with sender, subject, body → creates a `support_tickets` row with `source='email_inbound'` and a first `ticket_replies` (direction='inbound').
-  - **Link to existing ticket** — searchable ticket picker; attaches as an inbound reply.
-  - **Mark as noise** (mailer-daemon / OTP mail / etc.) — sets `review_action='noise'`, hides from default view.
-- One-tap "Add sender as customer" when the sender has no customer/lead row (this is why some legit emails stay `no_match`).
+### Out of scope
 
-### 5. Journey tree for a customer email (docs page)
+- Bulk ticket actions, ticket merging UI, SLA rule engine, per-user notifications, file uploads on replies.
 
-Add a short admin help card at the top of `/admin/quarantine` explaining the flow:
-
-```text
-help@businesshelpservices.com (Zoho Mail)
-        │  poll every 2 min via /api/public/cron/poll-zoho-inbox
-        ▼
-[fetch UIDs] ── seen? ──► skip
-        │ new
-        ▼
-Match by  In-Reply-To header
-        │ hit ──► append inbound reply to existing ticket
-        │ miss
-        ▼
-Match by sender email → recent open ticket
-        │ hit ──► append inbound reply
-        │ miss
-        ▼
-Sender is known customer/lead?
-        │ yes ──► create NEW ticket (source=email_inbound)
-        │ no  ──► inbound_email_quarantine (reason=no_match)
-                        │
-                        ▼ staff review in /admin/quarantine
-                Create ticket / Link / Mark as noise
-```
-
-## Technical details
-
-- New serverFn `pollInboxNow` in `src/lib/mail/inbox-poll.functions.ts` — `requireSupabaseAuth` + `has_role(admin|super_admin)` gate; imports `pollZohoInbox` inside handler.
-- New serverFns `convertQuarantineToTicket`, `linkQuarantineToTicket`, `markQuarantineAsNoise` in `src/lib/tickets/quarantine.functions.ts` (file exists — extend it).
-- UI edits: `src/routes/admin.quarantine.tsx` (filters + actions + poll button + help card), `src/routes/admin.tickets.$ticketId.tsx` (message-header popover).
-- No schema changes required (`review_action` column already exists).
-- Zero business-logic change to the poller itself.
+Approve to build.
