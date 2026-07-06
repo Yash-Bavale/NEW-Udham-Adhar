@@ -346,6 +346,12 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
         { applicationId: order.id, leadId: order.lead_id },
       );
     }
+    await notifyOrderEvent({
+      order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
+      kind: "order_status_change",
+      title: `${order.application_code || order.id.slice(0, 8)} submitted to authority`,
+      body: data.referenceNumber ? `Ref: ${data.referenceNumber}` : undefined,
+    });
     return { ok: true, order: updated, emailQueued };
   });
 
