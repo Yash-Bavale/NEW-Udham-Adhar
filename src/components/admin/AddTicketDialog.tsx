@@ -3,8 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, MailCheck, MailX, Plus, X } from "lucide-react";
-import { createTicket, searchCustomerOptions } from "@/lib/crm/tickets.functions";
+import { createTicket, searchCustomerOptions, checkOpenTicketForOrder } from "@/lib/crm/tickets.functions";
 import { listStaffForAssignment, searchOrderOptions } from "@/lib/crm/tasks.functions";
+import { Link } from "@tanstack/react-router";
 
 type Props = {
   open?: boolean;
