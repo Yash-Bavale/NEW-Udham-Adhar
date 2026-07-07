@@ -365,7 +365,10 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
           invoice_download_url: invoiceUrl,
           invoice_attachment: attachment.filename,
           transaction_id: pay?.transaction_id ?? pay?.razorpay_order_id ?? data.paymentId,
+          payment_reference: pay?.transaction_id ?? pay?.razorpay_order_id ?? data.paymentId,
           payment_datetime: fmtDateTime(paidAt),
+          payment_date: fmtDateTime(paidAt),
+          service_fee: Number(inv?.base_amount ?? lead.base_amount ?? 0).toFixed(2),
           support_email: "help@businesshelpservices.com",
         },
         {
