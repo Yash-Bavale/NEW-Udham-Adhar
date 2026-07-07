@@ -243,8 +243,8 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Unified action area — every tile is map-driven and always toasts. */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
+          {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
+          <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
             <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
             <div className="grid grid-cols-6 gap-1.5">
               {QUICK_ACTIONS.map((spec) => {
