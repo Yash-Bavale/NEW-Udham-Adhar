@@ -2835,6 +2835,7 @@ export type Database = {
           base_amount: number
           created_at: string
           description: string | null
+          govt_portal_url: string | null
           gst_amount: number
           id: string
           is_active: boolean
@@ -2849,6 +2850,7 @@ export type Database = {
           base_amount: number
           created_at?: string
           description?: string | null
+          govt_portal_url?: string | null
           gst_amount?: number
           id?: string
           is_active?: boolean
@@ -2863,6 +2865,7 @@ export type Database = {
           base_amount?: number
           created_at?: string
           description?: string | null
+          govt_portal_url?: string | null
           gst_amount?: number
           id?: string
           is_active?: boolean
@@ -2918,6 +2921,8 @@ export type Database = {
         Row: {
           application_id: string | null
           assigned_to: string | null
+          attachment_url: string | null
+          category: string | null
           closed_at: string | null
           created_at: string | null
           customer_id: string | null
@@ -2941,6 +2946,8 @@ export type Database = {
         Insert: {
           application_id?: string | null
           assigned_to?: string | null
+          attachment_url?: string | null
+          category?: string | null
           closed_at?: string | null
           created_at?: string | null
           customer_id?: string | null
@@ -2964,6 +2971,8 @@ export type Database = {
         Update: {
           application_id?: string | null
           assigned_to?: string | null
+          attachment_url?: string | null
+          category?: string | null
           closed_at?: string | null
           created_at?: string | null
           customer_id?: string | null
