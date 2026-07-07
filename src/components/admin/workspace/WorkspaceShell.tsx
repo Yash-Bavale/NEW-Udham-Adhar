@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, Mail, User2,
-  FileText, Workflow, Activity, LifeBuoy,
+  FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,6 +19,7 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { RefundRequestDialog } from "@/components/admin/RefundRequestDialog";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
@@ -45,11 +46,11 @@ interface Props {
 }
 
 const TAB_DEFS = [
-  { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
-  { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
-  { id: "emails"   as const, label: "Emails",            icon: Mail },
-  { id: "activity" as const, label: "Timeline",          icon: Activity },
-  { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
+  { id: "workflow" as const, label: "Employee Task",                    icon: Workflow, tooltip: "Move the order through its workflow stages" },
+  { id: "form"     as const, label: "Forms & Docs",                     icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
+  { id: "emails"   as const, label: "Emails",                           icon: Mail,     tooltip: "All emails sent or received for this order" },
+  { id: "activity" as const, label: "Timeline / Activity Log",          icon: Activity, tooltip: "Full chronological activity log for this order" },
+  { id: "support"  as const, label: "Internal Help / Support Ticket",   icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
 ];
 type TabId = WorkspaceTabId;
 
