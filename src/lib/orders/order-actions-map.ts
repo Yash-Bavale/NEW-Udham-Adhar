@@ -48,6 +48,8 @@ export interface QuickActionCtx {
 export interface QuickActionSpec {
   key: QuickActionKey;
   label: string;
+  /** 1-line hover tooltip explaining what this button does. */
+  tooltip: string;
   icon: LucideIcon;
   tint: QuickTint;
   /** Build the runtime bits (href / disabled reason / toast messages) for a specific order. */
