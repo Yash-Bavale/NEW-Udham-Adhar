@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate } from "./smtp.server";
-import { sendViaZoho } from "./zoho-smtp.server";
+import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 
 /** Strip HTML → plain-text fallback. Lovable email API rejects empty `text`. */
 function htmlToPlainText(html: string | null | undefined): string {
@@ -580,6 +580,29 @@ async function sendQueueRow(row: QueueRow) {
   }
 
   const errMsg = (lastError ?? "Unknown error").slice(0, 1000);
+  if (isZohoAuthOrRateLimitError(errMsg)) {
+    const next = new Date(Date.now() + 30 * 60_000).toISOString();
+    await Promise.all([
+      supabaseAdmin
+        .from("email_queue")
+        .update({ status: "failed", attempts: row.attempts ?? 0, next_attempt_at: next, last_error: errMsg })
+        .eq("id", row.id),
+      supabaseAdmin.from("email_logs").insert({
+        queue_id: row.id,
+        template_code: row.template_code,
+        to_email: row.to_email,
+        subject: row.subject,
+        status: "failed",
+        smtp_response: `[zoho] deferred`,
+        error_message: errMsg,
+        attempt,
+        lead_id: row.lead_id,
+        application_id: row.application_id,
+      }),
+    ]);
+    return { ok: false, error: errMsg, providerBlocked: true };
+  }
+
   const isDlq = attempt >= (row.max_attempts ?? 5);
   const delayMin = RETRY_BACKOFF_MIN[Math.min(attempt - 1, RETRY_BACKOFF_MIN.length - 1)];
   const next = new Date(Date.now() + delayMin * 60_000).toISOString();
@@ -627,7 +650,10 @@ export async function processQueueInternal(limit = 20) {
   for (const r of rows) {
     const res = await sendQueueRowById((r as { id: string }).id);
     if (res.ok) sent++;
-    else failed++;
+    else {
+      failed++;
+      if ((res as { providerBlocked?: boolean }).providerBlocked) break;
+    }
   }
   return { processed: rows.length, sent, failed };
 }
