@@ -1,5 +1,9 @@
-// pg_cron calls this every 6h to flag SLA-breached complaints + enqueue reminder emails.
+// pg_cron calls this periodically to flag SLA-breached complaints + enqueue reminder emails.
+// The reminder email itself is the `complaint_sla_breach` row in email_templates —
+// disable/enable it from the admin Email Templates screen. Capped at 3 reminders per complaint.
 import { createFileRoute } from "@tanstack/react-router";
+
+const MAX_REMINDERS_PER_COMPLAINT = 3;
 
 export const Route = createFileRoute("/api/public/cron/complaints-sla")({
   server: {
@@ -13,8 +17,9 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
         const now = new Date().toISOString();
+
         // 1) Mark newly-breached complaints
         const { data: breaching } = await supabaseAdmin
           .from("complaints")
@@ -32,18 +37,21 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
             .in("id", breachedIds);
         }
 
-        // 2) For all open + breached complaints, enqueue an SLA alert email
-        //    (max 1 per 24h via last_reminded_at guard)
+        // 2) For open + breached complaints under the reminder cap, enqueue an
+        //    SLA alert email (max 1 per 24h via last_reminded_at guard, and
+        //    hard capped at MAX_REMINDERS_PER_COMPLAINT total).
         const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         const { data: openBreached } = await supabaseAdmin
           .from("complaints")
           .select("id, complaint_number, lead_id, severity, category, sla_due_at, last_reminded_at, reminder_count")
           .not("breached_at", "is", null)
           .not("status", "in", "(resolved,closed)")
+          .lt("reminder_count", MAX_REMINDERS_PER_COMPLAINT)
           .or(`last_reminded_at.is.null,last_reminded_at.lt.${dayAgo}`)
           .limit(100);
 
         let queued = 0;
+        let skippedDisabled = 0;
         for (const c of openBreached ?? []) {
           const { data: lead } = await supabaseAdmin
             .from("leads")
@@ -51,20 +59,28 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
             .eq("id", c.lead_id)
             .single();
           if (!lead?.email) continue;
-          await enqueueEmailInternal({
-            toEmail: lead.email,
-            toName: lead.name,
-            subject: `[Action Required] Update on grievance ${c.complaint_number ?? c.id.slice(0, 8)}`,
-            bodyHtml: `<div style="font-family:Arial,sans-serif;padding:20px">
-              <p>Dear ${lead.name ?? "Customer"},</p>
-              <p>Your grievance <b>${c.complaint_number ?? ""}</b> has crossed the expected resolution window.
-              Our senior operations team has been alerted and will revert within 24 hours.</p>
-              <p>Severity: <b>${(c.severity ?? "normal").toUpperCase()}</b></p>
-              <p>Thank you for your patience.</p>
-            </div>`,
-            templateCode: "complaint_sla_breach",
-            leadId: c.lead_id,
-          });
+
+          try {
+            const result = await enqueueFromTemplateInternal(
+              "complaint_sla_breach",
+              lead.email,
+              {
+                customerName: lead.name ?? "Customer",
+                complaintNumber: c.complaint_number ?? c.id.slice(0, 8),
+                severity: (c.severity ?? "normal").toString().toUpperCase(),
+              },
+              { toName: lead.name ?? undefined, leadId: c.lead_id },
+            );
+            // enqueueFromTemplateInternal returns undefined when the template
+            // is disabled — treat that as a skip, not a send.
+            if (!result) {
+              skippedDisabled += 1;
+              continue;
+            }
+          } catch {
+            continue;
+          }
+
           await supabaseAdmin
             .from("complaints")
             .update({ last_reminded_at: now, reminder_count: (c.reminder_count ?? 0) + 1 })
@@ -76,6 +92,7 @@ export const Route = createFileRoute("/api/public/cron/complaints-sla")({
           ok: true,
           newly_breached: breachedIds.length,
           alerts_queued: queued,
+          skipped_template_disabled: skippedDisabled,
         });
       },
     },
