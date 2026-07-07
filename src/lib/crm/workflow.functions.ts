@@ -363,10 +363,16 @@ export const resumeOrder = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, workflow_status")
+      .select("id, lead_id, workflow_status, application_code")
       .eq("id", data.applicationId)
       .maybeSingle();
     if (!app) throw new Error("Application not found");
+
+    const { data: lead } = await admin
+      .from("leads")
+      .select("name, email, service")
+      .eq("id", app.lead_id!)
+      .maybeSingle();
 
     // Cancel all pending reminders for this application
     await admin
@@ -374,6 +380,7 @@ export const resumeOrder = createServerFn({ method: "POST" })
       .update({ status: "cancelled" } as never)
       .eq("application_id", app.id)
       .eq("status", "pending");
+
 
     await admin
       .from("applications")
