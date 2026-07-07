@@ -617,7 +617,7 @@ async function sendQueueRow(row: QueueRow) {
       to_email: row.to_email,
       subject: row.subject,
       status: "failed",
-      smtp_response: `[lovable] failed`,
+          smtp_response: `[zoho] failed`,
       error_message: errMsg,
       attempt,
       lead_id: row.lead_id,
