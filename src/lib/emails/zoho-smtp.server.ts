@@ -65,10 +65,6 @@ function mailHost(dc = activeDc): string {
   return `https://mail.zoho.${dc}`;
 }
 
-function dcCandidates(): string[] {
-  return Array.from(new Set([DEFAULT_DC, activeDc, "in", "com", "eu", "com.au", "jp"].filter(Boolean)));
-}
-
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Zoho Mail API credentials missing (${name}).`);
@@ -97,22 +93,19 @@ async function getZohoAccessToken(): Promise<string> {
     grant_type: "refresh_token",
   });
 
-  let lastError = "unknown";
-  for (const dc of dcCandidates()) {
-    const res = await fetch(`${accountsHost(dc)}/oauth/v2/token?${params.toString()}`, { method: "POST" });
-    const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
-    if (res.ok && body.access_token) {
-      activeDc = dc;
-      tokenCache = {
-        token: body.access_token,
-        expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
-      };
-      return body.access_token;
-    }
-    lastError = body.error_description || body.error || String(res.status);
+  const res = await fetch(`${accountsHost(DEFAULT_DC)}/oauth/v2/token?${params.toString()}`, { method: "POST" });
+  const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
+  if (!res.ok || !body.access_token) {
+    const details = body.error_description || body.error || String(res.status);
+    throw new Error(`Zoho token refresh failed: ${details}`);
   }
 
-  throw new Error(`Zoho token refresh failed: ${lastError}`);
+  activeDc = DEFAULT_DC;
+  tokenCache = {
+    token: body.access_token,
+    expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
+  };
+  return body.access_token;
 }
 
 async function resolveAccountId(forceRefresh = false): Promise<string> {
@@ -269,4 +262,16 @@ export function zohoSenderInfo() {
     user: zohoFromEmail(),
     fromName: process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services",
   };
+}
+
+export function isZohoAuthOrRateLimitError(error: string | null | undefined): boolean {
+  const value = (error || "").toLowerCase();
+  return (
+    value.includes("zoho token refresh failed") ||
+    value.includes("invalid_client") ||
+    value.includes("access denied") ||
+    value.includes("too many requests") ||
+    value.includes("try again after some time") ||
+    value.includes("rate limit")
+  );
 }
