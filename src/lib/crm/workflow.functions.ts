@@ -279,6 +279,21 @@ export const setExternalDelay = createServerFn({ method: "POST" })
           console.error("[workflow] customer-side delay email failed", e);
         }
       }
+
+      // Internal notifications for customer-side hold (assignee + Super Admin).
+      {
+        const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+        const notifBase = {
+          kind: "customer_hold_started" as const,
+          title: `Customer-Side Delay — ${data.reasonLabel}`,
+          body: `Order ${app.application_code ?? ""} paused. Auto-closes in 8 business hours if no response.`,
+          href: `/admin/orders/${app.id}`,
+          entityKind: "application",
+          entityId: app.id,
+        };
+        if (lead?.assigned_to) await emitToUsers([lead.assigned_to], notifBase);
+        await emitToRole("super_admin", notifBase);
+      }
     } else {
       // ── Internal / our-side: notify customer with E005 hold intimation + assignee review reminder ──
       const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
@@ -298,15 +313,22 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         created_by: context.userId,
       } as never);
 
+      // Internal notifications: assignee (if any) + Super Admin/Admin/Ops so someone always sees it.
+      const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+      const notifBase = {
+        kind: "our_side_delay_start" as const,
+        title: `Our-Side Delay — ${data.reasonLabel}`,
+        body: `Order ${app.application_code ?? ""} paused (internal). Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
+        href: `/admin/orders/${app.id}`,
+        entityKind: "application",
+        entityId: app.id,
+      };
       if (lead?.assigned_to) {
-        await admin.from("notifications").insert({
-          user_id: lead.assigned_to,
-          title: `Internal delay logged — ${data.reasonLabel}`,
-          body: `Order ${app.application_code ?? ""} paused for internal reason. Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
-          kind: "workflow_internal_delay",
-          link_to: `/admin/orders/${app.id}`,
-        } as never);
+        await emitToUsers([lead.assigned_to], notifBase);
       }
+      await emitToRole("super_admin", notifBase);
+      await emitToRole("admin", notifBase);
+
 
       // Send our-side delay hold intimation email to customer (E005).
       if (lead?.email) {
@@ -426,6 +448,28 @@ export const resumeOrder = createServerFn({ method: "POST" })
       } catch (e) {
         console.error("[workflow] resume email failed", e);
       }
+    }
+
+    // Internal notifications: assignee + Super Admin that the order was resumed.
+    {
+      const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+      const notifBase = {
+        kind: "order_status_change" as const,
+        title: `Order Resumed — ${app.application_code ?? ""}`,
+        body: `${name} resumed processing.${data.note ? ` Note: ${data.note}` : ""}`,
+        href: `/admin/orders/${app.id}`,
+        entityKind: "application",
+        entityId: app.id,
+      };
+      const { data: leadRow } = await admin
+        .from("leads")
+        .select("assigned_to")
+        .eq("id", app.lead_id!)
+        .maybeSingle();
+      if (leadRow?.assigned_to && leadRow.assigned_to !== context.userId) {
+        await emitToUsers([leadRow.assigned_to], notifBase);
+      }
+      await emitToRole("super_admin", notifBase);
     }
 
     await writeAudit({
