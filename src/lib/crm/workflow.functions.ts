@@ -279,6 +279,21 @@ export const setExternalDelay = createServerFn({ method: "POST" })
           console.error("[workflow] customer-side delay email failed", e);
         }
       }
+
+      // Internal notifications for customer-side hold (assignee + Super Admin).
+      {
+        const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+        const notifBase = {
+          kind: "customer_hold_started" as const,
+          title: `Customer-Side Delay — ${data.reasonLabel}`,
+          body: `Order ${app.application_code ?? ""} paused. Auto-closes in 8 business hours if no response.`,
+          href: `/admin/orders/${app.id}`,
+          entityKind: "application",
+          entityId: app.id,
+        };
+        if (lead?.assigned_to) await emitToUsers([lead.assigned_to], notifBase);
+        await emitToRole("super_admin", notifBase);
+      }
     } else {
       // ── Internal / our-side: notify customer with E005 hold intimation + assignee review reminder ──
       const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
