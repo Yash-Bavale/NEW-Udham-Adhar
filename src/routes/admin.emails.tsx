@@ -64,12 +64,15 @@ function DashboardTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid md:grid-cols-5 gap-3">
+      <div className="grid md:grid-cols-4 lg:grid-cols-8 gap-3">
         <Stat label="Queued" value={c?.queued ?? 0} tone="default" />
         <Stat label="Sending" value={c?.sending ?? 0} tone="info" />
         <Stat label="Sent (24h)" value={c?.sent24h ?? 0} tone="success" />
         <Stat label="Sent (7d)" value={c?.sent7d ?? 0} tone="success" />
         <Stat label="Dead-letter" value={c?.dlq ?? 0} tone="danger" />
+        <Stat label="Queue Unmatched" value={c?.queueUnmatched ?? 0} tone="danger" />
+        <Stat label="Sent Unmatched" value={c?.sentLogsUnmatched ?? 0} tone="danger" />
+        <Stat label="All Unmatched" value={c?.allLogsUnmatched ?? 0} tone="danger" />
       </div>
 
       <div className="flex gap-2">
@@ -483,7 +486,16 @@ function LogsTab() {
                   <tr key={r.id} className="border-t">
                     <td className="p-2 text-xs">{new Date(r.sent_at).toLocaleString()}</td>
                     <td className="p-2">{r.to_email}</td>
-                    <td className="p-2 text-xs font-mono">{r.template_code ?? "—"}</td>
+                    <td className="p-2 text-xs font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <span>{r.template_code ?? "NO_TEMPLATE"}</span>
+                        {r.template_exists === false && (
+                          <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold text-rose-700 border border-rose-200">
+                            unmatched
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="p-2 text-xs">{r.subject}</td>
                     <td className="p-2"><StatusBadge status={r.status} /></td>
                     <td className="p-2 text-xs">{r.attempt}</td>
