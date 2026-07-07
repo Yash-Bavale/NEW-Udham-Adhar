@@ -146,17 +146,55 @@ export function WorkspaceShell(p: Props) {
                               "bg-sky-50 text-sky-700 ring-sky-200";
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-5 pb-10 max-w-[1400px] mx-auto">
       {/* Top row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link
           to="/admin/orders"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Orders
         </Link>
-        <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Schedule Follow-up" />
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={govtPortalUrl ?? undefined}
+                target={govtPortalUrl ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                onClick={(e) => { if (!govtPortalUrl) { e.preventDefault(); toast.error("No government portal URL set for this service"); } }}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border ${govtPortalUrl ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"}`}
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Govt Portal
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setRefundOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              >
+                <BadgeDollarSign className="w-3.5 h-3.5" /> Refund
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Log a refund request received from the customer</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Add Task / Follow-up" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Schedule a follow-up task for this order</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
+      <RefundRequestDialog applicationId={p.orderId} open={refundOpen} onClose={() => setRefundOpen(false)} />
+
 
       {/* Header card */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
