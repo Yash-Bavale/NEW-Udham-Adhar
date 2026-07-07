@@ -1,59 +1,43 @@
-## What is the right way
+## What's actually happening
 
-Use Zoho Mail HTTPS API only, not SMTP and not Lovable email. SMTP is what caused the proxy error. The remaining blocker is now Zoho OAuth/provider access: Zoho returned `Access Denied / too many requests` and then `invalid_client`, which means the saved OAuth client/refresh token is either temporarily throttled, wrong for the Zoho data center, revoked, or not authorized for the mailbox.
+The email you're seeing — **"[Action Required] Update on grievance CMP-…"** — is **not** one of the 13 templates in your Email Templates screen. It is hard-coded inside a cron endpoint (`src/routes/api/public/cron/complaints-sla.ts`) that scans the `complaints` table, and whenever it finds a complaint whose SLA due-date has passed, it enqueues a reminder email with subject + HTML built inline in the code and stamped with `template_code = "complaint_sla_breach"`.
 
-## What I need from you
+That is the **only** "phantom" email in the system I could find. Every other email in the queue traces back to one of the 13 rows in `email_templates`.
 
-After you approve this plan, I will open a secure credentials form if needed. Do not paste secrets in chat.
+Why it keeps hitting the same 4 people:
 
-Please be ready with fresh Zoho OAuth credentials for the exact mailbox that sends mail:
+- 4 complaints are stuck in status `pending` with `breached_at` set weeks ago (Jun 17 / Jun 26).
+- The cron re-queues each one once per 24h (guard: `last_reminded_at`), so each customer has already received **10–19** of these.
+- `CMP-202606-5MBNU` is the one currently failing — its latest attempt errors with `[zoho] proxy request failed, cannot connect to the specified address`. That's an outbound-network hiccup on the Zoho HTTPS API from this preview sandbox, **not** a Zoho auth problem — same account, same key, same code is delivering all your other mail right now. It will typically self-heal on the next queue tick, but the underlying issue is that this reminder should never have been sent 19 times to begin with.
 
-- Sender mailbox: `help@businesshelpservices.com` — confirm this exact spelling is correct.
-- Zoho data center: likely `in` unless your Zoho account was created elsewhere.
-- OAuth client ID.
-- OAuth client secret.
-- Refresh token generated with Zoho Mail scope: `ZohoMail.messages.CREATE` or `ZohoMail.messages.ALL`.
-- Numeric Zoho Mail account ID for that mailbox, if available.
+## Fix plan
 
-## Recovery plan
+**1. Make this email visible & controllable in your admin UI**
+Insert a proper row into `email_templates` for `complaint_sla_breach`:
 
-1. **Stop further damage first**
-   - Keep the queue paused/deferred so Zoho is not hammered every minute.
-   - Keep all failed compliance/order emails in the queue; do not delete them.
+- `code = complaint_sla_breach`, category `Support / Tickets` (or a new "Complaints" category), `is_system = true`, `dispatch_mode = auto`, `is_enabled = true`.
+- Move the subject + HTML body from the cron file into the template row (with `{{customerName}}`, `{{complaintNumber}}`, `{{severity}}` variables), matching how your other templates work.
 
-2. **Lock sending to Zoho Mail API**
-   - Keep SMTP removed from the app send path.
-   - Send from the confirmed `help@businesshelpservices.com` mailbox only.
-   - Keep Lovable email disabled/not used for these business emails.
+**2. Update the cron to respect the template row**
+Rewrite `src/routes/api/public/cron/complaints-sla.ts` so it:
 
-3. **Replace or verify Zoho credentials**
-   - If the current OAuth credentials still return `invalid_client`, use fresh Zoho credentials through the secure secret form.
-   - Set the correct Zoho data center and account ID so the app does not try the wrong Zoho host.
+- Loads the `complaint_sla_breach` template from `email_templates`.
+- Skips silently if `is_enabled = false` (so you can turn it off from the admin screen without touching code — exactly like the other auto templates).
+- Renders subject/body from the template with the complaint variables instead of hard-coding them.
 
-4. **Test safely with one email**
-   - Requeue only one failed email first.
-   - Process one queue item manually.
-   - Confirm it logs as sent and appears in Zoho Sent Mail before touching the full backlog.
+**3. Stop the current flood**
 
-5. **Release the backlog gradually**
-   - Requeue failed compliance/order/ticket emails in small batches.
-   - Stop immediately if Zoho returns auth/rate-limit errors again.
-   - Keep attempts/logs preserved for compliance evidence.
+- Cap total reminders per complaint (e.g. hard stop after 3) inside the cron, so a stale complaint can't rack up 19 emails.
+- One-time cleanup: for the 4 currently-breached complaints (`CMP-202606-5MBNU / IOAFV / WKIOE / 917TH`), set `last_reminded_at` far in the future OR bump their status out of `pending`, so no more reminders go out until you decide.
 
-6. **Publish the fixed app**
-   - The backend cron currently calls the published app URL, so preview fixes will not affect the live cron until you publish.
-   - After publish, verify the cron is using the fixed Zoho API sender.
+**4. Proxy send error**
 
-## Technical details
+- No code change needed for the Zoho path itself — the send helper already retries and the same account is delivering other mail. The failing row (`6c2aaac1-…`) will retry on the next tick.
+- Once step 1–3 are in, this class of email drops to near zero, and if it still errors it's now visible + toggleable from the admin.
 
-- The original error was from SMTP/proxy connectivity.
-- The next Zoho API error was an invalid payload field; that code path is fixed in preview.
-- The current blocker is OAuth/provider authorization, not SMTP.
-- The cron uses the published app endpoint, so publishing is required after code approval.
+## Questions before I build
 
-## Success check
+- **Kill switch style:** do you want me to *disable* `complaint_sla_breach` by default after moving it into `email_templates` (so nothing goes out until you flip it on), or leave it enabled with the 3-attempt cap? disable
+- **The 4 stuck complaints:** should I just stop future reminders on them, or also mark them `resolved` / assign them so the SLA clock isn't perpetually red?
 
-- One test email is accepted by Zoho Mail API.
-- `email_queue` row becomes `sent`.
-- `email_logs` shows `[zoho] ... accepted/sent`, not proxy or invalid-client errors.
-- Then and only then, requeue the rest of the failed business-critical emails.
+Say the word and I'll implement.
