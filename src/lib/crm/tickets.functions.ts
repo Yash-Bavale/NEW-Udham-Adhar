@@ -185,6 +185,8 @@ export const createTicket = createServerFn({ method: "POST" })
         applicationId: z.string().uuid().nullable().optional(),
         source: z.enum(["staff", "email_inbound", "web"]).default("staff"),
         allowDuplicate: z.boolean().default(false),
+        category: z.enum(["technical", "order_related", "suggestion_to_owner"]).nullable().optional(),
+        attachmentUrl: z.string().url().max(2000).nullable().optional(),
       })
       .parse(i)
   )
@@ -270,6 +272,8 @@ export const createTicket = createServerFn({ method: "POST" })
         status: "open",
         ticket_email: ticketEmail,
         source: data.source,
+        category: data.category ?? null,
+        attachment_url: data.attachmentUrl ?? null,
       } as never)
       .select("id, ticket_number")
       .single();

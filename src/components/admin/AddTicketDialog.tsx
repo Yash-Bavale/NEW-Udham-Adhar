@@ -88,6 +88,10 @@ function Body({
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"urgent" | "high" | "medium" | "low">("medium");
+  const [category, setCategory] = useState<"technical" | "order_related" | "suggestion_to_owner">(
+    defaultApplicationId ? "order_related" : "technical",
+  );
+  const [attachmentUrl, setAttachmentUrl] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(defaultCustomerId);
   const [customerLabel, setCustomerLabel] = useState<string | null>(defaultCustomerLabel);
@@ -133,6 +137,8 @@ function Body({
           customerId: customerId!,
           applicationId: orderId,
           allowDuplicate,
+          category,
+          attachmentUrl: attachmentUrl.trim() || null,
         },
       }),
     onSuccess: (res: any) => {
@@ -322,6 +328,19 @@ function Body({
             />
           </Field>
 
+          <Field label="Category" required>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as typeof category)}
+              className="w-full rounded border bg-transparent px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+            >
+              <option value="technical">Technical work related help</option>
+              <option value="order_related">Order related help</option>
+              <option value="suggestion_to_owner">Suggestion / other help to owner</option>
+            </select>
+          </Field>
+
           <Field label="Description">
             <textarea
               value={description}
@@ -329,6 +348,18 @@ function Body({
               rows={3}
               className="w-full rounded border bg-transparent px-2.5 py-1.5 text-sm"
               style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              placeholder="Describe the problem in detail"
+            />
+          </Field>
+
+          <Field label="Image / Attachment URL (optional)">
+            <input
+              value={attachmentUrl}
+              onChange={(e) => setAttachmentUrl(e.target.value)}
+              className="w-full rounded border bg-transparent px-2.5 py-1.5 text-sm"
+              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              placeholder="https://…"
+              type="url"
             />
           </Field>
 

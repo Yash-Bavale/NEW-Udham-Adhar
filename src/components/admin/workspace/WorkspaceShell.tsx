@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, Mail, User2,
-  FileText, Workflow, Activity, LifeBuoy,
+  FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,6 +19,7 @@ import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
 import { AddTaskDialog } from "@/components/admin/AddTaskDialog";
+import { RefundRequestDialog } from "@/components/admin/RefundRequestDialog";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
@@ -45,18 +46,20 @@ interface Props {
 }
 
 const TAB_DEFS = [
-  { id: "workflow" as const, label: "Employee Workflow", icon: Workflow },
-  { id: "form"     as const, label: "Forms & Docs",      icon: FileText },
-  { id: "emails"   as const, label: "Emails",            icon: Mail },
-  { id: "activity" as const, label: "Timeline",          icon: Activity },
-  { id: "support"  as const, label: "Support Ticket",    icon: LifeBuoy },
+  { id: "workflow" as const, label: "Employee Task",                    icon: Workflow, tooltip: "Move the order through its workflow stages" },
+  { id: "form"     as const, label: "Forms & Docs",                     icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
+  { id: "emails"   as const, label: "Emails",                           icon: Mail,     tooltip: "All emails sent or received for this order" },
+  { id: "activity" as const, label: "Timeline / Activity Log",          icon: Activity, tooltip: "Full chronological activity log for this order" },
+  { id: "support"  as const, label: "Internal Help / Support Ticket",   icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
 ];
 type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
+  const [refundOpen, setRefundOpen] = useState(false);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
+  const govtPortalUrl: string | null = (service as any)?.govt_portal_url ?? null;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
   const meta = STAGE_META[p.stage];
@@ -143,17 +146,55 @@ export function WorkspaceShell(p: Props) {
                               "bg-sky-50 text-sky-700 ring-sky-200";
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-5 pb-10 max-w-[1400px] mx-auto">
       {/* Top row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link
           to="/admin/orders"
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Orders
         </Link>
-        <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Schedule Follow-up" />
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={govtPortalUrl ?? undefined}
+                target={govtPortalUrl ? "_blank" : undefined}
+                rel="noopener noreferrer"
+                onClick={(e) => { if (!govtPortalUrl) { e.preventDefault(); toast.error("No government portal URL set for this service"); } }}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border ${govtPortalUrl ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"}`}
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Govt Portal
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setRefundOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              >
+                <BadgeDollarSign className="w-3.5 h-3.5" /> Refund
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Log a refund request received from the customer</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Add Task / Follow-up" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Schedule a follow-up task for this order</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
+      <RefundRequestDialog applicationId={p.orderId} open={refundOpen} onClose={() => setRefundOpen(false)} />
+
 
       {/* Header card */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
@@ -202,8 +243,8 @@ export function WorkspaceShell(p: Props) {
             <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
           </div>
 
-          {/* Unified action area — every tile is map-driven and always toasts. */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 h-fit min-w-[300px]">
+          {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
+          <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
             <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
             <div className="grid grid-cols-6 gap-1.5">
               {QUICK_ACTIONS.map((spec) => {
@@ -232,14 +273,20 @@ export function WorkspaceShell(p: Props) {
                   }
                 };
                 return (
-                  <QuickTile
-                    key={spec.key}
-                    icon={spec.icon}
-                    label={spec.label}
-                    tint={spec.tint}
-                    disabled={disabled}
-                    onClick={onClick}
-                  />
+                  <Tooltip key={spec.key}>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <QuickTile
+                          icon={spec.icon}
+                          label={spec.label}
+                          tint={spec.tint}
+                          disabled={disabled}
+                          onClick={onClick}
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>
@@ -283,29 +330,28 @@ export function WorkspaceShell(p: Props) {
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
         <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-          <TooltipProvider delayDuration={200}>
-            {TAB_DEFS.map((t) => {
-              const Icon = t.icon;
-              const state = availability[t.id];
-              const trigger = (
-                <TabsTrigger
-                  key={t.id}
-                  value={t.id}
-                  disabled={!state.enabled}
-                  className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Icon className="size-4" />
-                  {t.label}
-                </TabsTrigger>
-              );
-              return !state.enabled && state.reason ? (
-                <Tooltip key={t.id}>
-                  <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
-                  <TooltipContent>{state.reason}</TooltipContent>
-                </Tooltip>
-              ) : trigger;
-            })}
-          </TooltipProvider>
+          {TAB_DEFS.map((t) => {
+            const Icon = t.icon;
+            const state = availability[t.id];
+            const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
+            const trigger = (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                disabled={!state.enabled}
+                className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icon className="size-4" />
+                {t.label}
+              </TabsTrigger>
+            );
+            return (
+              <Tooltip key={t.id}>
+                <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
+                <TooltipContent>{tip}</TooltipContent>
+              </Tooltip>
+            );
+          })}
         </TabsList>
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
@@ -424,6 +470,7 @@ export function WorkspaceShell(p: Props) {
         </div>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }
 

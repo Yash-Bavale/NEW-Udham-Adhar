@@ -228,7 +228,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         ? admin.from("customers").select("id, customer_code, name, primary_email, primary_mobile").eq("id", app.customer_id).maybeSingle()
         : Promise.resolve({ data: null }),
       app.service_id
-        ? admin.from("services").select("id, service_code, service_name").eq("id", app.service_id).maybeSingle()
+        ? admin.from("services").select("id, service_code, service_name, govt_portal_url").eq("id", app.service_id).maybeSingle()
         : Promise.resolve({ data: null }),
       admin
         .from("payments")
