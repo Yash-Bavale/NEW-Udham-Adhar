@@ -330,29 +330,28 @@ export function WorkspaceShell(p: Props) {
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
         <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-          <TooltipProvider delayDuration={200}>
-            {TAB_DEFS.map((t) => {
-              const Icon = t.icon;
-              const state = availability[t.id];
-              const trigger = (
-                <TabsTrigger
-                  key={t.id}
-                  value={t.id}
-                  disabled={!state.enabled}
-                  className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Icon className="size-4" />
-                  {t.label}
-                </TabsTrigger>
-              );
-              return !state.enabled && state.reason ? (
-                <Tooltip key={t.id}>
-                  <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
-                  <TooltipContent>{state.reason}</TooltipContent>
-                </Tooltip>
-              ) : trigger;
-            })}
-          </TooltipProvider>
+          {TAB_DEFS.map((t) => {
+            const Icon = t.icon;
+            const state = availability[t.id];
+            const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
+            const trigger = (
+              <TabsTrigger
+                key={t.id}
+                value={t.id}
+                disabled={!state.enabled}
+                className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Icon className="size-4" />
+                {t.label}
+              </TabsTrigger>
+            );
+            return (
+              <Tooltip key={t.id}>
+                <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
+                <TooltipContent>{tip}</TooltipContent>
+              </Tooltip>
+            );
+          })}
         </TabsList>
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
