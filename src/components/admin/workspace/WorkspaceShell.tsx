@@ -273,14 +273,20 @@ export function WorkspaceShell(p: Props) {
                   }
                 };
                 return (
-                  <QuickTile
-                    key={spec.key}
-                    icon={spec.icon}
-                    label={spec.label}
-                    tint={spec.tint}
-                    disabled={disabled}
-                    onClick={onClick}
-                  />
+                  <Tooltip key={spec.key}>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <QuickTile
+                          icon={spec.icon}
+                          label={spec.label}
+                          tint={spec.tint}
+                          disabled={disabled}
+                          onClick={onClick}
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>
