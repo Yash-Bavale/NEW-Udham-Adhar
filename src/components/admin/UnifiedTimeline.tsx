@@ -8,7 +8,9 @@ interface Props {
   events: any[];
   payments: any[];
   documents: any[];
+  emailLogs?: any[];
   createdAt: string;
+  hideMoney?: boolean;
 }
 
 type Item = {
@@ -30,7 +32,12 @@ const TONE: Record<Item["tone"], { ring: string; bg: string; fg: string }> = {
   rose:    { ring: "#fecaca", bg: "#fff1f2", fg: "#be123c" },
 };
 
-export function UnifiedTimeline({ events, payments, documents, createdAt }: Props) {
+function stripReply(s: string | null | undefined): string {
+  if (!s) return "";
+  return String(s).replace(/^\s*(re|fwd|fw)\s*:\s*/i, "");
+}
+
+export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney }: Props) {
   const [showAll, setShowAll] = useState(false);
 
   const items: Item[] = useMemo(() => {
