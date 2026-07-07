@@ -8,7 +8,9 @@ interface Props {
   events: any[];
   payments: any[];
   documents: any[];
+  emailLogs?: any[];
   createdAt: string;
+  hideMoney?: boolean;
 }
 
 type Item = {
@@ -30,7 +32,12 @@ const TONE: Record<Item["tone"], { ring: string; bg: string; fg: string }> = {
   rose:    { ring: "#fecaca", bg: "#fff1f2", fg: "#be123c" },
 };
 
-export function UnifiedTimeline({ events, payments, documents, createdAt }: Props) {
+function stripReply(s: string | null | undefined): string {
+  if (!s) return "";
+  return String(s).replace(/^\s*(re|fwd|fw)\s*:\s*/i, "");
+}
+
+export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney }: Props) {
   const [showAll, setShowAll] = useState(false);
 
   const items: Item[] = useMemo(() => {
@@ -47,13 +54,14 @@ export function UnifiedTimeline({ events, payments, documents, createdAt }: Prop
     for (const p of payments ?? []) {
       const amt = Number(p.amount || 0);
       const isRefund = amt < 0 || p.status === "refunded";
+      const amountStr = hideMoney ? "₹••••" : `₹${Math.abs(amt).toLocaleString("en-IN")}`;
       out.push({
         id: `pay-${p.id}`,
         ts: p.payment_date || p.created_at,
         icon: CreditCard,
         tone: isRefund ? "rose" : "emerald",
         title: isRefund ? "Refund processed" : "Payment received",
-        detail: `₹${Math.abs(amt).toLocaleString("en-IN")} · ${p.gateway_name ?? "—"} · ${String(p.status).replace(/_/g, " ")}`,
+        detail: `${amountStr} · ${p.gateway_name ?? "—"} · ${String(p.status).replace(/_/g, " ")}`,
       });
     }
 
@@ -65,6 +73,41 @@ export function UnifiedTimeline({ events, payments, documents, createdAt }: Prop
         tone: d.doc_type === "certificate" ? "emerald" : "violet",
         title: d.doc_type === "certificate" ? "Certificate uploaded" : "Document uploaded",
         detail: `${d.doc_type?.replace(/_/g, " ")} · ${d.file_name}`,
+      });
+    }
+
+    // Every email send/failure — surfaced from email_logs so the audit trail
+    // shows the actual template + subject + status, not just "Email sent".
+    const emailEventIds = new Set<string>();
+    for (const l of emailLogs ?? []) {
+      const status = String(l.status ?? "").toLowerCase();
+      const failed = ["failed", "bounced", "dlq"].includes(status);
+      const tone: Item["tone"] = failed ? "rose" : status === "sent" ? "blue" : "amber";
+      const label = failed ? "Email failed" : status === "sent" ? "Email sent" : `Email ${status || "queued"}`;
+      out.push({
+        id: `mail-${l.id}`,
+        ts: l.sent_at || l.created_at || l.queued_at,
+        icon: Mail,
+        tone,
+        title: (
+          <>
+            {label}
+            {l.template_code && (
+              <span className="ml-1.5 font-mono text-[10.5px] px-1 py-0.5 rounded bg-slate-100 text-slate-600">
+                {l.template_code}
+              </span>
+            )}
+          </>
+        ),
+        detail: (
+          <div className="space-y-0.5">
+            <div className="text-slate-700">{stripReply(l.subject) || "(no subject)"}</div>
+            {l.to_email && <div className="text-[11px] text-slate-500">To {l.to_email}</div>}
+            {failed && l.error_message && (
+              <div className="text-[11px] text-rose-600">Error: {String(l.error_message).slice(0, 200)}</div>
+            )}
+          </div>
+        ),
       });
     }
 
@@ -87,16 +130,23 @@ export function UnifiedTimeline({ events, payments, documents, createdAt }: Prop
         );
       } else if (e.event_type === "assignment_change") {
         icon = UserCog; tone = "violet"; title = "Assignee updated";
+        detail = e.old_value || e.new_value
+          ? <span className="text-[11px]">{e.old_value ?? "Unassigned"} → {e.new_value ?? "Unassigned"}</span>
+          : null;
       } else if (e.event_type === "note_added") {
         icon = MessageSquare; tone = "amber"; title = "Internal note";
         detail = <span className="whitespace-pre-wrap">{e.note}</span>;
       } else if (e.event_type === "email_sent") {
-        icon = Mail; tone = "blue"; title = "Email sent";
+        // Deduped — the email_logs loop above already added a rich entry for this send.
+        emailEventIds.add(String(e.id));
+        continue;
       } else if (e.event_type === "document_uploaded") {
         icon = Upload; tone = "violet"; title = "Document uploaded";
       } else if (e.event_type === "form_submitted") {
         icon = FileText; tone = "emerald"; title = "Form submitted";
       }
+
+      if (e.note && !detail) detail = <span className="whitespace-pre-wrap text-[11px]">{e.note}</span>;
 
       out.push({
         id: `ev-${e.id}`,
@@ -111,7 +161,7 @@ export function UnifiedTimeline({ events, payments, documents, createdAt }: Prop
 
     out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     return out;
-  }, [events, payments, documents, createdAt]);
+  }, [events, payments, documents, emailLogs, createdAt, hideMoney]);
 
   const visible = showAll ? items : items.slice(0, 12);
 

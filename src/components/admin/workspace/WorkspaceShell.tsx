@@ -58,7 +58,7 @@ export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
   const [refundOpen, setRefundOpen] = useState(false);
-  const { application, lead, customer, service, payments, paymentStatus, total, documents, events, stageMeta } = p.data;
+  const { application, lead, customer, service, payments, paymentStatus, total, documents, events, emailLogs, stageMeta } = p.data;
   const govtPortalUrl: string | null = (service as any)?.govt_portal_url ?? null;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -420,9 +420,11 @@ export function WorkspaceShell(p: Props) {
             <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
               <UnifiedTimeline
                 events={events}
+                emailLogs={emailLogs ?? []}
                 payments={p.hideAmount ? [] : payments}
                 documents={documents}
                 createdAt={application.created_at}
+                hideMoney={p.hideAmount}
               />
             </TabsContent>
 
