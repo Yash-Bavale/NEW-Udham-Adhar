@@ -189,6 +189,11 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
   );
 }
 
+function stripReplyPrefix(s: string | null | undefined): string {
+  if (!s) return "";
+  return String(s).replace(/^\s*(re|fwd|fw)\s*:\s*/i, "");
+}
+
 function EmailRow({ item }: { item: any }) {
   const [open, setOpen] = useState(false);
   // Only surface a "delivery error" when the send actually failed. SMTP
