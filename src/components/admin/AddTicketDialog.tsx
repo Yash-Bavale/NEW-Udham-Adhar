@@ -88,6 +88,10 @@ function Body({
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"urgent" | "high" | "medium" | "low">("medium");
+  const [category, setCategory] = useState<"technical" | "order_related" | "suggestion_to_owner">(
+    defaultApplicationId ? "order_related" : "technical",
+  );
+  const [attachmentUrl, setAttachmentUrl] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(defaultCustomerId);
   const [customerLabel, setCustomerLabel] = useState<string | null>(defaultCustomerLabel);
@@ -133,6 +137,8 @@ function Body({
           customerId: customerId!,
           applicationId: orderId,
           allowDuplicate,
+          category,
+          attachmentUrl: attachmentUrl.trim() || null,
         },
       }),
     onSuccess: (res: any) => {
