@@ -328,6 +328,19 @@ function Body({
             />
           </Field>
 
+          <Field label="Category" required>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as typeof category)}
+              className="w-full rounded border bg-transparent px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+            >
+              <option value="technical">Technical work related help</option>
+              <option value="order_related">Order related help</option>
+              <option value="suggestion_to_owner">Suggestion / other help to owner</option>
+            </select>
+          </Field>
+
           <Field label="Description">
             <textarea
               value={description}
@@ -335,6 +348,18 @@ function Body({
               rows={3}
               className="w-full rounded border bg-transparent px-2.5 py-1.5 text-sm"
               style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              placeholder="Describe the problem in detail"
+            />
+          </Field>
+
+          <Field label="Image / Attachment URL (optional)">
+            <input
+              value={attachmentUrl}
+              onChange={(e) => setAttachmentUrl(e.target.value)}
+              className="w-full rounded border bg-transparent px-2.5 py-1.5 text-sm"
+              style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+              placeholder="https://…"
+              type="url"
             />
           </Field>
 
