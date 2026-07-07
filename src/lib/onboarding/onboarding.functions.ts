@@ -224,11 +224,16 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         .maybeSingle();
       const adminTo = smtp?.reply_to ?? DEFAULT_ADMIN_EMAIL;
 
-      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
-      await enqueueEmailInternal({
-        toEmail: adminTo,
-        subject: `Onboarding submitted: ${lead.lead_code ?? lead.name ?? "Lead"}`,
-        bodyHtml: `<p>Customer onboarding was submitted.</p><p><b>Name:</b> ${lead.name ?? ""}<br/><b>Lead:</b> ${lead.lead_code ?? ""}<br/><b>Service:</b> ${lead.service ?? ""}<br/><b>Documents:</b> ${docCount ?? 0}</p>`,
+      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+      await enqueueFromTemplateInternal("admin_onboarding_submitted", adminTo, {
+        customer_name: lead.name ?? "",
+        name: lead.name ?? "",
+        lead_code: lead.lead_code ?? "",
+        order_number: lead.lead_code ?? "",
+        service_name: lead.service ?? "",
+        service: lead.service ?? "",
+        document_count: docCount ?? 0,
+      }, {
         leadId: lead.id,
         applicationId: app?.id ?? undefined,
       }).catch((e: unknown) => console.error("admin onboarding notification failed:", e));

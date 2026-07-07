@@ -46,8 +46,24 @@ export async function enqueueEmailInternal(input: {
   delaySeconds?: number;
   attachments?: EmailAttachment[];
   requireImmediateSuccess?: boolean;
+  allowWithoutTemplate?: boolean;
 }) {
+  const templateCode = input.templateCode?.trim() || null;
+  if (!templateCode && !input.allowWithoutTemplate) {
+    throw new Error("Email template code is required. Use a saved Email Template for this send.");
+  }
+  if (templateCode) {
+    const { data: tpl, error: tplErr } = await supabaseAdmin
+      .from("email_templates")
+      .select("code")
+      .eq("code", templateCode)
+      .maybeSingle();
+    if (tplErr) throw new Error(tplErr.message);
+    if (!tpl) throw new Error(`Email template '${templateCode}' not found.`);
+  }
+
   const variables: Record<string, unknown> = { ...(input.variables ?? {}) };
+  if (input.allowWithoutTemplate) variables.__allow_without_template = true;
   if (input.attachments && input.attachments.length > 0) {
     variables.__attachments = input.attachments;
   }
@@ -56,7 +72,7 @@ export async function enqueueEmailInternal(input: {
     : null;
 
   const row: Record<string, unknown> = {
-    template_code: input.templateCode ?? null,
+    template_code: templateCode,
     to_email: input.toEmail.toLowerCase().trim(),
     to_name: input.toName ?? null,
     subject: input.subject,
@@ -235,7 +251,7 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   rawVariables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual" },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual"; inReplyTo?: string | null; references?: string | null; threadSubject?: string | null },
 ) {
   const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
   const variables = withBothCases(enriched);
@@ -276,7 +292,12 @@ export async function enqueueFromTemplateInternal(
       .eq("id", opts.applicationId)
       .maybeSingle();
     const threadHead = (appRow as { email_thread_message_id?: string | null; email_thread_subject?: string | null } | null) ?? null;
-    if (threadHead?.email_thread_message_id) {
+    if (opts.inReplyTo || opts.references) {
+      const baseSubject = opts.threadSubject || threadHead?.email_thread_subject || subject;
+      subject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
+      finalVars.__in_reply_to = opts.inReplyTo ?? opts.references;
+      finalVars.__references = opts.references ?? opts.inReplyTo;
+    } else if (threadHead?.email_thread_message_id) {
       // Reply into existing thread — reuse subject and set In-Reply-To/References.
       subject = threadHead.email_thread_subject
         ? (threadHead.email_thread_subject.toLowerCase().startsWith("re:")
@@ -396,6 +417,47 @@ async function sendQueueRow(row: QueueRow) {
       ]);
       return { ok: true, skipped: true };
     }
+    if (!tpl) {
+      const err = `blocked: email template '${row.template_code}' not found`;
+      await Promise.all([
+        supabaseAdmin
+          .from("email_queue")
+          .update({ status: "dlq", last_error: err } as never)
+          .eq("id", row.id),
+        supabaseAdmin.from("email_logs").insert({
+          queue_id: row.id,
+          template_code: row.template_code,
+          to_email: row.to_email,
+          subject: row.subject,
+          status: "failed",
+          error_message: err,
+          attempt: (row.attempts ?? 0) + 1,
+          lead_id: row.lead_id,
+          application_id: row.application_id,
+        } as never),
+      ]);
+      return { ok: false, error: err };
+    }
+  } else if (!((row.variables ?? {}) as Record<string, unknown>).__allow_without_template) {
+    const err = "blocked: email template code is required";
+    await Promise.all([
+      supabaseAdmin
+        .from("email_queue")
+        .update({ status: "dlq", last_error: err } as never)
+        .eq("id", row.id),
+      supabaseAdmin.from("email_logs").insert({
+        queue_id: row.id,
+        template_code: null,
+        to_email: row.to_email,
+        subject: row.subject,
+        status: "failed",
+        error_message: err,
+        attempt: (row.attempts ?? 0) + 1,
+        lead_id: row.lead_id,
+        application_id: row.application_id,
+      } as never),
+    ]);
+    return { ok: false, error: err };
   }
 
   const { data: settings } = await supabaseAdmin

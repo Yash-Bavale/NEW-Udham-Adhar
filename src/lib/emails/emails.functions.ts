@@ -20,7 +20,7 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
       return count ?? 0;
     };
 
-    const [queued, sending, dlq, sent24h, sent7d, recentLogs, topErrors] = await Promise.all([
+    const [queued, sending, dlq, sent24h, sent7d, recentLogs, topErrors, queueRows, logRows, templates] = await Promise.all([
       counts("queued"),
       counts("sending"),
       counts("dlq"),
@@ -28,10 +28,17 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
       supabase.from("email_logs").select("*", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since7d).then((r) => r.count ?? 0),
       supabase.from("email_logs").select("id, to_email, subject, status, error_message, smtp_response, sent_at, template_code").order("sent_at", { ascending: false }).limit(20),
       supabase.from("email_queue").select("id, to_email, subject, last_error, attempts").eq("status", "dlq").order("updated_at", { ascending: false }).limit(10),
+      supabase.from("email_queue").select("template_code"),
+      supabase.from("email_logs").select("template_code, status"),
+      supabase.from("email_templates").select("code"),
     ]);
+    const templateSet = new Set((templates.data ?? []).map((t) => t.code));
+    const queueUnmatched = (queueRows.data ?? []).filter((r) => !r.template_code || !templateSet.has(r.template_code)).length;
+    const sentLogsUnmatched = (logRows.data ?? []).filter((r) => r.status === "sent" && (!r.template_code || !templateSet.has(r.template_code))).length;
+    const allLogsUnmatched = (logRows.data ?? []).filter((r) => !r.template_code || !templateSet.has(r.template_code)).length;
 
     return {
-      counts: { queued, sending, dlq, sent24h, sent7d },
+      counts: { queued, sending, dlq, sent24h, sent7d, queueUnmatched, sentLogsUnmatched, allLogsUnmatched },
       recentLogs: recentLogs.data ?? [],
       dlqRows: topErrors.data ?? [],
     };
@@ -90,11 +97,14 @@ export const sendTestEmail = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { enqueueEmailInternal, processQueueInternal } = await import("./emails.server");
     await enqueueEmailInternal({
+      templateCode: null,
       toEmail: data.toEmail,
       subject: data.subject ?? "SMTP test from Business Help Services",
       bodyHtml:
         "<p>This is a test email sent from the admin email console.</p><p>If you received this, SMTP is configured correctly.</p>",
       bodyText: "This is a test email. If you received this, SMTP is configured correctly.",
+      variables: { purpose: "smtp_test" },
+      allowWithoutTemplate: true,
     });
     // Process immediately so admin sees feedback fast
     const result = await processQueueInternal(5);
@@ -330,6 +340,8 @@ export const listEmailLogs = createServerFn({ method: "POST" })
     const { supabase } = context;
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
+    const { data: tplRows } = await supabase.from("email_templates").select("code");
+    const templateSet = new Set((tplRows ?? []).map((t) => t.code));
     let q = supabase
       .from("email_logs")
       .select("id, to_email, subject, status, error_message, smtp_response, attempt, template_code, sent_at", { count: "exact" })
@@ -342,7 +354,15 @@ export const listEmailLogs = createServerFn({ method: "POST" })
     }
     const { data: rows, error, count } = await q;
     if (error) throw new Error(error.message);
-    return { rows: rows ?? [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+    return {
+      rows: (rows ?? []).map((r) => ({
+        ...r,
+        template_exists: Boolean(r.template_code && templateSet.has(r.template_code)),
+      })),
+      total: count ?? 0,
+      page: data.page,
+      pageSize: data.pageSize,
+    };
   });
 
 // ── Send test by template (per-template end-to-end verification) ──

@@ -97,6 +97,16 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
                 {l.template_code}
               </span>
             )}
+            {!l.template_code && (
+              <span className="ml-1.5 font-mono text-[10.5px] px-1 py-0.5 rounded bg-rose-50 text-rose-700">
+                NO_TEMPLATE
+              </span>
+            )}
+            {l.template_exists === false && (
+              <span className="ml-1.5 text-[10.5px] px-1 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                unmatched
+              </span>
+            )}
           </>
         ),
         detail: (

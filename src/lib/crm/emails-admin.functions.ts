@@ -22,7 +22,11 @@ export const listLeadEmails = createServerFn({ method: "GET" })
     const allowed = ["super_admin", "admin", "operations", "support", "accounts", "finance", "executive", "manager"];
     if (!allowed.some((r) => roles.has(r))) return { logs: [], queue: [] };
 
-    const { data: logs, error: logErr } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { data: templateRows } = await admin.from("email_templates").select("code");
+    const templateSet = new Set((templateRows ?? []).map((t: any) => t.code));
+
+    const { data: logs, error: logErr } = await admin
       .from("email_logs")
       .select("*")
       .eq("lead_id", data.leadId)
@@ -30,7 +34,7 @@ export const listLeadEmails = createServerFn({ method: "GET" })
 
     if (logErr) throw new Error(logErr.message);
 
-    const { data: queue, error: queueErr } = await (await getAdmin())
+    const { data: queue, error: queueErr } = await admin
       .from("email_queue")
       .select("*")
       .eq("lead_id", data.leadId)
@@ -38,7 +42,11 @@ export const listLeadEmails = createServerFn({ method: "GET" })
 
     if (queueErr) throw new Error(queueErr.message);
 
-    return { logs: logs || [], queue: queue || [] };
+    const mark = (row: any) => ({
+      ...row,
+      template_exists: Boolean(row.template_code && templateSet.has(row.template_code)),
+    });
+    return { logs: (logs || []).map(mark), queue: (queue || []).map(mark) };
   });
 
 const SendEmailSchema = z.object({
