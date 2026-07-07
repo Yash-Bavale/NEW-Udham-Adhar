@@ -170,7 +170,6 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     const holdNowIst = fmtIST(new Date());
     const expectedIst = data.expectedReviewAt ? fmtIST(new Date(data.expectedReviewAt)) : "";
     const orderCreatedIst = (lead as any)?.created_at ? fmtIST(new Date((lead as any).created_at)) : "";
-    const holdStatusLabel = ((reasonRow as { label?: string } | null)?.label) || data.reasonLabel;
 
     // Load the full reason row (side + optional template override).
     const { data: reasonRow } = await admin
@@ -182,6 +181,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     const reasonBlock = ((reasonRow as { description?: string } | null)?.description) || data.reasonLabel;
     const defaultTplForSide = side === "internal" ? "bhs_e004_our_side_delay" : "bhs_e003_customer_delay";
     const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || defaultTplForSide;
+    const holdStatusLabel = ((reasonRow as { label?: string } | null)?.label) || data.reasonLabel;
 
     const expectedReviewIso = new Date(data.expectedReviewAt).toISOString();
 
