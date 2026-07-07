@@ -450,6 +450,28 @@ export const resumeOrder = createServerFn({ method: "POST" })
       }
     }
 
+    // Internal notifications: assignee + Super Admin that the order was resumed.
+    {
+      const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+      const notifBase = {
+        kind: "order_status_change" as const,
+        title: `Order Resumed — ${app.application_code ?? ""}`,
+        body: `${name} resumed processing.${data.note ? ` Note: ${data.note}` : ""}`,
+        href: `/admin/orders/${app.id}`,
+        entityKind: "application",
+        entityId: app.id,
+      };
+      const { data: leadRow } = await admin
+        .from("leads")
+        .select("assigned_to")
+        .eq("id", app.lead_id!)
+        .maybeSingle();
+      if (leadRow?.assigned_to && leadRow.assigned_to !== context.userId) {
+        await emitToUsers([leadRow.assigned_to], notifBase);
+      }
+      await emitToRole("super_admin", notifBase);
+    }
+
     await writeAudit({
       supabase: context.supabase,
       entityType: "application",
