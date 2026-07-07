@@ -41,13 +41,29 @@ type ZohoUploadedAttachment = {
   attachmentName: string;
 };
 
-const ZOHO_FROM_EMAIL = "help@busiesshelpservices.com";
-const DC = (process.env.ZOHO_MAIL_DC || "in").trim();
-const ACCOUNTS_HOST = `https://accounts.zoho.${DC}`;
-const MAIL_HOST = `https://mail.zoho.${DC}`;
+const FALLBACK_FROM_EMAIL = "help@businesshelpservices.com";
+const DEFAULT_DC = (process.env.ZOHO_MAIL_DC || "in").trim();
 
 let tokenCache: TokenCache | null = null;
 let accountIdCache: string | null = null;
+let activeDc = DEFAULT_DC;
+
+function zohoFromEmail(): string {
+  return (
+    process.env.ZOHO_FROM_EMAIL ||
+    process.env.ZOHO_SMTP_USER ||
+    process.env.SMTP_USER ||
+    FALLBACK_FROM_EMAIL
+  ).trim().toLowerCase();
+}
+
+function accountsHost(dc = activeDc): string {
+  return `https://accounts.zoho.${dc}`;
+}
+
+function mailHost(dc = activeDc): string {
+  return `https://mail.zoho.${dc}`;
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -76,11 +92,15 @@ async function getZohoAccessToken(): Promise<string> {
     client_secret: requireEnv("ZOHO_MAIL_CLIENT_SECRET"),
     grant_type: "refresh_token",
   });
-  const res = await fetch(`${ACCOUNTS_HOST}/oauth/v2/token?${params.toString()}`, { method: "POST" });
-  const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string };
+
+  const res = await fetch(`${accountsHost(DEFAULT_DC)}/oauth/v2/token?${params.toString()}`, { method: "POST" });
+  const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string; error_description?: string };
   if (!res.ok || !body.access_token) {
-    throw new Error(`Zoho token refresh failed: ${body.error || res.status}`);
+    const details = body.error_description || body.error || String(res.status);
+    throw new Error(`Zoho token refresh failed: ${details}`);
   }
+
+  activeDc = DEFAULT_DC;
   tokenCache = {
     token: body.access_token,
     expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
@@ -91,14 +111,15 @@ async function getZohoAccessToken(): Promise<string> {
 async function resolveAccountId(forceRefresh = false): Promise<string> {
   if (accountIdCache && !forceRefresh) return accountIdCache;
 
-  const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || ZOHO_FROM_EMAIL).trim();
+  const fromEmail = zohoFromEmail();
+  const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || fromEmail).trim();
   if (raw && /^\d+$/.test(raw) && !forceRefresh) {
     accountIdCache = raw;
     return raw;
   }
 
   const token = await getZohoAccessToken();
-  const res = await fetch(`${MAIL_HOST}/api/accounts`, {
+  const res = await fetch(`${mailHost()}/api/accounts`, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
   const text = await res.text();
@@ -111,7 +132,7 @@ async function resolveAccountId(forceRefresh = false): Promise<string> {
   if (accounts.length === 0) throw new Error("Zoho: no mail accounts are available for this OAuth token.");
 
   const wanted = raw.toLowerCase();
-  const from = ZOHO_FROM_EMAIL.toLowerCase();
+  const from = fromEmail.toLowerCase();
   const match = accounts.find((account) => {
     const addresses = [account.primaryEmailAddress, account.mailboxAddress, account.emailAddress]
       .filter(Boolean)
@@ -126,7 +147,7 @@ async function resolveAccountId(forceRefresh = false): Promise<string> {
 
 async function zohoApi<T>(path: string, init?: RequestInit, retryAccountOn404 = false): Promise<T> {
   const token = await getZohoAccessToken();
-  const res = await fetch(`${MAIL_HOST}${path}`, {
+  const res = await fetch(`${mailHost()}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
@@ -178,7 +199,7 @@ async function uploadAttachment(accountId: string, attachment: ZohoAttachment): 
 export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult> {
   try {
     const accountId = await resolveAccountId();
-    const fromEmail = ZOHO_FROM_EMAIL;
+    const fromEmail = zohoFromEmail();
     const fromName = (input.fromName || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services").trim();
     const messageId = angleWrap(input.messageId || generateMessageId(fromEmail));
     const threadHeaders: Record<string, string> = { "Message-ID": messageId };
@@ -199,29 +220,27 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
       ? await Promise.all(input.attachments.map((attachment) => uploadAttachment(accountId, attachment)))
       : undefined;
 
-    const headerText = Object.entries({ ...threadHeaders, ...(input.headers || {}) })
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\r\n");
-
-    const response = await zohoApi<{ data?: { messageId?: string; status?: string; message?: string }; status?: { description?: string } }>(
+    const response = await zohoApi<{ data?: { messageId?: string; status?: string; message?: string }; status?: { code?: number; description?: string } }>(
       `/api/accounts/${accountId}/messages`,
       {
         method: "POST",
         body: JSON.stringify({
           fromAddress: fromEmail,
           toAddress: input.to,
-          replyTo: input.replyTo || fromEmail,
           subject: input.subject,
           content: input.html,
           mailFormat: "html",
           encoding: "UTF-8",
           askReceipt: "no",
           attachments,
-          header: headerText || undefined,
         }),
       },
       true,
     );
+
+    if (response.status?.code && response.status.code >= 400) {
+      throw new Error(`Zoho Mail API rejected message: ${response.status.description || response.status.code}`);
+    }
 
     return {
       ok: true,
@@ -238,9 +257,21 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
 
 export function zohoSenderInfo() {
   return {
-    host: MAIL_HOST,
+    host: mailHost(),
     port: 443,
-    user: ZOHO_FROM_EMAIL,
+    user: zohoFromEmail(),
     fromName: process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services",
   };
+}
+
+export function isZohoAuthOrRateLimitError(error: string | null | undefined): boolean {
+  const value = (error || "").toLowerCase();
+  return (
+    value.includes("zoho token refresh failed") ||
+    value.includes("invalid_client") ||
+    value.includes("access denied") ||
+    value.includes("too many requests") ||
+    value.includes("try again after some time") ||
+    value.includes("rate limit")
+  );
 }
