@@ -69,6 +69,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "call",
     label: "Call",
+    tooltip: "Dial the customer's mobile number",
     icon: Phone,
     tint: "emerald",
     build: ({ mobile }) => ({
@@ -80,6 +81,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "whatsapp",
     label: "WhatsApp",
+    tooltip: "Open WhatsApp chat with the customer",
     icon: MessageCircle,
     tint: "emerald",
     build: ({ waUrl }) => ({
@@ -92,6 +94,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "email",
     label: "Email",
+    tooltip: "Compose a new email to the customer",
     icon: Mail,
     tint: "sky",
     build: ({ email }) => ({
@@ -103,6 +106,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "open_lead",
     label: "Open Lead",
+    tooltip: "Jump to the source lead for this order",
     icon: User2,
     tint: "violet",
     build: ({ leadId }) => ({
@@ -114,6 +118,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "print",
     label: "Print",
+    tooltip: "Print this order page",
     icon: Printer,
     tint: "slate",
     build: () => ({ toastSuccess: "Print dialog opened" }),
@@ -121,6 +126,7 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
   {
     key: "copy_code",
     label: "Copy Code",
+    tooltip: "Copy the order code to the clipboard",
     icon: Copy,
     tint: "slate",
     build: ({ applicationCode }) => ({ toastSuccess: `Copied ${applicationCode}` }),
@@ -144,6 +150,8 @@ export type StatusActionKey =
 
 export interface StatusActionMeta {
   label: string;
+  /** 1-line hover tooltip explaining the button. */
+  tooltip: string;
   icon: LucideIcon;
   tone: "primary" | "warn" | "danger" | "muted";
 }
