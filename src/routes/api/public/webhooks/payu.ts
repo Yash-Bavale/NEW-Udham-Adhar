@@ -294,7 +294,10 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   invoice_url: invoiceUrl,
                   invoice_download_url: invoiceUrl,
                   transaction_id: mihpayid || fields.txnid || payment.id,
+                  payment_reference: mihpayid || fields.txnid || payment.id,
                   payment_datetime: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST",
+                  payment_date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST",
+                  service_fee: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
                   support_email: "help@businesshelpservices.com",
                 };
 

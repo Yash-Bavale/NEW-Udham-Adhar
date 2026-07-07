@@ -153,9 +153,23 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
     const { data: lead } = await admin
       .from("leads")
-      .select("name, email, service, lead_code, assigned_to")
+      .select("name, email, mobile, service, lead_code, assigned_to, created_at")
       .eq("id", app.lead_id!)
       .maybeSingle();
+
+    const { data: latestInvoice } = await admin
+      .from("invoices")
+      .select("invoice_number, issued_at")
+      .eq("lead_id", app.lead_id!)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const fmtIST = (d: Date) =>
+      d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST";
+    const holdNowIst = fmtIST(new Date());
+    const expectedIst = data.expectedReviewAt ? fmtIST(new Date(data.expectedReviewAt)) : "";
+    const orderCreatedIst = (lead as any)?.created_at ? fmtIST(new Date((lead as any).created_at)) : "";
 
     // Load the full reason row (side + optional template override).
     const { data: reasonRow } = await admin
@@ -167,6 +181,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     const reasonBlock = ((reasonRow as { description?: string } | null)?.description) || data.reasonLabel;
     const defaultTplForSide = side === "internal" ? "bhs_e004_our_side_delay" : "bhs_e003_customer_delay";
     const customerTplCode = ((reasonRow as { email_template_code?: string } | null)?.email_template_code) || defaultTplForSide;
+    const holdStatusLabel = ((reasonRow as { label?: string } | null)?.label) || data.reasonLabel;
 
     const expectedReviewIso = new Date(data.expectedReviewAt).toISOString();
 
@@ -263,9 +278,17 @@ export const setExternalDelay = createServerFn({ method: "POST" })
             lead.email,
             {
               customer_name: lead.name ?? "Customer",
+              customer_email: lead.email ?? "",
+              customer_mobile: (lead as any).mobile ?? "",
               order_id: app.application_code ?? "",
               order_number: app.application_code ?? "",
               service_name: lead.service ?? "",
+              invoice_number: latestInvoice?.invoice_number ?? "—",
+              order_created_at: orderCreatedIst,
+              hold_status_label: holdStatusLabel,
+              followup_date: holdNowIst,
+              expected_update_date: expectedIst,
+              employee_remarks: data.internalNote ?? data.customerNote ?? "—",
               reason: data.reasonLabel,
               reason_block: reasonBlock,
               date: new Date().toLocaleDateString("en-IN"),
@@ -340,9 +363,17 @@ export const setExternalDelay = createServerFn({ method: "POST" })
             lead.email,
             {
               customer_name: lead.name ?? "Customer",
+              customer_email: lead.email ?? "",
+              customer_mobile: (lead as any).mobile ?? "",
               order_id: app.application_code ?? "",
               order_number: app.application_code ?? "",
               service_name: lead.service ?? "",
+              invoice_number: latestInvoice?.invoice_number ?? "—",
+              order_created_at: orderCreatedIst,
+              hold_status_label: holdStatusLabel,
+              followup_date: holdNowIst,
+              expected_update_date: expectedIst,
+              employee_remarks: data.internalNote ?? "—",
               reason: data.reasonLabel,
               reason_block: reasonBlock,
               date: new Date().toLocaleDateString("en-IN"),
