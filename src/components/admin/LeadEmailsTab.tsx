@@ -207,7 +207,12 @@ function EmailRow({ item }: { item: any }) {
           {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
         </TableCell>
         <TableCell><StatusIcon status={item.status} /></TableCell>
-        <TableCell className="max-w-xs truncate font-medium">{item.subject}</TableCell>
+        <TableCell className="max-w-xs font-medium">
+          <div className="truncate">{stripReplyPrefix(item.subject)}</div>
+          {item.template_code && (
+            <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">{item.template_code}</div>
+          )}
+        </TableCell>
         <TableCell className="text-xs">{item.to_email}</TableCell>
         <TableCell className="text-xs text-muted-foreground">
           {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
