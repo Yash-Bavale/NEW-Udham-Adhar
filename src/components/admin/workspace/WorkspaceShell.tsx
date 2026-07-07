@@ -420,9 +420,11 @@ export function WorkspaceShell(p: Props) {
             <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
               <UnifiedTimeline
                 events={events}
+                emailLogs={emailLogs ?? []}
                 payments={p.hideAmount ? [] : payments}
                 documents={documents}
                 createdAt={application.created_at}
+                hideMoney={p.hideAmount}
               />
             </TabsContent>
 
