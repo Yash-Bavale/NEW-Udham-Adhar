@@ -404,6 +404,30 @@ export const resumeOrder = createServerFn({ method: "POST" })
       metadata: {},
     } as never);
 
+    // Notify customer via email that their order is back in processing.
+    if (lead?.email) {
+      try {
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+        await enqueueFromTemplateInternal(
+          "bhs_order_resumed",
+          lead.email,
+          {
+            customer_name: lead.name ?? "Customer",
+            order_id: app.application_code ?? "",
+            order_number: app.application_code ?? "",
+            service_name: lead.service ?? "",
+            resume_note: data.note ?? "",
+            company_name: COMPANY_NAME,
+            support_email: SUPPORT_EMAIL,
+          },
+          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+        );
+      } catch (e) {
+        console.error("[workflow] resume email failed", e);
+      }
+    }
+
     await writeAudit({
       supabase: context.supabase,
       entityType: "application",
