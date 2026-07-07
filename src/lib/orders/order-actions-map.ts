@@ -157,17 +157,17 @@ export interface StatusActionMeta {
 }
 
 export const STATUS_ACTION_META: Record<StatusActionKey, StatusActionMeta> = {
-  send_form_link: { label: "Send / Resend Form Link", icon: Send, tone: "primary" },
-  manual_reminder: { label: "Send Manual Reminder", icon: Bell, tone: "muted" },
-  customer_delay: { label: "Customer-Side Delay", icon: PauseCircle, tone: "warn" },
-  our_delay: { label: "Our-Side Delay", icon: Timer, tone: "warn" },
-  start_processing: { label: "Start Processing", icon: PlayCircle, tone: "primary" },
-  submitted_to_govt: { label: "Mark Submitted to Govt", icon: Landmark, tone: "primary" },
-  certificate_issued: { label: "Mark Certificate Issued", icon: Award, tone: "primary" },
-  complete: { label: "Complete Order", icon: CheckCircle2, tone: "primary" },
-  request_refund: { label: "Request Refund", icon: BadgeDollarSign, tone: "danger" },
-  reopen: { label: "Reopen Order", icon: RotateCcw, tone: "muted" },
-  close_manual: { label: "Close Order", icon: XCircle, tone: "danger" },
+  send_form_link: { label: "Send / Resend Form Link", tooltip: "Email the customer their info-collection form link", icon: Send, tone: "primary" },
+  manual_reminder: { label: "Send Manual Reminder", tooltip: "Nudge the customer to submit pending info", icon: Bell, tone: "muted" },
+  customer_delay: { label: "Customer-Side Delay", tooltip: "Mark delay caused by customer (no info / no reply)", icon: PauseCircle, tone: "warn" },
+  our_delay: { label: "Our-Side Delay", tooltip: "Mark delay caused by our team or a dependency", icon: Timer, tone: "warn" },
+  start_processing: { label: "Start Processing", tooltip: "Begin working the application", icon: PlayCircle, tone: "primary" },
+  submitted_to_govt: { label: "Mark Submitted to Govt", tooltip: "Application filed on the government portal", icon: Landmark, tone: "primary" },
+  certificate_issued: { label: "Mark Certificate Issued", tooltip: "Government certificate has been received", icon: Award, tone: "primary" },
+  complete: { label: "Complete Order", tooltip: "Close order and notify the customer", icon: CheckCircle2, tone: "primary" },
+  request_refund: { label: "Request Refund", tooltip: "Raise a refund request for super-admin approval", icon: BadgeDollarSign, tone: "danger" },
+  reopen: { label: "Reopen Order", tooltip: "Restart a closed or completed order", icon: RotateCcw, tone: "muted" },
+  close_manual: { label: "Close Order", tooltip: "Manually close and archive this order", icon: XCircle, tone: "danger" },
 };
 
 /** Buttons per status. Refund gating still enforced at the panel by role. */
