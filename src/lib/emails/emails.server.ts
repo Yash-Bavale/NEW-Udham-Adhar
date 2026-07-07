@@ -486,7 +486,7 @@ async function sendQueueRow(row: QueueRow) {
       sentInReplyTo = parentMessageId;
       sentReferences = referencesHeader ?? null;
       sentCustomerId = customerId;
-      sentFromEmail = "help@busiesshelpservices.com";
+      sentFromEmail = "help@businesshelpservices.com";
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
