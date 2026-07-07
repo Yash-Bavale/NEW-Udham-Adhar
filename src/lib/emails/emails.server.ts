@@ -486,7 +486,7 @@ async function sendQueueRow(row: QueueRow) {
       sentInReplyTo = parentMessageId;
       sentReferences = referencesHeader ?? null;
       sentCustomerId = customerId;
-      sentFromEmail = (process.env.ZOHO_SMTP_USER || "").trim() || null;
+      sentFromEmail = "help@busiesshelpservices.com";
 
       // Mirror to email_send_log (canonical dashboard table).
       try {

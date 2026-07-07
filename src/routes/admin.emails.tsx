@@ -88,7 +88,7 @@ function DashboardTab() {
 
       <Section title="Recent send attempts">
         <div className="mb-2 text-xs text-slate-500">
-          Provider: <span className="font-medium text-emerald-700">Zoho Mail (SMTP)</span> · every send is logged in <code className="font-mono">email_send_log</code>
+          Provider: <span className="font-medium text-emerald-700">Zoho Mail API</span> · every send is logged in <code className="font-mono">email_send_log</code>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -149,11 +149,8 @@ function SmtpTab() {
     <div className="space-y-4">
       <Section title="Provider">
         <p className="text-sm text-slate-700">
-          Emails are now sent via <b>Zoho Mail (SMTP)</b> using the mailbox configured in the
-          <code className="mx-1 font-mono">ZOHO_SMTP_USER</code> secret. Update host / port / credentials in
-          the project secrets (<code className="font-mono">ZOHO_SMTP_HOST</code>,
-          <code className="font-mono"> ZOHO_SMTP_PORT</code>,
-          <code className="font-mono"> ZOHO_SMTP_PASS</code>) — no change is required here.
+          Emails are now sent via <b>Zoho Mail API</b> from <code className="mx-1 font-mono">help@busiesshelpservices.com</code>
+          using the connected Zoho OAuth mailbox. Update Zoho OAuth secrets only if the mailbox authorization changes.
           The fields below only control the visible <i>From name</i> and <i>Reply-To</i> on outgoing mail.
         </p>
       </Section>
@@ -272,7 +269,7 @@ function TemplatesTab() {
     <div className="space-y-4">
       <Section title="Send test by template (end-to-end verify)">
         <p className="text-xs text-slate-500 mb-2">
-          Sends a sample of the selected template via Zoho SMTP using auto-generated sample variables
+          Sends a sample of the selected template via Zoho Mail API using auto-generated sample variables
           (override any with JSON). Disabled templates are still sent for testing and prefixed with [TEST].
         </p>
         <div className="grid md:grid-cols-3 gap-3">
