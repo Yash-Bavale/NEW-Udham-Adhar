@@ -206,24 +206,28 @@ export const deliverCertificate = createServerFn({ method: "POST" })
     </td></tr>
   </table>
 </body></html>`;
-      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
-      await enqueueEmailInternal({
-        templateCode: "order_completed",
-        toEmail: lead.email,
-        toName: lead.name,
-        subject,
-        bodyHtml: html,
-        leadId: lead.id,
-        applicationId: app?.id ?? null,
-        variables: {
+      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+      await enqueueFromTemplateInternal("order_completed", lead.email, {
+          customer_name: customerName,
+          customerName,
+          service_name: "Service",
+          serviceName: "Service",
+          order_number: orderId,
+          orderNumber: orderId,
           certificateId: cert.id,
           certificate_number: cert.certificate_number ?? "",
           certificate_url: signed.signedUrl,
+          document_name: attachment?.filename ?? "Certificate",
           order_code: app?.application_code ?? "",
         },
-        attachments: attachment ? [attachment] : undefined,
-        requireImmediateSuccess: true,
-      });
+        {
+          toName: lead.name,
+          leadId: lead.id,
+          applicationId: app?.id ?? undefined,
+          attachments: attachment ? [attachment] : undefined,
+          requireImmediateSuccess: true,
+        },
+      );
     }
 
     await (await getAdmin())

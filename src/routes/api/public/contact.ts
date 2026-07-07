@@ -102,22 +102,27 @@ export const Route = createFileRoute("/api/public/contact")({
 
         // Fire-and-forget enqueues — never block the user on email backend
         try {
-          const { enqueueEmailInternal } = await import(
+          const { enqueueFromTemplateInternal } = await import(
             "@/lib/emails/emails.server"
           );
+          const commonVars = {
+            name: parsed.name,
+            customer_name: parsed.name,
+            email: parsed.email,
+            customer_email: parsed.email,
+            mobile: parsed.mobile,
+            customer_mobile: parsed.mobile,
+            lead_code: "",
+            order_number: "",
+            message: parsed.message,
+          };
           await Promise.all([
-            enqueueEmailInternal({
-              toEmail: parsed.email,
+            enqueueFromTemplateInternal("contact_acknowledgement", parsed.email, commonVars, {
               toName: parsed.name,
-              subject: "We received your enquiry",
-              bodyHtml: `<p>Hi ${parsed.name},</p><p>We received your enquiry and our team will contact you shortly.</p>`,
               leadId,
             }),
             (async () => {
-              await enqueueEmailInternal({
-                toEmail: adminTo,
-                subject: `New lead: ${parsed.name}`,
-                bodyHtml: `<p>New contact form submission from <b>${parsed.name}</b> (${parsed.email}, +91 ${parsed.mobile}).</p><p>${parsed.message}</p>`,
+              await enqueueFromTemplateInternal("admin_new_lead", adminTo, commonVars, {
                 leadId,
               });
             })(),

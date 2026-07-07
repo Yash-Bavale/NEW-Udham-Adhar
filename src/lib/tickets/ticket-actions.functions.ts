@@ -180,7 +180,7 @@ export const replyToTicket = createServerFn({ method: "POST" })
     const thread = await loadThreadHeaders(ticket.id, ticket.application_id ?? null);
 
     try {
-      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       const ticketNumber = ticket.ticket_number ?? ticket.id.slice(0, 8);
       // Prefer the order's canonical thread subject so Gmail groups replies with
       // the customer's original conversation. Fall back to ticket subject.
@@ -189,24 +189,30 @@ export const replyToTicket = createServerFn({ method: "POST" })
             ? thread.threadSubject
             : `Re: ${thread.threadSubject}`)
         : `Re: [#${ticketNumber}] ${ticket.subject}`;
-      const result = await enqueueEmailInternal({
-        templateCode: null,
-        toEmail: recipient,
-        toName: cust.name,
-        subject: threadedSubject,
-        bodyHtml: `<p>Hi ${cust.name || "Customer"},</p><div>${data.message.replace(/\n/g, "<br/>")}</div><p>Regards,<br/>${actorName} · Business Help Services</p>`,
-        bodyText: `Hi ${cust.name || "Customer"},\n\n${data.message}\n\nRegards,\n${actorName} · Business Help Services`,
-        variables: {
+      const result = await enqueueFromTemplateInternal(
+        BHS_EMAILS.E008_TICKET_REPLY,
+        recipient,
+        {
+          customer_name: cust.name,
           customerName: cust.name,
+          employee_reply: data.message,
           replyMessage: data.message,
+          ticket_number: ticketNumber,
           ticketNumber,
+          ticket_subject: ticket.subject,
           ticketSubject: ticket.subject,
           fromName: `${actorName} · Business Help Services`,
-          __in_reply_to: thread.inReplyTo,
-          __references: thread.references,
+          executive_name: actorName,
+          reason: data.message,
         },
-        applicationId: ticket.application_id ?? undefined,
-      });
+        {
+          toName: cust.name,
+          applicationId: ticket.application_id ?? undefined,
+          inReplyTo: thread.inReplyTo,
+          references: thread.references,
+          threadSubject: threadedSubject,
+        },
+      );
 
       // Best-effort: look up the outbound Message-ID from email_logs by queue_id
       // and stash it on the ticket_replies row so the next reply can chain.

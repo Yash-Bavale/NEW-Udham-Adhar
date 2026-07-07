@@ -130,22 +130,20 @@ export const Route = createFileRoute("/api/public/complaint")({
         const origin = new URL(request.url).origin;
 
         try {
-          const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
           // Admin/internal notification only — no customer acknowledgement
-          await enqueueEmailInternal({
-            toEmail: adminTo,
-            subject: `New complaint ${complaint.complaint_number} — ${parsed.name}`,
-            bodyHtml: `
-              <h2>New complaint received</h2>
-              <p><b>Complaint #:</b> ${complaint.complaint_number}</p>
-              <p><b>Name:</b> ${parsed.name}</p>
-              <p><b>Email:</b> ${parsed.email}</p>
-              <p><b>Mobile:</b> +91 ${parsed.mobile}</p>
-              <p><b>Application Ref:</b> ${parsed.application_ref || "—"}</p>
-              <p><b>Message:</b></p>
-              <p style="white-space:pre-wrap">${parsed.message.replace(/</g, "&lt;")}</p>
-              <p><a href="${origin}/admin/complaints">Open in CRM →</a></p>
-            `,
+          await enqueueFromTemplateInternal("complaint_admin_notification", adminTo, {
+            complaint_number: complaint.complaint_number,
+            customer_name: parsed.name,
+            name: parsed.name,
+            customer_email: parsed.email,
+            email: parsed.email,
+            customer_mobile: parsed.mobile,
+            mobile: parsed.mobile,
+            application_ref: parsed.application_ref || "—",
+            message: parsed.message,
+            admin_url: `${origin}/admin/complaints`,
+          }, {
             leadId,
           });
         } catch {

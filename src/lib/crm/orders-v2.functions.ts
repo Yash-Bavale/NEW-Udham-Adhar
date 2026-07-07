@@ -337,13 +337,20 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     // Enrich `email_sent` events with subject/template/status from email_logs so the
     // Timeline / Activity Log shows the actual template that was sent (not a bare
     // "Email sent" line). We match by application_id + created_at proximity.
-    const { data: emailLogRows } = await admin
-      .from("email_logs")
-      .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at, queued_at")
-      .eq("application_id", data.orderId)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    const emailLogs = (emailLogRows ?? []) as any[];
+    const [{ data: emailLogRows }, { data: templateRows }] = await Promise.all([
+      admin
+        .from("email_logs")
+        .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at, queued_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      admin.from("email_templates").select("code"),
+    ]);
+    const templateSet = new Set(((templateRows ?? []) as any[]).map((t) => t.code));
+    const emailLogs = ((emailLogRows ?? []) as any[]).map((l) => ({
+      ...l,
+      template_exists: Boolean(l.template_code && templateSet.has(l.template_code)),
+    }));
 
     return {
       application: app,
@@ -559,35 +566,25 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
       if (recipientEmail && certificateUrl) {
-        const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
-        await enqueueEmailInternal({
-          templateCode: "order_completed",
-          toEmail: recipientEmail,
-          toName: recipientName,
-          subject: `Your Order No. ${app.application_code ?? ""} has been completed`,
-          bodyHtml: buildCertificateEmailHtml({
-            recipientName,
-            serviceName,
-            certificateNumber: certNumber,
-            certificateUrl,
-            completionNotes,
-            orderCode: app.application_code ?? "",
-          }),
-          leadId: app.lead_id,
-          applicationId: data.orderId,
-          variables: {
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        await enqueueFromTemplateInternal("order_completed", recipientEmail, {
             customer_name: recipientName,
             service_name: serviceName,
+            order_number: app.application_code ?? "",
             certificate_number: certNumber,
             certificate_url: certificateUrl,
             completion_notes: completionNotes ?? "",
+            document_name: certAttachment?.filename ?? "Certificate",
             order_code: app.application_code ?? "",
-          },
-          attachments: certAttachment
-            ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
-            : undefined,
-          requireImmediateSuccess: true,
-        });
+          }, {
+            toName: recipientName,
+            leadId: app.lead_id,
+            applicationId: data.orderId,
+            attachments: certAttachment
+              ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
+              : undefined,
+            requireImmediateSuccess: true,
+          });
       }
 
       // Mark application completed only after certificate email send succeeds.
@@ -741,35 +738,24 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     }
 
     {
-      const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
-      await enqueueEmailInternal({
-        templateCode: "order_completed",
-        toEmail: recipientEmail,
-        toName: recipientName,
-        subject: `Your Order No. ${app?.application_code ?? ""} has been completed`,
-        bodyHtml: buildCertificateEmailHtml({
-          recipientName,
-          serviceName,
-          certificateNumber: cert.certificate_number ?? "",
-          certificateUrl: signed.signedUrl,
-          completionNotes: null,
-          orderCode: app?.application_code ?? "",
-          resend: true,
-        }),
-        leadId: cert.lead_id,
-        applicationId: data.orderId,
-        variables: {
+      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+      await enqueueFromTemplateInternal("order_completed", recipientEmail, {
           customer_name: recipientName,
           service_name: serviceName,
+          order_number: app?.application_code ?? "",
           certificate_number: cert.certificate_number,
           certificate_url: signed.signedUrl,
+          document_name: resendAttachment?.filename ?? "Certificate",
           resend: true,
-        },
-        attachments: resendAttachment
-          ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
-          : undefined,
-        requireImmediateSuccess: true,
-      });
+        }, {
+          toName: recipientName,
+          leadId: cert.lead_id,
+          applicationId: data.orderId,
+          attachments: resendAttachment
+            ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
+            : undefined,
+          requireImmediateSuccess: true,
+        });
     }
 
     await admin

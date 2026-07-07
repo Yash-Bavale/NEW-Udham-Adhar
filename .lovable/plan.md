@@ -1,61 +1,65 @@
+I checked the backend now. Current count from the email queue:
 
-## Problem
+- Total queued emails: 438
+- Emails not matching any row in Email Templates: 330
+- Emails with no template code at all: 23
+- Emails with a template code that is not present in Email Templates: 307
+- Sent emails that did not match Email Templates: 307
 
-1. **E001 Order Confirmation** template (`order_confirmation`) has `{{payment_reference}}`, `{{payment_date}}`, `{{service_fee}}` placeholders, but the three call sites enqueue different variable names (`transaction_id`, `payment_datetime`, `base_amount`) — so those three rows render empty in the sent email.
+Biggest unmatched template codes I found:
 
-2. **Hold emails** (`bhs_e003_customer_delay`, `bhs_e004_our_side_delay`):
-   - "Current Order Status" row is a hardcoded string (`On Hold – External Processing Delay` / `On Hold – Awaiting Customer Response`) instead of the actual selected reason label.
-   - `{{followup_date}}` (Hold Date & Time), `{{employee_remarks}}` (Additional Remarks), and `{{expected_update_date}}` (Expected Update By) placeholders exist in the DB template but nothing populates them, so the rows render empty. Same for `{{customer_email}}`, `{{customer_mobile}}`, `{{invoice_number}}`, `{{order_created_at}}`.
+- onboarding_complete: 88
+- payment_success: 66
+- admin_onboarding_submitted: 53
+- onboarding_reminder: 30
+- contact_acknowledgement: 20
+- order_pending_closure: 13
+- docs_required_reminder: 7
+- workflow_closure_notice: 6
+- service_processing_update: 4
+- consultation_service_converted: 4
+- plus smaller old/misc codes and 23 raw emails with no template code
 
-## Fix
+Plan to fix it:
 
-### 1. E001 — pass the missing variables
+1. Stop raw customer/admin email sends
+   - Replace direct `enqueueEmailInternal` sends with real Email Templates where possible.
+   - Keep the internal queue sender, but prevent normal app flows from sending customer-facing emails without a template code.
 
-Add `payment_reference`, `payment_date`, `service_fee` (aliases of the existing values, formatted for display) to the template data in all three enqueue sites, without removing the existing keys:
+2. Add missing template rows for active unmatched codes
+   - Create Email Template records for currently used active flows that are missing from the template manager, especially:
+     - `payment_success`
+     - `onboarding_complete`
+     - `admin_onboarding_submitted`
+     - `onboarding_reminder`
+     - `contact_acknowledgement`
+     - `docs_required_reminder`
+     - `order_pending_closure`
+     - `workflow_closure_notice`
+     - `service_processing_update`
+     - `ticket_created`
+   - Where these duplicate newer BHS templates, map code paths to the newer template instead of creating duplicates.
 
-- `src/routes/api/public/webhooks/ccavenue.ts` (~line 189)
-- `src/routes/api/public/webhooks/payu.ts` (~line 296)
-- `src/lib/crm/invoices.functions.ts` `resendOrderConfirmation` (~line 338)
+3. Fix the hardcoded send paths
+   - Contact form and Talk-to-Expert emails currently create raw bodies without Email Template records.
+   - Ticket reply email currently sends with `templateCode: null`.
+   - Admin test email currently sends raw content.
+   - These will be converted to template-backed sends or clearly marked as test/system-only.
 
-```ts
-payment_reference: trackingId || orderId || payment.id,
-payment_date: <same IST datetime already computed>,
-service_fee: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
-```
+4. Add a guardrail
+   - Add an internal validation so customer-facing emails cannot be queued with a missing template code.
+   - Allow only explicitly marked system/test/internal notifications to bypass templates.
 
-### 2. Hold emails — dynamic status + populate all rows
+5. Improve admin visibility
+   - In Email Logs / Email History, show a warning badge when an email has no matching Email Template.
+   - Add an “Unmatched Templates” section/count so this problem is visible immediately.
 
-**DB migration** — replace the hardcoded status cell in both templates with a placeholder:
+6. Backfill/audit existing records safely
+   - Do not rewrite sent email content.
+   - For old rows, preserve history but classify unmatched codes so the admin UI can show whether they are legacy/missing-template/raw emails.
 
-- `bhs_e004_our_side_delay`: `On Hold – External Processing Delay` → `{{hold_status_label}}`
-- `bhs_e003_customer_delay`: `On Hold – Awaiting Customer Response` → `{{hold_status_label}}`
+Technical notes:
 
-Use a single targeted `UPDATE ... SET body_html = replace(...)` per template — no schema changes.
-
-**Code — `src/lib/crm/workflow.functions.ts`** (`setDelayReason`, both `side === "customer"` and `else` branches around lines 261 and 338): expand the template-data object to fully populate the "Order Summary" and "Reason for Temporary Hold" sections. Also fetch `mobile`, `created_at`, and the latest invoice number for the lead so those rows render.
-
-Additions to templateData:
-```ts
-hold_status_label: reasonRow?.label ?? data.reasonLabel,   // dynamic status
-followup_date:  new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", ... }),
-employee_remarks:   data.internalNote ?? data.customerNote ?? "—",
-expected_update_date: new Date(data.expectedReviewAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", ... }),
-customer_email:  lead.email,
-customer_mobile: leadFull.mobile ?? "",
-order_created_at: leadFull.created_at ? formatIST(leadFull.created_at) : "",
-invoice_number:  latestInvoice?.invoice_number ?? "—",
-```
-
-Extend the `.select()` on `leads` (line 156) to also pull `mobile, created_at`, and add one small lookup against `invoices` (by `lead_id`, latest by `issued_at`).
-
-### 3. Out of scope
-- No design/layout changes to the templates.
-- No changes to the customer-hold action in `order-actions.functions.ts` (that path uses camelCase legacy vars for a different workflow and wasn't cited by the user).
-- No changes to any other template.
-
-## Files touched
-- `supabase/migrations/<new>.sql` — 2× targeted `UPDATE email_templates`.
-- `src/lib/crm/workflow.functions.ts` — extend leads select + templateData in both branches.
-- `src/routes/api/public/webhooks/ccavenue.ts` — add 3 keys.
-- `src/routes/api/public/webhooks/payu.ts` — add 3 keys.
-- `src/lib/crm/invoices.functions.ts` — add 3 keys in `resendOrderConfirmation`.
+- `enqueueFromTemplateInternal` already enforces lookup in `email_templates`; this is the correct path.
+- The problem comes from older/direct calls to `enqueueEmailInternal`, plus legacy template codes that exist in queued/logged emails but not in `email_templates`.
+- I will use migrations for missing template rows and code changes for active raw send paths.
