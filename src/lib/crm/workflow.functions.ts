@@ -153,9 +153,24 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
     const { data: lead } = await admin
       .from("leads")
-      .select("name, email, service, lead_code, assigned_to")
+      .select("name, email, mobile, service, lead_code, assigned_to, created_at")
       .eq("id", app.lead_id!)
       .maybeSingle();
+
+    const { data: latestInvoice } = await admin
+      .from("invoices")
+      .select("invoice_number, issued_at")
+      .eq("lead_id", app.lead_id!)
+      .order("issued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const fmtIST = (d: Date) =>
+      d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST";
+    const holdNowIst = fmtIST(new Date());
+    const expectedIst = data.expectedReviewAt ? fmtIST(new Date(data.expectedReviewAt)) : "";
+    const orderCreatedIst = (lead as any)?.created_at ? fmtIST(new Date((lead as any).created_at)) : "";
+    const holdStatusLabel = ((reasonRow as { label?: string } | null)?.label) || data.reasonLabel;
 
     // Load the full reason row (side + optional template override).
     const { data: reasonRow } = await admin
