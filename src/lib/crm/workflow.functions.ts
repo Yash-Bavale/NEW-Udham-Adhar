@@ -298,15 +298,22 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         created_by: context.userId,
       } as never);
 
+      // Internal notifications: assignee (if any) + Super Admin/Admin/Ops so someone always sees it.
+      const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
+      const notifBase = {
+        kind: "our_side_delay_start" as const,
+        title: `Our-Side Delay — ${data.reasonLabel}`,
+        body: `Order ${app.application_code ?? ""} paused (internal). Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
+        href: `/admin/orders/${app.id}`,
+        entityKind: "application",
+        entityId: app.id,
+      };
       if (lead?.assigned_to) {
-        await admin.from("notifications").insert({
-          user_id: lead.assigned_to,
-          title: `Internal delay logged — ${data.reasonLabel}`,
-          body: `Order ${app.application_code ?? ""} paused for internal reason. Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
-          kind: "workflow_internal_delay",
-          link_to: `/admin/orders/${app.id}`,
-        } as never);
+        await emitToUsers([lead.assigned_to], notifBase);
       }
+      await emitToRole("super_admin", notifBase);
+      await emitToRole("admin", notifBase);
+
 
       // Send our-side delay hold intimation email to customer (E005).
       if (lead?.email) {
