@@ -334,6 +334,17 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .map((p: any) => p.payment_date as string)
       .sort()[0] ?? null;
 
+    // Enrich `email_sent` events with subject/template/status from email_logs so the
+    // Timeline / Activity Log shows the actual template that was sent (not a bare
+    // "Email sent" line). We match by application_id + created_at proximity.
+    const { data: emailLogRows } = await admin
+      .from("email_logs")
+      .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at, queued_at")
+      .eq("application_id", data.orderId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const emailLogs = (emailLogRows ?? []) as any[];
+
     return {
       application: app,
       lead,
@@ -345,6 +356,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       total,
       documents: docsRes.data ?? [],
       events: evRes.data ?? [],
+      emailLogs,
       assignedStaff: (staffRes as any).data ?? null,
       workflowStages,
       stageMeta,
