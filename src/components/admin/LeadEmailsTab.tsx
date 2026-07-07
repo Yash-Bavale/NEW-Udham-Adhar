@@ -214,9 +214,14 @@ function EmailRow({ item }: { item: any }) {
         <TableCell><StatusIcon status={item.status} /></TableCell>
         <TableCell className="max-w-xs font-medium">
           <div className="truncate">{stripReplyPrefix(item.subject)}</div>
-          {item.template_code && (
-            <div className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">{item.template_code}</div>
-          )}
+          <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] font-mono text-slate-500 truncate">{item.template_code || "NO_TEMPLATE"}</span>
+            {item.template_exists === false && (
+              <span className="shrink-0 rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold text-rose-700 border border-rose-200">
+                unmatched
+              </span>
+            )}
+          </div>
         </TableCell>
         <TableCell className="text-xs">{item.to_email}</TableCell>
         <TableCell className="text-xs text-muted-foreground">
@@ -231,6 +236,7 @@ function EmailRow({ item }: { item: any }) {
                 <MetaCell label="From" value={item.from_email || "system default"} />
                 <MetaCell label="To" value={item.to_email} />
                 <MetaCell label="Template" value={item.template_code || "—"} mono />
+                <MetaCell label="Template Match" value={item.template_exists === false ? "Missing from Email Templates" : "Matched"} />
                 <MetaCell label="Attempts" value={String(item.attempt ?? item.attempts ?? 1)} />
                 <MetaCell label="Message ID" value={item.message_id || "—"} mono />
                 <MetaCell label="Direction" value={item.direction || "outbound"} />
