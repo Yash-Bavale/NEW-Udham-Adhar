@@ -39,7 +39,7 @@ export const closeOrder = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, application_code, workflow_status")
+      .select("id, lead_id, application_code, workflow_status, created_at")
       .eq("id", data.applicationId)
       .maybeSingle();
     if (!app) throw new Error("Application not found");
@@ -51,9 +51,10 @@ export const closeOrder = createServerFn({ method: "POST" })
       .eq("application_id", app.id)
       .eq("status", "pending");
 
+    const closedAt = new Date().toISOString();
     await admin
       .from("applications")
-      .update({ workflow_status: "closed" } as never)
+      .update({ workflow_status: "closed", workflow_closed_at: closedAt } as never)
       .eq("id", app.id);
 
     await admin.from("workflow_events").insert({
@@ -66,8 +67,55 @@ export const closeOrder = createServerFn({ method: "POST" })
       actor_id: context.userId,
       actor_name: name,
       is_system: false,
-      metadata: { reason_code: data.reasonCode },
+      metadata: { reason_code: data.reasonCode, reason_label: data.reasonLabel, notes: data.notes ?? null },
     } as never);
+
+    // Send closure confirmation email with the actual reason and remarks.
+    try {
+      const { data: lead } = await admin
+        .from("leads")
+        .select("name, email, mobile, service")
+        .eq("id", app.lead_id!)
+        .maybeSingle();
+      const { data: latestInvoice } = await admin
+        .from("invoices")
+        .select("invoice_number")
+        .eq("application_id", app.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lead?.email) {
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+        const istFmt = (iso: string) =>
+          new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+        await enqueueFromTemplateInternal(
+          "order_closure_confirmation",
+          lead.email,
+          {
+            customer_name: lead.name ?? "Customer",
+            customer_email: lead.email ?? "",
+            customer_mobile: (lead as any).mobile ?? "—",
+            order_id: app.application_code ?? "",
+            order_number: app.application_code ?? "",
+            service_name: lead.service ?? "—",
+            invoice_number: latestInvoice?.invoice_number ?? "—",
+            order_created_at: app.created_at ? istFmt(app.created_at as string) : "—",
+            closure_date: istFmt(closedAt),
+            closure_reason: data.reasonLabel,
+            reason: data.reasonLabel,
+            reason_block: data.reasonLabel,
+            employee_remarks: (data.notes && data.notes.trim()) ? data.notes.trim() : "—",
+            date: new Date().toLocaleDateString("en-IN"),
+            company_name: COMPANY_NAME,
+            support_email: SUPPORT_EMAIL,
+          },
+          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+        );
+      }
+    } catch (e) {
+      console.error("[closeOrder] closure email failed", e);
+    }
 
     await writeAudit({
       supabase: context.supabase,
@@ -75,7 +123,7 @@ export const closeOrder = createServerFn({ method: "POST" })
       entityId: app.id,
       action: "workflow_close_order",
       oldValue: { workflow_status: app.workflow_status },
-      newValue: { workflow_status: "closed", reason: data.reasonCode },
+      newValue: { workflow_status: "closed", reason: data.reasonCode, notes: data.notes ?? null },
       actorId: context.userId,
     });
 
