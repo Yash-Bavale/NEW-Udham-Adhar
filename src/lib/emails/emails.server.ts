@@ -283,42 +283,16 @@ export async function enqueueFromTemplateInternal(
   let subject = renderTemplate(tpl.subject, variables);
   const finalVars: Record<string, unknown> = { ...variables };
 
-  // Per-order threading: reuse Message-ID + subject from the first outbound mail
-  // for this application so Gmail/Outlook show ONE conversation.
-  if (opts?.applicationId) {
-    const { data: appRow } = await supabaseAdmin
-      .from("applications")
-      .select("email_thread_message_id, email_thread_subject")
-      .eq("id", opts.applicationId)
-      .maybeSingle();
-    const threadHead = (appRow as { email_thread_message_id?: string | null; email_thread_subject?: string | null } | null) ?? null;
-    if (opts.inReplyTo || opts.references) {
-      const baseSubject = opts.threadSubject || threadHead?.email_thread_subject || subject;
-      subject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
-      finalVars.__in_reply_to = opts.inReplyTo ?? opts.references;
-      finalVars.__references = opts.references ?? opts.inReplyTo;
-    } else if (threadHead?.email_thread_message_id) {
-      // Reply into existing thread — reuse subject and set In-Reply-To/References.
-      subject = threadHead.email_thread_subject
-        ? (threadHead.email_thread_subject.toLowerCase().startsWith("re:")
-            ? threadHead.email_thread_subject
-            : `Re: ${threadHead.email_thread_subject}`)
-        : `Re: ${subject}`;
-      finalVars.__in_reply_to = threadHead.email_thread_message_id;
-      finalVars.__references = threadHead.email_thread_message_id;
-    } else {
-      // First outbound on this order: mint a stable Message-ID and store it.
-      const mid = `<order.${opts.applicationId}.${Date.now()}@udyamadhar.in>`;
-      finalVars.__message_id = mid;
-      await supabaseAdmin
-        .from("applications")
-        .update({
-          email_thread_message_id: mid,
-          email_thread_subject: subject,
-        } as never)
-        .eq("id", opts.applicationId);
-    }
+  // Each template is delivered as its own standalone email (no per-order
+  // threading). We only set In-Reply-To/References when the caller explicitly
+  // asks for a reply (e.g. ticket replies to an inbound message).
+  if (opts?.inReplyTo || opts?.references) {
+    const baseSubject = opts.threadSubject || subject;
+    subject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
+    finalVars.__in_reply_to = opts.inReplyTo ?? opts.references;
+    finalVars.__references = opts.references ?? opts.inReplyTo;
   }
+
 
   return enqueueEmailInternal({
     templateCode: code,
