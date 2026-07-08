@@ -264,6 +264,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         payload: {
           reason: data.reasonLabel,
           reason_block: reasonBlock,
+          closure_reason: data.reasonLabel,
+          employee_remarks: (data.internalNote ?? data.customerNote ?? "").toString().trim() || "—",
           customer_email: lead?.email ?? null,
         },
         created_by: context.userId,
