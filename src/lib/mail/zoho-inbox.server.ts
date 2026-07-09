@@ -86,16 +86,22 @@ async function zohoFetch<T>(path: string): Promise<T> {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
   if (res.status === 401) {
-    // Force refresh once
+    // Force token refresh once and retry.
     tokenCache = null;
     const token2 = await getZohoAccessToken();
     const res2 = await fetch(`${MAIL_HOST}${path}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token2}` },
     });
-    if (!res2.ok) throw new Error(`Zoho GET ${path} failed: ${res2.status}`);
+    if (!res2.ok) {
+      const body = await res2.text().catch(() => "");
+      throw new Error(`Zoho GET ${path} failed: ${res2.status} ${body.slice(0, 200)}`);
+    }
     return (await res2.json()) as T;
   }
-  if (!res.ok) throw new Error(`Zoho GET ${path} failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Zoho GET ${path} failed: ${res.status} ${body.slice(0, 200)}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -137,7 +143,11 @@ export async function getInboxFolderId(): Promise<string> {
   try {
     data = await call(accountId);
   } catch (e) {
-    if (String((e as Error).message || "").includes(" 404")) {
+    // Both 401 and 404 usually mean the cached account ID is stale for this
+    // token (mailbox re-provisioned or account rotated). Force /api/accounts
+    // to fetch a fresh ID and retry once before giving up.
+    const msg = String((e as Error).message || "");
+    if (/ 401| 404/.test(msg)) {
       accountIdCache = null;
       accountId = await resolveAccountId(true);
       data = await call(accountId);
