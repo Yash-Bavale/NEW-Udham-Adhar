@@ -143,7 +143,11 @@ export async function getInboxFolderId(): Promise<string> {
   try {
     data = await call(accountId);
   } catch (e) {
-    if (String((e as Error).message || "").includes(" 404")) {
+    // Both 401 and 404 usually mean the cached account ID is stale for this
+    // token (mailbox re-provisioned or account rotated). Force /api/accounts
+    // to fetch a fresh ID and retry once before giving up.
+    const msg = String((e as Error).message || "");
+    if (/ 401| 404/.test(msg)) {
       accountIdCache = null;
       accountId = await resolveAccountId(true);
       data = await call(accountId);
