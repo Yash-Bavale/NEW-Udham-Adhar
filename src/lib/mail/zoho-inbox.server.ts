@@ -86,16 +86,22 @@ async function zohoFetch<T>(path: string): Promise<T> {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
   if (res.status === 401) {
-    // Force refresh once
+    // Force token refresh once and retry.
     tokenCache = null;
     const token2 = await getZohoAccessToken();
     const res2 = await fetch(`${MAIL_HOST}${path}`, {
       headers: { Authorization: `Zoho-oauthtoken ${token2}` },
     });
-    if (!res2.ok) throw new Error(`Zoho GET ${path} failed: ${res2.status}`);
+    if (!res2.ok) {
+      const body = await res2.text().catch(() => "");
+      throw new Error(`Zoho GET ${path} failed: ${res2.status} ${body.slice(0, 200)}`);
+    }
     return (await res2.json()) as T;
   }
-  if (!res.ok) throw new Error(`Zoho GET ${path} failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Zoho GET ${path} failed: ${res.status} ${body.slice(0, 200)}`);
+  }
   return (await res.json()) as T;
 }
 
