@@ -198,18 +198,55 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       inReplyTo,
     });
   } else if (fromEmail) {
-    await supabaseAdmin.from("inbound_email_quarantine").insert({
-      zoho_mail_uid: msg.messageId,
-      message_id: messageId,
-      in_reply_to: inReplyTo,
-      from_email: fromEmail,
-      to_email: toEmail,
-      subject,
-      body_text: bodyText.slice(0, 8000),
-      body_html: body.html,
-      reason: "no_match",
-      received_at: receivedAt,
-    } as never);
+    // No order/customer match — but we still want staff visibility.
+    // Skip obvious system/self senders; everything else becomes a standalone
+    // ticket so nothing lands only in quarantine and gets missed.
+    const lower = fromEmail.toLowerCase();
+    const isSystem =
+      /(^|[.@])(noreply|no-reply|mailer-daemon|postmaster|welcome|notifications?)@/i.test(lower) ||
+      lower.endsWith("@zohoaccounts.in") ||
+      lower.endsWith("@zoho.in") ||
+      lower.endsWith("@zoho.com") ||
+      lower.endsWith("@businesshelpservices.com") ||
+      lower.endsWith("@udyamadhar.in");
+
+    if (isSystem) {
+      await supabaseAdmin.from("inbound_email_quarantine").insert({
+        zoho_mail_uid: msg.messageId,
+        message_id: messageId,
+        in_reply_to: inReplyTo,
+        from_email: fromEmail,
+        to_email: toEmail,
+        subject,
+        body_text: bodyText.slice(0, 8000),
+        body_html: body.html,
+        reason: "system_sender",
+        received_at: receivedAt,
+      } as never);
+    } else {
+      await openOrAppendTicket({
+        applicationId: null,
+        customerId: null,
+        leadId: null,
+        subject,
+        body: bodyText,
+        fromEmail,
+        messageId,
+        inReplyTo,
+      });
+      await supabaseAdmin.from("inbound_email_quarantine").insert({
+        zoho_mail_uid: msg.messageId,
+        message_id: messageId,
+        in_reply_to: inReplyTo,
+        from_email: fromEmail,
+        to_email: toEmail,
+        subject,
+        body_text: bodyText.slice(0, 8000),
+        body_html: body.html,
+        reason: "converted_to_ticket",
+        received_at: receivedAt,
+      } as never);
+    }
   }
 }
 
