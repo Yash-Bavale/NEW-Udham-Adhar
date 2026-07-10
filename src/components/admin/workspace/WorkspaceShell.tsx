@@ -15,7 +15,7 @@ import { OrderActionRail } from "./OrderActionRail";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
-import { OrderWorkflowLiveStatus } from "./OrderWorkflowLiveStatus";
+
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
@@ -320,14 +320,16 @@ export function WorkspaceShell(p: Props) {
             Customer Journey
           </div>
         </div>
-        <OrderWorkflowLiveStatus applicationId={application.id} />
         <CustomerJourneyMap
+          applicationId={application.id}
           stage={p.stage}
           isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
           workflowStatus={(application as any).workflow_status}
           closureStage={(application as any).closure_stage}
           closureNextAt={(application as any).closure_next_at}
           closureReasonLabel={(application as any).closure_reason_code}
+          payments={payments}
+          hideAmount={p.hideAmount}
         />
       </section>
 
@@ -386,6 +388,8 @@ export function WorkspaceShell(p: Props) {
 
                   <OrderWorkflowPanel
                     applicationId={application.id}
+                    payments={payments}
+                    hideAmount={p.hideAmount}
                     current={current}
                     workflowStatus={(application as any).workflow_status}
                     closureStage={(application as any).closure_stage}
@@ -425,6 +429,7 @@ export function WorkspaceShell(p: Props) {
 
             <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
               <UnifiedTimeline
+                applicationId={application.id}
                 events={events}
                 emailLogs={emailLogs ?? []}
                 payments={p.hideAmount ? [] : payments}

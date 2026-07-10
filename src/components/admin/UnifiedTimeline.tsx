@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   Activity, CreditCard, FileText, Mail, MessageSquare, GitCommit, Upload, FileCheck2, UserCog,
+  Cog, AlarmClock,
 } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
+import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
+import { STAGE_LABEL, TIMER_LABEL, AUTO_LABEL } from "@/lib/workflow/engine-view";
 
 interface Props {
   events: any[];
@@ -11,6 +14,8 @@ interface Props {
   emailLogs?: any[];
   createdAt: string;
   hideMoney?: boolean;
+  /** When provided, merges workflow_events (engine) into the timeline. */
+  applicationId?: string;
 }
 
 type Item = {
@@ -37,8 +42,10 @@ function stripReply(s: string | null | undefined): string {
   return String(s).replace(/^\s*(re|fwd|fw)\s*:\s*/i, "");
 }
 
-export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney }: Props) {
+export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney, applicationId }: Props) {
   const [showAll, setShowAll] = useState(false);
+  const wf = useOrderWorkflow(applicationId ?? null);
+  const workflowEvents = applicationId ? wf.events : [];
 
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
@@ -169,9 +176,45 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
       });
     }
 
+
+    // Workflow engine events — stage transitions, timers fired, automations, etc.
+    for (const w of workflowEvents ?? []) {
+      const type = String(w.event_type ?? "");
+      let icon: typeof Activity = Cog;
+      let tone: Item["tone"] = "violet";
+      let title: React.ReactNode = w.title ?? type.replaceAll("_", " ");
+      if (type === "FormTimeout5m" || type === "FormTimeout8h" || type === "ClosureTimerFired" || type === "ReminderFired") {
+        icon = AlarmClock; tone = "amber";
+        const kind = type === "ClosureTimerFired" ? "closure" : type === "ReminderFired" ? "reminder" : "incomplete_form";
+        title = <>Timer fired · <span className="font-mono text-[11px]">{TIMER_LABEL[kind] ?? kind}</span></>;
+      } else if (type === "email_sent" || type === "email_failed" || type === "email_skipped") {
+        // Deduped by email_logs loop above.
+        continue;
+      } else if (type === "OrderClosed" || type === "GovApproved" || type === "GovRejected" || type === "CertificateUploaded") {
+        icon = GitCommit; tone = type === "GovRejected" ? "rose" : "emerald";
+      } else if ((w.metadata as any)?.event?.type) {
+        const evtType = String((w.metadata as any).event.type);
+        title = <>Workflow · <span className="font-mono text-[11px]">{evtType}</span></>;
+      }
+      out.push({
+        id: `wf-${w.id}`,
+        ts: w.created_at,
+        icon,
+        tone,
+        title,
+        detail: w.description ? <span className="whitespace-pre-wrap text-[11px]">{w.description}</span> : (
+          (w.metadata as any)?.event?.type && w.title !== ((w.metadata as any).event.type)
+            ? <span className="text-[11px] text-slate-500">{w.title}</span>
+            : null
+        ),
+        actor: w.actor_name ?? (w.is_system ? "System" : null),
+      });
+    }
+
     out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     return out;
-  }, [events, payments, documents, emailLogs, createdAt, hideMoney]);
+  }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents]);
+
 
   const visible = showAll ? items : items.slice(0, 12);
 
