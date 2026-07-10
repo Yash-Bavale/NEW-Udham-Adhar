@@ -388,6 +388,8 @@ export function WorkspaceShell(p: Props) {
 
                   <OrderWorkflowPanel
                     applicationId={application.id}
+                    payments={payments}
+                    hideAmount={p.hideAmount}
                     current={current}
                     workflowStatus={(application as any).workflow_status}
                     closureStage={(application as any).closure_stage}
@@ -427,6 +429,7 @@ export function WorkspaceShell(p: Props) {
 
             <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
               <UnifiedTimeline
+                applicationId={application.id}
                 events={events}
                 emailLogs={emailLogs ?? []}
                 payments={p.hideAmount ? [] : payments}
