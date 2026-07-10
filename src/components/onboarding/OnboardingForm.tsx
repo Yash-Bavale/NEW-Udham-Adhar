@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { INDIA_STATES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_STATES, PLANT_UNIT_TYPES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker } from "./NicCodePicker";
+import { DateInputDMY } from "@/components/ui/DateInputDMY";
+
 
 const UPPERCASE_FIELDS = new Set([
   "bank_ifsc",
