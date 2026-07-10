@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { supabase } from "@/integrations/supabase/client";
 import { SuperAdminDashboard, type DashboardRange } from "@/components/admin/SuperAdminDashboard";
+import { WorkflowStatusWidgets } from "@/components/admin/WorkflowStatusWidgets";
 import type { RangePreset } from "@/lib/crm/super-admin.functions";
 
 const searchSchema = z.object({
