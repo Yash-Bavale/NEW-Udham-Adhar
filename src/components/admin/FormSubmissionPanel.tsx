@@ -363,10 +363,11 @@ export function FormSubmissionPanel({
                               <AlertTriangle className="size-3.5" /> Required — empty
                             </span>
                           ) : (
-                            <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
+                            <span className="text-sm text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
                               {mask(f.key, v)}
                             </span>
                           )}
+
                         </div>
                       );
                     })}
