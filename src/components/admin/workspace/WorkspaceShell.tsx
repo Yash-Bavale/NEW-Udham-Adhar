@@ -15,6 +15,7 @@ import { OrderActionRail } from "./OrderActionRail";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
+import { OrderWorkflowLiveStatus } from "./OrderWorkflowLiveStatus";
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
 import { LeadEmailsTab } from "@/components/admin/LeadEmailsTab";
@@ -378,6 +379,7 @@ export function WorkspaceShell(p: Props) {
               ) : (
                 <>
                   {p.notesNode}
+                  <OrderWorkflowLiveStatus applicationId={application.id} />
                   <OrderWorkflowPanel
                     applicationId={application.id}
                     current={current}
