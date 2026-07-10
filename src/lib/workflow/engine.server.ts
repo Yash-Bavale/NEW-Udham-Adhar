@@ -171,7 +171,7 @@ async function applyEffect(
         actor_id: actorId ?? null,
         actor_name: "System",
         is_system: true,
-        metadata: { icon: effect.icon, category: effect.category },
+        metadata: { icon: effect.icon, category: effect.category } as never,
       });
       return;
   }
@@ -200,7 +200,7 @@ export async function dispatchEvent(event: WorkflowEvent, actorId?: string | nul
     actor_id: actorId ?? null,
     actor_name: actorId ? "Employee" : "System",
     is_system: !actorId,
-    metadata: { icon: t.icon, category: t.category, event },
+    metadata: { icon: t.icon, category: t.category, event } as never,
   });
 
   return t.next;
