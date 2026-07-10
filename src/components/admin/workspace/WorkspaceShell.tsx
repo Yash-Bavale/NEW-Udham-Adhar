@@ -383,7 +383,7 @@ export function WorkspaceShell(p: Props) {
               ) : (
                 <>
                   {p.notesNode}
-                  <OrderWorkflowLiveStatus applicationId={application.id} />
+
                   <OrderWorkflowPanel
                     applicationId={application.id}
                     current={current}
