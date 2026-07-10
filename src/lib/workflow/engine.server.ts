@@ -150,18 +150,92 @@ async function applyEffect(
         .eq("code", effect.code)
         .eq("status", "paused");
       return;
-    case "send_email":
-      // Phase 1: record intent. Phase 3 wires this to the existing email queue.
-      await supabase.from("workflow_events").insert({
-        application_id: applicationId,
-        event_type: "email_intent",
-        title: `Email queued: ${effect.template}`,
-        actor_id: actorId ?? null,
-        actor_name: "System",
-        is_system: true,
-        metadata: { template: effect.template, payload: (effect.payload ?? {}) as never } as never,
-      });
+    case "send_email": {
+      // Map state-machine template names → BHS registry codes.
+      const map: Record<string, string> = {
+        incomplete_information: "welcome_and_form_link",
+        closure_final: "order_closure_confirmation",
+        closure_intimation: "bhs_e003_customer_delay",
+        gov_delay_notification: "bhs_e004_our_side_delay",
+        gov_rejection: "order_closure_confirmation",
+        order_completed: "order_completed",
+      };
+      const code = map[effect.template] ?? effect.template;
+
+      // Resolve recipient from application → customer.
+      let toEmail: string | null = null;
+      try {
+        const { data: app } = await supabase
+          .from("applications")
+          .select("customer_id, lead_id")
+          .eq("id", applicationId)
+          .maybeSingle();
+        const row = app as { customer_id: string | null; lead_id: string | null } | null;
+        if (row?.customer_id) {
+          const { data: cust } = await supabase
+            .from("customers")
+            .select("primary_email")
+            .eq("id", row.customer_id)
+            .maybeSingle();
+          toEmail = (cust as { primary_email: string | null } | null)?.primary_email ?? null;
+        }
+        if (!toEmail && row?.lead_id) {
+          const { data: lead } = await supabase
+            .from("leads")
+            .select("email")
+            .eq("id", row.lead_id)
+            .maybeSingle();
+          toEmail = (lead as { email: string | null } | null)?.email ?? null;
+        }
+      } catch (err) {
+        console.error("[workflow] recipient lookup failed", err);
+      }
+
+      if (!toEmail) {
+        await supabase.from("workflow_events").insert({
+          application_id: applicationId,
+          event_type: "email_skipped",
+          title: `Email skipped (${effect.template}): no recipient`,
+          actor_id: actorId ?? null,
+          actor_name: "System",
+          is_system: true,
+          metadata: { template: code } as never,
+        });
+        return;
+      }
+
+      try {
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        await enqueueFromTemplateInternal(
+          code,
+          toEmail,
+          (effect.payload ?? {}) as Record<string, unknown>,
+          { applicationId, trigger: "auto" },
+        );
+        await supabase.from("workflow_events").insert({
+          application_id: applicationId,
+          event_type: "email_sent",
+          title: `Email queued: ${code}`,
+          actor_id: actorId ?? null,
+          actor_name: "System",
+          is_system: true,
+          metadata: { template: code, to: toEmail } as never,
+        });
+      } catch (err) {
+        console.error("[workflow] send_email failed", code, err);
+        await supabase.from("workflow_events").insert({
+          application_id: applicationId,
+          event_type: "email_failed",
+          title: `Email failed: ${code}`,
+          description: String(err),
+          actor_id: actorId ?? null,
+          actor_name: "System",
+          is_system: true,
+          metadata: { template: code, to: toEmail } as never,
+        });
+      }
       return;
+    }
     case "record_event":
       await supabase.from("workflow_events").insert({
         application_id: applicationId,
