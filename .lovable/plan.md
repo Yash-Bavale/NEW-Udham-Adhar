@@ -1,65 +1,30 @@
-I checked the backend now. Current count from the email queue:
+# Change support email `.in` → `.com` everywhere
 
-- Total queued emails: 438
-- Emails not matching any row in Email Templates: 330
-- Emails with no template code at all: 23
-- Emails with a template code that is not present in Email Templates: 307
-- Sent emails that did not match Email Templates: 307
+Update `help@businesshelpservices.in` to `help@businesshelpservices.com` in the 6 places it appears, then re-verify the Zoho inbox diagnosis with the correct address.
 
-Biggest unmatched template codes I found:
+## Files to edit
 
-- onboarding_complete: 88
-- payment_success: 66
-- admin_onboarding_submitted: 53
-- onboarding_reminder: 30
-- contact_acknowledgement: 20
-- order_pending_closure: 13
-- docs_required_reminder: 7
-- workflow_closure_notice: 6
-- service_processing_update: 4
-- consultation_service_converted: 4
-- plus smaller old/misc codes and 23 raw emails with no template code
+1. **`src/lib/brand.ts`** — `SUPPORT_EMAIL` constant (single source of truth; drives most templates, footers, and reply-to headers automatically).
+2. **`src/routes/api/public/contact.ts`** — hardcoded `to:` on the contact-form notification.
+3. **`src/routes/api/public/complaint.ts`** — hardcoded `to:` on the complaint-form notification.
+4. **`src/routes/api/public/talk-to-expert.ts`** — hardcoded `to:` on the expert-callback notification.
+5. **`src/lib/crm/cancellation.functions.ts`** — hardcoded support address in the cancellation email body.
+6. **`supabase/migrations/20260531125701_...sql`** — historical migration; leave as-is (already applied; editing it does nothing and risks a hash mismatch). Note it in the plan but don't touch.
 
-Plan to fix it:
+Content HTML files (`src/content/wp/contact.html`, `contact-us.html`) already use `.com` — no change needed.
 
-1. Stop raw customer/admin email sends
-   - Replace direct `enqueueEmailInternal` sends with real Email Templates where possible.
-   - Keep the internal queue sender, but prevent normal app flows from sending customer-facing emails without a template code.
+## Zoho re-check after the change
 
-2. Add missing template rows for active unmatched codes
-   - Create Email Template records for currently used active flows that are missing from the template manager, especially:
-     - `payment_success`
-     - `onboarding_complete`
-     - `admin_onboarding_submitted`
-     - `onboarding_reminder`
-     - `contact_acknowledgement`
-     - `docs_required_reminder`
-     - `order_pending_closure`
-     - `workflow_closure_notice`
-     - `service_processing_update`
-     - `ticket_created`
-   - Where these duplicate newer BHS templates, map code paths to the newer template instead of creating duplicates.
+The Zoho mailbox login is `help@businesshelpservices.in` (that's the actual Zoho account — the `.in` domain hosts the mailbox on Zoho Mail India DC). Changing the customer-facing display address to `.com` does **not** change:
 
-3. Fix the hardcoded send paths
-   - Contact form and Talk-to-Expert emails currently create raw bodies without Email Template records.
-   - Ticket reply email currently sends with `templateCode: null`.
-   - Admin test email currently sends raw content.
-   - These will be converted to template-backed sends or clearly marked as test/system-only.
+- `ZOHO_MAIL_REFRESH_TOKEN` / `ZOHO_MAIL_ACCOUNT_ID` — tied to the Zoho user, not to the address customers see
+- `ZOHO_MAIL_DC=in` — correct for a `.in` Zoho account
+- SMTP creds
 
-4. Add a guardrail
-   - Add an internal validation so customer-facing emails cannot be queued with a missing template code.
-   - Allow only explicitly marked system/test/internal notifications to bypass templates.
+So the Zoho inbox 401 diagnosis is independent of this rename. After the rename, I'll still add the diagnostic endpoint (from the previous plan) so we get Zoho's actual error body and fix the real cause of the 401 — not guess.
 
-5. Improve admin visibility
-   - In Email Logs / Email History, show a warning badge when an email has no matching Email Template.
-   - Add an “Unmatched Templates” section/count so this problem is visible immediately.
+## Verification
 
-6. Backfill/audit existing records safely
-   - Do not rewrite sent email content.
-   - For old rows, preserve history but classify unmatched codes so the admin UI can show whether they are legacy/missing-template/raw emails.
-
-Technical notes:
-
-- `enqueueFromTemplateInternal` already enforces lookup in `email_templates`; this is the correct path.
-- The problem comes from older/direct calls to `enqueueEmailInternal`, plus legacy template codes that exist in queued/logged emails but not in `email_templates`.
-- I will use migrations for missing template rows and code changes for active raw send paths.
+- `rg 'businesshelpservices\.in' src/` returns nothing after edits.
+- Templates that import `SUPPORT_EMAIL` from `@/lib/brand` update automatically — no per-template edits needed.
+- Preview the contact / complaint / talk-to-expert forms and confirm the internal notification `to:` shows `.com`.
