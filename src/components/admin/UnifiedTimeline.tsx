@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import {
   Activity, CreditCard, FileText, Mail, MessageSquare, GitCommit, Upload, FileCheck2, UserCog,
+  Cog, AlarmClock,
 } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
+import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
+import { STAGE_LABEL, TIMER_LABEL, AUTO_LABEL } from "@/lib/workflow/engine-view";
 
 interface Props {
   events: any[];
@@ -11,6 +14,8 @@ interface Props {
   emailLogs?: any[];
   createdAt: string;
   hideMoney?: boolean;
+  /** When provided, merges workflow_events (engine) into the timeline. */
+  applicationId?: string;
 }
 
 type Item = {
@@ -37,8 +42,10 @@ function stripReply(s: string | null | undefined): string {
   return String(s).replace(/^\s*(re|fwd|fw)\s*:\s*/i, "");
 }
 
-export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney }: Props) {
+export function UnifiedTimeline({ events, payments, documents, emailLogs, createdAt, hideMoney, applicationId }: Props) {
   const [showAll, setShowAll] = useState(false);
+  const wf = useOrderWorkflow(applicationId ?? null);
+  const workflowEvents = applicationId ? wf.events : [];
 
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
