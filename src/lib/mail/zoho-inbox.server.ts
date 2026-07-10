@@ -34,7 +34,12 @@ async function resolveAccountId(forceRefresh = false): Promise<string> {
   const res = await fetch(`${MAIL_HOST}/api/accounts`, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
-  if (!res.ok) throw new Error(`Zoho GET /api/accounts failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Zoho GET /api/accounts failed: ${res.status} host=${MAIL_HOST} dc=${DC} body=${body.slice(0, 300)}`,
+    );
+  }
   const j = (await res.json()) as {
     data?: Array<{ accountId?: string | number; primaryEmailAddress?: string; mailboxAddress?: string }>;
   };
