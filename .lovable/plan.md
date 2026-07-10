@@ -1,84 +1,101 @@
 ## Goal
+Bind existing CRM modules (orders, tickets, emails, timers, forms, government portal, dashboard) into ONE centralized **Workflow Engine** so any single action fans out to timeline, automation, timers, ticketing, dashboard, and notifications — without breaking current functionality.
 
-1. Update the **New Udyam Registration** intake form (and by inheritance the **Correct PAN/Aadhaar — Stage 2** form) to match the field spec you shared: multi-plant support, cascading State→District dropdowns, custom NIC coding (no 3-step drilldown), and every date field in DD/MM/YYYY.
-2. Enforce **DD/MM/YYYY** as the input AND display format for every date in the app — customer forms, admin panels, tables, emails and PDFs.
-
----
-
-## Part A — Form schema changes (`src/lib/onboarding/schemas.ts`)
-
-Extend the schema type system to support two new field kinds and cascading selects:
-
-- New `FieldType`s: `state`, `district`, `plantUnits` (repeatable group).
-- `district` field points at a sibling `state` field via `stateFrom: "state"` — dropdown reloads when the state changes.
-- `plantUnits` field type renders a repeater with **Add plant / Remove** buttons; each row has: Unit Name (dropdown: Plant / Branch / Warehouse / Head Office / Other), Flat, Premises, Village/Town, Block, Road, City, PIN, State (cascading), District (cascading).
-
-`NEW_UDYAM.fields` gets the following fixes vs. today:
-
-- 14. Address: change `state` and `district` field types from `text` to `state` / `district` (cascading).
-- 15. Add new `plants` field (type `plantUnits`) — currently missing entirely.
-- 19.1 Major Activity Under Services ◉ Non-Trading ◉ Trading
-- Renumber and re-label as per your spec.
-
-`CORRECT_PAN_AADHAAR_STAGE2` already reuses `NEW_UDYAM.fields`, so it inherits all changes automatically.
+This is a large, multi-week rebuild. To keep it shippable and reviewable, I'll deliver it in **6 sequenced phases**. Each phase leaves the app fully working, with the new engine progressively taking over.
 
 ---
 
-## Part B — DD/MM/YYYY input everywhere
+## Phase 1 — Workflow Engine Core (foundation)
 
-Create a new reusable component `src/components/ui/DateInputDMY.tsx`:
+**DB (single migration):**
+- `workflow_states` — per-order: `stage`, `status`, `sub_status`, `paused`, `pause_reason`, `active_ticket_id`, `assigned_to`, `updated_at`. One row per `application_id`.
+- `workflow_timers` — `order_id`, `kind` (`incomplete_form`, `closure`, `reminder`, `custom`), `fires_at`, `status` (`running|paused|fired|stopped`), `paused_at`, `payload jsonb`.
+- `workflow_events` (already exists — extend) — normalized enterprise timeline entries with `actor_kind` (employee/customer/system/gov), `icon`, `category`, `payload`.
+- `workflow_automations` — `order_id`, `code` (`incomplete_form_flow`, `closure_flow`, `gov_reminder_flow`), `status` (`running|paused|completed|stopped`), `context jsonb`.
+- Enum extensions on `order_status_enum` if any values missing (`WAITING_CUSTOMER`, `CLOSURE_PENDING`, `GOV_UPLOAD_PENDING`, etc.).
+- Grants + RLS for all new tables (staff read/write, service_role all).
 
-- Single text input masked/validated to `DD/MM/YYYY`.
-- Trailing calendar icon opens the existing shadcn `Calendar` popover.
-- Value stored as ISO `YYYY-MM-DD` internally so server logic, DB writes, and existing schemas are unchanged; only the visible UI is DD/MM/YYYY.
-- Handles paste, keyboard entry, and calendar selection.
+**Server (createServerFn + a tiny dispatcher):**
+- `src/lib/workflow/engine.server.ts` — pure `applyEvent(orderId, event)` that:
+  1. Loads current `workflow_state`
+  2. Runs the state machine (`src/lib/workflow/state-machine.ts`)
+  3. Writes state, timeline event, timer changes, automation status changes in a single transaction (RPC)
+  4. Emits notifications
+- `src/lib/workflow/events.ts` — typed event union (`PaymentReceived`, `FormSubmitted`, `FormTimeout5m`, `FormTimeout8h`, `CustomerEmailReceived`, `TicketOpened`, `TicketClosed`, `EmployeeResumed`, `GovUploaded`, `GovApproved`, `GovRejected`, `ReminderTick`, `DelayReasonSet`, …).
+- All existing serverFns (payments webhook, form submit, ticket create, gov upload, etc.) call `dispatchEvent(...)` instead of touching status columns directly. Existing behavior preserved; engine layered on top.
 
-Wire it into every `type: "date"` field renderer:
-
-- `src/components/onboarding/OnboardingForm.tsx` (customer form)
-- `src/components/admin/LeadFormSubmissionInline.tsx`
-- `src/components/admin/FormSubmissionPanel.tsx`
-- `src/components/admin/AdminOnboardingPanel.tsx` (admin edit view = the "workspace shell")
-
-Any other `<input type="date">` in admin routes gets swapped to the new component in the same pass (grep list: `admin.complaints*`, `admin.reports.tsx`, `admin.finance.settlements.tsx`, `ExternalDelayDialog`, etc.).
-
----
-
-## Part C — DD/MM/YYYY display everywhere
-
-`src/lib/datetime.ts` already exports `formatDateDMY`. Two changes:
-
-1. Update `formatIST({ dateOnly: true })` to return `DD/MM/YYYY` (currently returns `29 Jun 2026`). Since this is the app-wide formatter, every admin table, timeline, invoice, email and PDF that already goes through it flips automatically.
-2. Sweep the ~30 files using `toLocaleDateString` directly and route them through `formatDateDMY` / `formatIST({ dateOnly: true })`. Files include `admin.invoices.tsx`, `admin.leads.index.tsx`, `admin.orders.index.tsx`, `admin.customers.tsx`, `LeadFinanceTab.tsx`, `OrderPaymentsPanel.tsx`, `InternalNotesTimeline.tsx`, `pdf.server.ts` (invoice PDFs), `crm/invoices.functions.ts`, cron/webhook files, etc.
-
-Time-of-day rendering (e.g. "29/06/2026, 03:42 PM") stays intact — only the date portion is switched to DD/MM/YYYY.
+**Cron (existing `/api/public/cron/*`):**
+- `workflow-tick` route runs every minute → fires due timers → dispatches events.
 
 ---
 
-## Part D — Admin lead workspace panel (the "workspace shell")
+## Phase 2 — Ticket unification (max 1 active per order)
 
-`src/components/admin/AdminOnboardingPanel.tsx` + `FormSubmissionPanel.tsx` already render from the same schema, so the new fields (plants array, cascading state/district, NIC custom entry) show up automatically once the schema is updated and the new field-type renderers are added there too.
-
-Two panel-specific touch-ups:
-
-- Render the `plants` array as a compact list ("Plant 1: &nbsp; — &nbsp;") with expand/edit.
-- Show state/district as plain text once saved (no cascading needed in read-only view).
+- `find_or_append_ticket(order_id)` RPC — canonical "one active ticket" enforcement.
+- Inbound email matcher (`src/lib/mail/inbox-matcher.server.ts`) rewired: match → dispatch `CustomerEmailReceived` → engine finds/creates single ticket → **pauses** all running automations/timers for that order.
+- Ticket close → dispatch `TicketClosed` with `outcome: cooperating | not_cooperating` → engine resumes or continues closure.
+- UI: hide old "create ticket" button in order view; ticket lives inside the order panel.
 
 ---
 
-## Part E — Verification
+## Phase 3 — Automations (the 3 flows)
 
-After the edits, run `bun run build` and then hit these routes in the preview:
+Implemented as pure state-machine reactions inside the engine:
 
-- `/onboarding/<code>` for a New Udyam lead → confirm plants can be added, state/district cascades, NIC 2/4/5 accept custom values, every date field shows DD/MM/YYYY.
-- `/admin/leads/<id>` → confirm admin view shows the same fields and dates in DD/MM/YYYY.
-- `/admin/invoices` and one invoice PDF → confirm invoice date reads DD/MM/YYYY.
+1. **Incomplete Form Flow** — start on `OrderCreated` → 5 min timer → send `incomplete_info` email + resume link → 8 hr closure timer → closure email → close order. Cancelled on `FormSubmitted`. Paused on `CustomerEmailReceived`.
+2. **Closure Flow (verification / customer-side delay)** — start on `DelayReasonSet(kind=customer_side)` → delay email → 8 hr closure timer → closure email → close. Same pause/resume semantics.
+3. **Government Reminder Flow** — start on `DelayReasonSet(kind=our_side)` → **no closure**, only recurring reminders (default every 2h, employee-configurable: 30m / 1h / 2h / custom / stop). Reminders target the assigned employee, not the customer.
+
+All flows write to `workflow_automations` + `workflow_timers` so the UI can render "Running / Paused / Completed / Stopped" everywhere.
 
 ---
 
-## Technical notes
+## Phase 4 — Dashboard & widgets
 
-- No DB migration needed — every new field is stored inside the existing `onboarding_submissions.data` JSON blob.
-- `plants` is stored as `data.plants: Array<{ unit_name, address_flat, ... }>` — server validation in `onboarding.functions.ts` gets a small addition to iterate the array.
-- The internal wire format for date fields stays ISO `YYYY-MM-DD`; only the rendered UI/text becomes DD/MM/YYYY. This keeps existing SQL, PDF templates, and email templates working without data migration.
-- `INDIA_DISTRICTS` in `src/lib/onboarding/india-districts.ts` already has every state/UT — used as-is for the cascade.
+New live widgets on admin dashboard, each backed by a small serverFn + realtime subscription to `workflow_states`:
+- Orders Waiting Customer, Orders Waiting Employee, Government Pending, Delayed Orders, Tickets Open, Paused Workflows, Closure Today, Reminder Queue, High Priority, Employee SLA, Today's Automation.
+
+Realtime channel: `user:<uid>:workflow` (per existing memory rule).
+
+---
+
+## Phase 5 — Order workspace UI (redesign, functionality unchanged)
+
+Rebuild `admin/orders/$id` layout with:
+- **Sticky stage progress bar** (Payment → Form → Verification → Government → Completed) with color-coded states.
+- **Workflow status card**: Active Automation, Current Timer (live countdown), Next Scheduled Action, Current Owner.
+- **Sticky action panel** — buttons rendered from `getAvailableActions(state)`; no irrelevant buttons ever.
+- **Rich timeline** — grouped by day, icons per event kind, actor avatars, expandable payload.
+- **Badge row** — Customer Waiting / Employee Action / Gov Pending / Ticket Open / Paused / High Priority.
+- **Confirmation dialogs** for Close Order, Force Resume Closure, Reject Application.
+- **Inline single-ticket panel** with Reply / Resume Order / Close Ticket / Close Order.
+
+Existing forms, invoice, email, upload components are **reused as-is** — only the shell changes.
+
+---
+
+## Phase 6 — Cleanup & guardrails
+
+- Deprecate direct writes to `applications.order_status` outside the engine (grep + refactor call sites; add a DB trigger that logs any non-engine writes).
+- Migrate historical orders: backfill `workflow_states` from current `order_status`.
+- Add integration tests for the 3 automation flows (Playwright + engine unit tests).
+
+---
+
+## Technical notes (for reference)
+
+- **State machine** lives in one pure TS file so it's unit-testable and shared between server dispatcher and UI action-availability logic.
+- **Timers** stored in DB, not in memory — cron ticks them. Survives redeploys.
+- **Idempotency**: every event has a `dedup_key`; engine ignores duplicates (safe for webhook retries + email replay).
+- **Backwards compatible**: existing `order_status_enum` values kept; engine derives new richer `stage`/`status` from them + new columns.
+- No breaking API changes; all existing routes/serverFns keep working while engine takes over gradually.
+
+---
+
+## What I need from you to start
+
+1. **Green-light Phase 1** (engine + DB + dispatcher rewiring) — this is ~1 migration + ~15 new files, no UI change yet. Everything keeps working.
+2. Confirm the **default reminder cadence** for Government delay (I'll use **every 2h** unless you say otherwise).
+3. Confirm the **closure window** everywhere is **8 hours** (matches your spec).
+
+Say "go phase 1" and I'll ship it.
