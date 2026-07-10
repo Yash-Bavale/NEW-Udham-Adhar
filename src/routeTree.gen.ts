@@ -207,6 +207,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin.notificat
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
+import { Route as AdminInboxManagementRouteImport } from './routes/admin.inbox-management'
 import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminFinanceRouteImport } from './routes/admin.finance'
 import { Route as AdminEmployeesRouteImport } from './routes/admin.employees'
@@ -1283,6 +1284,11 @@ const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
   path: '/invoices',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminInboxManagementRoute = AdminInboxManagementRouteImport.update({
+  id: '/inbox-management',
+  path: '/inbox-management',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGatewaysRoute = AdminGatewaysRouteImport.update({
   id: '/gateways',
   path: '/gateways',
@@ -1745,6 +1751,7 @@ export interface FileRoutesByFullPath {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
@@ -1995,6 +2002,7 @@ export interface FileRoutesByTo {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -2245,6 +2253,7 @@ export interface FileRoutesById {
   '/admin/employees': typeof AdminEmployeesRoute
   '/admin/finance': typeof AdminFinanceRouteWithChildren
   '/admin/gateways': typeof AdminGatewaysRoute
+  '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
   '/admin/my-work': typeof AdminMyWorkRoute
@@ -2498,6 +2507,7 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
     | '/admin/my-work'
@@ -2748,6 +2758,7 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/my-work'
     | '/admin/notifications'
@@ -2997,6 +3008,7 @@ export interface FileRouteTypes {
     | '/admin/employees'
     | '/admin/finance'
     | '/admin/gateways'
+    | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
     | '/admin/my-work'
@@ -4655,6 +4667,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminInvoicesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/inbox-management': {
+      id: '/admin/inbox-management'
+      path: '/inbox-management'
+      fullPath: '/admin/inbox-management'
+      preLoaderRoute: typeof AdminInboxManagementRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gateways': {
       id: '/admin/gateways'
       path: '/gateways'
@@ -5130,6 +5149,7 @@ interface AdminRouteChildren {
   AdminEmployeesRoute: typeof AdminEmployeesRoute
   AdminFinanceRoute: typeof AdminFinanceRouteWithChildren
   AdminGatewaysRoute: typeof AdminGatewaysRoute
+  AdminInboxManagementRoute: typeof AdminInboxManagementRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
   AdminMyWorkRoute: typeof AdminMyWorkRoute
@@ -5170,6 +5190,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmployeesRoute: AdminEmployeesRoute,
   AdminFinanceRoute: AdminFinanceRouteWithChildren,
   AdminGatewaysRoute: AdminGatewaysRoute,
+  AdminInboxManagementRoute: AdminInboxManagementRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
   AdminMyWorkRoute: AdminMyWorkRoute,

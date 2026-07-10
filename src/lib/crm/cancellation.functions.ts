@@ -71,7 +71,7 @@ export const cancelClosureWorkflow = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const _CANCEL_SUPPORT_EMAIL = "help@businesshelpservices.in";
+export const _CANCEL_SUPPORT_EMAIL = "help@businesshelpservices.com";
 
 export const resumeCancelledOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
