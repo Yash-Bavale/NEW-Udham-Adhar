@@ -5,13 +5,28 @@ import { toast } from "sonner";
 import { getFormSubmissionForLead } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
+import { formatIST, formatDateDMY } from "@/lib/datetime";
 
-function fmtIST(iso?: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
-  });
+const fmtIST = (iso?: string | null) => formatIST(iso);
+
+function renderCell(key: string, v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (key === "plants" && typeof v === "string" && v.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr) && arr.length) {
+        return arr.map((p: any, i: number) => {
+          const line = [p.unit_name, p.address_flat, p.address_premises, p.address_village, p.address_road, p.city, p.district, p.state, p.pincode]
+            .filter((x) => x && String(x).trim()).join(", ");
+          return `#${i + 1}: ${line || "(empty)"}`;
+        }).join("\n");
+      }
+    } catch {}
+  }
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return formatDateDMY(v);
+  return String(v);
 }
+
 
 type SectionGroup = { label: string; fields: { key: string; label: string }[] };
 
@@ -109,8 +124,8 @@ export function LeadFormSubmissionInline({ leadId }: { leadId: string }) {
                   {visible.map((f) => (
                     <div key={f.key} className="flex flex-col min-w-0">
                       <span className="text-[10px] text-slate-400">{f.label}</span>
-                      <span className="text-xs text-slate-800 font-medium mt-0.5 break-words">
-                        {String(formData[f.key] ?? "—")}
+                      <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
+                        {renderCell(f.key, formData[f.key])}
                       </span>
                     </div>
                   ))}
@@ -125,9 +140,10 @@ export function LeadFormSubmissionInline({ leadId }: { leadId: string }) {
                 {extras.map((k) => (
                   <div key={k} className="flex flex-col min-w-0">
                     <span className="text-[10px] text-slate-400">{k.replace(/_/g, " ")}</span>
-                    <span className="text-xs text-slate-800 font-medium mt-0.5 break-words">
-                      {String(formData[k] ?? "—")}
+                    <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
+                      {renderCell(k, formData[k])}
                     </span>
+
                   </div>
                 ))}
               </div>

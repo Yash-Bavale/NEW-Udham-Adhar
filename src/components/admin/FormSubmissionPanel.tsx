@@ -20,27 +20,44 @@ import {
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
 import { Button } from "@/components/ui/button";
+import { formatIST, formatDateDMY } from "@/lib/datetime";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
-function mask(_field: string, value: unknown): string {
-  const v = String(value ?? "");
-  if (!v) return "—";
-  return v;
+function mask(field: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  // Plants (repeater) come in as a JSON-stringified array.
+  if (field === "plants" && typeof value === "string" && value.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(value);
+      if (Array.isArray(arr) && arr.length) {
+        return arr
+          .map((p: any, i: number) => {
+            const line = [
+              p.unit_name,
+              p.address_flat,
+              p.address_premises,
+              p.address_village,
+              p.address_road,
+              p.city,
+              p.district,
+              p.state,
+              p.pincode,
+            ].filter((x) => x && String(x).trim()).join(", ");
+            return `#${i + 1}: ${line || "(empty)"}`;
+          })
+          .join("\n");
+      }
+    } catch { /* fall through */ }
+  }
+  // ISO date → DD/MM/YYYY
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return formatDateDMY(value);
+  }
+  const v = String(value);
+  return v || "—";
 }
 
-
-function formatIST(iso?: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
 
 type SectionGroup = { label: string; fields: { key: string; label: string }[] };
 
@@ -346,10 +363,11 @@ export function FormSubmissionPanel({
                               <AlertTriangle className="size-3.5" /> Required — empty
                             </span>
                           ) : (
-                            <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
+                            <span className="text-sm text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
                               {mask(f.key, v)}
                             </span>
                           )}
+
                         </div>
                       );
                     })}
