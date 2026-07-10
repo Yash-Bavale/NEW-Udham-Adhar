@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { supabase } from "@/integrations/supabase/client";
 import { SuperAdminDashboard, type DashboardRange } from "@/components/admin/SuperAdminDashboard";
+import { WorkflowStatusWidgets } from "@/components/admin/WorkflowStatusWidgets";
 import type { RangePreset } from "@/lib/crm/super-admin.functions";
 
 const searchSchema = z.object({
@@ -42,12 +43,15 @@ function DashboardPage() {
     toIso: search.to,
   };
   return (
-    <SuperAdminDashboard
-      title="Executive Dashboard"
-      range={range}
-      onRangeChange={(r) =>
-        navigate({ search: { preset: r.preset, from: r.fromIso, to: r.toIso }, replace: true })
-      }
-    />
+    <div className="space-y-6">
+      <SuperAdminDashboard
+        title="Executive Dashboard"
+        range={range}
+        onRangeChange={(r) =>
+          navigate({ search: { preset: r.preset, from: r.fromIso, to: r.toIso }, replace: true })
+        }
+      />
+      <WorkflowStatusWidgets />
+    </div>
   );
 }
