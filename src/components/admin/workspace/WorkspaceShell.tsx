@@ -314,10 +314,13 @@ export function WorkspaceShell(p: Props) {
       />
 
       {/* Customer Journey */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-4">
-          Customer Journey
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
+            Customer Journey
+          </div>
         </div>
+        <OrderWorkflowLiveStatus applicationId={application.id} />
         <CustomerJourneyMap
           stage={p.stage}
           isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
@@ -327,6 +330,7 @@ export function WorkspaceShell(p: Props) {
           closureReasonLabel={(application as any).closure_reason_code}
         />
       </section>
+
 
       {/* Tabs */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
@@ -379,7 +383,7 @@ export function WorkspaceShell(p: Props) {
               ) : (
                 <>
                   {p.notesNode}
-                  <OrderWorkflowLiveStatus applicationId={application.id} />
+
                   <OrderWorkflowPanel
                     applicationId={application.id}
                     current={current}
