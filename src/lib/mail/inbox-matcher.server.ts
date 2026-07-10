@@ -578,6 +578,8 @@ async function openOrAppendTicket(input: {
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", ticketId);
+
+  return ticketId;
 }
 
 function stripHtml(html: string | null): string {
