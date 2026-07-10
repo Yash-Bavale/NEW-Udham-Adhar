@@ -141,16 +141,21 @@ function RootComponent() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Skip the initial restored-session event to avoid a redundant invalidate.
+      // Only react to real identity transitions — ignore TOKEN_REFRESHED and
+      // INITIAL_SESSION, which fire on every mount / hourly refresh and would
+      // thrash the router + query cache.
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       if (!seenInitial.current) {
         seenInitial.current = true;
-        if (event === "INITIAL_SESSION") return;
       }
       router.invalidate();
-      queryClient.invalidateQueries();
+      // Do NOT refetch on SIGNED_OUT — the cleared session would 401-storm
+      // every protected query and blank the screen before the redirect lands.
+      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
     });
     return () => subscription.unsubscribe();
   }, [router, queryClient]);
+
 
   // Lazy-load Google Analytics on idle so it doesn't compete with the LCP.
   useEffect(() => {
