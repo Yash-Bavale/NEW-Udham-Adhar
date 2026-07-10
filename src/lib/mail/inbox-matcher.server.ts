@@ -199,7 +199,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
       await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     }
-    await openOrAppendTicket({
+    const openedTicketId = await openOrAppendTicket({
       applicationId: matched.applicationId,
       customerId: matched.customerId,
       leadId: matched.leadId,
@@ -209,6 +209,19 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       messageId,
       inReplyTo,
     });
+    if (matched.applicationId && openedTicketId) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent({
+          type: "CustomerEmailReceived",
+          applicationId: matched.applicationId,
+          ticketId: openedTicketId,
+          messageId: messageId ?? msg.messageId,
+        });
+      } catch (e) {
+        console.error("[workflow] dispatch CustomerEmailReceived failed", e);
+      }
+    }
   } else if (fromEmail) {
     // No order/customer match — but we still want staff visibility.
     // Skip obvious system/self senders; everything else becomes a standalone
