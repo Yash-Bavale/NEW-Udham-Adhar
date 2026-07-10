@@ -3268,6 +3268,50 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_automations: {
+        Row: {
+          application_id: string
+          code: string
+          context: Json
+          created_at: string
+          ended_at: string | null
+          id: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          code: string
+          context?: Json
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          code?: string
+          context?: Json
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_automations_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_closure_reasons: {
         Row: {
           code: string
@@ -3510,6 +3554,122 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      workflow_states: {
+        Row: {
+          active_ticket_id: string | null
+          active_timer_id: string | null
+          application_id: string
+          assigned_to: string | null
+          created_at: string
+          id: string
+          last_event_at: string
+          pause_reason: string | null
+          paused: boolean
+          stage: string
+          status: string
+          sub_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          active_ticket_id?: string | null
+          active_timer_id?: string | null
+          application_id: string
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          last_event_at?: string
+          pause_reason?: string | null
+          paused?: boolean
+          stage?: string
+          status?: string
+          sub_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active_ticket_id?: string | null
+          active_timer_id?: string | null
+          application_id?: string
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          last_event_at?: string
+          pause_reason?: string | null
+          paused?: boolean
+          stage?: string
+          status?: string
+          sub_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_states_active_ticket_id_fkey"
+            columns: ["active_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_states_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_timers: {
+        Row: {
+          application_id: string
+          created_at: string
+          dedup_key: string | null
+          fired_at: string | null
+          fires_at: string
+          id: string
+          kind: string
+          paused_at: string | null
+          payload: Json
+          remaining_ms: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          dedup_key?: string | null
+          fired_at?: string | null
+          fires_at: string
+          id?: string
+          kind: string
+          paused_at?: string | null
+          payload?: Json
+          remaining_ms?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          dedup_key?: string | null
+          fired_at?: string | null
+          fires_at?: string
+          id?: string
+          kind?: string
+          paused_at?: string | null
+          payload?: Json
+          remaining_ms?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_timers_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
