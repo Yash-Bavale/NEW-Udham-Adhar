@@ -10,7 +10,9 @@ export type FieldType =
   | "select"
   | "textarea"
   | "nic"
+  | "plants"
   | "section";
+
 
 export type FieldDef = {
   key: string;
@@ -69,8 +71,17 @@ const GENDER = ["Male", "Female", "Others"] as const;
 const YES_NO = ["Yes", "No"] as const;
 const GST_OPTIONS = ["Yes", "No", "Exempted"] as const;
 const ACTIVITY_TYPES = ["Manufacturing", "Services", "Trading"] as const;
+const SERVICES_SUBTYPE = ["Non-Trading", "Trading"] as const;
 const REGISTRATION_HISTORY = ["N/A", "EM-II", "Previous UAM"] as const;
-// FORGOT_USER_TYPES removed — service 5 now uses the New Udyam form.
+export const PLANT_UNIT_TYPES = [
+  "Plant",
+  "Branch",
+  "Warehouse",
+  "Head Office",
+  "Factory",
+  "Other",
+] as const;
+
 
 export const INDIA_STATES = [
   "Andhra Pradesh",
@@ -147,21 +158,25 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "address_road", label: "Road / Street / Lane", type: "text", required: true, maxLength: 160 },
     { key: "city", label: "City", type: "text", required: true, maxLength: 80 },
     { key: "pincode", label: "PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
-    { key: "state", label: "State", type: "text", required: true, maxLength: 80 },
-    { key: "district", label: "District", type: "text", required: true, maxLength: 80 },
+    { key: "state", label: "State", type: "select", required: true, options: INDIA_STATES },
+    { key: "district", label: "District", type: "select", required: true },
+    { key: "section_plants", label: "15. Location of Plant(s) / Unit(s) and Details", type: "section" },
+    { key: "plants", label: "Add one row for each plant / unit / branch", type: "plants" },
     { key: "previous_registration", label: "16. Previous EM-II / UAM Registration Number, if any", type: "select", required: true, options: REGISTRATION_HISTORY },
     { key: "section_status", label: "17. Status of Enterprise", type: "section" },
-    { key: "incorporation_date", label: "a. Date of Incorporation / Registration", type: "date", required: true },
+    { key: "incorporation_date", label: "a. Date of Incorporation / Registration", type: "date", required: true, placeholder: "DD/MM/YYYY" },
     { key: "business_commenced", label: "b. Whether production / business commenced", type: "select", required: true, options: YES_NO },
-    { key: "commencement_date", label: "Date of Commencement", type: "date", required: true },
+    { key: "commencement_date", label: "Date of Commencement", type: "date", required: true, placeholder: "DD/MM/YYYY" },
     { key: "section_bank", label: "18. Bank Details", type: "section" },
     { key: "bank_name", label: "Bank Name", type: "text", required: true, maxLength: 120 },
     { key: "bank_ifsc", label: "IFSC Code", type: "text", required: true, pattern: "^[A-Z]{4}0[A-Z0-9]{6}$", maxLength: 11 },
     { key: "bank_account_no", label: "Bank Account Number", type: "text", required: true, maxLength: 30 },
     { key: "major_activity", label: "19. Major Activity of Unit", type: "select", required: true, options: ACTIVITY_TYPES },
-    { key: "nic_2_digit", label: "20a. NIC 2 Digit Code", type: "nic", required: true, nicDigits: 2, activityFrom: "major_activity", help: "Search and select your business division." },
-    { key: "nic_4_digit", label: "20b. NIC 4 Digit Code", type: "nic", required: true, nicDigits: 4, activityFrom: "major_activity", help: "Narrow down to your business group." },
-    { key: "nic_5_digit", label: "20c. NIC 5 Digit Code", type: "nic", required: true, nicDigits: 5, activityFrom: "major_activity", help: "Pick the exact 5-digit sub-class for your activity." },
+    { key: "major_activity_sub", label: "19.1 Major Activity Under Services", type: "select", required: false, options: SERVICES_SUBTYPE, help: "Required only if Major Activity is Services." },
+    { key: "section_nic", label: "20. National Industrial Classification (NIC) Code for Activities", type: "section" },
+    { key: "nic_2_digit", label: "NIC 2 Digit Code", type: "text", required: true, pattern: "^\\d{2}$", maxLength: 2, placeholder: "e.g. 14", help: "Enter 2-digit NIC division code (custom entry)." },
+    { key: "nic_4_digit", label: "NIC 4 Digit Code", type: "text", required: true, pattern: "^\\d{4}$", maxLength: 4, placeholder: "e.g. 1410", help: "Enter 4-digit NIC group code (custom entry)." },
+    { key: "nic_5_digit", label: "NIC 5 Digit Code", type: "text", required: true, pattern: "^\\d{5}$", maxLength: 5, placeholder: "e.g. 14101", help: "Enter 5-digit NIC sub-class code (custom entry)." },
     { key: "section_employees", label: "21. Number of persons employed", type: "section" },
     { key: "employees_male", label: "Male", type: "number", required: true },
     { key: "employees_female", label: "Female", type: "number", required: true },
@@ -174,6 +189,7 @@ const NEW_UDYAM: OnboardingSchema = {
   ],
   documents: [],
 };
+
 
 
 const UDYAM_UPDATE: OnboardingSchema = {
