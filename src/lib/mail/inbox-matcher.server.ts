@@ -518,7 +518,7 @@ async function openOrAppendTicket(input: {
   fromEmail: string | null;
   messageId?: string | null;
   inReplyTo?: string | null;
-}) {
+}): Promise<string | null> {
   // Find any open ticket for this order in the last 30 days.
   const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   let existingQuery = supabaseAdmin
@@ -555,7 +555,7 @@ async function openOrAppendTicket(input: {
       .single();
     if (error) {
       console.error("[zoho-inbox] ticket insert failed", error.message);
-      return;
+      return null;
     }
     ticketId = (created as { id: string }).id;
   }
