@@ -1,26 +1,38 @@
-// Employee Workflow tab body: internal notes + timeline & reminders only.
-// The primary/exception action buttons live in <OrderActionRail /> — the single
-// source of truth rendered above the Customer Journey.
+// Employee Workflow tab body: engine-driven live status + controls + notes/history.
+// - Live status: engine chips, active-ticket, pause reason.
+// - Payment mini-card (mirrors Customer Journey so it's visible here too).
+// - Live timers list with Pause / Resume / Cancel.
+// - Live automations list with Pause / Resume / Stop.
+// - Existing internal-notes + reminders + activity history retained below.
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Bell, Clock, X, Plus, History, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Bell, Clock, X, Plus, History, ChevronDown, ChevronRight,
+  Cog, AlarmClock, PlayCircle, PauseCircle, StopCircle, CheckCircle2, Ticket, CreditCard,
+} from "lucide-react";
 
 import {
   listWorkflowEvents, listWorkflowReminders,
   appendWorkflowEvent, cancelWorkflowReminder,
 } from "@/lib/crm/workflow.functions";
-import { formatIST } from "@/lib/datetime";
+import { controlTimer, controlAutomation } from "@/lib/workflow/engine.functions";
+import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
+import { STAGE_LABEL, TIMER_LABEL, AUTO_LABEL } from "@/lib/workflow/engine-view";
+import { formatIST, relativeIST } from "@/lib/datetime";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
 export function OrderWorkflowPanel({
   applicationId,
+  payments,
+  hideAmount,
 }: {
   applicationId: string;
-  // The remaining props are accepted for backwards compatibility but ignored;
-  // ActionRail owns the primary/exception surface now.
+  payments?: any[];
+  hideAmount?: boolean;
+  // Legacy props kept for backwards compatibility (rail owns primary actions).
   current?: FulfillmentStatus;
   workflowStatus?: string | null;
   closureStage?: string | null;
@@ -39,10 +51,13 @@ export function OrderWorkflowPanel({
     qc.invalidateQueries({ queryKey: ["order-exception-state", applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
+    qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
   };
 
   return (
     <div className="space-y-4">
+      <EngineControls applicationId={applicationId} payments={payments ?? []} hideAmount={!!hideAmount} onRefresh={refresh} />
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <button type="button" onClick={() => setHistoryOpen((v) => !v)}
           className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-slate-50">
@@ -57,6 +72,227 @@ export function OrderWorkflowPanel({
   );
 }
 
+// ── Engine controls ─────────────────────────────────────────────────────────
+function EngineControls({
+  applicationId, payments, hideAmount, onRefresh,
+}: { applicationId: string; payments: any[]; hideAmount: boolean; onRefresh: () => void }) {
+  const { view, isLoading } = useOrderWorkflow(applicationId);
+  const fnTimer = useServerFn(controlTimer);
+  const fnAuto = useServerFn(controlAutomation);
+
+  const timerMut = useMutation({
+    mutationFn: (v: { timerId: string; action: "pause" | "resume" | "cancel" }) => fnTimer({ data: v }),
+    onSuccess: (_r, v) => { toast.success(`Timer ${v.action}d`); onRefresh(); },
+    onError: (e) => toast.error(String(e)),
+  });
+  const autoMut = useMutation({
+    mutationFn: (v: { automationId: string; action: "pause" | "resume" | "stop" }) => fnAuto({ data: v }),
+    onSuccess: (_r, v) => { toast.success(`Automation ${v.action}d`); onRefresh(); },
+    onError: (e) => toast.error(String(e)),
+  });
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-slate-600">
+          <Cog className="size-3.5" /> Workflow engine
+        </div>
+        <OverallChip view={view} />
+      </div>
+
+      <div className="px-5 py-4 space-y-4">
+        {isLoading ? (
+          <div className="text-xs text-slate-500">Loading engine state…</div>
+        ) : !view.hasEngine ? (
+          <div className="text-xs text-slate-500">
+            No workflow row yet. The engine initialises this order automatically on the next event.
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <Kv label="Stage" value={STAGE_LABEL[view.stage ?? ""] ?? String(view.stage)} />
+              <Kv label="Status" value={String(view.status ?? "—").replaceAll("_", " ")} />
+              {view.subStatus && <Kv label="Sub-status" value={String(view.subStatus).replaceAll("_", " ")} />}
+              {view.pauseReason && <Kv label="Pause reason" value={String(view.pauseReason).replaceAll("_", " ")} />}
+            </div>
+
+            {view.activeTicketId && (
+              <div className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-800 inline-flex items-center gap-1">
+                <Ticket className="size-3" /> Active support ticket — engine paused pending resolution.
+              </div>
+            )}
+
+            <PaymentInline payments={payments} hideAmount={hideAmount} />
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
+                <AlarmClock className="size-3" /> Live timers ({view.timers.length})
+              </div>
+              {view.timers.length === 0 ? (
+                <div className="text-xs text-slate-500">No active timers.</div>
+              ) : (
+                <ul className="space-y-1">
+                  {view.timers.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between rounded-md border bg-white px-2 py-1 text-xs gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{TIMER_LABEL[t.kind] ?? t.kind}</span>
+                          <StatusChip status={t.status} />
+                        </div>
+                        {t.fires_at && (
+                          <div className="text-[11px] text-slate-500" title={formatIST(t.fires_at)}>
+                            {t.status === "paused" ? "paused" : `fires ${relativeIST(t.fires_at)}`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {t.status === "running" && (
+                          <IconBtn onClick={() => timerMut.mutate({ timerId: t.id, action: "pause" })} label="Pause">
+                            <PauseCircle className="size-3.5" />
+                          </IconBtn>
+                        )}
+                        {t.status === "paused" && (
+                          <IconBtn onClick={() => timerMut.mutate({ timerId: t.id, action: "resume" })} label="Resume">
+                            <PlayCircle className="size-3.5" />
+                          </IconBtn>
+                        )}
+                        <IconBtn onClick={() => timerMut.mutate({ timerId: t.id, action: "cancel" })} label="Cancel" tone="rose">
+                          <X className="size-3.5" />
+                        </IconBtn>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
+                <Cog className="size-3" /> Automations ({view.automations.length})
+              </div>
+              {view.automations.length === 0 ? (
+                <div className="text-xs text-slate-500">No active automations.</div>
+              ) : (
+                <ul className="space-y-1">
+                  {view.automations.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between rounded-md border bg-white px-2 py-1 text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium truncate">{AUTO_LABEL[a.code] ?? a.code}</span>
+                        <StatusChip status={a.status} />
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {a.status === "running" && (
+                          <IconBtn onClick={() => autoMut.mutate({ automationId: a.id, action: "pause" })} label="Pause">
+                            <PauseCircle className="size-3.5" />
+                          </IconBtn>
+                        )}
+                        {a.status === "paused" && (
+                          <IconBtn onClick={() => autoMut.mutate({ automationId: a.id, action: "resume" })} label="Resume">
+                            <PlayCircle className="size-3.5" />
+                          </IconBtn>
+                        )}
+                        <IconBtn onClick={() => autoMut.mutate({ automationId: a.id, action: "stop" })} label="Stop" tone="rose">
+                          <StopCircle className="size-3.5" />
+                        </IconBtn>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OverallChip({ view }: { view: ReturnType<typeof useOrderWorkflow>["view"] }) {
+  const Icon =
+    view.overallTone === "running" ? PlayCircle
+    : view.overallTone === "paused" ? PauseCircle
+    : view.overallTone === "completed" ? CheckCircle2
+    : StopCircle;
+  const cls =
+    view.overallTone === "running" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : view.overallTone === "paused" ? "bg-amber-50 text-amber-800 border-amber-200"
+    : view.overallTone === "completed" ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+    : "bg-slate-100 text-slate-600 border-slate-200";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`}>
+      <Icon className="size-3" /> {view.overallLabel}
+    </span>
+  );
+}
+
+function StatusChip({ status }: { status: string }) {
+  const cls =
+    status === "running" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : status === "paused" ? "bg-amber-50 text-amber-800 border-amber-200"
+    : "bg-slate-100 text-slate-600 border-slate-200";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold capitalize ${cls}`}>
+      {status}
+    </span>
+  );
+}
+
+function Kv({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-slate-100 bg-slate-50/60 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-slate-800 font-medium mt-0.5 capitalize">{value}</div>
+    </div>
+  );
+}
+
+function IconBtn({ onClick, label, tone, children }: { onClick: () => void; label: string; tone?: "rose"; children: React.ReactNode }) {
+  const cls = tone === "rose"
+    ? "text-rose-600 hover:bg-rose-50 border-rose-200"
+    : "text-slate-600 hover:bg-slate-100 border-slate-200";
+  return (
+    <button type="button" onClick={onClick} title={label} aria-label={label}
+      className={`inline-flex items-center justify-center rounded-md border bg-white size-6 ${cls}`}>
+      {children}
+    </button>
+  );
+}
+
+function PaymentInline({ payments, hideAmount }: { payments: any[]; hideAmount: boolean }) {
+  const paid = payments.filter((p) => (p.status === "success" || p.status === "captured" || p.status === "completed") && Number(p.amount ?? 0) > 0);
+  const total = paid.reduce((s, p) => s + Number(p.amount ?? 0), 0);
+  const latest = paid[0] ?? payments[0] ?? null;
+  const fmt = (n: number) => (hideAmount ? "₹••••" : `₹${n.toLocaleString("en-IN")}`);
+
+  if (payments.length === 0) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 inline-flex items-center gap-2">
+        <CreditCard className="size-3.5 text-amber-700" />
+        <span className="font-semibold">Payment</span>
+        <span>· Awaiting payment</span>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border border-emerald-200 bg-emerald-50/70 px-2 py-1.5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+        <span className="inline-flex items-center gap-1 font-semibold text-emerald-900">
+          <CreditCard className="size-3.5 text-emerald-700" /> Payment
+        </span>
+        <span className="text-emerald-800">{fmt(total)} received</span>
+        {latest?.gateway_name && <span className="text-slate-600">via <b>{latest.gateway_name}</b></span>}
+        {(latest?.txn_id ?? latest?.gateway_txn_id) && (
+          <span className="text-slate-600">Txn <b className="font-mono">{latest.txn_id ?? latest.gateway_txn_id}</b></span>
+        )}
+        {(latest?.payment_date ?? latest?.created_at) && (
+          <span className="text-slate-500">{formatIST(latest.payment_date ?? latest.created_at)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Existing history section (internal notes + reminders + activity) ────────
 function HistorySection({ applicationId, onRefresh }: { applicationId: string; onRefresh: () => void }) {
   const fnEvents = useServerFn(listWorkflowEvents);
   const fnReminders = useServerFn(listWorkflowReminders);
