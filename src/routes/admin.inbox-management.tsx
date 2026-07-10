@@ -135,7 +135,7 @@ function RecentEmailsTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["inbox.emails", page],
-    queryFn: () => emailsFn({ limit: 30, page }),
+    queryFn: () => emailsFn({ data: { limit: 30, page } }),
   });
 
   return (
@@ -216,7 +216,7 @@ function QuarantineTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["inbox.quarantine", page],
-    queryFn: () => quarantineFn({ limit: 30, page }),
+    queryFn: () => quarantineFn({ data: { limit: 30, page } }),
   });
 
   return (
@@ -308,7 +308,7 @@ function TicketsTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["inbox.tickets", page, status],
-    queryFn: () => ticketsFn({ limit: 30, page, status: status as any }),
+    queryFn: () => ticketsFn({ data: { limit: 30, page, status: status as any } }),
   });
 
   const statuses = ["open", "in_progress", "waiting_customer", "resolved", "closed"];
@@ -425,7 +425,7 @@ function PollSection() {
   const handlePoll = async () => {
     setLoading(true);
     try {
-      const result = await pollFn({ limit: 100 });
+      const result = await pollFn({ data: { limit: 100 } });
       toast.success(result.message);
       await qc.invalidateQueries({ queryKey: ["inbox"] });
     } catch (err) {
