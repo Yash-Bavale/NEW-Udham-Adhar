@@ -250,6 +250,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
+import { Route as ApiPublicCronZohoDiagnoseRouteImport } from './routes/api/public/cron/zoho-diagnose'
 import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api/public/cron/workflow-reminders'
 import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/public/cron/schedulers-tick'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
@@ -1510,6 +1511,12 @@ const ApiPublicInvoiceLeadCodeRoute =
     path: '/api/public/invoice/$leadCode',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronZohoDiagnoseRoute =
+  ApiPublicCronZohoDiagnoseRouteImport.update({
+    id: '/api/public/cron/zoho-diagnose',
+    path: '/api/public/cron/zoho-diagnose',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronWorkflowRemindersRoute =
   ApiPublicCronWorkflowRemindersRouteImport.update({
     id: '/api/public/cron/workflow-reminders',
@@ -1810,6 +1817,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
+  '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -2059,6 +2067,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
+  '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -2312,6 +2321,7 @@ export interface FileRoutesById {
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
+  '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -2566,6 +2576,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
+    | '/api/public/cron/zoho-diagnose'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -2815,6 +2826,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
+    | '/api/public/cron/zoho-diagnose'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -3067,6 +3079,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
+    | '/api/public/cron/zoho-diagnose'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -3271,6 +3284,7 @@ export interface RootRouteChildren {
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicCronSchedulersTickRoute: typeof ApiPublicCronSchedulersTickRoute
   ApiPublicCronWorkflowRemindersRoute: typeof ApiPublicCronWorkflowRemindersRoute
+  ApiPublicCronZohoDiagnoseRoute: typeof ApiPublicCronZohoDiagnoseRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
@@ -4968,6 +4982,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInvoiceLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/zoho-diagnose': {
+      id: '/api/public/cron/zoho-diagnose'
+      path: '/api/public/cron/zoho-diagnose'
+      fullPath: '/api/public/cron/zoho-diagnose'
+      preLoaderRoute: typeof ApiPublicCronZohoDiagnoseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/workflow-reminders': {
       id: '/api/public/cron/workflow-reminders'
       path: '/api/public/cron/workflow-reminders'
@@ -5418,6 +5439,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicCronSchedulersTickRoute: ApiPublicCronSchedulersTickRoute,
   ApiPublicCronWorkflowRemindersRoute: ApiPublicCronWorkflowRemindersRoute,
+  ApiPublicCronZohoDiagnoseRoute: ApiPublicCronZohoDiagnoseRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
