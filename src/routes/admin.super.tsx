@@ -39,13 +39,16 @@ function SuperAdminPage() {
     toIso: search.to,
   };
   return (
-    <SuperAdminDashboard
-      superMode
-      title="Super Admin Command Center"
-      range={range}
-      onRangeChange={(r) =>
-        navigate({ search: { preset: r.preset, from: r.fromIso, to: r.toIso }, replace: true })
-      }
-    />
+    <div className="space-y-6">
+      <SuperAdminDashboard
+        superMode
+        title="Super Admin Command Center"
+        range={range}
+        onRangeChange={(r) =>
+          navigate({ search: { preset: r.preset, from: r.fromIso, to: r.toIso }, replace: true })
+        }
+      />
+      <WorkflowStatusWidgets />
+    </div>
   );
 }
