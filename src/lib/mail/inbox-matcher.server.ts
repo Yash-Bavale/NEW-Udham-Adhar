@@ -141,6 +141,18 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
       await pauseActiveCustomerScheduler(ticketMatch.applicationId, null).catch(() => {});
+      // Workflow engine: pause timers/automations on customer reply.
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent({
+          type: "CustomerEmailReceived",
+          applicationId: ticketMatch.applicationId,
+          ticketId: ticketMatch.ticketId,
+          messageId: messageId ?? msg.messageId,
+        });
+      } catch (e) {
+        console.error("[workflow] dispatch CustomerEmailReceived failed", e);
+      }
     }
     result.matched += 1;
     return;
@@ -187,7 +199,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
       await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     }
-    await openOrAppendTicket({
+    const openedTicketId = await openOrAppendTicket({
       applicationId: matched.applicationId,
       customerId: matched.customerId,
       leadId: matched.leadId,
@@ -197,6 +209,19 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       messageId,
       inReplyTo,
     });
+    if (matched.applicationId && openedTicketId) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent({
+          type: "CustomerEmailReceived",
+          applicationId: matched.applicationId,
+          ticketId: openedTicketId,
+          messageId: messageId ?? msg.messageId,
+        });
+      } catch (e) {
+        console.error("[workflow] dispatch CustomerEmailReceived failed", e);
+      }
+    }
   } else if (fromEmail) {
     // No order/customer match — but we still want staff visibility.
     // Skip obvious system/self senders; everything else becomes a standalone
@@ -493,7 +518,7 @@ async function openOrAppendTicket(input: {
   fromEmail: string | null;
   messageId?: string | null;
   inReplyTo?: string | null;
-}) {
+}): Promise<string | null> {
   // Find any open ticket for this order in the last 30 days.
   const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   let existingQuery = supabaseAdmin
@@ -530,7 +555,7 @@ async function openOrAppendTicket(input: {
       .single();
     if (error) {
       console.error("[zoho-inbox] ticket insert failed", error.message);
-      return;
+      return null;
     }
     ticketId = (created as { id: string }).id;
   }
@@ -553,6 +578,8 @@ async function openOrAppendTicket(input: {
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", ticketId);
+
+  return ticketId;
 }
 
 function stripHtml(html: string | null): string {
