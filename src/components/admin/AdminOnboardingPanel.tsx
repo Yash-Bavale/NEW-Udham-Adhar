@@ -8,6 +8,28 @@ import {
   setDocumentStatus,
 } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
+import { formatIST, formatDateDMY } from "@/lib/datetime";
+
+function renderValue(key: string, v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (key === "plants" && typeof v === "string" && v.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr) && arr.length) {
+        return arr
+          .map((p: any, i: number) => {
+            const line = [p.unit_name, p.address_flat, p.address_premises, p.address_village, p.address_road, p.city, p.district, p.state, p.pincode]
+              .filter((x) => x && String(x).trim()).join(", ");
+            return `#${i + 1}: ${line || "(empty)"}`;
+          })
+          .join("\n");
+      }
+    } catch {}
+  }
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return formatDateDMY(v);
+  return String(v);
+}
+
 
 export function AdminOnboardingPanel({ leadId }: { leadId: string }) {
   const qc = useQueryClient();
@@ -54,14 +76,15 @@ export function AdminOnboardingPanel({ leadId }: { leadId: string }) {
               <div className="text-xs text-slate-500 mb-2">
                 Service: <span className="font-mono">{sub.service_code}</span>
                 {sub.submitted_at && (
-                  <> · Submitted {new Date(sub.submitted_at).toLocaleString("en-IN")}</>
+                  <> · Submitted {formatIST(sub.submitted_at)}</>
                 )}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 {Object.entries((sub.form_data ?? {}) as Record<string, unknown>).map(([k, v]) => (
                   <div key={k} className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
                     <dt className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">{labels.get(k) ?? k.replace(/_/g, " ")}</dt>
-                    <dd className="font-medium break-words text-slate-900 mt-0.5">{String(v ?? "—") || "—"}</dd>
+                    <dd className="font-medium break-words text-slate-900 mt-0.5 whitespace-pre-line">{renderValue(k, v) || "—"}</dd>
+
                   </div>
                 ))}
               </dl>
