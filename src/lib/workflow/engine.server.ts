@@ -67,7 +67,7 @@ async function applyEffect(
             kind: effect.timer,
             status: "running",
             fires_at: firesAt,
-            payload: effect.payload ?? {},
+            payload: (effect.payload ?? {}) as never,
             dedup_key: effect.dedupKey ?? null,
           },
           { onConflict: "application_id,kind,dedup_key" },
@@ -121,7 +121,7 @@ async function applyEffect(
           application_id: applicationId,
           code: effect.code,
           status: "running",
-          context: effect.context ?? {},
+          context: (effect.context ?? {}) as never,
         },
         { onConflict: "application_id,code" as never },
       );
@@ -159,7 +159,7 @@ async function applyEffect(
         actor_id: actorId ?? null,
         actor_name: "System",
         is_system: true,
-        metadata: { template: effect.template, payload: effect.payload ?? {} },
+        metadata: { template: effect.template, payload: (effect.payload ?? {}) as never } as never,
       });
       return;
     case "record_event":
