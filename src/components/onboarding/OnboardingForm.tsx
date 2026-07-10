@@ -293,8 +293,12 @@ function FieldRenderer({
   allValues: Record<string, string>;
   onChange: (v: string) => void;
 }) {
-  const colSpan = field.type === "textarea" || field.type === "nic" ? "md:col-span-2" : "";
+  const colSpan =
+    field.type === "textarea" || field.type === "nic" || field.type === "plants"
+      ? "md:col-span-2"
+      : "";
   const id = `f-${field.key}`;
+
   const isState = field.key === "state";
   const isDistrict = field.key === "district";
   const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
@@ -363,6 +367,17 @@ function FieldRenderer({
       </label>
       {field.type === "textarea" ? (
         <textarea {...common} onBlur={handleBlur} rows={3} />
+      ) : field.type === "date" ? (
+        <DateInputDMY
+          id={id}
+          name={field.key}
+          value={value}
+          onChange={onChange}
+          required={field.required}
+          placeholder={field.placeholder ?? "DD/MM/YYYY"}
+        />
+      ) : field.type === "plants" ? (
+        <PlantsField value={value} onChange={onChange} />
       ) : isState ? (
         <select {...common}>
           <option value="" disabled>
@@ -420,3 +435,156 @@ function FieldRenderer({
 
   );
 }
+
+// ---------- Plants (repeater) ----------
+
+type Plant = {
+  unit_name: string;
+  address_flat: string;
+  address_premises: string;
+  address_village: string;
+  address_block: string;
+  address_road: string;
+  city: string;
+  pincode: string;
+  state: string;
+  district: string;
+};
+
+function emptyPlant(): Plant {
+  return {
+    unit_name: "",
+    address_flat: "",
+    address_premises: "",
+    address_village: "",
+    address_block: "",
+    address_road: "",
+    city: "",
+    pincode: "",
+    state: "",
+    district: "",
+  };
+}
+
+function parsePlants(value: string): Plant[] {
+  if (!value) return [];
+  try {
+    const arr = JSON.parse(value);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((p) => ({ ...emptyPlant(), ...(p as any) }));
+  } catch {
+    return [];
+  }
+}
+
+function PlantsField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const plants = parsePlants(value);
+
+  const commit = (next: Plant[]) => {
+    onChange(next.length ? JSON.stringify(next) : "");
+  };
+
+  const setField = (idx: number, key: keyof Plant, v: string) => {
+    const next = plants.map((p, i) => {
+      if (i !== idx) return p;
+      const updated = { ...p, [key]: v };
+      if (key === "state") updated.district = "";
+      if (key === "pincode") updated.pincode = v.replace(/\D/g, "").slice(0, 6);
+      return updated;
+    });
+    commit(next);
+  };
+
+  return (
+    <div className="space-y-4">
+      {plants.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Add one row for each plant / unit / branch. Skip if you have only the main enterprise address above.
+        </p>
+      )}
+      {plants.map((p, i) => {
+        const districtOpts = INDIA_DISTRICTS[p.state] ?? [];
+        return (
+          <div key={i} className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-brand-navy-deep">Plant / Unit #{i + 1}</h4>
+              <button
+                type="button"
+                onClick={() => commit(plants.filter((_, j) => j !== i))}
+                className="text-xs inline-flex items-center gap-1 text-destructive hover:underline"
+              >
+                <Trash2 className="w-3 h-3" /> Remove
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <PlantSelect label="Unit Name" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)}
+                options={PLANT_UNIT_TYPES as unknown as string[]} placeholder="Choose unit name…" />
+              <PlantInput label="Flat / Door / Block No." value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
+              <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} />
+              <PlantInput label="Village / Town" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
+              <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} />
+              <PlantInput label="Road / Street / Lane" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} />
+              <PlantInput label="City" value={p.city} onChange={(v) => setField(i, "city", v)} />
+              <PlantInput label="PIN Code" value={p.pincode} onChange={(v) => setField(i, "pincode", v)} inputMode="numeric" maxLength={6} />
+              <PlantSelect label="State" value={p.state} onChange={(v) => setField(i, "state", v)}
+                options={INDIA_STATES as unknown as string[]} placeholder="Select state…" />
+              <PlantSelect label="District" value={p.district} onChange={(v) => setField(i, "district", v)}
+                options={districtOpts} placeholder={p.state ? "Select district…" : "Select state first"} disabled={!p.state} />
+            </div>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => commit([...plants, emptyPlant()])}
+        className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+      >
+        <Plus className="w-4 h-4" /> Add another plant / unit
+      </button>
+    </div>
+  );
+}
+
+function PlantInput({
+  label, value, onChange, inputMode, maxLength,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; maxLength?: number;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="text-xs text-muted-foreground mb-1 block">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        className={inputCls}
+      />
+    </label>
+  );
+}
+
+function PlantSelect({
+  label, value, onChange, options, placeholder, disabled,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  options: string[]; placeholder: string; disabled?: boolean;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="text-xs text-muted-foreground mb-1 block">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={inputCls}
+      >
+        <option value="" disabled>{placeholder}</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  );
+}
+
