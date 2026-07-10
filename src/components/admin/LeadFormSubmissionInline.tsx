@@ -124,8 +124,8 @@ export function LeadFormSubmissionInline({ leadId }: { leadId: string }) {
                   {visible.map((f) => (
                     <div key={f.key} className="flex flex-col min-w-0">
                       <span className="text-[10px] text-slate-400">{f.label}</span>
-                      <span className="text-xs text-slate-800 font-medium mt-0.5 break-words">
-                        {String(formData[f.key] ?? "—")}
+                      <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
+                        {renderCell(f.key, formData[f.key])}
                       </span>
                     </div>
                   ))}
@@ -140,9 +140,10 @@ export function LeadFormSubmissionInline({ leadId }: { leadId: string }) {
                 {extras.map((k) => (
                   <div key={k} className="flex flex-col min-w-0">
                     <span className="text-[10px] text-slate-400">{k.replace(/_/g, " ")}</span>
-                    <span className="text-xs text-slate-800 font-medium mt-0.5 break-words">
-                      {String(formData[k] ?? "—")}
+                    <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
+                      {renderCell(k, formData[k])}
                     </span>
+
                   </div>
                 ))}
               </div>
