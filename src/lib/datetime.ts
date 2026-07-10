@@ -17,15 +17,28 @@ export function formatIST(
     });
   }
   if (opts.dateOnly) {
-    return d.toLocaleDateString("en-IN", {
-      timeZone: IST, day: "2-digit", month: "short", year: opts.withYear === false ? undefined : "numeric",
-    });
+    // Always DD/MM/YYYY (project-wide standard).
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: IST, day: "2-digit", month: "2-digit",
+      year: opts.withYear === false ? undefined : "numeric",
+    }).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    return opts.withYear === false
+      ? `${get("day")}/${get("month")}`
+      : `${get("day")}/${get("month")}/${get("year")}`;
   }
-  return d.toLocaleString("en-IN", {
-    timeZone: IST,
-    day: "2-digit", month: "short", year: opts.withYear === false ? undefined : "numeric",
-    hour: "2-digit", minute: "2-digit", hour12: true,
+  const time = d.toLocaleTimeString("en-IN", {
+    timeZone: IST, hour: "2-digit", minute: "2-digit", hour12: true,
   });
+  const dateParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST, day: "2-digit", month: "2-digit",
+    year: opts.withYear === false ? undefined : "numeric",
+  }).formatToParts(d);
+  const get = (t: string) => dateParts.find((p) => p.type === t)?.value ?? "";
+  const datePart = opts.withYear === false
+    ? `${get("day")}/${get("month")}`
+    : `${get("day")}/${get("month")}/${get("year")}`;
+  return `${datePart}, ${time}`;
 }
 
 /** Returns YYYY-MM-DD in IST for grouping rows by day. */
