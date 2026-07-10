@@ -5,13 +5,28 @@ import { toast } from "sonner";
 import { getFormSubmissionForLead } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
+import { formatIST, formatDateDMY } from "@/lib/datetime";
 
-function fmtIST(iso?: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true,
-  });
+const fmtIST = (iso?: string | null) => formatIST(iso);
+
+function renderCell(key: string, v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (key === "plants" && typeof v === "string" && v.trim().startsWith("[")) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr) && arr.length) {
+        return arr.map((p: any, i: number) => {
+          const line = [p.unit_name, p.address_flat, p.address_premises, p.address_village, p.address_road, p.city, p.district, p.state, p.pincode]
+            .filter((x) => x && String(x).trim()).join(", ");
+          return `#${i + 1}: ${line || "(empty)"}`;
+        }).join("\n");
+      }
+    } catch {}
+  }
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return formatDateDMY(v);
+  return String(v);
 }
+
 
 type SectionGroup = { label: string; fields: { key: string; label: string }[] };
 
