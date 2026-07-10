@@ -371,6 +371,22 @@ export const closeTicketFinal = createServerFn({ method: "POST" })
     const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
     await cancelTicketAutocloseByTicket(ticket.id, "closed_final");
 
+    if (ticket.application_id) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent(
+          {
+            type: "TicketClosed",
+            applicationId: ticket.application_id,
+            ticketId: ticket.id,
+            outcome: "not_cooperating",
+            actorId: context.userId,
+          },
+          context.userId,
+        );
+      } catch (e) { console.error("[workflow] TicketClosed dispatch failed", e); }
+    }
+
     const cust = await loadCustomer(ticket.customer_id);
     const recipient = ticket.ticket_email || cust.email;
     if (recipient) {
@@ -478,6 +494,22 @@ export const resolveTicketAndResumeOrder = createServerFn({ method: "POST" })
       created_by: context.userId,
     } as never);
 
+    // Workflow engine: cooperating close → resume paused timers/automations.
+    try {
+      const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+      await dispatchEvent(
+        {
+          type: "TicketClosed",
+          applicationId: ticket.application_id,
+          ticketId: ticket.id,
+          outcome: "cooperating",
+          actorId: context.userId,
+        },
+        context.userId,
+      );
+    } catch (e) { console.error("[workflow] TicketClosed dispatch failed", e); }
+
     return { ok: true, resumeTo: data.resumeTo };
   });
+
 
