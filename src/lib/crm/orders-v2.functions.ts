@@ -340,7 +340,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     const [{ data: emailLogRows }, { data: templateRows }] = await Promise.all([
       admin
         .from("email_logs")
-        .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at, queued_at")
+        .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at")
         .eq("application_id", data.orderId)
         .order("created_at", { ascending: false })
         .limit(200),

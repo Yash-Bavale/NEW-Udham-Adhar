@@ -93,7 +93,7 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
       const label = failed ? "Email failed" : status === "sent" ? "Email sent" : `Email ${status || "queued"}`;
       out.push({
         id: `mail-${l.id}`,
-        ts: l.sent_at || l.created_at || l.queued_at,
+        ts: l.sent_at || l.created_at,
         icon: Mail,
         tone,
         title: (
