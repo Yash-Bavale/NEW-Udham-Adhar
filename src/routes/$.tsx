@@ -7,6 +7,7 @@ import {
   type ArticleSection,
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
+import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
 
 // Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
 // them quickly instead of re-crawling forever (faster than a soft 404).
@@ -59,6 +60,14 @@ export const Route = createFileRoute("/$")({
         statusCode: 301,
       });
     }
+
+    // Batch-1 SEO: 301 redirect legacy slugs to their new canonical URL.
+    const legacy = LEGACY_REDIRECTS[lower];
+    if (legacy) {
+      throw redirect({ to: legacy, statusCode: 301 });
+    }
+
+
 
     try {
       const result = await getArticleBySlug({ data: { slug: lower } });

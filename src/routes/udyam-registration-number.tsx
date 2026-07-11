@@ -1,18 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SeoLandingPage } from "@/components/site/SeoLandingPage";
-import html from "@/content/wp/udyam-registration-number.html?raw";
+import { SeoContentPage, buildSeoJsonLd, type SeoPageData } from "@/components/site/SeoContentPage";
+import data from "@/content/seo-batch1/udyam-registration-number.json";
+
+const page = data as SeoPageData;
 
 export const Route = createFileRoute("/udyam-registration-number")({
   head: () => ({
     meta: [
-      { title: "Udyam Registration Number - Unique MSME Identification Code" },
-      { name: "description", content: "The Udyam registration number is a unique identification code issued to each business after successful registration as an MSME on the official Udyam..." },
-      { property: "og:title", content: "Udyam Registration Number - Unique MSME Identification Code" },
-      { property: "og:description", content: "The Udyam registration number is a unique identification code issued to each business after successful registration as an MSME on the official Udyam..." },
+      { title: page.seo.metaTitle },
+      { name: "description", content: page.seo.metaDescription },
+      { property: "og:title", content: page.seo.ogTitle || page.seo.metaTitle },
+      { property: "og:description", content: page.seo.ogDescription || page.seo.metaDescription },
+      { property: "og:type", content: "article" },
+      { property: "og:url", content: page.canonical },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: page.seo.twitterTitle || page.seo.metaTitle },
+      { name: "twitter:description", content: page.seo.twitterDescription || page.seo.metaDescription },
     ],
-    links: [
-      { rel: "canonical", href: "https://udyamadhar.in/udyam-registration-number" },
+    links: [{ rel: "canonical", href: page.canonical }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: buildSeoJsonLd(page),
+      },
     ],
   }),
-  component: () => <SeoLandingPage title="Udyam Registration Number" linkTitle="Udyam Registration Number - Unique MSME Identification Code" content={`The Udyam registration number is a unique identification code issued to each business after successful registration as an MSME on the official Udyam portal. This number acts as permanent proof of your business’s Micro, Small, or Medium Enterprise status and is essential for accessing government schemes, subsidies, collateral-free loans, priority lending, and participation in procurement tenders. The Udyam registration number ensures credibility and authenticity, enabling businesses to operate formally while complying with government regulations. Once assigned, it remains valid throughout the lifetime of the business and is linked with a digitally signed Udyam certificate that can be downloaded anytime from the portal. Using this number, banks, clients, and government authorities can verify your MSME registration instantly, eliminating the need for repetitive documentation. The unique registration ID also facilitates business growth by providing access to various financial and operational support programs designed for small and medium enterprises. Whether you are a startup or an established business, having a Udyam registration number enhances your market credibility, ensures eligibility for government benefits, and simplifies interactions with institutions that require verified MSME status.`} html={html} />,
+  component: () => <SeoContentPage data={page} />,
 });
