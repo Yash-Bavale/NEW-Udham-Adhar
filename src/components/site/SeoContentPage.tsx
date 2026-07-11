@@ -341,10 +341,37 @@ export function SeoContentPage({ data }: { data: SeoPageData }) {
             </div>
           )}
 
+          {/* Related guides — always render declared internal links */}
+          {data.internalLinks.length > 0 && (
+            <div className="mt-10 rounded-xl border border-border bg-muted/30 p-6">
+              <h2 className="font-display text-xl font-bold text-brand-navy-deep">
+                Related guides
+              </h2>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {data.internalLinks.map((l, i) => (
+                  <li key={i}>
+                    <a
+                      href={l.href}
+                      className="text-brand-navy underline hover:text-brand-navy-deep"
+                    >
+                      {l.anchor}
+                    </a>
+                    {l.reason && (
+                      <span className="ml-1 text-sm text-muted-foreground">
+                        — {l.reason}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Bottom CTA */}
           {data.cta.bottom && <CtaBox text={data.cta.bottom} tone="primary" />}
         </div>
       </section>
+
 
       <TrustBlock />
     </div>
