@@ -1,60 +1,27 @@
-# Phase 5.1 — Make the workflow engine visible in the admin order UI
+## SEO/Content Regression Check — Batch 1 (20 routes)
 
-Phase 5 only added a new "Workflow engine" card. The existing Customer Journey, Process Tracker, Order Workflow panel and Unified Timeline still read the legacy `p.stage` / `application.workflow_status` / `application.closure_stage` fields, so the redesign is invisible. This phase rewires those four surfaces to the engine tables (`workflow_states`, `workflow_timers`, `workflow_automations`, `workflow_events`) and adds the missing Payment section.
+Goal: verify each of the 20 new SEO pages renders the expected visible content and correct head metadata against the source JSON in `src/content/seo-batch1/`.
 
-## What changes
+### Scope (20 routes)
+udyam-registration, udyam-registration-online, udyam-certificate, msme-registration, udyam-registration-process, udyam-registration-number, udyam-registration-status, udyam-registration-fee, udyam-registration-free, udyam-registration-benefits, udyam-registration-eligibility, udyam-registration-documents-required, udyam-registration-certificate, udyam-registration-update, udyam-login, forgot-udyam-registration-number, download-udyam-certificate, print-udyam-certificate, verify-udyam-certificate, msme-certificate-benefits, udyam-certificate (+ download alt).
 
-### 1. Shared engine hook + stage mapping (new)
+### Approach
 
-- New `src/lib/workflow/engine-view.ts` (client-safe):
-  - `WORKFLOW_TO_JOURNEY`: maps engine `WorkflowStage` (`payment_successful`, `form`, `verification`, `government_portal`, `completed`, `closed`) → journey node (`payment`, `form`, `verification`, `govt`, `processing`, `completed`).
-  - `deriveJourneyView(state, timers, automations, application)`: returns `{ activeNode, doneNodes, blockedNodes, paused, pauseReason, activeTicket, paymentStatus, nextTimer, activeAutomation }`. Falls back to legacy `computeOrderStage` only when no `workflow_states` row exists yet.
-- New `src/hooks/useOrderWorkflow.ts`: wraps `useServerFn(getWorkflowState)` + `useQuery` (15s refetch, focus refetch), keyed by `applicationId`. Single source of truth reused by the four surfaces below.
+1. **Static audit (source of truth check)**
+   - Read `SeoContentPage.tsx` to confirm it renders each required block: H1, AI Overview, Quick Facts, body sections, internal links, EEAT disclaimer, FAQ accordion, CTA.
+   - Read each of the 20 route files to confirm they wire `head()` with title, description, og:title/description/url/type, canonical link, and JSON-LD schemas from the JSON data.
+   - Diff route `head()` output vs source JSON meta fields.
 
-### 2. CustomerJourneyMap — engine-driven + folds in the standalone card
+2. **Rendered audit (Playwright)**
+   - Script iterates all 20 URLs on `http://localhost:8080`.
+   - For each: capture rendered `<h1>`, count Quick Facts items, presence of EEAT block, count FAQ accordion items, count CTAs and internal links, and read `document.title`, meta description, canonical href, og:url, first JSON-LD block.
+   - Compare against expected values parsed from the matching JSON.
+   - Emit a table: route | H1 match | QuickFacts count vs expected | EEAT present | FAQ count vs expected | Canonical correct | Meta title/desc match | JSON-LD types present.
 
-- Accept `applicationId` (not just legacy `stage`); call `useOrderWorkflow` internally.
-- Active/done/blocked nodes derived from `deriveJourneyView`.
-- Header row inside the map card now shows: overall chip (Running / Paused / Completed / Stopped), active-ticket badge, pause reason, and the next-firing timer (`AlarmClock · fires in 42m`) + running automation chips — this is the fold-in of `OrderWorkflowLiveStatus`.
-- Keep the legacy cancellation strip (`CANCEL_STEPS`) but drive it from engine `sub_status`/`stage=closed` instead of `closure_stage`.
+3. **Report**
+   - List routes that pass fully.
+   - List each failing route with the specific mismatch (missing block, wrong canonical, truncated meta, missing FAQ items, etc.).
+   - No code changes in this task — findings only. Fixes come in a follow-up once you approve the diff list.
 
-### 3. ProcessTracker — engine-driven colors
-
-- Accept optional `applicationId`; when provided, read engine stage via `useOrderWorkflow` and:
-  - `done` = nodes before engine stage.
-  - `current` = engine stage node.
-  - `blocked` = current node when `paused === true` OR `active_ticket_id` present (red instead of blue).
-- Falls back to the passed `stage` prop when no engine row exists (keeps existing call sites working).
-
-### 4. OrderWorkflowPanel — engine controls, not legacy closure fields
-
-- Replace the current `workflowStatus / closureStage / closureNextAt / cancellationRequestedAt` inputs with `useOrderWorkflow(applicationId)`.
-- New panel body:
-  - Header: engine stage + status + sub-status chips, pause reason, active-ticket link.
-  - Payment mini-card (see §3).
-  - **Timers list** with kind label, `fires in …`, and Pause / Resume / Cancel buttons wired to existing engine server fns (`pauseTimer`, `resumeTimer`, `cancelTimer` — add thin wrappers in `engine.functions.ts` if missing).
-  - **Automations list** with Pause / Resume / Stop.
-  - **Advance / Pause workflow** buttons that dispatch engine events (`PauseWorkflow`, `ResumeWorkflow`, `AdvanceStage`) through existing `dispatchWorkflowEvent`.
-  - All mutations invalidate the `["order-workflow-state", applicationId]` query.
-
-### 5. UnifiedTimeline — merge engine events
-
-- Extend `UnifiedTimeline` props with `workflowEvents` (fetched via new `listWorkflowEventsForOrder({ applicationId })` server fn under `src/lib/workflow/engine.functions.ts`, RLS-scoped by staff role).
-- Merge into the existing chronological stream with a new category `workflow` (icon `Cog`, tint indigo). Event titles use the same `TIMER_LABEL` / `AUTO_LABEL` / `STAGE_LABEL` maps.
-- `WorkspaceShell` passes them in on the Activity tab.
-
-### 6. Remove the standalone card
-
-- Delete `src/components/admin/workspace/OrderWorkflowLiveStatus.tsx`.
-- Remove its render + import from `WorkspaceShell.tsx` (functionality is now inside `CustomerJourneyMap` and `OrderWorkflowPanel`).
-
-## Files touched
-
-- New: `src/lib/workflow/engine-view.ts`, `src/hooks/useOrderWorkflow.ts`
-- Edited: `src/components/admin/workspace/CustomerJourneyMap.tsx`, `src/components/admin/workspace/OrderWorkflowPanel.tsx`, `src/components/admin/workspace/WorkspaceShell.tsx`, `src/components/admin/ProcessTracker.tsx`, `src/components/admin/UnifiedTimeline.tsx`, `src/lib/workflow/engine.functions.ts` (add `listWorkflowEventsForOrder` + timer/automation control wrappers if missing)
-- Deleted: `src/components/admin/workspace/OrderWorkflowLiveStatus.tsx`
-
-## Verification
-
-- `tsgo` typecheck.
-- Manual: open an order → Customer Journey card shows engine chip + payment row + highlighted node matching engine stage; Employee Workflow tab shows live timers with Pause/Resume; Activity tab shows a `workflow` event when the cron tick fires a timer; ProcessTracker turns red when workflow is paused or has an active ticket.
+### Out of scope
+Redirect chain checks, image/OG image validation (per original build), Section 15 image SEO, non-batch-1 routes.
