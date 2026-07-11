@@ -11,10 +11,12 @@ import {
 import { useEffect, useRef, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteShell } from "../components/site/SiteShell";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+
 
 function NotFoundComponent() {
   return (
@@ -105,7 +107,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
       { property: "og:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" },
+    ],
+
     scripts: [
       // GA is loaded lazily on idle from RootComponent to keep the critical
       // path light (PageSpeed/Core Web Vitals).
