@@ -183,10 +183,13 @@ export function SeoContentPage({ data }: { data: SeoPageData }) {
             <img
               src={certImg.url}
               alt="Sample Udyam Adhar Certificate"
+              width={800}
+              height={1035}
               className="w-full h-auto rounded-md border border-border"
               loading="eager"
               fetchPriority="high"
             />
+
             <p className="mt-3 text-center text-sm text-muted-foreground text-slate-950">
               Note: Sample Udyam Adhar Certificate shown for reference purposes only.
             </p>
