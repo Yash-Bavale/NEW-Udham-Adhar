@@ -517,8 +517,9 @@ function PlantsField({ value, onChange }: { value: string; onChange: (v: string)
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <PlantSelect label="Unit Name" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)}
-                options={PLANT_UNIT_TYPES as unknown as string[]} placeholder="Choose unit name…" />
+              <PlantInput label="Unit / Plant Name" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)} />
+
+
               <PlantInput label="Flat / Door / Block No." value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
               <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} />
               <PlantInput label="Village / Town" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
