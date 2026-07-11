@@ -48,11 +48,11 @@ const BUCKETS: { id: Bucket; label: string }[] = [
 ];
 
 const PAYMENT_TONE: Record<string, string> = {
-  paid:           "bg-slate-100 text-slate-700",
-  partially_paid: "bg-amber-50 text-amber-700",
-  refunded:       "bg-rose-50 text-rose-700",
-  pending:        "bg-slate-100 text-slate-600",
-  unpaid:         "bg-slate-100 text-slate-600",
+  Paid:             "bg-slate-100 text-slate-700",
+  "Partially Paid": "bg-amber-50 text-amber-700",
+  Refunded:         "bg-rose-50 text-rose-700",
+  Pending:          "bg-slate-100 text-slate-600",
+  Failed:           "bg-rose-50 text-rose-700",
 };
 
 const FULFILL_TONE: Record<string, string> = {
