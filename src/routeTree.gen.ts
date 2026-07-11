@@ -106,6 +106,7 @@ import { Route as MsmeCerRouteImport } from './routes/msme-cer'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
+import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as HttpsUdyamregistrationGovInRouteImport } from './routes/https-udyamregistration-gov-in'
 import { Route as HomeRouteImport } from './routes/home'
@@ -724,6 +725,11 @@ const LlmsFullDottxtRoute = LlmsFullDottxtRouteImport.update({
   path: '/llms-full.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IndexDothtmlRoute = IndexDothtmlRouteImport.update({
+  id: '/index.html',
+  path: '/index.html',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ImportantNoticeRoute = ImportantNoticeRouteImport.update({
   id: '/important-notice',
   path: '/important-notice',
@@ -1332,6 +1338,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -1540,6 +1547,7 @@ export interface FileRoutesByTo {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -1748,6 +1756,7 @@ export interface FileRoutesById {
   '/home': typeof HomeRoute
   '/https-udyamregistration-gov-in': typeof HttpsUdyamregistrationGovInRoute
   '/important-notice': typeof ImportantNoticeRoute
+  '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
@@ -1959,6 +1968,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2167,6 +2177,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2374,6 +2385,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/https-udyamregistration-gov-in'
     | '/important-notice'
+    | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/migrate-udyog-aadhaar-to-udyam'
@@ -2584,6 +2596,7 @@ export interface RootRouteChildren {
   HomeRoute: typeof HomeRoute
   HttpsUdyamregistrationGovInRoute: typeof HttpsUdyamregistrationGovInRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
+  IndexDothtmlRoute: typeof IndexDothtmlRoute
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
@@ -3394,6 +3407,13 @@ declare module '@tanstack/react-router' {
       path: '/llms-full.txt'
       fullPath: '/llms-full.txt'
       preLoaderRoute: typeof LlmsFullDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/index.html': {
+      id: '/index.html'
+      path: '/index.html'
+      fullPath: '/index.html'
+      preLoaderRoute: typeof IndexDothtmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/important-notice': {
@@ -4383,6 +4403,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRoute: HomeRoute,
   HttpsUdyamregistrationGovInRoute: HttpsUdyamregistrationGovInRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
+  IndexDothtmlRoute: IndexDothtmlRoute,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
@@ -4520,3 +4541,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
