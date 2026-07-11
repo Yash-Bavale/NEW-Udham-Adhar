@@ -177,10 +177,11 @@ function OrdersListPage() {
           <SelectTrigger className="h-9 w-[140px] text-sm bg-white"><SelectValue placeholder="All payment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All payment</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="partially_paid">Partially paid</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Partially Paid">Partially paid</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Failed">Failed</SelectItem>
           </SelectContent>
         </Select>
         <Input
