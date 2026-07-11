@@ -85,13 +85,18 @@ export const Route = createFileRoute("/sitemap.xml")({
           .map((p) => p.toLowerCase())
           .filter((p) => !isExcluded(p));
 
-        const buildDate = new Date().toISOString();
+        // Stable lastmod for static routes. Bump this string only when the
+        // route list or page content materially changes — do NOT use
+        // `new Date()` here or Google sees every URL "updated today" on
+        // every crawl, which suppresses re-indexing signals.
+        const STATIC_LASTMOD = "2026-07-11";
 
         type Entry = { path: string; lastmod: string };
         const entries = new Map<string, Entry>();
-        for (const p of routePaths) entries.set(p, { path: p, lastmod: buildDate });
+        for (const p of routePaths) entries.set(p, { path: p, lastmod: STATIC_LASTMOD });
 
-        // 2. Pull enabled SEO pages from the DB and merge in (with lastmod).
+        // 2. Pull enabled SEO pages from the DB and merge in — these carry
+        //    their own updated_at so lastmod reflects real edits.
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data } = await supabaseAdmin
@@ -104,13 +109,14 @@ export const Route = createFileRoute("/sitemap.xml")({
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
             if (isExcluded(path)) continue;
-            const lastmod =
-              (row as { updated_at?: string }).updated_at ?? buildDate;
+            const raw = (row as { updated_at?: string }).updated_at;
+            const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
           }
         } catch {
           // If DB is unreachable, still emit the static route list.
         }
+
 
         const sorted = Array.from(entries.values()).sort((a, b) =>
           a.path.localeCompare(b.path),
