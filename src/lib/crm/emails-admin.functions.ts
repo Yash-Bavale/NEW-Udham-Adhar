@@ -67,7 +67,8 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
     if (!entry) throw new Error("Invalid template code");
 
     // Fetch lead details for defaults
-    const { data: lead } = await (await getAdmin())
+    const admin = await getAdmin();
+    const { data: lead } = await admin
       .from("leads")
       .select("*")
       .eq("id", leadId)
@@ -75,10 +76,18 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
 
     if (!lead) throw new Error("Lead not found");
 
+    const { data: app } = await admin
+      .from("applications")
+      .select("application_code")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const finalTo = toEmail || lead.email;
     const finalVars = {
       customerName: lead.name,
-      orderNumber: lead.lead_code,
+      orderNumber: app?.application_code ?? lead.lead_code,
       formLink: `https://${process.env.LOVABLE_APP_DOMAIN || 'udyamadhar.in'}/onboarding/${lead.lead_code}`,
       ...variables
     };

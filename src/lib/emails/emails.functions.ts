@@ -221,7 +221,7 @@ export const sendOrderTemplateEmail = createServerFn({ method: "POST" })
       name: lead.name ?? "",
       customer_email: lead.email,
       customer_mobile: lead.mobile ?? "",
-      order_number: lead.lead_code ?? "",
+      order_number: app?.application_code ?? lead.lead_code ?? "",
       lead_code: lead.lead_code ?? "",
       service_name: lead.service ?? "",
       service: lead.service ?? "",

@@ -317,6 +317,11 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .select("id, invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
       .eq("payment_id", data.paymentId).maybeSingle();
 
+    const { data: appRow } = payment.application_id
+      ? await admin.from("applications").select("application_code").eq("id", payment.application_id).maybeSingle()
+      : await admin.from("applications").select("application_code").eq("lead_id", payment.lead_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const orderNumber = (appRow as any)?.application_code ?? lead.lead_code ?? "";
+
     const { data: pay } = await admin
       .from("payments")
       .select("transaction_id, razorpay_order_id, payment_date")
@@ -344,7 +349,7 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
           customer_mobile: lead.mobile ?? "",
           lead_code: lead.lead_code ?? "",
           leadCode: lead.lead_code ?? "",
-          order_number: lead.lead_code ?? "",
+          order_number: orderNumber,
           service: lead.service ?? "",
           service_name: lead.service ?? "",
           base_amount: Number(inv?.base_amount ?? lead.base_amount ?? 0).toFixed(2),

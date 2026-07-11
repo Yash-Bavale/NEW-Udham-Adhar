@@ -185,13 +185,22 @@ export const sendConsultationPaymentLink = createServerFn({ method: "POST" })
     const total = Number((link as any).amount ?? lead.total_amount ?? 0);
     const paymentUrl = (link as any).payment_url as string;
 
+    const { data: appRow } = await supabaseAdmin
+      .from("applications")
+      .select("application_code")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const orderNumber = (appRow as any)?.application_code ?? leadCode;
+
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     await enqueueFromTemplateInternal("payment_link", lead.email, {
       customer_name: lead.name ?? "Customer",
       name: lead.name ?? "Customer",
       service_name: lead.service ?? "your consultation",
       service: lead.service ?? "your consultation",
-      order_number: leadCode,
+      order_number: orderNumber,
       lead_code: leadCode,
       payment_url: paymentUrl,
       total_amount: total.toFixed(2),

@@ -388,6 +388,15 @@ export const resendFormLink = createServerFn({ method: "POST" })
       process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
     const formLink = `${origin}/onboarding/${encodeURIComponent(lead.lead_code ?? "")}`;
 
+    const { data: appRow } = await supabaseAdmin
+      .from("applications")
+      .select("application_code")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const orderNumber = (appRow as any)?.application_code ?? lead.lead_code ?? "";
+
     await enqueueFromTemplateInternal(
       "welcome_and_form_link",
       lead.email,
@@ -396,7 +405,7 @@ export const resendFormLink = createServerFn({ method: "POST" })
         customer_name: lead.name ?? "Customer",
         service_name: lead.service ?? "your service",
         form_link: formLink,
-        order_number: lead.lead_code ?? "",
+        order_number: orderNumber,
         // legacy camelCase aliases kept for older templates
         name: lead.name ?? "Customer",
         leadCode: lead.lead_code ?? "",
