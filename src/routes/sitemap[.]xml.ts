@@ -21,21 +21,38 @@ const EXCLUDED_PREFIXES = [
   "/complaint",
 ];
 
-// Top-funnel high-priority paths.
+// Top-funnel high-priority paths (includes Batch 1 SEO landing pages).
 const HIGH_PRIORITY = new Set<string>([
   "/",
+  // Batch 1 SEO pages
   "/udyam-registration",
-  "/udyam-aadhar-registration",
-  "/msme-registration",
-  "/new-udyam-registration",
+  "/udyam-registration-online",
+  "/udyam-registration-process",
+  "/udyam-registration-number",
+  "/udyam-registration-status",
+  "/udyam-registration-fee",
+  "/udyam-registration-free",
+  "/udyam-registration-benefits",
+  "/udyam-registration-eligibility",
+  "/udyam-registration-documents-required",
+  "/udyam-registration-certificate",
+  "/udyam-registration-update",
+  "/udyam-certificate",
+  "/udyam-login",
+  "/forgot-udyam-registration-number",
   "/download-udyam-certificate",
   "/print-udyam-certificate",
+  "/verify-udyam-certificate",
+  "/msme-registration",
+  "/msme-certificate-benefits",
+  // Other top-funnel
+  "/udyam-aadhar-registration",
+  "/new-udyam-registration",
   "/update-udyam-certificate",
   "/migrate-udyog-aadhaar-to-udyam",
-  "/verify-udyam-certificate",
-  "/udyam-registration-process",
   "/msme-registration-fee",
 ]);
+
 
 function isExcluded(p: string): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
