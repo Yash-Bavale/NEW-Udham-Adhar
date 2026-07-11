@@ -1,18 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SeoLandingPage } from "@/components/site/SeoLandingPage";
-import html from "@/content/wp/print-udyam-certificate.html?raw";
+import { SeoContentPage, buildSeoJsonLd, type SeoPageData } from "@/components/site/SeoContentPage";
+import data from "@/content/seo-batch1/print-udyam-certificate.json";
+
+const page = data as SeoPageData;
 
 export const Route = createFileRoute("/print-udyam-certificate")({
   head: () => ({
     meta: [
-      { title: "Print Udyam Certificate Online | Download Udyam Registration Certificate" },
-      { name: "description", content: "Printing your Udyam Certificate online is a simple and secure process for all registered MSMEs. By accessing the official Udyam portal, entrepreneurs can..." },
-      { property: "og:title", content: "Print Udyam Certificate Online | Download Udyam Registration Certificate" },
-      { property: "og:description", content: "Printing your Udyam Certificate online is a simple and secure process for all registered MSMEs. By accessing the official Udyam portal, entrepreneurs can..." },
+      { title: page.seo.metaTitle },
+      { name: "description", content: page.seo.metaDescription },
+      { property: "og:title", content: page.seo.ogTitle || page.seo.metaTitle },
+      { property: "og:description", content: page.seo.ogDescription || page.seo.metaDescription },
+      { property: "og:type", content: "article" },
+      { property: "og:url", content: page.canonical },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: page.seo.twitterTitle || page.seo.metaTitle },
+      { name: "twitter:description", content: page.seo.twitterDescription || page.seo.metaDescription },
     ],
-    links: [
-      { rel: "canonical", href: "https://udyamadhar.in/print-udyam-certificate" },
+    links: [{ rel: "canonical", href: page.canonical }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: buildSeoJsonLd(page),
+      },
     ],
   }),
-  component: () => <SeoLandingPage title="Print Udyam Certificate" linkTitle="Print Udyam Certificate Online | Download Udyam Registration Certificate" content={`Printing your Udyam Certificate online is a simple and secure process for all registered MSMEs. By accessing the official Udyam portal, entrepreneurs can retrieve their MSME registration certificate using their Udyam Registration Number and registered mobile number for OTP verification. The certificate is digitally signed and available in PDF format, which can be easily printed for official use. This document is essential for bank loan applications, government tenders, subsidies, and other MSME-related benefits. The portal ensures a paperless, fast, and user-friendly experience, allowing small, medium, and micro enterprises to maintain compliance and credibility. With clear step-by-step instructions, businesses can download, store, or print their certificates anytime, ensuring uninterrupted eligibility for government schemes and financial programs. Whether you are updating records, applying for loans, or participating in tenders, printing your Udyam certificate is an essential step in MSME compliance and recognition.`} html={html} />,
+  component: () => <SeoContentPage data={page} />,
 });
