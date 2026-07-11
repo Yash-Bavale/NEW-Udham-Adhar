@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Search, Eye } from "lucide-react";
+import { Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -48,11 +48,11 @@ const BUCKETS: { id: Bucket; label: string }[] = [
 ];
 
 const PAYMENT_TONE: Record<string, string> = {
-  paid:           "bg-slate-100 text-slate-700",
-  partially_paid: "bg-amber-50 text-amber-700",
-  refunded:       "bg-rose-50 text-rose-700",
-  pending:        "bg-slate-100 text-slate-600",
-  unpaid:         "bg-slate-100 text-slate-600",
+  Paid:             "bg-slate-100 text-slate-700",
+  "Partially Paid": "bg-amber-50 text-amber-700",
+  Refunded:         "bg-rose-50 text-rose-700",
+  Pending:          "bg-slate-100 text-slate-600",
+  Failed:           "bg-rose-50 text-rose-700",
 };
 
 const FULFILL_TONE: Record<string, string> = {
@@ -80,15 +80,17 @@ function OrdersListPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [bucket, setBucket] = useState<Bucket>("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
 
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.orders.v2", search, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+    queryKey: ["admin.orders.v2", page, search, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
     queryFn: () => listFn({
       data: {
-        page: 1, pageSize: 100,
+        page, pageSize,
         fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
         serviceId: serviceId === "all" ? undefined : serviceId,
         assignedTo: assignedTo === "all" ? undefined : assignedTo,
@@ -175,10 +177,11 @@ function OrdersListPage() {
           <SelectTrigger className="h-9 w-[140px] text-sm bg-white"><SelectValue placeholder="All payment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All payment</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="partially_paid">Partially paid</SelectItem>
-            <SelectItem value="refunded">Refunded</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Partially Paid">Partially paid</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Failed">Failed</SelectItem>
           </SelectContent>
         </Select>
         <Input
@@ -257,6 +260,31 @@ function OrdersListPage() {
             </tbody>
           </table>
         </div>
+        {total > pageSize && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-600">
+            <div>
+              Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isLoading}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="size-3.5" /> Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+                disabled={page * pageSize >= total || isLoading}
+                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
