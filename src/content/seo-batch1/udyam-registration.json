@@ -12,7 +12,11 @@
     "breadcrumb": "Home > Udyam Registration"
   },
   "h1": "Udyam Registration — Register Your Business the Right Way",
-  "aiOverview": null,
+  "aiOverview": {
+    "short": "Udyam Registration is the official process by which micro, small and medium enterprises in India register themselves with the Ministry of MSME using PAN and Aadhaar. It gives businesses a unique Udyam Registration Number and certificate, which is needed to access government schemes, subsidies and priority lending benefits.",
+    "medium": "Udyam Registration is a free, self declaration based online registration for micro, small and medium enterprises in India, introduced by the Ministry of MSME. It replaced the older Udyog Aadhaar system. Businesses register using their Aadhaar and PAN, and provide details like investment in plant or machinery and annual turnover. Once approved, the business receives a Udyam Registration Number and an e-certificate. This certificate is widely used to apply for MSME loans, government tenders, subsidies, and protection under the MSME Development Act, including delayed payment protection from buyers. It is not compulsory but is highly recommended for most small businesses.",
+    "long": "Udyam Registration is the Government of India's official system for registering micro, small and medium enterprises (MSMEs), managed by the Ministry of MSME. It is a paperless, self declaration based process that uses your Aadhaar and PAN to verify your identity and link your business to income tax and GST records automatically. Based on your investment in plant, machinery or equipment and your annual turnover, your business is classified as micro, small or medium. Once registered, you receive a unique Udyam Registration Number along with a downloadable e-certificate that has no expiry date. This certificate helps businesses access collateral free loans, interest subsidies, protection against delayed payments from buyers, priority in government tenders, and eligibility for various central and state government MSME schemes. Many banks, tenders and vendors now ask for this certificate before doing business with a company, making it an important document for any small or growing enterprise in India.\n\n---"
+  },
   "quickFacts": [
     {
       "label": "Processing Time",
@@ -181,7 +185,13 @@
       "subsections": []
     }
   ],
-  "eeat": null,
+  "eeat": {
+    "experience": "",
+    "expertise": "",
+    "trust": "",
+    "transparency": "",
+    "disclaimer": "We provide professional assistance for registration and compliance services. We are a private consultancy and are not affiliated with any Government department.\n\n---"
+  },
   "faq": [
     {
       "question": "Is Udyam Registration compulsory for small businesses?",
@@ -291,7 +301,14 @@
       "reason": "Referenced in FAQ"
     }
   ],
-  "cta": null,
+  "cta": {
+    "hero": "Get Your Udyam Registration Done Right — Talk to an Expert Today",
+    "middle": "Not sure if you're eligible? Let us check your business details for free before you apply.",
+    "bottom": "Avoid delays and rejections. Let Udyamadhar handle your Udyam Registration end to end.",
+    "trust": "Trusted by small business owners across India for accurate, hassle-free Udyam Registration assistance.",
+    "benefits": "Fast processing | Error free application | Personal support | Post registration help",
+    "why": "We are not a government portal, but a dedicated private consultancy that understands the process inside out, catches errors before they cause delays, and stays with you even after your certificate is issued for any updates or corrections you may need later.\n\n---"
+  },
   "howto": [
     {
       "name": "The process begins with entering the Aadhaar number of the business owner or aut",
