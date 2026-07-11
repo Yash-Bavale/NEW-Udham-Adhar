@@ -107,7 +107,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
       { property: "og:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" },
+    ],
+
     scripts: [
       // GA is loaded lazily on idle from RootComponent to keep the critical
       // path light (PageSpeed/Core Web Vitals).
