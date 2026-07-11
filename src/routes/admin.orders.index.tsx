@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Search, Eye } from "lucide-react";
+import { Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -80,15 +80,17 @@ function OrdersListPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [bucket, setBucket] = useState<Bucket>("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 100;
 
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.orders.v2", search, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+    queryKey: ["admin.orders.v2", page, search, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
     queryFn: () => listFn({
       data: {
-        page: 1, pageSize: 100,
+        page, pageSize,
         fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
         serviceId: serviceId === "all" ? undefined : serviceId,
         assignedTo: assignedTo === "all" ? undefined : assignedTo,
