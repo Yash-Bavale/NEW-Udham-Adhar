@@ -52,6 +52,15 @@ export const queueDocumentReminder = createServerFn({ method: "POST" })
     if (!lead) throw new Error("Lead not found");
     if (!lead.email) throw new Error("Customer has no email on file");
 
+    let appCode: string | null = null;
+    if (applicationId) {
+      const { data: a } = await admin.from("applications").select("application_code").eq("id", applicationId).maybeSingle();
+      appCode = (a as any)?.application_code ?? null;
+    } else {
+      const { data: a } = await admin.from("applications").select("application_code").eq("lead_id", lead.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      appCode = (a as any)?.application_code ?? null;
+    }
+
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
       await enqueueFromTemplateInternal(
@@ -60,7 +69,7 @@ export const queueDocumentReminder = createServerFn({ method: "POST" })
         {
           customer_name: lead.name ?? "Customer",
           service_name: lead.service ?? "your service",
-          order_number: lead.lead_code ?? "",
+          order_number: appCode ?? lead.lead_code ?? "",
           message: "Please upload the pending documents to continue.",
         },
         { toName: lead.name ?? undefined, leadId: lead.id, applicationId: applicationId ?? undefined },
