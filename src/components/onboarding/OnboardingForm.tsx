@@ -293,8 +293,14 @@ function FieldRenderer({
   allValues: Record<string, string>;
   onChange: (v: string) => void;
 }) {
+  const nicDigitsFromKey =
+    field.key === "nic_2_digit" ? 2
+    : field.key === "nic_4_digit" ? 4
+    : field.key === "nic_5_digit" ? 5
+    : null;
+  const isNicField = field.type === "nic" || nicDigitsFromKey !== null;
   const colSpan =
-    field.type === "textarea" || field.type === "nic" || field.type === "plants"
+    field.type === "textarea" || isNicField || field.type === "plants"
       ? "md:col-span-2"
       : "";
   const id = `f-${field.key}`;
@@ -338,7 +344,7 @@ function FieldRenderer({
     className: inputCls,
   };
 
-  const activityRaw = field.activityFrom ? allValues[field.activityFrom] : undefined;
+  const activityRaw = field.activityFrom ? allValues[field.activityFrom] : isNicField ? allValues.major_activity : undefined;
   const activity =
     activityRaw === "Manufacturing" || activityRaw === "Services" || activityRaw === "Trading"
       ? activityRaw
@@ -411,12 +417,12 @@ function FieldRenderer({
             </option>
           ))}
         </select>
-      ) : field.type === "nic" ? (
+      ) : isNicField ? (
         <NicCodePicker
           id={id}
           value={value}
           onChange={onChange}
-          digits={field.nicDigits ?? 5}
+          digits={field.nicDigits ?? nicDigitsFromKey ?? 5}
           activity={activity}
           required={field.required}
         />
