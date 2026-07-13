@@ -267,6 +267,16 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                 const invoiceUrl = `${APP_ORIGIN}/api/public/invoice/${encodeURIComponent(leadRow.lead_code)}`;
                 const total = Number(invoiceRow?.total_amount ?? leadRow.total_amount ?? 0);
                 const issued = invoiceRow?.issued_at ? new Date(invoiceRow.issued_at) : new Date();
+                let applicationCode: string | null = null;
+                if (applicationId) {
+                  const { data: appRow } = await supabaseAdmin
+                    .from("applications")
+                    .select("application_code")
+                    .eq("id", applicationId)
+                    .maybeSingle();
+                  applicationCode = appRow?.application_code ?? null;
+                }
+                const orderNumber = applicationCode ?? leadRow.lead_code;
                 const commonVars = {
                   name: leadRow.name ?? "",
                   customer_name: leadRow.name ?? "",
@@ -274,7 +284,9 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   customer_mobile: leadRow.mobile ?? "",
                   lead_code: leadRow.lead_code,
                   leadCode: leadRow.lead_code,
-                  order_number: leadRow.lead_code,
+                  order_number: orderNumber,
+                  order_id: orderNumber,
+                  application_code: orderNumber,
                   service: leadRow.service ?? "",
                   service_name: leadRow.service ?? "",
                   base_amount: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
