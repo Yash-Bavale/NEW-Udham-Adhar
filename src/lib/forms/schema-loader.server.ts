@@ -26,10 +26,23 @@ function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSche
   } else {
     fields = fallback.fields;
   }
+  const fallbackByKey = new Map(fallback.fields.map((f) => [f.key, f]));
+  const normalizedFields = fields.map((field) => {
+    const fallbackField = fallbackByKey.get(field.key);
+    if (fallbackField?.type !== "nic") return field;
+
+    return {
+      ...field,
+      ...fallbackField,
+      label: field.label || fallbackField.label,
+      required: field.required ?? fallbackField.required,
+    };
+  });
+
   return {
     title: row.title || fallback.title,
     description: row.description ?? fallback.description,
-    fields,
+    fields: normalizedFields,
     documents: row.documents ?? fallback.documents,
   };
 }
