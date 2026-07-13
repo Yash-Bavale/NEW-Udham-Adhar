@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 const Input = z.object({
   q: z.string().trim().max(120).default(""),
@@ -21,9 +23,18 @@ export type NicResult = {
 export const searchNicCodes = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<{ results: NicResult[]; error: string | null }> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
-      const { data: rows, error } = await supabaseAdmin.rpc("search_nic_codes", {
+      // Use the publishable/anon client, not supabaseAdmin. `nic_codes` has a
+      // public-read RLS policy and `search_nic_codes` has EXECUTE for anon,
+      // and the Data API rejects new-format service-role keys with
+      // "Expected 3 parts in JWT; got 1".
+      const url = process.env.SUPABASE_URL!;
+      const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
+      const supabase = createClient<Database>(url, key, {
+        auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: rows, error } = await supabase.rpc("search_nic_codes", {
         q: data.q,
         activity: data.activity ?? undefined,
         limit_n: data.limit,
