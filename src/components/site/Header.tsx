@@ -91,8 +91,7 @@ export function Header() {
     };
     const s = document.createElement("script");
     s.id = "google-translate-script";
-    s.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    s.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     s.async = true;
     document.body.appendChild(s);
   }
@@ -104,7 +103,6 @@ export function Header() {
     const stored = readStoredLang();
     if (stored && stored !== "en") ensureTranslateScript();
   }, []);
-
 
   // Re-apply translation after each SPA route change
   useEffect(() => {
@@ -142,7 +140,6 @@ export function Header() {
       // Widget not ready yet — full reload picks up the cookie
       window.location.reload();
     }
-
   };
 
   const handleTitleClick = () => {
@@ -175,15 +172,9 @@ export function Header() {
             ))}
           </select>
           {/* Hidden Google widget host (required for script to mount) */}
-          <div
-            id="google_translate_element"
-            className="gtranslate-host sr-only"
-            aria-hidden
-          />
+          <div id="google_translate_element" className="gtranslate-host sr-only" aria-hidden />
         </div>
       </div>
-
-
 
       {/* Main header */}
       <header className="bg-background border-b border-border">
@@ -213,15 +204,14 @@ export function Header() {
             </button>
           </div>
 
-
           {/* Desktop */}
           <div className="hidden md:grid grid-cols-3 items-center gap-4">
             <Link to="/" className="flex flex-col">
               <span className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose">
-                Udyam Registration
+                Business Help Services
               </span>
               <span className="text-sm text-foreground/80 leading-relaxed">
-                Consultancy & Assistance Services
+                Business Consultancy & Assistance Services
               </span>
             </Link>
 
@@ -235,7 +225,7 @@ export function Header() {
                 सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
               </div>
               <p className="text-xs tracking-wider text-brand-navy font-semibold mt-1">
-                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES 
+                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
               </p>
             </button>
 
@@ -253,10 +243,7 @@ export function Header() {
 
       {/* Mobile sidebar drawer */}
       {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 md:hidden"
-          onClick={() => setOpen(false)}
-        >
+        <div className="fixed inset-0 z-50 bg-black/60 md:hidden" onClick={() => setOpen(false)}>
           <aside
             className="absolute right-0 top-0 h-full w-[82%] max-w-sm bg-brand-navy text-white shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
