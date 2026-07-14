@@ -276,6 +276,13 @@ export const sendFormLink = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { assertTransitionAllowed } = await import("@/lib/workflow/transition-guard.server");
+    assertTransitionAllowed({
+      stage: (order as any).order_status,
+      workflowStatus: (order as any).workflow_status ?? null,
+      closureStage: (order as any).closure_stage ?? null,
+      action: "send_form_link",
+    });
     const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
     let emailQueued = false;
     if (customer?.primary_email) {
@@ -306,6 +313,7 @@ export const sendFormLink = createServerFn({ method: "POST" })
     }
     return { ok: true, order: updated, emailQueued };
   });
+
 
 // ─────────────────────── Start Processing ───────────────────────
 
