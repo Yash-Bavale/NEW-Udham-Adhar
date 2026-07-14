@@ -24,28 +24,47 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "active" | "completed" | "exception";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "exception";
 
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
-const ACTIVE_STAGES: OrderStage[] = ["under_review", "in_progress", "submitted_to_govt", "under_processing", "certificate_ready"];
 const COMPLETED_STAGES: OrderStage[] = ["completed"];
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
+// Pending = anything not completed and not a terminal exception (closed / refunded / uninterested).
+function isPending(stage: OrderStage): boolean {
+  return !COMPLETED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
+}
 
-function bucketOf(stage: OrderStage): Bucket {
-  if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
-  if (ACTIVE_STAGES.includes(stage)) return "active";
+function bucketOf(stage: OrderStage): Exclude<Bucket, "all"> {
   if (COMPLETED_STAGES.includes(stage)) return "completed";
   if (EXCEPTION_STAGES.includes(stage)) return "exception";
-  return "active";
+  if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
+  return "pending";
 }
 
 const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "all",          label: "All" },
   { id: "needs_action", label: "Needs Action" },
-  { id: "active",       label: "Active" },
+  { id: "pending",      label: "Pending" },
   { id: "completed",    label: "Completed" },
   { id: "exception",    label: "Exception" },
 ];
+
+type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
+const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
+  { id: "any",    label: "Any age" },
+  { id: "1",      label: "1 day+ pending" },
+  { id: "2",      label: "2 days+ pending" },
+  { id: "3",      label: "3 days+ pending" },
+  { id: "7",      label: "7 days+ pending" },
+  { id: "custom", label: "Custom days…" },
+];
+
+function daysSince(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
 
 const PAYMENT_TONE: Record<string, string> = {
   Paid:             "bg-slate-100 text-slate-700",
@@ -80,6 +99,8 @@ function OrdersListPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [bucket, setBucket] = useState<Bucket>("all");
+  const [pendingAge, setPendingAge] = useState<PendingAge>("any");
+  const [customDays, setCustomDays] = useState<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 100;
 
@@ -103,13 +124,48 @@ function OrdersListPage() {
   });
 
   const allRows = (data?.rows ?? []) as any[];
-  const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: allRows.length, needs_action: 0, active: 0, completed: 0, exception: 0 };
-    for (const r of allRows) c[bucketOf(r.stage as OrderStage)]++;
-    return c;
-  }, [allRows]);
 
-  const rows = bucket === "all" ? allRows : allRows.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
+  // Compute pending-age threshold in days from filter selection.
+  const minDays: number | null = useMemo(() => {
+    if (pendingAge === "any") return null;
+    if (pendingAge === "custom") {
+      const n = parseInt(customDays, 10);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return parseInt(pendingAge, 10);
+  }, [pendingAge, customDays]);
+
+  // Age filter applies to pending rows only (rows that are not completed/exception).
+  const ageFiltered = useMemo(() => {
+    if (minDays == null) return allRows;
+    return allRows.filter((r) => {
+      if (!isPending(r.stage as OrderStage)) return true; // don't hide completed/exception here
+      return daysSince(r.created_at) >= minDays;
+    });
+  }, [allRows, minDays]);
+
+  const counts = useMemo(() => {
+    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, exception: 0 };
+    for (const r of ageFiltered) c[bucketOf(r.stage as OrderStage)]++;
+    return c;
+  }, [ageFiltered]);
+
+  // Ageing histogram — shown when Pending bucket is active.
+  const ageBuckets = useMemo(() => {
+    const b = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
+    for (const r of ageFiltered) {
+      if (!isPending(r.stage as OrderStage)) continue;
+      const d = daysSince(r.created_at);
+      if (d >= 7) b.older++;
+      else if (d >= 3) b.d7++;
+      else if (d >= 2) b.d3++;
+      else if (d >= 1) b.d2++;
+      else b.d1++;
+    }
+    return b;
+  }, [ageFiltered]);
+
+  const rows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
   const total = data?.total ?? 0;
 
   // Group by day
@@ -196,7 +252,39 @@ function OrdersListPage() {
           onChange={(e) => setDateTo(e.target.value)}
           className="h-9 w-[160px] text-sm bg-white"
         />
+        <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+          <SelectTrigger className="h-9 w-[170px] text-sm bg-white">
+            <SelectValue placeholder="Pending age" />
+          </SelectTrigger>
+          <SelectContent>
+            {PENDING_AGE_OPTIONS.map((o) => (
+              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {pendingAge === "custom" && (
+          <Input
+            type="number"
+            min={1}
+            value={customDays}
+            onChange={(e) => setCustomDays(e.target.value)}
+            placeholder="Days"
+            className="h-9 w-[90px] text-sm bg-white"
+          />
+        )}
       </div>
+
+      {/* Pending ageing summary — shown when Pending bucket active or an age filter is applied */}
+      {(bucket === "pending" || minDays != null) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-900">
+          <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
+          <AgeChip label="< 1d" n={ageBuckets.d1} />
+          <AgeChip label="1d+"  n={ageBuckets.d2} />
+          <AgeChip label="2d+"  n={ageBuckets.d3} />
+          <AgeChip label="3d+"  n={ageBuckets.d7} />
+          <AgeChip label="7d+"  n={ageBuckets.older} tone="rose" />
+        </div>
+      )}
 
       {/* Bucket chips */}
       <div className="flex flex-wrap gap-2">
@@ -329,9 +417,26 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
       </td>
       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{order.service_name ?? "—"}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
-          {meta?.label ?? stage}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
+            {meta?.label ?? stage}
+          </span>
+          {isPending(stage) && (() => {
+            const d = daysSince(order.created_at);
+            if (d < 1) return null;
+            const tone = d >= 7 ? "bg-rose-50 text-rose-700 border-rose-200"
+              : d >= 3 ? "bg-amber-50 text-amber-800 border-amber-200"
+              : "bg-slate-100 text-slate-600 border-slate-200";
+            return (
+              <span
+                title={`Pending for ${d} day${d === 1 ? "" : "s"} (since order created)`}
+                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tone}`}
+              >
+                {d}d
+              </span>
+            );
+          })()}
+        </div>
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${fulTone}`}>
@@ -372,4 +477,16 @@ function paymentLabel(s: string): string {
     case "unpaid": return "Unpaid";
     default: return s || "—";
   }
+}
+
+function AgeChip({ label, n, tone = "amber" }: { label: string; n: number; tone?: "amber" | "rose" }) {
+  const cls = tone === "rose"
+    ? "bg-rose-100 text-rose-800 border-rose-200"
+    : "bg-white text-amber-900 border-amber-200";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium ${cls}`}>
+      <span className="text-[10px] uppercase tracking-wider opacity-70">{label}</span>
+      <span className="font-semibold">{n}</span>
+    </span>
+  );
 }
