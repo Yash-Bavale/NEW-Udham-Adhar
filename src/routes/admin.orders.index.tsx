@@ -417,9 +417,26 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
       </td>
       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{order.service_name ?? "—"}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
-          {meta?.label ?? stage}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
+            {meta?.label ?? stage}
+          </span>
+          {isPending(stage) && (() => {
+            const d = daysSince(order.created_at);
+            if (d < 1) return null;
+            const tone = d >= 7 ? "bg-rose-50 text-rose-700 border-rose-200"
+              : d >= 3 ? "bg-amber-50 text-amber-800 border-amber-200"
+              : "bg-slate-100 text-slate-600 border-slate-200";
+            return (
+              <span
+                title={`Pending for ${d} day${d === 1 ? "" : "s"} (since order created)`}
+                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${tone}`}
+              >
+                {d}d
+              </span>
+            );
+          })()}
+        </div>
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${fulTone}`}>
