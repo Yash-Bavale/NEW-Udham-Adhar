@@ -443,7 +443,7 @@ export type Database = {
             foreignKeyName: "applications_closure_reason_id_fkey"
             columns: ["closure_reason_id"]
             isOneToOne: false
-            referencedRelation: "delay_reasons"
+            referencedRelation: "order_close_reasons"
             referencedColumns: ["id"]
           },
           {
