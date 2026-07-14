@@ -31,17 +31,20 @@ export const JOURNEY_STAGES: JourneyStageDef[] = [
   { key: "completed",         label: "Order Completed",            short: "Completed" },
 ];
 
-/** Map current OrderStage → happy-path stage index for highlighting. */
+/** Map current OrderStage → happy-path stage index for highlighting.
+ * Note: once payment is successful the order automatically advances to
+ * "Order Received" (index 2). "Payment Received" (index 1) is only ever
+ * the live stage while payment is still pending. */
 export function stageToJourneyIndex(stage: OrderStage): number {
   switch (stage) {
     case "lead_received":
-    case "payment_pending":
       return 0;
-    case "payment_done":
+    case "payment_pending":
       return 1;
+    case "payment_done":
     case "consultation_pending":
+      return 2;
     case "form_submitted":
-      return stage === "form_submitted" ? 3 : 2;
     case "in_progress":
     case "under_review":
       return 3;
@@ -56,6 +59,7 @@ export function stageToJourneyIndex(stage: OrderStage): number {
       return 2; // order_received default
   }
 }
+
 
 /**
  * Sub-branch definitions attached under a specific happy-path stage.
