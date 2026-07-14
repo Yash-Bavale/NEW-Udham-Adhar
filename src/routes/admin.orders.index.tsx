@@ -124,13 +124,48 @@ function OrdersListPage() {
   });
 
   const allRows = (data?.rows ?? []) as any[];
-  const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: allRows.length, needs_action: 0, active: 0, completed: 0, exception: 0 };
-    for (const r of allRows) c[bucketOf(r.stage as OrderStage)]++;
-    return c;
-  }, [allRows]);
 
-  const rows = bucket === "all" ? allRows : allRows.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
+  // Compute pending-age threshold in days from filter selection.
+  const minDays: number | null = useMemo(() => {
+    if (pendingAge === "any") return null;
+    if (pendingAge === "custom") {
+      const n = parseInt(customDays, 10);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return parseInt(pendingAge, 10);
+  }, [pendingAge, customDays]);
+
+  // Age filter applies to pending rows only (rows that are not completed/exception).
+  const ageFiltered = useMemo(() => {
+    if (minDays == null) return allRows;
+    return allRows.filter((r) => {
+      if (!isPending(r.stage as OrderStage)) return true; // don't hide completed/exception here
+      return daysSince(r.created_at) >= minDays;
+    });
+  }, [allRows, minDays]);
+
+  const counts = useMemo(() => {
+    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, exception: 0 };
+    for (const r of ageFiltered) c[bucketOf(r.stage as OrderStage)]++;
+    return c;
+  }, [ageFiltered]);
+
+  // Ageing histogram — shown when Pending bucket is active.
+  const ageBuckets = useMemo(() => {
+    const b = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
+    for (const r of ageFiltered) {
+      if (!isPending(r.stage as OrderStage)) continue;
+      const d = daysSince(r.created_at);
+      if (d >= 7) b.older++;
+      else if (d >= 3) b.d7++;
+      else if (d >= 2) b.d3++;
+      else if (d >= 1) b.d2++;
+      else b.d1++;
+    }
+    return b;
+  }, [ageFiltered]);
+
+  const rows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
   const total = data?.total ?? 0;
 
   // Group by day
