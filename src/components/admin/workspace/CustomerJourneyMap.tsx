@@ -1,7 +1,5 @@
-// Unified Customer Journey Map — 4 independent tracks:
-//   🟢 Main Journey · 🟡 Delay Flow · 🔴 Closure Flow · 🔵 Support Ticket Flow
-// Each track is self-contained so pausing / delaying / closing never hides
-// the accumulated progress on the main path.
+// Unified Customer Journey Map — one straight main journey with connected
+// stage-level subpaths for delay, closure, and support-ticket handling.
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,8 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Check, Ticket, AlertTriangle, ShieldAlert, CreditCard,
-  User, FileText, Landmark, Trophy, ClipboardCheck, Inbox, PauseCircle,
-  Clock, XCircle,
+  User, FileText, Landmark, Trophy, ClipboardCheck, Inbox, Clock,
 } from "lucide-react";
 
 import type { OrderStage } from "@/lib/crm/computeOrderStage";
@@ -21,7 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   JOURNEY_STAGES, JOURNEY_BRANCHES, TICKET_BUTTONS, CLOSURE_BUTTONS, FORCE_CLOSE_BUTTON,
   stageToJourneyIndex, getActiveDelayBranchKey,
-  type JourneyBranch, type JourneyActionKind,
+  type JourneyBranch, type JourneyActionKind, type JourneyStageKey,
 } from "@/lib/orders/journey-map";
 
 import { JourneyActionButton } from "./JourneyActionButton";
@@ -65,28 +62,166 @@ const TONE_MAP = {
   emerald: { border: "border-emerald-300", bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-400" },
 };
 
+const FLOW_LINE = {
+  main: "border-emerald-300 bg-emerald-50 text-emerald-700",
+  delay: "border-amber-300 bg-amber-50 text-amber-700",
+  closure: "border-rose-300 bg-rose-50 text-rose-700",
+  ticket: "border-sky-300 bg-sky-50 text-sky-700",
+} as const;
+
+type FlowItem = JourneyBranch & {
+  lineLabel?: "Main" | "Delay" | "Closure" | "Ticket";
+  note?: ReactNode;
+};
+
 export function CustomerJourneyMap(p: Props) {
   const qc = useQueryClient();
   const { view } = useOrderWorkflow(p.applicationId);
   const currentIdx = stageToJourneyIndex(p.stage);
   const isTalkToExpert = /talk|expert|consult/i.test(p.serviceCode ?? "") || !!p.isConsultationOrder;
   const ticketActive = !!view.activeTicketId;
-  const closed = (p.closureStage && p.closureStage !== "none") || view.stage === "closed";
+  const closureStageValue = (p.closureStage ?? "").toLowerCase();
+  const closed = view.stage === "closed" || /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
   const closureArmed = !!p.closureStage && p.closureStage !== "none" && !closed;
 
   const activeDelayKey = useMemo(
     () => getActiveDelayBranchKey(p.workflowStatus),
     [p.workflowStatus],
   );
+  const currentStageKey = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)]?.key ?? "order_received";
 
-  // Branches split by track
-  const mainBranches   = JOURNEY_BRANCHES.filter(b => b.track === "main" && (b.key !== "talk-to-expert" || isTalkToExpert));
-  const delayBranches  = JOURNEY_BRANCHES.filter(b => b.track === "delay");
-  const mainByStage = useMemo(() => {
-    const m: Record<string, JourneyBranch[]> = {};
-    for (const b of mainBranches) (m[b.parentStage] ??= []).push(b);
-    return m;
-  }, [mainBranches]);
+  const flowByStage = useMemo(() => {
+    const byKey = new Map(JOURNEY_BRANCHES.map((b) => [b.key, b]));
+    const stageMap: Record<JourneyStageKey, FlowItem[]> = {
+      lead_received: [],
+      payment_received: [],
+      order_received: [],
+      form_submitted: [],
+      app_submitted: [],
+      check_status: [],
+      completed: [],
+    };
+
+    const timerNote = closureArmed && (p.closureNextAt || p.closureReasonLabel) ? (
+      <>
+        {p.closureNextAt && <span>Auto-close {relativeIST(p.closureNextAt)} · {formatIST(p.closureNextAt)}</span>}
+        {p.closureReasonLabel && <span>Reason: <b>{p.closureReasonLabel}</b></span>}
+      </>
+    ) : null;
+
+    const push = (stage: JourneyStageKey, item: FlowItem | undefined | null) => {
+      if (item) stageMap[stage].push(item);
+    };
+
+    const formPending = byKey.get("form-not-submitted");
+    if (formPending) {
+      push("order_received", {
+        ...formPending,
+        lineLabel: "Delay",
+        note: activeDelayKey === formPending.key ? timerNote : null,
+      });
+      push("order_received", {
+        key: "form-missing-auto-close",
+        parentStage: "order_received",
+        track: "closure",
+        lineLabel: "Closure",
+        title: "Form Missing → Auto Close",
+        tone: "rose",
+        description: "If the customer still does not submit the form after E002, the 8-hour timer closes with reason A7.",
+        buttons: [],
+        note: activeDelayKey === formPending.key ? timerNote : null,
+      });
+    }
+
+    const customerDelay = byKey.get("customer-side-delay");
+    if (customerDelay) {
+      push("form_submitted", {
+        ...customerDelay,
+        lineLabel: "Delay",
+        note: activeDelayKey === customerDelay.key ? timerNote : null,
+      });
+      push("form_submitted", {
+        key: "customer-delay-auto-close",
+        parentStage: "form_submitted",
+        track: "closure",
+        lineLabel: "Closure",
+        title: "Customer Delay → Close",
+        tone: "rose",
+        description: "If the selected customer-side reason is not resolved, close/auto-close using the same Category A reason.",
+        buttons: [FORCE_CLOSE_BUTTON],
+        note: activeDelayKey === customerDelay.key ? timerNote : null,
+      });
+    }
+
+    const technicalDelay = byKey.get("technical-delay");
+    if (technicalDelay) {
+      push("form_submitted", {
+        ...technicalDelay,
+        lineLabel: "Delay",
+        note: activeDelayKey === technicalDelay.key ? timerNote : null,
+      });
+    }
+
+    const appSubmitted = byKey.get("app-submitted-actions");
+    if (appSubmitted) push("app_submitted", { ...appSubmitted, lineLabel: "Main" });
+
+    const finalStatus = byKey.get("final-status-actions");
+    if (finalStatus) {
+      push("check_status", {
+        ...finalStatus,
+        lineLabel: "Main",
+        buttons: finalStatus.buttons.filter((button) => button.action !== "application_rejected"),
+      });
+    }
+
+    const govtRejectButton = CLOSURE_BUTTONS.find((button) => button.action === "application_rejected");
+    if (govtRejectButton) {
+      push("check_status", {
+        key: "govt-rejection-closure",
+        parentStage: "check_status",
+        track: "closure",
+        lineLabel: "Closure",
+        title: "Government Rejection Closure",
+        tone: "rose",
+        description: "If the govt rejects the application, select Category B reason. Sends E008 and closes the order.",
+        buttons: [govtRejectButton],
+        note: closed && p.closureReasonLabel ? <>Closed reason: <b>{p.closureReasonLabel}</b></> : null,
+      });
+    }
+
+    push("completed", {
+      key: "force-close-terminal",
+      parentStage: "completed",
+      track: "closure",
+      lineLabel: "Closure",
+      title: closed ? "Order Closed" : "Manual Closure",
+      tone: closed ? "emerald" : "rose",
+      description: closed
+        ? "Terminal closure path reached with the selected reason."
+        : "Use only when the order must be closed manually. Sends E010 and cancels pending timers.",
+      buttons: closed ? [] : [FORCE_CLOSE_BUTTON],
+      note: closed && p.closureReasonLabel ? <>Selected reason: <b>{p.closureReasonLabel}</b></> : null,
+    });
+
+    const talkToExpert = byKey.get("talk-to-expert");
+    if (isTalkToExpert && talkToExpert) push("completed", { ...talkToExpert, lineLabel: "Main" });
+
+    if (ticketActive) {
+      push(currentStageKey, {
+        key: "active-support-ticket",
+        parentStage: currentStageKey,
+        track: "ticket",
+        lineLabel: "Ticket",
+        title: "Support Ticket Open",
+        tone: "sky",
+        description: "Customer replied or ticket opened. Workflow is paused until support resolves it.",
+        buttons: TICKET_BUTTONS,
+        note: view.activeTicketId ? <>Ticket: <b>{String(view.activeTicketId).slice(0, 8)}</b></> : null,
+      });
+    }
+
+    return stageMap;
+  }, [activeDelayKey, closed, closureArmed, currentStageKey, isTalkToExpert, p.closureNextAt, p.closureReasonLabel, ticketActive, view.activeTicketId]);
 
   const [dialog, setDialog] = useState<
     | null
@@ -157,191 +292,74 @@ export function CustomerJourneyMap(p: Props) {
 
   return (
     <div className="space-y-4">
-      {/* ─────────── 🟢 MAIN JOURNEY TRACK ─────────── */}
-      <TrackCard
-        color="emerald"
-        label="Main Journey"
-        status={closed ? "Closed" : ticketActive ? "Paused" : "Live"}
-        icon={<Trophy className="size-4" />}
-        subtitle="Happy path from lead capture to certificate delivery."
-      >
-        <div className="overflow-x-auto pb-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-slate-100 pb-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-700">Customer Journey & Employee Actions</span>
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                closed ? "bg-slate-600 text-white" : ticketActive ? "bg-sky-600 text-white" : activeDelayKey ? "bg-amber-500 text-white" : "bg-emerald-600 text-white",
+              )}>
+                {closed ? "Closed" : ticketActive ? "Ticket Paused" : activeDelayKey ? "Delay Live" : "Live"}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-600">
+              Main path is straight. Delay, closure, and ticket subpaths are connected directly below the stage where they can happen.
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-1.5 text-[9px] font-bold uppercase tracking-wider">
+            <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Main</span>
+            <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Delay</span>
+            <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Closure</span>
+            <span className="rounded-full bg-sky-100 px-2 py-1 text-sky-700">Ticket</span>
+          </div>
+        </header>
+
+        <div className="overflow-x-auto pb-2 pt-4">
           <div
-            className="grid gap-2 min-w-[900px]"
-            style={{ gridTemplateColumns: `repeat(${JOURNEY_STAGES.length}, minmax(140px, 1fr))` }}
+            className="grid min-w-[900px] gap-2"
+            style={{ gridTemplateColumns: `repeat(${JOURNEY_STAGES.length}, minmax(120px, 1fr))` }}
           >
             {JOURNEY_STAGES.map((s, i) => {
-              const Icon = STAGE_ICON[s.key];
               const done = i < currentIdx || (i === currentIdx && s.key === "completed" && p.stage === "completed");
               const active = i === currentIdx && !done && !closed;
-              const blocked = active && (ticketActive || !!activeDelayKey);
-              const isLast = i === JOURNEY_STAGES.length - 1;
+              const blocked = active && (ticketActive || !!activeDelayKey || closureArmed);
               return (
-                <div key={`stage-${s.key}`} className="relative flex flex-col items-center gap-2">
-                  {!isLast && (
-                    <div className="absolute top-6 left-1/2 w-full h-0.5 z-0">
-                      <div className={cn(
-                        "h-full",
-                        i < currentIdx ? "bg-emerald-400"
-                        : i === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
-                        : "bg-slate-200",
-                      )}/>
-                    </div>
-                  )}
-                  <div className="relative z-10">
-                    <div className={cn(
-                      "size-12 rounded-full grid place-items-center transition-all",
-                      done ? "bg-emerald-500 text-white shadow"
-                      : blocked ? "bg-rose-500 text-white shadow ring-4 ring-rose-100"
-                      : active ? "bg-indigo-600 text-white shadow ring-4 ring-indigo-100"
-                      : "bg-slate-100 text-slate-400",
-                    )}>
-                      {done ? <Check className="size-5" /> : <Icon className="size-5" />}
-                    </div>
-                    {(active || blocked) && (
-                      <span className={cn(
-                        "absolute inset-0 size-12 rounded-full ring-2 animate-ping opacity-40",
-                        blocked ? "ring-rose-400" : "ring-indigo-400",
-                      )}/>
-                    )}
-                  </div>
-                  <span className={cn(
-                    "text-[11px] font-semibold text-center leading-tight",
-                    done ? "text-slate-900"
-                    : blocked ? "text-rose-700"
-                    : active ? "text-indigo-700"
-                    : "text-slate-500",
-                  )}>
-                    {s.short}
-                  </span>
-                  <div className="text-[9px] text-slate-400 text-center leading-tight max-w-[120px]">
-                    {s.label}
-                  </div>
-                </div>
-              );
-            })}
-
-            {JOURNEY_STAGES.map((s) => {
-              const branches = mainByStage[s.key] ?? [];
-              return (
-                <div key={`branches-${s.key}`} className="flex flex-col gap-2 pt-2">
-                  {branches.length === 0
-                    ? <div className="h-full min-h-[40px]" />
-                    : branches.map((branch) => (
-                        <BranchCard key={branch.key} branch={branch} active={false} onAction={runAction} />
-                      ))}
-                </div>
+                <StageColumn
+                  key={s.key}
+                  stage={s}
+                  index={i}
+                  total={JOURNEY_STAGES.length}
+                  currentIdx={currentIdx}
+                  done={done}
+                  active={active}
+                  blocked={blocked}
+                  flows={flowByStage[s.key] ?? []}
+                  activeDelayKey={activeDelayKey}
+                  ticketActive={ticketActive}
+                  closureActive={closureArmed || closed}
+                  onAction={runAction}
+                />
               );
             })}
           </div>
         </div>
-      </TrackCard>
 
-      {/* ─────────── 🟡 DELAY FLOW TRACK ─────────── */}
-      <TrackCard
-        color="amber"
-        label="Delay Flow"
-        status={activeDelayKey ? "Live" : "Idle"}
-        icon={<Clock className="size-4" />}
-        subtitle="Pause the workflow when either side needs more time. All three paths always available."
-      >
-        <div className="grid gap-2 md:grid-cols-3">
-          {delayBranches.map((branch) => (
-            <BranchCard
-              key={branch.key}
-              branch={branch}
-              active={activeDelayKey === branch.key}
-              onAction={runAction}
-              muted={activeDelayKey !== null && activeDelayKey !== branch.key}
-            />
-          ))}
-        </div>
-        {activeDelayKey && p.closureReasonLabel && (
-          <div className="mt-3 text-[11px] text-amber-800 bg-amber-100/60 border border-amber-200 rounded-md px-3 py-1.5">
-            <b>Why:</b> {p.closureReasonLabel}
-          </div>
-        )}
-      </TrackCard>
-
-      {/* ─────────── 🔴 CLOSURE FLOW TRACK ─────────── */}
-      <TrackCard
-        color="rose"
-        label="Closure Flow"
-        status={closed ? "Closed" : closureArmed ? "Armed" : "Idle"}
-        icon={<XCircle className="size-4" />}
-        subtitle="Auto-close countdown, government rejection, and force close live here."
-      >
-        {closed ? (
-          <div className="flex items-center gap-3 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5">
-            <ShieldAlert className="size-5 text-slate-600 shrink-0" />
-            <div className="text-sm font-semibold text-slate-800">
-              Order is closed
-              {p.closureReasonLabel && <> — reason: <b>{p.closureReasonLabel}</b></>}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {closureArmed && (
-              <div className="rounded-lg border-2 border-rose-300 bg-rose-50 px-3 py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Clock className="size-4 text-rose-600 shrink-0" />
-                  <div className="text-xs">
-                    <div className="font-bold text-rose-900">Auto-close armed — {p.closureStage}</div>
-                    {p.closureNextAt && (
-                      <div className="text-rose-800/80">
-                        Fires {relativeIST(p.closureNextAt)} · {formatIST(p.closureNextAt)}
-                      </div>
-                    )}
-                    {p.closureReasonLabel && (
-                      <div className="text-rose-800/80">Reason: <b>{p.closureReasonLabel}</b></div>
-                    )}
-                  </div>
-                </div>
-              </div>
+        {(view.hasEngine && view.nextTimer && !closed) || closureArmed || closed ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+            {view.hasEngine && view.nextTimer && !closed && (
+              <span><Clock className="mr-1 inline size-3" />Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)} · {formatIST(view.nextTimer.firesAt)}</span>
             )}
-            <div className="flex flex-wrap gap-2">
-              <JourneyActionButton button={FORCE_CLOSE_BUTTON} onClick={() => runAction("force_close")} />
-              {CLOSURE_BUTTONS.map((b) => (
-                <JourneyActionButton key={b.key} button={b} onClick={() => runAction(b.action)} />
-              ))}
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-rose-800/70">
-              <AlertTriangle className="size-3" />
-              Force Close sends E010 and cancels all pending timers. E008 closes on govt rejection.
-            </div>
+            {closureArmed && p.closureStage && (
+              <span><AlertTriangle className="mr-1 inline size-3 text-rose-600" />Closure armed: <b>{p.closureStage}</b></span>
+            )}
+            {closed && (
+              <span><ShieldAlert className="mr-1 inline size-3 text-slate-600" />Order closed{p.closureReasonLabel ? <> · <b>{p.closureReasonLabel}</b></> : null}</span>
+            )}
           </div>
-        )}
-      </TrackCard>
-
-      {/* ─────────── 🔵 SUPPORT TICKET TRACK (only when active) ─────────── */}
-      {ticketActive && (
-        <TrackCard
-          color="sky"
-          label="Support Ticket Flow"
-          status="Paused"
-          icon={<Ticket className="size-4" />}
-          subtitle="One ticket per order — reopens instead of duplicating. Workflow resumes once closed."
-        >
-          <div className="rounded-lg border-2 border-rose-300 bg-rose-50 px-3 py-2 flex items-start gap-2 mb-3">
-            <PauseCircle className="size-4 text-rose-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-rose-900">
-              Workflow paused — active ticket blocks automated steps until resolved.
-            </div>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {TICKET_BUTTONS.map((b) => (
-              <JourneyActionButton key={b.key} button={b} onClick={() => runAction(b.action)} />
-            ))}
-          </div>
-        </TrackCard>
-      )}
-
-      {view.hasEngine && view.nextTimer && !closed && (
-        <div className="text-[11px] text-slate-500 text-center">
-          Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)}
-          {" · "}{formatIST(view.nextTimer.firesAt)}
-        </div>
-      )}
+        ) : null}
+      </section>
 
       {/* ─────────── Dialogs ─────────── */}
       <ExternalDelayDialog
@@ -396,78 +414,145 @@ export function CustomerJourneyMap(p: Props) {
 
 /* ═══════════════════════ Helpers ═══════════════════════ */
 
-const TRACK_COLOR = {
-  emerald: { dot: "bg-emerald-500", header: "text-emerald-700", border: "border-emerald-200", bg: "from-emerald-50/40" },
-  amber:   { dot: "bg-amber-500",   header: "text-amber-700",   border: "border-amber-200",   bg: "from-amber-50/40"   },
-  rose:    { dot: "bg-rose-500",    header: "text-rose-700",    border: "border-rose-200",    bg: "from-rose-50/40"    },
-  sky:     { dot: "bg-sky-500",     header: "text-sky-700",     border: "border-sky-200",     bg: "from-sky-50/40"     },
-} as const;
-
-const STATUS_CHIP: Record<string, string> = {
-  Live:   "bg-emerald-600 text-white",
-  Idle:   "bg-slate-200 text-slate-700",
-  Paused: "bg-rose-600 text-white",
-  Armed:  "bg-amber-500 text-white",
-  Closed: "bg-slate-500 text-white",
-};
-
-function TrackCard({
-  color, label, status, icon, subtitle, children,
+function StageColumn({
+  stage,
+  index,
+  total,
+  currentIdx,
+  done,
+  active,
+  blocked,
+  flows,
+  activeDelayKey,
+  ticketActive,
+  closureActive,
+  onAction,
 }: {
-  color: keyof typeof TRACK_COLOR;
-  label: string;
-  status: string;
-  icon: ReactNode;
-  subtitle: string;
-  children: ReactNode;
+  stage: (typeof JOURNEY_STAGES)[number];
+  index: number;
+  total: number;
+  currentIdx: number;
+  done: boolean;
+  active: boolean;
+  blocked: boolean;
+  flows: FlowItem[];
+  activeDelayKey: string | null;
+  ticketActive: boolean;
+  closureActive: boolean;
+  onAction: (a: JourneyActionKind) => void;
 }) {
-  const c = TRACK_COLOR[color];
+  const Icon = STAGE_ICON[stage.key];
+  const isLast = index === total - 1;
+  const hasFlows = flows.length > 0;
+
   return (
-    <section className={cn("rounded-2xl border bg-gradient-to-b to-white p-5 shadow-sm", c.border, c.bg)}>
-      <header className="flex items-center gap-2 mb-1">
-        <span className={cn("size-2.5 rounded-full", c.dot)} />
-        <span className={cn("text-[11px] uppercase tracking-[0.14em] font-bold flex items-center gap-1.5", c.header)}>
-          {icon}
-          {label}
+    <div className="relative flex min-h-[420px] flex-col items-center">
+      {!isLast && (
+        <div className="absolute left-1/2 top-6 h-0.5 w-[calc(100%+0.5rem)] z-0">
+          <div className={cn(
+            "h-full",
+            index < currentIdx ? "bg-emerald-400"
+            : index === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
+            : "bg-slate-200",
+          )} />
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col items-center gap-1.5">
+        <div className={cn(
+          "grid size-12 place-items-center rounded-full transition-all",
+          done ? "bg-emerald-500 text-white shadow"
+          : blocked ? "bg-rose-500 text-white shadow ring-4 ring-rose-100"
+          : active ? "bg-indigo-600 text-white shadow ring-4 ring-indigo-100"
+          : "bg-slate-100 text-slate-400",
+        )}>
+          {done ? <Check className="size-5" /> : <Icon className="size-5" />}
+        </div>
+        {(active || blocked) && (
+          <span className={cn(
+            "absolute top-0 size-12 rounded-full ring-2 opacity-40 animate-ping",
+            blocked ? "ring-rose-400" : "ring-indigo-400",
+          )} />
+        )}
+        <span className={cn(
+          "text-center text-[11px] font-semibold leading-tight",
+          done ? "text-slate-900"
+          : blocked ? "text-rose-700"
+          : active ? "text-indigo-700"
+          : "text-slate-500",
+        )}>
+          {stage.short}
         </span>
-        <span className={cn("ml-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", STATUS_CHIP[status] ?? STATUS_CHIP.Idle)}>
-          {status}
-        </span>
-      </header>
-      <p className="text-[11px] text-slate-600 mb-3">{subtitle}</p>
-      {children}
-    </section>
+        <span className="max-w-[112px] text-center text-[9px] leading-tight text-slate-400">{stage.label}</span>
+      </div>
+
+      <div className="relative mt-3 flex w-full flex-1 flex-col items-stretch">
+        {hasFlows && <div className="mx-auto h-8 w-px bg-slate-300" />}
+        <div className="flex flex-col gap-2">
+          {flows.map((flow) => {
+            const flowActive =
+              flow.key === activeDelayKey ||
+              (flow.track === "ticket" && ticketActive) ||
+              (flow.track === "closure" && closureActive) ||
+              (flow.track === "main" && index === currentIdx);
+            const muted = !!activeDelayKey && flow.track === "delay" && flow.key !== activeDelayKey;
+
+            return (
+              <div key={flow.key} className="relative">
+                <div className="absolute -top-2 left-1/2 h-2 w-px -translate-x-1/2 bg-slate-300" />
+                <BranchCard branch={flow} active={flowActive} muted={muted} onAction={onAction} />
+              </div>
+            );
+          })}
+        </div>
+        {!hasFlows && <div className="min-h-[120px]" />}
+      </div>
+    </div>
   );
 }
 
 function BranchCard({
   branch, active, muted, onAction,
 }: {
-  branch: JourneyBranch;
+  branch: FlowItem;
   active: boolean;
   muted?: boolean;
   onAction: (a: JourneyActionKind) => void;
 }) {
   const tone = TONE_MAP[branch.tone];
+  const line = FLOW_LINE[branch.track];
   return (
     <div className={cn(
-      "rounded-lg border p-2.5 space-y-2 transition text-left",
+      "rounded-lg border p-2.5 space-y-2 transition text-left shadow-sm",
       tone.border, tone.bg,
       active && "ring-2 ring-offset-1 shadow-md",
       active && tone.ring,
       muted && "opacity-60",
     )}>
       <div className="flex items-start justify-between gap-1">
-        <div className={cn("text-[9px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
-          {branch.title}
-          {active && (
-            <span className="ml-1 rounded-full bg-rose-600 px-1 py-0.5 text-[8px] font-bold text-white uppercase">
-              Live
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className={cn("rounded-full border px-1 py-0.5 text-[8px] font-bold uppercase", line)}>
+              {branch.lineLabel ?? branch.track}
             </span>
-          )}
+            {active && (
+              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">
+                Active
+              </span>
+            )}
+            {branch.track === "ticket" && <Ticket className="size-3 text-sky-600" />}
+          </div>
+          <div className={cn("mt-1 text-[8px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
+            {branch.title}
+          </div>
         </div>
       </div>
-      <div className="text-[10px] text-slate-600 leading-snug">{branch.description}</div>
+      <div className="text-[9px] text-slate-600 leading-snug">{branch.description}</div>
+      {branch.note && (
+        <div className={cn("flex flex-col gap-0.5 rounded-md border px-2 py-1 text-[9px] leading-snug", line)}>
+          {branch.note}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         {branch.buttons.map((b) => (
           <JourneyActionButton
