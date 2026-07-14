@@ -297,7 +297,7 @@ export const CLOSURE_BUTTONS: JourneyBranchButton[] = [
 export function getActiveDelayBranchKey(workflowStatus?: string | null): string | null {
   if (!workflowStatus) return null;
   if (/customer_hold|customer_side|customer_delay/i.test(workflowStatus)) return "customer-side-delay";
-  if (/technical_hold|external_delay|govt_delay|technical_delay/i.test(workflowStatus)) return "technical-delay";
+  if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/i.test(workflowStatus)) return "technical-delay";
   if (/form_pending|awaiting_form|form_not_submitted/i.test(workflowStatus)) return "form-not-submitted";
   return null;
 }
@@ -340,7 +340,7 @@ export function deriveJourneyLiveState(input: {
     activeSubKey = "form-not-submitted";
   } else if (/customer_hold|customer_side|customer_delay/.test(ws)) {
     activeSubKey = "customer-delay";
-  } else if (/technical_hold|external_delay|govt_delay|technical_delay/.test(ws)) {
+  } else if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws)) {
     activeSubKey = "technical-delay";
   } else if (idx === 4 || idx === 5) {
     activeSubKey = "govt-awaiting";
