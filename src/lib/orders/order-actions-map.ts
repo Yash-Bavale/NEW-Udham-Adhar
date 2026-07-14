@@ -280,6 +280,16 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
     hint: "Mark the certificate issued as soon as it arrives.",
     primary: "certificate_issued",
   },
+  AWAITING_GOVT_APPROVAL: {
+    headline: "Awaiting govt approval",
+    hint: "Waiting on the government portal. Mark certificate issued when it arrives.",
+    primary: "certificate_issued",
+  },
+  CHECKING_STATUS: {
+    headline: "Checking status",
+    hint: "Actively checking the portal for updates.",
+    primary: "certificate_issued",
+  },
   CERTIFICATE_ISSUED: {
     headline: "Certificate issued",
     hint: "Complete the order to notify the customer.",
