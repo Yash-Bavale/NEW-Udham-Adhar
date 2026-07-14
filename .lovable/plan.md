@@ -1,76 +1,114 @@
+## Customer Journey Map — final polish
 
-## Goal
+### 1. Add a true "Order Closed" terminal node (parallel to "Completed")
 
-Replace the single-row journey with **4 clearly separated tracks** stacked vertically, each with its own header, color band, stages and action buttons. The active sub-path is always visually highlighted (green = done, indigo = current, amber/rose = live delay/closure), and every branch is always visible even when inactive — so the employee sees at a glance where the order stands and every path it *could* take.
+Right now every closure sub-branch visually points back toward the "Completed" (green flag) node, which is wrong. Add an **8th terminal node** ("Order Closed", rose circle with `XCircle` icon) placed **below** the "Completed" node on the far right, at approx `(NODE_X[6], SUB2_Y)`.
 
-## The 4 Tracks
+Rewire connectors so:
+- Force Close (E010) → Order Closed node
+- Customer Side Delay → Order Closed node
+- Application Rejected (E008) → Order Closed node
+- "Order Closed with Selected Reason" card becomes a badge that sits on top of / feeds into the Order Closed node (or is merged into it).
 
-```text
-┌─ 🟢 MAIN JOURNEY ────────────────────────────────────────────────┐
-│  Lead → Payment → Order Rcvd → Form → Govt Portal → Final → Done │
-│  (7 stage nodes, current one pulses indigo, done ones green)     │
-└──────────────────────────────────────────────────────────────────┘
+The main horizontal line stops at "Completed". Closure is a distinct branch that terminates at "Order Closed". Node state logic updates so when `closed === true`:
+- The "Completed" node becomes `upcoming/blocked` (grey/muted), not `current`
+- The "Order Closed" node becomes `current` (rose ring)
 
-┌─ 🟡 DELAY FLOW  (visible always, "LIVE" chip when active) ───────┐
-│  ┌─ Form Not Submitted ─┐ ┌─ Customer Delay ─┐ ┌─ Tech Delay ─┐  │
-│  │ E002 Send Form Link  │ │ E004 (Cat A)     │ │ E003 (Cat B) │  │
-│  └──────────────────────┘ └──────────────────┘ └──────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+### 2. Consistent color code across main + sub stages
 
-┌─ 🔴 CLOSURE FLOW  (auto-close countdown + reasons) ──────────────┐
-│  Countdown chip · Reason label · [Force Close E010]              │
-│  [E008 Govt Rejected]  [T002 Reply w/ Reason 8h auto-close]      │
-└──────────────────────────────────────────────────────────────────┘
+Lock a single legend and reuse it everywhere (circles, sub-cards, connectors, tooltips, badges, bottom legend):
 
-┌─ 🔵 SUPPORT TICKET FLOW  (only rendered when ticket exists) ─────┐
-│  Ticket #XXX open · Workflow paused                              │
-│  [T001 Normal Close] [T001 Restart] [T001 Consult Done] [T002]   │
-└──────────────────────────────────────────────────────────────────┘
-```
+| Meaning | Color | Where |
+|---|---|---|
+| Done | emerald-500 | past main nodes, completed outcome |
+| Current / Active | indigo-500 | current main node + any live sub-card |
+| Upcoming | sky-400 | future main nodes, idle sub-cards |
+| Delay (customer OR technical) | amber-500 | delay sub-cards + their connectors |
+| Closure / Blocked | rose-500 | Force Close, Rejected, Order Closed |
+| Talk-to-Expert optional | violet-500 | only that card |
 
-Each track is a self-contained card so pausing/resuming, delays and closures never mutate or hide the Main Journey — the main path stays visible with its progress preserved.
+Sub-cards drop the `teal` and `sky` tones for delays and use `amber` uniformly (with a chip that says "Customer" vs "Technical") so the color instantly conveys "this is a delay branch", regardless of type. Idle sub-cards get `opacity-70` + slate-300 border instead of colored borders, so only the live one lights up.
 
-## Files to Change
+### 3. Current-stage indicator with sub-state
 
-**1. `src/lib/orders/journey-map.ts`** — add a `track` field to each branch/button config.
+Add a prominent **status pill** in the header next to "Current Stage:" that shows the sub-state, not just the main stage. Example values:
+
+- `Order Received · Form Not Submitted`
+- `Form Submitted · Technical Delay (B3)`
+- `Form Submitted · Customer Delay (A2)`
+- `Application Submitted to Govt · Awaiting Response`
+- `Order Closed · Force Closed (A7)`
+
+Derived from `stage + workflowStatus + closureStage + closureReasonLabel`. Also render the same sub-state as a small chip on the currently-active main node itself, so you don't need to scan the whole chart.
+
+### 4. Automatic branch mapping (already partly done — tighten)
+
+Extend `getActiveDelayBranchKey` in `src/lib/orders/journey-map.ts` into a single `deriveJourneyLiveState(props)` helper that returns:
 
 ```ts
-export type JourneyTrack = "main" | "delay" | "closure" | "ticket";
+{
+  currentMainIndex: number,
+  activeSubKey: "form-not-submitted" | "technical-delay" | "customer-delay" | "govt-awaiting" | "govt-rejected" | "force-closed" | null,
+  terminal: "completed" | "closed" | null,
+  reasonCode: string | null,   // e.g. "A7", "B3"
+  closureCountdownAt: string | null,
+}
 ```
 
-Re-tag existing branches:
-- `form-not-submitted`, `customer-side-delay`, `technical-delay` → `track: "delay"`
-- `app-submitted-actions`, `final-status-actions`, `talk-to-expert` → `track: "main"` (stay under their parent stage)
-- New `closure` track config: force-close, govt-rejected (E008), T002 reply-reason
-- `TICKET_BUTTONS` → `track: "ticket"`
+`CustomerJourneyMap` calls this once and every node/connector/pill reads from it. This is what makes the "always visible, correct one lights up" behaviour reliable across stage/status/closure combinations.
 
-Add `getActiveDelayBranchKey(workflowStatus)` and `getActiveClosureState(closureStage, closureNextAt)` helpers so the UI can highlight without re-deriving.
+### 5. Countdowns + auto-close labels on the branches themselves
 
-**2. `src/components/admin/workspace/CustomerJourneyMap.tsx`** — replace the single grid with 4 stacked `<TrackCard>` sections:
+- On **Form Not Submitted** card: replace static "Auto-closed in 8 hrs" with a live countdown pulled from `useOrderWorkflow().view.nextTimer` when kind matches `form_pending_autoclose_8h` (e.g. "Auto-closes in 6h 12m"). Show the E002 chip. If timer is armed, add a small amber pill "E002 armed · Reason A7".
+- On **Customer Side Delay** card: same treatment for `customer_hold_reminder` / auto-close (8h) — show remaining time + reason code (A-x) once picked.
+- On **Force Close (E010)** card: show "E010 · A-reason" chip; disabled with tooltip "Already closed" when `closed`.
+- On **Order Closed** terminal node: show the exact closure reason label + when it fired (`relativeIST(closure timestamp)`).
 
-- `<MainTrack>`: current 7-stage stepper + only the *positive* branches under `app_submitted` / `check_status` / `completed` (E005, E006, E007, E009). Same visual as today but narrower.
-- `<DelayTrack>`: 3 branch cards side-by-side (Form-Not-Submitted, Customer Delay, Tech Delay). All 3 always shown; the one matching `workflowStatus` gets a live ring + "LIVE" chip and a small "Why: {reason}" line pulled from `view` / `closureReasonLabel`.
-- `<ClosureTrack>`: shows the countdown chip (already in `view.nextTimer`) + closure-stage label + Force Close + E008 + T002 buttons. When `closed`, the whole card turns slate and shows the final reason.
-- `<TicketTrack>`: renders only when `view.activeTicketId`. Shows ticket id, "Workflow paused" banner (moved out of the top), and the 4 T00x buttons. **Not rendered when no ticket** (fixes the earlier ask "don't show ticket actions when no ticket").
+Countdowns re-use existing `useOrderWorkflow` timers — no new fetch.
 
-Shared visual language:
-- Track header: colored dot + bold label + status chip (`Idle` / `Live` / `Paused` / `Closed`).
-- Inactive branches: muted (60% opacity, no ring).
-- Active branch: colored ring + pulsing dot + reason caption.
-- All buttons stay clickable regardless of active state (per prior spec).
+### 6. Hover / click tooltips on connectors + nodes
 
-**3. No server / migration changes.** All wiring already exists (`useOrderWorkflow`, existing server fns for E002…E010, T001…T003). This is purely a presentation restructure of `CustomerJourneyMap.tsx` + config tags in `journey-map.ts`.
+Wrap every SVG connector `<path>` / `<line>` in a `<g>` with a `<title>` element (native SVG tooltip, zero deps) explaining the rule that triggered it. Examples:
 
-## Behavior Rules
+- Order Received → Form Not Submitted: "Triggered when payment received but no form submission after N minutes."
+- Form Submitted → Technical Delay: "Employee logged a Category B (technical/govt) delay."
+- Form Submitted → Customer Delay: "Employee logged a Category A (customer-side) delay — 8h auto-close armed."
+- Final Status → Rejected: "Govt portal returned rejection. E008 sent, order closed."
+- Completed → Order Closed (if closed): "Force closed by operator or by auto-close timer."
 
-- Main track is *never* replaced or hidden by a delay/closure — it stays with its accumulated green ticks.
-- Delay track shows all 3 sub-paths always; highlights the live one with reason text.
-- Closure track surfaces the auto-close countdown, closure reason, and every close-button in one place (no more scattered force-close footer + govt-rejected inline).
-- Ticket track is conditionally mounted — hidden entirely when there is no active ticket.
-- Positive next-step buttons (E005 / E006 / E007 / E009) stay under their Main-track stage columns exactly where they are today (matches your "buttons directly below stage" request).
+Same for main nodes and sub-cards (wrap in a div with `title=` attribute, plus a shadcn `Tooltip` for richer content: rule name, event that flipped it, timestamp).
 
-## Out of Scope
+### 7. Backend transition guard
 
-- No changes to email templates, server functions, or workflow engine.
-- No new dialogs — reuse `ExternalDelayDialog`, `CloseOrderDialog`, `CompletionGateDialogStandalone`, `GovtRejectedInline`.
-- Sidebar collapse, ticket-actions-only-when-ticket-exists were done earlier; only re-affirming ticket-track visibility here.
+Add a single server-side validator so illegal moves are rejected consistently across all the button paths (E002/E003/E004/E005/E006/E007/E008/E010, T001/T002):
+
+- New file: `src/lib/workflow/transition-guard.server.ts` exporting `assertTransitionAllowed({ from: { stage, workflowStatus, closureStage }, action })`.
+- Rules encoded from the flow chart:
+  - `send_form_link` (E002) only from `order_received`/`payment_done` and only when form not yet submitted; blocked when closed.
+  - `technical_delay` / `customer_delay` only after `form_submitted`; not both simultaneously — new one cancels prior.
+  - `submit_to_govt` (E005) only from `form_submitted` (or `verification`), and requires no active customer/technical hold.
+  - `complete_with_cert` (E007) only from `app_submitted` / `check_status`.
+  - `application_rejected` (E008) only from `app_submitted` / `check_status`.
+  - `force_close` (E010) allowed from any non-closed stage; requires Cat A reason.
+  - Any action rejected with 409 if `closureStage` is already a terminal closed value.
+- Call this guard at the top of every action handler in:
+  - `src/lib/orders/order-actions.functions.ts` (sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder)
+  - `src/lib/orders/actions/close-actions.functions.ts` (closeOrderSystem, handleGovtRejected)
+  - `src/lib/orders/actions/hold-actions.functions.ts` (all 5 hold actions)
+- Emit a typed error message the UI already surfaces via `toast.error`.
+- Also make each action write a `WorkflowEvent` (types already exist in `src/lib/workflow/events.ts`) so the timeline stays in sync — no drift between "stage says X, buttons say Y".
+
+### 8. Files touched
+
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — new Order Closed node, connectors, color pass, countdowns, tooltips, status pill.
+- `src/lib/orders/journey-map.ts` — `deriveJourneyLiveState` helper + reason-code parsing.
+- `src/lib/workflow/transition-guard.server.ts` — NEW guard module.
+- `src/lib/orders/order-actions.functions.ts` — call guard.
+- `src/lib/orders/actions/close-actions.functions.ts` — call guard.
+- `src/lib/orders/actions/hold-actions.functions.ts` — call guard.
+
+### 9. Out of scope (kept as-is)
+
+- The 14-reason list, email templates, ticket flow, and timer executor are unchanged.
+- No new DB migrations — guard runs in TS against existing columns.
+- No layout change to the 7 main stages; only the closure endpoint is added.
