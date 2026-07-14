@@ -415,10 +415,7 @@ const TONE_MAP = {
 function GovtRejectedInline({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const [reasonText, setReasonText] = useState("");
   const fn = useServerFn(handleGovtRejected);
-  const listReasons = useServerFn(
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("@/lib/orders/actions/reasons.functions").listCloseReasons,
-  );
+  const listReasons = useServerFn(listCloseReasons);
   const [busy, setBusy] = useState(false);
 
   const { data: reasons = [] } = useQuery({
