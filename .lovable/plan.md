@@ -1,98 +1,79 @@
-## Locked decisions (from your answers)
 
-1. **Hold states:** Split into `TECHNICAL_HOLD_EXTERNAL` (Cat B — govt/portal) and `TECHNICAL_HOLD_INTERNAL` (Cat C — our team).
-2. **Closure emails:** E004 fires on manual employee close; E010 fires on system/timer/ticket-driven close.
-3. **Ticket reopen:** Same customer emailing about same order after close → reopen the existing ticket (append to thread, re-pause workflow). One ticket per order lifetime.
-4. **Govt rejection (E008):** Always ends in forced manual close. No "resubmit" loop — customer reorders if needed.
-5. **Form Pending:** 4h nudge + 8h auto-close (fixed).
-6. **Reminder cadences → employee-configurable per order.** Employee picks hours/days (1h, 2h, 4h, 1d, 2d, 4d, custom) when placing/renewing the hold.
-7. **Awaiting Govt Approval:** Internal-only reminders (dashboard + assignee notification). No customer email on this cadence.
-8. **Consultation stage:** **Kept in the happy path** (optional pre-form step). Talk-to-expert remains available as a standalone ticket-style flow too.
+# Unified Customer Journey Map
 
-## Phase status
-- Phase 1 — Schema: **DONE**.
-- Phase 2 — Backend: **DONE**.
-- Phase 3 — Frontend: **DONE**.
-- Phase 4 — Timer consolidation: **DONE**.
+One component becomes the only place employees see the order's stage and act on it. Replaces `OrderJourney`, `StageJourneyStrip`, `OrderJourneyStepper`, and `OrderStageActions`.
 
----
+## Visual layout (matches your HTML flowchart)
 
-## Phase 1 — Schema (single migration, awaits your approval)
+```text
+Lead ─► Payment ─► Order ─► Form ─► App Submitted ─► Check Status ─► Completed
+Received  Received  Received  Submitted   to Govt Portal    (Final)
+  ✓         ✓         ●         ○              ○              ○           ○
+                      │         │              │              │
+                      │         ├─ Form Not Submitted ─► auto-close 8h (A7)
+                      │         ├─ Customer Delay (E004, Cat A)
+                      │         ├─ Technical Delay (E003, Cat B)
+                      │         └─ Waiting for Govt (reminder)
+                      │                        │
+                      │                        ├─ Accepted → E007 + PDF
+                      │                        ├─ Rejected → E008
+                      │                        └─ Reminder → E006
+                      └─ Ticket Open (pauses flow) ─► T001/T002/T003
+```
 
-**Enum additions** to `order_status_enum`:
-`PAYMENT_RECEIVED`, `ORDER_RECEIVED`, `FORM_PENDING`, `FORM_RECEIVED`, `TECHNICAL_HOLD_EXTERNAL`, `TECHNICAL_HOLD_INTERNAL`, `AWAITING_GOVT_APPROVAL`, `CHECKING_STATUS`.
+Happy path on top row. Sub-paths drop below their parent stage. Current stage highlighted; past stages ticked; the live path (including which sub-branch the order is on) is drawn in accent color. All action buttons always visible and always clickable regardless of stage.
 
-**New table `order_close_reasons`** — 14 reasons from your docx: `id`, `category` (A/B/C), `number` (1–14), `label`, `standard_reply`, `is_active`.
+## Button → action map
 
-**`applications` new columns:**
-- `active_reason_id` (FK → order_close_reasons)
-- `active_reason_text`
-- `technical_hold_started_at`, `technical_hold_kind` (external/internal)
-- `customer_hold_started_at`
-- `awaiting_govt_started_at`
+| Button | Template | Reason | Effect |
+|---|---|---|---|
+| (auto on payment) | E001 | — | Payment confirmation, sent by webhook |
+| Send Form Link / Reminder | E002 | — | Enqueue E002; start 8h auto-close armed with A7 |
+| Customer-Side Delay | E004 | Cat A picker | Send E004, log delay |
+| Technical Delay | E003 | Cat B picker | Send E003, log delay |
+| Complete at Submission | E005 | — | Send E005, move to Completed |
+| Add Reminder | E006 | — | Send E006 + create employee reminder (dashboard notif) |
+| Application Accepted | E007 | — | Upload PDF cert + send E007, move to Completed |
+| Application Rejected | E008 | Cat B picker | Send E008, force close via E010 |
+| Talk-to-Expert Reply | E009 | — | Visible only if service=talk_to_expert |
+| Force Close | E004+E010 | Cat A picker | Cancel timers + close order |
+| Ticket: Normal Close | T001-normal | — | Close ticket, resume workflow |
+| Ticket: Restart Order | T001-restart | — | Close ticket, resume timers |
+| Ticket: Consultation Done | T001 | — | Close ticket (support completed) |
+| Ticket: Reply w/ Reason | T002 | Cat A/B/C | Send reply, 8h auto-close ticket (T003) |
 
-**`workflow_timers` new `kind` values:**
-`form_pending_nudge_4h`, `form_pending_autoclose_8h`, `customer_hold_reminder`, `technical_hold_reminder`, `awaiting_govt_internal_reminder`.
+## Files
 
-Timer rows carry a `custom_interval_minutes` column (new) so employee-set cadences persist across ticks.
+**New**
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — the single map (happy path row + sub-branches + always-visible action rail below each node)
+- `src/components/admin/workspace/JourneyActionButton.tsx` — small button with template code chip
+- `src/lib/orders/journey-map.ts` — pure config: stages, branches, button definitions, service-visibility rules
+- `src/lib/orders/actions/employee-reminder.functions.ts` — E006 sends email + inserts `order_reminders` row with notify_at
 
-**`support_tickets`:** add `reopened_count`, `last_closed_at` (for reopen-existing logic).
+**Edit**
+- `src/components/admin/workspace/WorkspaceShell.tsx` — replace the 3 old components with `<CustomerJourneyMap />`
+- `src/lib/orders/order-actions.functions.ts` — add thin wrappers `sendE002`…`sendE009` calling `enqueueFromTemplateInternal` with the right BHS template + reason + side effects (timer arm/cancel, reminder insert)
+- `src/lib/emails/bhs-templates.ts` — ensure all E001–E010 codes are exported constants
 
-**`allowed_order_transitions`** function rewritten around the new stages + hold splits + forced-close rules.
+**Delete (after Shell swap)**
+- `src/components/admin/OrderJourney.tsx`
+- `src/components/admin/StageJourneyStrip.tsx`
+- `src/components/admin/OrderJourneyStepper.tsx`
+- `src/components/admin/workspace/OrderStageActions.tsx`
+- `src/components/admin/workspace/StageStepper.tsx`
 
-GRANTs + RLS follow the existing pattern.
+## Reason → standard reply → ticket
 
----
+When any reason-picker button is used, the send-email server fn:
+1. Reads the standard reply from `order_close_reasons.standard_reply` (already seeded from your docx).
+2. Uses it as the email body (editable in dialog).
+3. Calls `findOrReopenTicket` to open/reopen the single ticket for that order with the reply pre-attached as the first ticket reply.
 
-## Phase 2 — Backend server functions
+No schema changes required — all tables (`order_close_reasons`, `support_tickets`, `ticket_replies`, `order_reminders`, `email_queue`) already exist.
 
-New module `src/lib/orders/actions/` — one `createServerFn` per spec button:
+## Out of scope for this pass
+- Payment link button (removed as agreed)
+- Any migrations (schema already supports everything)
+- Redesign of dialogs — reuse existing `ReasonPicker`, `CloseOrderDialog`, `ExternalDelayDialog`
 
-- `markPaymentReceived` → sets `PAYMENT_RECEIVED`, sends E001
-- `sendFormLink` / `resendFormLink` → sets `FORM_PENDING`, starts 4h+8h timers, sends E003
-- `markFormReceived` → sets `FORM_RECEIVED`, cancels form timers
-- `startTechnicalHold({ kind: 'external'|'internal', reasonId, reminderMinutes })` → sets `TECHNICAL_HOLD_EXTERNAL|INTERNAL`, arms recurring reminder timer, sends E005 (external only)
-- `startCustomerHold({ reasonId, reminderMinutes })` → sets `CUSTOMER_HOLD`, sends E004-customer-delay, arms reminder
-- `resumeFromHold` → back to prior stage, cancels reminder
-- `submitToGovt` → sets `SUBMITTED_TO_GOVT`, sends E012
-- `markAwaitingGovt({ reminderMinutes })` → `AWAITING_GOVT_APPROVAL`, arms **internal-only** reminder (writes `notifications` rows, no email)
-- `markCompleted` → `COMPLETED`, sends E002
-- `closeOrderManual({ reasonId, remarks })` → sends **E004** (manual)
-- System/ticket/timer close paths → send **E010**
-- `handleGovtRejected({ reasonId })` → forced close via E010 path, no resume
-
-**Ticket layer** (`src/lib/tickets/`):
-- Inbound merge: match `(lower(customer_email), order_number)` → existing open ticket, else reopen last closed ticket for that order (increment `reopened_count`), else create new. Every reopen re-dispatches `TicketOpened` to pause workflow.
-- `closeTicketWithReply` / `closeTicketFinal` — fix the `cooperating` branch (currently only dispatches `not_cooperating`); UI passes outcome.
-- Delete `resolveTicketAndResumeOrder` bypass; route through engine `TicketClosed` event.
-
-**Reason picker RPC** returns `standard_reply` so the UI auto-fills the reply textarea when a reason is chosen.
-
-**Timer changes:** `workflow-tick` handles all new kinds; recurring reminders re-arm themselves using `custom_interval_minutes`.
-
----
-
-## Phase 3 — Frontend
-
-- `OrderActionRail.tsx` rewritten stage-aware — button set depends on current `order_status`.
-- New `ReasonPicker.tsx` — dropdown of 14 reasons grouped by category, shows `standard_reply` preview, editable before send.
-- New `ReminderCadencePicker.tsx` — presets (1h/2h/4h/1d/2d/4d) + "Custom…" input; used by all three hold types.
-- `CountdownChip.tsx` — shows next timer fires_at.
-- `CustomerJourneyMap.tsx` + `ProcessTracker.tsx` — remap nodes to new stages, drop consultation node.
-- New `TicketPanel.tsx` — threaded view per order, reopen indicator.
-- Admin orders list — filters + column badges for new statuses (hold split visible).
-
----
-
-## Phase 4 — Timers/cron consolidation
-
-- All new timer kinds live in `workflow_timers`; `workflow-tick` (1min pg_cron) is the only executor.
-- `workflow_reminders` and `order_schedulers` stay readable for legacy rows but nothing new writes to them.
-- `closure-workflow` (dead code) deleted.
-- Awaiting-Govt internal reminder writes to `notifications` table (assignee + ops role) — no email queued.
-
----
-
-## Open question before Phase 1
-
-**Consultation stage** — should I drop it from the happy-path entirely, or keep it as an optional pre-form step for services that need one? Everything else is locked; I'll start the migration as soon as this is confirmed.
+Approve and I'll build it in one shot.
