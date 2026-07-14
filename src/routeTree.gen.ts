@@ -215,7 +215,6 @@ import { Route as ApiPublicCronPollZohoInboxRouteImport } from './routes/api/pub
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
-import { Route as ApiPublicCronClosureWorkflowRouteImport } from './routes/api/public/cron/closure-workflow'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
 
 const WwwUdyamregistrationGovInRoute =
@@ -1295,12 +1294,6 @@ const ApiPublicCronComplaintsSlaRoute =
     path: '/api/public/cron/complaints-sla',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicCronClosureWorkflowRoute =
-  ApiPublicCronClosureWorkflowRouteImport.update({
-    id: '/api/public/cron/closure-workflow',
-    path: '/api/public/cron/closure-workflow',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicAdminRegenerateInvoicesRoute =
   ApiPublicAdminRegenerateInvoicesRouteImport.update({
     id: '/api/public/admin/regenerate-invoices',
@@ -1501,7 +1494,6 @@ export interface FileRoutesByFullPath {
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
-  '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1708,7 +1700,6 @@ export interface FileRoutesByTo {
   '/admin/tickets': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
-  '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1919,7 +1910,6 @@ export interface FileRoutesById {
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
-  '/api/public/cron/closure-workflow': typeof ApiPublicCronClosureWorkflowRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -2131,7 +2121,6 @@ export interface FileRouteTypes {
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/api/public/admin/regenerate-invoices'
-    | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -2338,7 +2327,6 @@ export interface FileRouteTypes {
     | '/admin/tickets'
     | '/onboarding/$leadCode'
     | '/api/public/admin/regenerate-invoices'
-    | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -2548,7 +2536,6 @@ export interface FileRouteTypes {
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/api/public/admin/regenerate-invoices'
-    | '/api/public/cron/closure-workflow'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -2710,7 +2697,6 @@ export interface RootRouteChildren {
   OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
   OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
   ApiPublicAdminRegenerateInvoicesRoute: typeof ApiPublicAdminRegenerateInvoicesRoute
-  ApiPublicCronClosureWorkflowRoute: typeof ApiPublicCronClosureWorkflowRoute
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronDailyDigestRoute: typeof ApiPublicCronDailyDigestRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
@@ -4172,13 +4158,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronComplaintsSlaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/cron/closure-workflow': {
-      id: '/api/public/cron/closure-workflow'
-      path: '/api/public/cron/closure-workflow'
-      fullPath: '/api/public/cron/closure-workflow'
-      preLoaderRoute: typeof ApiPublicCronClosureWorkflowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/admin/regenerate-invoices': {
       id: '/api/public/admin/regenerate-invoices'
       path: '/api/public/admin/regenerate-invoices'
@@ -4521,7 +4500,6 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
   OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
   ApiPublicAdminRegenerateInvoicesRoute: ApiPublicAdminRegenerateInvoicesRoute,
-  ApiPublicCronClosureWorkflowRoute: ApiPublicCronClosureWorkflowRoute,
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronDailyDigestRoute: ApiPublicCronDailyDigestRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
