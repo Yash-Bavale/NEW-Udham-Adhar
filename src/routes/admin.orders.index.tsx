@@ -478,3 +478,15 @@ function paymentLabel(s: string): string {
     default: return s || "—";
   }
 }
+
+function AgeChip({ label, n, tone = "amber" }: { label: string; n: number; tone?: "amber" | "rose" }) {
+  const cls = tone === "rose"
+    ? "bg-rose-100 text-rose-800 border-rose-200"
+    : "bg-white text-amber-900 border-amber-200";
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium ${cls}`}>
+      <span className="text-[10px] uppercase tracking-wider opacity-70">{label}</span>
+      <span className="font-semibold">{n}</span>
+    </span>
+  );
+}
