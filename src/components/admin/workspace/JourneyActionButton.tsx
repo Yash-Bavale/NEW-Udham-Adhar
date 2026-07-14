@@ -24,7 +24,7 @@ export function JourneyActionButton({ button, onClick, disabled, active }: Props
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed w-full justify-start",
         VARIANT[variant],
         active && "ring-2 ring-offset-1 ring-indigo-400",
       )}
@@ -32,13 +32,13 @@ export function JourneyActionButton({ button, onClick, disabled, active }: Props
     >
       <span
         className={cn(
-          "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded",
+          "font-mono text-[9px] font-bold px-1 py-0.5 rounded shrink-0",
           variant === "outline" ? "bg-slate-100 text-slate-600" : "bg-white/25 text-white",
         )}
       >
         {button.emailCode}
       </span>
-      <span className="truncate">{button.label.replace(/^[ETR]\d{3}\s*[—-]?\s*/, "")}</span>
+      <span className="truncate text-left">{button.label.replace(/^[ETR]\d{3}\s*[—-]?\s*/, "")}</span>
     </button>
   );
 }
