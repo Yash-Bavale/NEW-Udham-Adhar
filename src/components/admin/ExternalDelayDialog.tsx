@@ -118,8 +118,9 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
       toast.success(
         side === "customer"
           ? "Customer notified — 8-business-hour auto-closure scheduled."
-          : "Internal delay logged — assignee has been notified.",
+          : "E003 sent to customer + internal reminder queued for assignee.",
       );
+
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
@@ -161,8 +162,9 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
               active={side === "internal"}
               onClick={() => setSide("internal")}
               icon={<Server className="size-4" />}
-              title="Our-side (internal) delay"
-              subtitle="Notifies the assignee. No customer email. No auto-closure."
+              title="Our-side (technical) delay"
+              subtitle="Sends E003 to the customer AND creates an internal reminder for the assignee to follow up."
+
               accent="sky"
             />
           </div>
