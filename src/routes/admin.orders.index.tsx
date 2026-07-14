@@ -24,28 +24,47 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "active" | "completed" | "exception";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "exception";
 
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
-const ACTIVE_STAGES: OrderStage[] = ["under_review", "in_progress", "submitted_to_govt", "under_processing", "certificate_ready"];
 const COMPLETED_STAGES: OrderStage[] = ["completed"];
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
+// Pending = anything not completed and not a terminal exception (closed / refunded / uninterested).
+function isPending(stage: OrderStage): boolean {
+  return !COMPLETED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
+}
 
-function bucketOf(stage: OrderStage): Bucket {
-  if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
-  if (ACTIVE_STAGES.includes(stage)) return "active";
+function bucketOf(stage: OrderStage): Exclude<Bucket, "all"> {
   if (COMPLETED_STAGES.includes(stage)) return "completed";
   if (EXCEPTION_STAGES.includes(stage)) return "exception";
-  return "active";
+  if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
+  return "pending";
 }
 
 const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "all",          label: "All" },
   { id: "needs_action", label: "Needs Action" },
-  { id: "active",       label: "Active" },
+  { id: "pending",      label: "Pending" },
   { id: "completed",    label: "Completed" },
   { id: "exception",    label: "Exception" },
 ];
+
+type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
+const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
+  { id: "any",    label: "Any age" },
+  { id: "1",      label: "1 day+ pending" },
+  { id: "2",      label: "2 days+ pending" },
+  { id: "3",      label: "3 days+ pending" },
+  { id: "7",      label: "7 days+ pending" },
+  { id: "custom", label: "Custom days…" },
+];
+
+function daysSince(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
 
 const PAYMENT_TONE: Record<string, string> = {
   Paid:             "bg-slate-100 text-slate-700",
