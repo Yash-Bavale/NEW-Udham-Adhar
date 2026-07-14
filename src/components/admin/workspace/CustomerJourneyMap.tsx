@@ -1,7 +1,5 @@
-// Unified Customer Journey Map — 4 independent tracks:
-//   🟢 Main Journey · 🟡 Delay Flow · 🔴 Closure Flow · 🔵 Support Ticket Flow
-// Each track is self-contained so pausing / delaying / closing never hides
-// the accumulated progress on the main path.
+// Unified Customer Journey Map — one straight main journey with connected
+// stage-level subpaths for delay, closure, and support-ticket handling.
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -122,6 +120,17 @@ export function CustomerJourneyMap(p: Props) {
         lineLabel: "Delay",
         note: activeDelayKey === formPending.key ? timerNote : null,
       });
+      push("order_received", {
+        key: "form-missing-auto-close",
+        parentStage: "order_received",
+        track: "closure",
+        lineLabel: "Closure",
+        title: "Form Missing → Auto Close",
+        tone: "rose",
+        description: "If the customer still does not submit the form after E002, the 8-hour timer closes with reason A7.",
+        buttons: [],
+        note: activeDelayKey === formPending.key ? timerNote : null,
+      });
     }
 
     const customerDelay = byKey.get("customer-side-delay");
@@ -129,6 +138,17 @@ export function CustomerJourneyMap(p: Props) {
       push("form_submitted", {
         ...customerDelay,
         lineLabel: "Delay",
+        note: activeDelayKey === customerDelay.key ? timerNote : null,
+      });
+      push("form_submitted", {
+        key: "customer-delay-auto-close",
+        parentStage: "form_submitted",
+        track: "closure",
+        lineLabel: "Closure",
+        title: "Customer Delay → Close",
+        tone: "rose",
+        description: "If the selected customer-side reason is not resolved, close/auto-close using the same Category A reason.",
+        buttons: [FORCE_CLOSE_BUTTON],
         note: activeDelayKey === customerDelay.key ? timerNote : null,
       });
     }
@@ -298,8 +318,8 @@ export function CustomerJourneyMap(p: Props) {
 
         <div className="overflow-x-auto pb-2 pt-4">
           <div
-            className="grid min-w-[1280px] gap-3"
-            style={{ gridTemplateColumns: `repeat(${JOURNEY_STAGES.length}, minmax(160px, 1fr))` }}
+            className="grid min-w-[900px] gap-2"
+            style={{ gridTemplateColumns: `repeat(${JOURNEY_STAGES.length}, minmax(120px, 1fr))` }}
           >
             {JOURNEY_STAGES.map((s, i) => {
               const done = i < currentIdx || (i === currentIdx && s.key === "completed" && p.stage === "completed");
