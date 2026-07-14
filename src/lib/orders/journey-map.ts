@@ -61,19 +61,18 @@ export function stageToJourneyIndex(stage: OrderStage): number {
 }
 
 
-/**
- * Sub-branch definitions attached under a specific happy-path stage.
- * Every branch is always visible; buttons are always clickable regardless
- * of the current stage (per user spec).
- */
+export type JourneyTrack = "main" | "delay" | "closure" | "ticket";
+
 export interface JourneyBranch {
   key: string;
   parentStage: JourneyStageKey;
+  track: JourneyTrack;
   title: string;
   tone: "amber" | "rose" | "sky" | "violet" | "emerald";
   description: string;
   buttons: JourneyBranchButton[];
 }
+
 
 export interface JourneyBranchButton {
   key: string;
@@ -103,6 +102,7 @@ export type JourneyActionKind =
 export const JOURNEY_BRANCHES: JourneyBranch[] = [
   {
     key: "form-not-submitted",
+    track: "delay",
     parentStage: "order_received",
     title: "Form Not Submitted",
     tone: "amber",
@@ -120,6 +120,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "customer-side-delay",
+    track: "delay",
     parentStage: "form_submitted",
     title: "Customer-Side Delay",
     tone: "amber",
@@ -137,6 +138,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "technical-delay",
+    track: "delay",
     parentStage: "form_submitted",
     title: "Technical / External Delay",
     tone: "sky",
@@ -154,6 +156,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "app-submitted-actions",
+    track: "main",
     parentStage: "app_submitted",
     title: "After Application Submitted to Govt",
     tone: "violet",
@@ -178,6 +181,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "final-status-actions",
+    track: "main",
     parentStage: "check_status",
     title: "Check Final Application Status",
     tone: "emerald",
@@ -209,6 +213,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "talk-to-expert",
+    track: "main",
     parentStage: "completed",
     title: "Talk-to-Expert Service",
     tone: "violet",
@@ -266,3 +271,34 @@ export const TICKET_BUTTONS: JourneyBranchButton[] = [
     variant: "danger",
   },
 ];
+
+/** Closure-track buttons (E008 govt reject, T002 reply-reason). Force-close
+ * is exported separately because it's the always-visible red button. */
+export const CLOSURE_BUTTONS: JourneyBranchButton[] = [
+  {
+    key: "e008-closure",
+    label: "E008 — Application Rejected (Close)",
+    emailCode: "E008",
+    action: "application_rejected",
+    reasonCategory: "B",
+    variant: "danger",
+  },
+  {
+    key: "t002-closure",
+    label: "T002 — Reply w/ Reason (8h auto-close)",
+    emailCode: "T002",
+    action: "ticket_reply_reason",
+    reasonCategory: "A",
+    variant: "outline",
+  },
+];
+
+/** Map workflowStatus → live delay branch key (for highlighting). */
+export function getActiveDelayBranchKey(workflowStatus?: string | null): string | null {
+  if (!workflowStatus) return null;
+  if (/customer_hold|customer_side|customer_delay/i.test(workflowStatus)) return "customer-side-delay";
+  if (/technical_hold|external_delay|govt_delay|technical_delay/i.test(workflowStatus)) return "technical-delay";
+  if (/form_pending|awaiting_form|form_not_submitted/i.test(workflowStatus)) return "form-not-submitted";
+  return null;
+}
+
