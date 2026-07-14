@@ -184,7 +184,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_code, assigned_to")
+    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
