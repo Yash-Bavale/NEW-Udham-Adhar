@@ -1,57 +1,106 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, AlertTriangle, Calendar, MessageCircle, X } from "lucide-react";
+import {
+  Loader2, AlertTriangle, CalendarClock, MessageCircle, User2, Server,
+  CheckCircle2, Info, Search,
+} from "lucide-react";
 import { setExternalDelay, listDelayReasons } from "@/lib/crm/workflow.functions";
 import { toast } from "sonner";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
-export function ExternalDelayDialog({
-  applicationId,
-  open,
-  onClose,
-  initialSide = "customer",
-}: {
+type Side = "customer" | "internal";
+type Priority = "low" | "normal" | "high" | "urgent";
+
+interface Props {
   applicationId: string;
   open: boolean;
   onClose: () => void;
-  initialSide?: "customer" | "internal";
-}) {
+  initialSide?: Side;
+}
+
+const PRIORITY_META: Record<Priority, { label: string; className: string }> = {
+  low:    { label: "Low",    className: "border-slate-300 data-[on=true]:bg-slate-100 data-[on=true]:text-slate-900" },
+  normal: { label: "Normal", className: "border-sky-300 data-[on=true]:bg-sky-50 data-[on=true]:text-sky-900" },
+  high:   { label: "High",   className: "border-amber-300 data-[on=true]:bg-amber-50 data-[on=true]:text-amber-900" },
+  urgent: { label: "Urgent", className: "border-rose-300 data-[on=true]:bg-rose-50 data-[on=true]:text-rose-900" },
+};
+
+const EXPECTED_PRESETS: { label: string; days: number }[] = [
+  { label: "+1 day",  days: 1 },
+  { label: "+3 days", days: 3 },
+  { label: "+7 days", days: 7 },
+  { label: "+14 days", days: 14 },
+];
+
+function daysFromNow(days: number) {
+  const d = new Date(Date.now() + days * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+export function ExternalDelayDialog({ applicationId, open, onClose, initialSide = "customer" }: Props) {
   const qc = useQueryClient();
   const fnReasons = useServerFn(listDelayReasons);
   const fnSubmit = useServerFn(setExternalDelay);
 
-  const { data: reasons } = useQuery({
+  const { data: reasons, isLoading: reasonsLoading } = useQuery({
     queryKey: ["workflow-delay-reasons"],
     queryFn: () => fnReasons({ data: {} as never }),
     enabled: open,
   });
 
-  const [side, setSide] = useState<"customer" | "internal">(initialSide);
+  const [side, setSide] = useState<Side>(initialSide);
   const [reasonCode, setReasonCode] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
-  const [expected, setExpected] = useState(() => {
-    const d = new Date(Date.now() + 3 * 86400 * 1000);
-    return d.toISOString().slice(0, 10);
-  });
-  const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
+  const [expected, setExpected] = useState(() => daysFromNow(3));
+  const [priority, setPriority] = useState<Priority>("normal");
+  const [search, setSearch] = useState("");
 
-  const filteredReasons = (reasons?.reasons ?? []).filter((r: any) => (r.side ?? "customer") === side);
+  const allReasons = reasons?.reasons ?? [];
+  const filteredReasons = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return allReasons
+      .filter((r: any) => (r.side ?? "customer") === side)
+      .filter((r: any) =>
+        !s || r.label.toLowerCase().includes(s) || (r.description ?? "").toLowerCase().includes(s),
+      )
+      .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }, [allReasons, side, search]);
 
   useEffect(() => {
-    if (open) setSide(initialSide);
+    if (open) {
+      setSide(initialSide);
+      setSearch("");
+      setInternalNote("");
+      setCustomerNote("");
+      setExpected(daysFromNow(3));
+      setPriority("normal");
+    }
   }, [open, initialSide]);
 
   useEffect(() => {
-    if (open && filteredReasons.length && !filteredReasons.find((r) => r.code === reasonCode)) {
+    if (open && filteredReasons.length && !filteredReasons.find((r: any) => r.code === reasonCode)) {
       setReasonCode(filteredReasons[0].code);
     }
-  }, [open, reasons, side, reasonCode, filteredReasons]);
+     
+  }, [open, side, reasons]);
+
+  const selected = filteredReasons.find((r: any) => r.code === reasonCode) ?? null;
 
   const mut = useMutation({
     mutationFn: async () => {
-      const reason = reasons?.reasons.find((r) => r.code === reasonCode);
-      if (!reason) throw new Error("Pick a reason");
+      const reason = allReasons.find((r) => r.code === reasonCode);
+      if (!reason) throw new Error("Please pick a reason");
       await fnSubmit({
         data: {
           applicationId,
@@ -66,129 +115,315 @@ export function ExternalDelayDialog({
       });
     },
     onSuccess: () => {
-      toast.success(side === "customer" ? "Customer notified — auto-closure scheduled." : "Internal delay logged — assignee notified.");
+      toast.success(
+        side === "customer"
+          ? "Customer notified — 8-business-hour auto-closure scheduled."
+          : "Internal delay logged — assignee has been notified.",
+      );
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
       onClose();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to mark delay"),
   });
 
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
-      <div className="w-full max-w-xl rounded-lg border bg-card p-5 shadow-xl">
-        <div className="flex items-center justify-between mb-3">
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0">
+        <DialogHeader className="px-5 py-4 border-b bg-gradient-to-r from-amber-50 to-white">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="size-4 text-amber-500" />
-            <div className="font-semibold">Mark Delay</div>
-          </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="space-y-3 text-sm">
-          <div>
-            <label className="text-xs text-muted-foreground">Delay type</label>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setSide("customer")}
-                className={`rounded-md border px-2 py-2 text-left ${side === "customer" ? "border-primary bg-primary/5" : "bg-background"}`}
-              >
-                <div className="font-medium">Customer-side</div>
-                <div className="text-[11px] text-muted-foreground">Sends notice + auto-closes after 8 business hours</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSide("internal")}
-                className={`rounded-md border px-2 py-2 text-left ${side === "internal" ? "border-primary bg-primary/5" : "bg-background"}`}
-              >
-                <div className="font-medium">Our-side (internal)</div>
-                <div className="text-[11px] text-muted-foreground">Notifies assignee. No customer email, no auto-closure</div>
-              </button>
+            <div className="grid place-items-center size-9 rounded-full bg-amber-100 text-amber-700">
+              <AlertTriangle className="size-4" />
+            </div>
+            <div>
+              <DialogTitle className="text-base">Pause order — mark delay</DialogTitle>
+              <DialogDescription className="text-xs">
+                Choose the correct reason. The workflow, email template, and auto-closure timer are set from it.
+              </DialogDescription>
             </div>
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground">Reason</label>
-            <select
-              value={reasonCode}
-              onChange={(e) => setReasonCode(e.target.value)}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-            >
-              {filteredReasons.map((r) => (
-                <option key={r.code} value={r.code}>{r.label}</option>
-              ))}
-              {filteredReasons.length === 0 && <option value="">No reasons configured for this side</option>}
-            </select>
+        </DialogHeader>
+
+        {/* Side selector */}
+        <div className="px-5 pt-4 pb-3 border-b bg-slate-50/50">
+          <div className="grid grid-cols-2 gap-2">
+            <SideCard
+              active={side === "customer"}
+              onClick={() => setSide("customer")}
+              icon={<User2 className="size-4" />}
+              title="Customer-side delay"
+              subtitle="Sends E003 to the customer. Auto-closes in 8 business hours if no reply."
+              accent="amber"
+            />
+            <SideCard
+              active={side === "internal"}
+              onClick={() => setSide("internal")}
+              icon={<Server className="size-4" />}
+              title="Our-side (internal) delay"
+              subtitle="Notifies the assignee. No customer email. No auto-closure."
+              accent="sky"
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
+          {/* LEFT: Reason list */}
+          <div className="border-r">
+            <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${side === "customer" ? "customer" : "internal"} reasons…`}
+                  className="pl-8 h-8 text-sm"
+                />
+              </div>
+              <Badge variant="secondary" className="text-[10px]">
+                {filteredReasons.length} reason{filteredReasons.length === 1 ? "" : "s"}
+              </Badge>
+            </div>
+
+            <ScrollArea className="h-[340px] px-4 pb-4">
+              {reasonsLoading ? (
+                <div className="grid place-items-center h-40 text-sm text-slate-500">
+                  <Loader2 className="size-4 animate-spin" />
+                </div>
+              ) : filteredReasons.length === 0 ? (
+                <div className="text-sm text-slate-500 py-10 text-center">
+                  No reasons configured for this side.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {filteredReasons.map((r: any) => {
+                    const on = r.code === reasonCode;
+                    return (
+                      <button
+                        key={r.code}
+                        type="button"
+                        onClick={() => setReasonCode(r.code)}
+                        className={cn(
+                          "w-full text-left rounded-lg border p-2.5 transition group",
+                          on
+                            ? "border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-200"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div
+                            className={cn(
+                              "mt-0.5 size-4 rounded-full border grid place-items-center shrink-0",
+                              on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-300 bg-white",
+                            )}
+                          >
+                            {on && <CheckCircle2 className="size-3" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-medium text-slate-900 leading-snug">
+                              {r.label}
+                            </div>
+                            {r.description && (
+                              <div className="text-[11.5px] text-slate-500 leading-snug mt-0.5 line-clamp-2">
+                                {r.description}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <span className="text-[9.5px] font-mono uppercase text-slate-400 tracking-wider">
+                                {r.code}
+                              </span>
+                              {r.email_template_code && (
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono">
+                                  {r.email_template_code.toUpperCase().replace("BHS_", "")}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* RIGHT: Delay configuration */}
+          <div className="p-4 space-y-4 bg-slate-50/30">
             <div>
-              <label className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="size-3" /> Expected review</label>
-              <input
+              <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <CalendarClock className="size-3" /> Expected review date
+              </Label>
+              <Input
                 type="date"
                 value={expected}
                 onChange={(e) => setExpected(e.target.value)}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
+                min={new Date().toISOString().slice(0, 10)}
+                className="mt-1 h-9"
               />
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {EXPECTED_PRESETS.map((p) => {
+                  const val = daysFromNow(p.days);
+                  const on = val === expected;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setExpected(val)}
+                      className={cn(
+                        "text-[10.5px] font-medium rounded border px-1.5 py-0.5 transition",
+                        on
+                          ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
             <div>
-              <label className="text-xs text-muted-foreground">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as never)}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
+              <Label className="text-[11px] uppercase tracking-wider text-slate-500">Priority</Label>
+              <div className="mt-1 grid grid-cols-4 gap-1">
+                {(Object.keys(PRIORITY_META) as Priority[]).map((p) => {
+                  const meta = PRIORITY_META[p];
+                  const on = priority === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      data-on={on}
+                      onClick={() => setPriority(p)}
+                      className={cn(
+                        "text-[11px] font-semibold rounded-md border px-1.5 py-1.5 transition bg-white text-slate-600",
+                        meta.className,
+                      )}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {side === "customer" && (
+              <div className="rounded-md border border-amber-200 bg-amber-50/70 p-2.5 text-[11.5px] text-amber-900 flex gap-2">
+                <Info className="size-3.5 shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  Customer will receive the delay notice email now. Order auto-closes after
+                  <b> 8 business hours</b> if there's no reply. You can <b>Resume</b> anytime before that.
+                </div>
+              </div>
+            )}
+            {side === "internal" && (
+              <div className="rounded-md border border-sky-200 bg-sky-50/70 p-2.5 text-[11.5px] text-sky-900 flex gap-2">
+                <Info className="size-3.5 shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  No email is sent to the customer. Assignee is notified now and reminded again on the
+                  expected review date. Order stays paused until you <b>Resume</b> it.
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Notes */}
+        <div className="px-5 py-4 border-t space-y-3 bg-white">
           <div>
-            <label className="text-xs text-muted-foreground">Internal note</label>
-            <textarea
+            <Label className="text-[11px] uppercase tracking-wider text-slate-500">
+              Internal note (visible to the team only)
+            </Label>
+            <Textarea
               value={internalNote}
               onChange={(e) => setInternalNote(e.target.value)}
               rows={2}
-              className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-              placeholder="Visible to the team only"
+              className="mt-1 text-sm"
+              placeholder={selected?.description ? `e.g. ${selected.description.slice(0, 80)}…` : "Add context for the team"}
             />
           </div>
           {side === "customer" && (
             <div>
-              <label className="text-xs text-muted-foreground flex items-center gap-1">
-                <MessageCircle className="size-3" /> Customer-visible note (optional — sent in the email)
-              </label>
-              <textarea
+              <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <MessageCircle className="size-3" /> Customer-visible note (optional — appended to the email)
+              </Label>
+              <Textarea
                 value={customerNote}
                 onChange={(e) => setCustomerNote(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded-md border bg-background px-2 py-1.5"
-                placeholder="Will be included in the email to the customer"
+                rows={2}
+                className="mt-1 text-sm"
+                placeholder="Will be included at the bottom of the delay email"
               />
             </div>
           )}
-          <div className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-            {side === "customer"
-              ? "On save: customer gets the delay notice email now, and the order auto-closes after 8 business hours if no reply. You can Resume anytime before that."
-              : "On save: no customer email is sent. The assignee is notified now and reminded again at the expected review date. Order stays paused until you Resume it."}
-          </div>
         </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
-          <button
+
+        <DialogFooter className="px-5 py-3 border-t bg-slate-50 gap-2">
+          <div className="mr-auto text-[11px] text-slate-500 flex items-center gap-1.5">
+            {selected ? (
+              <>
+                <CheckCircle2 className="size-3 text-emerald-600" />
+                <span>
+                  Selected: <b className="text-slate-700">{selected.label}</b>
+                </span>
+              </>
+            ) : (
+              <span>Pick a reason to continue</span>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
             onClick={() => mut.mutate()}
             disabled={mut.isPending || !reasonCode}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground inline-flex items-center gap-2 disabled:opacity-50"
+            className="gap-1.5"
           >
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
             {side === "customer" ? "Save & notify customer" : "Save & notify assignee"}
-          </button>
-        </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SideCard({
+  active, onClick, icon, title, subtitle, accent,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  accent: "amber" | "sky";
+}) {
+  const accentCls =
+    accent === "amber"
+      ? "border-amber-400 bg-amber-50/60 ring-amber-200"
+      : "border-sky-400 bg-sky-50/60 ring-sky-200";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-lg border p-2.5 text-left transition flex gap-2.5 items-start bg-white",
+        active ? `${accentCls} ring-1` : "border-slate-200 hover:border-slate-300",
+      )}
+    >
+      <div
+        className={cn(
+          "grid place-items-center size-8 rounded-md shrink-0",
+          accent === "amber" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700",
+        )}
+      >
+        {icon}
       </div>
-    </div>
+      <div className="min-w-0">
+        <div className="text-[13px] font-semibold text-slate-900">{title}</div>
+        <div className="text-[11px] text-slate-500 leading-snug mt-0.5">{subtitle}</div>
+      </div>
+    </button>
   );
 }
