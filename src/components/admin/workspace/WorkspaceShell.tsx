@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
 import { OrderActionRail } from "./OrderActionRail";
+import { OrderStageActions } from "./OrderStageActions";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -312,6 +313,16 @@ export function WorkspaceShell(p: Props) {
         updatedAt={application.updated_at ?? application.created_at}
         onSwitchTab={(id) => setTab(id)}
       />
+
+      {/* Phase 3/4 — new-lifecycle stage actions (Form Pending/Received, hold
+          split, Await Govt, System Close, Govt Rejected). Coexists with the
+          legacy rail above during the transition. */}
+      {orderStatus && (
+        <OrderStageActions
+          orderId={application.id}
+          currentStatus={orderStatus as any}
+        />
+      )}
 
       {/* Customer Journey */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
