@@ -330,15 +330,22 @@ export async function enqueueFromTemplateInternal(
   rawVariables: Record<string, unknown>,
   opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual"; inReplyTo?: string | null; references?: string | null; threadSubject?: string | null },
 ) {
+  const resolved = resolveTemplateCode(code);
+  if (resolved.drop) {
+    console.warn(`[emails] dropping legacy template '${code}' (no longer sent).`);
+    return;
+  }
+  const effectiveCode = resolved.code ?? code;
   const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
   const variables = withBothCases(enriched);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled, dispatch_mode")
-    .eq("code", code)
+    .eq("code", effectiveCode)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!tpl) throw new Error(`Email template '${code}' not found.`);
+  if (!tpl) throw new Error(`Email template '${effectiveCode}' not found.`);
+
 
   if (!tpl.is_enabled) {
     if (opts?.requireImmediateSuccess) {
