@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin-login")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Admin Login" },
@@ -14,32 +17,43 @@ export const Route = createFileRoute("/admin-login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect away if already signed in. Use getUser() so we await session
-  // hydration (getSession() can return null on first paint). Also listen
-  // for auth state changes so a sign-in elsewhere navigates immediately.
+  const goNext = () => {
+    if (next) {
+      window.location.href = next;
+    } else {
+      navigate({ to: "/admin/dashboard", replace: true });
+    }
+  };
+
+  // Redirect away if already signed in.
   useEffect(() => {
     let cancelled = false;
 
     supabase.auth.getUser().then(({ data, error }) => {
       if (!cancelled && !error && data.user) {
-        navigate({ to: "/admin/dashboard", replace: true });
+        if (next) window.location.href = next;
+        else navigate({ to: "/admin/dashboard", replace: true });
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) navigate({ to: "/admin/dashboard", replace: true });
+      if (session) {
+        if (next) window.location.href = next;
+        else navigate({ to: "/admin/dashboard", replace: true });
+      }
     });
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, next]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +62,7 @@ function AdminLoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      navigate({ to: "/admin/dashboard", replace: true });
+      goNext();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
