@@ -271,3 +271,34 @@ export const TICKET_BUTTONS: JourneyBranchButton[] = [
     variant: "danger",
   },
 ];
+
+/** Closure-track buttons (E008 govt reject, T002 reply-reason). Force-close
+ * is exported separately because it's the always-visible red button. */
+export const CLOSURE_BUTTONS: JourneyBranchButton[] = [
+  {
+    key: "e008-closure",
+    label: "E008 — Application Rejected (Close)",
+    emailCode: "E008",
+    action: "application_rejected",
+    reasonCategory: "B",
+    variant: "danger",
+  },
+  {
+    key: "t002-closure",
+    label: "T002 — Reply w/ Reason (8h auto-close)",
+    emailCode: "T002",
+    action: "ticket_reply_reason",
+    reasonCategory: "A",
+    variant: "outline",
+  },
+];
+
+/** Map workflowStatus → live delay branch key (for highlighting). */
+export function getActiveDelayBranchKey(workflowStatus?: string | null): string | null {
+  if (!workflowStatus) return null;
+  if (/customer_hold|customer_side|customer_delay/i.test(workflowStatus)) return "customer-side-delay";
+  if (/technical_hold|external_delay|govt_delay|technical_delay/i.test(workflowStatus)) return "technical-delay";
+  if (/form_pending|awaiting_form|form_not_submitted/i.test(workflowStatus)) return "form-not-submitted";
+  return null;
+}
+
