@@ -3839,6 +3839,17 @@ export type Database = {
       }
       is_finance_viewer: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_order_close_reasons: {
+        Args: never
+        Returns: {
+          category: string
+          id: string
+          label: string
+          number: number
+          sort_order: number
+          standard_reply: string
+        }[]
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -3871,6 +3882,19 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      ticket_reopen_or_create: {
+        Args: {
+          _application_id: string
+          _channel?: string
+          _customer_email: string
+          _subject: string
+        }
+        Returns: {
+          ticket_id: string
+          was_created: boolean
+          was_reopened: boolean
+        }[]
+      }
       transition_order_status: {
         Args: {
           _force?: boolean
