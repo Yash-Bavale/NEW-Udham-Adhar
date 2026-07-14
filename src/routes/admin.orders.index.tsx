@@ -99,6 +99,8 @@ function OrdersListPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [bucket, setBucket] = useState<Bucket>("all");
+  const [pendingAge, setPendingAge] = useState<PendingAge>("any");
+  const [customDays, setCustomDays] = useState<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 100;
 
