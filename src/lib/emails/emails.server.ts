@@ -116,7 +116,12 @@ export async function enqueueEmailInternal(input: {
   requireImmediateSuccess?: boolean;
   allowWithoutTemplate?: boolean;
 }) {
-  const templateCode = input.templateCode?.trim() || null;
+  const resolved = resolveTemplateCode(input.templateCode);
+  if (resolved.drop) {
+    console.warn(`[emails] dropping legacy template '${input.templateCode}' (no longer sent).`);
+    return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+  }
+  const templateCode = resolved.code;
   if (!templateCode && !input.allowWithoutTemplate) {
     throw new Error("Email template code is required. Use a saved Email Template for this send.");
   }
@@ -129,6 +134,7 @@ export async function enqueueEmailInternal(input: {
     if (tplErr) throw new Error(tplErr.message);
     if (!tpl) throw new Error(`Email template '${templateCode}' not found.`);
   }
+
 
   const variables: Record<string, unknown> = { ...(input.variables ?? {}) };
   if (input.allowWithoutTemplate) variables.__allow_without_template = true;
