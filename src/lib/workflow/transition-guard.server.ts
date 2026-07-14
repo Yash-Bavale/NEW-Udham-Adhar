@@ -50,7 +50,7 @@ export function assertTransitionAllowed(i: GuardInput): void {
   const stage = (i.stage ?? "").toLowerCase();
   const ws = (i.workflowStatus ?? "").toLowerCase();
   const hasCustomerHold = /customer_hold|customer_side|customer_delay/.test(ws);
-  const hasTechHold = /technical_hold|external_delay|govt_delay|technical_delay/.test(ws);
+  const hasTechHold = /technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws);
 
   // Universal: nothing except reminders once closed.
   if (isClosed(i.closureStage) && i.action !== "reminder") {
