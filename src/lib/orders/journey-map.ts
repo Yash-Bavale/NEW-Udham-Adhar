@@ -340,7 +340,7 @@ export function deriveJourneyLiveState(input: {
     activeSubKey = "form-not-submitted";
   } else if (/customer_hold|customer_side|customer_delay/.test(ws)) {
     activeSubKey = "customer-delay";
-  } else if (/technical_hold|external_delay|govt_delay|technical_delay/.test(ws)) {
+  } else if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws)) {
     activeSubKey = "technical-delay";
   } else if (idx === 4 || idx === 5) {
     activeSubKey = "govt-awaiting";
