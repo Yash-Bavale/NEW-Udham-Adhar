@@ -1,27 +1,92 @@
-## SEO/Content Regression Check — Batch 1 (20 routes)
+## Locked decisions (from your answers)
 
-Goal: verify each of the 20 new SEO pages renders the expected visible content and correct head metadata against the source JSON in `src/content/seo-batch1/`.
+1. **Hold states:** Split into `TECHNICAL_HOLD_EXTERNAL` (Cat B — govt/portal) and `TECHNICAL_HOLD_INTERNAL` (Cat C — our team).
+2. **Closure emails:** E004 fires on manual employee close; E010 fires on system/timer/ticket-driven close.
+3. **Ticket reopen:** Same customer emailing about same order after close → reopen the existing ticket (append to thread, re-pause workflow). One ticket per order lifetime.
+4. **Govt rejection (E008):** Always ends in forced manual close. No "resubmit" loop — customer reorders if needed.
+5. **Form Pending:** 4h nudge + 8h auto-close (fixed).
+6. **Reminder cadences → employee-configurable per order.** Employee picks hours/days (1h, 2h, 4h, 1d, 2d, 4d, custom) when placing/renewing the hold.
+7. **Awaiting Govt Approval:** Internal-only reminders (dashboard + assignee notification). No customer email on this cadence.
+8. **Consultation stage:** Flagged — you said "don't know what I'm referring to." Old audit had `CONSULTATION` in the journey map. I'll **drop it from the new happy path** unless you tell me otherwise. Talk-to-expert stays as a standalone ticket-style flow, not a stage.
 
-### Scope (20 routes)
-udyam-registration, udyam-registration-online, udyam-certificate, msme-registration, udyam-registration-process, udyam-registration-number, udyam-registration-status, udyam-registration-fee, udyam-registration-free, udyam-registration-benefits, udyam-registration-eligibility, udyam-registration-documents-required, udyam-registration-certificate, udyam-registration-update, udyam-login, forgot-udyam-registration-number, download-udyam-certificate, print-udyam-certificate, verify-udyam-certificate, msme-certificate-benefits, udyam-certificate (+ download alt).
+---
 
-### Approach
+## Phase 1 — Schema (single migration, awaits your approval)
 
-1. **Static audit (source of truth check)**
-   - Read `SeoContentPage.tsx` to confirm it renders each required block: H1, AI Overview, Quick Facts, body sections, internal links, EEAT disclaimer, FAQ accordion, CTA.
-   - Read each of the 20 route files to confirm they wire `head()` with title, description, og:title/description/url/type, canonical link, and JSON-LD schemas from the JSON data.
-   - Diff route `head()` output vs source JSON meta fields.
+**Enum additions** to `order_status_enum`:
+`PAYMENT_RECEIVED`, `ORDER_RECEIVED`, `FORM_PENDING`, `FORM_RECEIVED`, `TECHNICAL_HOLD_EXTERNAL`, `TECHNICAL_HOLD_INTERNAL`, `AWAITING_GOVT_APPROVAL`, `CHECKING_STATUS`.
 
-2. **Rendered audit (Playwright)**
-   - Script iterates all 20 URLs on `http://localhost:8080`.
-   - For each: capture rendered `<h1>`, count Quick Facts items, presence of EEAT block, count FAQ accordion items, count CTAs and internal links, and read `document.title`, meta description, canonical href, og:url, first JSON-LD block.
-   - Compare against expected values parsed from the matching JSON.
-   - Emit a table: route | H1 match | QuickFacts count vs expected | EEAT present | FAQ count vs expected | Canonical correct | Meta title/desc match | JSON-LD types present.
+**New table `order_close_reasons`** — 14 reasons from your docx: `id`, `category` (A/B/C), `number` (1–14), `label`, `standard_reply`, `is_active`.
 
-3. **Report**
-   - List routes that pass fully.
-   - List each failing route with the specific mismatch (missing block, wrong canonical, truncated meta, missing FAQ items, etc.).
-   - No code changes in this task — findings only. Fixes come in a follow-up once you approve the diff list.
+**`applications` new columns:**
+- `active_reason_id` (FK → order_close_reasons)
+- `active_reason_text`
+- `technical_hold_started_at`, `technical_hold_kind` (external/internal)
+- `customer_hold_started_at`
+- `awaiting_govt_started_at`
 
-### Out of scope
-Redirect chain checks, image/OG image validation (per original build), Section 15 image SEO, non-batch-1 routes.
+**`workflow_timers` new `kind` values:**
+`form_pending_nudge_4h`, `form_pending_autoclose_8h`, `customer_hold_reminder`, `technical_hold_reminder`, `awaiting_govt_internal_reminder`.
+
+Timer rows carry a `custom_interval_minutes` column (new) so employee-set cadences persist across ticks.
+
+**`support_tickets`:** add `reopened_count`, `last_closed_at` (for reopen-existing logic).
+
+**`allowed_order_transitions`** function rewritten around the new stages + hold splits + forced-close rules.
+
+GRANTs + RLS follow the existing pattern.
+
+---
+
+## Phase 2 — Backend server functions
+
+New module `src/lib/orders/actions/` — one `createServerFn` per spec button:
+
+- `markPaymentReceived` → sets `PAYMENT_RECEIVED`, sends E001
+- `sendFormLink` / `resendFormLink` → sets `FORM_PENDING`, starts 4h+8h timers, sends E003
+- `markFormReceived` → sets `FORM_RECEIVED`, cancels form timers
+- `startTechnicalHold({ kind: 'external'|'internal', reasonId, reminderMinutes })` → sets `TECHNICAL_HOLD_EXTERNAL|INTERNAL`, arms recurring reminder timer, sends E005 (external only)
+- `startCustomerHold({ reasonId, reminderMinutes })` → sets `CUSTOMER_HOLD`, sends E004-customer-delay, arms reminder
+- `resumeFromHold` → back to prior stage, cancels reminder
+- `submitToGovt` → sets `SUBMITTED_TO_GOVT`, sends E012
+- `markAwaitingGovt({ reminderMinutes })` → `AWAITING_GOVT_APPROVAL`, arms **internal-only** reminder (writes `notifications` rows, no email)
+- `markCompleted` → `COMPLETED`, sends E002
+- `closeOrderManual({ reasonId, remarks })` → sends **E004** (manual)
+- System/ticket/timer close paths → send **E010**
+- `handleGovtRejected({ reasonId })` → forced close via E010 path, no resume
+
+**Ticket layer** (`src/lib/tickets/`):
+- Inbound merge: match `(lower(customer_email), order_number)` → existing open ticket, else reopen last closed ticket for that order (increment `reopened_count`), else create new. Every reopen re-dispatches `TicketOpened` to pause workflow.
+- `closeTicketWithReply` / `closeTicketFinal` — fix the `cooperating` branch (currently only dispatches `not_cooperating`); UI passes outcome.
+- Delete `resolveTicketAndResumeOrder` bypass; route through engine `TicketClosed` event.
+
+**Reason picker RPC** returns `standard_reply` so the UI auto-fills the reply textarea when a reason is chosen.
+
+**Timer changes:** `workflow-tick` handles all new kinds; recurring reminders re-arm themselves using `custom_interval_minutes`.
+
+---
+
+## Phase 3 — Frontend
+
+- `OrderActionRail.tsx` rewritten stage-aware — button set depends on current `order_status`.
+- New `ReasonPicker.tsx` — dropdown of 14 reasons grouped by category, shows `standard_reply` preview, editable before send.
+- New `ReminderCadencePicker.tsx` — presets (1h/2h/4h/1d/2d/4d) + "Custom…" input; used by all three hold types.
+- `CountdownChip.tsx` — shows next timer fires_at.
+- `CustomerJourneyMap.tsx` + `ProcessTracker.tsx` — remap nodes to new stages, drop consultation node.
+- New `TicketPanel.tsx` — threaded view per order, reopen indicator.
+- Admin orders list — filters + column badges for new statuses (hold split visible).
+
+---
+
+## Phase 4 — Timers/cron consolidation
+
+- All new timer kinds live in `workflow_timers`; `workflow-tick` (1min pg_cron) is the only executor.
+- `workflow_reminders` and `order_schedulers` stay readable for legacy rows but nothing new writes to them.
+- `closure-workflow` (dead code) deleted.
+- Awaiting-Govt internal reminder writes to `notifications` table (assignee + ops role) — no email queued.
+
+---
+
+## Open question before Phase 1
+
+**Consultation stage** — should I drop it from the happy-path entirely, or keep it as an optional pre-form step for services that need one? Everything else is locked; I'll start the migration as soon as this is confirmed.

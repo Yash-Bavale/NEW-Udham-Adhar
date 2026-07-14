@@ -251,11 +251,14 @@ export type Database = {
       }
       applications: {
         Row: {
+          active_reason_id: string | null
+          active_reason_text: string | null
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_at: string | null
           assigned_to: string | null
           auto_assigned: boolean
+          awaiting_govt_started_at: string | null
           cancellation_requested_at: string | null
           certificate_number: string | null
           certificate_uploaded_at: string | null
@@ -266,6 +269,7 @@ export type Database = {
           closure_remarks: string | null
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
+          customer_hold_started_at: string | null
           customer_id: string | null
           deleted_at: string | null
           document_status: string
@@ -297,6 +301,8 @@ export type Database = {
           reopened_at: string | null
           reopened_by: string | null
           service_id: string | null
+          technical_hold_kind: string | null
+          technical_hold_started_at: string | null
           updated_at: string
           workflow_delay_reason: string | null
           workflow_expected_review_at: string | null
@@ -304,11 +310,14 @@ export type Database = {
           workflow_status: Database["public"]["Enums"]["workflow_status"] | null
         }
         Insert: {
+          active_reason_id?: string | null
+          active_reason_text?: string | null
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_at?: string | null
           assigned_to?: string | null
           auto_assigned?: boolean
+          awaiting_govt_started_at?: string | null
           cancellation_requested_at?: string | null
           certificate_number?: string | null
           certificate_uploaded_at?: string | null
@@ -319,6 +328,7 @@ export type Database = {
           closure_remarks?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
+          customer_hold_started_at?: string | null
           customer_id?: string | null
           deleted_at?: string | null
           document_status?: string
@@ -350,6 +360,8 @@ export type Database = {
           reopened_at?: string | null
           reopened_by?: string | null
           service_id?: string | null
+          technical_hold_kind?: string | null
+          technical_hold_started_at?: string | null
           updated_at?: string
           workflow_delay_reason?: string | null
           workflow_expected_review_at?: string | null
@@ -359,11 +371,14 @@ export type Database = {
             | null
         }
         Update: {
+          active_reason_id?: string | null
+          active_reason_text?: string | null
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
           assigned_at?: string | null
           assigned_to?: string | null
           auto_assigned?: boolean
+          awaiting_govt_started_at?: string | null
           cancellation_requested_at?: string | null
           certificate_number?: string | null
           certificate_uploaded_at?: string | null
@@ -374,6 +389,7 @@ export type Database = {
           closure_remarks?: string | null
           closure_stage?: Database["public"]["Enums"]["closure_stage"]
           created_at?: string
+          customer_hold_started_at?: string | null
           customer_id?: string | null
           deleted_at?: string | null
           document_status?: string
@@ -405,6 +421,8 @@ export type Database = {
           reopened_at?: string | null
           reopened_by?: string | null
           service_id?: string | null
+          technical_hold_kind?: string | null
+          technical_hold_started_at?: string | null
           updated_at?: string
           workflow_delay_reason?: string | null
           workflow_expected_review_at?: string | null
@@ -414,6 +432,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_active_reason_id_fkey"
+            columns: ["active_reason_id"]
+            isOneToOne: false
+            referencedRelation: "order_close_reasons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "applications_closure_reason_id_fkey"
             columns: ["closure_reason_id"]
@@ -2075,6 +2100,42 @@ export type Database = {
         }
         Relationships: []
       }
+      order_close_reasons: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          number: number
+          sort_order: number
+          standard_reply: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          number: number
+          sort_order?: number
+          standard_reply?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          number?: number
+          sort_order?: number
+          standard_reply?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_reminders: {
         Row: {
           application_id: string
@@ -2929,9 +2990,11 @@ export type Database = {
           description: string | null
           first_response_at: string | null
           id: string
+          last_closed_at: string | null
           last_customer_message_at: string | null
           last_staff_message_at: string | null
           priority: Database["public"]["Enums"]["priority_enum"] | null
+          reopened_count: number
           resolved_at: string | null
           resolved_by: string | null
           service_id: string | null
@@ -2954,9 +3017,11 @@ export type Database = {
           description?: string | null
           first_response_at?: string | null
           id?: string
+          last_closed_at?: string | null
           last_customer_message_at?: string | null
           last_staff_message_at?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
+          reopened_count?: number
           resolved_at?: string | null
           resolved_by?: string | null
           service_id?: string | null
@@ -2979,9 +3044,11 @@ export type Database = {
           description?: string | null
           first_response_at?: string | null
           id?: string
+          last_closed_at?: string | null
           last_customer_message_at?: string | null
           last_staff_message_at?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
+          reopened_count?: number
           resolved_at?: string | null
           resolved_by?: string | null
           service_id?: string | null
@@ -3622,6 +3689,7 @@ export type Database = {
         Row: {
           application_id: string
           created_at: string
+          custom_interval_minutes: number | null
           dedup_key: string | null
           fired_at: string | null
           fires_at: string
@@ -3629,6 +3697,7 @@ export type Database = {
           kind: string
           paused_at: string | null
           payload: Json
+          recurring: boolean
           remaining_ms: number | null
           status: string
           updated_at: string
@@ -3636,6 +3705,7 @@ export type Database = {
         Insert: {
           application_id: string
           created_at?: string
+          custom_interval_minutes?: number | null
           dedup_key?: string | null
           fired_at?: string | null
           fires_at: string
@@ -3643,6 +3713,7 @@ export type Database = {
           kind: string
           paused_at?: string | null
           payload?: Json
+          recurring?: boolean
           remaining_ms?: number | null
           status?: string
           updated_at?: string
@@ -3650,6 +3721,7 @@ export type Database = {
         Update: {
           application_id?: string
           created_at?: string
+          custom_interval_minutes?: number | null
           dedup_key?: string | null
           fired_at?: string | null
           fires_at?: string
@@ -3657,6 +3729,7 @@ export type Database = {
           kind?: string
           paused_at?: string | null
           payload?: Json
+          recurring?: boolean
           remaining_ms?: number | null
           status?: string
           updated_at?: string
@@ -3807,11 +3880,14 @@ export type Database = {
           _remarks?: string
         }
         Returns: {
+          active_reason_id: string | null
+          active_reason_text: string | null
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
           assigned_at: string | null
           assigned_to: string | null
           auto_assigned: boolean
+          awaiting_govt_started_at: string | null
           cancellation_requested_at: string | null
           certificate_number: string | null
           certificate_uploaded_at: string | null
@@ -3822,6 +3898,7 @@ export type Database = {
           closure_remarks: string | null
           closure_stage: Database["public"]["Enums"]["closure_stage"]
           created_at: string
+          customer_hold_started_at: string | null
           customer_id: string | null
           deleted_at: string | null
           document_status: string
@@ -3853,6 +3930,8 @@ export type Database = {
           reopened_at: string | null
           reopened_by: string | null
           service_id: string | null
+          technical_hold_kind: string | null
+          technical_hold_started_at: string | null
           updated_at: string
           workflow_delay_reason: string | null
           workflow_expected_review_at: string | null
@@ -3968,6 +4047,14 @@ export type Database = {
         | "REFUND_PROCESSED"
         | "CLOSED"
         | "REOPENED"
+        | "PAYMENT_RECEIVED"
+        | "ORDER_RECEIVED"
+        | "FORM_PENDING"
+        | "FORM_RECEIVED"
+        | "TECHNICAL_HOLD_EXTERNAL"
+        | "TECHNICAL_HOLD_INTERNAL"
+        | "AWAITING_GOVT_APPROVAL"
+        | "CHECKING_STATUS"
       payment_status: "created" | "attempted" | "paid" | "failed" | "refunded"
       payment_status_enum:
         | "pending"
@@ -4255,6 +4342,14 @@ export const Constants = {
         "REFUND_PROCESSED",
         "CLOSED",
         "REOPENED",
+        "PAYMENT_RECEIVED",
+        "ORDER_RECEIVED",
+        "FORM_PENDING",
+        "FORM_RECEIVED",
+        "TECHNICAL_HOLD_EXTERNAL",
+        "TECHNICAL_HOLD_INTERNAL",
+        "AWAITING_GOVT_APPROVAL",
+        "CHECKING_STATUS",
       ],
       payment_status: ["created", "attempted", "paid", "failed", "refunded"],
       payment_status_enum: [

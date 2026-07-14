@@ -173,12 +173,20 @@ export const STATUS_ACTION_META: Record<StatusActionKey, StatusActionMeta> = {
 /** Buttons per status. Refund gating still enforced at the panel by role. */
 export const STATUS_ACTIONS: Record<OrderStatus, StatusActionKey[]> = {
   NEW_ORDER: ["send_form_link", "customer_delay", "close_manual"],
+  PAYMENT_RECEIVED: ["send_form_link", "close_manual"],
+  ORDER_RECEIVED: ["send_form_link", "close_manual"],
+  FORM_PENDING: ["send_form_link", "manual_reminder", "customer_delay", "close_manual"],
+  FORM_RECEIVED: ["start_processing", "customer_delay", "close_manual"],
   WAITING_CUSTOMER_INFO: ["send_form_link", "manual_reminder", "customer_delay", "close_manual"],
   INFO_RECEIVED: ["start_processing", "our_delay", "customer_delay"],
   IN_PROCESSING: ["our_delay", "customer_delay", "submitted_to_govt"],
   CUSTOMER_HOLD: ["send_form_link", "manual_reminder", "start_processing", "close_manual"],
+  TECHNICAL_HOLD_EXTERNAL: ["start_processing", "close_manual"],
+  TECHNICAL_HOLD_INTERNAL: ["start_processing", "close_manual"],
   OUR_SIDE_DELAY: ["start_processing", "submitted_to_govt", "our_delay"],
   SUBMITTED_TO_GOVT: ["certificate_issued", "our_delay"],
+  AWAITING_GOVT_APPROVAL: ["certificate_issued", "close_manual"],
+  CHECKING_STATUS: ["certificate_issued", "close_manual"],
   CERTIFICATE_ISSUED: ["complete"],
   COMPLETED: ["reopen"],
   HIGH_PRIORITY: ["start_processing", "submitted_to_govt", "our_delay", "customer_delay"],
@@ -212,6 +220,26 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
     hint: "Send the customer info form link to kick things off.",
     primary: "send_form_link",
   },
+  PAYMENT_RECEIVED: {
+    headline: "Payment received",
+    hint: "Send the customer info form link.",
+    primary: "send_form_link",
+  },
+  ORDER_RECEIVED: {
+    headline: "Order received",
+    hint: "Send the customer info form link.",
+    primary: "send_form_link",
+  },
+  FORM_PENDING: {
+    headline: "Form pending",
+    hint: "Customer has 8h to submit — send a reminder or resend the link.",
+    primary: "manual_reminder",
+  },
+  FORM_RECEIVED: {
+    headline: "Form received",
+    hint: "Start processing the application.",
+    primary: "start_processing",
+  },
   WAITING_CUSTOMER_INFO: {
     headline: "Waiting for customer info",
     hint: "Send a reminder if 24h has passed since the last nudge.",
@@ -232,6 +260,16 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
     hint: "Reach out to unblock, then resume processing.",
     primary: "send_form_link",
   },
+  TECHNICAL_HOLD_EXTERNAL: {
+    headline: "Technical hold — govt/portal",
+    hint: "Portal issue on govt side. Retry when clear or close the order.",
+    primary: "start_processing",
+  },
+  TECHNICAL_HOLD_INTERNAL: {
+    headline: "Technical hold — internal",
+    hint: "Blocked on our side. Resolve and resume processing.",
+    primary: "start_processing",
+  },
   OUR_SIDE_DELAY: {
     headline: "Our-side delay",
     hint: "Resume processing or file when the block is cleared.",
@@ -240,6 +278,16 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
   SUBMITTED_TO_GOVT: {
     headline: "Submitted to government",
     hint: "Mark the certificate issued as soon as it arrives.",
+    primary: "certificate_issued",
+  },
+  AWAITING_GOVT_APPROVAL: {
+    headline: "Awaiting govt approval",
+    hint: "Waiting on the government portal. Mark certificate issued when it arrives.",
+    primary: "certificate_issued",
+  },
+  CHECKING_STATUS: {
+    headline: "Checking status",
+    hint: "Actively checking the portal for updates.",
     primary: "certificate_issued",
   },
   CERTIFICATE_ISSUED: {
