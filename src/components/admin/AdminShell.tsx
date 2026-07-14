@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
+import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
 import {
