@@ -61,19 +61,18 @@ export function stageToJourneyIndex(stage: OrderStage): number {
 }
 
 
-/**
- * Sub-branch definitions attached under a specific happy-path stage.
- * Every branch is always visible; buttons are always clickable regardless
- * of the current stage (per user spec).
- */
+export type JourneyTrack = "main" | "delay" | "closure" | "ticket";
+
 export interface JourneyBranch {
   key: string;
   parentStage: JourneyStageKey;
+  track: JourneyTrack;
   title: string;
   tone: "amber" | "rose" | "sky" | "violet" | "emerald";
   description: string;
   buttons: JourneyBranchButton[];
 }
+
 
 export interface JourneyBranchButton {
   key: string;
