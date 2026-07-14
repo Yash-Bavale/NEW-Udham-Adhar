@@ -182,10 +182,12 @@ async function notifyInternal(appId: string) {
   try {
     await supabaseAdmin.from("notifications").insert({
       user_id: assignee,
+      kind: "order_reminder",
       title: "Order needs follow-up",
       body: `Order ${ctx?.application_code || appId.slice(0, 8)} awaiting action`,
-      link: `/admin/applications/${appId}`,
-      kind: "order_reminder",
+      href: `/admin/orders/${appId}`,
+      entity_kind: "order",
+      entity_id: appId,
     } as never);
   } catch (e) {
     console.error("[timers-tick] internal notify failed", e);
