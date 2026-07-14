@@ -448,7 +448,7 @@ function StageColumn({
   return (
     <div className="relative flex min-h-[420px] flex-col items-center">
       {!isLast && (
-        <div className="absolute left-1/2 top-6 h-0.5 w-[calc(100%+0.75rem)] z-0">
+        <div className="absolute left-1/2 top-6 h-0.5 w-[calc(100%+0.5rem)] z-0">
           <div className={cn(
             "h-full",
             index < currentIdx ? "bg-emerald-400"
@@ -483,7 +483,7 @@ function StageColumn({
         )}>
           {stage.short}
         </span>
-        <span className="max-w-[130px] text-center text-[9px] leading-tight text-slate-400">{stage.label}</span>
+        <span className="max-w-[112px] text-center text-[9px] leading-tight text-slate-400">{stage.label}</span>
       </div>
 
       <div className="relative mt-3 flex w-full flex-1 flex-col items-stretch">
@@ -532,7 +532,7 @@ function BranchCard({
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1">
-            <span className={cn("rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase", line)}>
+            <span className={cn("rounded-full border px-1 py-0.5 text-[8px] font-bold uppercase", line)}>
               {branch.lineLabel ?? branch.track}
             </span>
             {active && (
@@ -542,14 +542,14 @@ function BranchCard({
             )}
             {branch.track === "ticket" && <Ticket className="size-3 text-sky-600" />}
           </div>
-          <div className={cn("mt-1 text-[9px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
+          <div className={cn("mt-1 text-[8px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
             {branch.title}
           </div>
         </div>
       </div>
-      <div className="text-[10px] text-slate-600 leading-snug">{branch.description}</div>
+      <div className="text-[9px] text-slate-600 leading-snug">{branch.description}</div>
       {branch.note && (
-        <div className={cn("flex flex-col gap-0.5 rounded-md border px-2 py-1 text-[10px] leading-snug", line)}>
+        <div className={cn("flex flex-col gap-0.5 rounded-md border px-2 py-1 text-[9px] leading-snug", line)}>
           {branch.note}
         </div>
       )}
