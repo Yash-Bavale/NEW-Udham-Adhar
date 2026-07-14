@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 
 import { WorkspaceShell } from "@/components/admin/workspace/WorkspaceShell";
 import { ExceptionBanner } from "@/components/admin/workspace/ExceptionBanner";
+import { TicketPanel } from "@/components/admin/workspace/TicketPanel";
 import { computeOrderStage, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { isConvertedConsultationLead, isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 import { useRole } from "@/hooks/useRole";
@@ -94,6 +95,7 @@ function OrderDetailPage() {
       notesNode={
         <div className="space-y-4">
           <ExceptionBanner orderId={orderId} />
+          <TicketPanel orderId={orderId} />
           <InternalNotes orderId={orderId} />
         </div>
       }
