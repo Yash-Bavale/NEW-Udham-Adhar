@@ -118,8 +118,9 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
       toast.success(
         side === "customer"
           ? "Customer notified — 8-business-hour auto-closure scheduled."
-          : "Internal delay logged — assignee has been notified.",
+          : "E003 sent to customer + internal reminder queued for assignee.",
       );
+
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
