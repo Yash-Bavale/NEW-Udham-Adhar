@@ -11,8 +11,6 @@ import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
-import { OrderActionRail } from "./OrderActionRail";
-import { OrderStageActions } from "./OrderStageActions";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -298,43 +296,25 @@ export function WorkspaceShell(p: Props) {
             (OrderWorkflowPanel). This card is header info only. */}
       </section>
 
-      {/* ── EMPLOYEE ACTIONS (single source of truth) ── */}
-      <OrderActionRail
-        applicationId={application.id}
-        leadId={lead?.id ?? null}
-        stage={p.stage}
-        current={current}
-        workflowStatus={(application as any).workflow_status}
-        closureStage={(application as any).closure_stage}
-        closureNextAt={(application as any).closure_next_at}
-        cancellationRequestedAt={(application as any).cancellation_requested_at}
-        reasonCode={(application as any).closure_reason_code}
-        reasonText={(application as any).closure_reason_text}
-        updatedAt={application.updated_at ?? application.created_at}
-        onSwitchTab={(id) => setTab(id)}
-      />
-
-      {/* Phase 3/4 — new-lifecycle stage actions (Form Pending/Received, hold
-          split, Await Govt, System Close, Govt Rejected). Coexists with the
-          legacy rail above during the transition. */}
-      {orderStatus && (
-        <OrderStageActions
-          orderId={application.id}
-          currentStatus={orderStatus as any}
-        />
-      )}
-
-      {/* Customer Journey */}
+      {/* ── SINGLE SOURCE OF TRUTH: Customer Journey Map ────────────
+          Replaces OrderActionRail + OrderStageActions + the old
+          Customer Journey card. Every employee action lives here. */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
         <div className="flex items-center justify-between">
-          <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
-            Customer Journey
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
+              Customer Journey & Employee Actions
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              Every stage, every button — one map. All action buttons are always visible; the highlighted node shows where the order is right now.
+            </div>
           </div>
         </div>
         <CustomerJourneyMap
           applicationId={application.id}
           stage={p.stage}
           isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
+          serviceCode={(service as any)?.service_code ?? (service as any)?.code ?? lead?.service ?? null}
           workflowStatus={(application as any).workflow_status}
           closureStage={(application as any).closure_stage}
           closureNextAt={(application as any).closure_next_at}
@@ -343,6 +323,7 @@ export function WorkspaceShell(p: Props) {
           hideAmount={p.hideAmount}
         />
       </section>
+
 
 
       {/* Tabs */}
