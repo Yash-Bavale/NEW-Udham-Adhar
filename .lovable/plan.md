@@ -10,10 +10,10 @@
 8. **Consultation stage:** **Kept in the happy path** (optional pre-form step). Talk-to-expert remains available as a standalone ticket-style flow too.
 
 ## Phase status
-- Phase 1 — Schema: **DONE** (enum + `order_close_reasons` + applications/workflow_timers/support_tickets columns + `allowed_order_transitions` rewrite).
-- Phase 2 — Backend: in progress.
-- Phase 3 — Frontend: pending.
-- Phase 4 — Timer consolidation: pending.
+- Phase 1 — Schema: **DONE**.
+- Phase 2 — Backend: **DONE**.
+- Phase 3 — Frontend: **DONE**.
+- Phase 4 — Timer consolidation: **DONE**.
 
 ---
 
