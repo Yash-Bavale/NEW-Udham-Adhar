@@ -102,6 +102,7 @@ export type JourneyActionKind =
 export const JOURNEY_BRANCHES: JourneyBranch[] = [
   {
     key: "form-not-submitted",
+    track: "delay",
     parentStage: "order_received",
     title: "Form Not Submitted",
     tone: "amber",
@@ -119,6 +120,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "customer-side-delay",
+    track: "delay",
     parentStage: "form_submitted",
     title: "Customer-Side Delay",
     tone: "amber",
@@ -136,6 +138,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "technical-delay",
+    track: "delay",
     parentStage: "form_submitted",
     title: "Technical / External Delay",
     tone: "sky",
@@ -153,6 +156,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "app-submitted-actions",
+    track: "main",
     parentStage: "app_submitted",
     title: "After Application Submitted to Govt",
     tone: "violet",
@@ -177,6 +181,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "final-status-actions",
+    track: "main",
     parentStage: "check_status",
     title: "Check Final Application Status",
     tone: "emerald",
@@ -208,6 +213,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
   },
   {
     key: "talk-to-expert",
+    track: "main",
     parentStage: "completed",
     title: "Talk-to-Expert Service",
     tone: "violet",
