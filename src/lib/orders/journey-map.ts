@@ -302,3 +302,68 @@ export function getActiveDelayBranchKey(workflowStatus?: string | null): string 
   return null;
 }
 
+/* ─────────────────────── Live-state derivation ─────────────────────── */
+
+export type JourneyLiveSubKey =
+  | "form-not-submitted"
+  | "technical-delay"
+  | "customer-delay"
+  | "govt-awaiting"
+  | "govt-rejected"
+  | "force-closed"
+  | null;
+
+export interface JourneyLiveState {
+  currentMainIndex: number;
+  activeSubKey: JourneyLiveSubKey;
+  terminal: "completed" | "closed" | null;
+  reasonCode: string | null;
+  subStateLabel: string;
+}
+
+export function deriveJourneyLiveState(input: {
+  stage: OrderStage;
+  workflowStatus?: string | null;
+  closureStage?: string | null;
+  closureReasonLabel?: string | null;
+}): JourneyLiveState {
+  const idx = stageToJourneyIndex(input.stage);
+  const closureStageValue = (input.closureStage ?? "").toLowerCase();
+  const isClosed = /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
+  const isCompleted = input.stage === "completed";
+  const ws = (input.workflowStatus ?? "").toLowerCase();
+  const reasonMatch = (input.closureReasonLabel ?? "").match(/\b([ABC]\d{1,2})\b/i);
+  const reasonCode = reasonMatch ? reasonMatch[1].toUpperCase() : null;
+
+  let activeSubKey: JourneyLiveSubKey = null;
+  if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
+    activeSubKey = "form-not-submitted";
+  } else if (/customer_hold|customer_side|customer_delay/.test(ws)) {
+    activeSubKey = "customer-delay";
+  } else if (/technical_hold|external_delay|govt_delay|technical_delay/.test(ws)) {
+    activeSubKey = "technical-delay";
+  } else if (idx === 4 || idx === 5) {
+    activeSubKey = "govt-awaiting";
+  }
+  if (isClosed) {
+    activeSubKey = reasonCode?.startsWith("B") ? "govt-rejected" : "force-closed";
+  }
+
+  let subStateLabel = "In progress";
+  if (isClosed) subStateLabel = `Closed${reasonCode ? ` · ${reasonCode}` : ""}`;
+  else if (activeSubKey === "form-not-submitted") subStateLabel = "Form Not Submitted";
+  else if (activeSubKey === "customer-delay") subStateLabel = `Customer Delay${reasonCode ? ` (${reasonCode})` : ""}`;
+  else if (activeSubKey === "technical-delay") subStateLabel = `Technical Delay${reasonCode ? ` (${reasonCode})` : ""}`;
+  else if (activeSubKey === "govt-awaiting") subStateLabel = "Awaiting Govt Response";
+  else if (isCompleted) subStateLabel = "Completed";
+
+  return {
+    currentMainIndex: idx,
+    activeSubKey,
+    terminal: isClosed ? "closed" : isCompleted ? "completed" : null,
+    reasonCode,
+    subStateLabel,
+  };
+}
+
+
