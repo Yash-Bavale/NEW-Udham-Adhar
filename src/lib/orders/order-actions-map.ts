@@ -260,6 +260,16 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
     hint: "Reach out to unblock, then resume processing.",
     primary: "send_form_link",
   },
+  TECHNICAL_HOLD_EXTERNAL: {
+    headline: "Technical hold — govt/portal",
+    hint: "Portal issue on govt side. Retry when clear or close the order.",
+    primary: "start_processing",
+  },
+  TECHNICAL_HOLD_INTERNAL: {
+    headline: "Technical hold — internal",
+    hint: "Blocked on our side. Resolve and resume processing.",
+    primary: "start_processing",
+  },
   OUR_SIDE_DELAY: {
     headline: "Our-side delay",
     hint: "Resume processing or file when the block is cleared.",
