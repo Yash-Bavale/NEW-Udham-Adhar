@@ -2,6 +2,74 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate } from "./smtp.server";
 import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 
+/**
+ * Legacy → canonical template alias.
+ * The ONLY email templates that exist in the DB are the 14 approved
+ * BHS templates (E001–E010, T001–T003, R001). Any legacy code passed by
+ * older call-sites is resolved here. Codes mapped to `null` are silently
+ * dropped (no email is sent) — used to kill off admin/internal notices
+ * the product owner has explicitly removed.
+ */
+const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
+  // Order lifecycle
+  order_confirmation: "E001",
+  welcome_and_form_link: "E002",
+  "client-info-request": "E002",
+  docs_required_reminder: "E002",
+  payment_link: "E002",
+  lead_welcome: "E002",
+  bhs_e005_manual_reminder: "E002",
+  workflow_external_delay_notice: "E003",
+  bhs_e004_our_side_delay: "E003",
+  bhs_e003_customer_delay: "E004",
+  bhs_e012_submitted_to_govt: "E006",
+  bhs_order_resumed: "E006",
+  workflow_processing_update_3d: "E006",
+  order_completed: "E007",
+  certificate_delivery: "E007",
+  "certificate-delivered": "E007",
+  talk_to_expert_completed: "E009",
+  consultation_service_converted: "E009",
+  talk_to_expert_request_customer: "E009",
+  order_closure_confirmation: "E010",
+  order_pending_closure: "E010",
+  "cancel-action-required": "E010",
+  "cancel-closure-confirmation": "E010",
+  workflow_closure_notice: "E010",
+  // Tickets
+  support_ticket_reply: "T002",
+  support_ticket_closed: "T001",
+  support_ticket_closed_final: "T003",
+  ticket_created: "T002",
+  // Refunds
+  refund_processed_confirmation: "R001",
+  // Explicitly dropped — no customer/admin email should fire
+  contact_acknowledgement: null,
+  admin_new_lead: null,
+  admin_onboarding_submitted: null,
+  complaint_admin_notification: null,
+  complaint_sla_breach: null,
+  talk_to_expert_request_admin: null,
+  onboarding_complete: null,
+  onboarding_reminder: null,
+  payment_success: null,
+  service_processing_update: null,
+};
+
+/** Resolve a caller-supplied template code to a canonical one, or null to skip. */
+function resolveTemplateCode(code: string | null | undefined): { code: string | null; drop: boolean } {
+  if (!code) return { code: null, drop: false };
+  const trimmed = code.trim();
+  if (/^(E0(0[1-9]|10)|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
+  if (Object.prototype.hasOwnProperty.call(LEGACY_TEMPLATE_ALIAS, trimmed)) {
+    const mapped = LEGACY_TEMPLATE_ALIAS[trimmed];
+    return { code: mapped, drop: mapped === null };
+  }
+  // Unknown code — let downstream template lookup fail loudly
+  return { code: trimmed, drop: false };
+}
+
+
 /** Strip HTML → plain-text fallback. Lovable email API rejects empty `text`. */
 function htmlToPlainText(html: string | null | undefined): string {
   if (!html) return "";
@@ -48,7 +116,12 @@ export async function enqueueEmailInternal(input: {
   requireImmediateSuccess?: boolean;
   allowWithoutTemplate?: boolean;
 }) {
-  const templateCode = input.templateCode?.trim() || null;
+  const resolved = resolveTemplateCode(input.templateCode);
+  if (resolved.drop) {
+    console.warn(`[emails] dropping legacy template '${input.templateCode}' (no longer sent).`);
+    return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+  }
+  const templateCode = resolved.code;
   if (!templateCode && !input.allowWithoutTemplate) {
     throw new Error("Email template code is required. Use a saved Email Template for this send.");
   }
@@ -61,6 +134,7 @@ export async function enqueueEmailInternal(input: {
     if (tplErr) throw new Error(tplErr.message);
     if (!tpl) throw new Error(`Email template '${templateCode}' not found.`);
   }
+
 
   const variables: Record<string, unknown> = { ...(input.variables ?? {}) };
   if (input.allowWithoutTemplate) variables.__allow_without_template = true;
@@ -191,7 +265,10 @@ async function backfillCommonVariables(
     if (missing("customer_email") && lead?.email) out.customer_email = lead.email;
     if (missing("customer_mobile") && lead?.mobile) out.customer_mobile = lead.mobile;
     if (missing("service_name") && lead?.service) out.service_name = lead.service;
-    if (missing("order_number")) out.order_number = app?.application_code ?? lead?.lead_code ?? "";
+    // Order number is ALWAYS the application_code — never fall back to the lead_code.
+    // Lead code is a pre-order identifier and must never appear as the order number.
+    if (missing("order_number")) out.order_number = app?.application_code ?? "";
+    if (missing("lead_code") && lead?.lead_code) out.lead_code = lead.lead_code;
     const created = app?.created_at ?? lead?.created_at ?? null;
     if (missing("order_created_at") && created) {
       out.order_created_at = new Date(created).toLocaleString("en-IN", {
@@ -253,15 +330,22 @@ export async function enqueueFromTemplateInternal(
   rawVariables: Record<string, unknown>,
   opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual"; inReplyTo?: string | null; references?: string | null; threadSubject?: string | null },
 ) {
+  const resolved = resolveTemplateCode(code);
+  if (resolved.drop) {
+    console.warn(`[emails] dropping legacy template '${code}' (no longer sent).`);
+    return;
+  }
+  const effectiveCode = resolved.code ?? code;
   const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
   const variables = withBothCases(enriched);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled, dispatch_mode")
-    .eq("code", code)
+    .eq("code", effectiveCode)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!tpl) throw new Error(`Email template '${code}' not found.`);
+  if (!tpl) throw new Error(`Email template '${effectiveCode}' not found.`);
+
 
   if (!tpl.is_enabled) {
     if (opts?.requireImmediateSuccess) {
@@ -295,7 +379,7 @@ export async function enqueueFromTemplateInternal(
 
 
   return enqueueEmailInternal({
-    templateCode: code,
+    templateCode: effectiveCode,
     toEmail,
     toName: opts?.toName ?? null,
     subject,
