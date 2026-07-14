@@ -1,79 +1,76 @@
 
-# Unified Customer Journey Map
+## Goal
 
-One component becomes the only place employees see the order's stage and act on it. Replaces `OrderJourney`, `StageJourneyStrip`, `OrderJourneyStepper`, and `OrderStageActions`.
+Replace the single-row journey with **4 clearly separated tracks** stacked vertically, each with its own header, color band, stages and action buttons. The active sub-path is always visually highlighted (green = done, indigo = current, amber/rose = live delay/closure), and every branch is always visible even when inactive — so the employee sees at a glance where the order stands and every path it *could* take.
 
-## Visual layout (matches your HTML flowchart)
+## The 4 Tracks
 
 ```text
-Lead ─► Payment ─► Order ─► Form ─► App Submitted ─► Check Status ─► Completed
-Received  Received  Received  Submitted   to Govt Portal    (Final)
-  ✓         ✓         ●         ○              ○              ○           ○
-                      │         │              │              │
-                      │         ├─ Form Not Submitted ─► auto-close 8h (A7)
-                      │         ├─ Customer Delay (E004, Cat A)
-                      │         ├─ Technical Delay (E003, Cat B)
-                      │         └─ Waiting for Govt (reminder)
-                      │                        │
-                      │                        ├─ Accepted → E007 + PDF
-                      │                        ├─ Rejected → E008
-                      │                        └─ Reminder → E006
-                      └─ Ticket Open (pauses flow) ─► T001/T002/T003
+┌─ 🟢 MAIN JOURNEY ────────────────────────────────────────────────┐
+│  Lead → Payment → Order Rcvd → Form → Govt Portal → Final → Done │
+│  (7 stage nodes, current one pulses indigo, done ones green)     │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ 🟡 DELAY FLOW  (visible always, "LIVE" chip when active) ───────┐
+│  ┌─ Form Not Submitted ─┐ ┌─ Customer Delay ─┐ ┌─ Tech Delay ─┐  │
+│  │ E002 Send Form Link  │ │ E004 (Cat A)     │ │ E003 (Cat B) │  │
+│  └──────────────────────┘ └──────────────────┘ └──────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ 🔴 CLOSURE FLOW  (auto-close countdown + reasons) ──────────────┐
+│  Countdown chip · Reason label · [Force Close E010]              │
+│  [E008 Govt Rejected]  [T002 Reply w/ Reason 8h auto-close]      │
+└──────────────────────────────────────────────────────────────────┘
+
+┌─ 🔵 SUPPORT TICKET FLOW  (only rendered when ticket exists) ─────┐
+│  Ticket #XXX open · Workflow paused                              │
+│  [T001 Normal Close] [T001 Restart] [T001 Consult Done] [T002]   │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-Happy path on top row. Sub-paths drop below their parent stage. Current stage highlighted; past stages ticked; the live path (including which sub-branch the order is on) is drawn in accent color. All action buttons always visible and always clickable regardless of stage.
+Each track is a self-contained card so pausing/resuming, delays and closures never mutate or hide the Main Journey — the main path stays visible with its progress preserved.
 
-## Button → action map
+## Files to Change
 
-| Button | Template | Reason | Effect |
-|---|---|---|---|
-| (auto on payment) | E001 | — | Payment confirmation, sent by webhook |
-| Send Form Link / Reminder | E002 | — | Enqueue E002; start 8h auto-close armed with A7 |
-| Customer-Side Delay | E004 | Cat A picker | Send E004, log delay |
-| Technical Delay | E003 | Cat B picker | Send E003, log delay |
-| Complete at Submission | E005 | — | Send E005, move to Completed |
-| Add Reminder | E006 | — | Send E006 + create employee reminder (dashboard notif) |
-| Application Accepted | E007 | — | Upload PDF cert + send E007, move to Completed |
-| Application Rejected | E008 | Cat B picker | Send E008, force close via E010 |
-| Talk-to-Expert Reply | E009 | — | Visible only if service=talk_to_expert |
-| Force Close | E004+E010 | Cat A picker | Cancel timers + close order |
-| Ticket: Normal Close | T001-normal | — | Close ticket, resume workflow |
-| Ticket: Restart Order | T001-restart | — | Close ticket, resume timers |
-| Ticket: Consultation Done | T001 | — | Close ticket (support completed) |
-| Ticket: Reply w/ Reason | T002 | Cat A/B/C | Send reply, 8h auto-close ticket (T003) |
+**1. `src/lib/orders/journey-map.ts`** — add a `track` field to each branch/button config.
 
-## Files
+```ts
+export type JourneyTrack = "main" | "delay" | "closure" | "ticket";
+```
 
-**New**
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — the single map (happy path row + sub-branches + always-visible action rail below each node)
-- `src/components/admin/workspace/JourneyActionButton.tsx` — small button with template code chip
-- `src/lib/orders/journey-map.ts` — pure config: stages, branches, button definitions, service-visibility rules
-- `src/lib/orders/actions/employee-reminder.functions.ts` — E006 sends email + inserts `order_reminders` row with notify_at
+Re-tag existing branches:
+- `form-not-submitted`, `customer-side-delay`, `technical-delay` → `track: "delay"`
+- `app-submitted-actions`, `final-status-actions`, `talk-to-expert` → `track: "main"` (stay under their parent stage)
+- New `closure` track config: force-close, govt-rejected (E008), T002 reply-reason
+- `TICKET_BUTTONS` → `track: "ticket"`
 
-**Edit**
-- `src/components/admin/workspace/WorkspaceShell.tsx` — replace the 3 old components with `<CustomerJourneyMap />`
-- `src/lib/orders/order-actions.functions.ts` — add thin wrappers `sendE002`…`sendE009` calling `enqueueFromTemplateInternal` with the right BHS template + reason + side effects (timer arm/cancel, reminder insert)
-- `src/lib/emails/bhs-templates.ts` — ensure all E001–E010 codes are exported constants
+Add `getActiveDelayBranchKey(workflowStatus)` and `getActiveClosureState(closureStage, closureNextAt)` helpers so the UI can highlight without re-deriving.
 
-**Delete (after Shell swap)**
-- `src/components/admin/OrderJourney.tsx`
-- `src/components/admin/StageJourneyStrip.tsx`
-- `src/components/admin/OrderJourneyStepper.tsx`
-- `src/components/admin/workspace/OrderStageActions.tsx`
-- `src/components/admin/workspace/StageStepper.tsx`
+**2. `src/components/admin/workspace/CustomerJourneyMap.tsx`** — replace the single grid with 4 stacked `<TrackCard>` sections:
 
-## Reason → standard reply → ticket
+- `<MainTrack>`: current 7-stage stepper + only the *positive* branches under `app_submitted` / `check_status` / `completed` (E005, E006, E007, E009). Same visual as today but narrower.
+- `<DelayTrack>`: 3 branch cards side-by-side (Form-Not-Submitted, Customer Delay, Tech Delay). All 3 always shown; the one matching `workflowStatus` gets a live ring + "LIVE" chip and a small "Why: {reason}" line pulled from `view` / `closureReasonLabel`.
+- `<ClosureTrack>`: shows the countdown chip (already in `view.nextTimer`) + closure-stage label + Force Close + E008 + T002 buttons. When `closed`, the whole card turns slate and shows the final reason.
+- `<TicketTrack>`: renders only when `view.activeTicketId`. Shows ticket id, "Workflow paused" banner (moved out of the top), and the 4 T00x buttons. **Not rendered when no ticket** (fixes the earlier ask "don't show ticket actions when no ticket").
 
-When any reason-picker button is used, the send-email server fn:
-1. Reads the standard reply from `order_close_reasons.standard_reply` (already seeded from your docx).
-2. Uses it as the email body (editable in dialog).
-3. Calls `findOrReopenTicket` to open/reopen the single ticket for that order with the reply pre-attached as the first ticket reply.
+Shared visual language:
+- Track header: colored dot + bold label + status chip (`Idle` / `Live` / `Paused` / `Closed`).
+- Inactive branches: muted (60% opacity, no ring).
+- Active branch: colored ring + pulsing dot + reason caption.
+- All buttons stay clickable regardless of active state (per prior spec).
 
-No schema changes required — all tables (`order_close_reasons`, `support_tickets`, `ticket_replies`, `order_reminders`, `email_queue`) already exist.
+**3. No server / migration changes.** All wiring already exists (`useOrderWorkflow`, existing server fns for E002…E010, T001…T003). This is purely a presentation restructure of `CustomerJourneyMap.tsx` + config tags in `journey-map.ts`.
 
-## Out of scope for this pass
-- Payment link button (removed as agreed)
-- Any migrations (schema already supports everything)
-- Redesign of dialogs — reuse existing `ReasonPicker`, `CloseOrderDialog`, `ExternalDelayDialog`
+## Behavior Rules
 
-Approve and I'll build it in one shot.
+- Main track is *never* replaced or hidden by a delay/closure — it stays with its accumulated green ticks.
+- Delay track shows all 3 sub-paths always; highlights the live one with reason text.
+- Closure track surfaces the auto-close countdown, closure reason, and every close-button in one place (no more scattered force-close footer + govt-rejected inline).
+- Ticket track is conditionally mounted — hidden entirely when there is no active ticket.
+- Positive next-step buttons (E005 / E006 / E007 / E009) stay under their Main-track stage columns exactly where they are today (matches your "buttons directly below stage" request).
+
+## Out of Scope
+
+- No changes to email templates, server functions, or workflow engine.
+- No new dialogs — reuse `ExternalDelayDialog`, `CloseOrderDialog`, `CompletionGateDialogStandalone`, `GovtRejectedInline`.
+- Sidebar collapse, ticket-actions-only-when-ticket-exists were done earlier; only re-affirming ticket-track visibility here.
