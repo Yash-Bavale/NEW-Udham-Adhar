@@ -251,6 +251,7 @@ export type Database = {
       }
       applications: {
         Row: {
+          active_reason_id: string | null
           active_reason_text: string | null
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
@@ -309,6 +310,7 @@ export type Database = {
           workflow_status: Database["public"]["Enums"]["workflow_status"] | null
         }
         Insert: {
+          active_reason_id?: string | null
           active_reason_text?: string | null
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
@@ -369,6 +371,7 @@ export type Database = {
             | null
         }
         Update: {
+          active_reason_id?: string | null
           active_reason_text?: string | null
           application_code?: string | null
           application_status?: Database["public"]["Enums"]["application_status"]
@@ -429,6 +432,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_active_reason_id_fkey"
+            columns: ["active_reason_id"]
+            isOneToOne: false
+            referencedRelation: "order_close_reasons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "applications_closure_reason_id_fkey"
             columns: ["closure_reason_id"]
@@ -2086,6 +2096,42 @@ export type Database = {
           service_code?: string
           status?: string
           submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      order_close_reasons: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          number: number
+          sort_order: number
+          standard_reply: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          number: number
+          sort_order?: number
+          standard_reply?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          number?: number
+          sort_order?: number
+          standard_reply?: string
           updated_at?: string
         }
         Relationships: []
@@ -3834,6 +3880,7 @@ export type Database = {
           _remarks?: string
         }
         Returns: {
+          active_reason_id: string | null
           active_reason_text: string | null
           application_code: string | null
           application_status: Database["public"]["Enums"]["application_status"]
