@@ -19,7 +19,7 @@ import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
 import { formatIST, relativeIST } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-import { stageToJourneyIndex, JOURNEY_STAGES } from "@/lib/orders/journey-map";
+import { stageToJourneyIndex, JOURNEY_STAGES, deriveJourneyLiveState } from "@/lib/orders/journey-map";
 
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
