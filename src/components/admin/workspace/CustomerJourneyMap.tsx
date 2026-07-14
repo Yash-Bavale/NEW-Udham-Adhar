@@ -1,13 +1,7 @@
-// Unified Customer Journey Map — the single source of truth for the order
-// workspace. Renders the exact flowchart shape supplied by the user:
-//
-//   Lead ─► Payment ─► Order ─► Form ─► Govt Submitted ─► Final Status ─► Completed
-//                              │            │                │
-//                              └─ sub-branches with ALL buttons always visible
-//
-// Replaces OrderJourney, StageJourneyStrip, OrderJourneyStepper and
-// OrderStageActions. All email E-codes (E001–E010) + ticket codes (T001–T003)
-// are wired here so employees never leave this component to progress an order.
+// Unified Customer Journey Map — single source of truth for the order workspace.
+// Each stage in the happy path is rendered as a COLUMN with its branch cards
+// (and their buttons) stacked directly below it, so employees see visually
+// which sub-path the order is currently on — matching the drawio flowchart.
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +35,6 @@ import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 
-// ─── Icons per stage (matches flowchart) ────────────────────────────
 const STAGE_ICON = {
   lead_received:    User,
   payment_received: CreditCard,
@@ -52,12 +45,11 @@ const STAGE_ICON = {
   completed:        Trophy,
 } as const;
 
-// ─── Component props ────────────────────────────────────────────────
 interface Props {
   applicationId: string;
   stage: OrderStage;
   isConsultationOrder?: boolean;
-  serviceCode?: string | null;    // used to gate E009 (talk_to_expert)
+  serviceCode?: string | null;
   workflowStatus?: string | null;
   closureStage?: string | null;
   closureNextAt?: string | null;
@@ -65,6 +57,14 @@ interface Props {
   payments?: any[];
   hideAmount?: boolean;
 }
+
+const TONE_MAP = {
+  amber:   { border: "border-amber-300",   bg: "bg-amber-50",   text: "text-amber-700",   ring: "ring-amber-400"   },
+  rose:    { border: "border-rose-300",    bg: "bg-rose-50",    text: "text-rose-700",    ring: "ring-rose-400"    },
+  sky:     { border: "border-sky-300",     bg: "bg-sky-50",     text: "text-sky-700",     ring: "ring-sky-400"     },
+  violet:  { border: "border-violet-300",  bg: "bg-violet-50",  text: "text-violet-700",  ring: "ring-violet-400"  },
+  emerald: { border: "border-emerald-300", bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-400" },
+};
 
 export function CustomerJourneyMap(p: Props) {
   const qc = useQueryClient();
@@ -74,16 +74,23 @@ export function CustomerJourneyMap(p: Props) {
   const ticketActive = !!view.activeTicketId;
   const closed = (p.closureStage && p.closureStage !== "none") || view.stage === "closed";
 
-  // Which sub-branch (if any) reflects the live path
   const activeBranchKey = useMemo<string | null>(() => {
-    if (ticketActive) return "ticket";
     if (/customer_hold|customer_side/i.test(p.workflowStatus ?? "")) return "customer-side-delay";
     if (/technical_hold|delay|external/i.test(p.workflowStatus ?? "")) return "technical-delay";
-    if (p.stage === "form_submitted" || p.stage === "in_progress") return null;
     return null;
-  }, [ticketActive, p.workflowStatus, p.stage]);
+  }, [p.workflowStatus]);
 
-  // Dialog state
+  // Group branches by parent stage
+  const branchesByStage = useMemo(() => {
+    const m: Record<string, JourneyBranch[]> = {};
+    for (const b of JOURNEY_BRANCHES) {
+      // Filter Talk-to-Expert branch when service doesn't match
+      if (b.key === "talk-to-expert" && !isTalkToExpert) continue;
+      (m[b.parentStage] ??= []).push(b);
+    }
+    return m;
+  }, [isTalkToExpert]);
+
   const [dialog, setDialog] = useState<
     | null
     | { kind: "customer_delay" }
@@ -100,7 +107,6 @@ export function CustomerJourneyMap(p: Props) {
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.applicationId] });
   };
 
-  // ─── Wired server fns ─────────────────────────────────────────────
   const fnFormLink = useServerFn(sendFormLink);
   const fnSubmit   = useServerFn(markSubmittedToGovt);
   const fnReminder = useServerFn(sendManualReminder);
@@ -128,7 +134,6 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // ─── Route each JourneyActionKind ────────────────────────────────
   const runAction = (action: JourneyActionKind) => {
     switch (action) {
       case "send_form_link":       return mutFormLink.mutate();
@@ -154,15 +159,14 @@ export function CustomerJourneyMap(p: Props) {
   };
 
   return (
-    <div className="space-y-5">
-      {/* Ticket-open banner — pauses the flow visually */}
+    <div className="space-y-4">
       {ticketActive && (
         <div className="rounded-xl border-2 border-rose-300 bg-rose-50 px-4 py-3 flex items-start gap-3">
           <PauseCircle className="size-5 text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-rose-900">Workflow paused — ticket open for this customer</div>
             <div className="text-xs text-rose-800 mt-0.5">
-              Close the ticket using one of the buttons below to resume the journey.
+              Resolve the ticket from the Support tab to resume the journey.
             </div>
           </div>
         </div>
@@ -178,21 +182,35 @@ export function CustomerJourneyMap(p: Props) {
         </div>
       )}
 
-      {/* ── HAPPY PATH (top row) ─────────────────────────────────── */}
+      {/* ── JOURNEY MAP: stage columns with branches below each ──────── */}
       <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-5">
-        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-3">
-          Happy Path
+        <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-4">
+          Customer Journey — Live Path
         </div>
-        <div className="flex items-start justify-between gap-1 overflow-x-auto pb-1">
-          {JOURNEY_STAGES.map((s, i) => {
-            const Icon = STAGE_ICON[s.key];
-            const done = i < currentIdx || (i === currentIdx && s.key === "completed" && p.stage === "completed");
-            const active = i === currentIdx && !done && !closed;
-            const blocked = active && (ticketActive || !!activeBranchKey);
-            return (
-              <div key={s.key} className="flex items-start gap-1 flex-1 min-w-0">
-                <div className="flex flex-col items-center gap-2 flex-1 min-w-[80px]">
-                  <div className="relative">
+
+        <div className="overflow-x-auto pb-2">
+          <div className="grid gap-2 min-w-[900px]" style={{ gridTemplateColumns: `repeat(${JOURNEY_STAGES.length}, minmax(140px, 1fr))` }}>
+            {/* Row 1: stage nodes + connectors */}
+            {JOURNEY_STAGES.map((s, i) => {
+              const Icon = STAGE_ICON[s.key];
+              const done = i < currentIdx || (i === currentIdx && s.key === "completed" && p.stage === "completed");
+              const active = i === currentIdx && !done && !closed;
+              const blocked = active && (ticketActive || !!activeBranchKey);
+              const isLast = i === JOURNEY_STAGES.length - 1;
+              return (
+                <div key={`stage-${s.key}`} className="relative flex flex-col items-center gap-2">
+                  {/* connector to next */}
+                  {!isLast && (
+                    <div className="absolute top-6 left-1/2 w-full h-0.5 z-0">
+                      <div className={cn(
+                        "h-full",
+                        i < currentIdx ? "bg-emerald-400"
+                        : i === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
+                        : "bg-slate-200",
+                      )}/>
+                    </div>
+                  )}
+                  <div className="relative z-10">
                     <div className={cn(
                       "size-12 rounded-full grid place-items-center transition-all",
                       done ? "bg-emerald-500 text-white shadow"
@@ -218,87 +236,72 @@ export function CustomerJourneyMap(p: Props) {
                   )}>
                     {s.short}
                   </span>
-                  <div className="text-[9px] text-slate-400 text-center leading-tight max-w-[110px]">
+                  <div className="text-[9px] text-slate-400 text-center leading-tight max-w-[120px]">
                     {s.label}
                   </div>
                 </div>
-                {i < JOURNEY_STAGES.length - 1 && (
-                  <div className="flex items-center h-12 flex-1 min-w-[16px]">
-                    <div className={cn(
-                      "h-0.5 w-full",
-                      i < currentIdx ? "bg-emerald-400"
-                      : i === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
-                      : "bg-slate-200",
-                    )}/>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+              );
+            })}
 
-      {/* ── SUB-BRANCHES (always visible) ────────────────────────── */}
-      <div className="grid gap-3 md:grid-cols-2">
-        {JOURNEY_BRANCHES.map((branch) => {
-          const visibleButtons = branch.buttons.filter(
-            (b) => !b.serviceOnly || (b.serviceOnly === "talk_to_expert" && isTalkToExpert),
-          );
-          if (visibleButtons.length === 0) return null;
-          return (
-            <BranchCard
-              key={branch.key}
-              branch={branch}
-              buttons={visibleButtons}
-              active={activeBranchKey === branch.key}
-              onAction={runAction}
-              currentStageKey={JOURNEY_STAGES[currentIdx]?.key}
-            />
-          );
-        })}
-      </div>
-
-      {/* ── TICKET RAIL (always visible) ─────────────────────────── */}
-      <div className={cn(
-        "rounded-2xl border p-4",
-        ticketActive ? "border-rose-300 bg-rose-50/40" : "border-slate-200 bg-white",
-      )}>
-        <div className="flex items-center gap-2 mb-2">
-          <Ticket className="size-4 text-rose-600" />
-          <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-rose-700">
-            Ticket Close Actions
+            {/* Row 2: branches under their parent stage */}
+            {JOURNEY_STAGES.map((s) => {
+              const branches = branchesByStage[s.key] ?? [];
+              return (
+                <div key={`branches-${s.key}`} className="flex flex-col gap-2 pt-2">
+                  {branches.length === 0 ? (
+                    <div className="h-full min-h-[40px]" />
+                  ) : (
+                    branches.map((branch) => (
+                      <BranchCard
+                        key={branch.key}
+                        branch={branch}
+                        active={activeBranchKey === branch.key}
+                        onAction={runAction}
+                      />
+                    ))
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {ticketActive && (
-            <span className="ml-1 rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">
-              Active
-            </span>
-          )}
-        </div>
-        <div className="text-[11px] text-slate-600 mb-3">
-          One ticket per order — reopens instead of duplicating. Use these when a mail/contact/complaint arrives.
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {TICKET_BUTTONS.map((b) => (
-            <JourneyActionButton key={b.key} button={b} onClick={() => runAction(b.action)} />
-          ))}
         </div>
       </div>
 
-      {/* ── FORCE CLOSE FOOTER (always visible) ──────────────────── */}
+      {/* ── TICKET RAIL — only when active ───────────────────────── */}
+      {ticketActive && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50/40 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Ticket className="size-4 text-rose-600" />
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-rose-700">
+              Ticket Close Actions
+            </div>
+            <span className="ml-1 rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">Active</span>
+          </div>
+          <div className="text-[11px] text-slate-600 mb-3">
+            One ticket per order — reopens instead of duplicating.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {TICKET_BUTTONS.map((b) => (
+              <JourneyActionButton key={b.key} button={b} onClick={() => runAction(b.action)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── FORCE CLOSE FOOTER ───────────────────────────────────── */}
       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <AlertTriangle className="size-5 text-rose-600 shrink-0" />
           <div className="min-w-0">
             <div className="text-sm font-bold text-rose-900">Force Close Order</div>
             <div className="text-[11px] text-rose-800/80">
-              Pick a Category A reason. Sends E010 closure email with the reason and cancels every pending timer.
+              Pick a Category A reason. Sends E010 closure email and cancels every pending timer.
             </div>
           </div>
         </div>
         <JourneyActionButton button={FORCE_CLOSE_BUTTON} onClick={() => runAction("force_close")} />
       </div>
 
-      {/* ── Engine footer info ───────────────────────────────────── */}
       {view.hasEngine && view.nextTimer && (
         <div className="text-[11px] text-slate-500 text-center">
           Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)}
@@ -306,7 +309,6 @@ export function CustomerJourneyMap(p: Props) {
         </div>
       )}
 
-      {/* ── Dialogs (reused) ─────────────────────────────────────── */}
       <ExternalDelayDialog
         applicationId={p.applicationId}
         initialSide="customer"
@@ -357,40 +359,35 @@ export function CustomerJourneyMap(p: Props) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
 function BranchCard({
-  branch, buttons, active, onAction, currentStageKey,
+  branch, active, onAction,
 }: {
   branch: JourneyBranch;
-  buttons: JourneyBranchButton[];
   active: boolean;
   onAction: (a: JourneyActionKind) => void;
-  currentStageKey?: JourneyStageKey;
 }) {
-  const parent = JOURNEY_STAGES.find((s) => s.key === branch.parentStage);
   const tone = TONE_MAP[branch.tone];
-  const attachedToCurrent = currentStageKey === branch.parentStage;
   return (
     <div className={cn(
-      "rounded-xl border p-4 space-y-3 transition",
+      "rounded-lg border p-2.5 space-y-2 transition text-left",
       tone.border, tone.bg,
-      active && "ring-2 ring-offset-1 ring-indigo-400 shadow-md",
+      active && "ring-2 ring-offset-1 shadow-md",
+      active && tone.ring,
     )}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className={cn("text-[10px] uppercase tracking-wider font-bold", tone.text)}>
-            Under: {parent?.short}
-            {attachedToCurrent && (
-              <span className="ml-2 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[9px] font-bold text-white">Current</span>
-            )}
-          </div>
-          <div className="text-sm font-bold text-slate-900 mt-0.5">{branch.title}</div>
+      <div className="flex items-start justify-between gap-1">
+        <div className={cn("text-[9px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
+          {branch.title}
+          {active && (
+            <span className="ml-1 rounded-full bg-rose-600 px-1 py-0.5 text-[8px] font-bold text-white uppercase">
+              Live
+            </span>
+          )}
         </div>
-        <ArrowRight className={cn("size-4 shrink-0", tone.text)} />
+        <ArrowRight className={cn("size-3 shrink-0 mt-0.5", tone.text)} />
       </div>
-      <div className="text-[11px] text-slate-600 leading-relaxed">{branch.description}</div>
-      <div className="flex flex-wrap gap-2 pt-1">
-        {buttons.map((b) => (
+      <div className="text-[10px] text-slate-600 leading-snug line-clamp-3">{branch.description}</div>
+      <div className="flex flex-col gap-1.5">
+        {branch.buttons.map((b) => (
           <JourneyActionButton
             key={b.key}
             button={b}
@@ -403,15 +400,6 @@ function BranchCard({
   );
 }
 
-const TONE_MAP = {
-  amber:   { border: "border-amber-200",   bg: "bg-amber-50/40",   text: "text-amber-700"   },
-  rose:    { border: "border-rose-200",    bg: "bg-rose-50/40",    text: "text-rose-700"    },
-  sky:     { border: "border-sky-200",     bg: "bg-sky-50/40",     text: "text-sky-700"     },
-  violet:  { border: "border-violet-200",  bg: "bg-violet-50/40",  text: "text-violet-700"  },
-  emerald: { border: "border-emerald-200", bg: "bg-emerald-50/40", text: "text-emerald-700" },
-};
-
-// Inline dialog for E008 (govt rejected) — reuses closeOrderSystem with source=govt_rejection.
 function GovtRejectedInline({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const [reasonText, setReasonText] = useState("");
   const fn = useServerFn(handleGovtRejected);
