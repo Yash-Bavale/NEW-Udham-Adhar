@@ -161,8 +161,9 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
               active={side === "internal"}
               onClick={() => setSide("internal")}
               icon={<Server className="size-4" />}
-              title="Our-side (internal) delay"
-              subtitle="Notifies the assignee. No customer email. No auto-closure."
+              title="Our-side (technical) delay"
+              subtitle="Sends E003 to the customer AND creates an internal reminder for the assignee to follow up."
+
               accent="sky"
             />
           </div>
