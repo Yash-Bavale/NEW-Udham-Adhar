@@ -414,16 +414,15 @@ const TONE_MAP = {
 function GovtRejectedInline({ orderId, onClose }: { orderId: string; onClose: () => void }) {
   const [reasonText, setReasonText] = useState("");
   const fn = useServerFn(handleGovtRejected);
+  const listReasons = useServerFn(
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("@/lib/orders/actions/reasons.functions").listCloseReasons,
+  );
   const [busy, setBusy] = useState(false);
 
-  // Pull first Category B reason for a sane default
   const { data: reasons = [] } = useQuery({
-    queryKey: ["close-reasons-catb"],
-    queryFn: async () => {
-      const { listCloseReasons } = await import("@/lib/orders/actions/reasons.functions");
-      const rows = await (useServerFn as any)(listCloseReasons)();
-      return rows;
-    },
+    queryKey: ["close-reasons-all"],
+    queryFn: () => listReasons(),
     staleTime: 60_000,
   });
   const catB = (reasons as any[]).filter((r) => r.category === "B");
