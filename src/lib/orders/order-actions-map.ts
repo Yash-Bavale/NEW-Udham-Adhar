@@ -220,6 +220,26 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
     hint: "Send the customer info form link to kick things off.",
     primary: "send_form_link",
   },
+  PAYMENT_RECEIVED: {
+    headline: "Payment received",
+    hint: "Send the customer info form link.",
+    primary: "send_form_link",
+  },
+  ORDER_RECEIVED: {
+    headline: "Order received",
+    hint: "Send the customer info form link.",
+    primary: "send_form_link",
+  },
+  FORM_PENDING: {
+    headline: "Form pending",
+    hint: "Customer has 8h to submit — send a reminder or resend the link.",
+    primary: "manual_reminder",
+  },
+  FORM_RECEIVED: {
+    headline: "Form received",
+    hint: "Start processing the application.",
+    primary: "start_processing",
+  },
   WAITING_CUSTOMER_INFO: {
     headline: "Waiting for customer info",
     hint: "Send a reminder if 24h has passed since the last nudge.",
