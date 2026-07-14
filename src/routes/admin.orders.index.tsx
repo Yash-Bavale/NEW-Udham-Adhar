@@ -252,7 +252,39 @@ function OrdersListPage() {
           onChange={(e) => setDateTo(e.target.value)}
           className="h-9 w-[160px] text-sm bg-white"
         />
+        <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+          <SelectTrigger className="h-9 w-[170px] text-sm bg-white">
+            <SelectValue placeholder="Pending age" />
+          </SelectTrigger>
+          <SelectContent>
+            {PENDING_AGE_OPTIONS.map((o) => (
+              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {pendingAge === "custom" && (
+          <Input
+            type="number"
+            min={1}
+            value={customDays}
+            onChange={(e) => setCustomDays(e.target.value)}
+            placeholder="Days"
+            className="h-9 w-[90px] text-sm bg-white"
+          />
+        )}
       </div>
+
+      {/* Pending ageing summary — shown when Pending bucket active or an age filter is applied */}
+      {(bucket === "pending" || minDays != null) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-900">
+          <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
+          <AgeChip label="< 1d" n={ageBuckets.d1} />
+          <AgeChip label="1d+"  n={ageBuckets.d2} />
+          <AgeChip label="2d+"  n={ageBuckets.d3} />
+          <AgeChip label="3d+"  n={ageBuckets.d7} />
+          <AgeChip label="7d+"  n={ageBuckets.older} tone="rose" />
+        </div>
+      )}
 
       {/* Bucket chips */}
       <div className="flex flex-wrap gap-2">
