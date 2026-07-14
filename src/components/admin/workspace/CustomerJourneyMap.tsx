@@ -194,13 +194,25 @@ export function CustomerJourneyMap(p: Props) {
       parentStage: "completed",
       track: "closure",
       lineLabel: "Closure",
-      title: closed ? "Order Closed" : "Manual Closure",
+      title: "Manual Close Action",
       tone: closed ? "emerald" : "rose",
       description: closed
-        ? "Terminal closure path reached with the selected reason."
+        ? "This order has already reached the closure endpoint."
         : "Use only when the order must be closed manually. Sends E010 and cancels pending timers.",
       buttons: closed ? [] : [FORCE_CLOSE_BUTTON],
       note: closed && p.closureReasonLabel ? <>Selected reason: <b>{p.closureReasonLabel}</b></> : null,
+    });
+
+    push("completed", {
+      key: "order-closed-terminal",
+      parentStage: "completed",
+      track: "closure",
+      lineLabel: "Closed",
+      title: "Order Closed",
+      tone: closed ? "emerald" : "rose",
+      description: "Final endpoint for force-close, auto-close, government rejection, or ticket reason closure.",
+      buttons: [],
+      note: closed && p.closureReasonLabel ? <>Closed with reason: <b>{p.closureReasonLabel}</b></> : <>Reached after a closure path completes.</>,
     });
 
     const talkToExpert = byKey.get("talk-to-expert");
@@ -313,6 +325,7 @@ export function CustomerJourneyMap(p: Props) {
             <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Delay</span>
             <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">Closure</span>
             <span className="rounded-full bg-sky-100 px-2 py-1 text-sky-700">Ticket</span>
+            <span className="rounded-full bg-slate-800 px-2 py-1 text-white">Order Closed</span>
           </div>
         </header>
 
@@ -499,7 +512,10 @@ function StageColumn({
 
             return (
               <div key={flow.key} className="relative">
-                <div className="absolute -top-2 left-1/2 h-2 w-px -translate-x-1/2 bg-slate-300" />
+                <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 flex-col items-center text-slate-400">
+                  <span className="h-3 w-px bg-slate-300" />
+                  <span className="-mt-1 text-[10px] leading-none">↓</span>
+                </div>
                 <BranchCard branch={flow} active={flowActive} muted={muted} onAction={onAction} />
               </div>
             );
