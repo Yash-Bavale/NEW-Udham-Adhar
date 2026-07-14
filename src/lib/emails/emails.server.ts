@@ -379,7 +379,7 @@ export async function enqueueFromTemplateInternal(
 
 
   return enqueueEmailInternal({
-    templateCode: code,
+    templateCode: effectiveCode,
     toEmail,
     toName: opts?.toName ?? null,
     subject,
