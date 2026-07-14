@@ -104,7 +104,6 @@ import { Route as MsmeCertificateBenefitsRouteImport } from './routes/msme-certi
 import { Route as MsmeCertificateRouteImport } from './routes/msme-certificate'
 import { Route as MsmeCerRouteImport } from './routes/msme-cer'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
-import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
@@ -179,8 +178,6 @@ import { Route as AdminCannedResponsesRouteImport } from './routes/admin.canned-
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
-import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
 import { Route as AdminTicketsIndexRouteImport } from './routes/admin.tickets.index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin.orders.index'
@@ -203,8 +200,6 @@ import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
 import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
 import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
-import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -719,11 +714,6 @@ const MigrateUdyogAadhaarToUdyamRoute =
     path: '/migrate-udyog-aadhaar-to-udyam',
     getParentRoute: () => rootRouteImport,
   } as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   id: '/llms.txt',
   path: '/llms.txt',
@@ -1099,18 +1089,6 @@ const AdminActivityRoute = AdminActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => AdminRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const OnboardingLeadCodeIndexRoute = OnboardingLeadCodeIndexRouteImport.update({
   id: '/onboarding/$leadCode/',
   path: '/onboarding/$leadCode/',
@@ -1227,17 +1205,6 @@ const AdminApplicationsApplicationIdRoute =
     path: '/$applicationId',
     getParentRoute: () => AdminApplicationsRoute,
   } as any)
-const Char91DotmcpChar93InvokeToolToolRoute =
-  Char91DotmcpChar93InvokeToolToolRouteImport.update({
-    id: '/.mcp/invoke-tool/$tool',
-    path: '/.mcp/invoke-tool/$tool',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
     id: '/lovable/email/transactional/send',
@@ -1367,7 +1334,6 @@ export interface FileRoutesByFullPath {
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/msme-cer': typeof MsmeCerRoute
   '/msme-certificate': typeof MsmeCertificateRoute
@@ -1463,8 +1429,6 @@ export interface FileRoutesByFullPath {
   '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
-  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
-  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
@@ -1507,8 +1471,6 @@ export interface FileRoutesByFullPath {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1580,7 +1542,6 @@ export interface FileRoutesByTo {
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/msme-cer': typeof MsmeCerRoute
   '/msme-certificate': typeof MsmeCertificateRoute
@@ -1676,8 +1637,6 @@ export interface FileRoutesByTo {
   '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
-  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
-  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
@@ -1718,8 +1677,6 @@ export interface FileRoutesByTo {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1793,7 +1750,6 @@ export interface FileRoutesById {
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
-  '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
   '/msme-cer': typeof MsmeCerRoute
   '/msme-certificate': typeof MsmeCertificateRoute
@@ -1889,8 +1845,6 @@ export interface FileRoutesById {
   '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/www-udyamregistration-gov-in': typeof WwwUdyamregistrationGovInRoute
-  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
-  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
@@ -1933,8 +1887,6 @@ export interface FileRoutesById {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
-  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
-  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -2009,7 +1961,6 @@ export interface FileRouteTypes {
     | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
-    | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/msme-cer'
     | '/msme-certificate'
@@ -2105,8 +2056,6 @@ export interface FileRouteTypes {
     | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
-    | '/.mcp/list-tools'
-    | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
@@ -2149,8 +2098,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
-    | '/.lovable/oauth/consent'
-    | '/.mcp/invoke-tool/$tool'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2222,7 +2169,6 @@ export interface FileRouteTypes {
     | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
-    | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/msme-cer'
     | '/msme-certificate'
@@ -2318,8 +2264,6 @@ export interface FileRouteTypes {
     | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
-    | '/.mcp/list-tools'
-    | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
@@ -2360,8 +2304,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin'
-    | '/.lovable/oauth/consent'
-    | '/.mcp/invoke-tool/$tool'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2434,7 +2376,6 @@ export interface FileRouteTypes {
     | '/index.html'
     | '/llms-full.txt'
     | '/llms.txt'
-    | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
     | '/msme-cer'
     | '/msme-certificate'
@@ -2530,8 +2471,6 @@ export interface FileRouteTypes {
     | '/verify-udyam-certificate'
     | '/www-udyamregistration'
     | '/www-udyamregistration-gov-in'
-    | '/.mcp/list-tools'
-    | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/audit'
@@ -2574,8 +2513,6 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
-    | '/.lovable/oauth/consent'
-    | '/.mcp/invoke-tool/$tool'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2649,7 +2586,6 @@ export interface RootRouteChildren {
   IndexDothtmlRoute: typeof IndexDothtmlRoute
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
-  McpRoute: typeof McpRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
   MsmeCerRoute: typeof MsmeCerRoute
   MsmeCertificateRoute: typeof MsmeCertificateRoute
@@ -2745,8 +2681,6 @@ export interface RootRouteChildren {
   VerifyUdyamCertificateRoute: typeof VerifyUdyamCertificateRoute
   WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   WwwUdyamregistrationGovInRoute: typeof WwwUdyamregistrationGovInRoute
-  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
-  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AppTokenRoute: typeof AppTokenRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
@@ -2754,8 +2688,6 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
-  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
-  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
@@ -3449,13 +3381,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MigrateUdyogAadhaarToUdyamRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/llms.txt': {
       id: '/llms.txt'
       path: '/llms.txt'
@@ -3974,20 +3899,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.mcp/list-tools': {
-      id: '/.mcp/list-tools'
-      path: '/.mcp/list-tools'
-      fullPath: '/.mcp/list-tools'
-      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/onboarding/$leadCode/': {
       id: '/onboarding/$leadCode/'
       path: '/onboarding/$leadCode'
@@ -4141,20 +4052,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/applications/$applicationId'
       preLoaderRoute: typeof AdminApplicationsApplicationIdRouteImport
       parentRoute: typeof AdminApplicationsRoute
-    }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
@@ -4488,7 +4385,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexDothtmlRoute: IndexDothtmlRoute,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
-  McpRoute: McpRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
   MsmeCerRoute: MsmeCerRoute,
   MsmeCertificateRoute: MsmeCertificateRoute,
@@ -4588,9 +4484,6 @@ const rootRouteChildren: RootRouteChildren = {
   VerifyUdyamCertificateRoute: VerifyUdyamCertificateRoute,
   WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   WwwUdyamregistrationGovInRoute: WwwUdyamregistrationGovInRoute,
-  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
-  Char91DotwellKnownChar93OauthProtectedResourceRoute:
-    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   AppTokenRoute: AppTokenRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,
@@ -4598,8 +4491,6 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
-  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
-  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,
