@@ -34,8 +34,8 @@ export const findOrReopenTicket = createServerFn({ method: "POST" })
 
     // Every open/reopen dispatches TicketOpened to pause the workflow.
     try {
-      const { dispatchWorkflowEvent } = await import("@/lib/workflow/engine.server");
-      await dispatchWorkflowEvent({
+      const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+      await dispatchEvent({
         type: "TicketOpened",
         applicationId: data.applicationId,
         ticketId,
