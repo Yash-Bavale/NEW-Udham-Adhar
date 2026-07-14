@@ -70,7 +70,7 @@ const FLOW_LINE = {
 } as const;
 
 type FlowItem = JourneyBranch & {
-  lineLabel?: "Main" | "Delay" | "Closure" | "Ticket";
+  lineLabel?: "Main" | "Delay" | "Closure" | "Ticket" | "Closed";
   note?: ReactNode;
 };
 
