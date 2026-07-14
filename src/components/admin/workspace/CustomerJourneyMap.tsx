@@ -9,8 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Check, Ticket, AlertTriangle, ShieldAlert, CreditCard,
-  User, FileText, Landmark, Trophy, ClipboardCheck, Inbox, PauseCircle,
-  Clock, XCircle,
+  User, FileText, Landmark, Trophy, ClipboardCheck, Inbox, Clock,
 } from "lucide-react";
 
 import type { OrderStage } from "@/lib/crm/computeOrderStage";
@@ -64,6 +63,13 @@ const TONE_MAP = {
   violet:  { border: "border-violet-300",  bg: "bg-violet-50",  text: "text-violet-700",  ring: "ring-violet-400"  },
   emerald: { border: "border-emerald-300", bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-400" },
 };
+
+const FLOW_LINE = {
+  main: "border-emerald-300 bg-emerald-50 text-emerald-700",
+  delay: "border-amber-300 bg-amber-50 text-amber-700",
+  closure: "border-rose-300 bg-rose-50 text-rose-700",
+  ticket: "border-sky-300 bg-sky-50 text-sky-700",
+} as const;
 
 type FlowItem = JourneyBranch & {
   lineLabel?: "Main" | "Delay" | "Closure" | "Ticket";
@@ -388,78 +394,145 @@ export function CustomerJourneyMap(p: Props) {
 
 /* ═══════════════════════ Helpers ═══════════════════════ */
 
-const TRACK_COLOR = {
-  emerald: { dot: "bg-emerald-500", header: "text-emerald-700", border: "border-emerald-200", bg: "from-emerald-50/40" },
-  amber:   { dot: "bg-amber-500",   header: "text-amber-700",   border: "border-amber-200",   bg: "from-amber-50/40"   },
-  rose:    { dot: "bg-rose-500",    header: "text-rose-700",    border: "border-rose-200",    bg: "from-rose-50/40"    },
-  sky:     { dot: "bg-sky-500",     header: "text-sky-700",     border: "border-sky-200",     bg: "from-sky-50/40"     },
-} as const;
-
-const STATUS_CHIP: Record<string, string> = {
-  Live:   "bg-emerald-600 text-white",
-  Idle:   "bg-slate-200 text-slate-700",
-  Paused: "bg-rose-600 text-white",
-  Armed:  "bg-amber-500 text-white",
-  Closed: "bg-slate-500 text-white",
-};
-
-function TrackCard({
-  color, label, status, icon, subtitle, children,
+function StageColumn({
+  stage,
+  index,
+  total,
+  currentIdx,
+  done,
+  active,
+  blocked,
+  flows,
+  activeDelayKey,
+  ticketActive,
+  closureActive,
+  onAction,
 }: {
-  color: keyof typeof TRACK_COLOR;
-  label: string;
-  status: string;
-  icon: ReactNode;
-  subtitle: string;
-  children: ReactNode;
+  stage: (typeof JOURNEY_STAGES)[number];
+  index: number;
+  total: number;
+  currentIdx: number;
+  done: boolean;
+  active: boolean;
+  blocked: boolean;
+  flows: FlowItem[];
+  activeDelayKey: string | null;
+  ticketActive: boolean;
+  closureActive: boolean;
+  onAction: (a: JourneyActionKind) => void;
 }) {
-  const c = TRACK_COLOR[color];
+  const Icon = STAGE_ICON[stage.key];
+  const isLast = index === total - 1;
+  const hasFlows = flows.length > 0;
+
   return (
-    <section className={cn("rounded-2xl border bg-gradient-to-b to-white p-5 shadow-sm", c.border, c.bg)}>
-      <header className="flex items-center gap-2 mb-1">
-        <span className={cn("size-2.5 rounded-full", c.dot)} />
-        <span className={cn("text-[11px] uppercase tracking-[0.14em] font-bold flex items-center gap-1.5", c.header)}>
-          {icon}
-          {label}
+    <div className="relative flex min-h-[420px] flex-col items-center">
+      {!isLast && (
+        <div className="absolute left-1/2 top-6 h-0.5 w-[calc(100%+0.75rem)] z-0">
+          <div className={cn(
+            "h-full",
+            index < currentIdx ? "bg-emerald-400"
+            : index === currentIdx ? "bg-gradient-to-r from-emerald-400 to-slate-200"
+            : "bg-slate-200",
+          )} />
+        </div>
+      )}
+
+      <div className="relative z-10 flex flex-col items-center gap-1.5">
+        <div className={cn(
+          "grid size-12 place-items-center rounded-full transition-all",
+          done ? "bg-emerald-500 text-white shadow"
+          : blocked ? "bg-rose-500 text-white shadow ring-4 ring-rose-100"
+          : active ? "bg-indigo-600 text-white shadow ring-4 ring-indigo-100"
+          : "bg-slate-100 text-slate-400",
+        )}>
+          {done ? <Check className="size-5" /> : <Icon className="size-5" />}
+        </div>
+        {(active || blocked) && (
+          <span className={cn(
+            "absolute top-0 size-12 rounded-full ring-2 opacity-40 animate-ping",
+            blocked ? "ring-rose-400" : "ring-indigo-400",
+          )} />
+        )}
+        <span className={cn(
+          "text-center text-[11px] font-semibold leading-tight",
+          done ? "text-slate-900"
+          : blocked ? "text-rose-700"
+          : active ? "text-indigo-700"
+          : "text-slate-500",
+        )}>
+          {stage.short}
         </span>
-        <span className={cn("ml-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", STATUS_CHIP[status] ?? STATUS_CHIP.Idle)}>
-          {status}
-        </span>
-      </header>
-      <p className="text-[11px] text-slate-600 mb-3">{subtitle}</p>
-      {children}
-    </section>
+        <span className="max-w-[130px] text-center text-[9px] leading-tight text-slate-400">{stage.label}</span>
+      </div>
+
+      <div className="relative mt-3 flex w-full flex-1 flex-col items-stretch">
+        {hasFlows && <div className="mx-auto h-8 w-px bg-slate-300" />}
+        <div className="flex flex-col gap-2">
+          {flows.map((flow) => {
+            const flowActive =
+              flow.key === activeDelayKey ||
+              (flow.track === "ticket" && ticketActive) ||
+              (flow.track === "closure" && closureActive) ||
+              (flow.track === "main" && index === currentIdx);
+            const muted = !!activeDelayKey && flow.track === "delay" && flow.key !== activeDelayKey;
+
+            return (
+              <div key={flow.key} className="relative">
+                <div className="absolute -top-2 left-1/2 h-2 w-px -translate-x-1/2 bg-slate-300" />
+                <BranchCard branch={flow} active={flowActive} muted={muted} onAction={onAction} />
+              </div>
+            );
+          })}
+        </div>
+        {!hasFlows && <div className="min-h-[120px]" />}
+      </div>
+    </div>
   );
 }
 
 function BranchCard({
   branch, active, muted, onAction,
 }: {
-  branch: JourneyBranch;
+  branch: FlowItem;
   active: boolean;
   muted?: boolean;
   onAction: (a: JourneyActionKind) => void;
 }) {
   const tone = TONE_MAP[branch.tone];
+  const line = FLOW_LINE[branch.track];
   return (
     <div className={cn(
-      "rounded-lg border p-2.5 space-y-2 transition text-left",
+      "rounded-lg border p-2.5 space-y-2 transition text-left shadow-sm",
       tone.border, tone.bg,
       active && "ring-2 ring-offset-1 shadow-md",
       active && tone.ring,
       muted && "opacity-60",
     )}>
       <div className="flex items-start justify-between gap-1">
-        <div className={cn("text-[9px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
-          {branch.title}
-          {active && (
-            <span className="ml-1 rounded-full bg-rose-600 px-1 py-0.5 text-[8px] font-bold text-white uppercase">
-              Live
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className={cn("rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase", line)}>
+              {branch.lineLabel ?? branch.track}
             </span>
-          )}
+            {active && (
+              <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">
+                Active
+              </span>
+            )}
+            {branch.track === "ticket" && <Ticket className="size-3 text-sky-600" />}
+          </div>
+          <div className={cn("mt-1 text-[9px] uppercase tracking-wider font-bold leading-tight", tone.text)}>
+            {branch.title}
+          </div>
         </div>
       </div>
       <div className="text-[10px] text-slate-600 leading-snug">{branch.description}</div>
+      {branch.note && (
+        <div className={cn("flex flex-col gap-0.5 rounded-md border px-2 py-1 text-[10px] leading-snug", line)}>
+          {branch.note}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         {branch.buttons.map((b) => (
           <JourneyActionButton
