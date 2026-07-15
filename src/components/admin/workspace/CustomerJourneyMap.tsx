@@ -600,8 +600,8 @@ function FlowNode({
       style={{
         left: node.x,
         top: node.y,
-        width: NODE_W,
-        minHeight: isAction ? NODE_H + 28 : NODE_H,
+        width: nodeW(node),
+        minHeight: nodeH(node),
       }}
       data-node={node.id}
       data-state={state}
