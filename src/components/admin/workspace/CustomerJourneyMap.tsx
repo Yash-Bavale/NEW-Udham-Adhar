@@ -1,10 +1,22 @@
-// Customer Journey — Live Path (flowchart)
-// Fixed-layout tree that mirrors the approved BHS flow chart:
-//   Lead → Payment → Order → Form → Govt Portal → Final Status → Completed
-//                                                                        │
-//                                                                     Order Closed (terminal)
-// Sub-branches are ALWAYS visible; the correct one lights up automatically
-// based on stage + workflowStatus + closureStage.
+// Customer Journey — Live Path (lane-based layout).
+//
+// Top row: linear 7-node happy path (Lead → … → Completed) plus an
+// "Order Closed" terminal node.
+// Below the main path: one clearly-labeled horizontal LANE per branch,
+// each anchored to its parent stage. Lanes never overlap; the live lane
+// lights up based on derivePhase() + workflowStatus + closureStage.
+//
+// Lanes:
+//   A — Form Not Submitted           (parent: Order Received)      → Order Closed
+//   B — Technical Delay              (parent: Form Submitted)      → back to Govt Portal
+//   C — Customer-Side Delay          (parent: Form Submitted)      → Order Closed
+//     └─ Ticket paused (sub-lane)    (parent: Lane C)              → resume via T001/T002
+//   D — Consultation Completed       (parent: Govt Portal / Form)  → Completed
+//   E — Final Status (Wait / Accept / Reject / Reminder)           → Completed / Closed
+//
+// Button gating flows through PHASE_ENABLED_BUTTONS[phase] — every disabled
+// button shows a tooltip explaining why. When a button's phase already fired,
+// gate() naturally reports false so the button renders as "Sent ✓".
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,27 +24,35 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Check, User, CreditCard, Inbox, FileText, Landmark, Search, Flag,
-  Hourglass, Mail, Clock, ThumbsUp, UploadCloud, XCircle, CheckCircle2,
-  ArrowRight, ClipboardCheck, AlertTriangle,
+  Clock, XCircle, CheckCircle2, ClipboardCheck,
+  FileWarning, Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
+  ArrowRight,
 } from "lucide-react";
 
 import type { OrderStage } from "@/lib/crm/computeOrderStage";
 import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
-import { formatIST, relativeIST } from "@/lib/datetime";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { relativeIST } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-import { JOURNEY_STAGES, deriveJourneyLiveState, derivePhase, PHASE_ENABLED_BUTTONS, type ButtonCode } from "@/lib/orders/journey-map";
+import {
+  JOURNEY_STAGES, deriveJourneyLiveState, derivePhase,
+  PHASE_ENABLED_BUTTONS, type ButtonCode,
+} from "@/lib/orders/journey-map";
+import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
+import { CountdownChip } from "./CountdownChip";
 
-import { sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder } from "@/lib/orders/order-actions.functions";
+import {
+  sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder,
+} from "@/lib/orders/order-actions.functions";
 import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
-
 
 interface Props {
   applicationId: string;
@@ -47,38 +67,34 @@ interface Props {
   hideAmount?: boolean;
 }
 
-/* ─────────────────── Layout constants (px) ─────────────────── */
-
-const NODE_X = [110, 320, 530, 740, 950, 1160, 1400];
-const NODE_Y = 60;
-const CIRCLE = 56;
-const LABEL_W = 170;
-const CARD_W = 190;
-const CARD_H = 118;
-const ROW_STRIDE = 140;
-const ROW_Y = [230, 230 + ROW_STRIDE, 230 + ROW_STRIDE * 2, 230 + ROW_STRIDE * 3];
-const CLOSED_NODE_X = NODE_X[6];
-const CLOSED_NODE_Y = ROW_Y[3] + CARD_H + 40; // 810
-const CANVAS_W = 1560;
-const CANVAS_H = CLOSED_NODE_Y + 90;
-
-/* ─────────────────── Component ─────────────────── */
-
-type NodeState = "done" | "current" | "upcoming" | "blocked";
-
 const MAIN_NODES = [
-  { key: "lead",      short: "Lead\nReceived",       Icon: User },
-  { key: "payment",   short: "Payment\nReceived",    Icon: CreditCard },
-  { key: "order",     short: "Order\nReceived",      Icon: Inbox },
-  { key: "form",      short: "Form\nSubmitted",      Icon: FileText },
-  { key: "govt",      short: "Application\nSubmitted to\nGovt Portal", Icon: Landmark },
-  { key: "final",     short: "Check Final\nApplication\nStatus on\nGovt Portal", Icon: Search },
-  { key: "completed", short: "Order\nCompleted",     Icon: Flag },
+  { key: "lead",      label: "Lead\nReceived",           Icon: User },
+  { key: "payment",   label: "Payment\nReceived",        Icon: CreditCard },
+  { key: "order",     label: "Order\nReceived",          Icon: Inbox },
+  { key: "form",      label: "Form\nSubmitted",          Icon: FileText },
+  { key: "govt",      label: "Application\nSubmitted",   Icon: Landmark },
+  { key: "final",     label: "Check Final\nStatus",      Icon: Search },
+  { key: "completed", label: "Order\nCompleted",         Icon: Flag },
 ] as const;
+
+/* Tone system --------------------------------------------------------- */
+
+type Tone = "amber" | "rose" | "sky" | "violet" | "emerald" | "indigo";
+const TONE: Record<Tone, { rail: string; text: string; bg: string; ring: string; btn: string; chip: string }> = {
+  amber:   { rail: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50",   ring: "ring-amber-300",   btn: "bg-amber-500 hover:bg-amber-600 text-white",     chip: "bg-amber-100 text-amber-800" },
+  rose:    { rail: "bg-rose-500",    text: "text-rose-700",    bg: "bg-rose-50",    ring: "ring-rose-300",    btn: "bg-rose-600 hover:bg-rose-700 text-white",       chip: "bg-rose-100 text-rose-800" },
+  sky:     { rail: "bg-sky-400",     text: "text-sky-700",     bg: "bg-sky-50",     ring: "ring-sky-300",     btn: "bg-sky-600 hover:bg-sky-700 text-white",         chip: "bg-sky-100 text-sky-800" },
+  violet:  { rail: "bg-violet-500",  text: "text-violet-700",  bg: "bg-violet-50",  ring: "ring-violet-300",  btn: "bg-violet-600 hover:bg-violet-700 text-white",   chip: "bg-violet-100 text-violet-800" },
+  emerald: { rail: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50", ring: "ring-emerald-300", btn: "bg-emerald-600 hover:bg-emerald-700 text-white", chip: "bg-emerald-100 text-emerald-800" },
+  indigo:  { rail: "bg-indigo-500",  text: "text-indigo-700",  bg: "bg-indigo-50",  ring: "ring-indigo-300",  btn: "bg-indigo-600 hover:bg-indigo-700 text-white",   chip: "bg-indigo-100 text-indigo-800" },
+};
+
+/* ═════════════════════════ Component ═════════════════════════ */
 
 export function CustomerJourneyMap(p: Props) {
   const qc = useQueryClient();
   const { view, events } = useOrderWorkflow(p.applicationId);
+
   const live = useMemo(() => deriveJourneyLiveState({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
@@ -92,12 +108,11 @@ export function CustomerJourneyMap(p: Props) {
   const completed = live.terminal === "completed";
   const closureArmed = !!p.closureStage && p.closureStage !== "none" && !closed;
 
-  // Derive reminder count from workflow events (E006 = ReminderScheduled)
   const reminderCount = useMemo(
     () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
     [events],
   );
-  // B07 press flag — persisted client-side per order (server state is idempotent E005).
+
   const postWaitKey = `journey.b07Pressed:${p.applicationId}`;
   const [postWaitSubmitted, setPostWaitSubmitted] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -118,9 +133,7 @@ export function CustomerJourneyMap(p: Props) {
   }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
-  const gate = (code: ButtonCode) => enabledCodes.includes(code);
-  const gateDisabledTitle = "Not available in the current phase";
-
+  const gate = (code: ButtonCode) => enabledCodes.includes(code) && !closed && !completed;
 
   const timers = view.timers ?? [];
   const findTimer = (kindMatch: RegExp) =>
@@ -129,19 +142,26 @@ export function CustomerJourneyMap(p: Props) {
   const customerHoldTimer   = findTimer(/customer_hold|customer_side_autoclose/);
   const technicalHoldTimer  = findTimer(/technical_hold|our_side_reminder/);
 
+  // Open ticket for this order (pauses Lane C)
+  const listTickets = useServerFn(listOrderTickets);
+  const ticketQ = useQuery({
+    queryKey: ["order-tickets", p.applicationId],
+    queryFn: () => listTickets({ data: { orderId: p.applicationId } }),
+    staleTime: 30_000,
+  });
+  useRealtimeTable("support_tickets", () => ticketQ.refetch(), {
+    filter: `application_id=eq.${p.applicationId}`,
+  });
+  const openTicket = (ticketQ.data?.tickets ?? []).find((t: any) => {
+    const s = String(t.status ?? "").toLowerCase();
+    return s !== "closed" && s !== "resolved";
+  });
+  const hasOpenTicket = !!openTicket;
+
   const currentStageLabel = useMemo(() => {
     const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
     return s?.label ?? "Order Received";
   }, [currentIdx]);
-
-  const nodeState = (idx: number): NodeState => {
-    if (closed) return idx < currentIdx ? "done" : "upcoming";
-    if (idx < currentIdx) return "done";
-    if (idx === currentIdx) return "current";
-    return "upcoming";
-  };
-  const completedNodeState: NodeState = completed ? "current" : closed ? "blocked" : nodeState(6);
-  const closedNodeState: NodeState = closed ? "current" : "upcoming";
 
   const [dialog, setDialog] = useState<
     | null
@@ -171,14 +191,11 @@ export function CustomerJourneyMap(p: Props) {
     onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-
   const mutSubmitAfterWait = useMutation({
     mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
     onSuccess: () => { toast.success("E005 sent — consultation completed (after waiting)"); markPostWaitSubmitted(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-
-
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
     onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); invalidate(); },
@@ -205,24 +222,25 @@ export function CustomerJourneyMap(p: Props) {
     if (note !== null) mutReminder.mutate(note);
   };
 
-  const activeLine = "#6366F1";
-  const doneLine   = "#10B981";
-  const idleLine   = "#CBD5E1";
-  const delayLine  = "#F59E0B";
-  const closeLine  = "#F43F5E";
+  /* ───── Lane liveness flags ───── */
+  const laneALive = live.activeSubKey === "form-not-submitted";
+  const laneBLive = live.activeSubKey === "technical-delay";
+  const laneCLive = live.activeSubKey === "customer-delay";
+  const laneDLive = phase === "consultation_done";
+  const laneELive = phase === "awaiting_govt" || phase === "status_checked" || phase === "post_wait_submitted";
 
-  /* Helper: orthogonal L-connector from (x1,y1) down/right to (x2,y2) */
-  const ortho = (x1: number, y1: number, x2: number, y2: number, bend?: number) => {
-    const bx = bend ?? x1;
-    return `M ${x1} ${y1} L ${bx} ${(y1 + y2) / 2} L ${x2} ${(y1 + y2) / 2} L ${x2} ${y2}`;
-  };
+  const closedByA = closed && !!live.reasonCode?.startsWith("A");
+  const closedByB = closed && !!live.reasonCode?.startsWith("B");
 
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        {/* Header */}
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-700">Customer Journey — Live Path</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-700">
+              Customer Journey — Live Path
+            </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
               <span>Current Stage:</span>
               <span className="font-semibold text-indigo-700">{currentStageLabel}</span>
@@ -230,9 +248,10 @@ export function CustomerJourneyMap(p: Props) {
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                   closed ? "bg-rose-100 text-rose-700"
-                  : live.activeSubKey?.includes("delay") ? "bg-amber-100 text-amber-800"
-                  : live.activeSubKey === "form-not-submitted" ? "bg-amber-100 text-amber-800"
-                  : live.activeSubKey === "govt-awaiting" ? "bg-sky-100 text-sky-800"
+                  : laneBLive ? "bg-sky-100 text-sky-800"
+                  : laneCLive ? "bg-amber-100 text-amber-800"
+                  : laneALive ? "bg-amber-100 text-amber-800"
+                  : laneELive ? "bg-violet-100 text-violet-800"
                   : completed ? "bg-emerald-100 text-emerald-800"
                   : "bg-indigo-100 text-indigo-800",
                 )}
@@ -240,415 +259,327 @@ export function CustomerJourneyMap(p: Props) {
                 {closed ? <XCircle className="size-3" /> : <ClipboardCheck className="size-3" />}
                 {live.subStateLabel}
               </span>
+              {hasOpenTicket && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
+                  <LifeBuoy className="size-3" /> Ticket open
+                </span>
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold text-slate-600">
-            <LegendDot color="bg-emerald-500 text-white"><Check className="size-3" /></LegendDot><span>Completed</span>
-            <LegendDot color="bg-white border-2 border-indigo-500 text-indigo-600" /><span>Current</span>
-            <LegendDot color="bg-white border-2 border-sky-400 text-sky-500" /><span>Upcoming</span>
-            <LegendDot color="bg-white border-2 border-amber-500 text-amber-500" /><span>Delay</span>
-            <LegendDot color="bg-white border-2 border-rose-500 text-rose-500" /><span>Closed</span>
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-500">
+            <LegendDot cls="bg-emerald-500" /> Done
+            <LegendDot cls="bg-indigo-500" /> Current
+            <LegendDot cls="bg-amber-400" /> Delay
+            <LegendDot cls="bg-rose-500" /> Closed
+            <LegendDot cls="bg-slate-300" /> Idle
           </div>
         </header>
 
-        <div className="overflow-x-auto pb-2 pt-4">
-          <div className="relative" style={{ width: CANVAS_W, height: CANVAS_H }}>
-            <svg width={CANVAS_W} height={CANVAS_H} className="absolute inset-0 pointer-events-none">
-              <defs>
-                {["done","current","idle","delay","close"].map((k, i) => {
-                  const color = [doneLine, activeLine, idleLine, delayLine, closeLine][i];
-                  return (
-                    <marker key={k} id={`arrow-${k}`} viewBox="0 0 10 10" refX="8" refY="5"
-                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M0,0 L10,5 L0,10 z" fill={color} />
-                    </marker>
-                  );
-                })}
-              </defs>
-
-              {/* Main horizontal line */}
-              {NODE_X.slice(0, -1).map((x, i) => {
-                const nextX = NODE_X[i + 1];
-                const state = nodeState(i);
-                const nextState = nodeState(i + 1);
-                const color = closed ? idleLine
-                  : state === "done" ? doneLine
-                  : (nextState === "current" || state === "current") ? activeLine
-                  : idleLine;
-                return (
-                  <line key={i}
-                    x1={x + CIRCLE / 2} y1={NODE_Y}
-                    x2={nextX - CIRCLE / 2} y2={NODE_Y}
-                    stroke={color} strokeWidth={2.5}
-                    markerEnd={`url(#arrow-${state === "done" ? "done" : (nextState === "current" || state === "current") ? "current" : "idle"})`}
+        {/* ═══════════ Main path row ═══════════ */}
+        <div className="overflow-x-auto pb-2 pt-5">
+          <div className="min-w-[900px]">
+            <div className="flex items-start">
+              {MAIN_NODES.map((n, i) => (
+                <div key={n.key} className="flex flex-1 items-start">
+                  <MainStage
+                    Icon={n.Icon}
+                    label={n.label}
+                    state={
+                      closed ? (i < currentIdx ? "done" : "upcoming")
+                      : i < currentIdx ? "done"
+                      : i === currentIdx ? "current"
+                      : "upcoming"
+                    }
+                    highlight={i === currentIdx && !closed ? live.subStateLabel : undefined}
                   />
-                );
-              })}
-
-              {/* ─── Order Received column (index 2): Form Not Submitted → Force Close → Order Closed */}
-              <line x1={NODE_X[2]} y1={NODE_Y + CIRCLE / 2}
-                    x2={NODE_X[2]} y2={ROW_Y[0] - 4}
-                    stroke={live.activeSubKey === "form-not-submitted" ? delayLine : idleLine} strokeWidth={2}
-                    markerEnd={`url(#arrow-${live.activeSubKey === "form-not-submitted" ? "delay" : "idle"})`} />
-              <line x1={NODE_X[2]} y1={ROW_Y[0] + CARD_H}
-                    x2={NODE_X[2]} y2={ROW_Y[1] - 4}
-                    stroke={closed && live.reasonCode?.startsWith("A") ? closeLine : idleLine} strokeWidth={2} strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${closed && live.reasonCode?.startsWith("A") ? "close" : "idle"})`} />
-              {/* Force Close → Order Closed (bottom-right terminal): horizontal then down */}
-              <path d={`M ${NODE_X[2]} ${ROW_Y[1] + CARD_H} L ${NODE_X[2]} ${CLOSED_NODE_Y} L ${CLOSED_NODE_X - CIRCLE / 2} ${CLOSED_NODE_Y}`}
-                    stroke={closed && live.reasonCode?.startsWith("A") ? closeLine : idleLine}
-                    strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${closed && live.reasonCode?.startsWith("A") ? "close" : "idle"})`} />
-
-              {/* ─── Form Submitted column (index 3): Technical Delay → return; Customer Delay → Order Closed */}
-              <line x1={NODE_X[3]} y1={NODE_Y + CIRCLE / 2}
-                    x2={NODE_X[3]} y2={ROW_Y[0] - 4}
-                    stroke={live.activeSubKey === "technical-delay" ? delayLine : idleLine} strokeWidth={2}
-                    markerEnd={`url(#arrow-${live.activeSubKey === "technical-delay" ? "delay" : "idle"})`} />
-              {/* Tech Delay resumes → arrow back up to Govt Portal node */}
-              <path d={`M ${NODE_X[3] + CARD_W / 2 - 10} ${ROW_Y[0] + CARD_H / 2}
-                        L ${(NODE_X[3] + NODE_X[4]) / 2} ${ROW_Y[0] + CARD_H / 2}
-                        L ${(NODE_X[3] + NODE_X[4]) / 2} ${NODE_Y + CIRCLE / 2 + 4}
-                        L ${NODE_X[4]} ${NODE_Y + CIRCLE / 2 + 4}`}
-                    stroke={live.activeSubKey === "technical-delay" ? delayLine : idleLine} strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${live.activeSubKey === "technical-delay" ? "delay" : "idle"})`} />
-              <line x1={NODE_X[3]} y1={ROW_Y[0] + CARD_H}
-                    x2={NODE_X[3]} y2={ROW_Y[1] - 4}
-                    stroke={live.activeSubKey === "customer-delay" ? delayLine : idleLine} strokeWidth={2}
-                    markerEnd={`url(#arrow-${live.activeSubKey === "customer-delay" ? "delay" : "idle"})`} />
-              <path d={`M ${NODE_X[3]} ${ROW_Y[1] + CARD_H} L ${NODE_X[3]} ${CLOSED_NODE_Y} L ${CLOSED_NODE_X - CIRCLE / 2} ${CLOSED_NODE_Y}`}
-                    stroke={closed && live.reasonCode?.startsWith("A") ? closeLine : idleLine}
-                    strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${closed && live.reasonCode?.startsWith("A") ? "close" : "idle"})`} />
-
-              {/* ─── Govt Portal column (index 4): Consultation Completed → Completed; Waiting → Final Status */}
-              <line x1={NODE_X[4]} y1={NODE_Y + CIRCLE / 2}
-                    x2={NODE_X[4]} y2={ROW_Y[0] - 4}
-                    stroke={completed ? doneLine : activeLine} strokeWidth={2}
-                    markerEnd={`url(#arrow-${completed ? "done" : "current"})`} />
-              {/* Consultation Completed card → Completed node (right-up curve) */}
-              <path d={`M ${NODE_X[4] + CARD_W / 2} ${ROW_Y[0] + CARD_H / 2}
-                        L ${NODE_X[6]} ${ROW_Y[0] + CARD_H / 2}
-                        L ${NODE_X[6]} ${NODE_Y + CIRCLE / 2 + 4}`}
-                    stroke={completed ? doneLine : idleLine} strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${completed ? "done" : "idle"})`} />
-              {/* Waiting for Govt Approval card → Final Status */}
-              <line x1={NODE_X[4]} y1={ROW_Y[0] + CARD_H}
-                    x2={NODE_X[4]} y2={ROW_Y[1] - 4}
-                    stroke={live.activeSubKey === "govt-awaiting" ? activeLine : idleLine} strokeWidth={2}
-                    markerEnd={`url(#arrow-${live.activeSubKey === "govt-awaiting" ? "current" : "idle"})`} />
-              <path d={`M ${NODE_X[4] + CARD_W / 2} ${ROW_Y[1] + CARD_H / 2}
-                        L ${NODE_X[5]} ${ROW_Y[1] + CARD_H / 2}
-                        L ${NODE_X[5]} ${NODE_Y + CIRCLE / 2 + 4}`}
-                    stroke={idleLine} strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-idle)`} />
-
-              {/* ─── Check Final Status column (index 5): 4 rows */}
-              {[0, 1, 2, 3].map((r) => (
-                <line key={r}
-                  x1={NODE_X[5]} y1={r === 0 ? NODE_Y + CIRCLE / 2 : ROW_Y[r - 1] + CARD_H}
-                  x2={NODE_X[5]} y2={ROW_Y[r] - 4}
-                  stroke={idleLine} strokeWidth={2} strokeDasharray={r === 0 ? undefined : "5 4"}
-                  markerEnd={`url(#arrow-idle)`} />
+                  {i < MAIN_NODES.length - 1 && (
+                    <div className="mt-6 flex-1 px-1">
+                      <div
+                        className={cn(
+                          "h-0.5 w-full",
+                          i < currentIdx ? "bg-emerald-500"
+                          : i === currentIdx ? "bg-indigo-400"
+                          : "bg-slate-200",
+                        )}
+                      />
+                    </div>
+                  )}
+                </div>
               ))}
-              {/* Awaiting Response (row 0) → returns loop to same node (small arc right) */}
-              {/* Consultation Completed (After Waiting) row 1 → Completed */}
-              <path d={`M ${NODE_X[5] + CARD_W / 2} ${ROW_Y[1] + CARD_H / 2}
-                        L ${NODE_X[6]} ${ROW_Y[1] + CARD_H / 2}
-                        L ${NODE_X[6]} ${NODE_Y + CIRCLE / 2 + 4}`}
-                    stroke={completed ? doneLine : idleLine} strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${completed ? "done" : "idle"})`} />
-              {/* Accepted Upload PDF row 2 → Completed */}
-              <path d={`M ${NODE_X[5] + CARD_W / 2} ${ROW_Y[2] + CARD_H / 2}
-                        L ${NODE_X[6]} ${ROW_Y[2] + CARD_H / 2}
-                        L ${NODE_X[6]} ${NODE_Y + CIRCLE / 2 + 4}`}
-                    stroke={completed ? doneLine : idleLine} strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${completed ? "done" : "idle"})`} />
-              {/* Rejected row 3 → Order Closed */}
-              <path d={`M ${NODE_X[5] + CARD_W / 2} ${ROW_Y[3] + CARD_H / 2}
-                        L ${CLOSED_NODE_X - CIRCLE / 2 - 20} ${ROW_Y[3] + CARD_H / 2}
-                        L ${CLOSED_NODE_X - CIRCLE / 2 - 20} ${CLOSED_NODE_Y}
-                        L ${CLOSED_NODE_X - CIRCLE / 2} ${CLOSED_NODE_Y}`}
-                    stroke={closed && live.reasonCode?.startsWith("B") ? closeLine : idleLine}
-                    strokeWidth={2} fill="none" strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${closed && live.reasonCode?.startsWith("B") ? "close" : "idle"})`} />
-
-              {/* Completed → Order Closed (only when closed) */}
-              <line x1={NODE_X[6]} y1={NODE_Y + CIRCLE / 2}
-                    x2={NODE_X[6]} y2={CLOSED_NODE_Y - CIRCLE / 2}
-                    stroke={closed ? closeLine : idleLine} strokeWidth={2} strokeDasharray="5 4"
-                    markerEnd={`url(#arrow-${closed ? "close" : "idle"})`} />
-            </svg>
-
-            {/* Main nodes */}
-            {MAIN_NODES.map((n, i) => (
-              <MainStage
-                key={n.key}
-                x={NODE_X[i]}
-                state={i === 6 ? completedNodeState : nodeState(i)}
-                Icon={n.Icon}
-                label={n.short}
-                tooltip={STAGE_TOOLTIPS[i]}
-                sublabel={i === currentIdx && !closed ? live.subStateLabel : undefined}
-              />
-            ))}
-
-            {/* Order Closed terminal */}
-            <MainStage
-              x={CLOSED_NODE_X}
-              y={CLOSED_NODE_Y}
-              state={closedNodeState}
-              Icon={XCircle}
-              label={"Order\nClosed"}
-              tone="rose"
-              tooltip="Terminal. All closure paths (Force Close E010, Customer Delay auto-close, Govt Rejection E008) land here."
-              sublabel={closed && p.closureReasonLabel ? p.closureReasonLabel : undefined}
-            />
-
-            {/* ─── Sub-cards ─── */}
-
-            {/* Order column: Form Not Submitted */}
-            <SubCard
-              x={NODE_X[2] - CARD_W / 2} y={ROW_Y[0]}
-              w={CARD_W} h={CARD_H}
-              tone="amber"
-              active={live.activeSubKey === "form-not-submitted"}
-              icon={<Hourglass className="size-4" />}
-              chip="E002"
-              title="Form Not Submitted"
-              subtitle={
-                formAutoCloseTimer
-                  ? `Auto-closes ${relativeIST(formAutoCloseTimer.fires_at ?? formAutoCloseTimer.firesAt)}`
-                  : "Send info-incomplete mail · Auto-close in 8h (A7)"
-              }
-              tooltip="Send E002 (form link / incomplete-information mail). Arms 8-hour auto-close with reason A7."
-              button={{
-                label: "Send Information Incomplete Mail (E002)",
-                onClick: () => mutFormLink.mutate(),
-                variant: "amber",
-                disabled: mutFormLink.isPending || closed || !gate("B01"),
-              }}
-
-            />
-            {/* Order column: Force Close */}
-            <SubCard
-              x={NODE_X[2] - CARD_W / 2} y={ROW_Y[1]}
-              w={CARD_W} h={CARD_H}
-              tone="rose"
-              active={closed && live.reasonCode?.startsWith("A") === true}
-              icon={<Mail className="size-4" />}
-              chip="E010"
-              title="Force Close Order"
-              subtitle="Pick Category A reason · sends E010 · Order Closed"
-              tooltip="Force-close now with a Category A reason. Cancels any pending timers."
-              button={{
-                label: "Force Close (E010)",
-                onClick: () => setDialog({ kind: "force_close" }),
-                variant: "rose",
-                disabled: closed,
-              }}
-
-            />
-
-            {/* Form column: Technical Delay — CTA swaps to B03 (E011 resolve) when a technical hold is active */}
-            <SubCard
-              x={NODE_X[3] - CARD_W / 2} y={ROW_Y[0]}
-              w={CARD_W} h={CARD_H}
-              tone="amber"
-              active={live.activeSubKey === "technical-delay"}
-              icon={<Clock className="size-4" />}
-              chip={phase === "technical_delay" ? "E011" : "E003 · B"}
-              title={phase === "technical_delay" ? "Technical Delay — Issue Resolved" : "Technical Delay"}
-              subtitle={
-                phase === "technical_delay"
-                  ? "Resume order · Sends E011 to customer"
-                  : technicalHoldTimer
-                    ? `Reminder ${relativeIST(technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt)}`
-                    : "Sends E003 to customer + employee reminder"
-              }
-              tooltip={
-                phase === "technical_delay"
-                  ? "Technical delay resolved. Sends E011 (Order Resumed) to the customer and returns the order to the Govt Portal flow."
-                  : "Log a technical/external delay. Sends E003 to the customer AND creates a reminder for the assignee to follow up. Resumes to Govt Portal when cleared."
-              }
-              button={
-                phase === "technical_delay"
-                  ? {
-                      label: "Issue Resolved (E011)",
-                      onClick: () => mutResume.mutate(),
-                      variant: "emerald",
-                      disabled: mutResume.isPending || closed || !gate("B03"),
-                    }
-                  : {
-                      label: "Select Reason + Add Reminder",
-                      onClick: () => setDialog({ kind: "technical_delay" }),
-                      variant: "amber",
-                      disabled: closed || !gate("B02"),
-                    }
-              }
-            />
-            {/* Form column: Customer Side Delay */}
-            <SubCard
-              x={NODE_X[3] - CARD_W / 2} y={ROW_Y[1]}
-              w={CARD_W} h={CARD_H}
-              tone="amber"
-              active={live.activeSubKey === "customer-delay"}
-              icon={<AlertTriangle className="size-4" />}
-              chip="E004 · A"
-              title="Customer Side Delay"
-              subtitle={
-                customerHoldTimer
-                  ? `Auto-closes ${relativeIST(customerHoldTimer.fires_at ?? customerHoldTimer.firesAt)}`
-                  : "Select reason · Auto-close in 8h · Order Closed"
-              }
-              tooltip="Log a customer-side delay. E004 sends and 8-hour auto-close arms — expires to Order Closed with selected reason."
-              button={{
-                label: "Select Reason (E004)",
-                onClick: () => setDialog({ kind: "customer_delay" }),
-                variant: "amber",
-                disabled: closed || !gate("B10"),
-              }}
-            />
-
-
-            {/* Govt Portal column: Consultation Completed */}
-            <SubCard
-              x={NODE_X[4] - CARD_W / 2} y={ROW_Y[0]}
-              w={CARD_W} h={CARD_H}
-              tone="emerald"
-              icon={<CheckCircle2 className="size-4" />}
-              chip="E005"
-              title="Consultation Completed"
-              subtitle="Application Submitted to Govt Portal → Order Completed"
-              tooltip="Close the customer loop with E005 and mark this order as completed (submitted-to-govt)."
-              button={{
-                label: "Order Completed (E005)",
-                onClick: () => mutSubmit.mutate(),
-                variant: "emerald",
-                disabled: mutSubmit.isPending || closed || !gate("B04"),
-              }}
-
-            />
-            {/* Govt Portal column: Waiting for Govt Approval */}
-            <SubCard
-              x={NODE_X[4] - CARD_W / 2} y={ROW_Y[1]}
-              w={CARD_W} h={CARD_H}
-              tone="indigo"
-              icon={<Clock className="size-4" />}
-              chip="E006"
-              title="Application Submitted, Waiting for Govt. Approval"
-              subtitle="Send E006 + add reminder for yourself"
-              tooltip="Send E006 to the customer and queue a reminder for you to check final status later."
-              button={{
-                label: "Add Reminder (E006)",
-                onClick: promptReminder,
-                variant: "indigo",
-                disabled: closed || !gate("B05"),
-              }}
-
-            />
-
-            {/* Check Final Status column: 4 rows */}
-            <SubCard
-              x={NODE_X[5] - CARD_W / 2} y={ROW_Y[0]}
-              w={CARD_W} h={CARD_H}
-              tone="sky"
-              active={live.activeSubKey === "govt-awaiting"}
-              icon={<Search className="size-4" />}
-              chip="E006"
-              title="Application Status Checked — Awaiting Government Response"
-              subtitle="Add reminder"
-              tooltip="Portal still hasn't returned a final status — queue a reminder to check again."
-              button={{
-                label: "Add Reminder",
-                onClick: promptReminder,
-                variant: "sky",
-                disabled: closed || !gate("B06"),
-              }}
-
-            />
-            <SubCard
-              x={NODE_X[5] - CARD_W / 2} y={ROW_Y[1]}
-              w={CARD_W} h={CARD_H}
-              tone="emerald"
-              icon={<CheckCircle2 className="size-4" />}
-              chip="E005"
-              title="Consultation Completed — Application Submitted to Govt Portal (After Waiting)"
-              subtitle="Add note · Order Completed"
-              tooltip="After waiting on govt response, mark consultation/submission complete."
-              button={{
-                label: "Order Completed (E005)",
-                onClick: () => mutSubmitAfterWait.mutate(),
-                variant: "emerald",
-                disabled: mutSubmitAfterWait.isPending || closed || !gate("B07"),
-              }}
-
-            />
-            <SubCard
-              x={NODE_X[5] - CARD_W / 2} y={ROW_Y[2]}
-              w={CARD_W} h={CARD_H}
-              tone="emerald"
-              active={completed}
-              icon={<UploadCloud className="size-4" />}
-              chip="E007"
-              title="Application Accepted — Upload PDF"
-              subtitle="Add note · Order Completed"
-              tooltip="Govt portal accepted the application. Upload the certificate PDF and send E007 to complete."
-              button={{
-                label: "Upload Cert & Complete (E007)",
-                onClick: () => setDialog({ kind: "complete_with_cert" }),
-                variant: "emerald",
-                disabled: closed || !gate("B08"),
-              }}
-
-            />
-            <SubCard
-              x={NODE_X[5] - CARD_W / 2} y={ROW_Y[3]}
-              w={CARD_W} h={CARD_H}
-              tone="rose"
-              active={closed && live.reasonCode?.startsWith("B") === true}
-              icon={<XCircle className="size-4" />}
-              chip="E008 · B"
-              title="Application Rejected"
-              subtitle="Select reason · Add note · Order Closed"
-              tooltip="Portal rejected. E008 sends and the order lands at Order Closed with a Category B reason."
-              button={{
-                label: "Select Reason (E008)",
-                onClick: () => setDialog({ kind: "govt_rejected" }),
-                variant: "rose",
-                disabled: closed || !gate("B09"),
-              }}
-
-            />
-
-            {isTalkToExpert && (
-              <SubCard
-                x={NODE_X[6] - CARD_W / 2} y={ROW_Y[0]}
-                w={CARD_W} h={CARD_H}
-                tone="violet"
-                icon={<CheckCircle2 className="size-4" />}
-                chip="E009"
-                title="Talk-to-Expert"
-                subtitle="Mark consultation done"
-                tooltip="Talk-to-Expert services close with E009 once the consultation is completed."
-                button={{
-                  label: "Send E009",
-                  onClick: () => mutTalkExpert.mutate(),
-                  variant: "violet",
-                  disabled: mutTalkExpert.isPending || closed,
-                }}
-              />
-            )}
+            </div>
           </div>
         </div>
 
+        {/* ═══════════ Lane strips ═══════════ */}
+        <div className="mt-4 space-y-2.5">
+          {/* Lane A — Form Not Submitted */}
+          <LaneRow
+            id="A"
+            tone="amber"
+            parent="Order Received"
+            title="Form Not Submitted"
+            Icon={FileWarning}
+            live={laneALive}
+            terminal={closedByA ? "Order Closed (E010)" : undefined}
+            terminalTone="rose"
+            countdown={
+              (laneALive || closureArmed) && (formAutoCloseTimer || p.closureNextAt) ? (
+                <CountdownChip
+                  firesAt={formAutoCloseTimer?.fires_at ?? formAutoCloseTimer?.firesAt ?? p.closureNextAt}
+                  label="auto-close"
+                />
+              ) : null
+            }
+            buttons={[
+              {
+                code: "B01",
+                emailCode: "E002",
+                label: "Send Form Link",
+                onClick: () => mutFormLink.mutate(),
+                enabled: gate("B01"),
+                pending: mutFormLink.isPending,
+                tone: "amber",
+              },
+            ]}
+            phase={phase}
+          />
+
+          {/* Lane B — Technical Delay */}
+          <LaneRow
+            id="B"
+            tone="sky"
+            parent="Form Submitted"
+            title="Technical / External Delay"
+            Icon={Wrench}
+            live={laneBLive}
+            terminal={phase === "technical_delay" ? undefined : undefined}
+            countdown={
+              laneBLive && technicalHoldTimer ? (
+                <CountdownChip
+                  firesAt={technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt}
+                  label="reminder"
+                />
+              ) : null
+            }
+            buttons={[
+              {
+                code: "B02",
+                emailCode: "E003",
+                label: "Log Technical Delay",
+                onClick: () => setDialog({ kind: "technical_delay" }),
+                enabled: gate("B02"),
+                tone: "sky",
+              },
+              {
+                code: "B03",
+                emailCode: "E011",
+                label: "Issue Resolved — Resume",
+                onClick: () => mutResume.mutate(),
+                enabled: gate("B03"),
+                pending: mutResume.isPending,
+                tone: "emerald",
+              },
+            ]}
+            phase={phase}
+          />
+
+          {/* Lane C — Customer-Side Delay */}
+          <LaneRow
+            id="C"
+            tone={hasOpenTicket && laneCLive ? "violet" : "amber"}
+            parent="Form Submitted"
+            title={hasOpenTicket && laneCLive ? "Customer Delay — Ticket open (paused)" : "Customer-Side Delay"}
+            Icon={hasOpenTicket && laneCLive ? LifeBuoy : UserX}
+            live={laneCLive}
+            terminal={closedByA ? "Order Closed" : undefined}
+            terminalTone="rose"
+            countdown={
+              laneCLive && (customerHoldTimer || p.closureNextAt) ? (
+                <CountdownChip
+                  firesAt={customerHoldTimer?.fires_at ?? customerHoldTimer?.firesAt ?? p.closureNextAt}
+                  label="auto-close"
+                  paused={hasOpenTicket}
+                />
+              ) : null
+            }
+            buttons={[
+              {
+                code: "B10",
+                emailCode: "E004",
+                label: "Log Customer Delay",
+                onClick: () => setDialog({ kind: "customer_delay" }),
+                enabled: gate("B10"),
+                tone: "amber",
+              },
+            ]}
+            phase={phase}
+          />
+
+          {/* Sub-lane: ticket paused (only when open ticket exists on this order) */}
+          {hasOpenTicket && openTicket?.id && (
+            <div className="ml-8 rounded-lg border border-violet-200 bg-violet-50/40 p-2.5">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-violet-900">
+                <LifeBuoy className="size-3.5 text-violet-600" />
+                <span className="font-bold">Ticket #{openTicket.ticket_number ?? String(openTicket.id).slice(0, 8)}</span>
+                <span className="text-violet-500">·</span>
+                <span className="truncate max-w-[280px]">{openTicket.subject ?? "Customer inquiry"}</span>
+                <span className="text-violet-500">·</span>
+                <a
+                  href={`/admin/tickets/${openTicket.id}`}
+                  className="inline-flex items-center gap-0.5 rounded-md border border-violet-300 bg-white px-1.5 py-0.5 font-semibold text-violet-700 hover:bg-violet-100"
+                >
+                  Open thread <ArrowRight className="size-3" />
+                </a>
+              </div>
+              <div className="mt-1.5 text-[10px] text-violet-700">
+                Close the ticket from the ticket page to resume Lane C (or restart / complete the order).
+              </div>
+            </div>
+          )}
+
+          {/* Lane D — Consultation Completed / Submit shortcut */}
+          <LaneRow
+            id="D"
+            tone="emerald"
+            parent="Form / Govt Portal"
+            title="Consultation Completed → Submit to Govt"
+            Icon={Send}
+            live={laneDLive}
+            terminal={completed ? "Order Completed" : undefined}
+            terminalTone="emerald"
+            buttons={[
+              {
+                code: "B04",
+                emailCode: "E005",
+                label: "Consultation Done · Submit (E005)",
+                onClick: () => mutSubmit.mutate(),
+                enabled: gate("B04"),
+                pending: mutSubmit.isPending,
+                tone: "emerald",
+              },
+            ]}
+            phase={phase}
+          />
+
+          {/* Lane E — Awaiting Govt Approval / Final Status flow */}
+          <LaneRow
+            id="E"
+            tone="violet"
+            parent="Govt Portal → Final Status"
+            title="Awaiting Govt · Check Status · Final Outcome"
+            Icon={ClipboardCheck}
+            live={laneELive}
+            terminal={
+              completed ? "Order Completed"
+              : closedByB ? "Order Closed (E008)"
+              : undefined
+            }
+            terminalTone={closedByB ? "rose" : "emerald"}
+            buttons={[
+              {
+                code: "B05",
+                emailCode: "E006",
+                label: "Submitted · Waiting (+reminder)",
+                onClick: promptReminder,
+                enabled: gate("B05"),
+                tone: "violet",
+              },
+              {
+                code: "B06",
+                emailCode: "E006",
+                label: "Status Checked · Add Reminder",
+                onClick: promptReminder,
+                enabled: gate("B06"),
+                tone: "sky",
+              },
+              {
+                code: "B07",
+                emailCode: "E005",
+                label: "Consultation Done (After Wait)",
+                onClick: () => mutSubmitAfterWait.mutate(),
+                enabled: gate("B07"),
+                pending: mutSubmitAfterWait.isPending,
+                tone: "emerald",
+              },
+              {
+                code: "B08",
+                emailCode: "E007",
+                label: "Accepted · Upload PDF",
+                onClick: () => setDialog({ kind: "complete_with_cert" }),
+                enabled: gate("B08"),
+                tone: "emerald",
+              },
+              {
+                code: "B09",
+                emailCode: "E008",
+                label: "Rejected · Close",
+                onClick: () => setDialog({ kind: "govt_rejected" }),
+                enabled: gate("B09"),
+                tone: "rose",
+              },
+              {
+                code: "B10",
+                emailCode: "E004",
+                label: "Customer Delay (again)",
+                onClick: () => setDialog({ kind: "customer_delay" }),
+                enabled: gate("B10"),
+                tone: "amber",
+              },
+            ]}
+            phase={phase}
+          />
+
+          {/* Talk-to-Expert lane (only for consultation orders) */}
+          {isTalkToExpert && (
+            <LaneRow
+              id="TX"
+              tone="violet"
+              parent="Order Completed"
+              title="Talk-to-Expert Consultation"
+              Icon={CheckCircle2}
+              live={false}
+              buttons={[
+                {
+                  code: "B08",
+                  emailCode: "E009",
+                  label: "Consultation Completed (E009)",
+                  onClick: () => mutTalkExpert.mutate(),
+                  enabled: !closed && !completed,
+                  pending: mutTalkExpert.isPending,
+                  tone: "violet",
+                },
+              ]}
+              phase={phase}
+            />
+          )}
+
+          {/* Always-visible Force Close row (Cat A → E010) */}
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2">
+            <div className="flex items-center gap-2 text-[11px] text-rose-800">
+              <Mail className="size-3.5 text-rose-600" />
+              <span className="font-bold">Force Close (E010)</span>
+              <span className="text-rose-500">·</span>
+              <span>Cancels all timers. Requires a Category A reason.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDialog({ kind: "force_close" })}
+              disabled={closed}
+              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+            >
+              Force Close
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom status strip */}
         {(view.hasEngine && view.nextTimer && !closed) || closureArmed || closed ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-600">
             {view.hasEngine && view.nextTimer && !closed && (
-              <span><Clock className="mr-1 inline size-3" />Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)} · {formatIST(view.nextTimer.firesAt)}</span>
+              <span><Clock className="mr-1 inline size-3" />Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)}</span>
             )}
             {closureArmed && p.closureStage && (
-              <span><Hourglass className="mr-1 inline size-3 text-amber-600" />Closure armed: <b>{p.closureStage}</b>{p.closureNextAt ? <> · fires {relativeIST(p.closureNextAt)}</> : null}</span>
+              <span><Clock className="mr-1 inline size-3 text-amber-600" />Closure armed: <b>{p.closureStage}</b>{p.closureNextAt ? <> · fires {relativeIST(p.closureNextAt)}</> : null}</span>
             )}
             {closed && (
               <span><XCircle className="mr-1 inline size-3 text-rose-600" />Order closed{p.closureReasonLabel ? <> · <b>{p.closureReasonLabel}</b></> : null}</span>
@@ -708,174 +639,158 @@ export function CustomerJourneyMap(p: Props) {
   );
 }
 
-
-/* ═════════════════════════ Tooltips ═════════════════════════ */
-
-const STAGE_TOOLTIPS = [
-  "Lead captured from the site / call / referral.",
-  "Payment successfully received. Order object is now created.",
-  "Order received. Waiting for the customer to submit the onboarding form.",
-  "Customer submitted the form. Employee verifies details before submitting to the portal.",
-  "Application submitted to the government portal. Awaiting portal response.",
-  "Checking the final status on the government portal.",
-  "Order completed. Certificate delivered to the customer.",
-];
-
-const SEGMENT_TOOLTIPS = [
-  "Lead → Payment: fires when the customer completes the payment.",
-  "Payment → Order: fires automatically once payment is confirmed.",
-  "Order → Form: fires when the customer submits the onboarding form.",
-  "Form → Govt Portal: employee clicks Send E005 to mark the application as submitted.",
-  "Govt Portal → Final Status: employee opens the govt portal to check the outcome.",
-  "Final Status → Completed: fires only on acceptance (E007). Rejection routes to Order Closed instead.",
-];
-
 /* ═════════════════════════ Pieces ═════════════════════════ */
 
-function MainStage({
-  x, y = NODE_Y, state, Icon, label, tooltip, sublabel, tone,
-}: {
-  x: number; y?: number; state: NodeState; Icon: any; label: string;
-  tooltip?: string; sublabel?: string;
-  tone?: "rose" | "default";
-}) {
-  const isRose = tone === "rose";
-  const circle =
-    state === "done"     ? "bg-emerald-500 border-emerald-500 text-white"
-  : state === "current"  ? (isRose
-      ? "bg-white border-rose-500 text-rose-600 ring-4 ring-rose-100"
-      : "bg-white border-indigo-500 text-indigo-600 ring-4 ring-indigo-100")
-  : state === "blocked"  ? "bg-white border-rose-500 text-rose-600 ring-4 ring-rose-100"
-  : isRose               ? "bg-white border-rose-300 text-rose-400"
-  :                        "bg-white border-sky-400 text-sky-500";
+type MainState = "done" | "current" | "upcoming";
 
+function MainStage({
+  Icon, label, state, highlight,
+}: {
+  Icon: any; label: string; state: MainState; highlight?: string;
+}) {
+  const circle =
+    state === "done"    ? "bg-emerald-500 border-emerald-500 text-white"
+  : state === "current" ? "bg-white border-indigo-500 text-indigo-600 ring-4 ring-indigo-100"
+  :                       "bg-white border-slate-300 text-slate-400";
   return (
-    <div className="absolute" style={{ left: x - CIRCLE / 2, top: y - CIRCLE / 2 }} title={tooltip}>
-      <div className={cn("grid place-items-center rounded-full border-[3px] shadow-sm", circle)}
-           style={{ width: CIRCLE, height: CIRCLE }}>
-        {state === "done" ? <Check className="size-6" /> : <Icon className="size-6" />}
+    <div className="flex w-24 flex-col items-center gap-1.5">
+      <div className={cn("grid place-items-center rounded-full border-2 shadow-sm size-12", circle)}>
+        {state === "done" ? <Check className="size-5" /> : <Icon className="size-5" />}
       </div>
-      <div
-        className={cn(
-          "absolute left-1/2 -translate-x-1/2 mt-3 rounded-lg border bg-white px-2 py-1.5 text-center shadow-sm",
-          state === "current" ? (isRose ? "border-rose-300" : "border-indigo-300") : "border-slate-200",
-        )}
-        style={{ width: LABEL_W, top: CIRCLE }}
-      >
-        <div className={cn(
-          "text-[11px] font-bold leading-tight whitespace-pre-line",
-          state === "current" ? (isRose ? "text-rose-700" : "text-indigo-700") : "text-slate-800",
-        )}>
-          {label}
+      <div className={cn(
+        "text-center text-[10px] font-bold leading-tight whitespace-pre-line",
+        state === "current" ? "text-indigo-700" : state === "done" ? "text-emerald-700" : "text-slate-500",
+      )}>
+        {label}
+      </div>
+      {highlight && state === "current" && (
+        <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-indigo-700">
+          {highlight}
         </div>
-        {sublabel && (
-          <div className={cn(
-            "mt-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase",
-            isRose ? "bg-rose-100 text-rose-700" : "bg-indigo-100 text-indigo-700",
-          )}>
-            {sublabel}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
 
-type Tone = "amber" | "rose" | "sky" | "teal" | "emerald" | "violet" | "indigo";
+interface LaneButton {
+  code: ButtonCode;
+  emailCode: string;
+  label: string;
+  onClick: () => void;
+  enabled: boolean;
+  pending?: boolean;
+  tone: Tone;
+}
 
-const TONE: Record<Tone, { border: string; bg: string; text: string; chip: string; ring: string; btn: string }> = {
-  amber:   { border: "border-amber-300",   bg: "bg-amber-50",   text: "text-amber-800",   chip: "bg-amber-100 text-amber-700",   ring: "ring-amber-400",   btn: "bg-amber-500 hover:bg-amber-600 text-white" },
-  rose:    { border: "border-rose-300",    bg: "bg-rose-50",    text: "text-rose-800",    chip: "bg-rose-100 text-rose-700",     ring: "ring-rose-400",    btn: "bg-rose-600 hover:bg-rose-700 text-white" },
-  sky:     { border: "border-sky-300",     bg: "bg-sky-50",     text: "text-sky-800",     chip: "bg-sky-100 text-sky-700",       ring: "ring-sky-400",     btn: "bg-sky-600 hover:bg-sky-700 text-white" },
-  teal:    { border: "border-teal-300",    bg: "bg-teal-50",    text: "text-teal-800",    chip: "bg-teal-100 text-teal-700",     ring: "ring-teal-400",    btn: "bg-teal-600 hover:bg-teal-700 text-white" },
-  emerald: { border: "border-emerald-300", bg: "bg-emerald-50", text: "text-emerald-800", chip: "bg-emerald-100 text-emerald-700", ring: "ring-emerald-400", btn: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-  violet:  { border: "border-violet-300",  bg: "bg-violet-50",  text: "text-violet-800",  chip: "bg-violet-100 text-violet-700", ring: "ring-violet-400",  btn: "bg-violet-600 hover:bg-violet-700 text-white" },
-  indigo:  { border: "border-indigo-300",  bg: "bg-indigo-50",  text: "text-indigo-800",  chip: "bg-indigo-100 text-indigo-700", ring: "ring-indigo-400",  btn: "bg-indigo-600 hover:bg-indigo-700 text-white" },
-};
-
-function SubCard({
-  x, y, w, h, tone, active, icon, title, subtitle, chip, button, secondary, tooltip,
+function LaneRow({
+  id, tone, parent, title, Icon, live, buttons, countdown, terminal, terminalTone, phase,
 }: {
-  x: number; y: number; w: number; h: number;
-  tone: Tone; active?: boolean;
-  icon: React.ReactNode; title: string; subtitle?: string; chip?: string;
-  button?: { label: string; onClick: () => void; variant: Tone; disabled?: boolean };
-  secondary?: { label: string; onClick: () => void };
-  tooltip?: string;
+  id: string;
+  tone: Tone;
+  parent: string;
+  title: string;
+  Icon: any;
+  live: boolean;
+  buttons: LaneButton[];
+  countdown?: React.ReactNode;
+  terminal?: string;
+  terminalTone?: Tone;
+  phase: string;
 }) {
   const t = TONE[tone];
   return (
     <div
-      title={tooltip}
       className={cn(
-        "absolute rounded-xl border-2 shadow-sm transition p-2.5 flex flex-col",
-        active ? cn(t.border, t.bg) : "border-slate-200 bg-white",
-        active && "ring-2 ring-offset-1 shadow-md", active && t.ring,
-        !active && "opacity-80",
+        "relative flex items-stretch gap-3 rounded-xl border-2 p-2.5 transition-all",
+        live ? cn(t.bg, "border-transparent ring-2", t.ring, "shadow-sm")
+             : "border-slate-200 bg-white/60",
       )}
-      style={{ left: x, top: y, width: w, minHeight: h }}
     >
-      <div className="flex items-center justify-between gap-1.5">
-        <div className={cn("grid size-7 place-items-center rounded-full bg-white border", active ? t.border : "border-slate-300", active ? t.text : "text-slate-500")}>
-          {icon}
-        </div>
-        {chip && (
-          <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase font-mono", active ? t.chip : "bg-slate-100 text-slate-600")}>{chip}</span>
-        )}
-        {active && (
-          <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Live</span>
-        )}
-      </div>
-      <div className={cn("mt-1.5 text-[11px] font-bold leading-tight", active ? t.text : "text-slate-700")}>{title}</div>
-      {subtitle && <div className="mt-0.5 text-[10px] leading-tight text-slate-600">{subtitle}</div>}
+      {/* left rail */}
+      <div className={cn("w-1 rounded-full", live ? t.rail : "bg-slate-200")} />
 
-      <div className="mt-auto flex flex-col gap-1 pt-2">
-        {button && (
-          <button
-            type="button"
-            onClick={button.onClick}
-            disabled={button.disabled}
-            title={button.disabled ? "Not available in the current phase" : button.label}
+      {/* label column */}
+      <div className="flex w-52 shrink-0 flex-col justify-center">
+        <div className="flex items-center gap-1.5">
+          <span className={cn(
+            "grid size-6 place-items-center rounded-full border",
+            live ? cn(t.text, "border-current bg-white") : "border-slate-300 text-slate-500 bg-white",
+          )}>
+            <Icon className="size-3.5" />
+          </span>
+          <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider", live ? t.chip : "bg-slate-100 text-slate-500")}>
+            Lane {id}
+          </span>
+          {live && <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Live</span>}
+        </div>
+        <div className={cn("mt-1 text-[12px] font-bold leading-tight", live ? t.text : "text-slate-700")}>
+          {title}
+        </div>
+        <div className="mt-0.5 text-[10px] text-slate-500">from {parent}</div>
+      </div>
+
+      {/* countdown + buttons */}
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+        {countdown && <div className="flex items-center gap-2">{countdown}</div>}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {buttons.map((b) => (
+            <LaneButton key={b.code + b.emailCode} b={b} phase={phase} />
+          ))}
+        </div>
+      </div>
+
+      {/* terminal chip */}
+      {terminal && (
+        <div className="flex items-center gap-1 self-center shrink-0">
+          <ArrowRight className={cn("size-3.5", live ? t.text : "text-slate-400")} />
+          <span
             className={cn(
-              "rounded-md px-2 py-1 text-[10px] font-bold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed",
-              TONE[button.variant].btn,
+              "rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide",
+              terminalTone ? TONE[terminalTone].chip : "bg-slate-100 text-slate-600",
             )}
           >
-            {button.label}
-          </button>
-        )}
-        {secondary && (
-          <button
-            type="button"
-            onClick={secondary.onClick}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            {secondary.label}
-          </button>
-        )}
-      </div>
+            {terminal}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function LegendDot({ color, children }: { color: string; children?: React.ReactNode }) {
+function LaneButton({ b, phase }: { b: LaneButton; phase: string }) {
+  const t = TONE[b.tone];
+  const disabled = !b.enabled || b.pending;
+  const isSent = !b.enabled; // gate() returned false → phase moved past it
+  const title = !b.enabled
+    ? `${b.code} not available in current phase (${phase})`
+    : b.label;
   return (
-    <span className={cn("grid size-4 place-items-center rounded-full", color)}>
-      {children}
-    </span>
+    <button
+      type="button"
+      onClick={b.onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold shadow-sm transition disabled:cursor-not-allowed",
+        b.enabled
+          ? t.btn
+          : "bg-slate-100 text-slate-500 border border-slate-200",
+      )}
+    >
+      <span className={cn(
+        "font-mono text-[8.5px] rounded px-1 py-0.5 shrink-0",
+        b.enabled ? "bg-white/25 text-white" : "bg-white text-slate-500",
+      )}>
+        {b.code}·{b.emailCode}
+      </span>
+      <span className="truncate max-w-[200px]">{b.label}</span>
+      {isSent && <Check className="size-3 shrink-0 opacity-70" />}
+    </button>
   );
 }
 
-function LegendRow({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="mt-0.5">{icon}</span>
-      <div className="leading-tight">
-        <div className="font-bold text-slate-800">{title}</div>
-        <div className="text-[10px] text-slate-500">{desc}</div>
-      </div>
-    </div>
-  );
+function LegendDot({ cls }: { cls: string }) {
+  return <span className={cn("inline-block size-2.5 rounded-full", cls)} />;
 }
 
 /* ─── Inline govt-rejected dialog ─── */
