@@ -252,7 +252,7 @@ export function CustomerJourneyMap(p: Props) {
     [currentIdx, phase, live.terminal],
   );
 
-  const visibleEdges = EDGES.filter((e) => e.branch !== "ticket" || hasOpenTicket);
+  const visibleEdges = EDGES;
   const { wrapRef, scale } = useResponsiveScale();
 
   return (
