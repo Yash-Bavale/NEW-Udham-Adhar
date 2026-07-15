@@ -774,7 +774,7 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
                 {showQuoted && (
                   hiddenSafeHtml
                     ? <div className="mt-2 border-l-2 pl-3 text-xs opacity-70 [&_a]:text-blue-600" style={{ borderColor: "var(--admin-border)" }} dangerouslySetInnerHTML={{ __html: hiddenSafeHtml }} />
-                    : <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{cleaned.hiddenText}</div>
+                    : <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{hiddenTextDecoded}</div>
                 )}
               </>
             )}
