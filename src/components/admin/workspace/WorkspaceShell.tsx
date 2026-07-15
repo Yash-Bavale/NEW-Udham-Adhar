@@ -9,7 +9,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { OrderJourneyBoardV2 } from "./OrderJourneyBoardV2";
 import { TabStatusHeader } from "./TabStatusHeader";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
