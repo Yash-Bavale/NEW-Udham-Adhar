@@ -214,6 +214,11 @@ export const sendOrderTemplateEmail = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
+    const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+    const orderNumber = app?.application_code
+      ?? (await resolveApplicationCode(data.leadId, { applicationId: app?.id ?? null }));
+    if (!orderNumber) throw new Error("Order number not ready yet — please retry in a moment.");
+
     const appOrigin = process.env.APP_BASE_URL || process.env.SUPABASE_URL || "";
     const onboardingUrl = lead.lead_code ? `${appOrigin}/onboarding/${encodeURIComponent(lead.lead_code)}` : "";
     const vars = {
@@ -221,7 +226,7 @@ export const sendOrderTemplateEmail = createServerFn({ method: "POST" })
       name: lead.name ?? "",
       customer_email: lead.email,
       customer_mobile: lead.mobile ?? "",
-      order_number: app?.application_code ?? lead.lead_code ?? "",
+      order_number: orderNumber,
       lead_code: lead.lead_code ?? "",
       service_name: lead.service ?? "",
       service: lead.service ?? "",
