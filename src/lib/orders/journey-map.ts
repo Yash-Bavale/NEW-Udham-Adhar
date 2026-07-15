@@ -375,7 +375,6 @@ export type ButtonCode =
 
 export type JourneyPhase =
   | "form_not_submitted"
-  | "form_link_sent"         // B01 pressed, customer hasn't submitted yet — no active buttons
   | "form_submitted"
   | "technical_delay"
   | "customer_delay"
@@ -387,8 +386,10 @@ export type JourneyPhase =
   | "closed";
 
 /**
- * After B10 (Customer Side Delay pressed): confirmed by user —
- * B02, B04, B05, B08, B09 remain active.
+ * FIXME(ops-confirm): After B10 (Customer Side Delay pressed) which buttons
+ * should remain active? Ops is unresolved on this — flip this list once
+ * confirmed. Do NOT hardcode elsewhere; components read this via
+ * PHASE_ENABLED_BUTTONS.customer_delay.
  */
 export const POST_B10_ALLOWED: ButtonCode[] = [
   "B02", "B04", "B05", "B08", "B09",
@@ -396,16 +397,15 @@ export const POST_B10_ALLOWED: ButtonCode[] = [
 
 export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   form_not_submitted:  ["B01"],
-  form_link_sent:      [],                                            // row 3: no buttons until customer submits
-  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],           // row 2
-  technical_delay:     ["B03"],                                       // row 4
-  customer_delay:      POST_B10_ALLOWED,                              // row 11
-  consultation_done:   ["B08", "B09"],                                // row 5 (post-B04)
-  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],           // row 6 (post-B05)
-  status_checked:      ["B07", "B08", "B09", "B10"],                  // row 7 (post-B06)
-  post_wait_submitted: ["B08", "B09"],                                // row 8 (post-B07)
-  completed:           [],                                            // row 9
-  closed:              [],                                            // row 10
+  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
+  technical_delay:     ["B03"],
+  customer_delay:      POST_B10_ALLOWED,
+  consultation_done:   ["B08", "B09"],
+  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
+  status_checked:      ["B07", "B08", "B09", "B10"],
+  post_wait_submitted: ["B08", "B09"],
+  completed:           [],
+  closed:              [],
 };
 
 export interface DerivePhaseInput {
@@ -417,8 +417,6 @@ export interface DerivePhaseInput {
   reminderCount?: number;
   /** True once B07 has been pressed (persisted client-side per order). */
   postWaitSubmitted?: boolean;
-  /** True once B01 (FormLinkSent) has been dispatched for this order. */
-  formLinkSent?: boolean;
 }
 
 /**
@@ -436,10 +434,7 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
   if (live.terminal === "completed") return "completed";
   if (live.activeSubKey === "technical-delay") return "technical_delay";
   if (live.activeSubKey === "customer-delay") return "customer_delay";
-  if (live.activeSubKey === "form-not-submitted") {
-    return i.formLinkSent ? "form_link_sent" : "form_not_submitted";
-  }
-
+  if (live.activeSubKey === "form-not-submitted") return "form_not_submitted";
 
   const stage = (i.stage ?? "").toLowerCase();
   const inGovtFlow = /submitted_to_govt|processing|certificate|check|final/.test(stage);

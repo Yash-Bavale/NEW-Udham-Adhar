@@ -97,11 +97,6 @@ export function CustomerJourneyMap(p: Props) {
     () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
     [events],
   );
-  // B01 (Form Link Sent) — detected from FormLinkSent workflow events.
-  const formLinkSent = useMemo(
-    () => (events ?? []).some((e: any) => e?.type === "FormLinkSent"),
-    [events],
-  );
   // B07 press flag — persisted client-side per order (server state is idempotent E005).
   const postWaitKey = `journey.b07Pressed:${p.applicationId}`;
   const [postWaitSubmitted, setPostWaitSubmitted] = useState<boolean>(() => {
@@ -120,9 +115,7 @@ export function CustomerJourneyMap(p: Props) {
     closureReasonLabel: p.closureReasonLabel,
     reminderCount,
     postWaitSubmitted,
-    formLinkSent,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted, formLinkSent]);
-
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
   const gate = (code: ButtonCode) => enabledCodes.includes(code);
