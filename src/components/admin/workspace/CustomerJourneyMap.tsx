@@ -598,8 +598,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Upload Cert & Complete (E007)",
                 onClick: () => setDialog({ kind: "complete_with_cert" }),
                 variant: "emerald",
-                disabled: closed,
+                disabled: closed || !gate("B08"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[3]}
