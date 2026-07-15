@@ -187,12 +187,15 @@ export const sendConsultationPaymentLink = createServerFn({ method: "POST" })
 
     const { data: appRow } = await supabaseAdmin
       .from("applications")
-      .select("application_code")
+      .select("id, application_code")
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const orderNumber = (appRow as any)?.application_code ?? leadCode;
+    const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+    const orderNumber = (appRow as any)?.application_code
+      ?? (await resolveApplicationCode(lead.id, { applicationId: (appRow as any)?.id ?? null }));
+    if (!orderNumber) throw new Error("Order number not ready yet — please retry in a moment.");
 
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     await enqueueFromTemplateInternal("payment_link", lead.email, {

@@ -78,16 +78,21 @@ export const sendLeadEmail = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("application_code")
+      .select("id, application_code")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+    const orderNumber = app?.application_code
+      ?? (await resolveApplicationCode(leadId, { applicationId: app?.id ?? null }));
+    if (!orderNumber) throw new Error("Order number not ready yet — please retry in a moment.");
+
     const finalTo = toEmail || lead.email;
     const finalVars = {
       customerName: lead.name,
-      orderNumber: app?.application_code ?? lead.lead_code,
+      orderNumber,
       formLink: `https://${process.env.LOVABLE_APP_DOMAIN || 'udyamadhar.in'}/onboarding/${lead.lead_code}`,
       ...variables
     };

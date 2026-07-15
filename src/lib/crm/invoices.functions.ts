@@ -318,9 +318,12 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       .eq("payment_id", data.paymentId).maybeSingle();
 
     const { data: appRow } = payment.application_id
-      ? await admin.from("applications").select("application_code").eq("id", payment.application_id).maybeSingle()
-      : await admin.from("applications").select("application_code").eq("lead_id", payment.lead_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const orderNumber = (appRow as any)?.application_code ?? lead.lead_code ?? "";
+      ? await admin.from("applications").select("id, application_code").eq("id", payment.application_id).maybeSingle()
+      : await admin.from("applications").select("id, application_code").eq("lead_id", payment.lead_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+    const orderNumber = (appRow as any)?.application_code
+      ?? (await resolveApplicationCode(payment.lead_id, { applicationId: payment.application_id ?? (appRow as any)?.id ?? null }));
+    if (!orderNumber) throw new Error("Order number not ready yet — please retry in a moment.");
 
     const { data: pay } = await admin
       .from("payments")
