@@ -26,11 +26,11 @@ import {
   PHASE_ENABLED_BUTTONS, type ButtonCode,
 } from "@/lib/orders/journey-map";
 import {
-  NODES, EDGES, nodeById, anchor, pathD,
+  NODES, EDGES, nodeById, anchor, pathD, nodeW, nodeH,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
   currentMainEdgeFor, currentStageNodeFor,
-  CANVAS_W, CANVAS_H, NODE_W, NODE_H,
-  type IconKey, type NodeDef, type Tone, type EdgeState, type NodeState,
+  CANVAS_W, CANVAS_H,
+  type IconKey, type NodeDef, type Tone, type NodeState,
 } from "@/lib/orders/journey-graph";
 import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
@@ -252,7 +252,7 @@ export function CustomerJourneyMap(p: Props) {
     [currentIdx, phase, live.terminal],
   );
 
-  const visibleEdges = EDGES.filter((e) => e.branch !== "ticket" || hasOpenTicket);
+  const visibleEdges = EDGES;
   const { wrapRef, scale } = useResponsiveScale();
 
   return (
@@ -600,12 +600,17 @@ function FlowNode({
       style={{
         left: node.x,
         top: node.y,
-        width: NODE_W,
-        minHeight: isAction ? NODE_H + 28 : NODE_H,
+        width: nodeW(node),
+        minHeight: nodeH(node),
       }}
       data-node={node.id}
       data-state={state}
     >
+      {node.tag && (
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow">
+          {node.tag}
+        </span>
+      )}
       {countdown && (
         <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
           {countdown}
