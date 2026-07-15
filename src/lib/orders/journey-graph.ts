@@ -228,20 +228,61 @@ export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<s
   return s;
 }
 
+/**
+ * The main-path edge that the customer is currently traversing (the "in
+ * progress" arrow from the current stage to the next). Returns null when
+ * terminal or when a sub-branch is holding progress — in those cases the
+ * branch itself or the terminal node carries the highlight.
+ */
+export function currentMainEdgeFor(
+  currentIdx: number,
+  phase: JourneyPhase,
+  terminal: "completed" | "closed" | null,
+): string | null {
+  if (terminal) return null;
+  if (phase === "form_not_submitted" || phase === "technical_delay" || phase === "customer_delay") return null;
+  if (currentIdx <= 2) return "e_or_fn";
+  if (currentIdx === 3) return "e_fs_gv";
+  if (currentIdx === 4) return "e_gv_ck";
+  if (currentIdx === 5) return "e_ck_cp";
+  return null;
+}
+
+/**
+ * The stage node that represents "where the customer is right now" so the
+ * operator can see it at a glance even when no sub-branch is active.
+ */
+export function currentStageNodeFor(
+  currentIdx: number,
+  phase: JourneyPhase,
+  terminal: "completed" | "closed" | null,
+): string | null {
+  if (terminal === "completed") return "completed";
+  if (terminal === "closed") return "closed_e010";
+  if (phase === "form_not_submitted") return "form_not";
+  if (currentIdx <= 2) return "order_recv";
+  if (currentIdx === 3) return "form_sub";
+  if (currentIdx === 4) return "govt_portal";
+  if (currentIdx === 5) return "check_status";
+  if (currentIdx >= 6) return "completed";
+  return null;
+}
+
 export interface EdgeStateInput {
   activeBranches: Set<BranchKey>;
   doneMainEdges: Set<string>;
   terminal: "completed" | "closed" | null;
+  currentMainEdge?: string | null;
 }
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   if (i.doneMainEdges.has(e.id)) return "done";
+  if (i.currentMainEdge && e.id === i.currentMainEdge) return "active";
   if (i.activeBranches.has(e.branch)) {
     if (i.terminal === "closed" &&
         (e.branch === "form-nag" || e.branch === "customer-delay" || e.branch === "reject")) {
       return "closed";
     }
-    // "accept" branch when completed = done, not active
     if (i.terminal === "completed" && (e.branch === "accept" || e.branch === "shortcut" || e.branch === "status")) {
       return "done";
     }
@@ -255,6 +296,7 @@ export interface NodeStateInput {
   activeBranches: Set<BranchKey>;
   terminal: "completed" | "closed" | null;
   phase: JourneyPhase;
+  currentStageNode?: string | null;
 }
 
 /** Stage nodes map to a JOURNEY_STAGES index for done detection. */
@@ -270,6 +312,9 @@ const STAGE_IDX: Record<string, number> = {
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
   if (nodeId === "completed" && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")  return "terminal-bad";
+
+  // Current stage node — operator's "you are here"
+  if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
   // Any node incident to an active branch is "active"
   const incident = EDGES.some(
