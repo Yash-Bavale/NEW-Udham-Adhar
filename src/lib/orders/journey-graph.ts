@@ -241,7 +241,16 @@ export interface EdgeStateInput {
   doneMainEdges: Set<string>;
   terminal: "completed" | "closed" | null;
   currentMainEdge?: string | null;
+  phase?: JourneyPhase;
+  currentIdx?: number;
 }
+
+/** Edges belonging to a delay loop that returns into the main flow. */
+const RESOLVED_DELAY_EDGES: Record<string, BranchKey> = {
+  e_fs_b02: "technical",
+  e_b02_b03: "technical",
+  e_b03_gv: "technical",
+};
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   if (i.doneMainEdges.has(e.id)) return "done";
@@ -255,6 +264,16 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
       return "done";
     }
     return "active";
+  }
+  // A resolved technical delay: once we've moved past form_submitted into the
+  // govt flow, show the technical loop as done (green) instead of idle.
+  if (
+    RESOLVED_DELAY_EDGES[e.id] &&
+    i.phase !== "technical_delay" &&
+    (i.currentIdx ?? 0) >= 4 &&
+    !i.terminal
+  ) {
+    return "done";
   }
   return "idle";
 }
