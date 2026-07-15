@@ -78,7 +78,7 @@ const MAIN_NODES = [
 
 export function CustomerJourneyMap(p: Props) {
   const qc = useQueryClient();
-  const { view } = useOrderWorkflow(p.applicationId);
+  const { view, events } = useOrderWorkflow(p.applicationId);
   const live = useMemo(() => deriveJourneyLiveState({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
@@ -91,6 +91,36 @@ export function CustomerJourneyMap(p: Props) {
   const closed = live.terminal === "closed";
   const completed = live.terminal === "completed";
   const closureArmed = !!p.closureStage && p.closureStage !== "none" && !closed;
+
+  // Derive reminder count from workflow events (E006 = ReminderScheduled)
+  const reminderCount = useMemo(
+    () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
+    [events],
+  );
+  // B07 press flag — persisted client-side per order (server state is idempotent E005).
+  const postWaitKey = `journey.b07Pressed:${p.applicationId}`;
+  const [postWaitSubmitted, setPostWaitSubmitted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(postWaitKey) === "1"; } catch { return false; }
+  });
+  const markPostWaitSubmitted = () => {
+    try { window.localStorage.setItem(postWaitKey, "1"); } catch {}
+    setPostWaitSubmitted(true);
+  };
+
+  const phase = useMemo(() => derivePhase({
+    stage: p.stage,
+    workflowStatus: p.workflowStatus,
+    closureStage: p.closureStage,
+    closureReasonLabel: p.closureReasonLabel,
+    reminderCount,
+    postWaitSubmitted,
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted]);
+
+  const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
+  const gate = (code: ButtonCode) => enabledCodes.includes(code);
+  const gateDisabledTitle = "Not available in the current phase";
+
 
   const timers = view.timers ?? [];
   const findTimer = (kindMatch: RegExp) =>
