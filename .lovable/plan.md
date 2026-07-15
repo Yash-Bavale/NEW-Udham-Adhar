@@ -1,136 +1,105 @@
-# Customer Journey — True Flowchart Layout
+# Compact, Config-Driven Journey Flowchart
 
-Scrap the stacked lane rows. Rebuild `CustomerJourneyMap.tsx` as an **SVG flowchart** that mirrors the drawio diagram: nodes placed on an XY grid, orthogonal connector lines with arrowheads, and the single live path lit up in color while inactive paths stay ghosted grey.
+Shrink the canvas, add responsive scaling, extract the graph into a pure config module, tighten highlight rules, and add unit tests.
 
-## Layout (matches uploaded drawio image)
+## 1. Compact + responsive canvas
 
-```text
-                                                    ┌─ B04 Consultation Done ─┐
-                                                    │                          │
-Order ─► Form Not ─► Form ─► B02 Tech ─► B03 Fix ─► APP SUBMITTED ──► CHECK ──►┼─► B07 After-Wait ─► ✅ Completed
-Recv     Submitted   Sub'd    Delay      Resolved   TO GOVT PORTAL    STATUS  ││    │
-  │        │           │        ▲                        ▲            │      ││    ├─► B08 Accepted+PDF ─► ✅
-  │        │           │        └──── (B03 loops up) ────┘            │      │└─► B05 Waiting Approval ┘
-  │        │           │                                              │      │
-  │        │           └─► B10 Customer Delay ───┐                    ▼      └─► B09 Rejected ─► ❌ Closed
-  │        │                    │                │              B06 Status
-  │        └─► B01 Form Reminder│(8h auto-close) │              Checked
-  │                 │           ▼                │              +Reminder
-  │                 └──────► ❌ Closed (E010) ◄──┘
-  └────────────────────────────► 🎫 Ticket Sub-lane (T001/T002)
-```
+Current canvas is 1720×820 fixed — too wide.
 
-## Approach
+- Shrink node size (`W=120, H=52`) and grid step (`180 → 140` X, `160 → 130` Y).
+- New viewBox: **1240×620** — fits comfortably in the workspace column.
+- Wrap SVG + overlay in a container that auto-scales:
+  ```tsx
+  <div ref={wrapRef} className="w-full">
+    <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: CANVAS_W, height: CANVAS_H * scale }}>
+      …svg + nodes…
+    </div>
+  </div>
+  ```
+  Scale = `min(1, wrapWidth / CANVAS_W)` via `ResizeObserver`. On mobile it renders at ~0.3–0.4× with no horizontal scroll; on desktop it renders 1:1.
+- Remove the `overflow-x-auto` scroller.
+- Node HTML uses `absolute` positions in the same coord space as the SVG so scaling transforms both together.
 
-**Single SVG canvas** (~1600×760) with:
-- **Node components** = rounded rects with icon + label + button-code chip, absolutely positioned by `x,y` from a config map.
-- **Edges** = SVG `<path d="M x1 y1 L x2 y2 …" />` with orthogonal (elbow) routing, arrowhead marker at the tip.
-- **Live-path highlight** = derive active edge/node set from `derivePhase()` + `deriveJourneyLiveState()`; those get colored stroke (`--primary`, animated `stroke-dasharray` flow); everything else stays `stroke-slate-200` dashed.
-- **Icons** = lucide (`FileText`, `Clock`, `Building2`, `Search`, `CheckCircle2`, `XCircle`, `Ticket`, `AlertTriangle`, `Send`).
-- **Buttons** stay attached to their node (bottom of the rect) but only clickable when `PHASE_ENABLED_BUTTONS[phase]` includes that code — otherwise 40% opacity + `cursor-not-allowed`.
+## 2. Extract graph to config module
 
-## Node & edge config (data-driven)
+New file: **`src/lib/orders/journey-graph.ts`** — pure, no React.
 
-```ts
-// journey-graph.ts (new file)
-export const NODES: Record<string, { x:number; y:number; w:number; h:number; label:string; icon:LucideIcon; kind:"stage"|"action"|"terminal"; tone:Tone; buttonCode?:ButtonCode }> = {
-  order_recv:   { x:  40, y:300, ... label:"Order Received",     icon:Inbox },
-  form_not:     { x: 220, y:300, ... label:"Form Not Submitted", icon:FileText },
-  form_sub:     { x: 400, y:300, ... label:"Form Submitted",     icon:FileCheck },
-  b02_tech:     { x: 580, y:220, ... buttonCode:"B02" },
-  b03_fix:      { x: 720, y:220, ... buttonCode:"B03" },
-  govt_portal:  { x: 900, y:300, ... label:"App Submitted to Govt", icon:Building2 },
-  b04_consult:  { x: 900, y:180, ... buttonCode:"B04" },
-  b05_wait:     { x:1080, y:400, ... buttonCode:"B05" },
-  check_status: { x:1180, y:300, ... label:"Check Final Status", icon:Search },
-  b06_remind:   { x:1180, y:180, ... buttonCode:"B06" },
-  b07_after:    { x:1360, y:220, ... buttonCode:"B07" },
-  b08_accept:   { x:1360, y:300, ... buttonCode:"B08" },
-  b09_reject:   { x:1360, y:400, ... buttonCode:"B09" },
-  completed:    { x:1540, y:260, ... label:"Completed",  icon:CheckCircle2, kind:"terminal", tone:"emerald" },
-  b01_reminder: { x: 220, y:460, ... buttonCode:"B01" },   // form-not-submitted branch
-  b10_cust:     { x: 400, y:460, ... buttonCode:"B10" },   // customer-side-delay branch
-  closed_e010:  { x:1540, y:460, ... label:"Order Closed", icon:XCircle, kind:"terminal", tone:"rose" },
-  ticket_lane:  { x:  40, y:620, ... label:"Support Ticket", icon:Ticket, kind:"sub" },
-};
+Exports:
+- `NODES: NodeDef[]` (id, x, y, kind, tone, icon key string, buttonCode, emailCode, subtitle).
+- `EDGES: EdgeDef[]` (from, fromSide, to, toSide, mode, branch, waypoints?).
+- `anchor(node, side)`, `pathD(a, b, mode, waypoints)` helpers.
+- `activeBranchesFor(phase, terminal, reasonCode)` → `Set<BranchKey>`.
+- `mainDoneEdgesFor(currentIdx)` → `Set<string>`.
+- `edgeState(edge, { activeBranches, doneMainEdges, terminal })` → `"done" | "active" | "closed" | "idle"`.
+- `nodeState(nodeId, { currentIdx, activeBranches, terminal })` → `"done" | "active" | "terminal-ok" | "terminal-bad" | "idle"`.
 
-export const EDGES: Array<{ from:string; to:string; via?:"H"|"V"|"HV"|"VH"; branch:BranchKey }> = [
-  // main happy path
-  { from:"order_recv",  to:"form_not",     branch:"main" },
-  { from:"form_not",    to:"form_sub",     branch:"main" },
-  { from:"form_sub",    to:"b02_tech",     via:"VH", branch:"technical" },
-  { from:"b02_tech",    to:"b03_fix",      branch:"technical" },
-  { from:"b03_fix",     to:"govt_portal",  via:"HV", branch:"technical" },
-  { from:"form_sub",    to:"govt_portal",  branch:"main" },
-  { from:"govt_portal", to:"b04_consult",  via:"VH", branch:"shortcut" },
-  { from:"b04_consult", to:"completed",    via:"HV", branch:"shortcut" },
-  { from:"govt_portal", to:"check_status", branch:"main" },
-  { from:"check_status",to:"b06_remind",   via:"VH", branch:"awaiting" },
-  { from:"check_status",to:"b07_after",    branch:"awaiting" },
-  { from:"check_status",to:"b08_accept",   branch:"main" },
-  { from:"check_status",to:"b09_reject",   via:"HV", branch:"rejected" },
-  { from:"b07_after",   to:"completed",    branch:"awaiting" },
-  { from:"b08_accept",  to:"completed",    branch:"main" },
-  { from:"b09_reject",  to:"closed_e010",  branch:"rejected" },
-  // delay/close branches
-  { from:"form_not",    to:"b01_reminder", via:"VH", branch:"form-nag" },
-  { from:"b01_reminder",to:"closed_e010",  via:"HV", branch:"form-nag" },
-  { from:"form_sub",    to:"b10_cust",     via:"VH", branch:"customer-delay" },
-  { from:"b10_cust",    to:"closed_e010",  via:"HV", branch:"customer-delay" },
-  { from:"b05_wait",    to:"b08_accept",   branch:"awaiting" },
-];
-```
+Icon lookup stays in the component (React-only), keyed by string (`"inbox" | "fileText" | …`) so the config file stays pure JS.
 
-## Live highlighting
+`CustomerJourneyMap.tsx` becomes rendering-only: imports graph + helpers, iterates NODES/EDGES, no hard-coded coordinates or branch logic in the component.
 
-`activeBranches: Set<BranchKey>` derived from phase:
-| Phase | Active branches |
-|---|---|
-| `form_not_submitted` | `main`(order→form_not) + `form-nag` |
-| `form_submitted` | `main` up to govt_portal |
-| `technical_delay` | `technical` loop |
-| `customer_delay` | `customer-delay` (+ reopened `main` per `POST_B10_ALLOWED`) |
-| `consultation_done` | `shortcut` |
-| `awaiting_govt` | `awaiting` |
-| `status_checked` | `main` + `awaiting` after check |
-| `completed` | full green trace to `completed` |
-| `closed` | red trace to `closed_e010` |
+## 3. Highlight rules — exact per stage
 
-Rendering rules:
-- **Active edge**: `stroke-2 stroke-primary` + `strokeDasharray="8 4"` + `animate` (`stroke-dashoffset` marching ants via CSS keyframe).
-- **Completed edge** (already passed): solid `stroke-emerald-500`, no animation.
-- **Idle edge**: `stroke-slate-200 stroke-1 stroke-dashed`.
-- **Terminal reached**: emerald or rose fill on the terminal node.
-- Countdown chip floats above the active button (uses existing `CountdownChip`).
-- Ticket sub-lane sits below on a violet strip; when open, dashed violet arrow rises to the currently-paused stage node.
+Rewrite `activeBranchesFor` to make one and only one sub-branch active for the current phase, matching the flowchart:
 
-## Orthogonal routing
+| Phase                 | Active branch(es)          | Notes                                    |
+|-----------------------|----------------------------|------------------------------------------|
+| `form_not_submitted`  | `form-nag`                 | main up to `form_not` = done             |
+| `form_submitted`      | (none — main only)         | main up to `form_sub` = done             |
+| `technical_delay`     | `technical`                | loop lit; main freezes at `form_sub`     |
+| `customer_delay`      | `customer-delay`           | main up to `form_sub` = done             |
+| `consultation_done`   | `shortcut`                 | main up to `govt_portal` = done          |
+| `awaiting_govt`       | `awaiting`                 | main up to `govt_portal` = done          |
+| `status_checked`      | `status`                   | main up to `check_status` = done         |
+| `post_wait_submitted` | `status` + `accept`(pre-lit) | main up to `check_status` = done       |
+| `completed`           | winning branch to completed| based on last touched (accept/status/shortcut) |
+| `closed`              | closing branch to closed_e010 | pick by reasonCode: A→form-nag OR customer-delay; B→reject |
 
-Small helper `elbow(from, to, via)` returns the `d` string:
-- `via="H"` → straight horizontal
-- `via="V"` → straight vertical
-- `via="HV"` → horizontal then vertical (right-angle)
-- `via="VH"` → vertical then horizontal
-Anchors picked from node edge midpoints (`x+w`, `y+h/2` for right, etc.). No collision solver needed — grid is hand-tuned in the config.
+Also fix: when `closed` with reason A but the order actually died on the customer-delay branch, prefer that branch. Heuristic: if `workflowStatus` recently contained "customer" → customer-delay; else form-nag.
+
+## 4. Line/node icon consistency
+
+- All node badges use the same 20px circular icon well; state color comes from the tone system, not from ad-hoc classes.
+- All arrowheads are a single shared triangle marker rendered per state color (currently correct).
+- Add small directional icons at edge joins where lines change direction (subtle 6px dot at each corner) so orthogonal turns match the drawio look.
+- Line strokes: idle 1.25px dashed slate-300; done 2px solid emerald-500; active 2px dashed indigo-500 marching-ants; closed 2px dashed rose-500.
+- Node role indicators: `stage` = rounded rectangle with icon left; `action` = same shape + button footer; `terminal` = filled rounded rectangle in tone; `sub` = dashed outline.
+
+## 5. Tests
+
+New file: **`src/components/admin/workspace/__tests__/CustomerJourneyMap.test.tsx`** (Vitest + React Testing Library).
+
+Cases (one per JourneyPhase + terminals):
+1. `form_not_submitted` → `form-nag` edges active, main-1 done, all others idle.
+2. `form_submitted` → main-1..3 done; no branch active.
+3. `technical_delay` → `technical` active; `main-3` idle (not done — still holding).
+4. `customer_delay` → `customer-delay` edges active; countdown chip present on `b10_cust`.
+5. `consultation_done` → `shortcut` active; `main-4` done.
+6. `awaiting_govt` → `awaiting` active; `b05_wait` node active.
+7. `status_checked` → `status` active.
+8. `post_wait_submitted` → `status` + `accept` active.
+9. terminal `completed` → `completed` node = `terminal-ok`.
+10. terminal `closed` (reason A) → `closed_e010` = `terminal-bad`; `form-nag`/`customer-delay` closed.
+11. terminal `closed` (reason B7) → `reject` closed; `b09_reject` shown red.
+
+Snapshot test for the pure graph config (nodes/edges list stability) so unintentional layout drift shows up in review.
+
+**Approach:** unit-test the pure helpers (`activeBranchesFor`, `edgeState`, `nodeState`) directly — no DOM needed for the highlighting logic. Add ONE integration test that mounts `CustomerJourneyMap` with mocked hooks (`useOrderWorkflow`, `useServerFn`, `useQuery`) and verifies node count, one live "LIVE" badge, and correct edge stroke classes via `container.querySelectorAll('path[data-branch="form-nag"]')` — add `data-branch` and `data-state` attributes to each path/node for testability.
+
+Adds `data-testid`, `data-branch`, `data-state` attributes throughout — no visual change.
 
 ## Files
 
 **New**
-- `src/lib/orders/journey-graph.ts` — NODES + EDGES + `activeBranchesForPhase(phase)` helper + `elbow()` path builder.
-- `src/components/admin/workspace/journey/FlowNode.tsx` — rounded-rect node with icon, label, optional button pill, `state: "idle"|"active"|"done"|"terminal-ok"|"terminal-bad"`.
-- `src/components/admin/workspace/journey/FlowEdge.tsx` — `<path>` + arrowhead marker, respects state.
+- `src/lib/orders/journey-graph.ts` — pure config + helpers.
+- `src/lib/orders/__tests__/journey-graph.test.ts` — pure-helper unit tests (11 cases).
+- `src/components/admin/workspace/__tests__/CustomerJourneyMap.test.tsx` — one integration render test.
 
 **Rewritten**
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — replaces the row layout entirely: one `<svg viewBox="0 0 1600 760">` that maps NODES/EDGES, plus a floating action layer for buttons (HTML overlay absolutely positioned at each node's coords so clicks + tooltips still work). Keeps all existing mutation wiring (`mutFormLink`, `mutResume`, `mutSubmit`, ticket dialogs, reason picker, etc.).
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — imports config, adds `useResponsiveScale` hook, renders responsive scaled diagram, adds test hooks (`data-*` attrs).
 
 **Untouched**
-- `journey-map.ts` config, `PHASE_ENABLED_BUTTONS`, all server functions, workflow engine, templates, migrations.
-
-## Responsiveness
-
-- Canvas has fixed `viewBox`; wrap in horizontal-scroll container on `<lg` screens.
-- Add zoom-out toggle (0.75× / 1× / 1.25×) via CSS transform on the SVG wrapper.
+- `journey-map.ts` (existing config), all server fns, workflow engine, dialogs, `CountdownChip`, `PHASE_ENABLED_BUTTONS`.
 
 ## Deliverable
 
-An operator opening an order sees the exact drawio flowchart, one path lit up in `--primary` with marching-ants animation ending at a live-countdown button chip, everything else greyed. No stacked lanes, no overlapping cards.
+The Customer Journey renders at natural 1240×620 on desktop and auto-shrinks on tablet/mobile with no horizontal scroll bar and no clipping. Only the connector segment matching the current phase lights up. Graph is data-driven from one config file. Unit tests cover every phase transition and terminal outcome.
