@@ -470,7 +470,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             </span>
           </div>
           <h1 className="mt-1.5 truncate text-[15px] font-semibold leading-tight" style={{ color: "var(--admin-fg)" }}>
-            {t.subject}
+            {decodeHtmlEntities(t.subject)}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
             {t.ticket_email ? (
