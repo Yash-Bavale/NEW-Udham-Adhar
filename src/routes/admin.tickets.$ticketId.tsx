@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ChevronLeft, ChevronRight, Loader2, Lock, Mail, MailCheck, MailX, Send,
-  Sparkles, PlayCircle, CheckCircle2, RotateCcw, XCircle, Package, Search,
+  Sparkles, PlayCircle, RotateCcw, Package, Search,
   Filter, ArrowUpDown, Copy, Printer, Download, AlertTriangle, User, FileText,
   Clock, Zap, MessageSquare, StickyNote, ExternalLink, Paperclip, Bold,
   Italic, Underline as UIcon, List, ListOrdered, Link as LinkIcon, Smile,
