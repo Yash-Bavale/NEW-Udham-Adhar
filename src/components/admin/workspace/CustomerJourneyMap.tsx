@@ -21,16 +21,18 @@ import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
 import { formatIST, relativeIST } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-import { JOURNEY_STAGES, deriveJourneyLiveState } from "@/lib/orders/journey-map";
+import { JOURNEY_STAGES, deriveJourneyLiveState, derivePhase, PHASE_ENABLED_BUTTONS, type ButtonCode } from "@/lib/orders/journey-map";
 
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 
 import { sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder } from "@/lib/orders/order-actions.functions";
+import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
+
 
 interface Props {
   applicationId: string;
@@ -76,7 +78,7 @@ const MAIN_NODES = [
 
 export function CustomerJourneyMap(p: Props) {
   const qc = useQueryClient();
-  const { view } = useOrderWorkflow(p.applicationId);
+  const { view, events } = useOrderWorkflow(p.applicationId);
   const live = useMemo(() => deriveJourneyLiveState({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
@@ -89,6 +91,36 @@ export function CustomerJourneyMap(p: Props) {
   const closed = live.terminal === "closed";
   const completed = live.terminal === "completed";
   const closureArmed = !!p.closureStage && p.closureStage !== "none" && !closed;
+
+  // Derive reminder count from workflow events (E006 = ReminderScheduled)
+  const reminderCount = useMemo(
+    () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
+    [events],
+  );
+  // B07 press flag — persisted client-side per order (server state is idempotent E005).
+  const postWaitKey = `journey.b07Pressed:${p.applicationId}`;
+  const [postWaitSubmitted, setPostWaitSubmitted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(postWaitKey) === "1"; } catch { return false; }
+  });
+  const markPostWaitSubmitted = () => {
+    try { window.localStorage.setItem(postWaitKey, "1"); } catch {}
+    setPostWaitSubmitted(true);
+  };
+
+  const phase = useMemo(() => derivePhase({
+    stage: p.stage,
+    workflowStatus: p.workflowStatus,
+    closureStage: p.closureStage,
+    closureReasonLabel: p.closureReasonLabel,
+    reminderCount,
+    postWaitSubmitted,
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted]);
+
+  const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
+  const gate = (code: ButtonCode) => enabledCodes.includes(code);
+  const gateDisabledTitle = "Not available in the current phase";
+
 
   const timers = view.timers ?? [];
   const findTimer = (kindMatch: RegExp) =>
@@ -132,6 +164,20 @@ export function CustomerJourneyMap(p: Props) {
   const fnReminder = useServerFn(sendManualReminder);
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
+  const fnResume   = useServerFn(resumeFromHold);
+
+  const mutResume = useMutation({
+    mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
+    onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutSubmitAfterWait = useMutation({
+    mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("E005 sent — consultation completed (after waiting)"); markPostWaitSubmitted(); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
@@ -380,8 +426,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Send Information Incomplete Mail (E002)",
                 onClick: () => mutFormLink.mutate(),
                 variant: "amber",
-                disabled: mutFormLink.isPending || closed,
+                disabled: mutFormLink.isPending || closed || !gate("B01"),
               }}
+
             />
             {/* Order column: Force Close */}
             <SubCard
@@ -400,29 +447,45 @@ export function CustomerJourneyMap(p: Props) {
                 variant: "rose",
                 disabled: closed,
               }}
+
             />
 
-            {/* Form column: Technical Delay */}
+            {/* Form column: Technical Delay — CTA swaps to B03 (E011 resolve) when a technical hold is active */}
             <SubCard
               x={NODE_X[3] - CARD_W / 2} y={ROW_Y[0]}
               w={CARD_W} h={CARD_H}
               tone="amber"
               active={live.activeSubKey === "technical-delay"}
               icon={<Clock className="size-4" />}
-              chip="E003 · B"
-              title="Technical Delay"
+              chip={phase === "technical_delay" ? "E011" : "E003 · B"}
+              title={phase === "technical_delay" ? "Technical Delay — Issue Resolved" : "Technical Delay"}
               subtitle={
-                technicalHoldTimer
-                  ? `Reminder ${relativeIST(technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt)}`
-                  : "Sends E003 to customer + employee reminder"
+                phase === "technical_delay"
+                  ? "Resume order · Sends E011 to customer"
+                  : technicalHoldTimer
+                    ? `Reminder ${relativeIST(technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt)}`
+                    : "Sends E003 to customer + employee reminder"
               }
-              tooltip="Log a technical/external delay. Sends E003 to the customer AND creates a reminder for the assignee to follow up. Resumes to Govt Portal when cleared."
-              button={{
-                label: "Select Reason + Add Reminder",
-                onClick: () => setDialog({ kind: "technical_delay" }),
-                variant: "amber",
-                disabled: closed,
-              }}
+              tooltip={
+                phase === "technical_delay"
+                  ? "Technical delay resolved. Sends E011 (Order Resumed) to the customer and returns the order to the Govt Portal flow."
+                  : "Log a technical/external delay. Sends E003 to the customer AND creates a reminder for the assignee to follow up. Resumes to Govt Portal when cleared."
+              }
+              button={
+                phase === "technical_delay"
+                  ? {
+                      label: "Issue Resolved (E011)",
+                      onClick: () => mutResume.mutate(),
+                      variant: "emerald",
+                      disabled: mutResume.isPending || closed || !gate("B03"),
+                    }
+                  : {
+                      label: "Select Reason + Add Reminder",
+                      onClick: () => setDialog({ kind: "technical_delay" }),
+                      variant: "amber",
+                      disabled: closed || !gate("B02"),
+                    }
+              }
             />
             {/* Form column: Customer Side Delay */}
             <SubCard
@@ -443,9 +506,10 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Select Reason (E004)",
                 onClick: () => setDialog({ kind: "customer_delay" }),
                 variant: "amber",
-                disabled: closed,
+                disabled: closed || !gate("B10"),
               }}
             />
+
 
             {/* Govt Portal column: Consultation Completed */}
             <SubCard
@@ -461,8 +525,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Order Completed (E005)",
                 onClick: () => mutSubmit.mutate(),
                 variant: "emerald",
-                disabled: mutSubmit.isPending || closed,
+                disabled: mutSubmit.isPending || closed || !gate("B04"),
               }}
+
             />
             {/* Govt Portal column: Waiting for Govt Approval */}
             <SubCard
@@ -478,8 +543,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Add Reminder (E006)",
                 onClick: promptReminder,
                 variant: "indigo",
-                disabled: closed,
+                disabled: closed || !gate("B05"),
               }}
+
             />
 
             {/* Check Final Status column: 4 rows */}
@@ -497,8 +563,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Add Reminder",
                 onClick: promptReminder,
                 variant: "sky",
-                disabled: closed,
+                disabled: closed || !gate("B06"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[1]}
@@ -511,10 +578,11 @@ export function CustomerJourneyMap(p: Props) {
               tooltip="After waiting on govt response, mark consultation/submission complete."
               button={{
                 label: "Order Completed (E005)",
-                onClick: () => mutSubmit.mutate(),
+                onClick: () => mutSubmitAfterWait.mutate(),
                 variant: "emerald",
-                disabled: mutSubmit.isPending || closed,
+                disabled: mutSubmitAfterWait.isPending || closed || !gate("B07"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[2]}
@@ -530,8 +598,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Upload Cert & Complete (E007)",
                 onClick: () => setDialog({ kind: "complete_with_cert" }),
                 variant: "emerald",
-                disabled: closed,
+                disabled: closed || !gate("B08"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[3]}
@@ -547,8 +616,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Select Reason (E008)",
                 onClick: () => setDialog({ kind: "govt_rejected" }),
                 variant: "rose",
-                disabled: closed,
+                disabled: closed || !gate("B09"),
               }}
+
             />
 
             {isTalkToExpert && (
@@ -765,7 +835,7 @@ function SubCard({
             type="button"
             onClick={button.onClick}
             disabled={button.disabled}
-            title={button.disabled ? "Not available in the current state" : button.label}
+            title={button.disabled ? "Not available in the current phase" : button.label}
             className={cn(
               "rounded-md px-2 py-1 text-[10px] font-bold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed",
               TONE[button.variant].btn,
