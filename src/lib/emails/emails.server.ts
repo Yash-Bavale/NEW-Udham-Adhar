@@ -273,6 +273,13 @@ async function backfillCommonVariables(
     const v = out[k];
     return v === undefined || v === null || v === "";
   };
+  // Always provide {{resolved_at}} = current IST timestamp when caller didn't set it.
+  if (missing("resolved_at")) {
+    out.resolved_at = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+  }
   if (!leadId && !applicationId) return out;
   try {
     type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
