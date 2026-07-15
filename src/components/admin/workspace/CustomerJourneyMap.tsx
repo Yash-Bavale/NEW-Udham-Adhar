@@ -360,7 +360,7 @@ export function CustomerJourneyMap(p: Props) {
                   if (!from || !to) return null;
                   const a = anchor(from, e.fromSide);
                   const b = anchor(to,   e.toSide);
-                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdge });
+                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdge, phase, currentIdx });
                   const cls =
                     state === "done"   ? "stroke-emerald-500"
                   : state === "active" ? "stroke-indigo-500 edge-active"
