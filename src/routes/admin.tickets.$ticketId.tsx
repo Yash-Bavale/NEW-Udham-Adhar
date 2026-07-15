@@ -19,7 +19,6 @@ import {
 } from "@/lib/crm/tickets.functions";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
-  resolveTicketAndResumeOrder,
   closeTicketNormalT001,
   closeTicketRestartT001,
   closeTicketConsultationT001,
