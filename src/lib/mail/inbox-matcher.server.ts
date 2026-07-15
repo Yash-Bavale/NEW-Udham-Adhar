@@ -431,12 +431,18 @@ type MatchResult = {
 } | null;
 
 async function matchOrder(input: {
+  subject: string | null;
   inReplyTo: string | null;
   references: string[];
   xBhsOrder: string | null;
   xBhsCustomer: string | null;
   fromEmail: string | null;
 }): Promise<MatchResult> {
+  // 0) Subject-embedded order code (AP-YYYY-######) or lead code (UA-YYYY-######).
+  //    Highest priority — most reliable signal from Zoho replies that drop headers.
+  const bySubject = await matchBySubjectCode(input.subject);
+  if (bySubject) return bySubject;
+
   // 1) In-Reply-To / References → email_logs.message_id
   const idsToMatch = [input.inReplyTo, ...input.references].filter(Boolean) as string[];
   if (idsToMatch.length > 0) {
