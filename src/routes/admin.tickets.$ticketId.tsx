@@ -72,6 +72,27 @@ function relTime(iso: string | null | undefined): string {
   return `${Math.floor(s / 604800)}w ago`;
 }
 
+/** Decode common HTML entities so plain-text ticket bodies don't render as `&amp;` / `&nbsp;`. */
+function decodeHtmlEntities(input: string | null | undefined): string {
+  if (!input) return "";
+  return input
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&hellip;/gi, "…")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&rsquo;|&lsquo;/gi, "'")
+    .replace(/&rdquo;|&ldquo;/gi, '"');
+}
+
+
+
 function initials(name: string | null | undefined): string {
   if (!name) return "?";
   return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
@@ -340,7 +361,7 @@ function TicketListRail({ activeId, searchRef }: { activeId: string; searchRef: 
                         </div>
                       </div>
                       <p className="mt-0.5 truncate text-[13px] font-medium" style={{ color: "var(--admin-fg)" }}>
-                        {t.subject}
+                        {decodeHtmlEntities(t.subject)}
                       </p>
                       <p className="truncate text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
                         {t.customer_name ?? "—"}
@@ -449,7 +470,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             </span>
           </div>
           <h1 className="mt-1.5 truncate text-[15px] font-semibold leading-tight" style={{ color: "var(--admin-fg)" }}>
-            {t.subject}
+            {decodeHtmlEntities(t.subject)}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
             {t.ticket_email ? (
@@ -715,7 +736,10 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
     () => (cleaned.hiddenHtml ? DOMPurify.sanitize(cleaned.hiddenHtml, { ALLOWED_ATTR: ["href", "src", "alt", "title", "style", "target", "rel"] }) : null),
     [cleaned.hiddenHtml],
   );
-  const hasHidden = Boolean(hiddenSafeHtml || cleaned.hiddenText);
+  const visibleTextDecoded = useMemo(() => decodeHtmlEntities(cleaned.visibleText), [cleaned.visibleText]);
+  const hiddenTextDecoded = useMemo(() => decodeHtmlEntities(cleaned.hiddenText), [cleaned.hiddenText]);
+  const hasHidden = Boolean(hiddenSafeHtml || hiddenTextDecoded);
+
 
   return (
     <div className={`flex gap-3 ${isAgent ? "flex-row-reverse" : ""}`}>
@@ -739,7 +763,7 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
           <div className="mt-2 text-sm leading-relaxed" style={{ color: "var(--admin-fg)" }}>
             {visibleSafeHtml
               ? <div className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_p]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500" dangerouslySetInnerHTML={{ __html: visibleSafeHtml }} />
-              : <p className="whitespace-pre-wrap">{cleaned.visibleText}</p>
+              : <p className="whitespace-pre-wrap">{visibleTextDecoded}</p>
             }
             {hasHidden && (
               <>
@@ -750,7 +774,7 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
                 {showQuoted && (
                   hiddenSafeHtml
                     ? <div className="mt-2 border-l-2 pl-3 text-xs opacity-70 [&_a]:text-blue-600" style={{ borderColor: "var(--admin-border)" }} dangerouslySetInnerHTML={{ __html: hiddenSafeHtml }} />
-                    : <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{cleaned.hiddenText}</div>
+                    : <div className="mt-2 whitespace-pre-wrap rounded-md border-l-2 pl-3 text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>{hiddenTextDecoded}</div>
                 )}
               </>
             )}

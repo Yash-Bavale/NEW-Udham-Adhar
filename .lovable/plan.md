@@ -1,123 +1,81 @@
+## Problem (evidence)
 
-## Goal
+Recent inbound Zoho mails **are** being ingested (rows in `email_logs`) and support tickets **are** being created — but every recent ticket + email_log has `application_id = NULL`, even though the subject clearly contains the order code:
 
-Make the Customer Journey Map show/enable exactly the right B-buttons per current phase, add the missing **B03 – Technical Delay Resolved (E011)** button, and drive the enable/disable rules from a single config so we can flip the unresolved "after B10" set once you confirm.
-
-Purely UI + config changes — no email templates, no schema, no server actions rewritten (E011 wiring already exists from the last turn).
-
----
-
-## 1. New "phase" model (config, shared)
-
-Add to `src/lib/orders/journey-map.ts`:
-
-```ts
-export type JourneyPhase =
-  | "form_not_submitted"     // order_received, no form yet
-  | "form_submitted"         // form in / verification / review
-  | "technical_delay"        // B02 pressed, hold active
-  | "customer_delay"         // B10 pressed, hold active
-  | "consultation_done"      // B04 pressed → awaiting govt
-  | "awaiting_govt"          // B05 pressed → reminder queued
-  | "status_checked"         // B06 pressed → checked, still waiting
-  | "post_wait_submitted"    // B07 pressed
-  | "completed"              // B08 terminal
-  | "closed";                // B09 terminal (or A-closed)
+```
+Re: … Order No. AP-2026-007193      → ticket.application_id = NULL
+Re: … Order No. AP-2026-007184      → ticket.application_id = NULL
+Re: … Order No. AP-2026-006921      → ticket.application_id = NULL
+Re: … UA-2026-008120                → ticket.application_id = NULL
 ```
 
-`derivePhase(live, workflowStatus, closureStage, reasonCode)` — pure fn that returns one `JourneyPhase`. Reuses existing `deriveJourneyLiveState` output. Persist "last pressed" phase transitions in workflow events (already there) — read latest `workflow_event.kind` (`e005_sent`, `e006_sent`, etc.) via the existing `useOrderWorkflow` events list to distinguish B04/B05/B06/B07.
+Because `application_id` is NULL:
+- The order workspace's `TicketPanel` (filters `support_tickets.application_id = orderId`) shows nothing.
+- The ticket workspace's "emails" pane (queries `email_logs` by `application_id`) is empty, so no sent/received chat thread.
+- Journey map cannot pause/resume against these tickets.
 
-## 2. Button ↔ phase enablement map (config)
+`inbox-matcher.server.ts` only tries: In-Reply-To → `email_logs.message_id`, `X-BHS-Order` header, then `from_email → customers/leads`. It **never parses the order code from the subject**. Zoho customers replying from web/mobile frequently drop In-Reply-To, and we don't set `X-BHS-Order` on all outgoing mail — so matching falls to the `from_email` path, which returns customer_id but no application_id when the customer has multiple orders or the order is beyond the `NOT IN (COMPLETED,CLOSED,REFUND_PROCESSED)` filter.
 
-```ts
-// Order of buttons matches your reference (B01..B10)
-export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
-  form_not_submitted:  ["B01"],
-  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
-  technical_delay:     ["B03"],
-  customer_delay:      POST_B10_ALLOWED,   // configurable — see §4
-  consultation_done:   ["B08", "B09"],
-  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
-  status_checked:      ["B07", "B08", "B09", "B10"],
-  post_wait_submitted: ["B08", "B09"],
-  completed:           [],   // terminal
-  closed:              [],   // terminal
-};
-```
+Separate bug: HTML entities (`&amp;`, `&nbsp;`, `&#39;`) render literally. `stripHtml()` in `inbox-matcher.server.ts` removes tags but never decodes entities, so `body_text` (which the chat bubble renders as plain text when no HTML is present) contains raw entities. Subjects saved from Zoho headers can also arrive entity-encoded.
 
-`ButtonCode` = `"B01" | ... | "B10"`.
+## Plan
 
-## 3. Add the missing B03 sub-card
+### 1. Subject-based order matching (root fix)
 
-In `CustomerJourneyMap.tsx`, the Technical Delay card at `NODE_X[3] / ROW_Y[0]` currently only has "Select Reason + Add Reminder" (B02). When `phase === "technical_delay"` swap the CTA to:
+In `src/lib/mail/inbox-matcher.server.ts`, extend `matchOrder()` with a new **step 0** (highest priority, runs before In-Reply-To):
 
-- Label: **"Technical Delay — Issue Resolved"**
-- Chip: `E011`
-- onClick → calls the existing `resumeFromHold` server fn (already wired last turn) with the technical-hold row id from `useOrderWorkflow().view.timers`.
-- On success toast "E011 sent — order resumed" and invalidate the standard keys.
+- Regex the subject for `AP-\d{4}-\d{6}` and `UA-\d{4}-\d{6}`.
+- If `AP-...` found → `applications.application_code` lookup → return `{applicationId, leadId, customerId}`.
+- Else if `UA-...` found → `leads.lead_code` lookup → then latest application for that lead.
 
-No new server code; just a mutation + button swap inside the same card.
+Apply the same subject match inside `matchTicket()` too (before falling back to In-Reply-To) so replies without headers still merge into the right ticket via `ticket_reopen_or_create` when the matched application already has a ticket.
 
-## 4. Config value for "after B10" (unresolved)
+Also stop the current `from_email` path from silently dropping the order match when the customer has exactly one open order — remove the `NOT IN (COMPLETED,CLOSED)` filter's REOPENED exclusion so a customer replying to a completed order still links.
 
-```ts
-// src/lib/orders/journey-map.ts
-// FIXME(confirm): after B10 (Customer Side Delay) which buttons stay active?
-// Set to whichever variant Ops confirms. Flip here, not in components.
-export const POST_B10_ALLOWED: ButtonCode[] =
-  ["B02", "B04", "B05", "B08", "B09"];   // default guess; flip to include B10 or swap B09↔B10 later
-```
+### 2. Attach existing orphan tickets/emails (one-shot backfill)
 
-Component reads `PHASE_ENABLED_BUTTONS.customer_delay` — no hardcoding downstream.
+Migration `backfill_orphan_ticket_application_id.sql`:
 
-## 5. Gate every existing sub-card button
+- For every `support_tickets` row where `application_id IS NULL` and subject matches `AP-\d{4}-\d{6}` or `UA-\d{4}-\d{6}`, resolve to an application id and update.
+- Same for `email_logs` rows with `direction='incoming'` and `application_id IS NULL`.
+- Purely additive updates — no schema changes, no GRANT changes.
 
-Each `<SubCard button={...} />` gets a `disabled` derived from:
+### 3. Decode HTML entities
 
-```ts
-disabled: closed || !PHASE_ENABLED_BUTTONS[phase].includes(code)
-```
+- Update `stripHtml()` in `inbox-matcher.server.ts` to decode entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&nbsp;`, numeric `&#NN;` / `&#xNN;`) after tag removal.
+- Decode entities when normalizing `subject` headers coming out of Zoho.
+- In the ticket-thread `MessageCard` (`src/routes/admin.tickets.$ticketId.tsx`), when only `bodyText` is present, run a small `decodeEntities()` helper before rendering into the `<p className="whitespace-pre-wrap">` block. Keeps HTML path (DOMPurify) untouched.
 
-Mapping of the 10 existing cards → codes:
+### 4. Chat-box view (sent + received) on the order
 
-| Card location | Code | Existing label kept |
-|---|---|---|
-| Order col / row0 "Form Not Submitted" | B01 | Send Info Incomplete Mail (E002) |
-| Form col / row0 "Technical Delay" (CTA A) | B02 | Select Reason + Add Reminder (E003) |
-| Form col / row0 "Technical Delay" (CTA B, when active) | **B03** *(new)* | Issue Resolved (E011) |
-| Govt col / row0 "Consultation Completed" | B04 | Order Completed (E005) |
-| Govt col / row1 "Waiting for Govt Approval" | B05 | Add Reminder (E006) |
-| Final col / row0 "Awaiting Govt Response" | B06 | Add Reminder (E006) |
-| Final col / row1 "Consultation Completed (After Waiting)" | B07 | Order Completed (E005) |
-| Final col / row2 "Application Accepted — Upload PDF" | B08 | Upload Cert & Complete (E007) |
-| Final col / row3 "Application Rejected" | B09 | Select Reason (E008) |
-| Form col / row1 "Customer Side Delay" | B10 | Select Reason (E004) |
+`TicketPanel` today only lists ticket rows. Extend it (still under `CustomerJourneyMap`'s "Customer contacted" section):
 
-Force Close (E010) card stays as-is — it is not in the B-set and is always visible per existing rules.
+- For the top open ticket of the order, render a compact **thread preview**: last 4 messages using the existing bubble style (agent right / customer left), with sent/received chips, timestamp, and a "Open full thread ↗" link to `/admin/tickets/$ticketId`. No new server function — reuse `getTicketWorkspace` scoped to `mostRecentOpenTicket.id` or add a tiny `getOrderThreadPreview(orderId)` server fn that returns the last 4 merged `ticket_replies + email_logs`.
 
-## 6. Visual state for disabled buttons
+### 5. Journey ↔ Ticket mapping
 
-Existing `SubCard` already dims when `disabled`. Add a small "Not available in this phase" tooltip when `disabled && !closed` so employees understand why the CTA is greyed out instead of hidden.
+In `src/lib/orders/journey-map.ts` and `CustomerJourneyMap.tsx`:
 
-## 7. Files touched
+- Add a **"Customer contacted"** phase indicator (chip) that lights up when `support_tickets` has an open row for this order. It doesn't replace the B-button phase; it sits alongside as an overlay pill (amber).
+- When the pill is active, the E-template & button strip shows:
+  - E009 (Reply to customer) — links to open the thread composer
+  - "Resolve ticket & resume order" button — calls existing `resolveTicketAndResumeOrder`
+- Wire `TicketOpened` / `TicketClosed` workflow events (already dispatched by the matcher and `ticket-merge.functions.ts`) into the journey pill so it updates in real time via the existing `useRealtimeTable("support_tickets")` hook.
 
-- `src/lib/orders/journey-map.ts` — add `JourneyPhase`, `derivePhase()`, `PHASE_ENABLED_BUTTONS`, `POST_B10_ALLOWED`, `ButtonCode`.
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — compute `phase` via `derivePhase`, add B03 CTA branch on the Technical Delay card, apply `disabled` gating to all 10 cards, add tooltip.
+### 6. Verification
 
-No changes to: email templates, `hold-actions.functions.ts`, `transition-guard.server.ts`, migrations, `stageActionMap.ts`, invoices, or any other flow.
+- Manually trigger `/api/public/cron/poll-zoho-inbox` after fix + backfill; confirm new incoming replies land with `application_id` set.
+- Open `/admin/orders/abe94685-…` → confirm `TicketPanel` shows the ticket and thread preview.
+- Open the ticket detail; confirm sent (agent bubble) + received (customer bubble) rendering, and no `&amp;` / `&nbsp;` in body or subject.
+- Journey card shows the amber "Customer contacted" pill; clicking "Resolve & resume" clears it.
 
-## 8. Verification
+## Files touched
 
-- Build passes (tsgo).
-- Manually walk each phase in the preview at `/admin/orders/…`:
-  1. New order, no form → only B01 enabled.
-  2. Press B01 → all B* disabled (still `form_not_submitted` until form arrives).
-  3. Form submitted → B02/B04/B05/B08/B10 enabled.
-  4. Press B02 → only B03 enabled; press B03 → returns to (3).
-  5. Press B04 → B08/B09 only.
-  6. Press B05 → B06/B07/B08/B09/B10.
-  7. Press B06 → B07/B08/B09/B10.
-  8. Press B07 → B08/B09.
-  9. Press B08 → terminal completed, all disabled.
-  10. Press B09 → terminal closed, all disabled.
-  11. Press B10 → whatever `POST_B10_ALLOWED` says (documented as unresolved).
+- edit `src/lib/mail/inbox-matcher.server.ts` (subject regex match, entity decode)
+- new  `supabase/migrations/<ts>_backfill_orphan_ticket_application_id.sql`
+- edit `src/routes/admin.tickets.$ticketId.tsx` (decode entities in text-only bubbles)
+- edit `src/components/admin/workspace/TicketPanel.tsx` (thread preview)
+- new  `src/lib/tickets/order-thread-preview.functions.ts`
+- edit `src/components/admin/workspace/CustomerJourneyMap.tsx` + `src/lib/orders/journey-map.ts` (Customer-contacted pill + E009 / resolve-resume button)
+
+No changes to email sending, templates, `hold-actions.functions.ts`, workflow engine core, or GRANT/RLS policies.

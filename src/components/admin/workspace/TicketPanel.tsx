@@ -11,6 +11,17 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
+function decodeEntities(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; } })
+    .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; } })
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&hellip;/gi, "…").replace(/&mdash;/gi, "—").replace(/&ndash;/gi, "–")
+    .replace(/&rsquo;|&lsquo;/gi, "'").replace(/&rdquo;|&ldquo;/gi, '"');
+}
+
 interface Props {
   orderId: string;
 }
@@ -60,7 +71,7 @@ export function TicketPanel({ orderId }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-900 truncate">
-                      {t.subject || t.ticket_number || t.id.slice(0, 8)}
+                      {decodeEntities(t.subject) || t.ticket_number || t.id.slice(0, 8)}
                     </span>
                     {reopened && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
