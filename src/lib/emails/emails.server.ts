@@ -232,9 +232,20 @@ async function enforceApplicationOrderNumber(
   if (!leadId && !applicationId) return out;
 
   const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
-  const resolved = leadId
-    ? await resolveApplicationCode(leadId, { applicationId })
-    : null;
+  let effectiveLeadId = leadId ?? null;
+  let resolved: string | null = null;
+  if (applicationId && !effectiveLeadId) {
+    const { data: app } = await supabaseAdmin
+      .from("applications")
+      .select("lead_id, application_code")
+      .eq("id", applicationId)
+      .maybeSingle();
+    resolved = ((app as { application_code?: string | null } | null)?.application_code ?? null) || null;
+    effectiveLeadId = ((app as { lead_id?: string | null } | null)?.lead_id ?? null) || null;
+  }
+  if (!resolved && effectiveLeadId) {
+    resolved = await resolveApplicationCode(effectiveLeadId, { applicationId });
+  }
 
   if (!resolved) {
     throw new Error("Order number not ready yet — email was not sent.");
