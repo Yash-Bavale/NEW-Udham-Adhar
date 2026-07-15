@@ -164,6 +164,20 @@ export function CustomerJourneyMap(p: Props) {
   const fnReminder = useServerFn(sendManualReminder);
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
+  const fnResume   = useServerFn(resumeFromHold);
+
+  const mutResume = useMutation({
+    mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
+    onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutSubmitAfterWait = useMutation({
+    mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("E005 sent — consultation completed (after waiting)"); markPostWaitSubmitted(); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
