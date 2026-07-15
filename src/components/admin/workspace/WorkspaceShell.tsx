@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-import { OrderJourneyBoardV2 } from "./OrderJourneyBoardV2";
+import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
@@ -296,9 +296,9 @@ export function WorkspaceShell(p: Props) {
             (OrderWorkflowPanel). This card is header info only. */}
       </section>
 
-      {/* ── SINGLE SOURCE OF TRUTH: Order Journey Board V2 ───────────
-          NEW component (not an in-place edit of CustomerJourneyMap).
-          Buttons are gated by status via NEXT_ACTIVE_BUTTONS. */}
+      {/* ── SINGLE SOURCE OF TRUTH: Customer Journey Map ────────────
+          Replaces OrderActionRail + OrderStageActions + the old
+          Customer Journey card. Every employee action lives here. */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
         <div className="flex items-center justify-between">
           <div>
@@ -306,16 +306,21 @@ export function WorkspaceShell(p: Props) {
               Customer Journey & Employee Actions
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              Only buttons valid for the current status are shown. Two always-visible controls (Manual Close / Reopen) appear at the bottom.
+              Every stage, every button — one map. All action buttons are always visible; the highlighted node shows where the order is right now.
             </div>
           </div>
         </div>
-        <OrderJourneyBoardV2
+        <CustomerJourneyMap
           applicationId={application.id}
-          orderStatus={orderStatus}
-          applicationCode={application.application_code}
+          stage={p.stage}
+          isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
+          serviceCode={(service as any)?.service_code ?? (service as any)?.code ?? lead?.service ?? null}
           workflowStatus={(application as any).workflow_status}
+          closureStage={(application as any).closure_stage}
+          closureNextAt={(application as any).closure_next_at}
           closureReasonLabel={(application as any).closure_reason_code}
+          payments={payments}
+          hideAmount={p.hideAmount}
         />
       </section>
 
