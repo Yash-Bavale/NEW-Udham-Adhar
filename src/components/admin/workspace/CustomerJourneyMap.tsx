@@ -449,27 +449,42 @@ export function CustomerJourneyMap(p: Props) {
               }}
             />
 
-            {/* Form column: Technical Delay */}
+            {/* Form column: Technical Delay — CTA swaps to B03 (E011 resolve) when a technical hold is active */}
             <SubCard
               x={NODE_X[3] - CARD_W / 2} y={ROW_Y[0]}
               w={CARD_W} h={CARD_H}
               tone="amber"
               active={live.activeSubKey === "technical-delay"}
               icon={<Clock className="size-4" />}
-              chip="E003 · B"
-              title="Technical Delay"
+              chip={phase === "technical_delay" ? "E011" : "E003 · B"}
+              title={phase === "technical_delay" ? "Technical Delay — Issue Resolved" : "Technical Delay"}
               subtitle={
-                technicalHoldTimer
-                  ? `Reminder ${relativeIST(technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt)}`
-                  : "Sends E003 to customer + employee reminder"
+                phase === "technical_delay"
+                  ? "Resume order · Sends E011 to customer"
+                  : technicalHoldTimer
+                    ? `Reminder ${relativeIST(technicalHoldTimer.fires_at ?? technicalHoldTimer.firesAt)}`
+                    : "Sends E003 to customer + employee reminder"
               }
-              tooltip="Log a technical/external delay. Sends E003 to the customer AND creates a reminder for the assignee to follow up. Resumes to Govt Portal when cleared."
-              button={{
-                label: "Select Reason + Add Reminder",
-                onClick: () => setDialog({ kind: "technical_delay" }),
-                variant: "amber",
-                disabled: closed,
-              }}
+              tooltip={
+                phase === "technical_delay"
+                  ? "Technical delay resolved. Sends E011 (Order Resumed) to the customer and returns the order to the Govt Portal flow."
+                  : "Log a technical/external delay. Sends E003 to the customer AND creates a reminder for the assignee to follow up. Resumes to Govt Portal when cleared."
+              }
+              button={
+                phase === "technical_delay"
+                  ? {
+                      label: "Issue Resolved (E011)",
+                      onClick: () => mutResume.mutate(),
+                      variant: "emerald",
+                      disabled: mutResume.isPending || closed || !gate("B03"),
+                    }
+                  : {
+                      label: "Select Reason + Add Reminder",
+                      onClick: () => setDialog({ kind: "technical_delay" }),
+                      variant: "amber",
+                      disabled: closed || !gate("B02"),
+                    }
+              }
             />
             {/* Form column: Customer Side Delay */}
             <SubCard
@@ -490,9 +505,10 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Select Reason (E004)",
                 onClick: () => setDialog({ kind: "customer_delay" }),
                 variant: "amber",
-                disabled: closed,
+                disabled: closed || !gate("B10"),
               }}
             />
+
 
             {/* Govt Portal column: Consultation Completed */}
             <SubCard
