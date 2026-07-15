@@ -563,8 +563,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Add Reminder",
                 onClick: promptReminder,
                 variant: "sky",
-                disabled: closed,
+                disabled: closed || !gate("B06"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[1]}
