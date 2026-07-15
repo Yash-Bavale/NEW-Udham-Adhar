@@ -457,7 +457,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
   });
 
 
-  const canResume = (t.application_id && (data.ticket.applications?.order_status === "CUSTOMER_HOLD" || data.ticket.applications?.order_status === "OUR_SIDE_DELAY") && !["closed", "resolved"].includes(t.status));
+  
 
   const staffFn = useServerFn(listStaffForAssignment);
   const { data: staff } = useQuery({ queryKey: ["staff-assign"], queryFn: () => staffFn(), staleTime: 60_000 });
