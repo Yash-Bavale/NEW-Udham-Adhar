@@ -542,18 +542,28 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             {(staff?.staff ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
-          {canResume && (
-            <ToolbarBtn onClick={() => setResumeOpen(true)} icon={<PlayCircle className="size-3.5" />} label="Resume Order" success />
-          )}
-          {!["resolved", "closed"].includes(t.status) && (
-            <ToolbarBtn onClick={() => updMut.mutate({ status: "resolved" })} icon={<CheckCircle2 className="size-3.5" />} label="Resolve" />
-          )}
-          {t.status !== "closed" && (
-            <ToolbarBtn onClick={() => updMut.mutate({ status: "closed" })} icon={<XCircle className="size-3.5" />} label="Close" />
+          {!["closed", "resolved"].includes(t.status) && (
+            <>
+              <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
+              <TicketFlowBtn code="T001" label="Normal / No Action" tone="slate"
+                disabled={t001NormalMut.isPending}
+                onClick={() => { if (window.confirm("Close ticket — Normal mail / No action required?\nSends T001 to the customer.")) t001NormalMut.mutate(); }} />
+              <TicketFlowBtn code="T001" label="Restart Order" tone="emerald"
+                disabled={t001RestartMut.isPending || !t.application_id}
+                title={!t.application_id ? "No linked order" : undefined}
+                onClick={() => setRestartOpen(true)} />
+              <TicketFlowBtn code="T001" label="Consultation / Support Done" tone="indigo"
+                disabled={t001ConsultMut.isPending}
+                onClick={() => { if (window.confirm("Close ticket — Consultation / support completed?\nSends T001 to the customer.")) t001ConsultMut.mutate(); }} />
+              <TicketFlowBtn code="T002" label="Reply w/ Reason (8h auto-close)" tone="rose"
+                disabled={t002Mut.isPending}
+                onClick={() => setT002Open(true)} />
+            </>
           )}
           {(t.status === "closed" || t.status === "resolved") && (
             <ToolbarBtn onClick={() => updMut.mutate({ status: "open" })} icon={<RotateCcw className="size-3.5" />} label="Reopen" />
           )}
+
 
           <div className="relative ml-auto">
             <button
