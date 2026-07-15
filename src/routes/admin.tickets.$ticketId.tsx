@@ -590,27 +590,57 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
         </div>
       </header>
 
-      {resumeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setResumeOpen(false)}>
+      {restartOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setRestartOpen(false)}>
           <div className="w-full max-w-md rounded-2xl border p-5 shadow-xl" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Resolve ticket and resume order</h3>
-            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Marks this ticket resolved and moves the linked order out of hold.</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fef3c7", color: "#92400e" }}>T001</span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Close ticket &amp; restart order</h3>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Closes the ticket, sends T001, and — if the linked order is on hold — resumes it.</p>
             <label className="mt-4 block text-xs">
               <span className="font-medium uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Resume order to</span>
-              <select value={resumeTo} onChange={(e) => setResumeTo(e.target.value as any)} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}>
+              <select value={restartTo} onChange={(e) => setRestartTo(e.target.value as any)} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}>
                 <option value="IN_PROCESSING">In Processing</option>
                 <option value="SUBMITTED_TO_GOVT">Submitted to Govt</option>
               </select>
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setResumeOpen(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
-              <button type="button" disabled={resumeMut.isPending} onClick={() => resumeMut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#16a34a" }}>
-                {resumeMut.isPending ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-3" />} Confirm
+              <button type="button" onClick={() => setRestartOpen(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
+              <button type="button" disabled={t001RestartMut.isPending} onClick={() => t001RestartMut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#16a34a" }}>
+                {t001RestartMut.isPending ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-3" />} Restart &amp; close
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {t002Open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setT002Open(false)}>
+          <div className="w-full max-w-lg rounded-2xl border p-5 shadow-xl" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fee2e2", color: "#991b1b" }}>T002</span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Reply with reason &amp; arm 8h auto-close</h3>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Sends T002 to the customer. If they don't reply within 8 business hours the ticket auto-closes and T003 is sent.</p>
+            <div className="mt-4">
+              <ReasonPicker
+                value={t002ReasonId}
+                onChange={(id, r: OrderCloseReason | null) => { setT002ReasonId(id); setT002ReasonLabel(r ? `${r.category}${r.number} — ${r.label}` : ""); }}
+                reply={t002Reply}
+                onReplyChange={setT002Reply}
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setT002Open(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
+              <button type="button" disabled={t002Mut.isPending || !t002Reply.trim()} onClick={() => t002Mut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#dc2626" }}>
+                {t002Mut.isPending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />} Send &amp; arm auto-close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }
