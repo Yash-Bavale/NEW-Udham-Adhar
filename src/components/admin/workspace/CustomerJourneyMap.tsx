@@ -525,8 +525,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Order Completed (E005)",
                 onClick: () => mutSubmit.mutate(),
                 variant: "emerald",
-                disabled: mutSubmit.isPending || closed,
+                disabled: mutSubmit.isPending || closed || !gate("B04"),
               }}
+
             />
             {/* Govt Portal column: Waiting for Govt Approval */}
             <SubCard
