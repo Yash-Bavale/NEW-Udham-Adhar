@@ -243,6 +243,14 @@ export function CustomerJourneyMap(p: Props) {
     () => mainDoneEdgesFor(currentIdx, phase),
     [currentIdx, phase],
   );
+  const currentMainEdge = useMemo(
+    () => currentMainEdgeFor(currentIdx, phase, live.terminal),
+    [currentIdx, phase, live.terminal],
+  );
+  const currentStageNode = useMemo(
+    () => currentStageNodeFor(currentIdx, phase, live.terminal),
+    [currentIdx, phase, live.terminal],
+  );
 
   const visibleEdges = EDGES.filter((e) => e.branch !== "ticket" || hasOpenTicket);
   const { wrapRef, scale } = useResponsiveScale();
