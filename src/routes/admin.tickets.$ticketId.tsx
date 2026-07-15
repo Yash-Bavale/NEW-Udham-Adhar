@@ -361,7 +361,7 @@ function TicketListRail({ activeId, searchRef }: { activeId: string; searchRef: 
                         </div>
                       </div>
                       <p className="mt-0.5 truncate text-[13px] font-medium" style={{ color: "var(--admin-fg)" }}>
-                        {t.subject}
+                        {decodeHtmlEntities(t.subject)}
                       </p>
                       <p className="truncate text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
                         {t.customer_name ?? "—"}
