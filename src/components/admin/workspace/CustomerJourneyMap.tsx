@@ -580,11 +580,12 @@ function FlowNode({
   if (state === "terminal-ok") tone = "emerald";
   else if (state === "terminal-bad") tone = "rose";
   else if (state === "done" && node.kind === "stage") tone = "emerald";
-  else if (state === "idle" && (node.kind === "stage" || node.kind === "action")) tone = "slate";
+  else if (state === "idle" && node.kind === "stage") tone = "slate";
+  else if (state === "idle" && node.kind === "action" && !buttonEnabled) tone = "slate";
 
   const t = TONE_STYLES[tone];
-  const dim = state === "idle";
-  const active = state === "active";
+  const dim = state === "idle" && !buttonEnabled;
+  const active = state === "active" || (node.kind === "action" && buttonEnabled && state !== "done");
 
   return (
     <div
