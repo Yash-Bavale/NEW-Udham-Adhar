@@ -763,7 +763,7 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
           <div className="mt-2 text-sm leading-relaxed" style={{ color: "var(--admin-fg)" }}>
             {visibleSafeHtml
               ? <div className="prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline [&_p]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500" dangerouslySetInnerHTML={{ __html: visibleSafeHtml }} />
-              : <p className="whitespace-pre-wrap">{cleaned.visibleText}</p>
+              : <p className="whitespace-pre-wrap">{visibleTextDecoded}</p>
             }
             {hasHidden && (
               <>
