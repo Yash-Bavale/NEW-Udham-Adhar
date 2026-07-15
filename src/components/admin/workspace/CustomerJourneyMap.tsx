@@ -447,6 +447,7 @@ export function CustomerJourneyMap(p: Props) {
                 variant: "rose",
                 disabled: closed,
               }}
+
             />
 
             {/* Form column: Technical Delay — CTA swaps to B03 (E011 resolve) when a technical hold is active */}
