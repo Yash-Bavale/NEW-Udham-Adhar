@@ -28,6 +28,7 @@ import {
 import {
   NODES, EDGES, nodeById, anchor, pathD,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
+  currentMainEdgeFor, currentStageNodeFor,
   CANVAS_W, CANVAS_H, NODE_W, NODE_H,
   type IconKey, type NodeDef, type Tone, type EdgeState, type NodeState,
 } from "@/lib/orders/journey-graph";
@@ -242,6 +243,14 @@ export function CustomerJourneyMap(p: Props) {
     () => mainDoneEdgesFor(currentIdx, phase),
     [currentIdx, phase],
   );
+  const currentMainEdge = useMemo(
+    () => currentMainEdgeFor(currentIdx, phase, live.terminal),
+    [currentIdx, phase, live.terminal],
+  );
+  const currentStageNode = useMemo(
+    () => currentStageNodeFor(currentIdx, phase, live.terminal),
+    [currentIdx, phase, live.terminal],
+  );
 
   const visibleEdges = EDGES.filter((e) => e.branch !== "ticket" || hasOpenTicket);
   const { wrapRef, scale } = useResponsiveScale();
@@ -351,7 +360,7 @@ export function CustomerJourneyMap(p: Props) {
                   if (!from || !to) return null;
                   const a = anchor(from, e.fromSide);
                   const b = anchor(to,   e.toSide);
-                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal });
+                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdge });
                   const cls =
                     state === "done"   ? "stroke-emerald-500"
                   : state === "active" ? "stroke-indigo-500 edge-active"
@@ -382,7 +391,7 @@ export function CustomerJourneyMap(p: Props) {
               {/* Node overlay */}
               {NODES.map((n) => {
                 const state = nodeState(n.id, {
-                  currentIdx, activeBranches, terminal: live.terminal, phase,
+                  currentIdx, activeBranches, terminal: live.terminal, phase, currentStageNode,
                 });
                 const btnCode = n.buttonCode;
                 const enabled = btnCode ? gate(btnCode) : false;
