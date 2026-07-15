@@ -325,7 +325,7 @@ function ActionDialog({
         )}
 
         {needsReminder && (
-          <ReminderCadencePicker minutes={reminderMinutes} onChange={setReminderMinutes} />
+          <ReminderCadencePicker value={reminderMinutes} onChange={setReminderMinutes} />
         )}
 
         {state.kind === "confirm" && (
