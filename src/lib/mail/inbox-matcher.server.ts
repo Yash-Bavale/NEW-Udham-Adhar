@@ -81,7 +81,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     .filter(Boolean) as string[];
   const fromEmail = extractEmail(headers.From) || extractEmail(msg.fromAddress);
   const toEmail = extractEmail(headers.To) || extractEmail(msg.toAddress) || "inbox@udyamadhar.in";
-  const subject = headers.Subject || msg.subject || "(no subject)";
+  const subject = decodeEntities(headers.Subject || msg.subject || "(no subject)");
   const receivedAt = msg.receivedTime
     ? new Date(Number(msg.receivedTime)).toISOString()
     : new Date().toISOString();
