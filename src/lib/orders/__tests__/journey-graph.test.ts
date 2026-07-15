@@ -4,6 +4,9 @@ import {
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
   NODE_W, NODE_H,
 } from "@/lib/orders/journey-graph";
+import {
+  derivePhase, getActiveDelayBranchKey, PHASE_ENABLED_BUTTONS,
+} from "@/lib/orders/journey-map";
 
 /* ─── Geometry ─── */
 describe("geometry helpers", () => {
@@ -82,8 +85,30 @@ describe("activeBranchesFor", () => {
   it("closed reason A + customer workflow → customer-delay", () => {
     expect([...activeBranchesFor("closed", "closed", "A3", "customer_hold")]).toEqual(["customer-delay"]);
   });
+  it("closed waiting_for_customer workflow → customer-delay", () => {
+    expect([...activeBranchesFor("closed", "closed", "A3", "waiting_for_customer")]).toEqual(["customer-delay"]);
+  });
   it("closed reason B → reject", () => {
     expect([...activeBranchesFor("closed", "closed", "B4")]).toEqual(["reject"]);
+  });
+});
+
+/* ─── customer-delay phase from workflow status ─── */
+describe("customer delay workflow status", () => {
+  it("maps waiting_for_customer to the customer-delay branch", () => {
+    expect(getActiveDelayBranchKey("waiting_for_customer")).toBe("customer-side-delay");
+  });
+  it("maps external_dependency to the customer-delay branch", () => {
+    expect(getActiveDelayBranchKey("external_dependency")).toBe("customer-side-delay");
+  });
+  it("derives customer_delay phase after B10 is submitted", () => {
+    expect(derivePhase({
+      stage: "form_submitted",
+      workflowStatus: "waiting_for_customer",
+    })).toBe("customer_delay");
+  });
+  it("locks other next buttons while customer-delay is waiting to close", () => {
+    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual([]);
   });
 });
 
