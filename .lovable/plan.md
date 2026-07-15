@@ -1,114 +1,123 @@
-## Customer Journey Map — final polish
 
-### 1. Add a true "Order Closed" terminal node (parallel to "Completed")
+## Goal
 
-Right now every closure sub-branch visually points back toward the "Completed" (green flag) node, which is wrong. Add an **8th terminal node** ("Order Closed", rose circle with `XCircle` icon) placed **below** the "Completed" node on the far right, at approx `(NODE_X[6], SUB2_Y)`.
+Make the Customer Journey Map show/enable exactly the right B-buttons per current phase, add the missing **B03 – Technical Delay Resolved (E011)** button, and drive the enable/disable rules from a single config so we can flip the unresolved "after B10" set once you confirm.
 
-Rewire connectors so:
-- Force Close (E010) → Order Closed node
-- Customer Side Delay → Order Closed node
-- Application Rejected (E008) → Order Closed node
-- "Order Closed with Selected Reason" card becomes a badge that sits on top of / feeds into the Order Closed node (or is merged into it).
+Purely UI + config changes — no email templates, no schema, no server actions rewritten (E011 wiring already exists from the last turn).
 
-The main horizontal line stops at "Completed". Closure is a distinct branch that terminates at "Order Closed". Node state logic updates so when `closed === true`:
-- The "Completed" node becomes `upcoming/blocked` (grey/muted), not `current`
-- The "Order Closed" node becomes `current` (rose ring)
+---
 
-### 2. Consistent color code across main + sub stages
+## 1. New "phase" model (config, shared)
 
-Lock a single legend and reuse it everywhere (circles, sub-cards, connectors, tooltips, badges, bottom legend):
-
-| Meaning | Color | Where |
-|---|---|---|
-| Done | emerald-500 | past main nodes, completed outcome |
-| Current / Active | indigo-500 | current main node + any live sub-card |
-| Upcoming | sky-400 | future main nodes, idle sub-cards |
-| Delay (customer OR technical) | amber-500 | delay sub-cards + their connectors |
-| Closure / Blocked | rose-500 | Force Close, Rejected, Order Closed |
-| Talk-to-Expert optional | violet-500 | only that card |
-
-Sub-cards drop the `teal` and `sky` tones for delays and use `amber` uniformly (with a chip that says "Customer" vs "Technical") so the color instantly conveys "this is a delay branch", regardless of type. Idle sub-cards get `opacity-70` + slate-300 border instead of colored borders, so only the live one lights up.
-
-### 3. Current-stage indicator with sub-state
-
-Add a prominent **status pill** in the header next to "Current Stage:" that shows the sub-state, not just the main stage. Example values:
-
-- `Order Received · Form Not Submitted`
-- `Form Submitted · Technical Delay (B3)`
-- `Form Submitted · Customer Delay (A2)`
-- `Application Submitted to Govt · Awaiting Response`
-- `Order Closed · Force Closed (A7)`
-
-Derived from `stage + workflowStatus + closureStage + closureReasonLabel`. Also render the same sub-state as a small chip on the currently-active main node itself, so you don't need to scan the whole chart.
-
-### 4. Automatic branch mapping (already partly done — tighten)
-
-Extend `getActiveDelayBranchKey` in `src/lib/orders/journey-map.ts` into a single `deriveJourneyLiveState(props)` helper that returns:
+Add to `src/lib/orders/journey-map.ts`:
 
 ```ts
-{
-  currentMainIndex: number,
-  activeSubKey: "form-not-submitted" | "technical-delay" | "customer-delay" | "govt-awaiting" | "govt-rejected" | "force-closed" | null,
-  terminal: "completed" | "closed" | null,
-  reasonCode: string | null,   // e.g. "A7", "B3"
-  closureCountdownAt: string | null,
-}
+export type JourneyPhase =
+  | "form_not_submitted"     // order_received, no form yet
+  | "form_submitted"         // form in / verification / review
+  | "technical_delay"        // B02 pressed, hold active
+  | "customer_delay"         // B10 pressed, hold active
+  | "consultation_done"      // B04 pressed → awaiting govt
+  | "awaiting_govt"          // B05 pressed → reminder queued
+  | "status_checked"         // B06 pressed → checked, still waiting
+  | "post_wait_submitted"    // B07 pressed
+  | "completed"              // B08 terminal
+  | "closed";                // B09 terminal (or A-closed)
 ```
 
-`CustomerJourneyMap` calls this once and every node/connector/pill reads from it. This is what makes the "always visible, correct one lights up" behaviour reliable across stage/status/closure combinations.
+`derivePhase(live, workflowStatus, closureStage, reasonCode)` — pure fn that returns one `JourneyPhase`. Reuses existing `deriveJourneyLiveState` output. Persist "last pressed" phase transitions in workflow events (already there) — read latest `workflow_event.kind` (`e005_sent`, `e006_sent`, etc.) via the existing `useOrderWorkflow` events list to distinguish B04/B05/B06/B07.
 
-### 5. Countdowns + auto-close labels on the branches themselves
+## 2. Button ↔ phase enablement map (config)
 
-- On **Form Not Submitted** card: replace static "Auto-closed in 8 hrs" with a live countdown pulled from `useOrderWorkflow().view.nextTimer` when kind matches `form_pending_autoclose_8h` (e.g. "Auto-closes in 6h 12m"). Show the E002 chip. If timer is armed, add a small amber pill "E002 armed · Reason A7".
-- On **Customer Side Delay** card: same treatment for `customer_hold_reminder` / auto-close (8h) — show remaining time + reason code (A-x) once picked.
-- On **Force Close (E010)** card: show "E010 · A-reason" chip; disabled with tooltip "Already closed" when `closed`.
-- On **Order Closed** terminal node: show the exact closure reason label + when it fired (`relativeIST(closure timestamp)`).
+```ts
+// Order of buttons matches your reference (B01..B10)
+export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
+  form_not_submitted:  ["B01"],
+  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
+  technical_delay:     ["B03"],
+  customer_delay:      POST_B10_ALLOWED,   // configurable — see §4
+  consultation_done:   ["B08", "B09"],
+  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
+  status_checked:      ["B07", "B08", "B09", "B10"],
+  post_wait_submitted: ["B08", "B09"],
+  completed:           [],   // terminal
+  closed:              [],   // terminal
+};
+```
 
-Countdowns re-use existing `useOrderWorkflow` timers — no new fetch.
+`ButtonCode` = `"B01" | ... | "B10"`.
 
-### 6. Hover / click tooltips on connectors + nodes
+## 3. Add the missing B03 sub-card
 
-Wrap every SVG connector `<path>` / `<line>` in a `<g>` with a `<title>` element (native SVG tooltip, zero deps) explaining the rule that triggered it. Examples:
+In `CustomerJourneyMap.tsx`, the Technical Delay card at `NODE_X[3] / ROW_Y[0]` currently only has "Select Reason + Add Reminder" (B02). When `phase === "technical_delay"` swap the CTA to:
 
-- Order Received → Form Not Submitted: "Triggered when payment received but no form submission after N minutes."
-- Form Submitted → Technical Delay: "Employee logged a Category B (technical/govt) delay."
-- Form Submitted → Customer Delay: "Employee logged a Category A (customer-side) delay — 8h auto-close armed."
-- Final Status → Rejected: "Govt portal returned rejection. E008 sent, order closed."
-- Completed → Order Closed (if closed): "Force closed by operator or by auto-close timer."
+- Label: **"Technical Delay — Issue Resolved"**
+- Chip: `E011`
+- onClick → calls the existing `resumeFromHold` server fn (already wired last turn) with the technical-hold row id from `useOrderWorkflow().view.timers`.
+- On success toast "E011 sent — order resumed" and invalidate the standard keys.
 
-Same for main nodes and sub-cards (wrap in a div with `title=` attribute, plus a shadcn `Tooltip` for richer content: rule name, event that flipped it, timestamp).
+No new server code; just a mutation + button swap inside the same card.
 
-### 7. Backend transition guard
+## 4. Config value for "after B10" (unresolved)
 
-Add a single server-side validator so illegal moves are rejected consistently across all the button paths (E002/E003/E004/E005/E006/E007/E008/E010, T001/T002):
+```ts
+// src/lib/orders/journey-map.ts
+// FIXME(confirm): after B10 (Customer Side Delay) which buttons stay active?
+// Set to whichever variant Ops confirms. Flip here, not in components.
+export const POST_B10_ALLOWED: ButtonCode[] =
+  ["B02", "B04", "B05", "B08", "B09"];   // default guess; flip to include B10 or swap B09↔B10 later
+```
 
-- New file: `src/lib/workflow/transition-guard.server.ts` exporting `assertTransitionAllowed({ from: { stage, workflowStatus, closureStage }, action })`.
-- Rules encoded from the flow chart:
-  - `send_form_link` (E002) only from `order_received`/`payment_done` and only when form not yet submitted; blocked when closed.
-  - `technical_delay` / `customer_delay` only after `form_submitted`; not both simultaneously — new one cancels prior.
-  - `submit_to_govt` (E005) only from `form_submitted` (or `verification`), and requires no active customer/technical hold.
-  - `complete_with_cert` (E007) only from `app_submitted` / `check_status`.
-  - `application_rejected` (E008) only from `app_submitted` / `check_status`.
-  - `force_close` (E010) allowed from any non-closed stage; requires Cat A reason.
-  - Any action rejected with 409 if `closureStage` is already a terminal closed value.
-- Call this guard at the top of every action handler in:
-  - `src/lib/orders/order-actions.functions.ts` (sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder)
-  - `src/lib/orders/actions/close-actions.functions.ts` (closeOrderSystem, handleGovtRejected)
-  - `src/lib/orders/actions/hold-actions.functions.ts` (all 5 hold actions)
-- Emit a typed error message the UI already surfaces via `toast.error`.
-- Also make each action write a `WorkflowEvent` (types already exist in `src/lib/workflow/events.ts`) so the timeline stays in sync — no drift between "stage says X, buttons say Y".
+Component reads `PHASE_ENABLED_BUTTONS.customer_delay` — no hardcoding downstream.
 
-### 8. Files touched
+## 5. Gate every existing sub-card button
 
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — new Order Closed node, connectors, color pass, countdowns, tooltips, status pill.
-- `src/lib/orders/journey-map.ts` — `deriveJourneyLiveState` helper + reason-code parsing.
-- `src/lib/workflow/transition-guard.server.ts` — NEW guard module.
-- `src/lib/orders/order-actions.functions.ts` — call guard.
-- `src/lib/orders/actions/close-actions.functions.ts` — call guard.
-- `src/lib/orders/actions/hold-actions.functions.ts` — call guard.
+Each `<SubCard button={...} />` gets a `disabled` derived from:
 
-### 9. Out of scope (kept as-is)
+```ts
+disabled: closed || !PHASE_ENABLED_BUTTONS[phase].includes(code)
+```
 
-- The 14-reason list, email templates, ticket flow, and timer executor are unchanged.
-- No new DB migrations — guard runs in TS against existing columns.
-- No layout change to the 7 main stages; only the closure endpoint is added.
+Mapping of the 10 existing cards → codes:
+
+| Card location | Code | Existing label kept |
+|---|---|---|
+| Order col / row0 "Form Not Submitted" | B01 | Send Info Incomplete Mail (E002) |
+| Form col / row0 "Technical Delay" (CTA A) | B02 | Select Reason + Add Reminder (E003) |
+| Form col / row0 "Technical Delay" (CTA B, when active) | **B03** *(new)* | Issue Resolved (E011) |
+| Govt col / row0 "Consultation Completed" | B04 | Order Completed (E005) |
+| Govt col / row1 "Waiting for Govt Approval" | B05 | Add Reminder (E006) |
+| Final col / row0 "Awaiting Govt Response" | B06 | Add Reminder (E006) |
+| Final col / row1 "Consultation Completed (After Waiting)" | B07 | Order Completed (E005) |
+| Final col / row2 "Application Accepted — Upload PDF" | B08 | Upload Cert & Complete (E007) |
+| Final col / row3 "Application Rejected" | B09 | Select Reason (E008) |
+| Form col / row1 "Customer Side Delay" | B10 | Select Reason (E004) |
+
+Force Close (E010) card stays as-is — it is not in the B-set and is always visible per existing rules.
+
+## 6. Visual state for disabled buttons
+
+Existing `SubCard` already dims when `disabled`. Add a small "Not available in this phase" tooltip when `disabled && !closed` so employees understand why the CTA is greyed out instead of hidden.
+
+## 7. Files touched
+
+- `src/lib/orders/journey-map.ts` — add `JourneyPhase`, `derivePhase()`, `PHASE_ENABLED_BUTTONS`, `POST_B10_ALLOWED`, `ButtonCode`.
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — compute `phase` via `derivePhase`, add B03 CTA branch on the Technical Delay card, apply `disabled` gating to all 10 cards, add tooltip.
+
+No changes to: email templates, `hold-actions.functions.ts`, `transition-guard.server.ts`, migrations, `stageActionMap.ts`, invoices, or any other flow.
+
+## 8. Verification
+
+- Build passes (tsgo).
+- Manually walk each phase in the preview at `/admin/orders/…`:
+  1. New order, no form → only B01 enabled.
+  2. Press B01 → all B* disabled (still `form_not_submitted` until form arrives).
+  3. Form submitted → B02/B04/B05/B08/B10 enabled.
+  4. Press B02 → only B03 enabled; press B03 → returns to (3).
+  5. Press B04 → B08/B09 only.
+  6. Press B05 → B06/B07/B08/B09/B10.
+  7. Press B06 → B07/B08/B09/B10.
+  8. Press B07 → B08/B09.
+  9. Press B08 → terminal completed, all disabled.
+  10. Press B09 → terminal closed, all disabled.
+  11. Press B10 → whatever `POST_B10_ALLOWED` says (documented as unresolved).
