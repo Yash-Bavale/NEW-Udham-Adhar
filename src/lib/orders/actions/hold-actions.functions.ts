@@ -166,6 +166,17 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     z.object({ orderId: OrderId, target: z.enum(["IN_PROCESSING", "FORM_RECEIVED", "INFO_RECEIVED"]).default("IN_PROCESSING") }).parse(raw),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Snapshot pre-resume state so we know whether the customer was notified
+    // of a technical hold (external) and therefore needs the E011 resume email.
+    const { data: preRow } = await supabaseAdmin
+      .from("applications")
+      .select("technical_hold_kind, lead_id, application_code, customers(primary_email, name)")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    const wasExternalTechHold = (preRow as any)?.technical_hold_kind === "external";
+
     const { data: updated, error } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
       _new_status: data.target,
@@ -179,7 +190,6 @@ export const resumeFromHold = createServerFn({ method: "POST" })
       "awaiting_govt_internal_reminder",
     ]);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("applications")
       .update({
@@ -191,6 +201,37 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         active_reason_text: null,
       } as never)
       .eq("id", data.orderId);
+
+    // E011 — Technical Delay Resolved: notify the customer that we've resumed.
+    if (wasExternalTechHold) {
+      const email = (preRow as any)?.customers?.primary_email as string | undefined;
+      if (email) {
+        try {
+          const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
+            import("@/lib/emails/emails.server"),
+            import("@/lib/emails/bhs-templates"),
+          ]);
+          const resolvedAt = new Date().toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+            hour: "2-digit", minute: "2-digit", hour12: true,
+          });
+          await enqueueFromTemplateInternal(
+            BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
+            email,
+            {
+              customerName: ((preRow as any)?.customers?.name as string) || "Customer",
+              orderNumber: ((preRow as any)?.application_code as string) || data.orderId.slice(0, 8),
+              resolved_at: resolvedAt,
+              resolvedAt,
+              fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+            },
+            { applicationId: data.orderId, leadId: ((preRow as any)?.lead_id as string) ?? undefined },
+          );
+        } catch (e) {
+          console.error("[resumeFromHold] E011 enqueue failed", e);
+        }
+      }
+    }
 
     return { ok: true, order: updated };
   });

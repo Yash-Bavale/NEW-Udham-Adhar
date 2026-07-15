@@ -29,6 +29,8 @@ export const BHS_EMAILS = {
   E009_TALK_TO_EXPERT: 'E009',
   /** E010 — Order closure with previous reason (force close / final closure). */
   E010_ORDER_CLOSED: 'E010',
+  /** E011 — Technical (our-side) delay resolved & order resumed. */
+  E011_TECHNICAL_DELAY_RESOLVED: 'E011',
   /** T001 — Ticket reply: consultation / support completed. */
   T001_TICKET_COMPLETED: 'T001',
   /** T002 — Ticket reply with reason (manual reply). */

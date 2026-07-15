@@ -60,7 +60,7 @@ const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
 function resolveTemplateCode(code: string | null | undefined): { code: string | null; drop: boolean } {
   if (!code) return { code: null, drop: false };
   const trimmed = code.trim();
-  if (/^(E0(0[1-9]|10)|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
+  if (/^(E0(0[1-9]|1[01])|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
   if (Object.prototype.hasOwnProperty.call(LEGACY_TEMPLATE_ALIAS, trimmed)) {
     const mapped = LEGACY_TEMPLATE_ALIAS[trimmed];
     return { code: mapped, drop: mapped === null };
@@ -273,6 +273,13 @@ async function backfillCommonVariables(
     const v = out[k];
     return v === undefined || v === null || v === "";
   };
+  // Always provide {{resolved_at}} = current IST timestamp when caller didn't set it.
+  if (missing("resolved_at")) {
+    out.resolved_at = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+  }
   if (!leadId && !applicationId) return out;
   try {
     type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
