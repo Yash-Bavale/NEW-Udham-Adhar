@@ -263,6 +263,11 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
               if (leadRow?.email && leadRow.lead_code) {
                 const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
                 const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
+                const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+                const orderNumber = await resolveApplicationCode(payment.lead_id, { applicationId });
+                if (!orderNumber) {
+                  throw new Error("Order number not ready yet — E001 email was not sent.");
+                }
                 const onboardingUrl = `${APP_ORIGIN}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
                 const invoiceUrl = `${APP_ORIGIN}/api/public/invoice/${encodeURIComponent(leadRow.lead_code)}`;
                 const total = Number(invoiceRow?.total_amount ?? leadRow.total_amount ?? 0);
@@ -274,7 +279,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   customer_mobile: leadRow.mobile ?? "",
                   lead_code: leadRow.lead_code,
                   leadCode: leadRow.lead_code,
-                  order_number: leadRow.lead_code,
+                  order_number: orderNumber,
                   service: leadRow.service ?? "",
                   service_name: leadRow.service ?? "",
                   base_amount: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
