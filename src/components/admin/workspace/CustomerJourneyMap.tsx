@@ -426,8 +426,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Send Information Incomplete Mail (E002)",
                 onClick: () => mutFormLink.mutate(),
                 variant: "amber",
-                disabled: mutFormLink.isPending || closed,
+                disabled: mutFormLink.isPending || closed || !gate("B01"),
               }}
+
             />
             {/* Order column: Force Close */}
             <SubCard
