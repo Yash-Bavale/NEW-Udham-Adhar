@@ -310,6 +310,31 @@ async function matchTicket(input: {
     }
   }
 
+  // Subject contains AP-YYYY-######/UA-YYYY-###### → find the latest open ticket
+  // on that application. Zoho customer replies frequently drop In-Reply-To.
+  const codeMatch = await matchBySubjectCode(input.subject);
+  if (codeMatch?.applicationId) {
+    const { data } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id, ticket_email, application_id, customer_id")
+      .eq("application_id", codeMatch.applicationId)
+      .in("status", ["open", "in_progress", "waiting_customer"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      const r = data as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
+      return {
+        ticketId: r.id,
+        ticketEmail: r.ticket_email,
+        applicationId: r.application_id,
+        customerId: r.customer_id,
+        leadId: null,
+      };
+    }
+  }
+
+
   const ids = [input.inReplyTo, ...input.references].filter(Boolean) as string[];
   if (ids.length > 0) {
     const { data } = await supabaseAdmin
