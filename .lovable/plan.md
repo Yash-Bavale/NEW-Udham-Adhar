@@ -1,81 +1,136 @@
-## Problem (evidence)
+# Customer Journey — True Flowchart Layout
 
-Recent inbound Zoho mails **are** being ingested (rows in `email_logs`) and support tickets **are** being created — but every recent ticket + email_log has `application_id = NULL`, even though the subject clearly contains the order code:
+Scrap the stacked lane rows. Rebuild `CustomerJourneyMap.tsx` as an **SVG flowchart** that mirrors the drawio diagram: nodes placed on an XY grid, orthogonal connector lines with arrowheads, and the single live path lit up in color while inactive paths stay ghosted grey.
 
+## Layout (matches uploaded drawio image)
+
+```text
+                                                    ┌─ B04 Consultation Done ─┐
+                                                    │                          │
+Order ─► Form Not ─► Form ─► B02 Tech ─► B03 Fix ─► APP SUBMITTED ──► CHECK ──►┼─► B07 After-Wait ─► ✅ Completed
+Recv     Submitted   Sub'd    Delay      Resolved   TO GOVT PORTAL    STATUS  ││    │
+  │        │           │        ▲                        ▲            │      ││    ├─► B08 Accepted+PDF ─► ✅
+  │        │           │        └──── (B03 loops up) ────┘            │      │└─► B05 Waiting Approval ┘
+  │        │           │                                              │      │
+  │        │           └─► B10 Customer Delay ───┐                    ▼      └─► B09 Rejected ─► ❌ Closed
+  │        │                    │                │              B06 Status
+  │        └─► B01 Form Reminder│(8h auto-close) │              Checked
+  │                 │           ▼                │              +Reminder
+  │                 └──────► ❌ Closed (E010) ◄──┘
+  └────────────────────────────► 🎫 Ticket Sub-lane (T001/T002)
 ```
-Re: … Order No. AP-2026-007193      → ticket.application_id = NULL
-Re: … Order No. AP-2026-007184      → ticket.application_id = NULL
-Re: … Order No. AP-2026-006921      → ticket.application_id = NULL
-Re: … UA-2026-008120                → ticket.application_id = NULL
+
+## Approach
+
+**Single SVG canvas** (~1600×760) with:
+- **Node components** = rounded rects with icon + label + button-code chip, absolutely positioned by `x,y` from a config map.
+- **Edges** = SVG `<path d="M x1 y1 L x2 y2 …" />` with orthogonal (elbow) routing, arrowhead marker at the tip.
+- **Live-path highlight** = derive active edge/node set from `derivePhase()` + `deriveJourneyLiveState()`; those get colored stroke (`--primary`, animated `stroke-dasharray` flow); everything else stays `stroke-slate-200` dashed.
+- **Icons** = lucide (`FileText`, `Clock`, `Building2`, `Search`, `CheckCircle2`, `XCircle`, `Ticket`, `AlertTriangle`, `Send`).
+- **Buttons** stay attached to their node (bottom of the rect) but only clickable when `PHASE_ENABLED_BUTTONS[phase]` includes that code — otherwise 40% opacity + `cursor-not-allowed`.
+
+## Node & edge config (data-driven)
+
+```ts
+// journey-graph.ts (new file)
+export const NODES: Record<string, { x:number; y:number; w:number; h:number; label:string; icon:LucideIcon; kind:"stage"|"action"|"terminal"; tone:Tone; buttonCode?:ButtonCode }> = {
+  order_recv:   { x:  40, y:300, ... label:"Order Received",     icon:Inbox },
+  form_not:     { x: 220, y:300, ... label:"Form Not Submitted", icon:FileText },
+  form_sub:     { x: 400, y:300, ... label:"Form Submitted",     icon:FileCheck },
+  b02_tech:     { x: 580, y:220, ... buttonCode:"B02" },
+  b03_fix:      { x: 720, y:220, ... buttonCode:"B03" },
+  govt_portal:  { x: 900, y:300, ... label:"App Submitted to Govt", icon:Building2 },
+  b04_consult:  { x: 900, y:180, ... buttonCode:"B04" },
+  b05_wait:     { x:1080, y:400, ... buttonCode:"B05" },
+  check_status: { x:1180, y:300, ... label:"Check Final Status", icon:Search },
+  b06_remind:   { x:1180, y:180, ... buttonCode:"B06" },
+  b07_after:    { x:1360, y:220, ... buttonCode:"B07" },
+  b08_accept:   { x:1360, y:300, ... buttonCode:"B08" },
+  b09_reject:   { x:1360, y:400, ... buttonCode:"B09" },
+  completed:    { x:1540, y:260, ... label:"Completed",  icon:CheckCircle2, kind:"terminal", tone:"emerald" },
+  b01_reminder: { x: 220, y:460, ... buttonCode:"B01" },   // form-not-submitted branch
+  b10_cust:     { x: 400, y:460, ... buttonCode:"B10" },   // customer-side-delay branch
+  closed_e010:  { x:1540, y:460, ... label:"Order Closed", icon:XCircle, kind:"terminal", tone:"rose" },
+  ticket_lane:  { x:  40, y:620, ... label:"Support Ticket", icon:Ticket, kind:"sub" },
+};
+
+export const EDGES: Array<{ from:string; to:string; via?:"H"|"V"|"HV"|"VH"; branch:BranchKey }> = [
+  // main happy path
+  { from:"order_recv",  to:"form_not",     branch:"main" },
+  { from:"form_not",    to:"form_sub",     branch:"main" },
+  { from:"form_sub",    to:"b02_tech",     via:"VH", branch:"technical" },
+  { from:"b02_tech",    to:"b03_fix",      branch:"technical" },
+  { from:"b03_fix",     to:"govt_portal",  via:"HV", branch:"technical" },
+  { from:"form_sub",    to:"govt_portal",  branch:"main" },
+  { from:"govt_portal", to:"b04_consult",  via:"VH", branch:"shortcut" },
+  { from:"b04_consult", to:"completed",    via:"HV", branch:"shortcut" },
+  { from:"govt_portal", to:"check_status", branch:"main" },
+  { from:"check_status",to:"b06_remind",   via:"VH", branch:"awaiting" },
+  { from:"check_status",to:"b07_after",    branch:"awaiting" },
+  { from:"check_status",to:"b08_accept",   branch:"main" },
+  { from:"check_status",to:"b09_reject",   via:"HV", branch:"rejected" },
+  { from:"b07_after",   to:"completed",    branch:"awaiting" },
+  { from:"b08_accept",  to:"completed",    branch:"main" },
+  { from:"b09_reject",  to:"closed_e010",  branch:"rejected" },
+  // delay/close branches
+  { from:"form_not",    to:"b01_reminder", via:"VH", branch:"form-nag" },
+  { from:"b01_reminder",to:"closed_e010",  via:"HV", branch:"form-nag" },
+  { from:"form_sub",    to:"b10_cust",     via:"VH", branch:"customer-delay" },
+  { from:"b10_cust",    to:"closed_e010",  via:"HV", branch:"customer-delay" },
+  { from:"b05_wait",    to:"b08_accept",   branch:"awaiting" },
+];
 ```
 
-Because `application_id` is NULL:
-- The order workspace's `TicketPanel` (filters `support_tickets.application_id = orderId`) shows nothing.
-- The ticket workspace's "emails" pane (queries `email_logs` by `application_id`) is empty, so no sent/received chat thread.
-- Journey map cannot pause/resume against these tickets.
+## Live highlighting
 
-`inbox-matcher.server.ts` only tries: In-Reply-To → `email_logs.message_id`, `X-BHS-Order` header, then `from_email → customers/leads`. It **never parses the order code from the subject**. Zoho customers replying from web/mobile frequently drop In-Reply-To, and we don't set `X-BHS-Order` on all outgoing mail — so matching falls to the `from_email` path, which returns customer_id but no application_id when the customer has multiple orders or the order is beyond the `NOT IN (COMPLETED,CLOSED,REFUND_PROCESSED)` filter.
+`activeBranches: Set<BranchKey>` derived from phase:
+| Phase | Active branches |
+|---|---|
+| `form_not_submitted` | `main`(order→form_not) + `form-nag` |
+| `form_submitted` | `main` up to govt_portal |
+| `technical_delay` | `technical` loop |
+| `customer_delay` | `customer-delay` (+ reopened `main` per `POST_B10_ALLOWED`) |
+| `consultation_done` | `shortcut` |
+| `awaiting_govt` | `awaiting` |
+| `status_checked` | `main` + `awaiting` after check |
+| `completed` | full green trace to `completed` |
+| `closed` | red trace to `closed_e010` |
 
-Separate bug: HTML entities (`&amp;`, `&nbsp;`, `&#39;`) render literally. `stripHtml()` in `inbox-matcher.server.ts` removes tags but never decodes entities, so `body_text` (which the chat bubble renders as plain text when no HTML is present) contains raw entities. Subjects saved from Zoho headers can also arrive entity-encoded.
+Rendering rules:
+- **Active edge**: `stroke-2 stroke-primary` + `strokeDasharray="8 4"` + `animate` (`stroke-dashoffset` marching ants via CSS keyframe).
+- **Completed edge** (already passed): solid `stroke-emerald-500`, no animation.
+- **Idle edge**: `stroke-slate-200 stroke-1 stroke-dashed`.
+- **Terminal reached**: emerald or rose fill on the terminal node.
+- Countdown chip floats above the active button (uses existing `CountdownChip`).
+- Ticket sub-lane sits below on a violet strip; when open, dashed violet arrow rises to the currently-paused stage node.
 
-## Plan
+## Orthogonal routing
 
-### 1. Subject-based order matching (root fix)
+Small helper `elbow(from, to, via)` returns the `d` string:
+- `via="H"` → straight horizontal
+- `via="V"` → straight vertical
+- `via="HV"` → horizontal then vertical (right-angle)
+- `via="VH"` → vertical then horizontal
+Anchors picked from node edge midpoints (`x+w`, `y+h/2` for right, etc.). No collision solver needed — grid is hand-tuned in the config.
 
-In `src/lib/mail/inbox-matcher.server.ts`, extend `matchOrder()` with a new **step 0** (highest priority, runs before In-Reply-To):
+## Files
 
-- Regex the subject for `AP-\d{4}-\d{6}` and `UA-\d{4}-\d{6}`.
-- If `AP-...` found → `applications.application_code` lookup → return `{applicationId, leadId, customerId}`.
-- Else if `UA-...` found → `leads.lead_code` lookup → then latest application for that lead.
+**New**
+- `src/lib/orders/journey-graph.ts` — NODES + EDGES + `activeBranchesForPhase(phase)` helper + `elbow()` path builder.
+- `src/components/admin/workspace/journey/FlowNode.tsx` — rounded-rect node with icon, label, optional button pill, `state: "idle"|"active"|"done"|"terminal-ok"|"terminal-bad"`.
+- `src/components/admin/workspace/journey/FlowEdge.tsx` — `<path>` + arrowhead marker, respects state.
 
-Apply the same subject match inside `matchTicket()` too (before falling back to In-Reply-To) so replies without headers still merge into the right ticket via `ticket_reopen_or_create` when the matched application already has a ticket.
+**Rewritten**
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` — replaces the row layout entirely: one `<svg viewBox="0 0 1600 760">` that maps NODES/EDGES, plus a floating action layer for buttons (HTML overlay absolutely positioned at each node's coords so clicks + tooltips still work). Keeps all existing mutation wiring (`mutFormLink`, `mutResume`, `mutSubmit`, ticket dialogs, reason picker, etc.).
 
-Also stop the current `from_email` path from silently dropping the order match when the customer has exactly one open order — remove the `NOT IN (COMPLETED,CLOSED)` filter's REOPENED exclusion so a customer replying to a completed order still links.
+**Untouched**
+- `journey-map.ts` config, `PHASE_ENABLED_BUTTONS`, all server functions, workflow engine, templates, migrations.
 
-### 2. Attach existing orphan tickets/emails (one-shot backfill)
+## Responsiveness
 
-Migration `backfill_orphan_ticket_application_id.sql`:
+- Canvas has fixed `viewBox`; wrap in horizontal-scroll container on `<lg` screens.
+- Add zoom-out toggle (0.75× / 1× / 1.25×) via CSS transform on the SVG wrapper.
 
-- For every `support_tickets` row where `application_id IS NULL` and subject matches `AP-\d{4}-\d{6}` or `UA-\d{4}-\d{6}`, resolve to an application id and update.
-- Same for `email_logs` rows with `direction='incoming'` and `application_id IS NULL`.
-- Purely additive updates — no schema changes, no GRANT changes.
+## Deliverable
 
-### 3. Decode HTML entities
-
-- Update `stripHtml()` in `inbox-matcher.server.ts` to decode entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&nbsp;`, numeric `&#NN;` / `&#xNN;`) after tag removal.
-- Decode entities when normalizing `subject` headers coming out of Zoho.
-- In the ticket-thread `MessageCard` (`src/routes/admin.tickets.$ticketId.tsx`), when only `bodyText` is present, run a small `decodeEntities()` helper before rendering into the `<p className="whitespace-pre-wrap">` block. Keeps HTML path (DOMPurify) untouched.
-
-### 4. Chat-box view (sent + received) on the order
-
-`TicketPanel` today only lists ticket rows. Extend it (still under `CustomerJourneyMap`'s "Customer contacted" section):
-
-- For the top open ticket of the order, render a compact **thread preview**: last 4 messages using the existing bubble style (agent right / customer left), with sent/received chips, timestamp, and a "Open full thread ↗" link to `/admin/tickets/$ticketId`. No new server function — reuse `getTicketWorkspace` scoped to `mostRecentOpenTicket.id` or add a tiny `getOrderThreadPreview(orderId)` server fn that returns the last 4 merged `ticket_replies + email_logs`.
-
-### 5. Journey ↔ Ticket mapping
-
-In `src/lib/orders/journey-map.ts` and `CustomerJourneyMap.tsx`:
-
-- Add a **"Customer contacted"** phase indicator (chip) that lights up when `support_tickets` has an open row for this order. It doesn't replace the B-button phase; it sits alongside as an overlay pill (amber).
-- When the pill is active, the E-template & button strip shows:
-  - E009 (Reply to customer) — links to open the thread composer
-  - "Resolve ticket & resume order" button — calls existing `resolveTicketAndResumeOrder`
-- Wire `TicketOpened` / `TicketClosed` workflow events (already dispatched by the matcher and `ticket-merge.functions.ts`) into the journey pill so it updates in real time via the existing `useRealtimeTable("support_tickets")` hook.
-
-### 6. Verification
-
-- Manually trigger `/api/public/cron/poll-zoho-inbox` after fix + backfill; confirm new incoming replies land with `application_id` set.
-- Open `/admin/orders/abe94685-…` → confirm `TicketPanel` shows the ticket and thread preview.
-- Open the ticket detail; confirm sent (agent bubble) + received (customer bubble) rendering, and no `&amp;` / `&nbsp;` in body or subject.
-- Journey card shows the amber "Customer contacted" pill; clicking "Resolve & resume" clears it.
-
-## Files touched
-
-- edit `src/lib/mail/inbox-matcher.server.ts` (subject regex match, entity decode)
-- new  `supabase/migrations/<ts>_backfill_orphan_ticket_application_id.sql`
-- edit `src/routes/admin.tickets.$ticketId.tsx` (decode entities in text-only bubbles)
-- edit `src/components/admin/workspace/TicketPanel.tsx` (thread preview)
-- new  `src/lib/tickets/order-thread-preview.functions.ts`
-- edit `src/components/admin/workspace/CustomerJourneyMap.tsx` + `src/lib/orders/journey-map.ts` (Customer-contacted pill + E009 / resolve-resume button)
-
-No changes to email sending, templates, `hold-actions.functions.ts`, workflow engine core, or GRANT/RLS policies.
+An operator opening an order sees the exact drawio flowchart, one path lit up in `--primary` with marching-ants animation ending at a live-countdown button chip, everything else greyed. No stacked lanes, no overlapping cards.
