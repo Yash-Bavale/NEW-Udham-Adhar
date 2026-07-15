@@ -367,3 +367,88 @@ export function deriveJourneyLiveState(input: {
 }
 
 
+/* ─────────────────── Journey Phase → Button gating ─────────────────── */
+
+export type ButtonCode =
+  | "B01" | "B02" | "B03" | "B04" | "B05"
+  | "B06" | "B07" | "B08" | "B09" | "B10";
+
+export type JourneyPhase =
+  | "form_not_submitted"
+  | "form_submitted"
+  | "technical_delay"
+  | "customer_delay"
+  | "consultation_done"
+  | "awaiting_govt"
+  | "status_checked"
+  | "post_wait_submitted"
+  | "completed"
+  | "closed";
+
+/**
+ * FIXME(ops-confirm): After B10 (Customer Side Delay pressed) which buttons
+ * should remain active? Ops is unresolved on this — flip this list once
+ * confirmed. Do NOT hardcode elsewhere; components read this via
+ * PHASE_ENABLED_BUTTONS.customer_delay.
+ */
+export const POST_B10_ALLOWED: ButtonCode[] = [
+  "B02", "B04", "B05", "B08", "B09",
+];
+
+export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
+  form_not_submitted:  ["B01"],
+  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
+  technical_delay:     ["B03"],
+  customer_delay:      POST_B10_ALLOWED,
+  consultation_done:   ["B08", "B09"],
+  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
+  status_checked:      ["B07", "B08", "B09", "B10"],
+  post_wait_submitted: ["B08", "B09"],
+  completed:           [],
+  closed:              [],
+};
+
+export interface DerivePhaseInput {
+  stage: OrderStage;
+  workflowStatus?: string | null;
+  closureStage?: string | null;
+  closureReasonLabel?: string | null;
+  /** Number of E006 (reminder) emails/events sent for this order. */
+  reminderCount?: number;
+  /** True once B07 has been pressed (persisted client-side per order). */
+  postWaitSubmitted?: boolean;
+}
+
+/**
+ * Map current order state → single JourneyPhase used to gate buttons.
+ * Pure. Client-safe.
+ */
+export function derivePhase(i: DerivePhaseInput): JourneyPhase {
+  const live = deriveJourneyLiveState({
+    stage: i.stage,
+    workflowStatus: i.workflowStatus,
+    closureStage: i.closureStage,
+    closureReasonLabel: i.closureReasonLabel,
+  });
+  if (live.terminal === "closed") return "closed";
+  if (live.terminal === "completed") return "completed";
+  if (live.activeSubKey === "technical-delay") return "technical_delay";
+  if (live.activeSubKey === "customer-delay") return "customer_delay";
+  if (live.activeSubKey === "form-not-submitted") return "form_not_submitted";
+
+  const stage = (i.stage ?? "").toLowerCase();
+  const inGovtFlow = /submitted_to_govt|processing|certificate|check|final/.test(stage);
+
+  if (inGovtFlow) {
+    if (i.postWaitSubmitted) return "post_wait_submitted";
+    const r = i.reminderCount ?? 0;
+    if (r <= 0) return "consultation_done";
+    if (r === 1) return "awaiting_govt";
+    return "status_checked";
+  }
+
+  return "form_submitted";
+}
+
+
+
