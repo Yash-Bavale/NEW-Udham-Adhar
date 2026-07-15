@@ -26,11 +26,11 @@ import {
   PHASE_ENABLED_BUTTONS, type ButtonCode,
 } from "@/lib/orders/journey-map";
 import {
-  NODES, EDGES, nodeById, anchor, pathD,
+  NODES, EDGES, nodeById, anchor, pathD, nodeW, nodeH,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
   currentMainEdgeFor, currentStageNodeFor,
-  CANVAS_W, CANVAS_H, NODE_W, NODE_H,
-  type IconKey, type NodeDef, type Tone, type EdgeState, type NodeState,
+  CANVAS_W, CANVAS_H,
+  type IconKey, type NodeDef, type Tone, type NodeState,
 } from "@/lib/orders/journey-graph";
 import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
