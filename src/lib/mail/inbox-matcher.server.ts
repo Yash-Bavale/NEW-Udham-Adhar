@@ -160,6 +160,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
 
   // ── Step 2: Fall back to order-level match (legacy path) ───────────────
   const matched = await matchOrder({
+    subject,
     inReplyTo,
     references,
     xBhsOrder: headers["X-BHS-Order"] || null,
