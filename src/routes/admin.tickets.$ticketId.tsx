@@ -89,6 +89,9 @@ function decodeHtmlEntities(input: string | null | undefined): string {
     .replace(/&ndash;/gi, "–")
     .replace(/&rsquo;|&lsquo;/gi, "'")
     .replace(/&rdquo;|&ldquo;/gi, '"');
+}
+
+
 
 function initials(name: string | null | undefined): string {
   if (!name) return "?";
