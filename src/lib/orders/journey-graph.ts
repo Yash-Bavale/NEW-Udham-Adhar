@@ -199,7 +199,7 @@ export function activeBranchesFor(
     case "completed":          s.add("accept"); break;
     case "closed":
       if (reasonCode?.toUpperCase().startsWith("B")) s.add("reject");
-      else if (/customer/i.test(workflowStatus ?? "")) s.add("customer-delay");
+      else if (/customer|external_dependency/i.test(workflowStatus ?? "")) s.add("customer-delay");
       else s.add("form-nag");
       break;
   }

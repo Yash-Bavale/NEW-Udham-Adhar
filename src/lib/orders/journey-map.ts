@@ -296,7 +296,7 @@ export const CLOSURE_BUTTONS: JourneyBranchButton[] = [
 /** Map workflowStatus → live delay branch key (for highlighting). */
 export function getActiveDelayBranchKey(workflowStatus?: string | null): string | null {
   if (!workflowStatus) return null;
-  if (/customer_hold|customer_side|customer_delay/i.test(workflowStatus)) return "customer-side-delay";
+  if (/customer_hold|customer_side|customer_delay|waiting_for_customer|external_dependency/i.test(workflowStatus)) return "customer-side-delay";
   if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/i.test(workflowStatus)) return "technical-delay";
   if (/form_pending|awaiting_form|form_not_submitted/i.test(workflowStatus)) return "form-not-submitted";
   return null;
@@ -338,7 +338,7 @@ export function deriveJourneyLiveState(input: {
   let activeSubKey: JourneyLiveSubKey = null;
   if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
     activeSubKey = "form-not-submitted";
-  } else if (/customer_hold|customer_side|customer_delay/.test(ws)) {
+  } else if (/customer_hold|customer_side|customer_delay|waiting_for_customer|external_dependency/.test(ws)) {
     activeSubKey = "customer-delay";
   } else if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws)) {
     activeSubKey = "technical-delay";
@@ -385,15 +385,7 @@ export type JourneyPhase =
   | "completed"
   | "closed";
 
-/**
- * FIXME(ops-confirm): After B10 (Customer Side Delay pressed) which buttons
- * should remain active? Ops is unresolved on this — flip this list once
- * confirmed. Do NOT hardcode elsewhere; components read this via
- * PHASE_ENABLED_BUTTONS.customer_delay.
- */
-export const POST_B10_ALLOWED: ButtonCode[] = [
-  "B02", "B04", "B05", "B08", "B09",
-];
+export const POST_B10_ALLOWED: ButtonCode[] = [];
 
 export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   form_not_submitted:  ["B01"],
