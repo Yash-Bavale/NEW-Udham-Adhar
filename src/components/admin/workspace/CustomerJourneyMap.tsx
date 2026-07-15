@@ -578,10 +578,11 @@ export function CustomerJourneyMap(p: Props) {
               tooltip="After waiting on govt response, mark consultation/submission complete."
               button={{
                 label: "Order Completed (E005)",
-                onClick: () => mutSubmit.mutate(),
+                onClick: () => mutSubmitAfterWait.mutate(),
                 variant: "emerald",
-                disabled: mutSubmit.isPending || closed,
+                disabled: mutSubmitAfterWait.isPending || closed || !gate("B07"),
               }}
+
             />
             <SubCard
               x={NODE_X[5] - CARD_W / 2} y={ROW_Y[2]}
