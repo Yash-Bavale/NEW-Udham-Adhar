@@ -219,6 +219,32 @@ function withBothCases(input: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
+async function enforceApplicationOrderNumber(
+  input: Record<string, unknown>,
+  leadId?: string | null,
+  applicationId?: string | null,
+): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = { ...input };
+  const leadCode = String(out.lead_code ?? out.leadCode ?? "").trim();
+  const orderNumber = String(out.order_number ?? out.orderNumber ?? "").trim();
+  const looksLikeLeadCode = Boolean(leadCode && orderNumber && orderNumber === leadCode);
+  if (orderNumber && !looksLikeLeadCode) return out;
+  if (!leadId && !applicationId) return out;
+
+  const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+  const resolved = leadId
+    ? await resolveApplicationCode(leadId, { applicationId })
+    : null;
+
+  if (!resolved) {
+    throw new Error("Order number not ready yet — email was not sent.");
+  }
+
+  out.order_number = resolved;
+  out.orderNumber = resolved;
+  return out;
+}
+
 /**
  * Best-effort backfill of common customer/order/executive placeholders used by
  * the standard BHS templates. Only fills in keys the caller hasn't already
@@ -337,7 +363,7 @@ export async function enqueueFromTemplateInternal(
   }
   const effectiveCode = resolved.code ?? code;
   const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
-  const variables = withBothCases(enriched);
+  const variables = await enforceApplicationOrderNumber(withBothCases(enriched), opts?.leadId, opts?.applicationId);
   const { data: tpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled, dispatch_mode")
