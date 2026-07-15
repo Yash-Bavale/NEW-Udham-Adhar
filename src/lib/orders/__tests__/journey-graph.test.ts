@@ -107,8 +107,8 @@ describe("customer delay workflow status", () => {
       workflowStatus: "waiting_for_customer",
     })).toBe("customer_delay");
   });
-  it("locks other next buttons while customer-delay is waiting to close", () => {
-    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual([]);
+  it("keeps the standard next-step buttons available after B10 is submitted", () => {
+    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual(["B02", "B04", "B05", "B08", "B09"]);
   });
 });
 
