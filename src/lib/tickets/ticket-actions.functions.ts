@@ -512,4 +512,229 @@ export const resolveTicketAndResumeOrder = createServerFn({ method: "POST" })
     return { ok: true, resumeTo: data.resumeTo };
   });
 
+// ─────────────────────────── Support Ticket flowchart buttons ───────────────────────────
+// 4 canonical actions from the T001/T002/T003 flowchart. Each closes the ticket
+// (T002 arms the 8-business-hour auto-close that fires T003) and emails the
+// customer inside the existing ticket thread.
+
+async function sendTicketCloseEmail(opts: {
+  ticket: TicketRow;
+  code: string;
+  extraVars?: Record<string, unknown>;
+  actorId: string;
+}) {
+  const admin = await getAdmin();
+  const cust = await loadCustomer(opts.ticket.customer_id);
+  const recipient = opts.ticket.ticket_email || cust.email;
+  if (!recipient) return { emailed: false };
+  let actorName = "Support";
+  try {
+    const { data: prof } = await admin
+      .from("profiles")
+      .select("display_name, full_name, email")
+      .eq("id", opts.actorId)
+      .maybeSingle();
+    const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
+    actorName = p?.display_name || p?.full_name || p?.email?.split("@")[0] || "Support";
+  } catch { /* non-fatal */ }
+  const thread = await loadThreadHeaders(opts.ticket.id, opts.ticket.application_id ?? null);
+  const ticketNumber = opts.ticket.ticket_number ?? opts.ticket.id.slice(0, 8);
+  const threadedSubject = thread.threadSubject
+    ? (thread.threadSubject.toLowerCase().startsWith("re:") ? thread.threadSubject : `Re: ${thread.threadSubject}`)
+    : `Re: [#${ticketNumber}] ${opts.ticket.subject}`;
+  try {
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    await enqueueFromTemplateInternal(
+      opts.code,
+      recipient,
+      {
+        customer_name: cust.name,
+        customerName: cust.name,
+        ticket_number: ticketNumber,
+        ticketNumber,
+        ticket_subject: opts.ticket.subject,
+        ticketSubject: opts.ticket.subject,
+        fromName: `${actorName} · Business Help Services`,
+        executive_name: actorName,
+        ...(opts.extraVars ?? {}),
+      },
+      {
+        toName: cust.name,
+        applicationId: opts.ticket.application_id ?? undefined,
+        inReplyTo: thread.inReplyTo,
+        references: thread.references,
+        threadSubject: threadedSubject,
+      },
+    );
+    return { emailed: true, recipient };
+  } catch (e) {
+    console.error("[tickets] close email failed", opts.code, e);
+    return { emailed: false };
+  }
+}
+
+async function markTicketClosed(ticketId: string, actorId: string, noteText: string, reason: string) {
+  const admin = await getAdmin();
+  const now = new Date().toISOString();
+  await admin
+    .from("support_tickets")
+    .update({
+      status: "closed",
+      resolved_at: now,
+      resolved_by: actorId,
+      closed_at: now,
+      updated_at: now,
+      last_staff_message_at: now,
+    } as never)
+    .eq("id", ticketId);
+  await admin.from("ticket_replies").insert({
+    ticket_id: ticketId,
+    reply_text: noteText,
+    is_internal: true,
+    created_by: actorId,
+    direction: "note",
+  } as never);
+  try {
+    const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+    await cancelTicketAutocloseByTicket(ticketId, reason);
+  } catch { /* non-fatal */ }
+}
+
+// T001 — Normal Close / No Action Required
+export const closeTicketNormalT001 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const ticket = await loadTicket(data.ticketId);
+    await markTicketClosed(ticket.id, context.userId, "T001 — Closed: Normal mail / no action required.", "closed_t001_normal");
+    await sendTicketCloseEmail({
+      ticket, code: BHS_EMAILS.T001_TICKET_COMPLETED, actorId: context.userId,
+      extraVars: { ticket_close_variant: "normal_close", replyMessage: "Thank you for reaching out. No further action was required on this request." },
+    });
+    return { ok: true };
+  });
+
+// T001 — Restart Order
+export const closeTicketRestartT001 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    ticketId: z.string().uuid(),
+    resumeTo: z.enum(["IN_PROCESSING", "SUBMITTED_TO_GOVT"]).default("IN_PROCESSING"),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const ticket = await loadTicket(data.ticketId);
+    if (ticket.application_id) {
+      try {
+        const { data: app } = await admin
+          .from("applications")
+          .select("order_status")
+          .eq("id", ticket.application_id)
+          .maybeSingle();
+        const status = (app as { order_status?: string | null } | null)?.order_status ?? null;
+        if (status === "CUSTOMER_HOLD" || status === "OUR_SIDE_DELAY" || status === "TECHNICAL_HOLD_INTERNAL" || status === "TECHNICAL_HOLD_EXTERNAL") {
+          const { error: tErr } = await context.supabase.rpc("transition_order_status", {
+            _order_id: ticket.application_id,
+            _new_status: data.resumeTo,
+            _remarks: `Restarted from ticket ${ticket.ticket_number ?? ticket.id.slice(0, 8)}`,
+          });
+          if (tErr) console.error("[tickets] restart order transition failed", tErr.message);
+        }
+      } catch (e) { console.error("[tickets] restart order lookup failed", e); }
+    }
+    await markTicketClosed(ticket.id, context.userId, "T001 — Closed: Restart order.", "closed_t001_restart");
+    if (ticket.application_id) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent({
+          type: "TicketClosed", applicationId: ticket.application_id, ticketId: ticket.id,
+          outcome: "cooperating", actorId: context.userId,
+        }, context.userId);
+      } catch (e) { console.error("[workflow] TicketClosed(restart) dispatch failed", e); }
+    }
+    await sendTicketCloseEmail({
+      ticket, code: BHS_EMAILS.T001_TICKET_COMPLETED, actorId: context.userId,
+      extraVars: { ticket_close_variant: "restart_order", replyMessage: "Your order has been restarted and moved back into processing. Our team will keep you posted on the next update." },
+    });
+    return { ok: true };
+  });
+
+// T001 — Consultation / Support Completed
+export const closeTicketConsultationT001 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const ticket = await loadTicket(data.ticketId);
+    await markTicketClosed(ticket.id, context.userId, "T001 — Closed: Consultation / support completed.", "closed_t001_consultation");
+    if (ticket.application_id) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent({
+          type: "TicketClosed", applicationId: ticket.application_id, ticketId: ticket.id,
+          outcome: "cooperating", actorId: context.userId,
+        }, context.userId);
+      } catch (e) { console.error("[workflow] TicketClosed(consult) dispatch failed", e); }
+    }
+    await sendTicketCloseEmail({
+      ticket, code: BHS_EMAILS.T001_TICKET_COMPLETED, actorId: context.userId,
+      extraVars: { ticket_close_variant: "consultation_done", replyMessage: "Your consultation / support request has been completed. Please reach out if you need anything further." },
+    });
+    return { ok: true };
+  });
+
+// T002 — Reply w/ reason (arms 8h auto-close → T003)
+export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    ticketId: z.string().uuid(),
+    reasonId: z.string().uuid().nullable().optional(),
+    reasonLabel: z.string().max(200).optional(),
+    replyBody: z.string().min(1),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const ticket = await loadTicket(data.ticketId);
+    const now = new Date().toISOString();
+
+    await admin.from("ticket_replies").insert({
+      ticket_id: ticket.id,
+      reply_text: data.replyBody,
+      is_internal: false,
+      created_by: context.userId,
+      direction: "outbound",
+    } as never);
+
+    const patch: Record<string, unknown> = {
+      status: "waiting_customer",
+      updated_at: now,
+      last_staff_message_at: now,
+    };
+    if (!ticket.first_response_at) patch.first_response_at = now;
+    await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
+
+    try {
+      const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
+      await startTicketAutocloseScheduler({
+        ticketId: ticket.id,
+        applicationId: ticket.application_id ?? null,
+        totalSeconds: 8 * 60 * 60,
+        createdBy: context.userId,
+        note: data.reasonLabel ?? null,
+      });
+    } catch (e) { console.error("[tickets] T002 autoclose arm failed", e); }
+
+    await sendTicketCloseEmail({
+      ticket, code: BHS_EMAILS.T002_TICKET_REPLY, actorId: context.userId,
+      extraVars: {
+        ticket_close_variant: "reply_with_reason",
+        reason: data.reasonLabel ?? "",
+        employee_reply: data.replyBody,
+        replyMessage: data.replyBody,
+      },
+    });
+
+    return { ok: true };
+  });
+
+
 

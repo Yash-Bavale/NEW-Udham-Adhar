@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ChevronLeft, ChevronRight, Loader2, Lock, Mail, MailCheck, MailX, Send,
-  Sparkles, PlayCircle, CheckCircle2, RotateCcw, XCircle, Package, Search,
+  Sparkles, PlayCircle, RotateCcw, Package, Search,
   Filter, ArrowUpDown, Copy, Printer, Download, AlertTriangle, User, FileText,
   Clock, Zap, MessageSquare, StickyNote, ExternalLink, Paperclip, Bold,
   Italic, Underline as UIcon, List, ListOrdered, Link as LinkIcon, Smile,
@@ -18,7 +18,14 @@ import {
   type TicketStatus,
 } from "@/lib/crm/tickets.functions";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
-import { resolveTicketAndResumeOrder } from "@/lib/tickets/ticket-actions.functions";
+import {
+  closeTicketNormalT001,
+  closeTicketRestartT001,
+  closeTicketConsultationT001,
+  closeTicketReplyReasonT002,
+} from "@/lib/tickets/ticket-actions.functions";
+import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
+import type { OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -400,9 +407,16 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
   const sc = STATUS_TONE[t.status] ?? STATUS_TONE.open;
   const pc = PRIORITY_TONE[t.priority ?? "medium"];
   const updFn = useServerFn(updateTicket);
-  const resumeFn = useServerFn(resolveTicketAndResumeOrder);
-  const [resumeOpen, setResumeOpen] = useState(false);
-  const [resumeTo, setResumeTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
+  const t001NormalFn = useServerFn(closeTicketNormalT001);
+  const t001RestartFn = useServerFn(closeTicketRestartT001);
+  const t001ConsultFn = useServerFn(closeTicketConsultationT001);
+  const t002Fn = useServerFn(closeTicketReplyReasonT002);
+  const [t002Open, setT002Open] = useState(false);
+  const [t002ReasonId, setT002ReasonId] = useState<string | null>(null);
+  const [t002ReasonLabel, setT002ReasonLabel] = useState<string>("");
+  const [t002Reply, setT002Reply] = useState<string>("");
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartTo, setRestartTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
 
   const updMut = useMutation({
     mutationFn: (patch: any) => updFn({ data: { id: ticketId, ...patch } }),
@@ -410,17 +424,40 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
 
-  const resumeMut = useMutation({
-    mutationFn: () => resumeFn({ data: { ticketId, resumeTo } }),
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
+
+  const t001NormalMut = useMutation({
+    mutationFn: () => t001NormalFn({ data: { ticketId } }),
+    onSuccess: () => { toast.success("Ticket closed — Normal / no action (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Close failed"),
+  });
+  const t001RestartMut = useMutation({
+    mutationFn: () => t001RestartFn({ data: { ticketId, resumeTo: restartTo } }),
+    onSuccess: () => { setRestartOpen(false); toast.success("Ticket closed — Order restarted (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Restart failed"),
+  });
+  const t001ConsultMut = useMutation({
+    mutationFn: () => t001ConsultFn({ data: { ticketId } }),
+    onSuccess: () => { toast.success("Ticket closed — Consultation / support completed (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Close failed"),
+  });
+  const t002Mut = useMutation({
+    mutationFn: () => t002Fn({ data: {
+      ticketId,
+      reasonId: t002ReasonId,
+      reasonLabel: t002ReasonLabel || undefined,
+      replyBody: t002Reply.trim(),
+    } }),
     onSuccess: () => {
-      setResumeOpen(false);
-      toast.success("Ticket resolved · order resumed");
-      qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
+      setT002Open(false); setT002ReasonId(null); setT002ReasonLabel(""); setT002Reply("");
+      toast.success("Reply sent — ticket will auto-close in 8h (T002 → T003)");
+      invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Resume failed"),
+    onError: (e: any) => toast.error(e?.message ?? "Send failed"),
   });
 
-  const canResume = (t.application_id && (data.ticket.applications?.order_status === "CUSTOMER_HOLD" || data.ticket.applications?.order_status === "OUR_SIDE_DELAY") && !["closed", "resolved"].includes(t.status));
+
+  
 
   const staffFn = useServerFn(listStaffForAssignment);
   const { data: staff } = useQuery({ queryKey: ["staff-assign"], queryFn: () => staffFn(), staleTime: 60_000 });
@@ -504,18 +541,28 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             {(staff?.staff ?? []).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
 
-          {canResume && (
-            <ToolbarBtn onClick={() => setResumeOpen(true)} icon={<PlayCircle className="size-3.5" />} label="Resume Order" success />
-          )}
-          {!["resolved", "closed"].includes(t.status) && (
-            <ToolbarBtn onClick={() => updMut.mutate({ status: "resolved" })} icon={<CheckCircle2 className="size-3.5" />} label="Resolve" />
-          )}
-          {t.status !== "closed" && (
-            <ToolbarBtn onClick={() => updMut.mutate({ status: "closed" })} icon={<XCircle className="size-3.5" />} label="Close" />
+          {!["closed", "resolved"].includes(t.status) && (
+            <>
+              <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
+              <TicketFlowBtn code="T001" label="Normal / No Action" tone="slate"
+                disabled={t001NormalMut.isPending}
+                onClick={() => { if (window.confirm("Close ticket — Normal mail / No action required?\nSends T001 to the customer.")) t001NormalMut.mutate(); }} />
+              <TicketFlowBtn code="T001" label="Restart Order" tone="emerald"
+                disabled={t001RestartMut.isPending || !t.application_id}
+                title={!t.application_id ? "No linked order" : undefined}
+                onClick={() => setRestartOpen(true)} />
+              <TicketFlowBtn code="T001" label="Consultation / Support Done" tone="indigo"
+                disabled={t001ConsultMut.isPending}
+                onClick={() => { if (window.confirm("Close ticket — Consultation / support completed?\nSends T001 to the customer.")) t001ConsultMut.mutate(); }} />
+              <TicketFlowBtn code="T002" label="Reply w/ Reason (8h auto-close)" tone="rose"
+                disabled={t002Mut.isPending}
+                onClick={() => setT002Open(true)} />
+            </>
           )}
           {(t.status === "closed" || t.status === "resolved") && (
             <ToolbarBtn onClick={() => updMut.mutate({ status: "open" })} icon={<RotateCcw className="size-3.5" />} label="Reopen" />
           )}
+
 
           <div className="relative ml-auto">
             <button
@@ -542,27 +589,57 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
         </div>
       </header>
 
-      {resumeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setResumeOpen(false)}>
+      {restartOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setRestartOpen(false)}>
           <div className="w-full max-w-md rounded-2xl border p-5 shadow-xl" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Resolve ticket and resume order</h3>
-            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Marks this ticket resolved and moves the linked order out of hold.</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fef3c7", color: "#92400e" }}>T001</span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Close ticket &amp; restart order</h3>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Closes the ticket, sends T001, and — if the linked order is on hold — resumes it.</p>
             <label className="mt-4 block text-xs">
               <span className="font-medium uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Resume order to</span>
-              <select value={resumeTo} onChange={(e) => setResumeTo(e.target.value as any)} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}>
+              <select value={restartTo} onChange={(e) => setRestartTo(e.target.value as any)} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}>
                 <option value="IN_PROCESSING">In Processing</option>
                 <option value="SUBMITTED_TO_GOVT">Submitted to Govt</option>
               </select>
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setResumeOpen(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
-              <button type="button" disabled={resumeMut.isPending} onClick={() => resumeMut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#16a34a" }}>
-                {resumeMut.isPending ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-3" />} Confirm
+              <button type="button" onClick={() => setRestartOpen(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
+              <button type="button" disabled={t001RestartMut.isPending} onClick={() => t001RestartMut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#16a34a" }}>
+                {t001RestartMut.isPending ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-3" />} Restart &amp; close
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {t002Open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setT002Open(false)}>
+          <div className="w-full max-w-lg rounded-2xl border p-5 shadow-xl" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fee2e2", color: "#991b1b" }}>T002</span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Reply with reason &amp; arm 8h auto-close</h3>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Sends T002 to the customer. If they don't reply within 8 business hours the ticket auto-closes and T003 is sent.</p>
+            <div className="mt-4">
+              <ReasonPicker
+                value={t002ReasonId}
+                onChange={(id, r: OrderCloseReason | null) => { setT002ReasonId(id); setT002ReasonLabel(r ? `${r.category}${r.number} — ${r.label}` : ""); }}
+                reply={t002Reply}
+                onReplyChange={setT002Reply}
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setT002Open(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
+              <button type="button" disabled={t002Mut.isPending || !t002Reply.trim()} onClick={() => t002Mut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#dc2626" }}>
+                {t002Mut.isPending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />} Send &amp; arm auto-close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }
@@ -577,6 +654,36 @@ function ToolbarBtn({ onClick, icon, label, primary, success, iconOnly }: { onCl
     <button type="button" onClick={onClick} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all hover:scale-[1.03] hover:shadow-sm" style={style} title={label}>
       {icon}
       {!iconOnly && <span>{label}</span>}
+    </button>
+  );
+}
+
+function TicketFlowBtn({ code, label, tone, onClick, disabled, title }: {
+  code: "T001" | "T002";
+  label: string;
+  tone: "slate" | "emerald" | "indigo" | "rose";
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const toneMap: Record<string, { bg: string; fg: string; border: string; chipBg: string; chipFg: string }> = {
+    slate:   { bg: "#f8fafc", fg: "#0f172a", border: "#cbd5e1", chipBg: "#e2e8f0", chipFg: "#334155" },
+    emerald: { bg: "#ecfdf5", fg: "#064e3b", border: "#6ee7b7", chipBg: "#a7f3d0", chipFg: "#065f46" },
+    indigo:  { bg: "#eef2ff", fg: "#312e81", border: "#a5b4fc", chipBg: "#c7d2fe", chipFg: "#3730a3" },
+    rose:    { bg: "#dc2626", fg: "#ffffff", border: "#dc2626", chipBg: "#fecaca", chipFg: "#7f1d1d" },
+  };
+  const s = toneMap[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all hover:scale-[1.02] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ background: s.bg, color: s.fg, border: `1px solid ${s.border}` }}
+    >
+      <span className="rounded px-1 py-px font-mono text-[9px] font-bold tracking-wide" style={{ background: s.chipBg, color: s.chipFg }}>{code}</span>
+      <span>{label}</span>
     </button>
   );
 }
