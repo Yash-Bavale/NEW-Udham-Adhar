@@ -60,7 +60,7 @@ const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
 function resolveTemplateCode(code: string | null | undefined): { code: string | null; drop: boolean } {
   if (!code) return { code: null, drop: false };
   const trimmed = code.trim();
-  if (/^(E0(0[1-9]|10)|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
+  if (/^(E0(0[1-9]|1[01])|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
   if (Object.prototype.hasOwnProperty.call(LEGACY_TEMPLATE_ALIAS, trimmed)) {
     const mapped = LEGACY_TEMPLATE_ALIAS[trimmed];
     return { code: mapped, drop: mapped === null };
