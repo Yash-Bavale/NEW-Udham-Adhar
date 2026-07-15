@@ -60,7 +60,7 @@ export function TicketPanel({ orderId }: Props) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-900 truncate">
-                      {t.subject || t.ticket_number || t.id.slice(0, 8)}
+                      {decodeEntities(t.subject) || t.ticket_number || t.id.slice(0, 8)}
                     </span>
                     {reopened && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
