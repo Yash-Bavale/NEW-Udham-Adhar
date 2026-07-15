@@ -408,9 +408,16 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
   const sc = STATUS_TONE[t.status] ?? STATUS_TONE.open;
   const pc = PRIORITY_TONE[t.priority ?? "medium"];
   const updFn = useServerFn(updateTicket);
-  const resumeFn = useServerFn(resolveTicketAndResumeOrder);
-  const [resumeOpen, setResumeOpen] = useState(false);
-  const [resumeTo, setResumeTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
+  const t001NormalFn = useServerFn(closeTicketNormalT001);
+  const t001RestartFn = useServerFn(closeTicketRestartT001);
+  const t001ConsultFn = useServerFn(closeTicketConsultationT001);
+  const t002Fn = useServerFn(closeTicketReplyReasonT002);
+  const [t002Open, setT002Open] = useState(false);
+  const [t002ReasonId, setT002ReasonId] = useState<string | null>(null);
+  const [t002ReasonLabel, setT002ReasonLabel] = useState<string>("");
+  const [t002Reply, setT002Reply] = useState<string>("");
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartTo, setRestartTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
 
   const updMut = useMutation({
     mutationFn: (patch: any) => updFn({ data: { id: ticketId, ...patch } }),
@@ -418,15 +425,38 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
 
-  const resumeMut = useMutation({
-    mutationFn: () => resumeFn({ data: { ticketId, resumeTo } }),
-    onSuccess: () => {
-      setResumeOpen(false);
-      toast.success("Ticket resolved · order resumed");
-      qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Resume failed"),
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
+
+  const t001NormalMut = useMutation({
+    mutationFn: () => t001NormalFn({ data: { ticketId } }),
+    onSuccess: () => { toast.success("Ticket closed — Normal / no action (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Close failed"),
   });
+  const t001RestartMut = useMutation({
+    mutationFn: () => t001RestartFn({ data: { ticketId, resumeTo: restartTo } }),
+    onSuccess: () => { setRestartOpen(false); toast.success("Ticket closed — Order restarted (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Restart failed"),
+  });
+  const t001ConsultMut = useMutation({
+    mutationFn: () => t001ConsultFn({ data: { ticketId } }),
+    onSuccess: () => { toast.success("Ticket closed — Consultation / support completed (T001)"); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? "Close failed"),
+  });
+  const t002Mut = useMutation({
+    mutationFn: () => t002Fn({ data: {
+      ticketId,
+      reasonId: t002ReasonId,
+      reasonLabel: t002ReasonLabel || undefined,
+      replyBody: t002Reply.trim(),
+    } }),
+    onSuccess: () => {
+      setT002Open(false); setT002ReasonId(null); setT002ReasonLabel(""); setT002Reply("");
+      toast.success("Reply sent — ticket will auto-close in 8h (T002 → T003)");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Send failed"),
+  });
+
 
   const canResume = (t.application_id && (data.ticket.applications?.order_status === "CUSTOMER_HOLD" || data.ticket.applications?.order_status === "OUR_SIDE_DELAY") && !["closed", "resolved"].includes(t.status));
 
