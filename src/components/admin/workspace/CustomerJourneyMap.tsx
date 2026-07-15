@@ -835,7 +835,7 @@ function SubCard({
             type="button"
             onClick={button.onClick}
             disabled={button.disabled}
-            title={button.disabled ? "Not available in the current state" : button.label}
+            title={button.disabled ? "Not available in the current phase" : button.label}
             className={cn(
               "rounded-md px-2 py-1 text-[10px] font-bold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed",
               TONE[button.variant].btn,
