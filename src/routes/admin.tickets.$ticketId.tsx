@@ -715,7 +715,10 @@ function MessageCard({ kind, name, email, createdAt, bodyHtml, bodyText, emailed
     () => (cleaned.hiddenHtml ? DOMPurify.sanitize(cleaned.hiddenHtml, { ALLOWED_ATTR: ["href", "src", "alt", "title", "style", "target", "rel"] }) : null),
     [cleaned.hiddenHtml],
   );
-  const hasHidden = Boolean(hiddenSafeHtml || cleaned.hiddenText);
+  const visibleTextDecoded = useMemo(() => decodeHtmlEntities(cleaned.visibleText), [cleaned.visibleText]);
+  const hiddenTextDecoded = useMemo(() => decodeHtmlEntities(cleaned.hiddenText), [cleaned.hiddenText]);
+  const hasHidden = Boolean(hiddenSafeHtml || hiddenTextDecoded);
+
 
   return (
     <div className={`flex gap-3 ${isAgent ? "flex-row-reverse" : ""}`}>
