@@ -659,6 +659,36 @@ function ToolbarBtn({ onClick, icon, label, primary, success, iconOnly }: { onCl
   );
 }
 
+function TicketFlowBtn({ code, label, tone, onClick, disabled, title }: {
+  code: "T001" | "T002";
+  label: string;
+  tone: "slate" | "emerald" | "indigo" | "rose";
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const toneMap: Record<string, { bg: string; fg: string; border: string; chipBg: string; chipFg: string }> = {
+    slate:   { bg: "#f8fafc", fg: "#0f172a", border: "#cbd5e1", chipBg: "#e2e8f0", chipFg: "#334155" },
+    emerald: { bg: "#ecfdf5", fg: "#064e3b", border: "#6ee7b7", chipBg: "#a7f3d0", chipFg: "#065f46" },
+    indigo:  { bg: "#eef2ff", fg: "#312e81", border: "#a5b4fc", chipBg: "#c7d2fe", chipFg: "#3730a3" },
+    rose:    { bg: "#dc2626", fg: "#ffffff", border: "#dc2626", chipBg: "#fecaca", chipFg: "#7f1d1d" },
+  };
+  const s = toneMap[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all hover:scale-[1.02] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ background: s.bg, color: s.fg, border: `1px solid ${s.border}` }}
+    >
+      <span className="rounded px-1 py-px font-mono text-[9px] font-bold tracking-wide" style={{ background: s.chipBg, color: s.chipFg }}>{code}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function MoreItem({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
     <button
