@@ -390,12 +390,15 @@ export const resendFormLink = createServerFn({ method: "POST" })
 
     const { data: appRow } = await supabaseAdmin
       .from("applications")
-      .select("application_code")
+      .select("id, application_code")
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const orderNumber = (appRow as any)?.application_code ?? lead.lead_code ?? "";
+    const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
+    const orderNumber = (appRow as any)?.application_code
+      ?? (await resolveApplicationCode(lead.id, { applicationId: (appRow as any)?.id ?? null }));
+    if (!orderNumber) throw new Error("Order number not ready yet — please retry in a moment.");
 
     await enqueueFromTemplateInternal(
       "welcome_and_form_link",
