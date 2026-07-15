@@ -1,105 +1,56 @@
-# Compact, Config-Driven Journey Flowchart
+## Goal
 
-Shrink the canvas, add responsive scaling, extract the graph into a pure config module, tighten highlight rules, and add unit tests.
+Replace the current ticket toolbar (Reply / Note / Resolve / Close / Reopen / Resume Order) with the 4 canonical buttons from the Support Ticket flowchart, wired to the existing T001/T002/T003 email templates and the 8h auto-close for T002.
 
-## 1. Compact + responsive canvas
+## The 4 buttons (per attached flowchart)
 
-Current canvas is 1720×820 fixed — too wide.
+Each button lives on the ticket detail page toolbar and closes the ticket, sending the matching template email in the same customer thread.
 
-- Shrink node size (`W=120, H=52`) and grid step (`180 → 140` X, `160 → 130` Y).
-- New viewBox: **1240×620** — fits comfortably in the workspace column.
-- Wrap SVG + overlay in a container that auto-scales:
-  ```tsx
-  <div ref={wrapRef} className="w-full">
-    <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: CANVAS_W, height: CANVAS_H * scale }}>
-      …svg + nodes…
-    </div>
-  </div>
-  ```
-  Scale = `min(1, wrapWidth / CANVAS_W)` via `ResizeObserver`. On mobile it renders at ~0.3–0.4× with no horizontal scroll; on desktop it renders 1:1.
-- Remove the `overflow-x-auto` scroller.
-- Node HTML uses `absolute` positions in the same coord space as the SVG so scaling transforms both together.
+1. **T001 — Normal Close / No Action Required**  
+   Immediate close. Sends `T001_TICKET_COMPLETED` (Normal-close variant). Ticket → `closed`. No order side-effects.
 
-## 2. Extract graph to config module
+2. **T001 — Restart Order**  
+   Immediate close. Sends `T001_TICKET_COMPLETED` (Restart variant). Ticket → `closed` AND, if the ticket is linked to an order that is on hold, resumes the order (reuses `resolveTicketAndResumeOrder`).
 
-New file: **`src/lib/orders/journey-graph.ts`** — pure, no React.
+3. **T001 — Consultation / Support Completed**  
+   Immediate close. Sends `T001_TICKET_COMPLETED` (Consultation variant). Ticket → `closed`. If linked to a Talk-to-Expert order, marks the consultation done (E009-equivalent order event) so the order journey advances.
 
-Exports:
-- `NODES: NodeDef[]` (id, x, y, kind, tone, icon key string, buttonCode, emailCode, subtitle).
-- `EDGES: EdgeDef[]` (from, fromSide, to, toSide, mode, branch, waypoints?).
-- `anchor(node, side)`, `pathD(a, b, mode, waypoints)` helpers.
-- `activeBranchesFor(phase, terminal, reasonCode)` → `Set<BranchKey>`.
-- `mainDoneEdgesFor(currentIdx)` → `Set<string>`.
-- `edgeState(edge, { activeBranches, doneMainEdges, terminal })` → `"done" | "active" | "closed" | "idle"`.
-- `nodeState(nodeId, { currentIdx, activeBranches, terminal })` → `"done" | "active" | "terminal-ok" | "terminal-bad" | "idle"`.
+4. **T002 — Select Reason / Reply Manually (8h auto-close → T003)**  
+   Opens a small dialog: pick a Category-A reason (reuses `ReasonPicker`) + optional manual reply body. On confirm: sends `T002_TICKET_REPLY`, arms the existing 8-hour ticket auto-close timer, ticket → `waiting_customer`. When the timer fires, `T003_TICKET_CLOSED` sends and the ticket → `closed`. Customer reply before the timer cancels it (already handled by inbox matcher).
 
-Icon lookup stays in the component (React-only), keyed by string (`"inbox" | "fileText" | …`) so the config file stays pure JS.
+Manual `Reopen` stays available for closed tickets (small secondary control), but Reply / Note / Resolve / Close / Resume-Order buttons are removed from the toolbar — everything routes through the 4 buttons above. The composer (reply/note text area) stays for free-form staff messages within an open ticket.
 
-`CustomerJourneyMap.tsx` becomes rendering-only: imports graph + helpers, iterates NODES/EDGES, no hard-coded coordinates or branch logic in the component.
+## Files to change
 
-## 3. Highlight rules — exact per stage
+- `src/routes/admin.tickets.$ticketId.tsx`
+  - Remove Resolve / Close / Resume-Order toolbar buttons (~lines 507–518).
+  - Render the 4 new buttons as a `TicketActionBar` with T001 (3 variants) as outline pills and T002 as a red primary. Each shows its email code chip (T001/T002) to match the flowchart.
+  - Wire click handlers to the new server functions below; keep a small confirm modal for each destructive action.
+  - Keep `Reopen` for closed/resolved tickets.
 
-Rewrite `activeBranchesFor` to make one and only one sub-branch active for the current phase, matching the flowchart:
+- `src/lib/tickets/ticket-actions.functions.ts` — add 4 new atomic server fns (all `.middleware([requireSupabaseAuth])`):
+  - `closeTicketNormalT001({ ticketId })` → send T001 (normal-close template), status=`closed`, audit row.
+  - `closeTicketRestartT001({ ticketId })` → send T001 (restart template), status=`closed`, if `application_id` is on hold call the existing resume RPC (same code path as `resolveTicketAndResumeOrder`).
+  - `closeTicketConsultationT001({ ticketId })` → send T001 (consultation template), status=`closed`, if linked order is Talk-to-Expert emit the consultation-completed order event.
+  - `closeTicketReplyReasonT002({ ticketId, reasonId, replyBody })` → send T002 with the reason substituted + optional manual body, status=`waiting_customer`, arm 8h timer (kind `ticket_autoclose_t003`).
+  - All four reuse the existing thread-header helpers so replies land in the customer's original conversation.
+  - The existing `closeTicketWithReply` / `closeTicketFinal` / `resolveTicketAndResumeOrder` stay in place (used by cancellation flow) but are no longer wired to the ticket toolbar.
 
-| Phase                 | Active branch(es)          | Notes                                    |
-|-----------------------|----------------------------|------------------------------------------|
-| `form_not_submitted`  | `form-nag`                 | main up to `form_not` = done             |
-| `form_submitted`      | (none — main only)         | main up to `form_sub` = done             |
-| `technical_delay`     | `technical`                | loop lit; main freezes at `form_sub`     |
-| `customer_delay`      | `customer-delay`           | main up to `form_sub` = done             |
-| `consultation_done`   | `shortcut`                 | main up to `govt_portal` = done          |
-| `awaiting_govt`       | `awaiting`                 | main up to `govt_portal` = done          |
-| `status_checked`      | `status`                   | main up to `check_status` = done         |
-| `post_wait_submitted` | `status` + `accept`(pre-lit) | main up to `check_status` = done       |
-| `completed`           | winning branch to completed| based on last touched (accept/status/shortcut) |
-| `closed`              | closing branch to closed_e010 | pick by reasonCode: A→form-nag OR customer-delay; B→reject |
+- `src/lib/emails/bhs-templates.ts` — add 3 template variant keys under `T001_TICKET_COMPLETED` (`normal_close`, `restart_order`, `consultation_done`) so each button can pick the right body. `T002_TICKET_REPLY` and `T003_TICKET_CLOSED` already exist.
 
-Also fix: when `closed` with reason A but the order actually died on the customer-delay branch, prefer that branch. Heuristic: if `workflowStatus` recently contained "customer" → customer-delay; else form-nag.
+- `src/lib/orders/actions/timers-tick.server.ts` (or the timer registry) — register the `ticket_autoclose_t003` kind: on fire, send `T003_TICKET_CLOSED` and set ticket status=`closed`.
 
-## 4. Line/node icon consistency
+- `src/lib/orders/journey-map.ts` — `TICKET_BUTTONS` labels updated to match the flowchart wording exactly ("Closed Ticket — Normal Mail / No Action Required", etc.) so any consumer of that config stays in sync.
 
-- All node badges use the same 20px circular icon well; state color comes from the tone system, not from ad-hoc classes.
-- All arrowheads are a single shared triangle marker rendered per state color (currently correct).
-- Add small directional icons at edge joins where lines change direction (subtle 6px dot at each corner) so orthogonal turns match the drawio look.
-- Line strokes: idle 1.25px dashed slate-300; done 2px solid emerald-500; active 2px dashed indigo-500 marching-ants; closed 2px dashed rose-500.
-- Node role indicators: `stage` = rounded rectangle with icon left; `action` = same shape + button footer; `terminal` = filled rounded rectangle in tone; `sub` = dashed outline.
+## Technical notes
 
-## 5. Tests
+- All new server fns are pure `createServerFn` wrappers; helpers stay in `.server.ts` to comply with the sibling-import splitting rule.
+- T002 uses the existing `ReasonPicker` (Category A) already imported by `CustomerJourneyMap`.
+- Auto-close timer scheduling reuses `armTimer` / `cancelTimers` from `src/lib/orders/actions/timers.server.ts`; the inbox matcher already cancels ticket timers on customer reply.
+- No DB schema change required — `support_tickets.status` already supports `waiting_customer` and `closed`.
 
-New file: **`src/components/admin/workspace/__tests__/CustomerJourneyMap.test.tsx`** (Vitest + React Testing Library).
+## Out of scope
 
-Cases (one per JourneyPhase + terminals):
-1. `form_not_submitted` → `form-nag` edges active, main-1 done, all others idle.
-2. `form_submitted` → main-1..3 done; no branch active.
-3. `technical_delay` → `technical` active; `main-3` idle (not done — still holding).
-4. `customer_delay` → `customer-delay` edges active; countdown chip present on `b10_cust`.
-5. `consultation_done` → `shortcut` active; `main-4` done.
-6. `awaiting_govt` → `awaiting` active; `b05_wait` node active.
-7. `status_checked` → `status` active.
-8. `post_wait_submitted` → `status` + `accept` active.
-9. terminal `completed` → `completed` node = `terminal-ok`.
-10. terminal `closed` (reason A) → `closed_e010` = `terminal-bad`; `form-nag`/`customer-delay` closed.
-11. terminal `closed` (reason B7) → `reject` closed; `b09_reject` shown red.
-
-Snapshot test for the pure graph config (nodes/edges list stability) so unintentional layout drift shows up in review.
-
-**Approach:** unit-test the pure helpers (`activeBranchesFor`, `edgeState`, `nodeState`) directly — no DOM needed for the highlighting logic. Add ONE integration test that mounts `CustomerJourneyMap` with mocked hooks (`useOrderWorkflow`, `useServerFn`, `useQuery`) and verifies node count, one live "LIVE" badge, and correct edge stroke classes via `container.querySelectorAll('path[data-branch="form-nag"]')` — add `data-branch` and `data-state` attributes to each path/node for testability.
-
-Adds `data-testid`, `data-branch`, `data-state` attributes throughout — no visual change.
-
-## Files
-
-**New**
-- `src/lib/orders/journey-graph.ts` — pure config + helpers.
-- `src/lib/orders/__tests__/journey-graph.test.ts` — pure-helper unit tests (11 cases).
-- `src/components/admin/workspace/__tests__/CustomerJourneyMap.test.tsx` — one integration render test.
-
-**Rewritten**
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — imports config, adds `useResponsiveScale` hook, renders responsive scaled diagram, adds test hooks (`data-*` attrs).
-
-**Untouched**
-- `journey-map.ts` (existing config), all server fns, workflow engine, dialogs, `CountdownChip`, `PHASE_ENABLED_BUTTONS`.
-
-## Deliverable
-
-The Customer Journey renders at natural 1240×620 on desktop and auto-shrinks on tablet/mobile with no horizontal scroll bar and no clipping. Only the connector segment matching the current phase lights up. Graph is data-driven from one config file. Unit tests cover every phase transition and terminal outcome.
+- No changes to inbox intake / ticket creation.
+- Order-side journey map and its B01–B10 buttons are untouched.
+- No visual redesign of the ticket page beyond the toolbar swap.
