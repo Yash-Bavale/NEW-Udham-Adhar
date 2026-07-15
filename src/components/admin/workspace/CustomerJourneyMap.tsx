@@ -616,8 +616,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Select Reason (E008)",
                 onClick: () => setDialog({ kind: "govt_rejected" }),
                 variant: "rose",
-                disabled: closed,
+                disabled: closed || !gate("B09"),
               }}
+
             />
 
             {isTalkToExpert && (
