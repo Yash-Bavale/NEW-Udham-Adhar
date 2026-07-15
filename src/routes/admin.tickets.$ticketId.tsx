@@ -18,7 +18,15 @@ import {
   type TicketStatus,
 } from "@/lib/crm/tickets.functions";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
-import { resolveTicketAndResumeOrder } from "@/lib/tickets/ticket-actions.functions";
+import {
+  resolveTicketAndResumeOrder,
+  closeTicketNormalT001,
+  closeTicketRestartT001,
+  closeTicketConsultationT001,
+  closeTicketReplyReasonT002,
+} from "@/lib/tickets/ticket-actions.functions";
+import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
+import type { OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
