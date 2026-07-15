@@ -606,6 +606,11 @@ function FlowNode({
       data-node={node.id}
       data-state={state}
     >
+      {node.tag && (
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow">
+          {node.tag}
+        </span>
+      )}
       {countdown && (
         <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
           {countdown}
