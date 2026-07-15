@@ -543,8 +543,9 @@ export function CustomerJourneyMap(p: Props) {
                 label: "Add Reminder (E006)",
                 onClick: promptReminder,
                 variant: "indigo",
-                disabled: closed,
+                disabled: closed || !gate("B05"),
               }}
+
             />
 
             {/* Check Final Status column: 4 rows */}
