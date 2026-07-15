@@ -28,6 +28,7 @@ import {
 import {
   NODES, EDGES, nodeById, anchor, pathD,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
+  currentMainEdgeFor, currentStageNodeFor,
   CANVAS_W, CANVAS_H, NODE_W, NODE_H,
   type IconKey, type NodeDef, type Tone, type EdgeState, type NodeState,
 } from "@/lib/orders/journey-graph";
