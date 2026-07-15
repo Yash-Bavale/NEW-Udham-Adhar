@@ -229,7 +229,6 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         customer_name: lead.name ?? "",
         name: lead.name ?? "",
         lead_code: lead.lead_code ?? "",
-        order_number: lead.lead_code ?? "",
         service_name: lead.service ?? "",
         service: lead.service ?? "",
         document_count: docCount ?? 0,

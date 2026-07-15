@@ -103,7 +103,6 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
             problem: parsed.problem,
             lead_id: leadId,
             lead_code: leadCode ?? "",
-            order_number: leadCode ?? "",
             service_name: "Talk to Expert Consultation",
             total_amount: TOTAL,
             admin_url: `${origin}/admin/leads/${leadId}`,

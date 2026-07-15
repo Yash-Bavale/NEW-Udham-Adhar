@@ -225,10 +225,6 @@ async function enforceApplicationOrderNumber(
   applicationId?: string | null,
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = { ...input };
-  const leadCode = String(out.lead_code ?? out.leadCode ?? "").trim();
-  const orderNumber = String(out.order_number ?? out.orderNumber ?? "").trim();
-  const looksLikeLeadCode = Boolean(leadCode && orderNumber && orderNumber === leadCode);
-  if (orderNumber && !looksLikeLeadCode) return out;
   if (!leadId && !applicationId) return out;
 
   const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
@@ -248,7 +244,12 @@ async function enforceApplicationOrderNumber(
   }
 
   if (!resolved) {
-    throw new Error("Order number not ready yet — email was not sent.");
+    const orderNumber = String(out.order_number ?? out.orderNumber ?? "").trim();
+    const leadCode = String(out.lead_code ?? out.leadCode ?? "").trim();
+    if (!orderNumber || (leadCode && orderNumber === leadCode)) {
+      throw new Error("Order number not ready yet — email was not sent.");
+    }
+    return out;
   }
 
   out.order_number = resolved;
