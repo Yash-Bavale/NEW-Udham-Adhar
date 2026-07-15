@@ -391,7 +391,7 @@ export function CustomerJourneyMap(p: Props) {
               {/* Node overlay */}
               {NODES.map((n) => {
                 const state = nodeState(n.id, {
-                  currentIdx, activeBranches, terminal: live.terminal, phase,
+                  currentIdx, activeBranches, terminal: live.terminal, phase, currentStageNode,
                 });
                 const btnCode = n.buttonCode;
                 const enabled = btnCode ? gate(btnCode) : false;
