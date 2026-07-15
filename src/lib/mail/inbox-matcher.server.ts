@@ -584,10 +584,85 @@ async function openOrAppendTicket(input: {
 
 function stripHtml(html: string | null): string {
   if (!html) return "";
-  return html
+  const withoutTags = html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  return decodeEntities(withoutTags);
 }
+
+/** Decode the common HTML entities that leak into inbound Zoho subjects and text bodies. */
+export function decodeEntities(input: string | null | undefined): string {
+  if (!input) return "";
+  return input
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      try { return String.fromCodePoint(parseInt(h, 16)); } catch { return _; }
+    })
+    .replace(/&#(\d+);/g, (_, d) => {
+      try { return String.fromCodePoint(parseInt(d, 10)); } catch { return _; }
+    })
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&hellip;/gi, "…")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&rsquo;|&lsquo;/gi, "'")
+    .replace(/&rdquo;|&ldquo;/gi, '"');
+}
+
+/**
+ * Extract an application (AP-YYYY-######) or lead (UA-YYYY-######) code from a subject line
+ * and resolve it to an application_id / lead_id / customer_id triple. Runs before other
+ * matching strategies because Zoho web/mobile replies frequently drop In-Reply-To headers.
+ */
+async function matchBySubjectCode(subject: string | null | undefined): Promise<
+  { applicationId: string; leadId: string | null; customerId: string | null } | null
+> {
+  if (!subject) return null;
+  const decoded = decodeEntities(subject).toUpperCase();
+
+  const apMatch = decoded.match(/\bAP-\d{4}-\d{6}\b/);
+  if (apMatch) {
+    const { data } = await supabaseAdmin
+      .from("applications")
+      .select("id, lead_id, customer_id")
+      .eq("application_code", apMatch[0])
+      .maybeSingle();
+    if (data) {
+      const r = data as { id: string; lead_id: string | null; customer_id: string | null };
+      return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id };
+    }
+  }
+
+  const uaMatch = decoded.match(/\bUA-\d{4}-\d{6}\b/);
+  if (uaMatch) {
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("id, customer_id")
+      .eq("lead_code", uaMatch[0])
+      .maybeSingle();
+    const leadRow = lead as { id: string; customer_id: string | null } | null;
+    if (leadRow?.id) {
+      const { data: app } = await supabaseAdmin
+        .from("applications")
+        .select("id, lead_id, customer_id, created_at")
+        .eq("lead_id", leadRow.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (app) {
+        const r = app as { id: string; lead_id: string | null; customer_id: string | null };
+        return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id ?? leadRow.customer_id };
+      }
+    }
+  }
+
+  return null;
+}
+
