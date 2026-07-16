@@ -123,6 +123,41 @@ export function CustomerJourneyMap(p: Props) {
     setPostWaitSubmitted(true);
   };
 
+  const formLinkKey = `journey.b01Sent:${p.applicationId}`;
+  const [formLinkSent, setFormLinkSent] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(formLinkKey) === "1"; } catch { return false; }
+  });
+  const markFormLinkSent = () => {
+    try { window.localStorage.setItem(formLinkKey, "1"); } catch {}
+    setFormLinkSent(true);
+  };
+  const clearFormLinkSent = () => {
+    try { window.localStorage.removeItem(formLinkKey); } catch {}
+    setFormLinkSent(false);
+  };
+
+  const techResumeKey = `journey.b03Resumed:${p.applicationId}`;
+  const [techDelayResolved, setTechDelayResolved] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(techResumeKey) === "1"; } catch { return false; }
+  });
+  const markTechDelayResolved = () => {
+    try { window.localStorage.setItem(techResumeKey, "1"); } catch {}
+    setTechDelayResolved(true);
+  };
+  const clearTechDelayResolved = () => {
+    try { window.localStorage.removeItem(techResumeKey); } catch {}
+    setTechDelayResolved(false);
+  };
+
+  // Auto-clear the B01/B03 client flags when the underlying order state moves past them.
+  useEffect(() => {
+    if (formLinkSent && live.activeSubKey !== "form-not-submitted") clearFormLinkSent();
+    if (techDelayResolved && (live.activeSubKey === "technical-delay" || currentIdx >= 4)) clearTechDelayResolved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.activeSubKey, currentIdx]);
+
   const phase = useMemo(() => derivePhase({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
@@ -130,7 +165,9 @@ export function CustomerJourneyMap(p: Props) {
     closureReasonLabel: p.closureReasonLabel,
     reminderCount,
     postWaitSubmitted,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted]);
+    formLinkSent,
+    techDelayResolved,
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted, formLinkSent, techDelayResolved]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
   const gate = (code: ButtonCode) => enabledCodes.includes(code) && !closed && !completed;
