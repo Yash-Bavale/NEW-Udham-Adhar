@@ -102,6 +102,104 @@ async function loadThreadHeaders(ticketId: string, applicationId: string | null)
   };
 }
 
+async function loadActorName(actorId: string) {
+  const admin = await getAdmin();
+  try {
+    const { data: prof } = await admin
+      .from("profiles")
+      .select("display_name, full_name, email")
+      .eq("id", actorId)
+      .maybeSingle();
+    const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
+    return p?.display_name || p?.full_name || p?.email?.split("@")[0] || "Support";
+  } catch {
+    return "Support";
+  }
+}
+
+async function stampReplyEmailDelivery(input: {
+  replyId: string;
+  queueId: string | null;
+  inReplyTo: string | null;
+  emailedAt?: string;
+}) {
+  const admin = await getAdmin();
+  const now = input.emailedAt ?? new Date().toISOString();
+  let patch: Record<string, unknown> = { emailed_at: now, email_in_reply_to: input.inReplyTo };
+
+  if (input.queueId) {
+    try {
+      const { data: log } = await admin
+        .from("email_logs")
+        .select("id, message_id")
+        .eq("queue_id", input.queueId)
+        .eq("direction", "outgoing")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const l = log as { id: string | null; message_id: string | null } | null;
+      patch = {
+        ...patch,
+        email_message_id: l?.message_id ?? null,
+        email_send_log_id: l?.id ?? null,
+      };
+    } catch { /* non-fatal: emailed_at is still authoritative */ }
+  }
+
+  await admin.from("ticket_replies").update(patch as never).eq("id", input.replyId);
+}
+
+async function sendTicketTemplateEmail(opts: {
+  ticket: TicketRow;
+  code: string;
+  actorId: string;
+  extraVars?: Record<string, unknown>;
+  replyId?: string;
+}) {
+  const cust = await loadCustomer(opts.ticket.customer_id);
+  const recipient = opts.ticket.ticket_email || cust.email;
+  if (!recipient) throw new Error("Customer has no registered email address on this ticket.");
+
+  const actorName = await loadActorName(opts.actorId);
+  const thread = await loadThreadHeaders(opts.ticket.id, opts.ticket.application_id ?? null);
+  const ticketNumber = opts.ticket.ticket_number ?? opts.ticket.id.slice(0, 8);
+  const threadedSubject = thread.threadSubject
+    ? (thread.threadSubject.toLowerCase().startsWith("re:") ? thread.threadSubject : `Re: ${thread.threadSubject}`)
+    : `Re: [#${ticketNumber}] ${opts.ticket.subject}`;
+
+  const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+  const result = await enqueueFromTemplateInternal(
+    opts.code,
+    recipient,
+    {
+      customer_name: cust.name,
+      customerName: cust.name,
+      ticket_number: ticketNumber,
+      ticketNumber,
+      ticket_subject: opts.ticket.subject,
+      ticketSubject: opts.ticket.subject,
+      fromName: `${actorName} · Business Help Services`,
+      executive_name: actorName,
+      ...(opts.extraVars ?? {}),
+    },
+    {
+      toName: cust.name,
+      applicationId: opts.ticket.application_id ?? undefined,
+      inReplyTo: thread.inReplyTo,
+      references: thread.references,
+      threadSubject: threadedSubject,
+      requireImmediateSuccess: true,
+      trigger: "manual",
+    },
+  );
+
+  const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
+  if (opts.replyId) {
+    await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
+  }
+  return { emailed: true, recipient, queueId };
+}
+
 // ─────────────────────────── replyToTicket ───────────────────────────
 
 const ReplyInput = z.object({
@@ -165,91 +263,26 @@ export const replyToTicket = createServerFn({ method: "POST" })
       return { ok: true, emailed: false, reason: "no_recipient_email" };
     }
 
-    // Build actor + threading data
-    let actorName = "Support";
     try {
-      const { data: prof } = await admin
-        .from("profiles")
-        .select("display_name, full_name, email")
-        .eq("id", context.userId)
-        .maybeSingle();
-      const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
-      actorName = p?.display_name || p?.full_name || p?.email?.split("@")[0] || "Support";
-    } catch { /* non-fatal */ }
-
-    const thread = await loadThreadHeaders(ticket.id, ticket.application_id ?? null);
-
-    try {
-      const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       const ticketNumber = ticket.ticket_number ?? ticket.id.slice(0, 8);
-      // Prefer the order's canonical thread subject so Gmail groups replies with
-      // the customer's original conversation. Fall back to ticket subject.
-      const threadedSubject = thread.threadSubject
-        ? (thread.threadSubject.toLowerCase().startsWith("re:")
-            ? thread.threadSubject
-            : `Re: ${thread.threadSubject}`)
-        : `Re: [#${ticketNumber}] ${ticket.subject}`;
-      const result = await enqueueFromTemplateInternal(
-        BHS_EMAILS.E008_TICKET_REPLY,
-        recipient,
+      const result = await sendTicketTemplateEmail({
+        ticket,
+        code: BHS_EMAILS.T002_TICKET_REPLY,
+        actorId: context.userId,
+        replyId: (replyRow as { id: string }).id,
+        extraVars:
         {
-          customer_name: cust.name,
-          customerName: cust.name,
           employee_reply: data.message,
           replyMessage: data.message,
           ticket_number: ticketNumber,
           ticketNumber,
-          ticket_subject: ticket.subject,
-          ticketSubject: ticket.subject,
-          fromName: `${actorName} · Business Help Services`,
-          executive_name: actorName,
           reason: data.message,
         },
-        {
-          toName: cust.name,
-          applicationId: ticket.application_id ?? undefined,
-          inReplyTo: thread.inReplyTo,
-          references: thread.references,
-          threadSubject: threadedSubject,
-        },
-      );
-
-      // Best-effort: look up the outbound Message-ID from email_logs by queue_id
-      // and stash it on the ticket_replies row so the next reply can chain.
-      const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
-      if (queueId) {
-        try {
-          const { data: log } = await admin
-            .from("email_logs")
-            .select("id, message_id")
-            .eq("queue_id", queueId)
-            .eq("direction", "outgoing")
-            .order("sent_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const l = log as { id: string | null; message_id: string | null } | null;
-          if (l?.message_id) {
-            await admin
-              .from("ticket_replies")
-              .update({
-                email_message_id: l.message_id,
-                email_in_reply_to: thread.inReplyTo,
-                email_send_log_id: l.id,
-                emailed_at: now,
-              } as never)
-              .eq("id", (replyRow as { id: string }).id);
-          } else {
-            await admin
-              .from("ticket_replies")
-              .update({ emailed_at: now } as never)
-              .eq("id", (replyRow as { id: string }).id);
-          }
-        } catch { /* non-fatal */ }
-      }
-      return { ok: true, emailed: true, recipient };
+      });
+      return { ok: true, emailed: true, recipient: result.recipient };
     } catch (e) {
       console.error("[tickets] reply email failed", e);
-      return { ok: true, emailed: false, reason: "email_error" };
+      throw new Error(e instanceof Error ? e.message : "Reply was saved, but the email was not sent.");
     }
   });
 
