@@ -200,6 +200,54 @@ async function sendTicketTemplateEmail(opts: {
   return { emailed: true, recipient, queueId };
 }
 
+function escapeHtml(input: string) {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function sendTicketAdHocReply(opts: {
+  ticket: TicketRow;
+  actorId: string;
+  message: string;
+  replyId: string;
+}) {
+  const cust = await loadCustomer(opts.ticket.customer_id);
+  const recipient = opts.ticket.ticket_email || cust.email;
+  if (!recipient) throw new Error("Customer has no registered email address on this ticket.");
+
+  const actorName = await loadActorName(opts.actorId);
+  const thread = await loadThreadHeaders(opts.ticket.id, opts.ticket.application_id ?? null);
+  const ticketNumber = opts.ticket.ticket_number ?? opts.ticket.id.slice(0, 8);
+  const subjectBase = thread.threadSubject || `[#${ticketNumber}] ${opts.ticket.subject}`;
+  const subject = subjectBase.toLowerCase().startsWith("re:") ? subjectBase : `Re: ${subjectBase}`;
+  const bodyText = opts.message;
+  const bodyHtml = `<div>${escapeHtml(opts.message).replace(/\n/g, "<br />")}</div><p style="margin-top:16px;color:#64748b;font-size:12px">${escapeHtml(actorName)} · Business Help Services</p>`;
+
+  const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+  const result = await enqueueEmailInternal({
+    toEmail: recipient,
+    toName: cust.name,
+    subject,
+    bodyHtml,
+    bodyText,
+    applicationId: opts.ticket.application_id ?? undefined,
+    variables: {
+      __allow_without_template: true,
+      __in_reply_to: thread.inReplyTo,
+      __references: thread.references,
+    },
+    allowWithoutTemplate: true,
+    requireImmediateSuccess: true,
+  });
+  const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
+  await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
+  return { emailed: true, recipient, queueId };
+}
+
 // ─────────────────────────── replyToTicket ───────────────────────────
 
 const ReplyInput = z.object({
@@ -254,20 +302,11 @@ export const replyToTicket = createServerFn({ method: "POST" })
     }
 
     try {
-      const ticketNumber = ticket.ticket_number ?? ticket.id.slice(0, 8);
-      const result = await sendTicketTemplateEmail({
+      const result = await sendTicketAdHocReply({
         ticket,
-        code: BHS_EMAILS.T002_TICKET_REPLY,
         actorId: context.userId,
         replyId: (replyRow as { id: string }).id,
-        extraVars:
-        {
-          employee_reply: data.message,
-          replyMessage: data.message,
-          ticket_number: ticketNumber,
-          ticketNumber,
-          reason: data.message,
-        },
+        message: data.message,
       });
       // Arm ticket-autoclose only after the email actually leaves the system.
       if (data.armAutoclose) {
