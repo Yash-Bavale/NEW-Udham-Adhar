@@ -1,56 +1,30 @@
-## Goal
+## Plan
 
-Replace the current ticket toolbar (Reply / Note / Resolve / Close / Reopen / Resume Order) with the 4 canonical buttons from the Support Ticket flowchart, wired to the existing T001/T002/T003 email templates and the 8h auto-close for T002.
+1. **Correct the four support action buttons**
+   - **Normal / No Action**: close the ticket instantly only. Do not send T001.
+   - **Restart Order**: move the linked order directly to **FORM_RECEIVED / form completed**, resume the workflow, cancel/pause cleanup as needed, and close the ticket instantly. Do not send T001 unless explicitly needed later.
+   - **Consultation / Support Done**: send **T001** with full placeholders, then close the ticket instantly.
+   - **Reply w/ Reason (8h auto-close)**: send **T002** with the selected reason block + reply body, keep ticket waiting for customer, and arm the 8-business-hour auto-close.
 
-## The 4 buttons (per attached flowchart)
+2. **Make email delivery honest and visible**
+   - Change ticket action functions so they require immediate email success for customer-facing sends.
+   - If email fails, show a real error instead of “sent”.
+   - Mark the `ticket_replies` row with `emailed_at`, `email_message_id`, and related log info when sending succeeds, so the chat timeline reflects actual delivery.
 
-Each button lives on the ticket detail page toolbar and closes the ticket, sending the matching template email in the same customer thread.
+3. **Fix normal chat-box replies not reaching customers**
+   - Apply the same “require send success + update reply delivery metadata” behavior to the standard composer reply flow.
+   - Keep internal notes as staff-only with no email.
 
-1. **T001 — Normal Close / No Action Required**  
-   Immediate close. Sends `T001_TICKET_COMPLETED` (Normal-close variant). Ticket → `closed`. No order side-effects.
+4. **Map support tickets to orders and pause/resume timelines correctly**
+   - Preserve/use `application_id` on ticket actions.
+   - When a customer-delay scheduler is paused by a ticket, resolve/restart/consultation-close should dispatch the workflow close/resume event and resume paused customer-delay timers where appropriate.
+   - T002 should keep the ticket/order waiting, and the customer delay should remain paused until the ticket closes or the customer replies.
 
-2. **T001 — Restart Order**  
-   Immediate close. Sends `T001_TICKET_COMPLETED` (Restart variant). Ticket → `closed` AND, if the ticket is linked to an order that is on hold, resumes the order (reuses `resolveTicketAndResumeOrder`).
+5. **Update UI copy and modals to match behavior**
+   - Remove “Sends T001” from Normal / Restart copy.
+   - Restart modal becomes “move order to Form Completed and close ticket” with no destination dropdown.
+   - Success toasts distinguish actual emailed vs closed-only actions.
 
-3. **T001 — Consultation / Support Completed**  
-   Immediate close. Sends `T001_TICKET_COMPLETED` (Consultation variant). Ticket → `closed`. If linked to a Talk-to-Expert order, marks the consultation done (E009-equivalent order event) so the order journey advances.
-
-4. **T002 — Select Reason / Reply Manually (8h auto-close → T003)**  
-   Opens a small dialog: pick a Category-A reason (reuses `ReasonPicker`) + optional manual reply body. On confirm: sends `T002_TICKET_REPLY`, arms the existing 8-hour ticket auto-close timer, ticket → `waiting_customer`. When the timer fires, `T003_TICKET_CLOSED` sends and the ticket → `closed`. Customer reply before the timer cancels it (already handled by inbox matcher).
-
-Manual `Reopen` stays available for closed tickets (small secondary control), but Reply / Note / Resolve / Close / Resume-Order buttons are removed from the toolbar — everything routes through the 4 buttons above. The composer (reply/note text area) stays for free-form staff messages within an open ticket.
-
-## Files to change
-
-- `src/routes/admin.tickets.$ticketId.tsx`
-  - Remove Resolve / Close / Resume-Order toolbar buttons (~lines 507–518).
-  - Render the 4 new buttons as a `TicketActionBar` with T001 (3 variants) as outline pills and T002 as a red primary. Each shows its email code chip (T001/T002) to match the flowchart.
-  - Wire click handlers to the new server functions below; keep a small confirm modal for each destructive action.
-  - Keep `Reopen` for closed/resolved tickets.
-
-- `src/lib/tickets/ticket-actions.functions.ts` — add 4 new atomic server fns (all `.middleware([requireSupabaseAuth])`):
-  - `closeTicketNormalT001({ ticketId })` → send T001 (normal-close template), status=`closed`, audit row.
-  - `closeTicketRestartT001({ ticketId })` → send T001 (restart template), status=`closed`, if `application_id` is on hold call the existing resume RPC (same code path as `resolveTicketAndResumeOrder`).
-  - `closeTicketConsultationT001({ ticketId })` → send T001 (consultation template), status=`closed`, if linked order is Talk-to-Expert emit the consultation-completed order event.
-  - `closeTicketReplyReasonT002({ ticketId, reasonId, replyBody })` → send T002 with the reason substituted + optional manual body, status=`waiting_customer`, arm 8h timer (kind `ticket_autoclose_t003`).
-  - All four reuse the existing thread-header helpers so replies land in the customer's original conversation.
-  - The existing `closeTicketWithReply` / `closeTicketFinal` / `resolveTicketAndResumeOrder` stay in place (used by cancellation flow) but are no longer wired to the ticket toolbar.
-
-- `src/lib/emails/bhs-templates.ts` — add 3 template variant keys under `T001_TICKET_COMPLETED` (`normal_close`, `restart_order`, `consultation_done`) so each button can pick the right body. `T002_TICKET_REPLY` and `T003_TICKET_CLOSED` already exist.
-
-- `src/lib/orders/actions/timers-tick.server.ts` (or the timer registry) — register the `ticket_autoclose_t003` kind: on fire, send `T003_TICKET_CLOSED` and set ticket status=`closed`.
-
-- `src/lib/orders/journey-map.ts` — `TICKET_BUTTONS` labels updated to match the flowchart wording exactly ("Closed Ticket — Normal Mail / No Action Required", etc.) so any consumer of that config stays in sync.
-
-## Technical notes
-
-- All new server fns are pure `createServerFn` wrappers; helpers stay in `.server.ts` to comply with the sibling-import splitting rule.
-- T002 uses the existing `ReasonPicker` (Category A) already imported by `CustomerJourneyMap`.
-- Auto-close timer scheduling reuses `armTimer` / `cancelTimers` from `src/lib/orders/actions/timers.server.ts`; the inbox matcher already cancels ticket timers on customer reply.
-- No DB schema change required — `support_tickets.status` already supports `waiting_customer` and `closed`.
-
-## Out of scope
-
-- No changes to inbox intake / ticket creation.
-- Order-side journey map and its B01–B10 buttons are untouched.
-- No visual redesign of the ticket page beyond the toolbar swap.
+6. **Validate**
+   - Check the changed server functions for type/syntax issues.
+   - Verify button mutations and composer reply handling match the requested workflow.

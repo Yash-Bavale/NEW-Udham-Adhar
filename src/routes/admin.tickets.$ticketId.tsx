@@ -416,7 +416,6 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
   const [t002ReasonLabel, setT002ReasonLabel] = useState<string>("");
   const [t002Reply, setT002Reply] = useState<string>("");
   const [restartOpen, setRestartOpen] = useState(false);
-  const [restartTo, setRestartTo] = useState<"IN_PROCESSING" | "SUBMITTED_TO_GOVT">("IN_PROCESSING");
 
   const updMut = useMutation({
     mutationFn: (patch: any) => updFn({ data: { id: ticketId, ...patch } }),
@@ -428,12 +427,12 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
 
   const t001NormalMut = useMutation({
     mutationFn: () => t001NormalFn({ data: { ticketId } }),
-    onSuccess: () => { toast.success("Ticket closed — Normal / no action (T001)"); invalidate(); },
+    onSuccess: () => { toast.success("Ticket closed — Normal / no action"); invalidate(); },
     onError: (e: any) => toast.error(e?.message ?? "Close failed"),
   });
   const t001RestartMut = useMutation({
-    mutationFn: () => t001RestartFn({ data: { ticketId, resumeTo: restartTo } }),
-    onSuccess: () => { setRestartOpen(false); toast.success("Ticket closed — Order restarted (T001)"); invalidate(); },
+    mutationFn: () => t001RestartFn({ data: { ticketId } }),
+    onSuccess: () => { setRestartOpen(false); toast.success("Order moved to form completed — ticket closed"); invalidate(); },
     onError: (e: any) => toast.error(e?.message ?? "Restart failed"),
   });
   const t001ConsultMut = useMutation({
@@ -544,10 +543,10 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
           {!["closed", "resolved"].includes(t.status) && (
             <>
               <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
-              <TicketFlowBtn code="T001" label="Normal / No Action" tone="slate"
+              <TicketFlowBtn code="Close" label="Normal / No Action" tone="slate"
                 disabled={t001NormalMut.isPending}
-                onClick={() => { if (window.confirm("Close ticket — Normal mail / No action required?\nSends T001 to the customer.")) t001NormalMut.mutate(); }} />
-              <TicketFlowBtn code="T001" label="Restart Order" tone="emerald"
+                onClick={() => { if (window.confirm("Close ticket — Normal / No action required?\nNo email will be sent.")) t001NormalMut.mutate(); }} />
+              <TicketFlowBtn code="Order" label="Restart Order" tone="emerald"
                 disabled={t001RestartMut.isPending || !t.application_id}
                 title={!t.application_id ? "No linked order" : undefined}
                 onClick={() => setRestartOpen(true)} />
@@ -593,17 +592,10 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={() => setRestartOpen(false)}>
           <div className="w-full max-w-md rounded-2xl border p-5 shadow-xl" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fef3c7", color: "#92400e" }}>T001</span>
-              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Close ticket &amp; restart order</h3>
+              <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#d1fae5", color: "#065f46" }}>Order</span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Restart order &amp; close ticket</h3>
             </div>
-            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Closes the ticket, sends T001, and — if the linked order is on hold — resumes it.</p>
-            <label className="mt-4 block text-xs">
-              <span className="font-medium uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Resume order to</span>
-              <select value={restartTo} onChange={(e) => setRestartTo(e.target.value as any)} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-2 text-sm" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}>
-                <option value="IN_PROCESSING">In Processing</option>
-                <option value="SUBMITTED_TO_GOVT">Submitted to Govt</option>
-              </select>
-            </label>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Moves the linked order directly to Form Completed and closes this ticket instantly. No email will be sent.</p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setRestartOpen(false)} className="rounded-lg px-3 py-1.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Cancel</button>
               <button type="button" disabled={t001RestartMut.isPending} onClick={() => t001RestartMut.mutate()} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" style={{ background: "#16a34a" }}>
@@ -659,7 +651,7 @@ function ToolbarBtn({ onClick, icon, label, primary, success, iconOnly }: { onCl
 }
 
 function TicketFlowBtn({ code, label, tone, onClick, disabled, title }: {
-  code: "T001" | "T002";
+  code: string;
   label: string;
   tone: "slate" | "emerald" | "indigo" | "rose";
   onClick: () => void;
