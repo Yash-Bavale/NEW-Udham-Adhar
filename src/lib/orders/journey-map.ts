@@ -417,6 +417,10 @@ export interface DerivePhaseInput {
   reminderCount?: number;
   /** True once B07 has been pressed (persisted client-side per order). */
   postWaitSubmitted?: boolean;
+  /** True once B01 has been sent and we're still waiting for the customer. */
+  formLinkSent?: boolean;
+  /** True once B03 has resumed from a technical delay (until govt flow advances). */
+  techDelayResolved?: boolean;
 }
 
 /**
@@ -434,7 +438,9 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
   if (live.terminal === "completed") return "completed";
   if (live.activeSubKey === "technical-delay") return "technical_delay";
   if (live.activeSubKey === "customer-delay") return "customer_delay";
-  if (live.activeSubKey === "form-not-submitted") return "form_not_submitted";
+  if (live.activeSubKey === "form-not-submitted") {
+    return i.formLinkSent ? "form_link_sent" : "form_not_submitted";
+  }
 
   const stage = (i.stage ?? "").toLowerCase();
   const inGovtFlow = /submitted_to_govt|processing|certificate|check|final/.test(stage);
@@ -447,6 +453,7 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
     return "status_checked";
   }
 
+  if (i.techDelayResolved) return "post_b03_resume";
   return "form_submitted";
 }
 
