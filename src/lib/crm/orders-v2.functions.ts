@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   FULFILLMENT_STAGES,
+  FULFILLMENT_LABEL,
   type FulfillmentStatus,
   getAllowedFulfillmentTransitions,
 } from "./fulfillment-transitions";
@@ -436,17 +437,25 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       current !== "cancelled" &&
       target !== "cancelled";
 
-    if (!allowed.includes(target) && !isOneStepBack) {
-      throw new Error(`Invalid transition: ${current} → ${target}`);
-    }
+    // Completing an order (with certificate) is allowed from any active stage —
+    // staff frequently upload the final certificate without walking through
+    // every intermediate fulfillment stage. All other transitions still follow
+    // the strict stepwise map.
+    const isCompleteWithCert = target === "completed" && current !== "cancelled" && current !== "completed";
 
+    if (!allowed.includes(target) && !isOneStepBack && !isCompleteWithCert) {
+      const allowedLabel = allowed.length ? allowed.join(", ") : "none";
+      throw new Error(
+        `Cannot move order from "${FULFILLMENT_LABEL[current] ?? current}" to "${FULFILLMENT_LABEL[target] ?? target}". Allowed next stages: ${allowedLabel}.`,
+      );
+    }
 
     if (target === "completed") {
       if (!data.certificateDocumentId) {
-        throw new Error("Certificate upload required before marking complete.");
+        throw new Error("Please upload the certificate PDF before marking this order complete.");
       }
       if (!data.certificateNumber || !data.certificateNumber.trim()) {
-        throw new Error("Certificate / document number is required to complete this order.");
+        throw new Error("Please enter the certificate / document number before completing this order.");
       }
     }
 
