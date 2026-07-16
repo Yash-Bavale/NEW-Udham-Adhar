@@ -363,57 +363,15 @@ export const updateTicket = createServerFn({ method: "POST" })
       } as never);
     }
 
-    // Close auto-close scheduler when transitioning to resolved.
-    if (data.status === "resolved") {
+    // Close auto-close scheduler when staff manually resolves/closes the ticket.
+    if (data.status === "resolved" || data.status === "closed") {
       // Cancel any armed auto-close scheduler
       try {
         const { cancelTicketAutocloseByTicket } = await import(
           "@/lib/scheduling/schedulers.server"
         );
-        await cancelTicketAutocloseByTicket(data.id, "resolved_by_staff");
+        await cancelTicketAutocloseByTicket(data.id, data.status === "resolved" ? "resolved_by_staff" : "closed_by_staff");
       } catch { /* non-fatal */ }
-    }
-
-    // ── Send the customer email on resolve/close (E009 / E010). ──
-    if (data.status === "resolved" || data.status === "closed") {
-      try {
-        // Pull recipient details (customer email + name).
-        let recipient: string | null = row.ticket_email ?? null;
-        let customerName = "Customer";
-        if (row.customer_id) {
-          const { data: cust } = await admin
-            .from("customers")
-            .select("primary_email, name")
-            .eq("id", row.customer_id)
-            .maybeSingle();
-          const c = cust as { primary_email: string | null; name: string | null } | null;
-          recipient = recipient || c?.primary_email || null;
-          customerName = c?.name ?? "Customer";
-        }
-
-        if (recipient) {
-          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-          const { BHS_EMAILS } = await import("@/lib/emails/bhs-templates");
-          const templateCode =
-            data.status === "resolved"
-              ? BHS_EMAILS.E009_TICKET_RESOLVED
-              : BHS_EMAILS.E010_TICKET_CLOSED_FINAL;
-          await enqueueFromTemplateInternal(
-            templateCode,
-            recipient,
-            {
-              customerName,
-              ticketSubject: row.subject,
-              ticketNumber: row.ticket_number ?? data.id.slice(0, 8),
-              replyMessage: data.resolutionNote ?? "",
-              fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
-            },
-            { applicationId: row.application_id ?? undefined, toName: customerName },
-          );
-        }
-      } catch (e) {
-        console.error("[tickets] resolve/close email failed", e);
-      }
     }
 
 
