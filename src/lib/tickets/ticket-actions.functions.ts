@@ -244,16 +244,6 @@ export const replyToTicket = createServerFn({ method: "POST" })
     if (!ticket.first_response_at) patch.first_response_at = now;
     await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
 
-    // Arm ticket-autoclose (works for both order-linked and standalone tickets).
-    if (data.armAutoclose) {
-      const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
-      await startTicketAutocloseScheduler({
-        ticketId: ticket.id,
-        applicationId: ticket.application_id ?? null,
-        createdBy: context.userId,
-      });
-    }
-
     // Try to send the reply email. If the customer has no email on file we
     // still keep the reply row — staff can see it, but flag that nothing was
     // emailed so the UI can show a warning.
@@ -279,6 +269,15 @@ export const replyToTicket = createServerFn({ method: "POST" })
           reason: data.message,
         },
       });
+      // Arm ticket-autoclose only after the email actually leaves the system.
+      if (data.armAutoclose) {
+        const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
+        await startTicketAutocloseScheduler({
+          ticketId: ticket.id,
+          applicationId: ticket.application_id ?? null,
+          createdBy: context.userId,
+        });
+      }
       return { ok: true, emailed: true, recipient: result.recipient };
     } catch (e) {
       console.error("[tickets] reply email failed", e);
