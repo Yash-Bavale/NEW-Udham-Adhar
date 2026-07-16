@@ -48,15 +48,27 @@ async function loadTicket(ticketId: string): Promise<TicketRow> {
 }
 
 async function loadCustomer(customerId: string | null) {
-  if (!customerId) return { email: null as string | null, name: "Customer" };
+  if (!customerId) return { email: null as string | null, mobile: null as string | null, name: "Customer" };
   const admin = await getAdmin();
   const { data } = await admin
     .from("customers")
-    .select("primary_email, name")
+    .select("primary_email, primary_mobile, name")
     .eq("id", customerId)
     .maybeSingle();
-  const c = data as { primary_email: string | null; name: string | null } | null;
-  return { email: c?.primary_email ?? null, name: c?.name ?? "Customer" };
+  const c = data as { primary_email: string | null; primary_mobile: string | null; name: string | null } | null;
+  return { email: c?.primary_email ?? null, mobile: c?.primary_mobile ?? null, name: c?.name ?? "Customer" };
+}
+
+function formatTicketDate(iso = new Date().toISOString()) {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
 }
 
 /** Build In-Reply-To / References chain from prior outbound replies on this ticket,
@@ -174,10 +186,16 @@ async function sendTicketTemplateEmail(opts: {
     {
       customer_name: cust.name,
       customerName: cust.name,
+      customer_email: cust.email ?? "",
+      customerEmail: cust.email ?? "",
+      customer_mobile: cust.mobile ?? "",
+      customerMobile: cust.mobile ?? "",
       ticket_number: ticketNumber,
       ticketNumber,
       ticket_subject: opts.ticket.subject,
       ticketSubject: opts.ticket.subject,
+      closure_date: formatTicketDate(),
+      closureDate: formatTicketDate(),
       fromName: `${actorName} · Business Help Services`,
       executive_name: actorName,
       ...(opts.extraVars ?? {}),
@@ -711,7 +729,12 @@ export const closeTicketConsultationT001 = createServerFn({ method: "POST" })
     const ticket = await loadTicket(data.ticketId);
     await sendTicketTemplateEmail({
       ticket, code: BHS_EMAILS.T001_TICKET_COMPLETED, actorId: context.userId,
-      extraVars: { ticket_close_variant: "consultation_done", replyMessage: "Your consultation / support request has been completed. Please reach out if you need anything further." },
+      extraVars: {
+        ticket_close_variant: "consultation_done",
+        employee_reply: "Your consultation / support request has been completed. Please reach out if you need anything further.",
+        employeeReply: "Your consultation / support request has been completed. Please reach out if you need anything further.",
+        replyMessage: "Your consultation / support request has been completed. Please reach out if you need anything further.",
+      },
     });
     await markTicketClosed(ticket.id, context.userId, "T001 sent — Consultation / support completed.", "closed_t001_consultation");
     await dispatchTicketClosedCooperating(ticket, context.userId);
@@ -751,7 +774,11 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
         reasonBlock: data.reasonLabel ?? "",
         reason_block: data.reasonLabel ?? "",
         employee_reply: data.replyBody,
+        employee_remarks: data.replyBody,
+        employeeRemarks: data.replyBody,
         replyMessage: data.replyBody,
+        followup_date: "8 business hours",
+        followupDate: "8 business hours",
       },
     });
 
