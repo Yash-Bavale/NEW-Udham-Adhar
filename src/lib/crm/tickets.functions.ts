@@ -372,6 +372,33 @@ export const updateTicket = createServerFn({ method: "POST" })
         );
         await cancelTicketAutocloseByTicket(data.id, data.status === "resolved" ? "resolved_by_staff" : "closed_by_staff");
       } catch { /* non-fatal */ }
+
+      if (row.application_id) {
+        try {
+          const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+          await dispatchEvent({
+            type: "TicketClosed",
+            applicationId: row.application_id,
+            ticketId: data.id,
+            outcome: "cooperating",
+            actorId: context.userId,
+          }, context.userId);
+        } catch (e) { console.error("[workflow] TicketClosed(status update) dispatch failed", e); }
+
+        try {
+          const { data: paused } = await admin
+            .from("order_schedulers")
+            .select("id")
+            .eq("application_id", row.application_id)
+            .eq("status", "paused")
+            .eq("paused_by_ticket_id", data.id)
+            .in("scheduler_type", ["customer_closure_24h", "customer_side_delay"]);
+          if (paused?.length) {
+            const { resumeScheduler } = await import("@/lib/scheduling/schedulers.server");
+            for (const s of paused as Array<{ id: string }>) await resumeScheduler(s.id);
+          }
+        } catch (e) { console.error("[tickets] paused order scheduler resume failed", e); }
+      }
     }
 
 
