@@ -53,6 +53,7 @@ interface Props {
   isConsultationOrder?: boolean;
   serviceCode?: string | null;
   workflowStatus?: string | null;
+  orderStatus?: string | null;
   closureStage?: string | null;
   closureNextAt?: string | null;
   closureReasonLabel?: string | null;
@@ -98,9 +99,10 @@ export function CustomerJourneyMap(p: Props) {
   const live = useMemo(() => deriveJourneyLiveState({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
+    orderStatus: p.orderStatus,
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel]);
+  }), [p.stage, p.workflowStatus, p.orderStatus, p.closureStage, p.closureReasonLabel]);
 
   const currentIdx = live.currentMainIndex;
   const isTalkToExpert = /talk|expert|consult/i.test(p.serviceCode ?? "") || !!p.isConsultationOrder;
@@ -195,9 +197,11 @@ export function CustomerJourneyMap(p: Props) {
   const hasOpenTicket = !!openTicket;
 
   const currentStageLabel = useMemo(() => {
+    if (closed) return "Order Closed";
+    if (completed) return "Order Completed";
     const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
     return s?.label ?? "Order Received";
-  }, [currentIdx]);
+  }, [closed, completed, currentIdx]);
 
   const [dialog, setDialog] = useState<
     | null

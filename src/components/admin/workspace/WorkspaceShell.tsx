@@ -316,6 +316,7 @@ export function WorkspaceShell(p: Props) {
           isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
           serviceCode={(service as any)?.service_code ?? (service as any)?.code ?? lead?.service ?? null}
           workflowStatus={(application as any).workflow_status}
+          orderStatus={(application as any).order_status}
           closureStage={(application as any).closure_stage}
           closureNextAt={(application as any).closure_next_at}
           closureReasonLabel={(application as any).closure_reason_code}

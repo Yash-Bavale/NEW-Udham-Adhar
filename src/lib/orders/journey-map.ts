@@ -326,12 +326,16 @@ export function deriveJourneyLiveState(input: {
   workflowStatus?: string | null;
   closureStage?: string | null;
   closureReasonLabel?: string | null;
+  orderStatus?: string | null;
 }): JourneyLiveState {
   const idx = stageToJourneyIndex(input.stage);
   const closureStageValue = (input.closureStage ?? "").toLowerCase();
-  const isClosed = /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
-  const isCompleted = input.stage === "completed";
   const ws = (input.workflowStatus ?? "").toLowerCase();
+  const os = (input.orderStatus ?? "").toLowerCase();
+  const isClosed = /^(closed|auto_closed|force_closed|order_closed|final_ticket_closed)$/i.test(closureStageValue)
+    || ws === "closed"
+    || os === "closed";
+  const isCompleted = input.stage === "completed";
   const reasonMatch = (input.closureReasonLabel ?? "").match(/\b([ABC]\d{1,2})\b/i);
   const reasonCode = reasonMatch ? reasonMatch[1].toUpperCase() : null;
 

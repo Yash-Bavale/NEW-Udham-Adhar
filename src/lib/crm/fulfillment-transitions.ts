@@ -8,6 +8,7 @@ export type FulfillmentStatus =
   | "application_submitted"
   | "under_processing"
   | "completed"
+  | "closed"
   | "cancelled";
 
 export const FULFILLMENT_STAGES: FulfillmentStatus[] = [
@@ -17,6 +18,8 @@ export const FULFILLMENT_STAGES: FulfillmentStatus[] = [
   "application_submitted",
   "under_processing",
   "completed",
+  "closed",
+  "cancelled",
 ];
 
 export const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
@@ -26,6 +29,7 @@ export const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
   application_submitted: "Application Submitted",
   under_processing:      "Under Processing",
   completed:             "Completed",
+  closed:                "Closed",
   cancelled:             "Cancelled",
 };
 
@@ -36,12 +40,13 @@ export const FULFILLMENT_BADGE: Record<FulfillmentStatus, string> = {
   application_submitted: "bg-indigo-50 text-indigo-700 border-indigo-200",
   under_processing:      "bg-violet-50 text-violet-700 border-violet-200",
   completed:             "bg-emerald-50 text-emerald-700 border-emerald-200",
+  closed:                "bg-rose-50 text-rose-700 border-rose-200",
   cancelled:             "bg-rose-50 text-rose-700 border-rose-200",
 };
 
 // Allowed forward transitions. Backward moves require an admin override
 // (server-side check by role). `completed` is gated by certificate upload.
-// `cancelled` is not part of the standard forward path; use close/refund actions.
+// `closed` and `cancelled` are terminal statuses handled through close/refund paths.
 export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatus[]> = {
   order_received:        ["documents_received"],
   documents_received:    ["verification_pending"],
@@ -49,6 +54,7 @@ export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatu
   application_submitted: ["under_processing"],
   under_processing:      ["completed"],
   completed:             [],
+  closed:                [],
   cancelled:             [],
 };
 
