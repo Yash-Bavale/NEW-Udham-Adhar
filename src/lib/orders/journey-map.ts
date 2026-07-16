@@ -375,8 +375,10 @@ export type ButtonCode =
 
 export type JourneyPhase =
   | "form_not_submitted"
+  | "form_link_sent"
   | "form_submitted"
   | "technical_delay"
+  | "post_b03_resume"
   | "customer_delay"
   | "consultation_done"
   | "awaiting_govt"
@@ -386,17 +388,17 @@ export type JourneyPhase =
   | "closed";
 
 /**
- * After B10 (Customer Side Delay) is submitted the operator can still pick
- * from the standard happy-flow buttons (except B10 itself and B01/B03 which
- * belong to other lanes). Once the customer responds and the workflow status
- * clears, derivePhase() naturally returns to `form_submitted`.
+ * After B10 (Customer Side Delay) is submitted the operator returns to the
+ * standard Form Submitted set per the reference chart (B02, B04, B05, B08, B10).
  */
-export const POST_B10_ALLOWED: ButtonCode[] = ["B02", "B04", "B05", "B08", "B09"];
+export const POST_B10_ALLOWED: ButtonCode[] = ["B02", "B04", "B05", "B08", "B10"];
 
 export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   form_not_submitted:  ["B01"],
+  form_link_sent:      [],
   form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
   technical_delay:     ["B03"],
+  post_b03_resume:     ["B04", "B05", "B08", "B09", "B10"],
   customer_delay:      POST_B10_ALLOWED,
   consultation_done:   ["B08", "B09"],
   awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
