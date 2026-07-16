@@ -224,7 +224,7 @@ export function CustomerJourneyMap(p: Props) {
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
-    onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); invalidate(); },
+    onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); markTechDelayResolved(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutSubmitAfterWait = useMutation({
@@ -234,7 +234,7 @@ export function CustomerJourneyMap(p: Props) {
   });
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
-    onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); invalidate(); },
+    onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); markFormLinkSent(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutSubmit = useMutation({
