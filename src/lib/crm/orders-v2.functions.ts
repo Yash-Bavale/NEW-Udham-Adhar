@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   FULFILLMENT_STAGES,
+  FULFILLMENT_LABEL,
   type FulfillmentStatus,
   getAllowedFulfillmentTransitions,
 } from "./fulfillment-transitions";
