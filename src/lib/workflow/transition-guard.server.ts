@@ -59,7 +59,7 @@ export function assertTransitionAllowed(i: GuardInput): void {
 
   switch (i.action) {
     case "send_form_link": {
-      if (!/lead_received|payment|order|consult|awaiting/i.test(stage)) {
+      if (!/lead_received|payment|order|consult|awaiting|form_pending|form_not_submitted|waiting_customer|info_received|new_order/i.test(stage)) {
         throw new TransitionGuardError("Form link only sends before the form is submitted.");
       }
       return;
