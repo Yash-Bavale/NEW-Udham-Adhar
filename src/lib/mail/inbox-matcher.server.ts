@@ -528,17 +528,22 @@ async function matchOrder(input: {
 // ─────────────────────────── Side effects ───────────────────────────
 
 async function pauseActiveCustomerScheduler(applicationId: string, ticketOrLogId: string | null) {
+  // Pause EVERY active delay-path scheduler for this order so remaining
+  // business-seconds are preserved and can resume when the ticket closes.
+  // Never touch the ticket's own autoclose scheduler.
   const { data: active } = await supabaseAdmin
     .from("order_schedulers")
-    .select("id")
+    .select("id, scheduler_type")
     .eq("application_id", applicationId)
-    .eq("scheduler_type", SCHEDULER_CUSTOMER_CLOSURE)
     .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  const row = active as { id: string } | null;
-  if (!row) return;
-  await pauseScheduler(row.id, ticketOrLogId);
+    .neq("scheduler_type", "ticket_autoclose_24h");
+  const rows = (active ?? []) as Array<{ id: string; scheduler_type: string }>;
+  if (!rows.length) return;
+  for (const row of rows) {
+    await pauseScheduler(row.id, ticketOrLogId).catch((e) => {
+      console.error("[inbox] pause scheduler failed", row.id, e);
+    });
+  }
 }
 
 async function openOrAppendTicket(input: {
