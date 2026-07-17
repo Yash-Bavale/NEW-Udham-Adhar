@@ -609,18 +609,23 @@ async function resumePausedCustomerDelayForTicket(ticket: TicketRow) {
   if (!ticket.application_id) return;
   const admin = await getAdmin();
   try {
+    // Resume ALL delay-path schedulers this ticket paused (customer-closure,
+    // our-side-reminder, feedback-followup, etc.) — but never the ticket's own
+    // autoclose scheduler.
     const { data: rows } = await admin
       .from("order_schedulers")
-      .select("id")
+      .select("id, scheduler_type")
       .eq("application_id", ticket.application_id)
       .eq("status", "paused")
-      .eq("paused_by_ticket_id", ticket.id)
-      .in("scheduler_type", ["customer_closure_24h", "customer_side_delay"]);
+      .eq("paused_by_ticket_id", ticket.id);
     if (!rows?.length) return;
-    const { resumeScheduler } = await import("@/lib/scheduling/schedulers.server");
-    for (const row of rows as Array<{ id: string }>) await resumeScheduler(row.id);
+    const { resumeScheduler, SCHEDULER_TICKET_AUTOCLOSE } = await import("@/lib/scheduling/schedulers.server");
+    for (const row of rows as Array<{ id: string; scheduler_type: string }>) {
+      if (row.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) continue;
+      await resumeScheduler(row.id);
+    }
   } catch (e) {
-    console.error("[tickets] customer-delay resume failed", e);
+    console.error("[tickets] delay scheduler resume failed", e);
   }
 }
 
