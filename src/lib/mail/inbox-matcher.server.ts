@@ -196,7 +196,6 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
 
   if (matched?.applicationId || matched?.customerId) {
     if (matched.applicationId) {
-      await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
       await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     }
     const openedTicketId = await openOrAppendTicket({
@@ -209,6 +208,11 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       messageId,
       inReplyTo,
     });
+    if (matched.applicationId) {
+      // Pause delay-path timers using the ticket id when available so resume-
+      // on-close can find them via paused_by_ticket_id.
+      await pauseActiveCustomerScheduler(matched.applicationId, openedTicketId ?? logRow?.id ?? null).catch(() => {});
+    }
     if (matched.applicationId && openedTicketId) {
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
