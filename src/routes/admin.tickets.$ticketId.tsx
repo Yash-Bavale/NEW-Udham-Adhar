@@ -23,6 +23,7 @@ import {
   closeTicketRestartT001,
   closeTicketConsultationT001,
   closeTicketReplyReasonT002,
+  getTicketAutoclose,
 } from "@/lib/tickets/ticket-actions.functions";
 import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
 import type { OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
