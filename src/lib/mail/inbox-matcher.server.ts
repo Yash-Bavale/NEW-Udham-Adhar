@@ -17,7 +17,7 @@ import {
 import {
   pauseScheduler,
   cancelTicketAutocloseForOrder,
-  SCHEDULER_CUSTOMER_CLOSURE,
+  SCHEDULER_CUSTOMER_CLOSURE as _SCHEDULER_CUSTOMER_CLOSURE_UNUSED,
 } from "@/lib/scheduling/schedulers.server";
 
 export type PollResult = {
