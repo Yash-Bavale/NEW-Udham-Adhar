@@ -536,8 +536,26 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
               </span>
             )}
             {t.first_response_at && <span>First reply {relTime(t.first_response_at)}</span>}
+            {autoclose && autoclose.firesAt && !isClosed && (
+              <CountdownChip
+                firesAt={autoclose.firesAt}
+                label="Auto-close (T003)"
+                remainingSeconds={autoclose.businessSecondsRemaining ?? null}
+              />
+            )}
           </div>
         </div>
+
+        {/* Close-path banner — visible from T002 send until ticket is closed */}
+        {autoclose && !isClosed && (
+          <div
+            className="mx-5 mb-2 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px]"
+            style={{ background: "#fff1f2", borderColor: "#fecaca", color: "#991b1b" }}
+          >
+            <Clock className="size-3.5" />
+            <span>Ticket is on <strong>close path</strong> — auto-closes in 8 business hours if the customer doesn't reply.</span>
+          </div>
+        )}
 
         {/* Row 2 — Actions */}
         <div className="flex items-center gap-1.5 border-t px-5 py-2" style={{ borderColor: "var(--admin-border)" }}>
