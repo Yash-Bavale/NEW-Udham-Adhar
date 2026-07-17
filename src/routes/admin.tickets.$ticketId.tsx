@@ -457,8 +457,20 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Send failed"),
   });
 
-
-  
+  // 8h auto-close scheduler (armed by T002). Poll while active.
+  const autocloseFn = useServerFn(getTicketAutoclose);
+  const autocloseQ = useQuery({
+    queryKey: ["ticket-autoclose", ticketId],
+    queryFn: () => autocloseFn({ data: { ticketId } }),
+    refetchInterval: 60_000,
+  });
+  const autoclose = autocloseQ.data?.scheduler ?? null;
+  const isClosed = ["closed", "resolved"].includes(t.status);
+  const anyMutPending =
+    t001NormalMut.isPending || t001RestartMut.isPending || t001ConsultMut.isPending || t002Mut.isPending;
+  const anyMutSucceeded =
+    t001NormalMut.isSuccess || t001RestartMut.isSuccess || t001ConsultMut.isSuccess || t002Mut.isSuccess;
+  const actionLocked = isClosed || anyMutPending || anyMutSucceeded || !!autoclose;
 
   const staffFn = useServerFn(listStaffForAssignment);
   const { data: staff } = useQuery({ queryKey: ["staff-assign"], queryFn: () => staffFn(), staleTime: 60_000 });
