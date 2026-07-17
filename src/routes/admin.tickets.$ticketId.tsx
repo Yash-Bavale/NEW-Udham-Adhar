@@ -579,17 +579,20 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             <>
               <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
               <TicketFlowBtn code="Close" label="Normal / No Action" tone="slate"
-                disabled={t001NormalMut.isPending}
+                disabled={actionLocked}
+                title={autoclose ? "Ticket already on close path (T002 armed)" : undefined}
                 onClick={() => { if (window.confirm("Close ticket — Normal / No action required?\nNo email will be sent.")) t001NormalMut.mutate(); }} />
               <TicketFlowBtn code="Order" label="Restart Order" tone="emerald"
-                disabled={t001RestartMut.isPending || !t.application_id}
-                title={!t.application_id ? "No linked order" : undefined}
+                disabled={actionLocked || !t.application_id}
+                title={!t.application_id ? "No linked order" : (autoclose ? "Ticket already on close path (T002 armed)" : undefined)}
                 onClick={() => setRestartOpen(true)} />
               <TicketFlowBtn code="T001" label="Consultation / Support Done" tone="indigo"
-                disabled={t001ConsultMut.isPending}
+                disabled={actionLocked}
+                title={autoclose ? "Ticket already on close path (T002 armed)" : undefined}
                 onClick={() => { if (window.confirm("Close ticket — Consultation / support completed?\nSends T001 to the customer.")) t001ConsultMut.mutate(); }} />
               <TicketFlowBtn code="T002" label="Reply w/ Reason (8h auto-close)" tone="rose"
-                disabled={t002Mut.isPending}
+                disabled={actionLocked}
+                title={autoclose ? "Already armed — awaiting customer reply" : undefined}
                 onClick={() => setT002Open(true)} />
             </>
           )}
