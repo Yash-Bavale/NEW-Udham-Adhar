@@ -425,7 +425,10 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
+    qc.invalidateQueries({ queryKey: ["ticket-autoclose", ticketId] });
+  };
 
   const t001NormalMut = useMutation({
     mutationFn: () => t001NormalFn({ data: { ticketId } }),
