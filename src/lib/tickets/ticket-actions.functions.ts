@@ -807,5 +807,35 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Read the ticket's active auto-close scheduler (armed by T002).
+// Returns null when nothing is armed so the UI can hide the countdown.
+export const getTicketAutoclose = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: row } = await admin
+      .from("order_schedulers")
+      .select("id, status, fires_at, started_at, business_seconds_remaining, business_seconds_total")
+      .eq("scheduler_type", "ticket_autoclose_24h")
+      .eq("ticket_id", data.ticketId)
+      .in("status", ["active", "paused"])
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!row) return { scheduler: null as null };
+    return {
+      scheduler: {
+        id: (row as any).id as string,
+        status: (row as any).status as string,
+        firesAt: (row as any).fires_at as string | null,
+        startedAt: (row as any).started_at as string,
+        businessSecondsRemaining: (row as any).business_seconds_remaining as number | null,
+        businessSecondsTotal: (row as any).business_seconds_total as number | null,
+      },
+    };
+  });
+
+
 
 
