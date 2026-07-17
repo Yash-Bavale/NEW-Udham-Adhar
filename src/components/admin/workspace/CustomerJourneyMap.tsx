@@ -448,11 +448,14 @@ export function CustomerJourneyMap(p: Props) {
                     />
                   );
                 } else if (n.id === "b10_cust" && activeBranches.has("customer-delay") && (customerHoldTimer || p.closureNextAt)) {
+                  const remainMs = (customerHoldTimer as any)?.remaining_ms ?? (customerHoldTimer as any)?.remainingMs ?? null;
                   countdown = (
                     <CountdownChip
                       firesAt={customerHoldTimer?.fires_at ?? customerHoldTimer?.firesAt ?? p.closureNextAt}
                       label="auto-close"
                       paused={hasOpenTicket}
+                      pausedLabel={openTicket?.ticket_number ? `Paused — ticket #${openTicket.ticket_number}` : "Paused — ticket open"}
+                      remainingSeconds={remainMs ? Math.round(Number(remainMs) / 1000) : null}
                     />
                   );
                 } else if (n.id === "b02_tech" && activeBranches.has("technical") && technicalHoldTimer) {

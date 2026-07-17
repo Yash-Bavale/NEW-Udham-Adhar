@@ -1,59 +1,47 @@
 ## Goal
-Make the buttons that light up on the Customer Journey Map match the mapping in your chart exactly.
 
-## Reference (from your image)
-```text
-Form Not submitted  → B01
-Form submitted      → B02, B04, B05, B08, B10
-B01 sent            → No active buttons until customer submits form
-B02 sent            → B03
-B03 sent            → B04, B05, B08, B09, B10
-B04 sent            → B08, B09
-B05 sent            → B06, B07, B08, B09, B10
-B06 sent            → B07, B08, B09, B10
-B07 sent            → B08, B09
-B08 sent            → No active buttons (order completed)
-B09 sent            → No active buttons (order closed)
-B10 sent            → back to Form Submitted set: B02, B04, B05, B08, B10
-```
-
-## Gaps in current code (`src/lib/orders/journey-map.ts`)
-1. `customer_delay` (post-B10) currently exposes **B09** — chart says it should return to the Form Submitted set with **B10**, not B09.
-2. `form_not_submitted` currently keeps **B01** enabled even after B01 was already sent — chart says once B01 is sent, no button is active until the form is actually submitted.
-3. `technical_delay` (post-B02) shows only **B03** ✓, and B03 → `form_submitted` set naturally resumes ✓ but B03's resume set (`B04, B05, B08, B09, B10`) differs from the plain `form_submitted` set (`B02, B04, B05, B08, B10`). Need a distinct `post_b03_resume` phase.
-4. Everything else already matches (B04→B08,B09; B05→B06,B07,B08,B09,B10; B06→B07,B08,B09,B10; B07→B08,B09; B08/B09 terminal).
+When T002 is sent, surface an 8h close-path countdown on the ticket; when a new ticket arrives during an order's active delay countdown, pause the delay timer and auto-resume it the moment the ticket closes (showing the paused remaining time in the delayed-trigger line). Also lock the action toolbar once a terminal action has been taken.
 
 ## Changes
 
-### `src/lib/orders/journey-map.ts`
-- `POST_B10_ALLOWED` → `["B02","B04","B05","B08","B10"]` (drop B09, add B10 back — mirrors Form Submitted per chart).
-- Add two new `JourneyPhase` values: `"form_link_sent"` and `"post_b03_resume"`.
-- `PHASE_ENABLED_BUTTONS`:
-  - `form_link_sent: []`  (B01 was already sent, wait for customer)
-  - `post_b03_resume: ["B04","B05","B08","B09","B10"]`
-- Extend `DerivePhaseInput` with `formLinkSent?: boolean` and `techDelayResolved?: boolean` (parallels the existing `postWaitSubmitted` flag for B07).
-- `derivePhase()`:
-  - If `activeSubKey === "form-not-submitted"` and `formLinkSent` → return `"form_link_sent"`.
-  - After a technical delay is resolved (phase would otherwise be `form_submitted` and `techDelayResolved` is true) → return `"post_b03_resume"`.
+### 1. Ticket page — show 8h close-path countdown (T002 armed)
 
-### `src/components/admin/workspace/CustomerJourneyMap.tsx`
-- Track `formLinkSent` and `techDelayResolved` per order (localStorage, same pattern already used for `postWaitSubmitted`/B07):
-  - Set `formLinkSent = true` after a successful B01 (`sendFormLink`) mutation; clear it when phase leaves `form-not-submitted` (i.e. customer submitted).
-  - Set `techDelayResolved = true` after B03 (resume from technical hold); clear it when phase advances into the govt flow or a new technical delay starts.
-- Pass both flags into `derivePhase(...)` so button gating updates immediately.
-- Toolbar buttons already read `PHASE_ENABLED_BUTTONS[phase]`, so no per-button branching needed beyond the derive change.
+`src/routes/admin.tickets.$ticketId.tsx`
+- Fetch the ticket's active `ticket_autoclose_24h` scheduler row via `getOrderExceptionState` is order-scoped — instead add a small server fn `getTicketAutoclose({ ticketId })` in `src/lib/tickets/ticket-actions.functions.ts` returning `{ firesAt, businessSecondsRemaining, status, startedAt }` for the latest scheduler of type `SCHEDULER_TICKET_AUTOCLOSE` for that ticket.
+- In `TicketHeader`, when the row exists and ticket status is `waiting_customer`, render a `CountdownChip` labelled **"Auto-close in"** next to the status pill (Row 1). Invalidate on mutation success.
 
-### No changes needed
-- `journey-graph.ts` (SVG/highlight rules) — buttons enable/disable is driven purely by `PHASE_ENABLED_BUTTONS`; edge/branch highlights stay as-is.
-- Server-side transition guards — this is a UI enable/disable change only; the underlying action handlers already validate.
+### 2. Ticket page — lock buttons after terminal action
+
+`src/routes/admin.tickets.$ticketId.tsx`
+- Add local `actionLocked` flag: `true` if any of the four mutations `isPending` OR `isSuccess` OR ticket status is `closed`/`resolved` OR T002 autoclose scheduler is active.
+- Disable all four `TicketFlowBtn`s (Normal, Restart, T001-Consultation, T002) when `actionLocked` is true. Keep Reopen button unchanged.
+
+### 3. Delay-path pause when a ticket arrives on an order with active delay countdown
+
+Currently `pauseActiveCustomerScheduler` (invoked by inbox matcher) only pauses `SCHEDULER_CUSTOMER_CLOSURE`. Extend the pause/resume to cover the other delay-path scheduler types too so any active delay-trigger timer pauses.
+
+`src/lib/mail/inbox-matcher.server.ts`
+- Rename/extend `pauseActiveCustomerScheduler` → `pauseActiveDelaySchedulers(applicationId, ticketId)` that pauses ALL active schedulers for the order (customer-closure, our-side-reminder, feedback-followup — anything except the ticket_autoclose itself) via `pauseScheduler`, storing `paused_by_ticket_id = ticket.id`.
+
+`src/lib/tickets/ticket-actions.functions.ts`
+- In every close-path (T001 Normal, T001 Restart, T001 Consultation, T002 auto-close firing → T003 close, manual close): after the ticket transitions to `closed`, resume every scheduler where `paused_by_ticket_id = ticket.id` via `resumeScheduler`. The existing resume block (line ~570, ~617) already does this for one type — widen the query so it picks up all paused schedulers for the ticket (drop the `scheduler_type` filter, keep only `paused_by_ticket_id` + `status = 'paused'`).
+- `resumeScheduler` already recomputes `fires_at` from `business_seconds_remaining`, so the countdown resumes with exactly the time that was left.
+
+`src/lib/crm/tickets.functions.ts` (line 394 resume block) — same widening.
+
+### 4. Delayed-trigger UI — show paused remaining time
+
+`src/components/admin/workspace/CustomerJourneyMap.tsx` (and any place rendering delay-path countdown chips):
+- Read `order_schedulers` with `status IN ('active','paused')` for the order and pass `paused` + `pausedLabel="Paused — ticket #TKT-..."` + `firesAt` (which is null while paused) plus `businessSecondsRemaining` into `CountdownChip`.
+- Extend `CountdownChip` to accept `remainingSeconds` and, when `paused` and `firesAt` is null, format the pretty label from `remainingSeconds` instead of returning null. (Current chip returns null if `firesAt` is null — that's why paused rows disappear.)
+- The line will read: **"Delayed trigger paused — 6h 12m remaining · resumes when ticket TKT-… closes"**.
+
+### 5. No DB migration required
+
+`order_schedulers.paused_by_ticket_id`, `business_seconds_remaining`, and the pause/resume helpers already exist. Behaviour is purely a wiring/widening change plus one small read fn and two UI additions.
 
 ## Verification
-- Load an order in each state and confirm the enabled toolbar matches the chart row:
-  - Fresh `form_pending` order → only **B01** enabled.
-  - Click B01 → toolbar goes empty until the customer submits.
-  - Form submitted → **B02, B04, B05, B08, B10** enabled.
-  - Click B02 (technical delay) → only **B03** enabled.
-  - Click B03 → **B04, B05, B08, B09, B10** enabled.
-  - Click B10 (customer delay) → **B02, B04, B05, B08, B10** enabled again (B09 gone).
-  - Progress through B05→B06→B07 and confirm each row matches.
-- Typecheck must pass (new phases added to the `Record<JourneyPhase, ButtonCode[]>` map).
+
+- Open a `waiting_customer` order with an active customer-delay scheduler; email a new inbound reply → confirm a ticket opens, delay chip flips to violet "Paused — X remaining", and `order_schedulers.status='paused'`, `paused_by_ticket_id=<ticket>`.
+- Send T002 on that ticket → toolbar disables, header shows "Auto-close in 8h" chip counting down.
+- Close ticket (any path) → header buttons stay disabled (ticket resolved), delay chip resumes counting from the exact remaining seconds; scheduler `status='active'`, `fires_at` recomputed.

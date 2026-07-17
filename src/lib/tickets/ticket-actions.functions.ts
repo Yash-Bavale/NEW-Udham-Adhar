@@ -609,18 +609,23 @@ async function resumePausedCustomerDelayForTicket(ticket: TicketRow) {
   if (!ticket.application_id) return;
   const admin = await getAdmin();
   try {
+    // Resume ALL delay-path schedulers this ticket paused (customer-closure,
+    // our-side-reminder, feedback-followup, etc.) — but never the ticket's own
+    // autoclose scheduler.
     const { data: rows } = await admin
       .from("order_schedulers")
-      .select("id")
+      .select("id, scheduler_type")
       .eq("application_id", ticket.application_id)
       .eq("status", "paused")
-      .eq("paused_by_ticket_id", ticket.id)
-      .in("scheduler_type", ["customer_closure_24h", "customer_side_delay"]);
+      .eq("paused_by_ticket_id", ticket.id);
     if (!rows?.length) return;
-    const { resumeScheduler } = await import("@/lib/scheduling/schedulers.server");
-    for (const row of rows as Array<{ id: string }>) await resumeScheduler(row.id);
+    const { resumeScheduler, SCHEDULER_TICKET_AUTOCLOSE } = await import("@/lib/scheduling/schedulers.server");
+    for (const row of rows as Array<{ id: string; scheduler_type: string }>) {
+      if (row.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) continue;
+      await resumeScheduler(row.id);
+    }
   } catch (e) {
-    console.error("[tickets] customer-delay resume failed", e);
+    console.error("[tickets] delay scheduler resume failed", e);
   }
 }
 
@@ -801,6 +806,36 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// Read the ticket's active auto-close scheduler (armed by T002).
+// Returns null when nothing is armed so the UI can hide the countdown.
+export const getTicketAutoclose = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: row } = await admin
+      .from("order_schedulers")
+      .select("id, status, fires_at, started_at, business_seconds_remaining, business_seconds_total")
+      .eq("scheduler_type", "ticket_autoclose_24h")
+      .eq("ticket_id", data.ticketId)
+      .in("status", ["active", "paused"])
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!row) return { scheduler: null as null };
+    return {
+      scheduler: {
+        id: (row as any).id as string,
+        status: (row as any).status as string,
+        firesAt: (row as any).fires_at as string | null,
+        startedAt: (row as any).started_at as string,
+        businessSecondsRemaining: (row as any).business_seconds_remaining as number | null,
+        businessSecondsTotal: (row as any).business_seconds_total as number | null,
+      },
+    };
+  });
+
 
 
 
