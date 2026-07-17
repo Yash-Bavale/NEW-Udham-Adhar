@@ -139,7 +139,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     await cancelByTicket(ticketMatch.ticketId, "customer_replied").catch(() => {});
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
-      await pauseActiveCustomerScheduler(ticketMatch.applicationId, null).catch(() => {});
+      await pauseActiveCustomerScheduler(ticketMatch.applicationId, ticketMatch.ticketId).catch(() => {});
       // Workflow engine: pause timers/automations on customer reply.
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
