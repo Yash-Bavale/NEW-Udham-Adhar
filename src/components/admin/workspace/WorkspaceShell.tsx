@@ -253,10 +253,6 @@ export function WorkspaceShell(p: Props) {
                 const onClick = () => {
                   if (spec.key === "print") {
                     runQuickAction(spec.key, built, () => window.print());
-                  } else if (spec.key === "copy_code") {
-                    runQuickAction(spec.key, built, () =>
-                      navigator.clipboard.writeText(quickCtx.applicationCode),
-                    );
                   } else {
                     // Contact / link tiles: navigate manually so we can toast first.
                     runQuickAction(spec.key, built, () => {

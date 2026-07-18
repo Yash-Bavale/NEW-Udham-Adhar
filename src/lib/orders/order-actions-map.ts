@@ -14,7 +14,6 @@ import {
   Mail,
   User2,
   Printer,
-  Copy,
   Send,
   PlayCircle,
   PauseCircle,
@@ -33,7 +32,7 @@ import type { OrderStatus } from "@/lib/orders/order-status.functions";
 
 // ─────────────────────────── QUICK ACTIONS ───────────────────────────
 
-export type QuickActionKey = "call" | "whatsapp" | "email" | "open_lead" | "print" | "copy_code";
+export type QuickActionKey = "call" | "whatsapp" | "email" | "open_lead" | "print";
 
 export type QuickTint = "emerald" | "sky" | "violet" | "slate";
 
@@ -122,14 +121,6 @@ export const QUICK_ACTIONS: QuickActionSpec[] = [
     icon: Printer,
     tint: "slate",
     build: () => ({ toastSuccess: "Print dialog opened" }),
-  },
-  {
-    key: "copy_code",
-    label: "Copy Code",
-    tooltip: "Copy the order code to the clipboard",
-    icon: Copy,
-    tint: "slate",
-    build: ({ applicationCode }) => ({ toastSuccess: `Copied ${applicationCode}` }),
   },
 ];
 

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
 
 export const Route = createFileRoute("/admin/services")({ component: ServicesPage });
@@ -16,10 +17,11 @@ type ServiceForm = {
   total_amount: number;
   is_active: boolean;
   sort_order: number;
+  govt_portal_url?: string | null;
 };
 
 function emptyForm(): ServiceForm {
-  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0 };
+  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "" };
 }
 
 function ServicesPage() {
@@ -46,8 +48,9 @@ function ServicesPage() {
             <Input label="Base (₹)" type="number" value={String(form.base_amount)} onChange={(v) => setForm({ ...form, base_amount: Number(v) })} />
             <Input label="GST (₹)" type="number" value={String(form.gst_amount)} onChange={(v) => setForm({ ...form, gst_amount: Number(v) })} />
             <Input label="Total (₹)" type="number" value={String(form.total_amount)} onChange={(v) => setForm({ ...form, total_amount: Number(v) })} />
+            <Input label="Govt Portal URL" value={form.govt_portal_url ?? ""} onChange={(v) => setForm({ ...form, govt_portal_url: v })} />
             <Input label="Sort order" type="number" value={String(form.sort_order)} onChange={(v) => setForm({ ...form, sort_order: Number(v) })} />
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm md:col-span-2">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
               Active
             </label>
@@ -84,7 +87,19 @@ function ServicesPage() {
             {data?.rows.map((s) => (
               <tr key={s.id} className="border-t">
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
-                <td className="px-3 py-2">{s.service_name}</td>
+                <td className="px-3 py-2">
+                  <div className="font-medium">{s.service_name}</div>
+                  {s.govt_portal_url && (
+                    <a
+                      href={s.govt_portal_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-0.5 mt-0.5"
+                    >
+                      <ExternalLink className="size-3" /> Govt Portal
+                    </a>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right">₹{Number(s.base_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right">₹{Number(s.gst_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right font-semibold">₹{Number(s.total_amount).toFixed(2)}</td>

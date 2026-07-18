@@ -212,15 +212,28 @@ export function FormSubmissionPanel({
 
 
   return (
-    <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
-      {/* Header */}
-      <div className="px-5 py-3 border-b bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <FileText className="size-4 text-slate-600 shrink-0" />
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-slate-800 break-words">
-              Form Submission · <span className="text-slate-600">{serviceLabel}</span>
-            </h3>
+    <>
+      {/* Summary Box with Customer Name & Mobile Number details */}
+      <div className="mb-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm md:text-base">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-medium">Customer:</span>
+          <span className="text-slate-800 font-bold">{lead?.name ?? "—"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500 font-medium">Mobile:</span>
+          <span className="text-slate-800 font-semibold font-mono">{lead?.mobile ?? "—"}</span>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
+        {/* Header */}
+        <div className="px-5 py-3 border-b bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileText className="size-4 text-slate-600 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-slate-800 break-words">
+                {serviceLabel}
+              </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {submission ? (
                 isDraft ? (
@@ -354,7 +367,7 @@ export function FormSubmissionPanel({
                       const blank = isBlank(v);
                       return (
                         <div key={f.key} className="flex flex-col min-w-0">
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-blue-600 select-none font-medium">
                             {f.label}
                             {required && <span className="text-red-500 ml-0.5">*</span>}
                           </span>
@@ -386,7 +399,7 @@ export function FormSubmissionPanel({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                   {extras.map((k) => (
                     <div key={k} className="flex flex-col min-w-0">
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-blue-600 select-none font-medium">
                         {k.replace(/_/g, " ")}
                       </span>
                       <span className="text-sm text-slate-800 font-medium mt-0.5 break-words">
@@ -521,5 +534,6 @@ export function FormSubmissionPanel({
         )}
       </div>
     </div>
+    </>
   );
 }

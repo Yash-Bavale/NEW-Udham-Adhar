@@ -25,6 +25,7 @@ const ServiceInput = z.object({
   total_amount: z.number().min(0).max(1_000_000),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
+  govt_portal_url: z.string().trim().max(1000).nullable().optional(),
 });
 
 export const upsertService = createServerFn({ method: "POST" })
