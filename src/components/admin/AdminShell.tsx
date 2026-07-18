@@ -144,6 +144,13 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     .filter((g) => g.items.length > 0);
   const flatVisible = visibleNav.flatMap((g) => g.items);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("bhs.admin.sidebarCollapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("bhs.admin.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
   const { unseen: newLeads } = useNewLeadsWatcher();
 
   useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
