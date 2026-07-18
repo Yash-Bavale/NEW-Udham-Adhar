@@ -448,11 +448,6 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
       <td className="px-4 py-3 text-right font-semibold text-slate-900 whitespace-nowrap">
         {hideMoney ? "—" : `₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${payTone}`}>
-          {paymentLabel(order.payment_status)}
-        </span>
-      </td>
       <td className="px-4 py-3 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div>{formatIST(order.created_at, { dateOnly: true })}</div>
         <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
