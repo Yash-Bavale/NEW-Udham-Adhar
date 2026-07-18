@@ -54,7 +54,7 @@ export const closeOrder = createServerFn({ method: "POST" })
     const closedAt = new Date().toISOString();
     await admin
       .from("applications")
-      .update({ workflow_status: "closed", workflow_closed_at: closedAt } as never)
+      .update({ workflow_status: "closed", workflow_closed_at: closedAt, fulfillment_status: "order_closed" } as never)
       .eq("id", app.id);
 
     await admin.from("workflow_events").insert({
