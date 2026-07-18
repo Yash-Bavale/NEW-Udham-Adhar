@@ -310,35 +310,61 @@ function OrdersListPage() {
         })}
       </div>
 
+      {/* Pagination — top */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600">
+          <div>
+            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="size-3.5" /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+              disabled={page * pageSize >= total || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <ScrollableTable>
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-                <th className="text-left font-medium px-4 py-2.5">Order #</th>
-                <th className="text-left font-medium px-4 py-2.5">Customer</th>
-                <th className="text-left font-medium px-4 py-2.5">Service</th>
-                <th className="text-left font-medium px-4 py-2.5">Stage</th>
-                <th className="text-left font-medium px-4 py-2.5">Fulfillment</th>
-                <th className="text-left font-medium px-4 py-2.5">Assigned</th>
-                <th className="text-right font-medium px-4 py-2.5">Amount</th>
-                <th className="text-left font-medium px-4 py-2.5">Payment</th>
-                <th className="text-left font-medium px-4 py-2.5">Created</th>
-                <th className="px-4 py-2.5" />
+                <th className="text-left font-medium px-2 py-2.5">Order #</th>
+                <th className="text-left font-medium px-2 py-2.5">Customer</th>
+                <th className="text-left font-medium px-2 py-2.5">Service</th>
+                <th className="text-left font-medium px-2 py-2.5">Stage</th>
+                <th className="text-left font-medium px-2 py-2.5">Fulfillment</th>
+                <th className="text-left font-medium px-2 py-2.5">Assigned</th>
+                <th className="text-right font-medium px-2 py-2.5">Amount</th>
+                <th className="text-left font-medium px-2 py-2.5">Created</th>
+                <th className="px-2 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={10} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
@@ -347,32 +373,7 @@ function OrdersListPage() {
               ))}
             </tbody>
           </table>
-        </div>
-        {total > pageSize && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-600">
-            <div>
-              Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1 || isLoading}
-                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="size-3.5" /> Prev
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-                disabled={page * pageSize >= total || isLoading}
-                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next <ChevronRight className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+        </ScrollableTable>
       </div>
     </div>
   );
