@@ -4026,6 +4026,16 @@ export type Database = {
         | "under_processing"
         | "completed"
         | "cancelled"
+        | "form_not_submitted"
+        | "form_submitted"
+        | "technical_delay"
+        | "customer_delay"
+        | "consultation_completed"
+        | "awaiting_govt"
+        | "order_completed"
+        | "certificate_rejected"
+        | "ticket_open"
+        | "order_closed"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -4318,6 +4328,16 @@ export const Constants = {
         "under_processing",
         "completed",
         "cancelled",
+        "form_not_submitted",
+        "form_submitted",
+        "technical_delay",
+        "customer_delay",
+        "consultation_completed",
+        "awaiting_govt",
+        "order_completed",
+        "certificate_rejected",
+        "ticket_open",
+        "order_closed",
       ],
       lead_status: [
         "lead_created",
