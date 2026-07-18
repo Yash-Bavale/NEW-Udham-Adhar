@@ -388,16 +388,14 @@ export const updateTicket = createServerFn({ method: "POST" })
         try {
           const { data: paused } = await admin
             .from("order_schedulers")
-            .select("id, scheduler_type")
+            .select("id")
             .eq("application_id", row.application_id)
             .eq("status", "paused")
-            .eq("paused_by_ticket_id", data.id);
+            .eq("paused_by_ticket_id", data.id)
+            .in("scheduler_type", ["customer_closure_24h", "customer_side_delay"]);
           if (paused?.length) {
             const { resumeScheduler } = await import("@/lib/scheduling/schedulers.server");
-            for (const s of paused as Array<{ id: string; scheduler_type: string }>) {
-              if (s.scheduler_type === "ticket_autoclose_24h") continue;
-              await resumeScheduler(s.id);
-            }
+            for (const s of paused as Array<{ id: string }>) await resumeScheduler(s.id);
           }
         } catch (e) { console.error("[tickets] paused order scheduler resume failed", e); }
       }

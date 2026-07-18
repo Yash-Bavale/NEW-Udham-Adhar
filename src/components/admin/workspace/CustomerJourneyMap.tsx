@@ -53,7 +53,6 @@ interface Props {
   isConsultationOrder?: boolean;
   serviceCode?: string | null;
   workflowStatus?: string | null;
-  orderStatus?: string | null;
   closureStage?: string | null;
   closureNextAt?: string | null;
   closureReasonLabel?: string | null;
@@ -99,10 +98,9 @@ export function CustomerJourneyMap(p: Props) {
   const live = useMemo(() => deriveJourneyLiveState({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
-    orderStatus: p.orderStatus,
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
-  }), [p.stage, p.workflowStatus, p.orderStatus, p.closureStage, p.closureReasonLabel]);
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel]);
 
   const currentIdx = live.currentMainIndex;
   const isTalkToExpert = /talk|expert|consult/i.test(p.serviceCode ?? "") || !!p.isConsultationOrder;
@@ -197,11 +195,9 @@ export function CustomerJourneyMap(p: Props) {
   const hasOpenTicket = !!openTicket;
 
   const currentStageLabel = useMemo(() => {
-    if (closed) return "Order Closed";
-    if (completed) return "Order Completed";
     const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
     return s?.label ?? "Order Received";
-  }, [closed, completed, currentIdx]);
+  }, [currentIdx]);
 
   const [dialog, setDialog] = useState<
     | null
@@ -448,14 +444,11 @@ export function CustomerJourneyMap(p: Props) {
                     />
                   );
                 } else if (n.id === "b10_cust" && activeBranches.has("customer-delay") && (customerHoldTimer || p.closureNextAt)) {
-                  const remainMs = (customerHoldTimer as any)?.remaining_ms ?? (customerHoldTimer as any)?.remainingMs ?? null;
                   countdown = (
                     <CountdownChip
                       firesAt={customerHoldTimer?.fires_at ?? customerHoldTimer?.firesAt ?? p.closureNextAt}
                       label="auto-close"
                       paused={hasOpenTicket}
-                      pausedLabel={openTicket?.ticket_number ? `Paused — ticket #${openTicket.ticket_number}` : "Paused — ticket open"}
-                      remainingSeconds={remainMs ? Math.round(Number(remainMs) / 1000) : null}
                     />
                   );
                 } else if (n.id === "b02_tech" && activeBranches.has("technical") && technicalHoldTimer) {

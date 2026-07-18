@@ -23,11 +23,9 @@ import {
   closeTicketRestartT001,
   closeTicketConsultationT001,
   closeTicketReplyReasonT002,
-  getTicketAutoclose,
 } from "@/lib/tickets/ticket-actions.functions";
 import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
 import type { OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
-import { CountdownChip } from "@/components/admin/workspace/CountdownChip";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -425,10 +423,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Update failed"),
   });
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
-    qc.invalidateQueries({ queryKey: ["ticket-autoclose", ticketId] });
-  };
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["ticket-workspace", ticketId] });
 
   const t001NormalMut = useMutation({
     mutationFn: () => t001NormalFn({ data: { ticketId } }),
@@ -460,20 +455,8 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
     onError: (e: any) => toast.error(e?.message ?? "Send failed"),
   });
 
-  // 8h auto-close scheduler (armed by T002). Poll while active.
-  const autocloseFn = useServerFn(getTicketAutoclose);
-  const autocloseQ = useQuery({
-    queryKey: ["ticket-autoclose", ticketId],
-    queryFn: () => autocloseFn({ data: { ticketId } }),
-    refetchInterval: 60_000,
-  });
-  const autoclose = autocloseQ.data?.scheduler ?? null;
-  const isClosed = ["closed", "resolved"].includes(t.status);
-  const anyMutPending =
-    t001NormalMut.isPending || t001RestartMut.isPending || t001ConsultMut.isPending || t002Mut.isPending;
-  const anyMutSucceeded =
-    t001NormalMut.isSuccess || t001RestartMut.isSuccess || t001ConsultMut.isSuccess || t002Mut.isSuccess;
-  const actionLocked = isClosed || anyMutPending || anyMutSucceeded || !!autoclose;
+
+  
 
   const staffFn = useServerFn(listStaffForAssignment);
   const { data: staff } = useQuery({ queryKey: ["staff-assign"], queryFn: () => staffFn(), staleTime: 60_000 });
@@ -536,26 +519,8 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
               </span>
             )}
             {t.first_response_at && <span>First reply {relTime(t.first_response_at)}</span>}
-            {autoclose && autoclose.firesAt && !isClosed && (
-              <CountdownChip
-                firesAt={autoclose.firesAt}
-                label="Auto-close (T003)"
-                remainingSeconds={autoclose.businessSecondsRemaining ?? null}
-              />
-            )}
           </div>
         </div>
-
-        {/* Close-path banner — visible from T002 send until ticket is closed */}
-        {autoclose && !isClosed && (
-          <div
-            className="mx-5 mb-2 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px]"
-            style={{ background: "#fff1f2", borderColor: "#fecaca", color: "#991b1b" }}
-          >
-            <Clock className="size-3.5" />
-            <span>Ticket is on <strong>close path</strong> — auto-closes in 8 business hours if the customer doesn't reply.</span>
-          </div>
-        )}
 
         {/* Row 2 — Actions */}
         <div className="flex items-center gap-1.5 border-t px-5 py-2" style={{ borderColor: "var(--admin-border)" }}>
@@ -579,20 +544,17 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
             <>
               <span className="mx-1 h-4 w-px" style={{ background: "var(--admin-border)" }} />
               <TicketFlowBtn code="Close" label="Normal / No Action" tone="slate"
-                disabled={actionLocked}
-                title={autoclose ? "Ticket already on close path (T002 armed)" : undefined}
+                disabled={t001NormalMut.isPending}
                 onClick={() => { if (window.confirm("Close ticket — Normal / No action required?\nNo email will be sent.")) t001NormalMut.mutate(); }} />
               <TicketFlowBtn code="Order" label="Restart Order" tone="emerald"
-                disabled={actionLocked || !t.application_id}
-                title={!t.application_id ? "No linked order" : (autoclose ? "Ticket already on close path (T002 armed)" : undefined)}
+                disabled={t001RestartMut.isPending || !t.application_id}
+                title={!t.application_id ? "No linked order" : undefined}
                 onClick={() => setRestartOpen(true)} />
               <TicketFlowBtn code="T001" label="Consultation / Support Done" tone="indigo"
-                disabled={actionLocked}
-                title={autoclose ? "Ticket already on close path (T002 armed)" : undefined}
+                disabled={t001ConsultMut.isPending}
                 onClick={() => { if (window.confirm("Close ticket — Consultation / support completed?\nSends T001 to the customer.")) t001ConsultMut.mutate(); }} />
               <TicketFlowBtn code="T002" label="Reply w/ Reason (8h auto-close)" tone="rose"
-                disabled={actionLocked}
-                title={autoclose ? "Already armed — awaiting customer reply" : undefined}
+                disabled={t002Mut.isPending}
                 onClick={() => setT002Open(true)} />
             </>
           )}
