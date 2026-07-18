@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
@@ -310,35 +310,61 @@ function OrdersListPage() {
         })}
       </div>
 
+      {/* Pagination — top */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600">
+          <div>
+            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="size-3.5" /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+              disabled={page * pageSize >= total || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <ScrollableTable>
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-                <th className="text-left font-medium px-4 py-2.5">Order #</th>
-                <th className="text-left font-medium px-4 py-2.5">Customer</th>
-                <th className="text-left font-medium px-4 py-2.5">Service</th>
-                <th className="text-left font-medium px-4 py-2.5">Stage</th>
-                <th className="text-left font-medium px-4 py-2.5">Fulfillment</th>
-                <th className="text-left font-medium px-4 py-2.5">Assigned</th>
-                <th className="text-right font-medium px-4 py-2.5">Amount</th>
-                <th className="text-left font-medium px-4 py-2.5">Payment</th>
-                <th className="text-left font-medium px-4 py-2.5">Created</th>
-                <th className="px-4 py-2.5" />
+                <th className="text-left font-medium px-2 py-2.5">Order #</th>
+                <th className="text-left font-medium px-2 py-2.5">Customer</th>
+                <th className="text-left font-medium px-2 py-2.5">Service</th>
+                <th className="text-left font-medium px-2 py-2.5">Stage</th>
+                <th className="text-left font-medium px-2 py-2.5">Fulfillment</th>
+                <th className="text-left font-medium px-2 py-2.5">Assigned</th>
+                <th className="text-right font-medium px-2 py-2.5">Amount</th>
+                <th className="text-left font-medium px-2 py-2.5">Created</th>
+                <th className="px-2 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={10} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
@@ -347,32 +373,7 @@ function OrdersListPage() {
               ))}
             </tbody>
           </table>
-        </div>
-        {total > pageSize && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-600">
-            <div>
-              Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1 || isLoading}
-                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="size-3.5" /> Prev
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-                disabled={page * pageSize >= total || isLoading}
-                className="inline-flex items-center gap-1 h-8 px-3 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next <ChevronRight className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+        </ScrollableTable>
       </div>
     </div>
   );
@@ -408,15 +409,15 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
 
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50/60">
-      <td className="px-4 py-3 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
-      <td className="px-4 py-3 min-w-[200px]">
-        <div className="font-medium text-slate-900 leading-tight">{order.customer_name ?? "—"}</div>
+      <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+      <td className="px-2 py-2.5 min-w-[160px]">
+        <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{order.customer_mobile}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{order.service_name ?? "—"}</td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
+      <td className="px-2 py-2.5 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
             {meta?.label ?? stage}
@@ -438,25 +439,20 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
           })()}
         </div>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-2 py-2.5 whitespace-nowrap">
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${fulTone}`}>
           {FULFILLMENT_LABEL[fs]}
         </span>
       </td>
-      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{order.assigned_name ?? "Unassigned"}</td>
-      <td className="px-4 py-3 text-right font-semibold text-slate-900 whitespace-nowrap">
+      <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
+      <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
         {hideMoney ? "—" : `₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${payTone}`}>
-          {paymentLabel(order.payment_status)}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
+      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div>{formatIST(order.created_at, { dateOnly: true })}</div>
         <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-right">
+      <td className="px-2 py-2.5 whitespace-nowrap text-right">
         <Link
           to="/admin/orders/$orderId"
           params={{ orderId: order.id }}
@@ -466,6 +462,49 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
         </Link>
       </td>
     </tr>
+  );
+}
+
+function ScrollableTable({ children }: { children: React.ReactNode }) {
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+    const measure = () => {
+      const t = el.querySelector("table");
+      setWidth(t ? t.scrollWidth : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.querySelector("table")) ro.observe(el.querySelector("table")!);
+    return () => ro.disconnect();
+  }, [children]);
+
+  const syncTop = () => {
+    if (topRef.current && bottomRef.current) bottomRef.current.scrollLeft = topRef.current.scrollLeft;
+  };
+  const syncBottom = () => {
+    if (topRef.current && bottomRef.current) topRef.current.scrollLeft = bottomRef.current.scrollLeft;
+  };
+
+  return (
+    <>
+      <div
+        ref={topRef}
+        onScroll={syncTop}
+        className="overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-slate-50/60"
+        style={{ height: 12 }}
+      >
+        <div style={{ width, height: 1 }} />
+      </div>
+      <div ref={bottomRef} onScroll={syncBottom} className="overflow-x-auto">
+        {children}
+      </div>
+    </>
   );
 }
 
