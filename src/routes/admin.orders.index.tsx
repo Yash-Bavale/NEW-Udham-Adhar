@@ -409,15 +409,15 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
 
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50/60">
-      <td className="px-4 py-3 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
-      <td className="px-4 py-3 min-w-[200px]">
-        <div className="font-medium text-slate-900 leading-tight">{order.customer_name ?? "—"}</div>
+      <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+      <td className="px-2 py-2.5 min-w-[160px]">
+        <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{order.customer_mobile}</div>
         )}
       </td>
-      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{order.service_name ?? "—"}</td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
+      <td className="px-2 py-2.5 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
             {meta?.label ?? stage}
@@ -439,20 +439,20 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
           })()}
         </div>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">
+      <td className="px-2 py-2.5 whitespace-nowrap">
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${fulTone}`}>
           {FULFILLMENT_LABEL[fs]}
         </span>
       </td>
-      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{order.assigned_name ?? "Unassigned"}</td>
-      <td className="px-4 py-3 text-right font-semibold text-slate-900 whitespace-nowrap">
+      <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
+      <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
         {hideMoney ? "—" : `₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
       </td>
-      <td className="px-4 py-3 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
+      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div>{formatIST(order.created_at, { dateOnly: true })}</div>
         <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
       </td>
-      <td className="px-4 py-3 whitespace-nowrap text-right">
+      <td className="px-2 py-2.5 whitespace-nowrap text-right">
         <Link
           to="/admin/orders/$orderId"
           params={{ orderId: order.id }}
@@ -462,6 +462,49 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
         </Link>
       </td>
     </tr>
+  );
+}
+
+function ScrollableTable({ children }: { children: React.ReactNode }) {
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+    const measure = () => {
+      const t = el.querySelector("table");
+      setWidth(t ? t.scrollWidth : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.querySelector("table")) ro.observe(el.querySelector("table")!);
+    return () => ro.disconnect();
+  }, [children]);
+
+  const syncTop = () => {
+    if (topRef.current && bottomRef.current) bottomRef.current.scrollLeft = topRef.current.scrollLeft;
+  };
+  const syncBottom = () => {
+    if (topRef.current && bottomRef.current) topRef.current.scrollLeft = bottomRef.current.scrollLeft;
+  };
+
+  return (
+    <>
+      <div
+        ref={topRef}
+        onScroll={syncTop}
+        className="overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-slate-50/60"
+        style={{ height: 12 }}
+      >
+        <div style={{ width, height: 1 }} />
+      </div>
+      <div ref={bottomRef} onScroll={syncBottom} className="overflow-x-auto">
+        {children}
+      </div>
+    </>
   );
 }
 
