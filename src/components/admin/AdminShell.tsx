@@ -167,11 +167,18 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           width: 220,
           background: "var(--admin-sidebar)",
           color: "var(--admin-sidebar-fg)",
+      {/* Desktop sidebar — collapsible */}
+      <aside
+        className="hidden md:flex shrink-0 flex-col border-r transition-[width] duration-200"
+        style={{
+          width: sidebarCollapsed ? 56 : 220,
+          background: "var(--admin-sidebar)",
+          color: "var(--admin-sidebar-fg)",
           borderColor: "var(--admin-border)",
         }}
       >
         <div
-          className="flex items-center gap-2 px-4 h-14 border-b shrink-0"
+          className="flex items-center gap-2 px-2 h-14 border-b shrink-0"
           style={{ borderColor: "var(--admin-border)" }}
         >
           <div
@@ -180,12 +187,23 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           >
             UA
           </div>
-          <div className="min-w-0">
-            <div className="text-sm font-medium leading-tight">Udyam Ops OS</div>
-            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
-              Admin
+          {!sidebarCollapsed && (
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium leading-tight truncate">Udyam Ops OS</div>
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
+                Admin
+              </div>
             </div>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="shrink-0 rounded p-1 hover:bg-[var(--admin-surface-2)]"
+            style={{ color: "var(--admin-sidebar-muted)" }}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">
@@ -194,12 +212,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
               {gi > 0 && (
                 <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
               )}
-              <div
-                className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider"
-                style={{ color: "var(--admin-sidebar-muted)" }}
-              >
-                {group.label}
-              </div>
+              {!sidebarCollapsed && (
+                <div
+                  className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider"
+                  style={{ color: "var(--admin-sidebar-muted)" }}
+                >
+                  {group.label}
+                </div>
+              )}
               <div className="space-y-0.5">
                 {group.items.map((n) => {
                   const active = isActive(n.to);
@@ -209,7 +229,11 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                     <Link
                       key={n.to}
                       to={n.to}
-                      className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors"
+                      title={sidebarCollapsed ? n.label : undefined}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
+                        sidebarCollapsed ? "justify-center px-1.5" : "px-2.5",
+                      )}
                       style={{
                         background: active ? "var(--admin-accent-soft)" : "transparent",
                         color: active ? "var(--admin-primary)" : "var(--admin-sidebar-fg)",
@@ -217,8 +241,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                       }}
                     >
                       <Icon className="size-4 shrink-0" />
-                      <span className="truncate flex-1">{n.label}</span>
-                      {badge > 0 && (
+                      {!sidebarCollapsed && <span className="truncate flex-1">{n.label}</span>}
+                      {!sidebarCollapsed && badge > 0 && (
                         <span
                           className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
                           style={{ background: "var(--admin-danger)", color: "#fff" }}
@@ -238,14 +262,19 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
               await supabase.auth.signOut();
               navigate({ to: "/admin-login" });
             }}
-            className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors hover:bg-[var(--admin-surface-2)]"
+            title={sidebarCollapsed ? "Logout" : undefined}
+            className={cn(
+              "w-full flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors hover:bg-[var(--admin-surface-2)]",
+              sidebarCollapsed ? "justify-center px-1.5" : "px-2.5",
+            )}
             style={{ color: "var(--admin-sidebar-fg)" }}
           >
             <LogOut className="size-4 shrink-0" />
-            <span className="truncate">Logout</span>
+            {!sidebarCollapsed && <span className="truncate">Logout</span>}
           </button>
         </nav>
       </aside>
+
 
       <main className="flex-1 min-w-0 flex flex-col">
         {/* Top bar */}
