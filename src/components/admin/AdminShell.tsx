@@ -160,13 +160,6 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 
   return (
     <div className="min-h-screen flex" style={{ background: "var(--admin-bg)", color: "var(--admin-fg)" }}>
-      {/* Desktop sidebar — fixed 220px */}
-      <aside
-        className="hidden md:flex shrink-0 flex-col border-r"
-        style={{
-          width: 220,
-          background: "var(--admin-sidebar)",
-          color: "var(--admin-sidebar-fg)",
       {/* Desktop sidebar — collapsible */}
       <aside
         className="hidden md:flex shrink-0 flex-col border-r transition-[width] duration-200"
