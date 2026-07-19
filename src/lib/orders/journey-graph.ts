@@ -249,13 +249,13 @@ export const EDGES: EdgeDef[] = [
 
   /* ── Top rectangular loop: starts between form_sub and B02 → govt_portal & consult_stage ── */
   { id: "e_top_gv", from: "form_sub", fromSide: "R", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
-    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 36 }, { x: 926, y: 36 }] },
+    waypoints: [{ x: 460, y: 36 }, { x: 926, y: 36 }] },
   { id: "e_top_cs", from: "form_sub", fromSide: "R", to: "consult_stage", toSide: "T", mode: "S", branch: "technical",
-    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 18 }, { x: 1271, y: 18 }] },
+    waypoints: [{ x: 460, y: 18 }, { x: 1271, y: 18 }] },
 
   /* ── Bottom loop: starts between form_sub and B02 → B05 bottom & B04 left ── */
   { id: "e_bot_b04", from: "form_sub", fromSide: "R", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-main",
-    waypoints: [{ x: 468, y: 470 }] },
+    waypoints: [{ x: 460, y: 470 }] },
   { id: "e_b03_b04", from: "b03_fix", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-tech",
     waypoints: [{ x: 693, y: 470 }] },
   { id: "e_b05_b04", from: "b05_submit", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-govt",
