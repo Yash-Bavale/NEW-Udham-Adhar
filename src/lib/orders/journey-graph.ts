@@ -241,7 +241,8 @@ export const nodeById: Record<string, NodeDef> = Object.fromEntries(NODES.map((n
  * BOTTOM EXCEPTION PATHS:
  *   form_not B → B01 T                               [form-nag]
  *   B01 B → down(y=553) → right → closed_e010 B      [form-nag]
- *   form_sub B → down(y=543) → right → B04 L         [customer-delay]
+ *   form_sub B → down(y=543) → right → B04 B         [customer-delay]
+ *   b03_fix B → down(y=543) → left → B04 B           [customer-delay]
  *   B04 R → closed_e010 L                            [customer-delay]
  *   B08 B → down → closed_e010 T                     [reject]
  */
@@ -254,11 +255,13 @@ export const EDGES: EdgeDef[] = [
   { id: "e_fs_gv",  from: "form_sub",     fromSide: "R", to: "govt_portal",   toSide: "L", mode: "S", branch: "main-3" },
   { id: "e_gv_cs",  from: "govt_portal",  fromSide: "R", to: "consult_stage", toSide: "L", mode: "S", branch: "main-4" },
 
-  /* ── Top rectangular loop: form_sub → B02 → B03 → govt_portal ── */
-  { id: "e_fs_b02", from: "form_sub",  fromSide: "T", to: "b02_tech", toSide: "T", mode: "S", branch: "technical",
+  /* ── Top rectangular loop: form_sub ─up─ B02 ─right─ B03 ─right─ govt_portal ──
+     The single shared top rail at y=18 runs from x=395 to x=906.
+     e_fs_b02 draws left half, e_b03_gv draws right half — together they form the full top bar. ── */
+  { id: "e_fs_b02",  from: "form_sub",  fromSide: "T", to: "b02_tech",    toSide: "T", mode: "S", branch: "technical",
     waypoints: [{ x: 395, y: 18 }, { x: 537, y: 18 }] },
-  { id: "e_b02_b03", from: "b02_tech", fromSide: "R", to: "b03_fix",  toSide: "L", mode: "S", branch: "technical" },
-  { id: "e_b03_gv",  from: "b03_fix",  fromSide: "T", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
+  { id: "e_b02_b03", from: "b02_tech",  fromSide: "R", to: "b03_fix",     toSide: "L", mode: "S", branch: "technical" },
+  { id: "e_b03_gv",  from: "b03_fix",   fromSide: "T", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
     waypoints: [{ x: 677, y: 18 }, { x: 906, y: 18 }] },
 
   /* ── Vertical drops from Govt Portal to sub-cards ── */
@@ -276,9 +279,13 @@ export const EDGES: EdgeDef[] = [
   { id: "e_b01_cl", from: "b01_reminder", fromSide: "B", to: "closed_e010",  toSide: "B", mode: "S", branch: "form-nag",
     waypoints: [{ x: 197, y: 553 }, { x: 1251, y: 553 }] },
 
-  /* ── B04 customer-delay path ── */
-  { id: "e_fs_b04", from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 395, y: 543 }, { x: 640, y: 543 }] },
+  /* ── B04 customer-delay paths ──
+     form_sub bottom → straight down to y=470 → right → B04 left side
+     b03_fix  bottom → down to y=405 → right to B04 top center ── */
+  { id: "e_fs_b04",  from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
+    waypoints: [{ x: 395, y: 470 }] },
+  { id: "e_b03_b04", from: "b03_fix",  fromSide: "B", to: "b04_cust", toSide: "T", mode: "S", branch: "customer-delay",
+    waypoints: [{ x: 677, y: 405 }, { x: 740, y: 405 }] },
   { id: "e_b04_cl", from: "b04_cust", fromSide: "R", to: "closed_e010", toSide: "L", mode: "S", branch: "customer-delay" },
 
   /* ── B08 reject → Order Closed ── */
