@@ -59,16 +59,31 @@ export function computeOrderStage(
   // precedence over the form-submitted gate so the journey doesn't stall on
   // "Payment Done" if an order is force-completed without a customer form.
   const fs = application.fulfillment_status ?? "order_received";
-  if (fs === "completed" || application.application_status === "completed") return "completed";
+
+  // Terminals
+  if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
+  if (fs === "order_closed" || fs === "cancelled") return "refund_requested"; // closed → shown via closure UI; keep exception-side flag off happy path
+
+  // S09/S10 near-terminals
+  if (fs === "application_approved") return "certificate_ready";
+  if (fs === "application_rejected" || fs === "certificate_rejected") return "submitted_to_govt";
   if (application.certificate_uploaded_at) return "certificate_ready";
-  if (fs === "under_processing") return "under_processing";
-  if (fs === "application_submitted") return "submitted_to_govt";
+
+  // S07 Government Processing (and legacy govt-side stages)
+  if (fs === "government_processing" || fs === "application_submitted" || fs === "under_processing" || fs === "awaiting_govt") return "submitted_to_govt";
+
+  // Legacy interim stages
   if (fs === "verification_pending") return "under_review";
   if (fs === "documents_received") return "in_progress";
+
+  // S05/S06 delay stages keep the operator on form_submitted (main working stage)
+  if (fs === "technical_delay" || fs === "customer_delay") return "form_submitted";
+  if (fs === "consultation_completed") return "submitted_to_govt";
 
   if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
     return "consultation_pending";
   }
+  if (fs === "form_submitted") return "form_submitted";
   if (!application.form_submitted_at) return "payment_done";
 
   return "form_submitted";

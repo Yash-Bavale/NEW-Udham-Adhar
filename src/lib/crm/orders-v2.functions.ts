@@ -597,10 +597,11 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
       // Mark application completed only after certificate email send succeeds.
+      // S11 · Order Completed.
       await admin
         .from("applications")
         .update({
-          fulfillment_status: target,
+          fulfillment_status: "order_completed",
           application_status: "completed",
           fulfilled_at: now,
           certificate_uploaded_at: now,

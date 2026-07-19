@@ -72,7 +72,7 @@ export const startTechnicalHold = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    // Stamp hold metadata on the application.
+    // Stamp hold metadata + S05 Technical Delay fulfillment stage.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("applications")
@@ -80,6 +80,7 @@ export const startTechnicalHold = createServerFn({ method: "POST" })
         technical_hold_started_at: new Date().toISOString(),
         technical_hold_kind: data.kind,
         active_reason_id: data.reasonId,
+        fulfillment_status: "technical_delay",
       } as never)
       .eq("id", data.orderId);
 
@@ -143,7 +144,7 @@ export const markAwaitingGovt = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("applications")
-      .update({ awaiting_govt_started_at: new Date().toISOString() } as never)
+      .update({ awaiting_govt_started_at: new Date().toISOString(), fulfillment_status: "government_processing" } as never)
       .eq("id", data.orderId);
 
     const { armTimer } = await import("./timers.server");
@@ -199,6 +200,8 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         awaiting_govt_started_at: null,
         active_reason_id: null,
         active_reason_text: null,
+        // Delay resolved → revert to S04 Form Submitted (happy-flow hub)
+        fulfillment_status: "form_submitted",
       } as never)
       .eq("id", data.orderId);
 

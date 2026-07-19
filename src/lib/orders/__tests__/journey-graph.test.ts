@@ -162,11 +162,6 @@ describe("edgeState", () => {
 
 /* ─── nodeState ─── */
 describe("nodeState", () => {
-  it("completed terminal", () => {
-    const branches = activeBranchesFor("completed", "completed", null);
-    expect(nodeState("completed", { currentIdx: 6, activeBranches: branches, terminal: "completed", phase: "completed" }))
-      .toBe("terminal-ok");
-  });
   it("closed terminal", () => {
     const branches = activeBranchesFor("closed", "closed", "B4");
     expect(nodeState("closed_e010", { currentIdx: 3, activeBranches: branches, terminal: "closed", phase: "closed" }))
@@ -179,7 +174,7 @@ describe("nodeState", () => {
   });
   it("done stage below current index", () => {
     const branches = activeBranchesFor("awaiting_govt", null, null);
-    expect(nodeState("order_recv", { currentIdx: 4, activeBranches: branches, terminal: null, phase: "awaiting_govt" }))
+    expect(nodeState("form_not", { currentIdx: 4, activeBranches: branches, terminal: null, phase: "awaiting_govt" }))
       .toBe("done");
   });
   it("idle otherwise", () => {

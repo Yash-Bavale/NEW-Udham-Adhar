@@ -1,59 +1,72 @@
-## Goal
-Make the buttons that light up on the Customer Journey Map match the mapping in your chart exactly.
+# Adopt S01–S12 as the single source of truth
 
-## Reference (from your image)
+Rewires the order lifecycle to the 12 canonical stages from the uploaded doc. Old orders are left as-is (their old enum values remain valid) — only new activity uses the new stages. No data backfill.
+
+## New canonical stages
+
+| Code | `fulfillment_status_enum` value | Label |
+|------|--------------------------------|-------|
+| S01 | `order_received` (existing) | Order Received |
+| S02 | `awaiting_customer_form` (new) | Awaiting Customer Form |
+| S03 | `waiting_for_customer_submission` (new) | Waiting for Customer Submission |
+| S04 | `form_submitted` (existing) | Form Submitted |
+| S05 | `technical_delay` (existing) | Technical Delay |
+| S06 | `customer_delay` (existing) | Customer Side Delay |
+| S07 | `government_processing` (new) | Government Processing |
+| S08 | `consultation_completed` (existing) | Consultation Completed |
+| S09 | `application_approved` (new) | Application Approved |
+| S10 | `application_rejected` (new, replaces `certificate_rejected` for new orders) | Application Rejected |
+| S11 | `order_completed` (existing) — alias of `completed` for the new flow | Order Completed |
+| S12 | `order_closed` (existing) | Order Closed |
+
+Legacy enum values (`documents_received`, `verification_pending`, `application_submitted`, `under_processing`, `completed`, `cancelled`, `awaiting_govt`, `certificate_rejected`, `ticket_open`, `form_not_submitted`) stay in the enum for backward compat but are removed from the UI stage picker and journey map. `completed` is folded into `order_completed` for new writes.
+
+## Database migration (single migration)
+
+1. `ALTER TYPE public.fulfillment_status_enum ADD VALUE IF NOT EXISTS` for the 5 new values.
+2. New table `public.order_stage_catalog` (code S01–S12, enum_value, label, sort_order) seeded with the 12 rows — small reference table used by admin UI for labels/badges. GRANT SELECT to `authenticated`; ALL to `service_role`; RLS enabled with a read-any-authenticated policy.
+3. New SQL helper `public.next_fulfillment_stages(_from fulfillment_status_enum)` returning the allowed forward stages per the S01–S12 graph (see State machine below). Supersedes ad-hoc guards in code.
+
+No data backfill; old rows keep their existing enum values.
+
+## Code changes
+
+Rewrite these files to key off the S01–S12 vocabulary. Business logic is unchanged where it already matches the doc — only labels and enum values change.
+
+- `src/lib/crm/fulfillment-transitions.ts` — replace `FulfillmentStatus` union, `FULFILLMENT_STAGES`, `FULFILLMENT_LABEL`, `FULFILLMENT_BADGE`, `FULFILLMENT_TRANSITIONS` with the S01–S12 set. Keep legacy values in a separate `LEGACY_FULFILLMENT_STATUSES` union so old rows still render (labelled from a fallback map) but aren't offered as forward targets.
+- `src/lib/orders/journey-map.ts` — retarget `JOURNEY_STAGES`, `stageToJourneyIndex`, `deriveJourneyLiveState`, `derivePhase` at S01–S12. Button gating (B01–B10) already matches the doc; only the stage keys the branches attach to are renamed (`order_received` → S01, `form_submitted` → S04, `app_submitted` → S07, `check_status` stays on S07, `completed` → S11).
+- `src/lib/orders/journey-graph.ts` — node labels + `currentStageNodeFor` remapped to S01–S12.
+- `src/lib/crm/workflow-closure.functions.ts` — `closeOrder` writes `fulfillment_status = 'order_closed'` (already correct), `handleGovtRejected` writes `application_rejected` instead of `certificate_rejected`.
+- `src/lib/orders/actions/hold-actions.functions.ts` — `startTechnicalHold` / customer delay actions write `technical_delay` / `customer_delay` and resume back to `form_submitted` when cleared (already the behavior; verified).
+- `src/lib/crm/orders-v2.functions.ts` — `complete_with_cert` writes `order_completed` (was `completed`). Certificate-attach guard unchanged.
+- `src/lib/crm/stageActionMap.ts` — regenerate stage→primary CTA map against S01–S12. Old `OrderStage` keys that map to legacy fulfillment values are collapsed.
+- `src/components/admin/FulfillmentStatusUpdater.tsx`, `src/components/admin/workspace/StageStepper.tsx`, `src/components/admin/workspace/CustomerJourneyMap.tsx` — read labels/colors from the new `FULFILLMENT_LABEL` / `FULFILLMENT_BADGE`.
+- Unit tests: extend `src/lib/orders/__tests__/journey-graph.test.ts` with cases for each S01–S12 transition. Add a small `fulfillment-transitions.test.ts` asserting the allowed-transitions graph matches the doc.
+
+## State machine (S01–S12)
+
 ```text
-Form Not submitted  → B01
-Form submitted      → B02, B04, B05, B08, B10
-B01 sent            → No active buttons until customer submits form
-B02 sent            → B03
-B03 sent            → B04, B05, B08, B09, B10
-B04 sent            → B08, B09
-B05 sent            → B06, B07, B08, B09, B10
-B06 sent            → B07, B08, B09, B10
-B07 sent            → B08, B09
-B08 sent            → No active buttons (order completed)
-B09 sent            → No active buttons (order closed)
-B10 sent            → back to Form Submitted set: B02, B04, B05, B08, B10
+S01 Order Received
+  └─auto→ S02 Awaiting Customer Form
+S02 Awaiting Customer Form           (B01 available)
+  └─B01→ S03 Waiting for Customer Submission
+S03 Waiting for Customer Submission  (no buttons)
+  └─customer submits→ S04 Form Submitted
+S04 Form Submitted                   (B02, B04, B05, B06, B07, B08)
+  ├─B02→ S05 Technical Delay ──B03──▶ S04
+  ├─B04→ S06 Customer Side Delay ──resume──▶ S04
+  │                              └─8h auto──▶ S12 Order Closed
+  ├─B05→ S07 Government Processing
+  ├─B06→ S08 Consultation Completed
+  ├─B07→ S09 Application Approved ──cert upload──▶ S11 Order Completed
+  └─B08→ S10 Application Rejected ──▶ S12 Order Closed
+S07 Government Processing            (B04, B05, B06, B07, B08 same set)
+S09 → S11 Order Completed (terminal)
+S10 → S12 Order Closed (terminal)
+Admin B09/B10 override remains orthogonal (unlocks all buttons).
 ```
 
-## Gaps in current code (`src/lib/orders/journey-map.ts`)
-1. `customer_delay` (post-B10) currently exposes **B09** — chart says it should return to the Form Submitted set with **B10**, not B09.
-2. `form_not_submitted` currently keeps **B01** enabled even after B01 was already sent — chart says once B01 is sent, no button is active until the form is actually submitted.
-3. `technical_delay` (post-B02) shows only **B03** ✓, and B03 → `form_submitted` set naturally resumes ✓ but B03's resume set (`B04, B05, B08, B09, B10`) differs from the plain `form_submitted` set (`B02, B04, B05, B08, B10`). Need a distinct `post_b03_resume` phase.
-4. Everything else already matches (B04→B08,B09; B05→B06,B07,B08,B09,B10; B06→B07,B08,B09,B10; B07→B08,B09; B08/B09 terminal).
-
-## Changes
-
-### `src/lib/orders/journey-map.ts`
-- `POST_B10_ALLOWED` → `["B02","B04","B05","B08","B10"]` (drop B09, add B10 back — mirrors Form Submitted per chart).
-- Add two new `JourneyPhase` values: `"form_link_sent"` and `"post_b03_resume"`.
-- `PHASE_ENABLED_BUTTONS`:
-  - `form_link_sent: []`  (B01 was already sent, wait for customer)
-  - `post_b03_resume: ["B04","B05","B08","B09","B10"]`
-- Extend `DerivePhaseInput` with `formLinkSent?: boolean` and `techDelayResolved?: boolean` (parallels the existing `postWaitSubmitted` flag for B07).
-- `derivePhase()`:
-  - If `activeSubKey === "form-not-submitted"` and `formLinkSent` → return `"form_link_sent"`.
-  - After a technical delay is resolved (phase would otherwise be `form_submitted` and `techDelayResolved` is true) → return `"post_b03_resume"`.
-
-### `src/components/admin/workspace/CustomerJourneyMap.tsx`
-- Track `formLinkSent` and `techDelayResolved` per order (localStorage, same pattern already used for `postWaitSubmitted`/B07):
-  - Set `formLinkSent = true` after a successful B01 (`sendFormLink`) mutation; clear it when phase leaves `form-not-submitted` (i.e. customer submitted).
-  - Set `techDelayResolved = true` after B03 (resume from technical hold); clear it when phase advances into the govt flow or a new technical delay starts.
-- Pass both flags into `derivePhase(...)` so button gating updates immediately.
-- Toolbar buttons already read `PHASE_ENABLED_BUTTONS[phase]`, so no per-button branching needed beyond the derive change.
-
-### No changes needed
-- `journey-graph.ts` (SVG/highlight rules) — buttons enable/disable is driven purely by `PHASE_ENABLED_BUTTONS`; edge/branch highlights stay as-is.
-- Server-side transition guards — this is a UI enable/disable change only; the underlying action handlers already validate.
-
-## Verification
-- Load an order in each state and confirm the enabled toolbar matches the chart row:
-  - Fresh `form_pending` order → only **B01** enabled.
-  - Click B01 → toolbar goes empty until the customer submits.
-  - Form submitted → **B02, B04, B05, B08, B10** enabled.
-  - Click B02 (technical delay) → only **B03** enabled.
-  - Click B03 → **B04, B05, B08, B09, B10** enabled.
-  - Click B10 (customer delay) → **B02, B04, B05, B08, B10** enabled again (B09 gone).
-  - Progress through B05→B06→B07 and confirm each row matches.
-- Typecheck must pass (new phases added to the `Record<JourneyPhase, ButtonCode[]>` map).
+## Not doing
+- No migration of existing orders — they keep whatever legacy stage they had. New activity uses S01–S12.
+- No changes to ticket flow (T001/T002) beyond renaming stage references.
+- No UI redesign — same journey map, same buttons, only labels + enum values change.

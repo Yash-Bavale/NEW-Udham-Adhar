@@ -4036,6 +4036,11 @@ export type Database = {
         | "certificate_rejected"
         | "ticket_open"
         | "order_closed"
+        | "awaiting_customer_form"
+        | "waiting_for_customer_submission"
+        | "government_processing"
+        | "application_approved"
+        | "application_rejected"
       lead_status:
         | "lead_created"
         | "payment_pending"
@@ -4338,6 +4343,11 @@ export const Constants = {
         "certificate_rejected",
         "ticket_open",
         "order_closed",
+        "awaiting_customer_form",
+        "waiting_for_customer_submission",
+        "government_processing",
+        "application_approved",
+        "application_rejected",
       ],
       lead_status: [
         "lead_created",
