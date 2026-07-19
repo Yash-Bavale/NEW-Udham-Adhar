@@ -416,9 +416,9 @@ export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   customer_delay:       [],                                     // S06: waiting state
   govt_processing:      ["B04", "B05", "B06", "B07", "B08"],   // S07
   consultation_done:    ["B07", "B08"],                         // S08
-  application_approved: [],                                     // S09: complete the order
+  application_approved: ["B07", "B08"],                         // S09: complete the order
   application_rejected: ["B07", "B08"],                         // S10: can re-accept
-  completed:            [],                                     // S11
+  completed:            ["B07", "B08"],                         // S11
   closed:               [],                                     // S12
   admin_override:       ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08"],
 };
@@ -452,7 +452,12 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
     closureStage: i.closureStage,
     closureReasonLabel: i.closureReasonLabel,
   });
-  if (live.terminal === "closed") return "closed";
+  if (live.terminal === "closed") {
+    if (live.activeSubKey === "govt-rejected") {
+      return "application_rejected";
+    }
+    return "closed";
+  }
   if (live.terminal === "completed") return "completed";
   if (live.activeSubKey === "technical-delay") return "technical_delay";
   if (live.activeSubKey === "customer-delay") return "customer_delay";
