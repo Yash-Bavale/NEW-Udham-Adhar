@@ -47,8 +47,7 @@ export type EdgeMode = "S" | "HV" | "VH" | "HVH" | "VHV";
 export type BranchKey =
   | "main-1" | "main-2" | "main-3" | "main-4"
   | "form-nag" | "customer-delay" | "technical"
-  | "submit" | "consult" | "accept" | "reject"
-  | "shortcut";
+  | "submit" | "consult" | "accept" | "reject";
 
 export interface EdgeDef {
   id: string;
@@ -297,10 +296,6 @@ export const EDGES: EdgeDef[] = [
   // B08 bottom → down → closed_e010 top
   { id: "e_b08_cl", from: "b08_reject", fromSide: "B", to: "closed_e010", toSide: "T", mode: "VH", branch: "reject",
     waypoints: [{ x: 1327, y: 407 }] },
-
-  // Shortcut from Form Submitted to Application Accepted or Closed
-  { id: "e_fs_cs", from: "form_sub", fromSide: "T", to: "consult_stage", toSide: "T", mode: "S", branch: "shortcut",
-    waypoints: [{ x: 395, y: 32 }, { x: 1251, y: 32 }] },
 ];
 
 /* ─── Geometry helpers ─── */
@@ -343,14 +338,14 @@ export function activeBranchesFor(
   const s = new Set<BranchKey>();
   switch (phase) {
     case "form_not_submitted": s.add("form-nag"); break;
-    case "form_submitted":     s.add("shortcut"); break;
+    case "form_submitted":     break;
     case "technical_delay":    s.add("technical"); break;
     case "customer_delay":     s.add("customer-delay"); break;
-    case "govt_processing":    s.add("submit"); s.add("shortcut"); break;
-    case "consultation_done":  s.add("consult"); s.add("shortcut"); break;
+    case "govt_processing":    s.add("submit"); break;
+    case "consultation_done":  s.add("consult"); break;
     case "application_approved": s.add("accept"); break;
-    case "application_rejected": s.add("reject"); s.add("shortcut"); break;
-    case "post_b03_resume":    s.add("shortcut"); break;
+    case "application_rejected": s.add("reject"); break;
+    case "post_b03_resume":    break;
     case "completed":          s.add("accept"); break;
     case "closed":
       if (reasonCode?.toUpperCase().startsWith("B")) s.add("reject");
@@ -372,7 +367,7 @@ export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<s
   if (idx >= 2) s.add("e_or_fn");
   if (idx >= 3) s.add("e_fn_fs");
   if (idx >= 4) { s.add("e_fs_gv"); s.add("e_fs_b02"); s.add("e_b02_b03"); s.add("e_b03_gv"); }
-  if (idx >= 5) { s.add("e_gv_cs"); s.add("e_fs_cs"); }
+  if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
 
@@ -429,7 +424,7 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
       return "closed";
     }
     if (i.terminal === "completed" &&
-        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit" || e.branch === "shortcut")) {
+        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
     return "active";
