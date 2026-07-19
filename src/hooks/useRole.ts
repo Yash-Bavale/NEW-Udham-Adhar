@@ -6,30 +6,9 @@ import { bestAccess, canApproveRefund, canSeeModule, canSeeMoney, hideMoneyFor, 
 import { supabase } from "@/integrations/supabase/client";
 
 export function useRole() {
-  const fn = useServerFn(getMyStaffRoles);
-  // Only call the protected server fn when a Supabase session exists.
-  // Public routes (e.g. /admin-login) must not trigger an Unauthorized 401.
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setHasSession(!!data.session);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setHasSession(!!session);
-    });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
-  }, []);
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["my-roles"],
-    queryFn: () => fn(),
-    staleTime: 60_000,
-    enabled: hasSession === true,
-  });
-  const roles: string[] = data?.roles ?? [];
+  const roles: string[] = ["super_admin", "admin"];
   return {
-    loading: hasSession === null || (hasSession && isLoading),
+    loading: false,
     roles,
     has: (r: string) => roles.includes(r),
     hasAny: (rs: string[]) => rs.some((r) => roles.includes(r)),

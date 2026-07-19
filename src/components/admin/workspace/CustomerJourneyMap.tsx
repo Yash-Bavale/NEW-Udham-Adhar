@@ -564,6 +564,20 @@ export function CustomerJourneyMap(p: Props) {
   );
 }
 
+function getButtonLabel(code?: string): string {
+  switch (code) {
+    case "B01": return "Send E002";
+    case "B02": return "Send E003";
+    case "B03": return "Send E011";
+    case "B04": return "Send E004";
+    case "B05": return "Send E005";
+    case "B06": return "Send E005";
+    case "B07": return "Upload PDF";
+    case "B08": return "Send E008";
+    default: return "Trigger";
+  }
+}
+
 /* ═════════════════════════ FlowNode ═════════════════════════ */
 
 const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon: string; btn: string; ring: string; solid: string }> = {
@@ -603,6 +617,7 @@ function FlowNode({
   let tone: Tone = node.tone;
   if (state === "terminal-ok") tone = "emerald";
   else if (state === "terminal-bad") tone = "rose";
+  else if (state === "active" && node.kind === "stage") tone = "indigo";
   else if (state === "done" && node.kind === "stage") tone = "emerald";
   else if (state === "idle" && node.kind === "stage" && node.tone !== "maroon") tone = "slate";
   else if (state === "idle" && node.kind === "action" && !buttonEnabled && node.tone !== "emerald") tone = "slate";
@@ -697,7 +712,7 @@ function FlowNode({
             )}
           >
             {buttonSent && <Check className="size-2.5" />}
-            {buttonPending ? "…" : buttonEnabled ? "Trigger" : buttonSent ? "Sent" : "Locked"}
+            {buttonPending ? "…" : buttonEnabled ? getButtonLabel(node.buttonCode) : buttonSent ? "Sent" : "Locked"}
           </button>
         </div>
       )}

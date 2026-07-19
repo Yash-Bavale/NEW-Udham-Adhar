@@ -53,8 +53,8 @@ describe("activeBranchesFor", () => {
   it("form_not_submitted → form-nag", () => {
     expect([...activeBranchesFor("form_not_submitted", null, null)]).toEqual(["form-nag"]);
   });
-  it("form_submitted → no branch", () => {
-    expect([...activeBranchesFor("form_submitted", null, null)]).toEqual([]);
+  it("form_submitted → shortcut branch", () => {
+    expect([...activeBranchesFor("form_submitted", null, null)]).toEqual(["shortcut"]);
   });
   it("technical_delay → technical", () => {
     expect([...activeBranchesFor("technical_delay", null, null)]).toEqual(["technical"]);
@@ -62,17 +62,17 @@ describe("activeBranchesFor", () => {
   it("customer_delay → customer-delay", () => {
     expect([...activeBranchesFor("customer_delay", null, null)]).toEqual(["customer-delay"]);
   });
-  it("govt_processing → submit", () => {
-    expect([...activeBranchesFor("govt_processing", null, null)]).toEqual(["submit"]);
+  it("govt_processing → submit and shortcut", () => {
+    expect([...activeBranchesFor("govt_processing", null, null)]).toEqual(["submit", "shortcut"]);
   });
-  it("consultation_done → consult", () => {
-    expect([...activeBranchesFor("consultation_done", null, null)]).toEqual(["consult"]);
+  it("consultation_done → consult and shortcut", () => {
+    expect([...activeBranchesFor("consultation_done", null, null)]).toEqual(["consult", "shortcut"]);
   });
   it("application_approved → accept", () => {
     expect([...activeBranchesFor("application_approved", null, null)]).toEqual(["accept"]);
   });
-  it("application_rejected → reject", () => {
-    expect([...activeBranchesFor("application_rejected", null, null)]).toEqual(["reject"]);
+  it("application_rejected → reject and shortcut", () => {
+    expect([...activeBranchesFor("application_rejected", null, null)]).toEqual(["reject", "shortcut"]);
   });
   it("completed terminal → accept", () => {
     expect(activeBranchesFor("completed", "completed", null).has("accept")).toBe(true);
@@ -128,8 +128,8 @@ describe("mainDoneEdgesFor", () => {
     expect(s.has("e_gv_cs")).toBe(false);
   });
   it("progresses normally when not holding", () => {
-    // idx>=2: e_or_fn; idx>=3: e_fn_fs; idx>=4: e_fs_gv,e_fs_b02,e_b02_b03,e_b03_gv; idx>=5: e_gv_cs
-    expect(mainDoneEdgesFor(6, "completed").size).toBe(7);
+    // idx>=2: e_or_fn; idx>=3: e_fn_fs; idx>=4: e_fs_gv,e_fs_b02,e_b02_b03,e_b03_gv; idx>=5: e_gv_cs, e_fs_cs
+    expect(mainDoneEdgesFor(6, "completed").size).toBe(8);
   });
 });
 
