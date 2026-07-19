@@ -613,7 +613,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
               <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-mono font-semibold" style={{ background: "#fee2e2", color: "#991b1b" }}>T002</span>
               <h3 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>Reply with reason &amp; arm 8h auto-close</h3>
             </div>
-            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Sends T002 to the customer. If they don't reply within 8 business hours the ticket auto-closes and T003 is sent.</p>
+            <p className="mt-1 text-xs" style={{ color: "var(--admin-fg-muted)" }}>Sends T002 to the customer. If they don't reply within 8 hours the ticket auto-closes and T003 is sent.</p>
             <div className="mt-4">
               <ReasonPicker
                 value={t002ReasonId}

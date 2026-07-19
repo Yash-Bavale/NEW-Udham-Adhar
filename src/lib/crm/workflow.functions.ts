@@ -311,7 +311,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         const notifBase = {
           kind: "customer_hold_started" as const,
           title: `Customer-Side Delay — ${data.reasonLabel}`,
-          body: `Order ${app.application_code ?? ""} paused. Auto-closes in 8 business hours if no response.`,
+          body: `Order ${app.application_code ?? ""} paused. Auto-closes in 8 hours if no response.`,
           href: `/admin/orders/${app.id}`,
           entityKind: "application",
           entityId: app.id,

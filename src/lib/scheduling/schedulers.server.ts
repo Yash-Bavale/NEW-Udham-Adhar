@@ -465,7 +465,7 @@ async function fireCustomerClosure(s: {
     .update({
       order_status: "CLOSED",
       closure_reason_id: s.reason_id,
-      closure_remarks: s.remarks ?? "Auto-closed after 8 business hours of no reply",
+      closure_remarks: s.remarks ?? "Auto-closed after 8 hours of no reply",
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", s.application_id);
@@ -666,7 +666,7 @@ async function fireTicketAutoclose(s: {
 
   await supabaseAdmin.from("ticket_replies").insert({
     ticket_id: ticketId,
-    reply_text: "Auto-closed by system after 24 business hours of no customer reply.",
+    reply_text: "Auto-closed by system after 24 hours of no customer reply.",
     is_internal: true,
   } as never);
 

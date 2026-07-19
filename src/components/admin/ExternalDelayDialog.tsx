@@ -155,7 +155,7 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
               onClick={() => setSide("customer")}
               icon={<User2 className="size-4" />}
               title="Customer-side delay"
-              subtitle="Sends E003 to the customer. Auto-closes in 8 business hours if no reply."
+              subtitle="Sends E003 to the customer. Auto-closes in 8 hours if no reply."
               accent="amber"
             />
             <SideCard
@@ -316,7 +316,7 @@ export function ExternalDelayDialog({ applicationId, open, onClose, initialSide 
                 <Info className="size-3.5 shrink-0 mt-0.5" />
                 <div className="leading-snug">
                   Customer will receive the delay notice email now. Order auto-closes after
-                  <b> 8 business hours</b> if there's no reply. You can <b>Resume</b> anytime before that.
+                  <b> 8 hours</b> if there's no reply. You can <b>Resume</b> anytime before that.
                 </div>
               </div>
             )}

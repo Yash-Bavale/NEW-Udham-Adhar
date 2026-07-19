@@ -777,8 +777,8 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
         employee_remarks: data.replyBody,
         employeeRemarks: data.replyBody,
         replyMessage: data.replyBody,
-        followup_date: "8 business hours",
-        followupDate: "8 business hours",
+        followup_date: "8 hours",
+        followupDate: "8 hours",
       },
     });
 

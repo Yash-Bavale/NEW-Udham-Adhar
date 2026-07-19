@@ -82,110 +82,33 @@ function isWorkingDay(cfg: BusinessHoursConfig, y: number, mo: number, d: number
 
 // ------------ public API ------------
 
-/** Is the wall-clock instant within business hours? */
+/** Is the wall-clock instant within business hours? Always true when business hours are turned off. */
 export function isBusinessHour(date: Date, cfg: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS): boolean {
-  const p = tzParts(date, cfg.timezone);
-  if (!isWorkingDay(cfg, p.y, p.mo, p.d, p.dow)) return false;
-  const { h: oh, m: om } = parseHM(cfg.openTime);
-  const { h: ch, m: cm } = parseHM(cfg.closeTime);
-  const minutes = p.hh * 60 + p.mm;
-  const openMin = oh * 60 + om;
-  const closeMin = ch * 60 + cm;
-  return minutes >= openMin && minutes < closeMin;
+  return true;
 }
 
-/** Next wall-clock instant that lies within business hours (returns `date` unchanged if already inside). */
+/** Next wall-clock instant that lies within business hours (returns `date` unchanged since business hours are turned off). */
 export function nextBusinessInstant(date: Date, cfg: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS): Date {
-  if (isBusinessHour(date, cfg)) return date;
-  const { h: oh, m: om } = parseHM(cfg.openTime);
-  const { h: ch, m: cm } = parseHM(cfg.closeTime);
-  const openMin = oh * 60 + om;
-  const closeMin = ch * 60 + cm;
-
-  let cur = new Date(date.getTime());
-  for (let i = 0; i < 400; i++) {
-    // safety cap ~1yr
-    const p = tzParts(cur, cfg.timezone);
-    const workingDay = isWorkingDay(cfg, p.y, p.mo, p.d, p.dow);
-    const minutes = p.hh * 60 + p.mm;
-
-    if (workingDay && minutes < openMin) {
-      return fromTzClock(cfg.timezone, p.y, p.mo, p.d, oh, om, 0);
-    }
-    if (workingDay && minutes >= openMin && minutes < closeMin) {
-      return cur;
-    }
-    // advance to next day 00:00 tz-local, then loop
-    const nextDay = fromTzClock(cfg.timezone, p.y, p.mo, p.d, ch, cm, 0);
-    cur = new Date(nextDay.getTime() + 60_000); // step past close, then loop reevaluates day
-    // if we just crossed closing, jump straight to 00:00 next day for cleanliness
-    cur = new Date(cur.getTime() + (24 * 3600 - (ch * 3600 + cm * 60) - 60) * 1000);
-  }
-  return cur;
+  return date;
 }
 
-/** Add N seconds that only tick during business hours; return the resulting wall-clock instant. */
+/** Add N seconds; return the resulting wall-clock instant directly. */
 export function addBusinessSeconds(
   from: Date,
   seconds: number,
   cfg: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
 ): Date {
-  if (seconds <= 0) return from;
-  const { h: oh, m: om } = parseHM(cfg.openTime);
-  const { h: ch, m: cm } = parseHM(cfg.closeTime);
-  const openMin = oh * 60 + om;
-  const closeMin = ch * 60 + cm;
-  const dayCapacitySec = Math.max(0, (closeMin - openMin) * 60);
-  if (dayCapacitySec === 0) return from; // misconfigured
-
-  let cursor = nextBusinessInstant(from, cfg);
-  let remaining = seconds;
-
-  for (let i = 0; i < 400 && remaining > 0; i++) {
-    const p = tzParts(cursor, cfg.timezone);
-    const minutes = p.hh * 60 + p.mm;
-    const secOfDay = minutes * 60 + p.ss;
-    const closeSec = closeMin * 60;
-    const secLeftToday = Math.max(0, closeSec - secOfDay);
-
-    if (remaining <= secLeftToday) {
-      return new Date(cursor.getTime() + remaining * 1000);
-    }
-    remaining -= secLeftToday;
-    // jump to next business day open
-    const closeInstant = fromTzClock(cfg.timezone, p.y, p.mo, p.d, ch, cm, 0);
-    cursor = nextBusinessInstant(new Date(closeInstant.getTime() + 60_000), cfg);
-  }
-  return cursor;
+  return new Date(from.getTime() + seconds * 1000);
 }
 
-/** Business-seconds that elapsed between `a` and `b` (`a <= b`). */
+/** Wall-clock seconds that elapsed between `a` and `b` (`a <= b`). */
 export function businessSecondsBetween(
   a: Date,
   b: Date,
   cfg: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
 ): number {
   if (b.getTime() <= a.getTime()) return 0;
-  const { h: oh, m: om } = parseHM(cfg.openTime);
-  const { h: ch, m: cm } = parseHM(cfg.closeTime);
-  const openMin = oh * 60 + om;
-  const closeMin = ch * 60 + cm;
-
-  let total = 0;
-  let cursor = nextBusinessInstant(a, cfg);
-  if (cursor.getTime() >= b.getTime()) return 0;
-
-  for (let i = 0; i < 800; i++) {
-    const p = tzParts(cursor, cfg.timezone);
-    const closeInstant = fromTzClock(cfg.timezone, p.y, p.mo, p.d, ch, cm, 0);
-    void openMin;
-    const segmentEnd = new Date(Math.min(closeInstant.getTime(), b.getTime()));
-    total += Math.max(0, Math.floor((segmentEnd.getTime() - cursor.getTime()) / 1000));
-    if (segmentEnd.getTime() >= b.getTime()) return total;
-    cursor = nextBusinessInstant(new Date(closeInstant.getTime() + 60_000), cfg);
-    if (cursor.getTime() >= b.getTime()) return total;
-  }
-  return total;
+  return Math.max(0, Math.floor((b.getTime() - a.getTime()) / 1000));
 }
 
 /** Format helper for UI ("in 17h 32m business time"). */
