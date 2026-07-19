@@ -58,28 +58,28 @@ export const nodeH = (n: NodeDef) => n.h ?? NODE_H;
 
 /* ─── Nodes (layout matches reference diagram) ─── */
 export const NODES: NodeDef[] = [
-  /* Row 1 — main path (top row) */
-  { id: "form_not",     x:  30, y: 140, w: 150, h: 56,  label: "Form Not Submitted",             icon: "fileText",  kind: "stage",    tone: "slate" },
-  { id: "form_sub",     x: 240, y: 140, w: 140, h: 56,  label: "Form Submitted",                 icon: "fileCheck", kind: "stage",    tone: "slate" },
-  { id: "b02_tech",     x: 430, y:  70, w: 100, h: 150, label: "Technical Delay",                icon: "wrench",    kind: "action",   tone: "slate",   buttonCode: "B02", emailCode: "E003", subtitle: "Select Reason · Add reminder" },
-  { id: "b03_fix",      x: 550, y:  70, w: 100, h: 150, label: "Technical Delay",                icon: "rotate",    kind: "action",   tone: "slate",   buttonCode: "B03", emailCode: "E011", subtitle: "Issue Resolved" },
-  { id: "govt_portal",  x: 700, y: 120, w: 300, h: 62,  label: "Application Submitted to Govt Portal", icon: "landmark", kind: "stage", tone: "slate" },
+  /* Row 1 — main path (top row) — S01 → S04 → S07 → final status */
+  { id: "form_not",     x:  30, y: 140, w: 150, h: 56,  label: "S02 · Awaiting Customer Form",           icon: "fileText",  kind: "stage",    tone: "slate", tag: "S02" },
+  { id: "form_sub",     x: 240, y: 140, w: 140, h: 56,  label: "S04 · Form Submitted",                   icon: "fileCheck", kind: "stage",    tone: "slate", tag: "S04" },
+  { id: "b02_tech",     x: 430, y:  70, w: 100, h: 150, label: "S05 · Technical Delay",                  icon: "wrench",    kind: "action",   tone: "slate",   buttonCode: "B02", emailCode: "E003", subtitle: "Select Reason · Add reminder" },
+  { id: "b03_fix",      x: 550, y:  70, w: 100, h: 150, label: "S05 · Technical Delay",                  icon: "rotate",    kind: "action",   tone: "slate",   buttonCode: "B03", emailCode: "E011", subtitle: "Issue Resolved" },
+  { id: "govt_portal",  x: 700, y: 120, w: 300, h: 62,  label: "S07 · Government Processing",            icon: "landmark",  kind: "stage",    tone: "slate", tag: "S07" },
   { id: "check_status", x:1050, y: 120, w: 480, h: 62,  label: "Check Final Application Status on Govt Portal", icon: "search", kind: "stage", tone: "slate" },
 
   /* Row 2 — sub-branches under govt / check */
-  { id: "b04_consult",  x: 700, y: 235, w: 140, h: 160, label: "Consultation Completed Application Submitted to Govt Portal", icon: "send",  kind: "action", tone: "emerald", buttonCode: "B04", emailCode: "E005", subtitle: "Order Completed" },
-  { id: "b05_wait",     x: 855, y: 235, w: 140, h: 160, label: "Application Submitted Waiting for Govt. Approval", icon: "clock", kind: "action", tone: "slate", buttonCode: "B05", emailCode: "E006", subtitle: "Add reminder" },
-  { id: "b06_remind",   x: 1050, y: 235, w: 140, h: 160, label: "Application Status Checked – Awaiting Government Response", icon: "clipboard", kind: "action", tone: "slate", buttonCode: "B06", emailCode: "E006", subtitle: "Add reminder" },
-  { id: "b07_after",    x: 1200, y: 235, w: 140, h: 160, label: "Consultation Completed Application Submitted to Govt Portal (After Waiting)", icon: "send", kind: "action", tone: "emerald", buttonCode: "B07", emailCode: "E005", subtitle: "Order Completed" },
-  { id: "b08_accept",   x: 1350, y: 235, w: 140, h: 160, label: "Application Accepted Upload PDF Add Note", icon: "upload", kind: "action", tone: "emerald", buttonCode: "B08", emailCode: "E007", subtitle: "Order Completed" },
-  { id: "b09_reject",   x: 1500, y: 235, w: 140, h: 160, label: "Application Rejected Select Reason Add Note", icon: "xCircle", kind: "action", tone: "emerald", buttonCode: "B09", emailCode: "E008", subtitle: "Order Closed" },
+  { id: "b04_consult",  x: 700, y: 235, w: 140, h: 160, label: "S08 · Consultation Completed",            icon: "send",     kind: "action", tone: "emerald", buttonCode: "B04", emailCode: "E005", subtitle: "Order Completed" },
+  { id: "b05_wait",     x: 855, y: 235, w: 140, h: 160, label: "S07 · Government Processing (waiting)",   icon: "clock",    kind: "action", tone: "slate",   buttonCode: "B05", emailCode: "E006", subtitle: "Add reminder" },
+  { id: "b06_remind",   x: 1050, y: 235, w: 140, h: 160, label: "Status Checked — Awaiting Govt Response", icon: "clipboard",kind: "action", tone: "slate",   buttonCode: "B06", emailCode: "E006", subtitle: "Add reminder" },
+  { id: "b07_after",    x: 1200, y: 235, w: 140, h: 160, label: "S08 · Consultation Completed (post-wait)",icon: "send",     kind: "action", tone: "emerald", buttonCode: "B07", emailCode: "E005", subtitle: "Order Completed" },
+  { id: "b08_accept",   x: 1350, y: 235, w: 140, h: 160, label: "S09 · Application Approved — Upload PDF",icon: "upload",   kind: "action", tone: "emerald", buttonCode: "B08", emailCode: "E007", subtitle: "S11 Order Completed" },
+  { id: "b09_reject",   x: 1500, y: 235, w: 140, h: 160, label: "S10 · Application Rejected — Add Note",  icon: "xCircle",  kind: "action", tone: "emerald", buttonCode: "B09", emailCode: "E008", subtitle: "S12 Order Closed" },
 
   /* Row 3 — B01 (form-nag) */
-  { id: "b01_reminder", x: 105, y: 410, w: 190, h: 130, label: "Form Not Submitted Send information Incomplete mail", icon: "mailWarn", kind: "action", tone: "amber", buttonCode: "B01", emailCode: "E002", subtitle: "Order Autoclosed in 8 hrs" },
+  { id: "b01_reminder", x: 105, y: 410, w: 190, h: 130, label: "S03 · Waiting for Customer Submission",  icon: "mailWarn", kind: "action", tone: "amber", buttonCode: "B01", emailCode: "E002", subtitle: "Order Autoclosed in 8 hrs" },
 
   /* Row 4 — B10 (customer-delay) + E010 terminal */
-  { id: "b10_cust",     x: 1180, y: 470, w: 220, h: 90,  label: "Customer Side Delay Select Reason", icon: "userX",  kind: "action",   tone: "slate",   buttonCode: "B10", emailCode: "E004", subtitle: "Order Autoclosed in 8 hrs" },
-  { id: "closed_e010",  x: 1450, y: 450, w: 240, h: 130, label: "Order Closed with previous Selected Reason", icon: "xCircle", kind: "terminal", tone: "emerald", tag: "E010" },
+  { id: "b10_cust",     x: 1180, y: 470, w: 220, h: 90,  label: "S06 · Customer Side Delay",              icon: "userX",  kind: "action",   tone: "slate",   buttonCode: "B10", emailCode: "E004", subtitle: "Order Autoclosed in 8 hrs" },
+  { id: "closed_e010",  x: 1450, y: 450, w: 240, h: 130, label: "S12 · Order Closed",                     icon: "xCircle", kind: "terminal", tone: "emerald", tag: "E010" },
 ];
 
 export const nodeById: Record<string, NodeDef> = Object.fromEntries(NODES.map((n) => [n.id, n]));
