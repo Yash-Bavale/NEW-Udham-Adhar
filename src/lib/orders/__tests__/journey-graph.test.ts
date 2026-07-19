@@ -112,19 +112,24 @@ describe("customer delay workflow status", () => {
 
 /* ─── mainDoneEdgesFor ─── */
 describe("mainDoneEdgesFor", () => {
-  it("stops before form_sub while form_not_submitted", () => {
+  it("stops before fn_fs while form_not_submitted", () => {
     const s = mainDoneEdgesFor(3, "form_not_submitted");
     expect(s.has("e_or_fn")).toBe(true);
     expect(s.has("e_fn_fs")).toBe(false);
   });
-  it("includes e_or_fn, e_fn_fs, e_fs_b02, e_b02_b03 while technical_delay at index 4", () => {
-    const s = mainDoneEdgesFor(4, "technical_delay");
+  it("marks technical loop done at index 4", () => {
+    const s = mainDoneEdgesFor(4, "completed");
     expect(s.has("e_or_fn")).toBe(true);
     expect(s.has("e_fn_fs")).toBe(true);
-    expect(s.has("e_b03_gv")).toBe(false);
+    expect(s.has("e_fs_gv")).toBe(true);
+    expect(s.has("e_fs_b02")).toBe(true);
+    expect(s.has("e_b02_b03")).toBe(true);
+    expect(s.has("e_b03_gv")).toBe(true);
+    expect(s.has("e_gv_cs")).toBe(false);
   });
   it("progresses normally when not holding", () => {
-    expect(mainDoneEdgesFor(6, "completed").size).toBe(6);
+    // idx>=2: e_or_fn; idx>=3: e_fn_fs; idx>=4: e_fs_gv,e_fs_b02,e_b02_b03,e_b03_gv; idx>=5: e_gv_cs
+    expect(mainDoneEdgesFor(6, "completed").size).toBe(7);
   });
 });
 
@@ -144,10 +149,10 @@ describe("edgeState", () => {
     expect(edgeState(findEdge("e_b02_b03"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
       .toBe("active");
   });
-  it("marks main-3 done after form_submitted transitions past it", () => {
+  it("marks e_fs_gv done after form_submitted advances to govt", () => {
     const branches = activeBranchesFor("consultation_done", null, null);
-    const done = mainDoneEdgesFor(4, "consultation_done");
-    expect(edgeState(findEdge("e_b03_gv"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
+    const done = mainDoneEdgesFor(5, "consultation_done");
+    expect(edgeState(findEdge("e_fs_gv"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
       .toBe("done");
   });
   it("marks unrelated edge idle", () => {
