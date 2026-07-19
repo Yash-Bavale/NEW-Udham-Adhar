@@ -39,6 +39,10 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
     trackEvent("form_submitted", { service: payload.service, state: payload.state });
 
+    if (typeof window !== "undefined" && (window as any).gtag_report_conversion) {
+      (window as any).gtag_report_conversion();
+    }
+
     try {
       const lead = await submitLead({ data: payload as never });
       trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });

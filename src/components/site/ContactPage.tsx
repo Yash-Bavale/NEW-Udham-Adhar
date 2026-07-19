@@ -25,6 +25,10 @@ export function ContactPage() {
       language: String(fd.get("language") ?? "").trim(),
       message: String(fd.get("message") ?? "").trim(),
     };
+    if (typeof window !== "undefined" && (window as any).gtag_report_conversion) {
+      (window as any).gtag_report_conversion();
+    }
+
     try {
       const res = await fetch("/api/public/contact", {
         method: "POST",

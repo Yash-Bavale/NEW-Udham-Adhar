@@ -40,6 +40,10 @@ function TalkToExpertPage() {
       language: String(fd.get("language") ?? "").trim(),
       problem: String(fd.get("problem") ?? "").trim(),
     };
+    if (typeof window !== "undefined" && (window as any).gtag_report_conversion) {
+      (window as any).gtag_report_conversion();
+    }
+
     try {
       const res = await fetch("/api/public/talk-to-expert", {
         method: "POST",

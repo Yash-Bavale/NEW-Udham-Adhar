@@ -138,6 +138,22 @@ function RootShell({ children }: { children: ReactNode }) {
             gtag('config', 'AW-16801746830');
           `
         }} />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            function gtag_report_conversion(url) {
+              var callback = function () {
+                if (typeof(url) != 'undefined') {
+                  window.location = url;
+                }
+              };
+              gtag('event', 'conversion', {
+                  'send_to': 'AW-16801746830/1BGJCNDNmPEZEI6f2cs-',
+                  'event_callback': callback
+              });
+              return false;
+            }
+          `
+        }} />
         <HeadContent />
       </head>
       <body>
