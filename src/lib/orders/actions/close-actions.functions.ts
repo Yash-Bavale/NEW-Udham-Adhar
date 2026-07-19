@@ -46,6 +46,13 @@ export const closeOrderSystem = createServerFn({ method: "POST" })
     await cancelTimers(data.orderId);
     await cancelAllForOrder(data.orderId, `system_close:${data.source}`);
 
+    // S12 · Order Closed
+    const { supabaseAdmin: adminForClose } = await import("@/integrations/supabase/client.server");
+    await adminForClose
+      .from("applications")
+      .update({ fulfillment_status: "order_closed" } as never)
+      .eq("id", data.orderId);
+
     // Queue E010 (support_ticket_closed_final in current registry — same body
     // shape works for system-closure notices per spec v2).
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
