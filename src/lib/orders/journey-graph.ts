@@ -279,13 +279,10 @@ export const EDGES: EdgeDef[] = [
   { id: "e_b01_cl", from: "b01_reminder", fromSide: "B", to: "closed_e010",  toSide: "B", mode: "S", branch: "form-nag",
     waypoints: [{ x: 197, y: 553 }, { x: 1251, y: 553 }] },
 
-  /* ── B04 customer-delay paths ──
-     form_sub bottom → straight down to y=470 → right → B04 left side
-     b03_fix  bottom → down to y=405 → right to B04 top center ── */
-  { id: "e_fs_b04",  from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
+  /* ── B04 customer-delay path ──
+     form_sub bottom → down to y=470 → right → B04 left side → B04 right → Order Closed ── */
+  { id: "e_fs_b04", from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
     waypoints: [{ x: 395, y: 470 }] },
-  { id: "e_b03_b04", from: "b03_fix",  fromSide: "B", to: "b04_cust", toSide: "T", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 677, y: 405 }, { x: 740, y: 405 }] },
   { id: "e_b04_cl", from: "b04_cust", fromSide: "R", to: "closed_e010", toSide: "L", mode: "S", branch: "customer-delay" },
 
   /* ── B08 reject → Order Closed ── */
