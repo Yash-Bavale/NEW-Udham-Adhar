@@ -72,7 +72,7 @@ export const startTechnicalHold = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    // Stamp hold metadata on the application.
+    // Stamp hold metadata + S05 Technical Delay fulfillment stage.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("applications")
@@ -80,6 +80,7 @@ export const startTechnicalHold = createServerFn({ method: "POST" })
         technical_hold_started_at: new Date().toISOString(),
         technical_hold_kind: data.kind,
         active_reason_id: data.reasonId,
+        fulfillment_status: "technical_delay",
       } as never)
       .eq("id", data.orderId);
 
