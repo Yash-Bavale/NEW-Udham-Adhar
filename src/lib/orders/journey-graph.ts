@@ -118,6 +118,23 @@ export const NODES: NodeDef[] = [
     icon: "fileCheck", kind: "stage", tone: "slate",
   },
   {
+    id: "b02_tech", x: 475, y: 141, w: 125, h: 108,
+    label: "Technical Delay",
+    subtitle: "Select Reason",
+    highlightText: "Add Reminder",
+    icon: "wrench", kind: "action", tone: "slate",
+    buttonCode: "B02", emailCode: "E003",
+    badgeTop: "B02", badgeBottom: "E003",
+  },
+  {
+    id: "b03_fix", x: 615, y: 141, w: 125, h: 108,
+    label: "Technical Delay",
+    subtitle: "Issue Resolved",
+    icon: "rotate", kind: "action", tone: "slate",
+    buttonCode: "B03", emailCode: "E011",
+    badgeTop: "B03", badgeBottom: "E011",
+  },
+  {
     id: "govt_portal", x: 760, y: 155, w: 292, h: 80,
     label: "Application Submitted",
     subtitle: "Govt Portal",
@@ -128,25 +145,6 @@ export const NODES: NodeDef[] = [
     label: "Application Accepted",
     subtitle: "or Closed",
     icon: "clipboard", kind: "stage", tone: "slate",
-  },
-
-  /* ── ROW 0: Technical delay loop (above main path) ── */
-  {
-    id: "b02_tech", x: 475, y: 52, w: 125, h: 108,
-    label: "Technical Delay",
-    subtitle: "Select Reason",
-    highlightText: "Add Reminder",
-    icon: "wrench", kind: "action", tone: "slate",
-    buttonCode: "B02", emailCode: "E003",
-    badgeTop: "B02", badgeBottom: "E003",
-  },
-  {
-    id: "b03_fix", x: 615, y: 52, w: 125, h: 108,
-    label: "Technical Delay",
-    subtitle: "Issue Resolved",
-    icon: "rotate", kind: "action", tone: "slate",
-    buttonCode: "B03", emailCode: "E011",
-    badgeTop: "B03", badgeBottom: "E011",
   },
 
   /* ── ROW 2: Sub-cards under Govt Portal ── */
@@ -177,7 +175,7 @@ export const NODES: NodeDef[] = [
     highlightText: "Add Note- Order Completed",
     icon: "upload", kind: "action", tone: "emerald",
     buttonCode: "B07", emailCode: "E007",
-    badgeBottom: "E007",
+    badgeTop: "B07", badgeBottom: "E007",
   },
   {
     id: "b08_reject", x: 1257, y: 268, w: 140, h: 125,
@@ -200,7 +198,7 @@ export const NODES: NodeDef[] = [
     badgeTop: "B01", badgeBottom: "E002",
   },
   {
-    id: "b04_cust", x: 640, y: 415, w: 200, h: 110,
+    id: "b04_cust", x: 850, y: 415, w: 200, h: 110,
     label: "Customer Side Delay",
     subtitle: "Select Reason",
     highlightText: "Order Autoclosed in 8 hrs",
@@ -209,7 +207,7 @@ export const NODES: NodeDef[] = [
     badgeTop: "B04", badgeBottom: "E004",
   },
   {
-    id: "closed_e010", x: 1105, y: 415, w: 292, h: 110,
+    id: "closed_e010", x: 1105, y: 415, w: 180, h: 110,
     label: "Order Closed with previous Selected Reason",
     icon: "xCircle", kind: "terminal", tone: "emerald",
     badgeBottom: "E010",
@@ -236,14 +234,6 @@ export const nodeById: Record<string, NodeDef> = Object.fromEntries(NODES.map((n
  *   govt_portal B → straight down → b05_submit T      [submit]
  *   govt_portal B → straight down → b06_consult T     [consult]
  *   consult_stage B → straight down → b07_accept T    [accept]
- *   consult_stage B → straight down → b08_reject T    [reject]
- *
- * BOTTOM EXCEPTION PATHS:
- *   form_not B → straight down → b01_reminder T       [form-nag]
- *   b01_reminder B → down(y=553) → right → closed_e010 B   [form-nag]  (runs along very bottom)
- *   form_sub B → down(y=543) → right → b04_cust L     [customer-delay]  (goes under b01)
- *   b04_cust R → straight right → closed_e010 L       [customer-delay]
- *   b08_reject B → down → closed_e010 T               [reject]
  */
 
 export const EDGES: EdgeDef[] = [
@@ -251,51 +241,40 @@ export const EDGES: EdgeDef[] = [
   /* ── Main horizontal path ── */
   { id: "e_or_fn",  from: "order_rec",    fromSide: "R", to: "form_not",      toSide: "L", mode: "S", branch: "main-1" },
   { id: "e_fn_fs",  from: "form_not",     fromSide: "R", to: "form_sub",      toSide: "L", mode: "S", branch: "main-2" },
-  { id: "e_fs_gv",  from: "form_sub",     fromSide: "R", to: "govt_portal",   toSide: "L", mode: "S", branch: "main-3" },
+  { id: "e_fs_b02", from: "form_sub",     fromSide: "R", to: "b02_tech",      toSide: "L", mode: "S", branch: "technical" },
+  { id: "e_b02_b03", from: "b02_tech",    fromSide: "R", to: "b03_fix",       toSide: "L", mode: "S", branch: "technical" },
+  { id: "e_b03_gv",  from: "b03_fix",     fromSide: "R", to: "govt_portal",   toSide: "L", mode: "S", branch: "technical" },
   { id: "e_gv_cs",  from: "govt_portal",  fromSide: "R", to: "consult_stage", toSide: "L", mode: "S", branch: "main-4" },
 
-  /* ── Top rectangular loop: form_sub → B02 → B03 → govt_portal ── */
-  // form_sub TOP → up to y=18 → right to B02 top center, then down into B02 top
-  { id: "e_fs_b02", from: "form_sub",  fromSide: "T", to: "b02_tech", toSide: "T", mode: "S", branch: "technical",
-    waypoints: [{ x: 395, y: 18 }, { x: 537, y: 18 }] },
-  // B02 right → B03 left (straight horizontal at mid-height)
-  { id: "e_b02_b03", from: "b02_tech", fromSide: "R", to: "b03_fix",  toSide: "L", mode: "S", branch: "technical" },
-  // B03 top → up to y=18 → right to govt_portal top center, then down
-  { id: "e_b03_gv",  from: "b03_fix",  fromSide: "T", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
-    waypoints: [{ x: 677, y: 18 }, { x: 906, y: 18 }] },
+  /* ── Top rectangular loop: starts between form_sub and B02 → govt_portal & consult_stage ── */
+  { id: "e_top_gv", from: "form_sub", fromSide: "R", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
+    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 18 }, { x: 906, y: 18 }] },
+  { id: "e_top_cs", from: "form_sub", fromSide: "R", to: "consult_stage", toSide: "T", mode: "S", branch: "technical",
+    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 18 }, { x: 1251, y: 18 }] },
 
-  /* ── Vertical drops from Govt Portal to sub-cards ── */
-  // govt_portal bottom → straight down to B05 top (left sub-card)
-  { id: "e_gv_b05", from: "govt_portal",   fromSide: "B", to: "b05_submit",  toSide: "T", mode: "VH", branch: "submit",
-    waypoints: [{ x: 830, y: 240 }] },
-  // govt_portal bottom → straight down to B06 top (right sub-card)
-  { id: "e_gv_b06", from: "govt_portal",   fromSide: "B", to: "b06_consult", toSide: "T", mode: "VH", branch: "consult",
-    waypoints: [{ x: 982, y: 240 }] },
-  // consult_stage bottom → straight down to B07 top
+  /* ── Bottom loop: starts between form_sub and B02 → B05 bottom & B04 left ── */
+  { id: "e_bot_b05", from: "form_sub", fromSide: "R", to: "b05_submit", toSide: "B", mode: "S", branch: "customer-delay",
+    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 405 }, { x: 830, y: 405 }] },
+  { id: "e_bot_b04", from: "form_sub", fromSide: "R", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
+    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 405 }, { x: 810, y: 405 }, { x: 810, y: 470 }] },
+
+  /* ── Vertical drops from consult_stage to sub-cards ── */
   { id: "e_cs_b07", from: "consult_stage", fromSide: "B", to: "b07_accept",  toSide: "T", mode: "VH", branch: "accept",
     waypoints: [{ x: 1175, y: 240 }] },
-  // consult_stage bottom → straight down to B08 top
   { id: "e_cs_b08", from: "consult_stage", fromSide: "B", to: "b08_reject",  toSide: "T", mode: "VH", branch: "reject",
     waypoints: [{ x: 1327, y: 240 }] },
 
   /* ── B01 form-nag path ── */
-  // form_not bottom → straight down to B01 top
   { id: "e_fn_b01", from: "form_not",     fromSide: "B", to: "b01_reminder", toSide: "T", mode: "S", branch: "form-nag" },
-  // B01 bottom → down to y=553 (below all rows) → right → closed_e010 bottom
   { id: "e_b01_cl", from: "b01_reminder", fromSide: "B", to: "closed_e010",  toSide: "B", mode: "S", branch: "form-nag",
-    waypoints: [{ x: 197, y: 553 }, { x: 1251, y: 553 }] },
+    waypoints: [{ x: 198, y: 553 }, { x: 1195, y: 553 }] },
 
-  /* ── B04 customer-delay path ── */
-  // form_sub bottom → down to y=543 → right to B04 left
-  { id: "e_fs_b04", from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 395, y: 543 }, { x: 640, y: 543 }] },
-  // B04 right → straight right → closed_e010 left (same row)
+  /* ── B04 customer-delay path to Order Closed ── */
   { id: "e_b04_cl", from: "b04_cust", fromSide: "R", to: "closed_e010", toSide: "L", mode: "S", branch: "customer-delay" },
 
-  /* ── B08 reject → Order Closed ── */
-  // B08 bottom → down → closed_e010 top
-  { id: "e_b08_cl", from: "b08_reject", fromSide: "B", to: "closed_e010", toSide: "T", mode: "VH", branch: "reject",
-    waypoints: [{ x: 1327, y: 407 }] },
+  /* ── B08 reject → Order Closed right side ── */
+  { id: "e_b08_cl", from: "b08_reject", fromSide: "B", to: "closed_e010", toSide: "R", mode: "S", branch: "reject",
+    waypoints: [{ x: 1327, y: 470 }] },
 ];
 
 /* ─── Geometry helpers ─── */
@@ -366,22 +345,31 @@ export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<s
 
   if (idx >= 2) s.add("e_or_fn");
   if (idx >= 3) s.add("e_fn_fs");
-  if (idx >= 4) { s.add("e_fs_gv"); s.add("e_fs_b02"); s.add("e_b02_b03"); s.add("e_b03_gv"); }
+  if (idx >= 4) {
+    s.add("e_fs_b02");
+    s.add("e_b02_b03");
+    s.add("e_b03_gv");
+  }
   if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
 
-export function currentMainEdgeFor(
+export function currentMainEdgesFor(
   currentIdx: number,
   phase: JourneyPhase,
   terminal: "completed" | "closed" | null,
-): string | null {
-  if (terminal) return null;
-  if (phase === "form_not_submitted" || phase === "technical_delay" || phase === "customer_delay") return null;
-  if (currentIdx <= 2) return "e_or_fn";
-  if (currentIdx === 3) return "e_fs_gv";
-  if (currentIdx === 4) return "e_gv_cs";
-  return null;
+): Set<string> {
+  const s = new Set<string>();
+  if (terminal) return s;
+  if (phase === "form_not_submitted" || phase === "technical_delay" || phase === "customer_delay") return s;
+  if (currentIdx <= 2) s.add("e_or_fn");
+  if (currentIdx === 3) {
+    s.add("e_fs_b02");
+    s.add("e_b02_b03");
+    s.add("e_b03_gv");
+  }
+  if (currentIdx === 4) s.add("e_gv_cs");
+  return s;
 }
 
 export function currentStageNodeFor(
@@ -404,7 +392,7 @@ export interface EdgeStateInput {
   activeBranches: Set<BranchKey>;
   doneMainEdges: Set<string>;
   terminal: "completed" | "closed" | null;
-  currentMainEdge?: string | null;
+  currentMainEdges?: Set<string> | null;
   phase?: JourneyPhase;
   currentIdx?: number;
 }
@@ -416,7 +404,7 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   // 1. Already-completed main path edges
   if (i.doneMainEdges.has(e.id)) return "done";
   // 2. Currently traversing this edge
-  if (i.currentMainEdge && e.id === i.currentMainEdge) return "active";
+  if (i.currentMainEdges && i.currentMainEdges.has(e.id)) return "active";
   // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
     if (i.terminal === "closed" &&

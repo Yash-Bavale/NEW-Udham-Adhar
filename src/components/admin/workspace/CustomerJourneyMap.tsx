@@ -28,7 +28,7 @@ import {
 import {
   NODES, EDGES, nodeById, anchor, pathD, nodeW, nodeH,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
-  currentMainEdgeFor, currentStageNodeFor,
+  currentMainEdgesFor, currentStageNodeFor,
   CANVAS_W, CANVAS_H,
   type IconKey, type NodeDef, type Tone, type NodeState,
 } from "@/lib/orders/journey-graph";
@@ -266,8 +266,8 @@ export function CustomerJourneyMap(p: Props) {
     () => mainDoneEdgesFor(currentIdx, phase),
     [currentIdx, phase],
   );
-  const currentMainEdge = useMemo(
-    () => currentMainEdgeFor(currentIdx, phase, live.terminal),
+  const currentMainEdges = useMemo(
+    () => currentMainEdgesFor(currentIdx, phase, live.terminal),
     [currentIdx, phase, live.terminal],
   );
   const currentStageNode = useMemo(
@@ -384,7 +384,7 @@ export function CustomerJourneyMap(p: Props) {
                   if (!from || !to) return null;
                   const a = anchor(from, e.fromSide);
                   const b = anchor(to,   e.toSide);
-                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdge, phase, currentIdx });
+                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdges, phase, currentIdx });
                   const cls =
                     state === "done"   ? "stroke-emerald-500"
                   : state === "active" ? "stroke-indigo-500 edge-active"
@@ -626,6 +626,26 @@ function FlowNode({
   const dim = state === "idle" && !buttonEnabled;
   const active = state === "active" || (node.kind === "action" && buttonEnabled && state !== "done");
 
+  let badgeTopClass = "absolute -top-3 left-1/2 -translate-x-1/2";
+  if (node.id === "b05_submit") {
+    badgeTopClass = "absolute top-1/2 -translate-y-1/2 -left-6";
+  } else if (node.id === "b06_consult" || node.id === "b07_accept") {
+    badgeTopClass = "absolute top-1/2 -translate-y-1/2 -right-8";
+  } else if (node.id === "b08_reject") {
+    badgeTopClass = "absolute top-[35%] -translate-y-1/2 -right-8";
+  } else if (node.id === "b04_cust") {
+    badgeTopClass = "absolute -top-3 left-[35%] -translate-x-1/2";
+  }
+
+  let badgeBottomClass = "absolute -bottom-3 left-1/2 -translate-x-1/2";
+  if (node.id === "b08_reject") {
+    badgeBottomClass = "absolute top-[65%] -translate-y-1/2 -right-8";
+  } else if (node.id === "b04_cust") {
+    badgeBottomClass = "absolute -top-3 left-[65%] -translate-x-1/2";
+  } else if (node.id === "closed_e010") {
+    badgeBottomClass = "absolute top-1/2 -translate-y-1/2 -right-8";
+  }
+
   return (
     <div
       className={cn(
@@ -648,14 +668,14 @@ function FlowNode({
     >
       {/* Top B-Badge (Yellow pill on top edge) */}
       {node.badgeTop && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded bg-yellow-300 border border-yellow-400 px-1.5 py-px text-[9px] font-black text-slate-900 shadow-xs z-10 font-mono">
+        <span className={cn("rounded bg-yellow-300 border border-yellow-400 px-1.5 py-px text-[9px] font-black text-slate-900 shadow-xs z-10 font-mono", badgeTopClass)}>
           {node.badgeTop}
         </span>
       )}
 
       {/* Bottom E-Badge (Blue pill on bottom edge) */}
       {node.badgeBottom && (
-        <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded bg-blue-600 border border-blue-700 px-1.5 py-px text-[9px] font-black text-white shadow-xs z-10 font-mono">
+        <span className={cn("rounded bg-blue-600 border border-blue-700 px-1.5 py-px text-[9px] font-black text-white shadow-xs z-10 font-mono", badgeBottomClass)}>
           {node.badgeBottom}
         </span>
       )}
