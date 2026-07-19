@@ -144,7 +144,7 @@ export const markAwaitingGovt = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("applications")
-      .update({ awaiting_govt_started_at: new Date().toISOString() } as never)
+      .update({ awaiting_govt_started_at: new Date().toISOString(), fulfillment_status: "government_processing" } as never)
       .eq("id", data.orderId);
 
     const { armTimer } = await import("./timers.server");
