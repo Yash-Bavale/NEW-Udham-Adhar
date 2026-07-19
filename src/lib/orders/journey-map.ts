@@ -410,16 +410,16 @@ export type JourneyPhase =
 export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   form_not_submitted:   ["B01"],
   form_link_sent:       [],                                     // S03: waiting
-  form_submitted:       ["B02", "B04", "B05", "B06", "B07", "B08"],  // S04
-  technical_delay:      ["B03"],                                // S05
-  post_b03_resume:      ["B04", "B05", "B06", "B07", "B08"],   // S04 post-tech-fix (no B02)
+  form_submitted:       ["B02", "B04", "B05", "B06"],           // S04: can delay or submit (cannot accept/reject yet)
+  technical_delay:      ["B03"],                                // S05: issue resolved
+  post_b03_resume:      ["B04", "B05", "B06"],                  // S04 post-tech-fix: can delay or submit (cannot accept/reject yet)
   customer_delay:       [],                                     // S06: waiting state
-  govt_processing:      ["B04", "B05", "B06", "B07", "B08"],   // S07
+  govt_processing:      ["B04", "B07", "B08"],                  // S07: submitted, waiting for approval (cannot submit again)
   consultation_done:    ["B07", "B08"],                         // S08
-  application_approved: ["B07", "B08"],                         // S09: complete the order
-  application_rejected: ["B07", "B08"],                         // S10: can re-accept
-  completed:            ["B07", "B08"],                         // S11
-  closed:               [],                                     // S12
+  application_approved: ["B07"],                                // S09: already approved, only complete action is enabled
+  application_rejected: ["B07", "B08"],                         // S10: can correct and accept or reject
+  completed:            [],                                     // S11: final done
+  closed:               [],                                     // S12: final closed
   admin_override:       ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08"],
 };
 

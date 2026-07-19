@@ -268,12 +268,12 @@ export function CustomerJourneyMap(p: Props) {
     [phase, live.terminal, live.reasonCode, p.workflowStatus, currentIdx, techDelayResolved],
   );
   const doneMainEdges = useMemo(
-    () => mainDoneEdgesFor(currentIdx, phase),
-    [currentIdx, phase],
+    () => mainDoneEdgesFor(currentIdx, phase, techDelayResolved),
+    [currentIdx, phase, techDelayResolved],
   );
   const currentMainEdges = useMemo(
-    () => currentMainEdgesFor(currentIdx, phase, live.terminal),
-    [currentIdx, phase, live.terminal],
+    () => currentMainEdgesFor(currentIdx, phase, live.terminal, techDelayResolved),
+    [currentIdx, phase, live.terminal, techDelayResolved],
   );
   const currentStageNode = useMemo(
     () => currentStageNodeFor(currentIdx, phase, live.terminal),

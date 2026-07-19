@@ -365,7 +365,11 @@ export function activeBranchesFor(
   return s;
 }
 
-export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<string> {
+export function mainDoneEdgesFor(
+  currentIdx: number,
+  phase: JourneyPhase,
+  techDelayResolved?: boolean,
+): Set<string> {
   const s = new Set<string>();
   const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
   const idx = holding && phase === "form_not_submitted" ? 2
@@ -375,9 +379,13 @@ export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<s
   if (idx >= 2) s.add("e_or_fn");
   if (idx >= 3) s.add("e_fn_fs");
   if (idx >= 4) {
-    s.add("e_fs_b02");
-    s.add("e_b02_b03");
-    s.add("e_b03_gv");
+    if (techDelayResolved) {
+      s.add("e_fs_b02");
+      s.add("e_b02_b03");
+      s.add("e_b03_gv");
+    } else {
+      s.add("e_top_gv");
+    }
   }
   if (idx >= 5) s.add("e_gv_cs");
   return s;
@@ -387,15 +395,22 @@ export function currentMainEdgesFor(
   currentIdx: number,
   phase: JourneyPhase,
   terminal: "completed" | "closed" | null,
+  techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
   if (terminal) return s;
-  if (phase === "form_not_submitted" || phase === "technical_delay" || phase === "customer_delay") return s;
+  if (phase === "form_not_submitted" || phase === "customer_delay") return s;
   if (currentIdx <= 2) s.add("e_or_fn");
   if (currentIdx === 3) {
-    s.add("e_fs_b02");
-    s.add("e_b02_b03");
-    s.add("e_b03_gv");
+    if (phase === "technical_delay") {
+      s.add("e_fs_b02");
+      s.add("e_b02_b03");
+    } else if (phase === "post_b03_resume") {
+      s.add("e_b03_gv");
+    } else {
+      // Normal flow: bypassing B02/B03
+      s.add("e_top_gv");
+    }
   }
   if (currentIdx === 4) s.add("e_gv_cs");
   return s;
