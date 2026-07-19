@@ -11,7 +11,7 @@ import {
   Check, Inbox, FileText, FileCheck2, Landmark, Search, Flag,
   Clock, XCircle, CheckCircle2, ClipboardCheck,
   Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
-  ArrowRight, AlertTriangle, RotateCcw, MailWarning,
+  ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 
@@ -69,6 +69,7 @@ const ICONS: Record<IconKey, LucideIcon> = {
   wrench: Wrench, rotate: RotateCcw, mailWarn: MailWarning,
   userX: UserX, send: Send, clock: Clock, clipboard: ClipboardCheck,
   upload: UploadCloud, xCircle: XCircle, lifeBuoy: LifeBuoy,
+  shoppingBag: ShoppingBag,
 };
 
 /* ─── Responsive scaling hook ─── */
@@ -139,7 +140,7 @@ export function CustomerJourneyMap(p: Props) {
     setTechDelayResolved(true);
   };
   const clearTechDelayResolved = () => {
-    try { window.localStorage.removeItem(techResumeKey); } catch {}
+    try { window.localStorage.removeItem(techResumeKey) } catch {}
     setTechDelayResolved(false);
   };
 
@@ -245,17 +246,6 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  /**
-   * Button handlers — v2 mapping:
-   *   B01 = Send Form Link (E002)           — unchanged
-   *   B02 = Technical Delay (E003)          — unchanged
-   *   B03 = Issue Resolved (E011)           — unchanged
-   *   B04 = Customer Side Delay (E004)      — was B10
-   *   B05 = Application Submitted (E005)    — was B04
-   *   B06 = Consultation Completed (E005)   — was B07
-   *   B07 = Govt Accepted + PDF (E007)      — was B08
-   *   B08 = Govt Rejected (E008)            — was B09
-   */
   const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean }> = {
     B01: { onClick: () => mutFormLink.mutate(),         pending: mutFormLink.isPending },
     B02: { onClick: () => setDialog({ kind: "technical_delay" }) },
@@ -400,9 +390,8 @@ export function CustomerJourneyMap(p: Props) {
                   : state === "active" ? "stroke-indigo-500 edge-active"
                   : state === "closed" ? "stroke-rose-500 edge-active"
                   :                      "stroke-slate-300";
-                  const strokeWidth = state === "idle" ? 1.25 : 2;
-                  const dash = state === "active" || state === "closed" ? "8 4"
-                             : state === "idle" ? "4 4" : undefined;
+                  const strokeWidth = state === "idle" ? 1.5 : 2.5;
+                  const dash = state === "active" || state === "closed" ? "8 4" : undefined;
                   return (
                     <path
                       key={e.id}
@@ -578,13 +567,14 @@ export function CustomerJourneyMap(p: Props) {
 /* ═════════════════════════ FlowNode ═════════════════════════ */
 
 const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon: string; btn: string; ring: string; solid: string }> = {
-  slate:   { border: "border-slate-300",   bg: "bg-white",       text: "text-slate-700",   icon: "text-slate-500",   btn: "bg-slate-600 hover:bg-slate-700 text-white",     ring: "ring-slate-200",   solid: "bg-slate-600 text-white" },
-  amber:   { border: "border-amber-300",   bg: "bg-amber-50",    text: "text-amber-800",   icon: "text-amber-600",   btn: "bg-amber-500 hover:bg-amber-600 text-white",     ring: "ring-amber-200",   solid: "bg-amber-500 text-white" },
-  rose:    { border: "border-rose-300",    bg: "bg-rose-50",     text: "text-rose-800",    icon: "text-rose-600",    btn: "bg-rose-600 hover:bg-rose-700 text-white",       ring: "ring-rose-200",    solid: "bg-rose-600 text-white" },
-  sky:     { border: "border-sky-300",     bg: "bg-sky-50",      text: "text-sky-800",     icon: "text-sky-600",     btn: "bg-sky-600 hover:bg-sky-700 text-white",         ring: "ring-sky-200",     solid: "bg-sky-600 text-white" },
-  violet:  { border: "border-violet-300",  bg: "bg-violet-50",   text: "text-violet-800",  icon: "text-violet-600",  btn: "bg-violet-600 hover:bg-violet-700 text-white",   ring: "ring-violet-200",  solid: "bg-violet-600 text-white" },
-  emerald: { border: "border-emerald-300", bg: "bg-emerald-50",  text: "text-emerald-800", icon: "text-emerald-600", btn: "bg-emerald-600 hover:bg-emerald-700 text-white", ring: "ring-emerald-200", solid: "bg-emerald-600 text-white" },
-  indigo:  { border: "border-indigo-300",  bg: "bg-indigo-50",   text: "text-indigo-800",  icon: "text-indigo-600",  btn: "bg-indigo-600 hover:bg-indigo-700 text-white",   ring: "ring-indigo-200",  solid: "bg-indigo-600 text-white" },
+  maroon:  { border: "border-rose-900",    bg: "bg-rose-950",    text: "text-white",       icon: "text-white",       btn: "bg-rose-800 hover:bg-rose-700 text-white",       ring: "ring-rose-400",    solid: "bg-rose-900 text-white" },
+  slate:   { border: "border-slate-400",   bg: "bg-white",       text: "text-slate-800",   icon: "text-slate-600",   btn: "bg-slate-700 hover:bg-slate-800 text-white",     ring: "ring-slate-300",   solid: "bg-slate-700 text-white" },
+  amber:   { border: "border-amber-400",   bg: "bg-amber-50",    text: "text-amber-900",   icon: "text-amber-700",   btn: "bg-amber-600 hover:bg-amber-700 text-white",     ring: "ring-amber-300",   solid: "bg-amber-600 text-white" },
+  rose:    { border: "border-rose-400",    bg: "bg-rose-50",     text: "text-rose-900",    icon: "text-rose-700",    btn: "bg-rose-600 hover:bg-rose-700 text-white",       ring: "ring-rose-300",    solid: "bg-rose-600 text-white" },
+  sky:     { border: "border-sky-400",     bg: "bg-sky-50",      text: "text-sky-900",     icon: "text-sky-700",     btn: "bg-sky-600 hover:bg-sky-700 text-white",         ring: "ring-sky-300",     solid: "bg-sky-600 text-white" },
+  violet:  { border: "border-violet-400",  bg: "bg-violet-50",   text: "text-violet-900",  icon: "text-violet-700",  btn: "bg-violet-600 hover:bg-violet-700 text-white",   ring: "ring-violet-300",  solid: "bg-violet-600 text-white" },
+  emerald: { border: "border-emerald-500", bg: "bg-emerald-600", text: "text-white",       icon: "text-white",       btn: "bg-emerald-700 hover:bg-emerald-800 text-white", ring: "ring-emerald-300", solid: "bg-emerald-600 text-white" },
+  indigo:  { border: "border-indigo-400",  bg: "bg-indigo-50",   text: "text-indigo-900",  icon: "text-indigo-700",  btn: "bg-indigo-600 hover:bg-indigo-700 text-white",   ring: "ring-indigo-300",  solid: "bg-indigo-600 text-white" },
 };
 
 function FlowNode({
@@ -614,8 +604,8 @@ function FlowNode({
   if (state === "terminal-ok") tone = "emerald";
   else if (state === "terminal-bad") tone = "rose";
   else if (state === "done" && node.kind === "stage") tone = "emerald";
-  else if (state === "idle" && node.kind === "stage") tone = "slate";
-  else if (state === "idle" && node.kind === "action" && !buttonEnabled) tone = "slate";
+  else if (state === "idle" && node.kind === "stage" && node.tone !== "maroon") tone = "slate";
+  else if (state === "idle" && node.kind === "action" && !buttonEnabled && node.tone !== "emerald") tone = "slate";
 
   const t = TONE_STYLES[tone];
   const dim = state === "idle" && !buttonEnabled;
@@ -624,11 +614,11 @@ function FlowNode({
   return (
     <div
       className={cn(
-        "absolute rounded-lg border shadow-sm transition-all",
+        "absolute flex flex-col justify-between rounded-lg border-2 shadow-sm transition-all text-center p-1.5",
         t.border, t.bg,
         active && "ring-2 shadow-md",
         active && t.ring,
-        dim && "opacity-70",
+        dim && "opacity-80",
         isSub && "border-dashed",
       )}
       style={{
@@ -636,58 +626,73 @@ function FlowNode({
         top: node.y,
         width: nodeW(node),
         minHeight: nodeH(node),
+        height: nodeH(node),
       }}
       data-node={node.id}
       data-state={state}
     >
-      {node.tag && (
+      {/* Top B-Badge (Yellow pill on top edge) */}
+      {node.badgeTop && (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded bg-yellow-300 border border-yellow-400 px-1.5 py-px text-[9px] font-black text-slate-900 shadow-xs z-10 font-mono">
+          {node.badgeTop}
+        </span>
+      )}
+
+      {/* Bottom E-Badge (Blue pill on bottom edge) */}
+      {node.badgeBottom && (
+        <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded bg-blue-600 border border-blue-700 px-1.5 py-px text-[9px] font-black text-white shadow-xs z-10 font-mono">
+          {node.badgeBottom}
+        </span>
+      )}
+
+      {node.tag && !node.badgeBottom && (
         <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow">
           {node.tag}
         </span>
       )}
       {countdown && (
-        <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+        <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap z-20">
           {countdown}
         </div>
       )}
 
-      <div className="flex items-center gap-1 px-1.5 pt-1">
-        <span className={cn("grid size-5 place-items-center rounded-full border bg-white shrink-0", t.border)}>
+      <div className="flex items-center justify-center gap-1">
+        <span className={cn("grid size-4.5 place-items-center rounded-full border bg-white shrink-0", t.border)}>
           {state === "done" && node.kind === "stage"
-            ? <Check className={cn("size-3", t.icon)} />
-            : <Icon className={cn("size-3", t.icon)} />}
+            ? <Check className="size-3 text-emerald-600" />
+            : <Icon className={cn("size-3", node.tone === "maroon" || node.tone === "emerald" ? "text-slate-900" : t.icon)} />}
         </span>
-        {node.buttonCode && (
-          <span className={cn(
-            "rounded px-1 py-px font-mono text-[8px] font-black tracking-wider",
-            active ? "bg-white text-slate-700" : "bg-slate-100 text-slate-500",
-          )}>
-            {node.buttonCode}·{node.emailCode}
-          </span>
-        )}
         {active && !isTerminal && (
-          <span className="ml-auto rounded-full bg-rose-600 px-1 py-px text-[7px] font-black uppercase tracking-wider text-white">
+          <span className="rounded-full bg-rose-600 px-1 py-px text-[7px] font-black uppercase tracking-wider text-white">
             LIVE
           </span>
         )}
       </div>
 
-      <div className={cn("px-1.5 py-0.5", t.text)}>
-        <div className="text-[10px] font-bold leading-tight">{node.label}</div>
+      <div className={cn("px-0.5 my-auto", t.text)}>
+        <div className="text-[11px] font-bold leading-tight tracking-tight">{node.label}</div>
         {node.subtitle && (
-          <div className="mt-px text-[8px] font-medium leading-tight opacity-70">{node.subtitle}</div>
+          <div className="mt-0.5 text-[9px] font-medium leading-tight opacity-90">{node.subtitle}</div>
+        )}
+        {node.highlightText && (
+          <div className={cn(
+            "mt-0.5 text-[8.5px] font-extrabold leading-tight",
+            node.tone === "emerald" || tone === "emerald" ? "text-amber-200" : "text-rose-600"
+          )}>
+            {node.highlightText}
+          </div>
         )}
       </div>
 
       {isAction && (
-        <div className="px-1.5 pb-1">
+        <div className="pt-0.5">
           <button
             type="button"
             onClick={onButtonClick}
             disabled={!buttonEnabled || buttonPending}
             title={!buttonEnabled ? `${node.buttonCode} locked in phase "${phaseLabel}"` : node.label}
             className={cn(
-              "w-full inline-flex items-center justify-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold shadow-sm transition disabled:cursor-not-allowed",
+              "w-full inline-flex items-center justify-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold shadow-xs transition disabled:cursor-not-allowed",
               buttonEnabled ? t.btn : "bg-slate-100 text-slate-500 border border-slate-200",
             )}
           >
@@ -698,7 +703,7 @@ function FlowNode({
       )}
 
       {isSub && ticketOpen && (
-        <div className="px-1.5 pb-1">
+        <div className="pt-0.5">
           <a
             href={ticketHref ?? "#"}
             className="inline-flex w-full items-center justify-center gap-1 rounded bg-violet-600 px-1 py-0.5 text-[9px] font-bold text-white shadow-sm hover:bg-violet-700"
@@ -708,7 +713,7 @@ function FlowNode({
         </div>
       )}
       {isSub && !ticketOpen && (
-        <div className="px-1.5 pb-1 text-[8px] italic text-slate-500">No open ticket</div>
+        <div className="pt-0.5 text-[8px] italic opacity-60">No open ticket</div>
       )}
     </div>
   );

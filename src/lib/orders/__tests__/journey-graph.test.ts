@@ -62,19 +62,17 @@ describe("activeBranchesFor", () => {
   it("customer_delay → customer-delay", () => {
     expect([...activeBranchesFor("customer_delay", null, null)]).toEqual(["customer-delay"]);
   });
-  it("consultation_done → shortcut", () => {
-    expect([...activeBranchesFor("consultation_done", null, null)]).toEqual(["shortcut"]);
+  it("govt_processing → submit", () => {
+    expect([...activeBranchesFor("govt_processing", null, null)]).toEqual(["submit"]);
   });
-  it("awaiting_govt → awaiting", () => {
-    expect([...activeBranchesFor("awaiting_govt", null, null)]).toEqual(["awaiting"]);
+  it("consultation_done → consult", () => {
+    expect([...activeBranchesFor("consultation_done", null, null)]).toEqual(["consult"]);
   });
-  it("status_checked → status", () => {
-    expect([...activeBranchesFor("status_checked", null, null)]).toEqual(["status"]);
+  it("application_approved → accept", () => {
+    expect([...activeBranchesFor("application_approved", null, null)]).toEqual(["accept"]);
   });
-  it("post_wait_submitted → status + accept", () => {
-    const s = activeBranchesFor("post_wait_submitted", null, null);
-    expect(s.has("status")).toBe(true);
-    expect(s.has("accept")).toBe(true);
+  it("application_rejected → reject", () => {
+    expect([...activeBranchesFor("application_rejected", null, null)]).toEqual(["reject"]);
   });
   it("completed terminal → accept", () => {
     expect(activeBranchesFor("completed", "completed", null).has("accept")).toBe(true);
@@ -101,32 +99,32 @@ describe("customer delay workflow status", () => {
   it("maps external_dependency to the customer-delay branch", () => {
     expect(getActiveDelayBranchKey("external_dependency")).toBe("customer-side-delay");
   });
-  it("derives customer_delay phase after B10 is submitted", () => {
+  it("derives customer_delay phase when waiting_for_customer", () => {
     expect(derivePhase({
       stage: "form_submitted",
       workflowStatus: "waiting_for_customer",
     })).toBe("customer_delay");
   });
-  it("keeps the standard next-step buttons available after B10 is submitted", () => {
-    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual(["B02", "B04", "B05", "B08", "B09"]);
+  it("has no active buttons in waiting state during customer_delay", () => {
+    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual([]);
   });
 });
 
 /* ─── mainDoneEdgesFor ─── */
 describe("mainDoneEdgesFor", () => {
-  it("stops at form_not while form_not_submitted", () => {
+  it("stops before form_sub while form_not_submitted", () => {
     const s = mainDoneEdgesFor(3, "form_not_submitted");
-    // idx 2 clamp → only e_or_fn
-    expect([...s]).toEqual(["e_or_fn"]);
+    expect(s.has("e_or_fn")).toBe(true);
+    expect(s.has("e_fn_fs")).toBe(false);
   });
-  it("freezes at form_sub while technical_delay", () => {
+  it("includes e_or_fn, e_fn_fs, e_fs_b02, e_b02_b03 while technical_delay at index 4", () => {
     const s = mainDoneEdgesFor(4, "technical_delay");
     expect(s.has("e_or_fn")).toBe(true);
     expect(s.has("e_fn_fs")).toBe(true);
-    expect(s.has("e_fs_gv")).toBe(false);
+    expect(s.has("e_b03_gv")).toBe(false);
   });
   it("progresses normally when not holding", () => {
-    expect(mainDoneEdgesFor(6, "completed").size).toBe(5);
+    expect(mainDoneEdgesFor(6, "completed").size).toBe(6);
   });
 });
 
@@ -149,7 +147,7 @@ describe("edgeState", () => {
   it("marks main-3 done after form_submitted transitions past it", () => {
     const branches = activeBranchesFor("consultation_done", null, null);
     const done = mainDoneEdgesFor(4, "consultation_done");
-    expect(edgeState(findEdge("e_fs_gv"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
+    expect(edgeState(findEdge("e_b03_gv"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
       .toBe("done");
   });
   it("marks unrelated edge idle", () => {
@@ -169,17 +167,18 @@ describe("nodeState", () => {
   });
   it("active node incident to live branch", () => {
     const branches = activeBranchesFor("customer_delay", null, null);
-    expect(nodeState("b10_cust", { currentIdx: 3, activeBranches: branches, terminal: null, phase: "customer_delay" }))
+    expect(nodeState("b04_cust", { currentIdx: 3, activeBranches: branches, terminal: null, phase: "customer_delay" }))
       .toBe("active");
   });
   it("done stage below current index", () => {
-    const branches = activeBranchesFor("awaiting_govt", null, null);
-    expect(nodeState("form_not", { currentIdx: 4, activeBranches: branches, terminal: null, phase: "awaiting_govt" }))
+    const branches = activeBranchesFor("govt_processing", null, null);
+    expect(nodeState("form_not", { currentIdx: 4, activeBranches: branches, terminal: null, phase: "govt_processing" }))
       .toBe("done");
   });
   it("idle otherwise", () => {
     const branches = activeBranchesFor("form_submitted", null, null);
-    expect(nodeState("b09_reject", { currentIdx: 3, activeBranches: branches, terminal: null, phase: "form_submitted" }))
+    expect(nodeState("b08_reject", { currentIdx: 3, activeBranches: branches, terminal: null, phase: "form_submitted" }))
       .toBe("idle");
   });
 });
+
