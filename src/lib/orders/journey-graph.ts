@@ -1,15 +1,20 @@
 // Pure config + helpers for the CustomerJourneyMap flowchart.
-// Layout mirrors the operations reference diagram with B01…B08 action buttons
-// + E010 close. Updated for v2 button mapping (B04=Customer Delay, B05=Submit
-// to Govt, B06=Consultation, B07=Accept, B08=Reject).
+// Layout EXACTLY mirrors the operations reference diagram (Image 4).
+//
+// Layout structure:
+//   ROW 0 (y=50–155): B02/B03 Technical Delay boxes sit above main row inside top rectangle loop
+//   ROW 1 (y=160–230): Main horizontal path — Order Received → Form Not Submitted → Form Submitted
+//                       → Application Submitted Govt Portal → Application Accepted or Closed
+//   ROW 2 (y=265–390): Sub-cards hanging straight down: B05, B06 under Govt Portal; B07, B08 under Accepted
+//   ROW 3 (y=415–520): Bottom exceptions — B01 (below Form Not Sub), B04 (Customer Delay), Order Closed
 
 import type { ButtonCode, JourneyPhase } from "@/lib/orders/journey-map";
 
 /* ─── Canvas constants ─── */
-export const NODE_W = 130; // default; individual nodes may override via .w
-export const NODE_H = 60;  // default; individual nodes may override via .h
-export const CANVAS_W = 1750;
-export const CANVAS_H = 620;
+export const NODE_W = 130;
+export const NODE_H = 60;
+export const CANVAS_W = 1720;
+export const CANVAS_H = 570;
 
 /* ─── Types ─── */
 export type NodeKind = "stage" | "action" | "terminal" | "sub";
@@ -31,17 +36,17 @@ export interface NodeDef {
   emailCode?: string;
   subtitle?: string;
   highlightText?: string;
-  badgeTop?: string;    // Top yellow pill (e.g. "B01", "B02")
-  badgeBottom?: string; // Bottom blue pill (e.g. "E001", "E002")
-  tag?: string;         // extra legacy label tag
+  badgeTop?: string;    // Yellow pill on top border
+  badgeBottom?: string; // Blue pill on bottom border
+  tag?: string;
 }
 
 export type Side = "L" | "R" | "T" | "B";
 export type EdgeMode = "S" | "HV" | "VH" | "HVH" | "VHV";
 
 export type BranchKey =
-  | "main-1" | "main-2" | "main-3" | "main-4" | "main-tech"
-  | "form-nag" | "customer-delay" | "technical" | "shortcut"
+  | "main-1" | "main-2" | "main-3" | "main-4"
+  | "form-nag" | "customer-delay" | "technical"
   | "submit" | "consult" | "accept" | "reject";
 
 export interface EdgeDef {
@@ -56,76 +61,241 @@ export interface EdgeDef {
 export type EdgeState = "done" | "active" | "closed" | "idle";
 export type NodeState = "done" | "active" | "terminal-ok" | "terminal-bad" | "idle";
 
-/* ─── Node dimension helpers ─── */
+/* ─── Dimension helpers ─── */
 export const nodeW = (n: NodeDef) => n.w ?? NODE_W;
 export const nodeH = (n: NodeDef) => n.h ?? NODE_H;
 
-/* ─── Nodes (layout strictly mirrors reference diagram) ─── */
+/*
+ * ─── COORDINATE SYSTEM (matches reference Image 4 exactly) ───
+ *
+ * ROW 1 — Main path nodes, all centered at y=160..220 (h=60 → top at y=165)
+ *   order_rec    x=20,   w=110
+ *   form_not     x=165,  w=130
+ *   form_sub     x=330,  w=130
+ *   govt_portal  x=760,  w=290  [large box, spans B05+B06 width]
+ *   consult_stg  x=1105, w=290  [large box, spans B07+B08 width]
+ *
+ * MAIN PATH connects: order_rec → form_not → form_sub ──── govt_portal → consult_stage
+ * (form_sub to govt_portal is a direct horizontal line, B02/B03 are a SEPARATE branch ABOVE)
+ *
+ * ROW 0 — B02 & B03 float above main row (the technical delay loop)
+ *   b02_tech     x=480,  y=55,  w=125, h=105
+ *   b03_fix      x=620,  y=55,  w=125, h=105
+ *
+ * The top rectangular loop path:
+ *   form_sub TOP → up to y=18 → right → B02 TOP → B02/B03 straight → B03 TOP → right → govt_portal TOP
+ *   (the rectangle sits above B02 and B03, connecting form_sub back to govt_portal)
+ *
+ * ROW 2 — Sub-cards hanging straight down from parent stage cards
+ *   b05_submit   x=760,  y=270, w=140, h=120  [under govt_portal left]
+ *   b06_consult  x=912,  y=270, w=140, h=120  [under govt_portal right]
+ *   b07_accept   x=1105, y=270, w=140, h=120  [under consult_stage left]
+ *   b08_reject   x=1257, y=270, w=140, h=120  [under consult_stage right]
+ *
+ * ROW 3 — Bottom exception row
+ *   b01_reminder x=100,  y=415, w=195, h=110  [below form_not]
+ *   b04_cust     x=640,  y=415, w=205, h=110  [below form_sub area, left of closed]
+ *   closed_e010  x=1105, y=415, w=290, h=110  [far right, aligns with consult_stage]
+ */
+
 export const NODES: NodeDef[] = [
-  /* Row 1 — main path (horizontal row at y=110):
-     Order Received (E001) → Form Not Submitted → Form Submitted → B02 Tech Delay → B03 Issue Resolved → Govt Portal → Application Accepted or Closed */
-  { id: "order_rec",     x:   20, y: 110, w: 125, h: 70, label: "Order Received",                       icon: "shoppingBag", kind: "stage",  tone: "maroon",  badgeBottom: "E001" },
-  { id: "form_not",      x:  180, y: 110, w: 135, h: 70, label: "Form Not Submitted",                    icon: "fileText",    kind: "stage",  tone: "slate" },
-  { id: "form_sub",      x:  350, y: 110, w: 135, h: 70, label: "Form Submitted",                        icon: "fileCheck",   kind: "stage",  tone: "slate" },
-  { id: "b02_tech",      x:  520, y: 100, w: 130, h: 90, label: "Technical Delay",                       icon: "wrench",      kind: "action", tone: "slate",   buttonCode: "B02", emailCode: "E003", subtitle: "Select Reason", highlightText: "Add Reminder", badgeTop: "B02", badgeBottom: "E003" },
-  { id: "b03_fix",       x:  680, y: 100, w: 130, h: 90, label: "Technical Delay",                       icon: "rotate",      kind: "action", tone: "slate",   buttonCode: "B03", emailCode: "E011", subtitle: "Issue Resolved", badgeTop: "B03", badgeBottom: "E011" },
-  { id: "govt_portal",   x:  840, y:  95, w: 320, h: 100, label: "Application Submitted",                 icon: "landmark",    kind: "stage",  tone: "slate",   subtitle: "Govt Portal" },
-  { id: "consult_stage", x: 1220, y:  95, w: 320, h: 100, label: "Application Accepted",                  icon: "clipboard",   kind: "stage",  tone: "slate",   subtitle: "or Closed" },
 
-  /* Sub-cards under Govt Portal (y=245) */
-  { id: "b05_submit",    x:  840, y: 245, w: 150, h: 125, label: "Application Submitted",                 icon: "send",      kind: "action", tone: "slate",   buttonCode: "B05", emailCode: "E006", subtitle: "Waiting for Govt. Approval", highlightText: "Add Reminder & Button Press Counter", badgeTop: "B05", badgeBottom: "E006" },
-  { id: "b06_consult",   x: 1010, y: 245, w: 150, h: 125, label: "Consultation Completed",                icon: "clipboard", kind: "action", tone: "emerald", buttonCode: "B06", emailCode: "E005", subtitle: "Application Submitted to Govt Portal", highlightText: "Order Completed", badgeTop: "B06", badgeBottom: "E005" },
+  /* ── ROW 1: Main horizontal path ── */
+  {
+    id: "order_rec", x: 20, y: 165, w: 110, h: 60,
+    label: "Order Received",
+    icon: "shoppingBag", kind: "stage", tone: "maroon",
+    badgeBottom: "E001",
+  },
+  {
+    id: "form_not", x: 165, y: 165, w: 130, h: 60,
+    label: "Form Not Submitted",
+    icon: "fileText", kind: "stage", tone: "slate",
+  },
+  {
+    id: "form_sub", x: 330, y: 165, w: 130, h: 60,
+    label: "Form Submitted",
+    icon: "fileCheck", kind: "stage", tone: "slate",
+  },
+  {
+    id: "govt_portal", x: 760, y: 155, w: 292, h: 80,
+    label: "Application Submitted",
+    subtitle: "Govt Portal",
+    icon: "landmark", kind: "stage", tone: "slate",
+  },
+  {
+    id: "consult_stage", x: 1105, y: 155, w: 292, h: 80,
+    label: "Application Accepted",
+    subtitle: "or Closed",
+    icon: "clipboard", kind: "stage", tone: "slate",
+  },
 
-  /* Sub-cards under Application Accepted or Closed (y=245) */
-  { id: "b07_accept",    x: 1220, y: 245, w: 150, h: 125, label: "Application Accepted",                 icon: "upload",    kind: "action", tone: "emerald", buttonCode: "B07", emailCode: "E007", subtitle: "Upload PDF", highlightText: "Add Note- Order Completed", badgeBottom: "E007" },
-  { id: "b08_reject",    x: 1390, y: 245, w: 150, h: 125, label: "Application Rejected",                 icon: "xCircle",   kind: "action", tone: "emerald", buttonCode: "B08", emailCode: "E008", subtitle: "Select Reason", highlightText: "Add Note- Order Closed", badgeTop: "B08", badgeBottom: "E008" },
+  /* ── ROW 0: Technical delay loop (above main path) ── */
+  {
+    id: "b02_tech", x: 475, y: 52, w: 125, h: 108,
+    label: "Technical Delay",
+    subtitle: "Select Reason",
+    highlightText: "Add Reminder",
+    icon: "wrench", kind: "action", tone: "slate",
+    buttonCode: "B02", emailCode: "E003",
+    badgeTop: "B02", badgeBottom: "E003",
+  },
+  {
+    id: "b03_fix", x: 615, y: 52, w: 125, h: 108,
+    label: "Technical Delay",
+    subtitle: "Issue Resolved",
+    icon: "rotate", kind: "action", tone: "slate",
+    buttonCode: "B03", emailCode: "E011",
+    badgeTop: "B03", badgeBottom: "E011",
+  },
 
-  /* Bottom Row — Exception branches (y=440) */
-  { id: "b01_reminder",  x:  140, y: 440, w: 220, h: 110, label: "Form Not Submitted",                     icon: "mailWarn",  kind: "action", tone: "amber",   buttonCode: "B01", emailCode: "E002", subtitle: "Send information Incomplete mail", highlightText: "Order Autoclosed in 8 hrs", badgeTop: "B01", badgeBottom: "E002" },
-  { id: "b04_cust",      x:  710, y: 440, w: 220, h: 110, label: "Customer Side Delay",                    icon: "userX",     kind: "action", tone: "slate",   buttonCode: "B04", emailCode: "E004", subtitle: "Select Reason", highlightText: "Order Autoclosed in 8 hrs", badgeTop: "B04", badgeBottom: "E004" },
-  { id: "closed_e010",   x: 1220, y: 440, w: 320, h: 110, label: "Order Closed with previous Selected Reason", icon: "xCircle", kind: "terminal", tone: "emerald", badgeBottom: "E010" },
+  /* ── ROW 2: Sub-cards under Govt Portal ── */
+  {
+    id: "b05_submit", x: 760, y: 268, w: 140, h: 125,
+    label: "Application Submitted",
+    subtitle: "Waiting for Govt. Approval",
+    highlightText: "Add Reminder & Button Press Counter",
+    icon: "send", kind: "action", tone: "slate",
+    buttonCode: "B05", emailCode: "E006",
+    badgeTop: "B05", badgeBottom: "E006",
+  },
+  {
+    id: "b06_consult", x: 912, y: 268, w: 140, h: 125,
+    label: "Consultation Completed",
+    subtitle: "Application Submitted to Govt Portal",
+    highlightText: "Order Completed",
+    icon: "clipboard", kind: "action", tone: "emerald",
+    buttonCode: "B06", emailCode: "E005",
+    badgeTop: "B06", badgeBottom: "E005",
+  },
+
+  /* ── ROW 2: Sub-cards under Application Accepted or Closed ── */
+  {
+    id: "b07_accept", x: 1105, y: 268, w: 140, h: 125,
+    label: "Application Accepted",
+    subtitle: "Upload PDF",
+    highlightText: "Add Note- Order Completed",
+    icon: "upload", kind: "action", tone: "emerald",
+    buttonCode: "B07", emailCode: "E007",
+    badgeBottom: "E007",
+  },
+  {
+    id: "b08_reject", x: 1257, y: 268, w: 140, h: 125,
+    label: "Application Rejected",
+    subtitle: "Select Reason",
+    highlightText: "Add Note- Order Closed",
+    icon: "xCircle", kind: "action", tone: "emerald",
+    buttonCode: "B08", emailCode: "E008",
+    badgeTop: "B08", badgeBottom: "E008",
+  },
+
+  /* ── ROW 3: Bottom exception row ── */
+  {
+    id: "b01_reminder", x: 100, y: 415, w: 195, h: 110,
+    label: "Form Not Submitted",
+    subtitle: "Send information Incomplete mail",
+    highlightText: "Order Autoclosed in 8 hrs",
+    icon: "mailWarn", kind: "action", tone: "amber",
+    buttonCode: "B01", emailCode: "E002",
+    badgeTop: "B01", badgeBottom: "E002",
+  },
+  {
+    id: "b04_cust", x: 640, y: 415, w: 200, h: 110,
+    label: "Customer Side Delay",
+    subtitle: "Select Reason",
+    highlightText: "Order Autoclosed in 8 hrs",
+    icon: "userX", kind: "action", tone: "slate",
+    buttonCode: "B04", emailCode: "E004",
+    badgeTop: "B04", badgeBottom: "E004",
+  },
+  {
+    id: "closed_e010", x: 1105, y: 415, w: 292, h: 110,
+    label: "Order Closed with previous Selected Reason",
+    icon: "xCircle", kind: "terminal", tone: "emerald",
+    badgeBottom: "E010",
+  },
 ];
 
 export const nodeById: Record<string, NodeDef> = Object.fromEntries(NODES.map((n) => [n.id, n]));
 
-/* ─── Edges (Straight horizontal & vertical orthogonal lines) ─── */
+/*
+ * ─── EDGE ROUTING RULES (all orthogonal, zero diagonals, zero overlaps) ───
+ *
+ * MAIN PATH (straight horizontal lines, all at ~y=195):
+ *   order_rec R → form_not L          [main-1]
+ *   form_not R  → form_sub L          [main-2]
+ *   form_sub R  → govt_portal L       [main-3]  ← direct, SKIP the B02/B03 area
+ *   govt_portal R → consult_stage L   [main-4]
+ *
+ * TOP RECTANGLE LOOP for B02/B03 (technical delay):
+ *   form_sub TOP → up(y=18) → right → B02 TOP        [technical]
+ *   B02 R → B03 L  (straight horizontal)              [technical]
+ *   B03 TOP → up(y=18) → right → govt_portal TOP      [technical]
+ *
+ * VERTICAL DROP from stages to sub-cards:
+ *   govt_portal B → straight down → b05_submit T      [submit]
+ *   govt_portal B → straight down → b06_consult T     [consult]
+ *   consult_stage B → straight down → b07_accept T    [accept]
+ *   consult_stage B → straight down → b08_reject T    [reject]
+ *
+ * BOTTOM EXCEPTION PATHS:
+ *   form_not B → straight down → b01_reminder T       [form-nag]
+ *   b01_reminder B → down(y=553) → right → closed_e010 B   [form-nag]  (runs along very bottom)
+ *   form_sub B → down(y=543) → right → b04_cust L     [customer-delay]  (goes under b01)
+ *   b04_cust R → straight right → closed_e010 L       [customer-delay]
+ *   b08_reject B → down → closed_e010 T               [reject]
+ */
+
 export const EDGES: EdgeDef[] = [
-  // Main horizontal path (Row 1)
+
+  /* ── Main horizontal path ── */
   { id: "e_or_fn",  from: "order_rec",    fromSide: "R", to: "form_not",      toSide: "L", mode: "S", branch: "main-1" },
   { id: "e_fn_fs",  from: "form_not",     fromSide: "R", to: "form_sub",      toSide: "L", mode: "S", branch: "main-2" },
-  { id: "e_fs_b02", from: "form_sub",     fromSide: "R", to: "b02_tech",      toSide: "L", mode: "S", branch: "technical" },
-  { id: "e_b02_b03",from: "b02_tech",     fromSide: "R", to: "b03_fix",       toSide: "L", mode: "S", branch: "technical" },
-  { id: "e_b03_gv", from: "b03_fix",      fromSide: "R", to: "govt_portal",   toSide: "L", mode: "S", branch: "main-3" },
+  { id: "e_fs_gv",  from: "form_sub",     fromSide: "R", to: "govt_portal",   toSide: "L", mode: "S", branch: "main-3" },
   { id: "e_gv_cs",  from: "govt_portal",  fromSide: "R", to: "consult_stage", toSide: "L", mode: "S", branch: "main-4" },
 
-  // Top loop routes (return paths into Govt Portal)
-  { id: "e_fs_gv_top", from: "form_sub",    fromSide: "T", to: "govt_portal", toSide: "T", mode: "HVH", branch: "shortcut",
-    waypoints: [{ x: 417, y: 30 }, { x: 950, y: 30 }] },
-  { id: "e_cs_gv_top", from: "consult_stage",fromSide: "T", to: "govt_portal", toSide: "T", mode: "HVH", branch: "shortcut",
-    waypoints: [{ x: 1380, y: 30 }, { x: 1050, y: 30 }] },
+  /* ── Top rectangular loop: form_sub → B02 → B03 → govt_portal ── */
+  // form_sub TOP → up to y=18 → right to B02 top center, then down into B02 top
+  { id: "e_fs_b02", from: "form_sub",  fromSide: "T", to: "b02_tech", toSide: "T", mode: "S", branch: "technical",
+    waypoints: [{ x: 395, y: 18 }, { x: 537, y: 18 }] },
+  // B02 right → B03 left (straight horizontal at mid-height)
+  { id: "e_b02_b03", from: "b02_tech", fromSide: "R", to: "b03_fix",  toSide: "L", mode: "S", branch: "technical" },
+  // B03 top → up to y=18 → right to govt_portal top center, then down
+  { id: "e_b03_gv",  from: "b03_fix",  fromSide: "T", to: "govt_portal", toSide: "T", mode: "S", branch: "technical",
+    waypoints: [{ x: 677, y: 18 }, { x: 906, y: 18 }] },
 
-  // Sub-cards under Govt Portal & Accepted/Closed
-  { id: "e_gv_b05", from: "govt_portal",  fromSide: "B", to: "b05_submit",    toSide: "T", mode: "VH", branch: "submit",
-    waypoints: [{ x: 915, y: 220 }] },
-  { id: "e_gv_b06", from: "govt_portal",  fromSide: "B", to: "b06_consult",   toSide: "T", mode: "VH", branch: "consult",
-    waypoints: [{ x: 1085, y: 220 }] },
-  { id: "e_cs_b07", from: "consult_stage", fromSide: "B", to: "b07_accept",   toSide: "T", mode: "VH", branch: "accept",
-    waypoints: [{ x: 1295, y: 220 }] },
-  { id: "e_cs_b08", from: "consult_stage", fromSide: "B", to: "b08_reject",   toSide: "T", mode: "VH", branch: "reject",
-    waypoints: [{ x: 1465, y: 220 }] },
+  /* ── Vertical drops from Govt Portal to sub-cards ── */
+  // govt_portal bottom → straight down to B05 top (left sub-card)
+  { id: "e_gv_b05", from: "govt_portal",   fromSide: "B", to: "b05_submit",  toSide: "T", mode: "VH", branch: "submit",
+    waypoints: [{ x: 830, y: 240 }] },
+  // govt_portal bottom → straight down to B06 top (right sub-card)
+  { id: "e_gv_b06", from: "govt_portal",   fromSide: "B", to: "b06_consult", toSide: "T", mode: "VH", branch: "consult",
+    waypoints: [{ x: 982, y: 240 }] },
+  // consult_stage bottom → straight down to B07 top
+  { id: "e_cs_b07", from: "consult_stage", fromSide: "B", to: "b07_accept",  toSide: "T", mode: "VH", branch: "accept",
+    waypoints: [{ x: 1175, y: 240 }] },
+  // consult_stage bottom → straight down to B08 top
+  { id: "e_cs_b08", from: "consult_stage", fromSide: "B", to: "b08_reject",  toSide: "T", mode: "VH", branch: "reject",
+    waypoints: [{ x: 1327, y: 240 }] },
 
-  // Bottom row branches
-  { id: "e_fn_b01", from: "form_not",     fromSide: "B", to: "b01_reminder",  toSide: "T", mode: "S", branch: "form-nag" },
-  { id: "e_b01_cl", from: "b01_reminder", fromSide: "R", to: "closed_e010",   toSide: "L", mode: "S", branch: "form-nag" },
+  /* ── B01 form-nag path ── */
+  // form_not bottom → straight down to B01 top
+  { id: "e_fn_b01", from: "form_not",     fromSide: "B", to: "b01_reminder", toSide: "T", mode: "S", branch: "form-nag" },
+  // B01 bottom → down to y=553 (below all rows) → right → closed_e010 bottom
+  { id: "e_b01_cl", from: "b01_reminder", fromSide: "B", to: "closed_e010",  toSide: "B", mode: "S", branch: "form-nag",
+    waypoints: [{ x: 197, y: 553 }, { x: 1251, y: 553 }] },
 
-  { id: "e_fs_b04", from: "form_sub",     fromSide: "B", to: "b04_cust",      toSide: "L", mode: "VH", branch: "customer-delay",
-    waypoints: [{ x: 417, y: 495 }] },
-  { id: "e_b04_cl", from: "b04_cust",     fromSide: "R", to: "closed_e010",   toSide: "L", mode: "S", branch: "customer-delay" },
-  { id: "e_b04_gv", from: "b04_cust",     fromSide: "T", to: "govt_portal",   toSide: "T", mode: "VHV", branch: "customer-delay",
-    waypoints: [{ x: 820, y: 300 }, { x: 780, y: 30 }, { x: 1000, y: 30 }] },
+  /* ── B04 customer-delay path ── */
+  // form_sub bottom → down to y=543 → right to B04 left
+  { id: "e_fs_b04", from: "form_sub", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
+    waypoints: [{ x: 395, y: 543 }, { x: 640, y: 543 }] },
+  // B04 right → straight right → closed_e010 left (same row)
+  { id: "e_b04_cl", from: "b04_cust", fromSide: "R", to: "closed_e010", toSide: "L", mode: "S", branch: "customer-delay" },
 
-  { id: "e_b08_cl", from: "b08_reject",   fromSide: "B", to: "closed_e010",   toSide: "T", mode: "S", branch: "reject",
-    waypoints: [{ x: 1465, y: 400 }, { x: 1380, y: 400 }] },
+  /* ── B08 reject → Order Closed ── */
+  // B08 bottom → down → closed_e010 top
+  { id: "e_b08_cl", from: "b08_reject", fromSide: "B", to: "closed_e010", toSide: "T", mode: "VH", branch: "reject",
+    waypoints: [{ x: 1327, y: 407 }] },
 ];
 
 /* ─── Geometry helpers ─── */
@@ -175,7 +345,7 @@ export function activeBranchesFor(
     case "consultation_done":  s.add("consult"); break;
     case "application_approved": s.add("accept"); break;
     case "application_rejected": s.add("reject"); break;
-    case "post_b03_resume":    break; // back to form_submitted, no branch
+    case "post_b03_resume":    break;
     case "completed":          s.add("accept"); break;
     case "closed":
       if (reasonCode?.toUpperCase().startsWith("B")) s.add("reject");
@@ -196,7 +366,7 @@ export function mainDoneEdgesFor(currentIdx: number, phase: JourneyPhase): Set<s
 
   if (idx >= 2) s.add("e_or_fn");
   if (idx >= 3) s.add("e_fn_fs");
-  if (idx >= 4) { s.add("e_fs_b02"); s.add("e_b02_b03"); s.add("e_b03_gv"); }
+  if (idx >= 4) { s.add("e_fs_gv"); s.add("e_fs_b02"); s.add("e_b02_b03"); s.add("e_b03_gv"); }
   if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
@@ -209,9 +379,8 @@ export function currentMainEdgeFor(
   if (terminal) return null;
   if (phase === "form_not_submitted" || phase === "technical_delay" || phase === "customer_delay") return null;
   if (currentIdx <= 2) return "e_or_fn";
-  if (currentIdx === 3) return "e_fs_b02";
-  if (currentIdx === 4) return "e_b03_gv";
-  if (currentIdx >= 5) return "e_gv_cs";
+  if (currentIdx === 3) return "e_fs_gv";
+  if (currentIdx === 4) return "e_gv_cs";
   return null;
 }
 
@@ -240,34 +409,31 @@ export interface EdgeStateInput {
   currentIdx?: number;
 }
 
-/** Edges belonging to a delay loop that returns into the main flow. */
-const RESOLVED_DELAY_EDGES: Record<string, BranchKey> = {
-  e_fs_b02: "technical",
-  e_b02_b03: "technical",
-  e_b03_gv: "technical",
-};
+/** Technical loop edges — shown as done once order moves past form_submitted. */
+const RESOLVED_TECH_EDGES = new Set(["e_fs_b02", "e_b02_b03", "e_b03_gv"]);
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
+  // 1. Already-completed main path edges
   if (i.doneMainEdges.has(e.id)) return "done";
+  // 2. Currently traversing this edge
   if (i.currentMainEdge && e.id === i.currentMainEdge) return "active";
+  // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
     if (i.terminal === "closed" &&
         (e.branch === "form-nag" || e.branch === "customer-delay" || e.branch === "reject")) {
       return "closed";
     }
-    if (i.terminal === "completed" && (e.branch === "accept" || e.branch === "shortcut" || e.branch === "consult" || e.branch === "submit")) {
+    if (i.terminal === "completed" &&
+        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
     return "active";
   }
-  // A resolved technical delay: once we've moved past form_submitted into the
-  // govt flow, show the technical loop as done (green) instead of idle.
-  if (
-    RESOLVED_DELAY_EDGES[e.id] &&
-    i.phase !== "technical_delay" &&
-    (i.currentIdx ?? 0) >= 4 &&
-    !i.terminal
-  ) {
+  // 4. Technical loop edges go green once order is past form_submitted into govt flow
+  if (RESOLVED_TECH_EDGES.has(e.id) &&
+      i.phase !== "technical_delay" &&
+      (i.currentIdx ?? 0) >= 4 &&
+      !i.terminal) {
     return "done";
   }
   return "idle";
@@ -290,8 +456,8 @@ const STAGE_IDX: Record<string, number> = {
 };
 
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
-  if (nodeId === "b07_accept" && i.terminal === "completed") return "terminal-ok";
-  if (nodeId === "closed_e010" && i.terminal === "closed")  return "terminal-bad";
+  if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
+  if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
@@ -305,4 +471,3 @@ export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
 
   return "idle";
 }
-
