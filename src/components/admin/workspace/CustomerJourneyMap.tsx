@@ -28,7 +28,7 @@ import {
 import {
   NODES, EDGES, nodeById, anchor, pathD, nodeW, nodeH,
   activeBranchesFor, mainDoneEdgesFor, edgeState, nodeState,
-  currentMainEdgeFor, currentStageNodeFor,
+  currentMainEdgesFor, currentStageNodeFor,
   CANVAS_W, CANVAS_H,
   type IconKey, type NodeDef, type Tone, type NodeState,
 } from "@/lib/orders/journey-graph";
@@ -271,8 +271,8 @@ export function CustomerJourneyMap(p: Props) {
     () => mainDoneEdgesFor(currentIdx, phase),
     [currentIdx, phase],
   );
-  const currentMainEdge = useMemo(
-    () => currentMainEdgeFor(currentIdx, phase, live.terminal),
+  const currentMainEdges = useMemo(
+    () => currentMainEdgesFor(currentIdx, phase, live.terminal),
     [currentIdx, phase, live.terminal],
   );
   const currentStageNode = useMemo(
@@ -389,7 +389,7 @@ export function CustomerJourneyMap(p: Props) {
                   if (!from || !to) return null;
                   const a = anchor(from, e.fromSide);
                   const b = anchor(to,   e.toSide);
-                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdge, phase, currentIdx });
+                  const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdges, phase, currentIdx });
                   const cls =
                     state === "done"   ? "stroke-emerald-500"
                   : state === "active" ? "stroke-indigo-500 edge-active"

@@ -121,15 +121,14 @@ describe("mainDoneEdgesFor", () => {
     const s = mainDoneEdgesFor(4, "completed");
     expect(s.has("e_or_fn")).toBe(true);
     expect(s.has("e_fn_fs")).toBe(true);
-    expect(s.has("e_fs_gv")).toBe(true);
     expect(s.has("e_fs_b02")).toBe(true);
     expect(s.has("e_b02_b03")).toBe(true);
     expect(s.has("e_b03_gv")).toBe(true);
     expect(s.has("e_gv_cs")).toBe(false);
   });
   it("progresses normally when not holding", () => {
-    // idx>=2: e_or_fn; idx>=3: e_fn_fs; idx>=4: e_fs_gv,e_fs_b02,e_b02_b03,e_b03_gv; idx>=5: e_gv_cs
-    expect(mainDoneEdgesFor(6, "completed").size).toBe(7);
+    // idx>=2: e_or_fn; idx>=3: e_fn_fs; idx>=4: e_fs_b02,e_b02_b03,e_b03_gv; idx>=5: e_gv_cs
+    expect(mainDoneEdgesFor(6, "completed").size).toBe(6);
   });
 });
 
@@ -149,10 +148,10 @@ describe("edgeState", () => {
     expect(edgeState(findEdge("e_b02_b03"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
       .toBe("active");
   });
-  it("marks e_fs_gv done after form_submitted advances to govt", () => {
+  it("marks e_fs_b02 done after form_submitted advances to govt", () => {
     const branches = activeBranchesFor("consultation_done", null, null);
     const done = mainDoneEdgesFor(5, "consultation_done");
-    expect(edgeState(findEdge("e_fs_gv"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
+    expect(edgeState(findEdge("e_fs_b02"), { activeBranches: branches, doneMainEdges: done, terminal: null }))
       .toBe("done");
   });
   it("marks unrelated edge idle", () => {
