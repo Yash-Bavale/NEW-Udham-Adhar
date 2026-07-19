@@ -113,6 +113,13 @@ export const handleGovtRejected = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
+    // S10 · Application Rejected → S12 · Order Closed
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("applications")
+      .update({ fulfillment_status: "application_rejected" } as never)
+      .eq("id", data.orderId);
+
     // Same cleanup as system close.
     const [{ cancelTimers }, { cancelAllForOrder }] = await Promise.all([
       import("./timers.server"),
@@ -120,6 +127,11 @@ export const handleGovtRejected = createServerFn({ method: "POST" })
     ]);
     await cancelTimers(data.orderId);
     await cancelAllForOrder(data.orderId, "govt_rejection");
+
+    await supabaseAdmin
+      .from("applications")
+      .update({ fulfillment_status: "order_closed" } as never)
+      .eq("id", data.orderId);
 
     return { ok: true, order: updated, source: "govt_rejection" as const };
   });
