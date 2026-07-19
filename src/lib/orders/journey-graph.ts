@@ -46,7 +46,7 @@ export type EdgeMode = "S" | "HV" | "VH" | "HVH" | "VHV";
 
 export type BranchKey =
   | "main-1" | "main-2" | "main-3" | "main-4"
-  | "form-nag" | "customer-delay" | "technical"
+  | "form-nag" | "customer-delay" | "customer-delay-main" | "customer-delay-tech" | "customer-delay-govt" | "technical"
   | "submit" | "consult" | "accept" | "reject";
 
 export interface EdgeDef {
@@ -254,12 +254,12 @@ export const EDGES: EdgeDef[] = [
     waypoints: [{ x: 468, y: 195 }, { x: 468, y: 18 }, { x: 1271, y: 18 }] },
 
   /* ── Bottom loop: starts between form_sub and B02 → B05 bottom & B04 left ── */
-  { id: "e_bot_b04", from: "form_sub", fromSide: "R", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 468, y: 195 }, { x: 468, y: 405 }, { x: 830, y: 405 }, { x: 830, y: 470 }] },
-  { id: "e_b03_b04", from: "b03_fix", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 693, y: 405 }, { x: 830, y: 405 }, { x: 830, y: 470 }] },
-  { id: "e_b05_b04", from: "b05_submit", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay",
-    waypoints: [{ x: 850, y: 405 }, { x: 830, y: 405 }, { x: 830, y: 470 }] },
+  { id: "e_bot_b04", from: "form_sub", fromSide: "R", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-main",
+    waypoints: [{ x: 468, y: 470 }] },
+  { id: "e_b03_b04", from: "b03_fix", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-tech",
+    waypoints: [{ x: 693, y: 470 }] },
+  { id: "e_b05_b04", from: "b05_submit", fromSide: "B", to: "b04_cust", toSide: "L", mode: "S", branch: "customer-delay-govt",
+    waypoints: [{ x: 850, y: 470 }] },
 
   /* ── Vertical drops from govt_portal to sub-cards ── */
   { id: "e_gv_b05", from: "govt_portal", fromSide: "B", to: "b05_submit",  toSide: "T", mode: "VH", branch: "submit",
@@ -324,13 +324,23 @@ export function activeBranchesFor(
   terminal: "completed" | "closed" | null,
   reasonCode: string | null,
   workflowStatus?: string | null,
+  currentIdx?: number,
+  techDelayResolved?: boolean,
 ): Set<BranchKey> {
   const s = new Set<BranchKey>();
   switch (phase) {
     case "form_not_submitted": s.add("form-nag"); break;
     case "form_submitted":     break;
     case "technical_delay":    s.add("technical"); break;
-    case "customer_delay":     s.add("customer-delay"); break;
+    case "customer_delay":
+      if (currentIdx !== undefined && currentIdx >= 4) {
+        s.add("customer-delay-govt");
+      } else if (techDelayResolved) {
+        s.add("customer-delay-tech");
+      } else {
+        s.add("customer-delay-main");
+      }
+      break;
     case "govt_processing":    s.add("submit"); break;
     case "consultation_done":  s.add("consult"); break;
     case "application_approved": s.add("accept"); break;
@@ -339,7 +349,15 @@ export function activeBranchesFor(
     case "completed":          s.add("accept"); break;
     case "closed":
       if (reasonCode?.toUpperCase().startsWith("B")) s.add("reject");
-      else if (/customer|external_dependency/i.test(workflowStatus ?? "")) s.add("customer-delay");
+      else if (/customer|external_dependency/i.test(workflowStatus ?? "")) {
+        if (currentIdx !== undefined && currentIdx >= 4) {
+          s.add("customer-delay-govt");
+        } else if (techDelayResolved) {
+          s.add("customer-delay-tech");
+        } else {
+          s.add("customer-delay-main");
+        }
+      }
       else s.add("form-nag");
       break;
   }
@@ -421,7 +439,12 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
     if (i.terminal === "closed" &&
-        (e.branch === "form-nag" || e.branch === "customer-delay" || e.branch === "reject")) {
+        (e.branch === "form-nag" ||
+         e.branch === "customer-delay" ||
+         e.branch === "customer-delay-main" ||
+         e.branch === "customer-delay-tech" ||
+         e.branch === "customer-delay-govt" ||
+         e.branch === "reject")) {
       return "closed";
     }
     if (i.terminal === "completed" &&
@@ -468,13 +491,20 @@ export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
-  const incident = EDGES.some(
-    (e) => (e.from === nodeId || e.to === nodeId) && i.activeBranches.has(e.branch),
-  );
-  if (incident) return "active";
-
   const stageIdx = STAGE_IDX[nodeId];
   if (stageIdx !== undefined && i.currentIdx > stageIdx) return "done";
+
+  const incident = EDGES.some(
+    (e) => {
+      if (!i.activeBranches.has(e.branch)) return false;
+      const node = nodeById[nodeId];
+      if (node?.kind === "action" || node?.kind === "sub" || node?.kind === "terminal") {
+        return e.to === nodeId;
+      }
+      return e.from === nodeId || e.to === nodeId;
+    }
+  );
+  if (incident) return "active";
 
   return "idle";
 }

@@ -122,11 +122,11 @@ export function CustomerJourneyMap(p: Props) {
     try { return window.localStorage.getItem(formLinkKey) === "1"; } catch { return false; }
   });
   const markFormLinkSent = () => {
-    try { window.localStorage.setItem(formLinkKey, "1"); } catch {}
+    try { window.localStorage.setItem(formLinkKey, "1"); } catch { }
     setFormLinkSent(true);
   };
   const clearFormLinkSent = () => {
-    try { window.localStorage.removeItem(formLinkKey); } catch {}
+    try { window.localStorage.removeItem(formLinkKey); } catch { }
     setFormLinkSent(false);
   };
 
@@ -136,11 +136,11 @@ export function CustomerJourneyMap(p: Props) {
     try { return window.localStorage.getItem(techResumeKey) === "1"; } catch { return false; }
   });
   const markTechDelayResolved = () => {
-    try { window.localStorage.setItem(techResumeKey, "1"); } catch {}
+    try { window.localStorage.setItem(techResumeKey, "1"); } catch { }
     setTechDelayResolved(true);
   };
   const clearTechDelayResolved = () => {
-    try { window.localStorage.removeItem(techResumeKey) } catch {}
+    try { window.localStorage.removeItem(techResumeKey) } catch { }
     setTechDelayResolved(false);
   };
 
@@ -173,9 +173,9 @@ export function CustomerJourneyMap(p: Props) {
   const timers = view.timers ?? [];
   const findTimer = (kindMatch: RegExp) =>
     timers.find((t: any) => kindMatch.test(t?.kind ?? "") && t?.status === "running") ?? null;
-  const formAutoCloseTimer  = findTimer(/form_pending_autoclose|form_.*8h/);
-  const customerHoldTimer   = findTimer(/customer_hold|customer_side_autoclose/);
-  const technicalHoldTimer  = findTimer(/technical_hold|our_side_reminder/);
+  const formAutoCloseTimer = findTimer(/form_pending_autoclose|form_.*8h/);
+  const customerHoldTimer = findTimer(/customer_hold|customer_side_autoclose/);
+  const technicalHoldTimer = findTimer(/technical_hold|our_side_reminder/);
 
   const listTickets = useServerFn(listOrderTickets);
   const ticketQ = useQuery({
@@ -214,11 +214,11 @@ export function CustomerJourneyMap(p: Props) {
   };
 
   const fnFormLink = useServerFn(sendFormLink);
-  const fnSubmit   = useServerFn(markSubmittedToGovt);
+  const fnSubmit = useServerFn(markSubmittedToGovt);
   const fnReminder = useServerFn(sendManualReminder);
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
-  const fnResume   = useServerFn(resumeFromHold);
+  const fnResume = useServerFn(resumeFromHold);
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
@@ -252,20 +252,20 @@ export function CustomerJourneyMap(p: Props) {
   });
 
   const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean }> = {
-    B01: { onClick: () => mutFormLink.mutate(),         pending: mutFormLink.isPending },
+    B01: { onClick: () => mutFormLink.mutate(), pending: mutFormLink.isPending },
     B02: { onClick: () => setDialog({ kind: "technical_delay" }) },
-    B03: { onClick: () => mutResume.mutate(),           pending: mutResume.isPending },
+    B03: { onClick: () => mutResume.mutate(), pending: mutResume.isPending },
     B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
-    B05: { onClick: () => mutSubmit.mutate(),           pending: mutSubmit.isPending },
-    B06: { onClick: () => mutConsultation.mutate(),     pending: mutConsultation.isPending },
+    B05: { onClick: () => mutSubmit.mutate(), pending: mutSubmit.isPending },
+    B06: { onClick: () => mutConsultation.mutate(), pending: mutConsultation.isPending },
     B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
     B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
 
   /* ─── Highlight state (pure) ─── */
   const activeBranches = useMemo(
-    () => activeBranchesFor(phase, live.terminal, live.reasonCode, p.workflowStatus),
-    [phase, live.terminal, live.reasonCode, p.workflowStatus],
+    () => activeBranchesFor(phase, live.terminal, live.reasonCode, p.workflowStatus, currentIdx, techDelayResolved),
+    [phase, live.terminal, live.reasonCode, p.workflowStatus, currentIdx, techDelayResolved],
   );
   const doneMainEdges = useMemo(
     () => mainDoneEdgesFor(currentIdx, phase),
@@ -299,12 +299,12 @@ export function CustomerJourneyMap(p: Props) {
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                   closed ? "bg-rose-100 text-rose-700"
-                  : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
-                  : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
-                  : phase === "govt_processing" || phase === "consultation_done" ? "bg-violet-100 text-violet-800"
-                  : completed ? "bg-emerald-100 text-emerald-800"
-                  : p.adminOverride ? "bg-orange-100 text-orange-800"
-                  : "bg-indigo-100 text-indigo-800",
+                    : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
+                      : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
+                        : phase === "govt_processing" || phase === "consultation_done" ? "bg-violet-100 text-violet-800"
+                          : completed ? "bg-emerald-100 text-emerald-800"
+                            : p.adminOverride ? "bg-orange-100 text-orange-800"
+                              : "bg-indigo-100 text-indigo-800",
                 )}
               >
                 {closed ? <XCircle className="size-3" /> : <ClipboardCheck className="size-3" />}
@@ -369,10 +369,10 @@ export function CustomerJourneyMap(p: Props) {
                       <path
                         d="M 0 0 L 10 5 L 0 10 z"
                         className={
-                          s === "done"   ? "fill-emerald-500"
-                        : s === "active" ? "fill-indigo-500"
-                        : s === "closed" ? "fill-rose-500"
-                        :                  "fill-slate-300"
+                          s === "done" ? "fill-emerald-500"
+                            : s === "active" ? "fill-indigo-500"
+                              : s === "closed" ? "fill-rose-500"
+                                : "fill-slate-300"
                         }
                       />
                     </marker>
@@ -385,16 +385,16 @@ export function CustomerJourneyMap(p: Props) {
 
                 {visibleEdges.map((e) => {
                   const from = nodeById[e.from];
-                  const to   = nodeById[e.to];
+                  const to = nodeById[e.to];
                   if (!from || !to) return null;
                   const a = anchor(from, e.fromSide);
-                  const b = anchor(to,   e.toSide);
+                  const b = anchor(to, e.toSide);
                   const state = edgeState(e, { activeBranches, doneMainEdges, terminal: live.terminal, currentMainEdges, phase, currentIdx });
                   const cls =
-                    state === "done"   ? "stroke-emerald-500"
-                  : state === "active" ? "stroke-indigo-500 edge-active"
-                  : state === "closed" ? "stroke-rose-500 edge-active"
-                  :                      "stroke-slate-300";
+                    state === "done" ? "stroke-emerald-500"
+                      : state === "active" ? "stroke-indigo-500 edge-active"
+                        : state === "closed" ? "stroke-rose-500 edge-active"
+                          : "stroke-slate-300";
                   const strokeWidth = state === "idle" ? 1.5 : 2.5;
                   const dash = state === "active" || state === "closed" ? "8 4" : undefined;
                   return (
@@ -586,14 +586,14 @@ function getButtonLabel(code?: string): string {
 /* ═════════════════════════ FlowNode ═════════════════════════ */
 
 const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon: string; btn: string; ring: string; solid: string }> = {
-  maroon:  { border: "border-rose-900",    bg: "bg-rose-950",    text: "text-white",       icon: "text-white",       btn: "bg-rose-800 hover:bg-rose-700 text-white",       ring: "ring-rose-400",    solid: "bg-rose-900 text-white" },
-  slate:   { border: "border-slate-400",   bg: "bg-white",       text: "text-slate-800",   icon: "text-slate-600",   btn: "bg-slate-700 hover:bg-slate-800 text-white",     ring: "ring-slate-300",   solid: "bg-slate-700 text-white" },
-  amber:   { border: "border-amber-400",   bg: "bg-amber-50",    text: "text-amber-900",   icon: "text-amber-700",   btn: "bg-amber-600 hover:bg-amber-700 text-white",     ring: "ring-amber-300",   solid: "bg-amber-600 text-white" },
-  rose:    { border: "border-rose-400",    bg: "bg-rose-50",     text: "text-rose-900",    icon: "text-rose-700",    btn: "bg-rose-600 hover:bg-rose-700 text-white",       ring: "ring-rose-300",    solid: "bg-rose-600 text-white" },
-  sky:     { border: "border-sky-400",     bg: "bg-sky-50",      text: "text-sky-900",     icon: "text-sky-700",     btn: "bg-sky-600 hover:bg-sky-700 text-white",         ring: "ring-sky-300",     solid: "bg-sky-600 text-white" },
-  violet:  { border: "border-violet-400",  bg: "bg-violet-50",   text: "text-violet-900",  icon: "text-violet-700",  btn: "bg-violet-600 hover:bg-violet-700 text-white",   ring: "ring-violet-300",  solid: "bg-violet-600 text-white" },
-  emerald: { border: "border-emerald-500", bg: "bg-emerald-600", text: "text-white",       icon: "text-white",       btn: "bg-emerald-700 hover:bg-emerald-800 text-white", ring: "ring-emerald-300", solid: "bg-emerald-600 text-white" },
-  indigo:  { border: "border-indigo-400",  bg: "bg-indigo-50",   text: "text-indigo-900",  icon: "text-indigo-700",  btn: "bg-indigo-600 hover:bg-indigo-700 text-white",   ring: "ring-indigo-300",  solid: "bg-indigo-600 text-white" },
+  maroon: { border: "border-rose-900", bg: "bg-rose-950", text: "text-white", icon: "text-white", btn: "bg-rose-800 hover:bg-rose-700 text-white", ring: "ring-rose-400", solid: "bg-rose-900 text-white" },
+  slate: { border: "border-slate-400", bg: "bg-white", text: "text-slate-800", icon: "text-slate-600", btn: "bg-slate-700 hover:bg-slate-800 text-white", ring: "ring-slate-300", solid: "bg-slate-700 text-white" },
+  amber: { border: "border-amber-400", bg: "bg-amber-50", text: "text-amber-900", icon: "text-amber-700", btn: "bg-amber-600 hover:bg-amber-700 text-white", ring: "ring-amber-300", solid: "bg-amber-600 text-white" },
+  rose: { border: "border-rose-400", bg: "bg-rose-50", text: "text-rose-900", icon: "text-rose-700", btn: "bg-rose-600 hover:bg-rose-700 text-white", ring: "ring-rose-300", solid: "bg-rose-600 text-white" },
+  sky: { border: "border-sky-400", bg: "bg-sky-50", text: "text-sky-900", icon: "text-sky-700", btn: "bg-sky-600 hover:bg-sky-700 text-white", ring: "ring-sky-300", solid: "bg-sky-600 text-white" },
+  violet: { border: "border-violet-400", bg: "bg-violet-50", text: "text-violet-900", icon: "text-violet-700", btn: "bg-violet-600 hover:bg-violet-700 text-white", ring: "ring-violet-300", solid: "bg-violet-600 text-white" },
+  emerald: { border: "border-emerald-500", bg: "bg-emerald-600", text: "text-white", icon: "text-white", btn: "bg-emerald-700 hover:bg-emerald-800 text-white", ring: "ring-emerald-300", solid: "bg-emerald-600 text-white" },
+  indigo: { border: "border-indigo-400", bg: "bg-indigo-50", text: "text-indigo-900", icon: "text-indigo-700", btn: "bg-indigo-600 hover:bg-indigo-700 text-white", ring: "ring-indigo-300", solid: "bg-indigo-600 text-white" },
 };
 
 function FlowNode({
