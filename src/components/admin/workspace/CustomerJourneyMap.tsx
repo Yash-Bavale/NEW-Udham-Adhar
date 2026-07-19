@@ -58,6 +58,8 @@ interface Props {
   closureReasonLabel?: string | null;
   payments?: any[];
   hideAmount?: boolean;
+  /** Admin override state — controlled by parent (WorkspaceShell). */
+  adminOverride?: boolean;
 }
 
 /* Icon registry keyed by string keys used in journey-graph */
@@ -113,16 +115,6 @@ export function CustomerJourneyMap(p: Props) {
     [events],
   );
 
-  const postWaitKey = `journey.b07Pressed:${p.applicationId}`;
-  const [postWaitSubmitted, setPostWaitSubmitted] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(postWaitKey) === "1"; } catch { return false; }
-  });
-  const markPostWaitSubmitted = () => {
-    try { window.localStorage.setItem(postWaitKey, "1"); } catch {}
-    setPostWaitSubmitted(true);
-  };
-
   const formLinkKey = `journey.b01Sent:${p.applicationId}`;
   const [formLinkSent, setFormLinkSent] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -164,10 +156,10 @@ export function CustomerJourneyMap(p: Props) {
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
     reminderCount,
-    postWaitSubmitted,
     formLinkSent,
     techDelayResolved,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, postWaitSubmitted, formLinkSent, techDelayResolved]);
+    adminOverride: p.adminOverride,
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, formLinkSent, techDelayResolved, p.adminOverride]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
   const gate = (code: ButtonCode) => enabledCodes.includes(code) && !closed && !completed;
@@ -227,11 +219,6 @@ export function CustomerJourneyMap(p: Props) {
     onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); markTechDelayResolved(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const mutSubmitAfterWait = useMutation({
-    mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
-    onSuccess: () => { toast.success("E005 sent — consultation completed (after waiting)"); markPostWaitSubmitted(); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
-  });
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
     onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); markFormLinkSent(); invalidate(); },
@@ -240,6 +227,11 @@ export function CustomerJourneyMap(p: Props) {
   const mutSubmit = useMutation({
     mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
     onSuccess: () => { toast.success("E005 sent — application marked submitted to govt"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const mutConsultation = useMutation({
+    mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("E005 sent — consultation completed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutReminder = useMutation({
@@ -253,22 +245,26 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const promptReminder = () => {
-    const note = window.prompt("Optional message to include with reminder:", "");
-    if (note !== null) mutReminder.mutate(note);
-  };
-
+  /**
+   * Button handlers — v2 mapping:
+   *   B01 = Send Form Link (E002)           — unchanged
+   *   B02 = Technical Delay (E003)          — unchanged
+   *   B03 = Issue Resolved (E011)           — unchanged
+   *   B04 = Customer Side Delay (E004)      — was B10
+   *   B05 = Application Submitted (E005)    — was B04
+   *   B06 = Consultation Completed (E005)   — was B07
+   *   B07 = Govt Accepted + PDF (E007)      — was B08
+   *   B08 = Govt Rejected (E008)            — was B09
+   */
   const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean }> = {
     B01: { onClick: () => mutFormLink.mutate(),         pending: mutFormLink.isPending },
     B02: { onClick: () => setDialog({ kind: "technical_delay" }) },
     B03: { onClick: () => mutResume.mutate(),           pending: mutResume.isPending },
-    B04: { onClick: () => mutSubmit.mutate(),           pending: mutSubmit.isPending },
-    B05: { onClick: promptReminder },
-    B06: { onClick: promptReminder },
-    B07: { onClick: () => mutSubmitAfterWait.mutate(),  pending: mutSubmitAfterWait.isPending },
-    B08: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
-    B09: { onClick: () => setDialog({ kind: "govt_rejected" }) },
-    B10: { onClick: () => setDialog({ kind: "customer_delay" }) },
+    B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
+    B05: { onClick: () => mutSubmit.mutate(),           pending: mutSubmit.isPending },
+    B06: { onClick: () => mutConsultation.mutate(),     pending: mutConsultation.isPending },
+    B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
+    B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
 
   /* ─── Highlight state (pure) ─── */
@@ -310,13 +306,14 @@ export function CustomerJourneyMap(p: Props) {
                   closed ? "bg-rose-100 text-rose-700"
                   : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
                   : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
-                  : phase === "awaiting_govt" || phase === "status_checked" ? "bg-violet-100 text-violet-800"
+                  : phase === "govt_processing" || phase === "consultation_done" ? "bg-violet-100 text-violet-800"
                   : completed ? "bg-emerald-100 text-emerald-800"
+                  : p.adminOverride ? "bg-orange-100 text-orange-800"
                   : "bg-indigo-100 text-indigo-800",
                 )}
               >
                 {closed ? <XCircle className="size-3" /> : <ClipboardCheck className="size-3" />}
-                {live.subStateLabel}
+                {p.adminOverride ? "ADMIN OVERRIDE" : live.subStateLabel}
               </span>
               {hasOpenTicket && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
@@ -443,7 +440,7 @@ export function CustomerJourneyMap(p: Props) {
                       label="auto-close"
                     />
                   );
-                } else if (n.id === "b10_cust" && activeBranches.has("customer-delay") && (customerHoldTimer || p.closureNextAt)) {
+                } else if (n.id === "b04_cust" && activeBranches.has("customer-delay") && (customerHoldTimer || p.closureNextAt)) {
                   countdown = (
                     <CountdownChip
                       firesAt={customerHoldTimer?.fires_at ?? customerHoldTimer?.firesAt ?? p.closureNextAt}

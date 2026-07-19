@@ -1,8 +1,17 @@
-// Single source of truth for the 7-stage happy path + sub-branches shown
-// in the CustomerJourneyMap. Pure config — no React, no side effects.
+// Single source of truth for the journey-map stage flow S01–S12 and
+// button gating B01–B10. Pure config — no React, no side effects.
 //
-// Mirrors the flowchart in Business_Help_Services_Order_and_Support_Ticket
-// _Flow_Chart_Button.drawio.html supplied by the user.
+// Button-to-action mapping (v2):
+//   B01 — Send Form Link / Reminder   (E002)
+//   B02 — Technical Delay              (E003)
+//   B03 — Issue Resolved               (E011)
+//   B04 — Customer Side Delay          (E004)
+//   B05 — Application Submitted to Govt(E005)
+//   B06 — Consultation Completed       (E005)
+//   B07 — Government Accepted          (E007)
+//   B08 — Government Rejected          (E008)
+//   B09 — Admin Override Enable
+//   B10 — Admin Override Disable
 
 import type { OrderStage } from "@/lib/crm/computeOrderStage";
 
@@ -77,7 +86,7 @@ export interface JourneyBranch {
 export interface JourneyBranchButton {
   key: string;
   label: string;
-  emailCode: string;             // E001…E010, T001…T003, R001
+  emailCode: string;             // E001…E011, T001…T003, R001
   action: JourneyActionKind;
   reasonCategory?: "A" | "B" | "C";
   variant?: "primary" | "outline" | "danger" | "success";
@@ -85,15 +94,19 @@ export interface JourneyBranchButton {
 }
 
 export type JourneyActionKind =
-  | "send_form_link"           // E002
-  | "customer_delay"           // E004 + Cat A picker
-  | "technical_delay"          // E003 + Cat B picker
-  | "submit_to_govt"           // E005
+  | "send_form_link"           // B01 → E002
+  | "customer_delay"           // B04 → E004 + Cat A picker
+  | "technical_delay"          // B02 → E003 + Cat B picker
+  | "technical_resolved"       // B03 → E011
+  | "submit_to_govt"           // B05 → E005
+  | "consultation_completed"   // B06 → E005
+  | "govt_accepted"            // B07 → E007 + Upload PDF
+  | "govt_rejected"            // B08 → E008 + Cat B picker
   | "reminder_e006"            // E006 + employee reminder
-  | "complete_with_cert"       // E007
-  | "application_rejected"     // E008 + govt rejected close
   | "talk_to_expert_done"      // E009
   | "force_close"              // E010 + Cat A picker
+  | "admin_override_enable"    // B09
+  | "admin_override_disable"   // B10
   | "ticket_normal_close"      // T001 normal
   | "ticket_restart_order"     // T001 restart
   | "ticket_consultation_done" // T001 consultation
@@ -161,21 +174,21 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
     title: "After Application Submitted to Govt",
     tone: "violet",
     description:
-      "Either close the loop with E005, or send E006 + add a reminder for yourself to check the final status.",
+      "Application submitted to government portal. Awaiting consultation completion.",
     buttons: [
       {
-        key: "e005",
-        label: "Send E005 — Complete Submission",
+        key: "e005-submit",
+        label: "Send E005 — Application Submitted",
         emailCode: "E005",
         action: "submit_to_govt",
         variant: "success",
       },
       {
-        key: "e006",
-        label: "Send E006 + Add Reminder",
-        emailCode: "E006",
-        action: "reminder_e006",
-        variant: "outline",
+        key: "e005-consult",
+        label: "Send E005 — Consultation Completed",
+        emailCode: "E005",
+        action: "consultation_completed",
+        variant: "success",
       },
     ],
   },
@@ -191,23 +204,16 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
         key: "e007",
         label: "E007 — Accepted + Attach PDF",
         emailCode: "E007",
-        action: "complete_with_cert",
+        action: "govt_accepted",
         variant: "success",
       },
       {
         key: "e008",
         label: "E008 — Application Rejected",
         emailCode: "E008",
-        action: "application_rejected",
+        action: "govt_rejected",
         reasonCategory: "B",
         variant: "danger",
-      },
-      {
-        key: "e006-again",
-        label: "Add Reminder Again",
-        emailCode: "E006",
-        action: "reminder_e006",
-        variant: "outline",
       },
     ],
   },
@@ -279,7 +285,7 @@ export const CLOSURE_BUTTONS: JourneyBranchButton[] = [
     key: "e008-closure",
     label: "E008 — Application Rejected (Close)",
     emailCode: "E008",
-    action: "application_rejected",
+    action: "govt_rejected",
     reasonCategory: "B",
     variant: "danger",
   },
@@ -374,38 +380,47 @@ export type ButtonCode =
   | "B06" | "B07" | "B08" | "B09" | "B10";
 
 export type JourneyPhase =
-  | "form_not_submitted"
-  | "form_link_sent"
-  | "form_submitted"
-  | "technical_delay"
-  | "post_b03_resume"
-  | "customer_delay"
-  | "consultation_done"
-  | "awaiting_govt"
-  | "status_checked"
-  | "post_wait_submitted"
-  | "completed"
-  | "closed";
+  | "form_not_submitted"     // S02 — B01 active
+  | "form_link_sent"         // S03 — waiting for customer submission
+  | "form_submitted"         // S04 — B02, B04, B05, B06, B07, B08
+  | "technical_delay"        // S05 — B03 only
+  | "post_b03_resume"        // S04 after tech delay resolved — B04, B05, B06, B07, B08
+  | "customer_delay"         // S06 — no buttons (waiting state)
+  | "govt_processing"        // S07 — B04, B05, B06, B07, B08
+  | "consultation_done"      // S08 — B07, B08
+  | "application_approved"   // S09 — no buttons (completion action)
+  | "application_rejected"   // S10 — B07, B08 (can correct)
+  | "completed"              // S11 — no buttons
+  | "closed"                 // S12 — no buttons
+  | "admin_override";        // All buttons active
 
 /**
- * After B10 (Customer Side Delay) is submitted the operator returns to the
- * standard Form Submitted set per the reference chart (B02, B04, B05, B08, B10).
+ * Phase → enabled buttons mapping. This is the core gating table that
+ * mirrors the user's reference chart.
+ *
+ * New B-code meanings (v2):
+ *   B04 = Customer Side Delay (was B10)
+ *   B05 = Submit to Govt (was B04)
+ *   B06 = Consultation Completed (was B07)
+ *   B07 = Govt Accepted (was B08)
+ *   B08 = Govt Rejected (was B09)
+ *   B09 = Admin Override Enable
+ *   B10 = Admin Override Disable
  */
-export const POST_B10_ALLOWED: ButtonCode[] = ["B02", "B04", "B05", "B08", "B10"];
-
 export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
-  form_not_submitted:  ["B01"],
-  form_link_sent:      [],
-  form_submitted:      ["B02", "B04", "B05", "B08", "B10"],
-  technical_delay:     ["B03"],
-  post_b03_resume:     ["B04", "B05", "B08", "B09", "B10"],
-  customer_delay:      POST_B10_ALLOWED,
-  consultation_done:   ["B08", "B09"],
-  awaiting_govt:       ["B06", "B07", "B08", "B09", "B10"],
-  status_checked:      ["B07", "B08", "B09", "B10"],
-  post_wait_submitted: ["B08", "B09"],
-  completed:           [],
-  closed:              [],
+  form_not_submitted:   ["B01"],
+  form_link_sent:       [],                                     // S03: waiting
+  form_submitted:       ["B02", "B04", "B05", "B06", "B07", "B08"],  // S04
+  technical_delay:      ["B03"],                                // S05
+  post_b03_resume:      ["B04", "B05", "B06", "B07", "B08"],   // S04 post-tech-fix (no B02)
+  customer_delay:       [],                                     // S06: waiting state
+  govt_processing:      ["B04", "B05", "B06", "B07", "B08"],   // S07
+  consultation_done:    ["B07", "B08"],                         // S08
+  application_approved: [],                                     // S09: complete the order
+  application_rejected: ["B07", "B08"],                         // S10: can re-accept
+  completed:            [],                                     // S11
+  closed:               [],                                     // S12
+  admin_override:       ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08"],
 };
 
 export interface DerivePhaseInput {
@@ -415,12 +430,12 @@ export interface DerivePhaseInput {
   closureReasonLabel?: string | null;
   /** Number of E006 (reminder) emails/events sent for this order. */
   reminderCount?: number;
-  /** True once B07 has been pressed (persisted client-side per order). */
-  postWaitSubmitted?: boolean;
   /** True once B01 has been sent and we're still waiting for the customer. */
   formLinkSent?: boolean;
   /** True once B03 has resumed from a technical delay (until govt flow advances). */
   techDelayResolved?: boolean;
+  /** True once the admin override (B09) is active. */
+  adminOverride?: boolean;
 }
 
 /**
@@ -428,6 +443,9 @@ export interface DerivePhaseInput {
  * Pure. Client-safe.
  */
 export function derivePhase(i: DerivePhaseInput): JourneyPhase {
+  // Admin override trumps everything
+  if (i.adminOverride) return "admin_override";
+
   const live = deriveJourneyLiveState({
     stage: i.stage,
     workflowStatus: i.workflowStatus,
@@ -443,14 +461,26 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
   }
 
   const stage = (i.stage ?? "").toLowerCase();
-  const inGovtFlow = /submitted_to_govt|processing|certificate|check|final/.test(stage);
+  const fulfillment = (i.workflowStatus ?? "").toLowerCase();
+
+  // S09 Application Approved
+  if (fulfillment === "application_approved" || fulfillment === "application_accepted") {
+    return "application_approved";
+  }
+  // S10 Application Rejected
+  if (fulfillment === "application_rejected" || fulfillment === "certificate_rejected") {
+    return "application_rejected";
+  }
+
+  const inGovtFlow = /submitted_to_govt|government_processing|processing|certificate|check|final|consultation_completed/.test(stage);
 
   if (inGovtFlow) {
-    if (i.postWaitSubmitted) return "post_wait_submitted";
-    const r = i.reminderCount ?? 0;
-    if (r <= 0) return "consultation_done";
-    if (r === 1) return "awaiting_govt";
-    return "status_checked";
+    // S08 Consultation Completed
+    if (fulfillment === "consultation_completed" || /consultation_completed|consultation_done/.test(fulfillment)) {
+      return "consultation_done";
+    }
+    // S07 Government Processing
+    return "govt_processing";
   }
 
   if (i.techDelayResolved) return "post_b03_resume";

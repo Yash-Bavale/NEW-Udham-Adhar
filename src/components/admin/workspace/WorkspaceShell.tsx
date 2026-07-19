@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
+  ShieldAlert, ShieldOff,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -58,6 +59,7 @@ export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("workflow");
   const [refundOpen, setRefundOpen] = useState(false);
+  const [adminOverride, setAdminOverride] = useState(false);
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, emailLogs, stageMeta } = p.data;
   const govtPortalUrl: string | null = (service as any)?.govt_portal_url ?? null;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
@@ -317,7 +319,52 @@ export function WorkspaceShell(p: Props) {
           closureReasonLabel={(application as any).closure_reason_code}
           payments={payments}
           hideAmount={p.hideAmount}
+          adminOverride={adminOverride}
         />
+      </section>
+
+      {/* ── Admin Override (B09 / B10) ──────────────────────────── */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500">
+              Admin Override
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {adminOverride
+                ? "Override active — all journey buttons are unlocked regardless of stage."
+                : "Enable override to unlock all journey map buttons for manual correction."}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!adminOverride ? (
+              <button
+                type="button"
+                onClick={() => setAdminOverride(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 shadow-sm hover:bg-orange-100 transition"
+              >
+                <ShieldAlert className="size-3.5" />
+                B09 — Enable Override
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAdminOverride(false)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm hover:bg-emerald-100 transition"
+              >
+                <ShieldOff className="size-3.5" />
+                B10 — Disable Override
+              </button>
+            )}
+          </div>
+        </div>
+        {adminOverride && (
+          <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-800">
+            <ShieldAlert className="mr-1 inline size-3" />
+            <strong>Warning:</strong> Admin override is active. All journey map action buttons are unlocked.
+            Changes made in this mode bypass the normal stage gating rules. Click <strong>B10</strong> to return to the normal flow.
+          </div>
+        )}
       </section>
 
 
