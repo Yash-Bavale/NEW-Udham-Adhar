@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
+import { Menu } from "lucide-react";
+import bhsLogo from "@/assets/bhs-logo.png.asset.json";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
@@ -164,39 +166,36 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       <aside
         className="hidden md:flex shrink-0 flex-col border-r transition-[width] duration-200"
         style={{
-          width: sidebarCollapsed ? 56 : 220,
+          width: sidebarCollapsed ? 64 : 220,
           background: "var(--admin-sidebar)",
           color: "var(--admin-sidebar-fg)",
           borderColor: "var(--admin-border)",
         }}
       >
         <div
-          className="flex items-center gap-2 px-2 h-14 border-b shrink-0"
+          className="flex items-center gap-2 px-3 h-14 border-b shrink-0"
           style={{ borderColor: "var(--admin-border)" }}
         >
-          <div
-            className="size-8 rounded-md flex items-center justify-center font-semibold text-sm shrink-0"
-            style={{ background: "var(--admin-primary)", color: "#fff" }}
-          >
-            UA
-          </div>
-          {!sidebarCollapsed && (
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium leading-tight truncate">Udyam Ops OS</div>
-              <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
-                Admin
-              </div>
-            </div>
-          )}
           <button
             type="button"
             onClick={() => setSidebarCollapsed((v) => !v)}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="shrink-0 rounded p-1 hover:bg-[var(--admin-surface-2)]"
-            style={{ color: "var(--admin-sidebar-muted)" }}
+            className="shrink-0 rounded-full p-2 hover:bg-[var(--admin-surface-2)]"
+            style={{ color: "var(--admin-sidebar-fg)" }}
           >
-            {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            <Menu className="size-5" />
           </button>
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <img src={bhsLogo.url} alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium leading-tight truncate">Udyam Ops OS</div>
+                <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
+                  Admin
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2">

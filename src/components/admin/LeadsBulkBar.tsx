@@ -52,7 +52,7 @@ export function LeadsBulkBar({
           </span>
           <div className="h-5 w-px" style={{ background: "var(--admin-border)" }} />
           <PopBtn icon={<Tag className="size-4" />} label="Status" onClick={() => { setStatusOpen(!statusOpen); setAssignOpen(false); }} active={statusOpen} />
-          <PopBtn icon={<UserCog className="size-4" />} label="Assign" onClick={() => { setAssignOpen(!assignOpen); setStatusOpen(false); }} active={assignOpen} />
+          {isAdmin && <PopBtn icon={<UserCog className="size-4" />} label="Assign" onClick={() => { setAssignOpen(!assignOpen); setStatusOpen(false); }} active={assignOpen} />}
           <PopBtn icon={<Mail className="size-4" />} label="Email" onClick={() => setEmailOpen(true)} />
           {isAdmin && <PopBtn icon={<Trash2 className="size-4" />} label="Delete" onClick={onDelete} danger />}
           <button onClick={onClear} className="ml-1 p-1.5 rounded hover:bg-[var(--admin-surface-2)]" aria-label="Clear selection">
