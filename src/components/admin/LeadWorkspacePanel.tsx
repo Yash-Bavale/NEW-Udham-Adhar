@@ -271,17 +271,23 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
   );
   const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
 
-  const markContacted = async () => {
+  const toggleContacted = async () => {
+    const next = currentStatus === "contacted" ? "new_lead" : "contacted";
     setContactBusy(true);
     try {
-      await transitionFn({ data: { leadId: lead.id, toStatus: "contacted" } });
-      toast.success("Marked as Contacted");
+      await transitionFn({ data: { leadId: lead.id, toStatus: next } });
+      toast.success(next === "contacted" ? "Marked as Contacted" : "Marked as New Lead");
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+      qc.invalidateQueries({ queryKey: ["admin.leads"] });
+      qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
   };
+
+  const isContacted = currentStatus === "contacted";
+  const showContactToggle = currentStatus === "new_lead" || currentStatus === "contacted";
 
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
@@ -290,17 +296,23 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
         <h3 className="text-sm font-semibold">Quick Actions</h3>
       </div>
       <div className="flex flex-col gap-2">
-        {currentStatus === "new_lead" && (
+        {showContactToggle && (
           <Button
             size="sm"
             disabled={contactBusy}
-            onClick={markContacted}
-            className="justify-start text-xs bg-indigo-600 hover:bg-indigo-700"
+            onClick={toggleContacted}
+            className={`justify-start text-xs ${isContacted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
+            title={isContacted ? "Click to revert to New Lead" : "Mark as Contacted"}
           >
             <CheckCircle2 className="size-3.5 mr-1.5" />
-            {contactBusy ? "Updating…" : "Mark as Contacted"}
+            {contactBusy
+              ? "Updating…"
+              : isContacted
+                ? "Contacted ✓ (click to undo)"
+                : "Mark as Contacted"}
           </Button>
         )}
+
         <CopyButton value={formLink} label="Copy Payment Link" className="justify-start" />
         {waSendUrl && (
           <a
