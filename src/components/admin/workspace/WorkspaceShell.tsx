@@ -679,6 +679,9 @@ export function WorkspaceShell(p: Props) {
             })()}
           </div>
         </section>
+        )}
+
+
 
         {/* Dialog Overlays */}
         <ExternalDelayDialog
