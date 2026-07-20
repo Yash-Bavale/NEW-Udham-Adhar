@@ -6,6 +6,7 @@ import { Mail, UserCog, Tag, Trash2, X } from "lucide-react";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { listAssignableStaff } from "@/lib/crm/leads-bulk.functions";
 import { BulkEmailDialog } from "./BulkEmailDialog";
+import { useRole } from "@/hooks/useRole";
 
 export function LeadsBulkBar({
   selectedIds,
@@ -25,12 +26,15 @@ export function LeadsBulkBar({
   const [emailOpen, setEmailOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const role = useRole();
   const staffFn = useServerFn(listAssignableStaff);
   const { data: staff } = useQuery({
     queryKey: ["admin.staff"],
     queryFn: () => staffFn(),
     enabled: assignOpen,
   });
+
+  const isAdmin = role.hasAny(["super_admin", "admin"]);
 
   return (
     <AnimatePresence>
@@ -50,7 +54,7 @@ export function LeadsBulkBar({
           <PopBtn icon={<Tag className="size-4" />} label="Status" onClick={() => { setStatusOpen(!statusOpen); setAssignOpen(false); }} active={statusOpen} />
           <PopBtn icon={<UserCog className="size-4" />} label="Assign" onClick={() => { setAssignOpen(!assignOpen); setStatusOpen(false); }} active={assignOpen} />
           <PopBtn icon={<Mail className="size-4" />} label="Email" onClick={() => setEmailOpen(true)} />
-          <PopBtn icon={<Trash2 className="size-4" />} label="Delete" onClick={onDelete} danger />
+          {isAdmin && <PopBtn icon={<Trash2 className="size-4" />} label="Delete" onClick={onDelete} danger />}
           <button onClick={onClear} className="ml-1 p-1.5 rounded hover:bg-[var(--admin-surface-2)]" aria-label="Clear selection">
             <X className="size-4" />
           </button>

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useEffect, useState } from "react";
 import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight, PackageOpen } from "lucide-react";
 import { getMyWorkSummary, type MyWorkSummary } from "@/lib/crm/my-work.functions";
+import { useRole } from "@/hooks/useRole";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/admin/my-work")({
 function MyWorkPage() {
   const fetchSummary = useServerFn(getMyWorkSummary);
   const [hasSession, setHasSession] = useState(false);
+  const role = useRole();
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }) => { if (active) setHasSession(!!data.session); });
@@ -34,15 +36,20 @@ function MyWorkPage() {
   const counters = data?.counters;
 
   const cards = useMemo(
-    () => [
-      { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)" },
-      { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316" },
-      { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)" },
-      { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)" },
-      { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)" },
-      { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)" },
-    ],
-    [counters],
+    () => {
+      const base = [
+        { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)" },
+        { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316" },
+        { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)" },
+        { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)" },
+        { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)" },
+      ];
+      if (role.hasAny(["super_admin", "admin"])) {
+        base.splice(2, 0, { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)" });
+      }
+      return base;
+    },
+    [counters, role],
   );
 
 
@@ -129,31 +136,33 @@ function MyWorkPage() {
       </Section>
 
 
-      <Section
-        title="Documents pending review"
-        subtitle="Oldest uploads first"
-        empty="No pending documents."
-        href="/admin/review"
-      >
-        {(data?.pendingDocuments ?? []).slice(0, 8).map((d) => (
-          <Link
-            key={d.id}
-            to="/admin/review"
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
-          >
-            <FileCheck2 className="size-4" style={{ color: "var(--admin-warn)" }} />
-            <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>
-              {d.doc_type}
-            </span>
-            <span className="text-xs truncate max-w-[260px]" style={{ color: "var(--admin-fg-muted)" }}>
-              {d.file_name}
-            </span>
-            <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-              {formatRelative(d.uploaded_at)}
-            </span>
-          </Link>
-        ))}
-      </Section>
+      {role.hasAny(["super_admin", "admin"]) && (
+        <Section
+          title="Documents pending review"
+          subtitle="Oldest uploads first"
+          empty="No pending documents."
+          href="/admin/review"
+        >
+          {(data?.pendingDocuments ?? []).slice(0, 8).map((d) => (
+            <Link
+              key={d.id}
+              to="/admin/review"
+              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
+            >
+              <FileCheck2 className="size-4" style={{ color: "var(--admin-warn)" }} />
+              <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>
+                {d.doc_type}
+              </span>
+              <span className="text-xs truncate max-w-[260px]" style={{ color: "var(--admin-fg-muted)" }}>
+                {d.file_name}
+              </span>
+              <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                {formatRelative(d.uploaded_at)}
+              </span>
+            </Link>
+          ))}
+        </Section>
+      )}
 
       <Section
         title="My active leads"

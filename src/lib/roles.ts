@@ -68,26 +68,44 @@ function readWithFull(...fullModules: Module[]): Partial<Record<Module, Access>>
 export const ACCESS_MATRIX: Record<Role, Partial<Record<Module, Access>>> = {
   super_admin: fullAll(),
   admin: fullAll(),
-  manager: readWithFull(
-    "dashboard", "leads", "orders", "customers", "documents",
-    "complaints", "tickets", "tasks", "reports",
-  ),
-  executive: readWithFull(
-    "leads", "orders", "customers", "documents", "tasks",
-  ),
-  support: readWithFull(
-    "complaints", "tickets", "tasks",
-  ),
-  accounts: readWithFull(
-    "payments", "invoices",
-  ),
-  finance: readWithFull(
-    "payments", "invoices", "reports",
-  ),
-  operations: readWithFull(
-    "dashboard", "leads", "orders", "customers",
-    "documents", "complaints", "tickets", "tasks",
-  ),
+  manager: {
+    ...readWithFull(
+      "dashboard", "leads", "orders", "customers", "documents",
+      "complaints", "tickets", "tasks", "reports",
+    ),
+    documents: "none",
+  },
+  executive: {
+    ...readWithFull(
+      "leads", "orders", "customers", "documents", "tasks",
+    ),
+    documents: "none",
+  },
+  support: {
+    ...readWithFull(
+      "complaints", "tickets", "tasks",
+    ),
+    documents: "none",
+  },
+  accounts: {
+    ...readWithFull(
+      "payments", "invoices",
+    ),
+    documents: "none",
+  },
+  finance: {
+    ...readWithFull(
+      "payments", "invoices", "reports",
+    ),
+    documents: "none",
+  },
+  operations: {
+    ...readWithFull(
+      "dashboard", "leads", "orders", "customers",
+      "documents", "complaints", "tickets", "tasks",
+    ),
+    documents: "none",
+  },
 };
 
 export function bestAccess(roles: string[], module: Module): Access {

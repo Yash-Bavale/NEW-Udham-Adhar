@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -10,6 +10,7 @@ import {
   getDocumentVersions,
   type DocRow,
 } from "@/lib/crm/documents-admin.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/documents")({
   head: () => ({
@@ -18,6 +19,18 @@ export const Route = createFileRoute("/admin/documents")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  beforeLoad: async () => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) throw redirect({ to: "/admin-login" });
+    const { data: rows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    const roles = (rows ?? []).map((r) => r.role as string);
+    if (!roles.includes("admin") && !roles.includes("super_admin")) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   component: DocumentsPage,
 });
 

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { isUserAdmin } from "@/lib/audit";
 
 export type DocRow = {
   id: string;
@@ -34,6 +35,9 @@ export const listAllDocuments = createServerFn({ method: "GET" })
   .inputValidator((i: z.infer<typeof FilterSchema>) => FilterSchema.parse(i ?? {}))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const isAdmin = await isUserAdmin(supabase, context.userId);
+    if (!isAdmin) throw new Error("Forbidden: Admin access required.");
+
     let q = supabase
       .from("documents")
       .select(

@@ -6,9 +6,17 @@ import { bestAccess, canApproveRefund, canSeeModule, canSeeMoney, hideMoneyFor, 
 import { supabase } from "@/integrations/supabase/client";
 
 export function useRole() {
-  const roles: string[] = ["super_admin", "admin"];
+  const fetchRoles = useServerFn(getMyStaffRoles);
+  const { data, isLoading } = useQuery({
+    queryKey: ["myStaffRoles"],
+    queryFn: () => fetchRoles(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const roles = data?.roles ?? [];
+
   return {
-    loading: false,
+    loading: isLoading,
     roles,
     has: (r: string) => roles.includes(r),
     hasAny: (rs: string[]) => rs.some((r) => roles.includes(r)),

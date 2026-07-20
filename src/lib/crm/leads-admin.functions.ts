@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { writeAudit, assertRole } from "@/lib/audit";
+import { writeAudit, assertRole, isUserAdmin } from "@/lib/audit";
 import { Database } from "@/integrations/supabase/types";
+
 
 const STAFF_READ_ROLES: Database["public"]["Enums"]["app_role"][] = [
   "super_admin",
@@ -188,15 +189,20 @@ export const listLeads = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
     let query = admin.from("leads").select("*", { count: "exact" });
 
     if (data.status) query = query.eq("status", data.status);
     if (data.source) query = query.ilike("lead_source", data.source);
     if (data.service) query = query.eq("service", data.service);
-    if (data.assignee === "__unassigned") query = query.is("assigned_to", null);
-    else if (data.assignee === "__me") query = query.eq("assigned_to", context.userId);
-    else if (data.assignee) query = query.eq("assigned_to", data.assignee);
+    if (!isAdmin) {
+      query = query.eq("assigned_to", context.userId);
+    } else {
+      if (data.assignee === "__unassigned") query = query.is("assigned_to", null);
+      else if (data.assignee === "__me") query = query.eq("assigned_to", context.userId);
+      else if (data.assignee) query = query.eq("assigned_to", data.assignee);
+    }
     if (data.dateFrom) query = query.gte("created_at", new Date(data.dateFrom).toISOString());
     if (data.dateTo) {
       const to = new Date(data.dateTo); to.setDate(to.getDate() + 1);
@@ -256,11 +262,16 @@ export const getLead = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
-    const { data: lead, error } = await admin
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+
+    let query = admin
       .from("leads")
       .select("*, applications!fk_applications_lead(*), lead_notes(*)")
-      .eq("id", data.id)
-      .single();
+      .eq("id", data.id);
+    if (!isAdmin) {
+      query = query.eq("assigned_to", context.userId);
+    }
+    const { data: lead, error } = await query.single();
 
     if (error || !lead) throw new Error("Lead not found");
 
@@ -342,14 +353,17 @@ export const getLeadCounts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+
     // Paginate beyond PostgREST's 1000-row cap to get true counts per status.
     const counts: Record<string, number> = { all: 0 };
     const pageSize = 1000;
     for (let from = 0; from < 500_000; from += pageSize) {
-      const { data, error } = await admin
-        .from("leads")
-        .select("status")
-        .range(from, from + pageSize - 1);
+      let q = admin.from("leads").select("status");
+      if (!isAdmin) {
+        q = q.eq("assigned_to", context.userId);
+      }
+      const { data, error } = await q.range(from, from + pageSize - 1);
       if (error) throw new Error(error.message);
       const rows = data ?? [];
       counts.all += rows.length;

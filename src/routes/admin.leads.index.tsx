@@ -70,8 +70,8 @@ function LeadsPage() {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data.user?.id ?? "";
       setCurrentUserId(uid);
-      // Executives default to "My Leads" view
-      if (uid && !defaultApplied && role.roles.length > 0 && role.roles[0] === "executive" && !assignee) {
+      // If user is not an admin, default assignee to current user ID
+      if (uid && !defaultApplied && !role.hasAny(["super_admin", "admin"])) {
         setAssignee(uid);
       }
     });
@@ -218,7 +218,7 @@ function LeadsPage() {
         <FilterChip active={status === "" && !assignee} onClick={() => { setStatus(""); setAssignee(""); setPage(1); }}>
           All <span className="ml-1 opacity-60">({counts.all ?? 0})</span>
         </FilterChip>
-        {currentUserId && (
+        {currentUserId && role.hasAny(["super_admin", "admin"]) && (
           <FilterChip
             active={assignee === currentUserId}
             onClick={() => { setAssignee(assignee === currentUserId ? "" : currentUserId); setPage(1); }}
@@ -269,18 +269,20 @@ function LeadsPage() {
             <option key={s.id} value={s.service_name}>{s.service_name}</option>
           ))}
         </select>
-        <select
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <option value="">All assignees</option>
-          <option value="__unassigned">Unassigned</option>
-          {staffData?.profiles.map((p: any) => (
-            <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
-          ))}
-        </select>
+        {role.hasAny(["super_admin", "admin"]) && (
+          <select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            className="rounded-lg border px-3 py-2 text-sm"
+            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+          >
+            <option value="">All assignees</option>
+            <option value="__unassigned">Unassigned</option>
+            {staffData?.profiles.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}>
           <Calendar className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
           <input
@@ -299,9 +301,15 @@ function LeadsPage() {
             style={{ color: "var(--admin-fg)" }}
           />
         </div>
-        {(source || service || assignee || dateFrom || dateTo) && (
+        {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
-            onClick={() => { setSource(""); setService(""); setAssignee(""); setDateFrom(""); setDateTo(""); }}
+            onClick={() => {
+              setSource("");
+              setService("");
+              setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
+              setDateFrom("");
+              setDateTo("");
+            }}
             className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)]"
             style={{ color: "var(--admin-fg-muted)" }}
           >

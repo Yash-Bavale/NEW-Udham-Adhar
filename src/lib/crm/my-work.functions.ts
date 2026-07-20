@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isUserAdmin } from "@/lib/audit";
 
 export type WorkApplication = {
   id: string;
@@ -55,6 +56,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyWorkSummary> => {
     const { supabase, userId } = context;
+    const isAdmin = await isUserAdmin(supabase, userId);
 
     const [appsRes, docsRes, leadsRes, notifRes] = await Promise.all([
       supabase
@@ -66,12 +68,14 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .order("updated_at", { ascending: true })
         .limit(100),
 
-      supabase
-        .from("documents")
-        .select("id, doc_type, file_name, uploaded_at, lead_id, application_id")
-        .eq("status", "pending")
-        .order("uploaded_at", { ascending: true })
-        .limit(50),
+      isAdmin
+        ? supabase
+            .from("documents")
+            .select("id, doc_type, file_name, uploaded_at, lead_id, application_id")
+            .eq("status", "pending")
+            .order("uploaded_at", { ascending: true })
+            .limit(50)
+        : Promise.resolve({ data: [], error: null } as any),
       supabase
         .from("leads")
         .select("id, lead_code, name, email, mobile, service, status, created_at")

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/crm/document-review.functions";
 import { requestDocumentReupload } from "@/lib/crm/onboarding-admin.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/review")({
   head: () => ({
@@ -30,6 +31,18 @@ export const Route = createFileRoute("/admin/review")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  beforeLoad: async () => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) throw redirect({ to: "/admin-login" });
+    const { data: rows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    const roles = (rows ?? []).map((r) => r.role as string);
+    if (!roles.includes("admin") && !roles.includes("super_admin")) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   component: DocumentReviewPage,
 });
 

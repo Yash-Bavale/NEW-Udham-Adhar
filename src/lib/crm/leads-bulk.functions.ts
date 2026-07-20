@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { LEAD_STATUSES, type LeadStatus } from "./types";
+import { isUserAdmin } from "@/lib/audit";
 
 
 async function getAdmin() {
@@ -58,9 +59,23 @@ export const bulkUpdateLeadStatus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => IdsStatusInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertOps(context.userId);
+    const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+
+    let finalIds = data.ids;
+    if (!isAdmin) {
+      const { data: allowedLeads } = await admin
+        .from("leads")
+        .select("id")
+        .in("id", data.ids)
+        .eq("assigned_to", context.userId);
+      finalIds = (allowedLeads ?? []).map((l: any) => l.id);
+      if (finalIds.length === 0) throw new Error("Forbidden: None of the leads are assigned to you.");
+    }
+
     let updated = 0;
-    for (const batch of chunk(data.ids, 200)) {
-      const { error, count } = await (await getAdmin())
+    for (const batch of chunk(finalIds, 200)) {
+      const { error, count } = await admin
         .from("leads")
         .update({ status: data.status as LeadStatus }, { count: "exact" })
         .in("id", batch);
@@ -210,8 +225,10 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ExportInput.parse(i ?? {}))
   .handler(async ({ data, context }) => {
     await assertOps(context.userId);
+    const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
-    let q = (await getAdmin())
+    let q = admin
       .from("leads")
       .select(
         "id, lead_code, created_at, name, email, mobile, state, language, service, status, base_amount, gst_amount, total_amount, assigned_to, lead_source",
@@ -220,7 +237,11 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       .limit(50000);
 
     if (data.status) q = q.eq("status", data.status as LeadStatus);
-    if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (!isAdmin) {
+      q = q.eq("assigned_to", context.userId);
+    } else {
+      if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    }
     if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
     if (data.dateTo) q = q.lte("created_at", data.dateTo);
     if (data.search) {

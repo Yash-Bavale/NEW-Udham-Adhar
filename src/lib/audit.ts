@@ -63,3 +63,16 @@ export async function assertRole(
 
   return user;
 }
+
+export async function isUserAdmin(
+  supabase: SupabaseClient<Database>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+  const roles = (data ?? []).map((r) => r.role as string);
+  return roles.includes("super_admin") || roles.includes("admin");
+}
+
