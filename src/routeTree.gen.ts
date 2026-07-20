@@ -212,6 +212,7 @@ import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api
 import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/public/cron/schedulers-tick'
 import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/public/cron/process-emails'
 import { Route as ApiPublicCronPollZohoInboxRouteImport } from './routes/api/public/cron/poll-zoho-inbox'
+import { Route as ApiPublicCronPayuReconcileRouteImport } from './routes/api/public/cron/payu-reconcile'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
@@ -1276,6 +1277,12 @@ const ApiPublicCronPollZohoInboxRoute =
     path: '/api/public/cron/poll-zoho-inbox',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronPayuReconcileRoute =
+  ApiPublicCronPayuReconcileRouteImport.update({
+    id: '/api/public/cron/payu-reconcile',
+    path: '/api/public/cron/payu-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronOnboardingRemindersRoute =
   ApiPublicCronOnboardingRemindersRouteImport.update({
     id: '/api/public/cron/onboarding-reminders',
@@ -1497,6 +1504,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/payu-reconcile': typeof ApiPublicCronPayuReconcileRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
@@ -1703,6 +1711,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/payu-reconcile': typeof ApiPublicCronPayuReconcileRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
@@ -1913,6 +1922,7 @@ export interface FileRoutesById {
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
+  '/api/public/cron/payu-reconcile': typeof ApiPublicCronPayuReconcileRoute
   '/api/public/cron/poll-zoho-inbox': typeof ApiPublicCronPollZohoInboxRoute
   '/api/public/cron/process-emails': typeof ApiPublicCronProcessEmailsRoute
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
@@ -2124,6 +2134,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/payu-reconcile'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
@@ -2330,6 +2341,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/payu-reconcile'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
@@ -2539,6 +2551,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
+    | '/api/public/cron/payu-reconcile'
     | '/api/public/cron/poll-zoho-inbox'
     | '/api/public/cron/process-emails'
     | '/api/public/cron/schedulers-tick'
@@ -2700,6 +2713,7 @@ export interface RootRouteChildren {
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronDailyDigestRoute: typeof ApiPublicCronDailyDigestRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
+  ApiPublicCronPayuReconcileRoute: typeof ApiPublicCronPayuReconcileRoute
   ApiPublicCronPollZohoInboxRoute: typeof ApiPublicCronPollZohoInboxRoute
   ApiPublicCronProcessEmailsRoute: typeof ApiPublicCronProcessEmailsRoute
   ApiPublicCronSchedulersTickRoute: typeof ApiPublicCronSchedulersTickRoute
@@ -4137,6 +4151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronPollZohoInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/payu-reconcile': {
+      id: '/api/public/cron/payu-reconcile'
+      path: '/api/public/cron/payu-reconcile'
+      fullPath: '/api/public/cron/payu-reconcile'
+      preLoaderRoute: typeof ApiPublicCronPayuReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/onboarding-reminders': {
       id: '/api/public/cron/onboarding-reminders'
       path: '/api/public/cron/onboarding-reminders'
@@ -4503,6 +4524,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronDailyDigestRoute: ApiPublicCronDailyDigestRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
+  ApiPublicCronPayuReconcileRoute: ApiPublicCronPayuReconcileRoute,
   ApiPublicCronPollZohoInboxRoute: ApiPublicCronPollZohoInboxRoute,
   ApiPublicCronProcessEmailsRoute: ApiPublicCronProcessEmailsRoute,
   ApiPublicCronSchedulersTickRoute: ApiPublicCronSchedulersTickRoute,

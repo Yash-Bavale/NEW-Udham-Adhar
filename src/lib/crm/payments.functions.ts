@@ -194,36 +194,50 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
 
     const { data: payment, error } = await (await getAdmin())
       .from("payments")
-      .select("id, gateway_name, status, transaction_id, razorpay_order_id")
+      .select("id, gateway_name, status, transaction_id, razorpay_order_id, lead_id")
       .eq("id", data.paymentId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!payment) throw new Error("Payment not found");
 
-    if (payment.gateway_name !== "ccavenue") {
-      throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
-    }
+    const gateway = String(payment.gateway_name ?? "").toLowerCase();
 
-    const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
-    const orderId = payment.transaction_id || payment.razorpay_order_id;
-    if (!orderId) throw new Error("Payment is missing an order id");
+    // ── PayU ─────────────────────────────────────────────────────────────
+    if (gateway === "payu") {
+      const { verifyPayUPayment } = await import("@/lib/payments/payu.server");
+      const txnid = payment.transaction_id || payment.razorpay_order_id;
+      if (!txnid) throw new Error("Payment is missing a transaction id");
+      const verified = await verifyPayUPayment(txnid);
+      const status = String(verified?.status ?? "").trim().toLowerCase();
+      const unmapped = String(verified?.unmappedstatus ?? "").trim().toLowerCase();
+      const success = status === "success" || unmapped === "captured";
+      const failure = status === "failure" || status === "failed" ||
+        ["bounced", "dropped", "failed", "usercancelled"].includes(unmapped);
 
-    const result = await callOrderStatusApi(orderId);
-    const newStatus = result.status === "paid" ? "paid"
-      : result.status === "failed" ? "failed"
-      : result.status === "refunded" ? "refunded"
-      : result.status === "attempted" ? "attempted"
-      : payment.status;
+      const newStatus = success ? "paid" : failure ? "failed" : payment.status;
+      if (newStatus === payment.status && !success) {
+        return { ok: true, status: newStatus, raw: verified };
+      }
 
-    if (newStatus !== payment.status) {
-      await (await getAdmin())
-        .from("payments")
-        .update({
-          status: newStatus,
-          payment_date: newStatus === "paid" ? new Date().toISOString() : undefined,
-          raw_response: result.raw as any,
-        })
-        .eq("id", payment.id);
+      const mihpayid = verified?.mihpayid ? String(verified.mihpayid) : null;
+      await (await getAdmin()).from("payments").update({
+        status: newStatus,
+        payment_date: newStatus === "paid" ? new Date().toISOString() : undefined,
+        webhook_received_at: newStatus === "paid" ? new Date().toISOString() : undefined,
+        razorpay_payment_id: mihpayid,
+        payu_mihpayid: mihpayid,
+        payu_bank_ref_num: verified?.bank_ref_num ? String(verified.bank_ref_num) : null,
+        raw_response: { verified_payment: verified, source: "admin-reconcile" } as any,
+      } as any).eq("id", payment.id);
+
+      if (newStatus === "paid") {
+        const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+        await finalizePaidPayment(payment.id, { source: "reconcile", txnid, mihpayid });
+      } else if (newStatus === "failed") {
+        await (await getAdmin()).from("leads")
+          .update({ status: "payment_pending", lead_status_v2: "payment_failed" } as any)
+          .eq("id", payment.lead_id);
+      }
 
       await writeAudit({
         supabase: context.supabase,
@@ -231,9 +245,49 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
         entityId: payment.id,
         action: "status_reconciled",
         oldValue: { status: payment.status },
-        newValue: { status: newStatus, source: "ccavenue.orderStatusTracker" },
+        newValue: { status: newStatus, source: "payu.verify_payment" },
       });
+
+      return { ok: true, status: newStatus, raw: verified as any };
+
     }
 
-    return { ok: true, status: newStatus, raw: result.raw };
+    // ── CCAvenue ─────────────────────────────────────────────────────────
+    if (gateway === "ccavenue") {
+      const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
+      const orderId = payment.transaction_id || payment.razorpay_order_id;
+      if (!orderId) throw new Error("Payment is missing an order id");
+
+      const result = await callOrderStatusApi(orderId);
+      const newStatus = result.status === "paid" ? "paid"
+        : result.status === "failed" ? "failed"
+        : result.status === "refunded" ? "refunded"
+        : result.status === "attempted" ? "attempted"
+        : payment.status;
+
+      if (newStatus !== payment.status) {
+        await (await getAdmin())
+          .from("payments")
+          .update({
+            status: newStatus,
+            payment_date: newStatus === "paid" ? new Date().toISOString() : undefined,
+            raw_response: result.raw as any,
+          })
+          .eq("id", payment.id);
+
+        await writeAudit({
+          supabase: context.supabase,
+          entityType: "payment",
+          entityId: payment.id,
+          action: "status_reconciled",
+          oldValue: { status: payment.status },
+          newValue: { status: newStatus, source: "ccavenue.orderStatusTracker" },
+        });
+      }
+
+      return { ok: true, status: newStatus, raw: result.raw as any };
+    }
+
+    throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
   });
+
