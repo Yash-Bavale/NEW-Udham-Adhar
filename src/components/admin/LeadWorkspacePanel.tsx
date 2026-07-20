@@ -573,11 +573,7 @@ function EventsTimeline({ leadId }: { leadId: string }) {
     } finally { setBusy(false); }
   };
 
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString("en-IN", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: true,
-    });
+  const fmt = (iso: string) => formatIST(iso);
 
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4" style={{ borderColor: "var(--admin-border)" }}>
