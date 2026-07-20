@@ -248,7 +248,8 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
         newValue: { status: newStatus, source: "payu.verify_payment" },
       });
 
-      return { ok: true, status: newStatus, raw: verified };
+      return { ok: true, status: newStatus, raw: verified as any };
+
     }
 
     // ── CCAvenue ─────────────────────────────────────────────────────────
