@@ -15,9 +15,11 @@ export type OrderStage =
   | "under_processing"
   | "certificate_ready"
   | "completed"
+  | "closed"
   | "uninterested"
   | "refund_requested"
   | "refunded";
+
 
 export interface ComputeStageLead {
   lead_status_v2?: string | null;
