@@ -1035,3 +1035,152 @@ export const addOrderNoteV2 = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ── Change Service (allowed until form submitted / S04) ─────────────────
+// Swaps the order's service to a different one and adjusts lead pricing to
+// the new service's totals. If the customer already paid more than the new
+// total, no automatic refund is triggered (per business rule). If they paid
+// less, a `payment_links` row is created for the delta as a supplementary
+// top-up record for staff to share; the supplementary invoice is issued when
+// that top-up payment is finalized (uses the existing finalize pipeline).
+const ChangeServiceInput = z.object({
+  orderId: z.string().uuid(),
+  newServiceId: z.string().uuid(),
+});
+
+const CHANGE_SERVICE_ALLOWED_STAGES = new Set<string>([
+  "order_received",
+  "awaiting_customer_form",
+  "waiting_customer_submission",
+  // legacy fallbacks
+  "S01", "S02", "S03",
+]);
+
+export const changeOrderService = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ChangeServiceInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+    if (!isAdmin) {
+      const { data: roleRows } = await context.supabase
+        .from("user_roles").select("role").eq("user_id", context.userId);
+      const ok = (roleRows ?? []).some((r: any) => ["manager", "operations"].includes(r.role));
+      if (!ok) throw new Error("Forbidden");
+    }
+
+    const { data: app, error: appErr } = await admin
+      .from("applications")
+      .select("id, lead_id, customer_id, service_id, fulfillment_status, application_status, form_submitted_at")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (appErr) throw new Error(appErr.message);
+    if (!app) throw new Error("Order not found");
+
+    const stage = String((app as any).fulfillment_status ?? "");
+    if (app.form_submitted_at) throw new Error("Service cannot be changed after the form is submitted.");
+    if (!CHANGE_SERVICE_ALLOWED_STAGES.has(stage)) {
+      throw new Error(`Service change is only allowed before form submission (current stage: ${stage}).`);
+    }
+
+    const { data: newSvc, error: svcErr } = await admin
+      .from("services")
+      .select("id, service_name, base_amount, gst_amount, total_amount, govt_portal_url")
+      .eq("id", data.newServiceId)
+      .maybeSingle();
+    if (svcErr) throw new Error(svcErr.message);
+    if (!newSvc) throw new Error("Selected service not found");
+    if (newSvc.id === app.service_id) throw new Error("This is already the selected service.");
+
+    // Compute total paid so far (successful payments only).
+    const { data: paidRows } = await admin
+      .from("payments")
+      .select("amount, status")
+      .eq("lead_id", app.lead_id)
+      .eq("status", "paid");
+    const paidSum = (paidRows ?? []).reduce((s, r: any) => s + Number(r.amount ?? 0), 0);
+    const newTotal = Number(newSvc.total_amount) || 0;
+    const delta = Math.round((newTotal - paidSum) * 100) / 100;
+
+    // Snapshot old service label for the timeline.
+    const { data: oldSvc } = app.service_id
+      ? await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()
+      : { data: null as any };
+
+    // Swap on lead + application (+ pricing on lead).
+    const { error: leadUpdErr } = await admin
+      .from("leads")
+      .update({
+        service: newSvc.service_name,
+        service_id: newSvc.id,
+        base_amount: newSvc.base_amount,
+        gst_amount: newSvc.gst_amount,
+        total_amount: newSvc.total_amount,
+      } as never)
+      .eq("id", app.lead_id);
+    if (leadUpdErr) throw new Error(leadUpdErr.message);
+
+    const { error: appUpdErr } = await admin
+      .from("applications")
+      .update({ service_id: newSvc.id } as never)
+      .eq("id", app.id);
+    if (appUpdErr) throw new Error(appUpdErr.message);
+
+    // If a top-up is needed, record a supplementary payment_links row (staff
+    // shares this with the customer). Actual charge amount handling for the
+    // delta uses the standard lead payment page.
+    let topUpLinkId: string | null = null;
+    if (delta > 0.01) {
+      const { data: leadRow } = await admin
+        .from("leads").select("lead_code").eq("id", app.lead_id).maybeSingle();
+      const leadCode = leadRow?.lead_code as string | undefined;
+      if (leadCode) {
+        const origin = process.env.APP_BASE_URL || "https://udyamadhar.in";
+        const txnid = `TOPUP-${leadCode}-${Date.now().toString(36)}`.toUpperCase();
+        const { data: link } = await admin
+          .from("payment_links" as any)
+          .insert({
+            lead_id: app.lead_id,
+            amount: delta,
+            txnid,
+            payment_url: `${origin}/payment/${encodeURIComponent(leadCode)}`,
+            status: "pending",
+            expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+          } as never)
+          .select("id")
+          .single();
+        topUpLinkId = (link as any)?.id ?? null;
+      }
+    }
+
+    // Timeline entry.
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    await admin.from("application_events").insert({
+      application_id: app.id,
+      lead_id: app.lead_id,
+      customer_id: app.customer_id,
+      event_type: "service_changed",
+      old_value: (oldSvc as any)?.service_name ?? null,
+      new_value: newSvc.service_name,
+      note: delta > 0.01
+        ? `Service changed. Top-up of ₹${delta.toFixed(2)} required.`
+        : delta < -0.01
+          ? `Service changed. Customer overpaid by ₹${Math.abs(delta).toFixed(2)} (no refund per policy).`
+          : `Service changed. Amount unchanged.`,
+      created_by: context.userId,
+      staff_name: profile?.display_name || profile?.email || "Staff",
+      staff_role: (roleRows?.[0] as any)?.role ?? "staff",
+    } as never);
+
+    return {
+      ok: true,
+      newService: newSvc,
+      paidSum,
+      newTotal,
+      delta,
+      topUpLinkId,
+    };
+  });
