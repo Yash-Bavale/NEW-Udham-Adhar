@@ -347,19 +347,22 @@ export function activeBranchesFor(
     case "application_rejected": s.add("reject"); break;
     case "post_b03_resume":    break;
     case "completed":          s.add("accept"); break;
-    case "closed":
-      if (reasonCode?.toUpperCase().startsWith("B")) s.add("reject");
-      else if (/customer|external_dependency/i.test(workflowStatus ?? "")) {
-        if (currentIdx !== undefined && currentIdx >= 4) {
-          s.add("customer-delay-govt");
-        } else if (techDelayResolved) {
-          s.add("customer-delay-tech");
-        } else {
-          s.add("customer-delay-main");
-        }
-      }
-      else s.add("form-nag");
+    case "closed": {
+      const rc = reasonCode?.toUpperCase() ?? "";
+      const ws = workflowStatus ?? "";
+      // Reason code first (C* customer-delay, B* rejected, A* form-nag), fall
+      // back to fulfillment/workflow hints so the closure path lights up even
+      // when the reason label was cleared during close.
+      const isCustomerClose = rc.startsWith("C") || /customer|external_dependency|customer_hold|customer_delay|waiting_for_customer/i.test(ws);
+      const isRejectClose = rc.startsWith("B") || /reject/i.test(ws);
+      if (isRejectClose) s.add("reject");
+      else if (isCustomerClose) {
+        if (currentIdx !== undefined && currentIdx >= 4) s.add("customer-delay-govt");
+        else if (techDelayResolved) s.add("customer-delay-tech");
+        else s.add("customer-delay-main");
+      } else s.add("form-nag");
       break;
+    }
   }
   if (terminal === "completed") s.add("accept");
   return s;
