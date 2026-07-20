@@ -88,15 +88,17 @@ function MyWorkPage() {
 
       <Section
         title="Next-best actions"
-        subtitle="Order Received items shown first — these are ready to work on now"
+        subtitle="Fresh orders with no action yet — shown first"
         empty="No assigned applications — you're clear."
         href="/admin/applications"
       >
         {[...(data?.assignedApplications ?? [])]
           .sort((a, b) => {
-            const aFresh = a.fulfillment_status === "order_received" ? 0 : 1;
-            const bFresh = b.fulfillment_status === "order_received" ? 0 : 1;
-            return aFresh - bFresh;
+            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+            const aFresh = actNow.includes(a.fulfillment_status ?? "order_received") ? 0 : 1;
+            const bFresh = actNow.includes(b.fulfillment_status ?? "order_received") ? 0 : 1;
+            if (aFresh !== bFresh) return aFresh - bFresh;
+            return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
           })
           .slice(0, 12)
           .map((a) => {
