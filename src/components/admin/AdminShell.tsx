@@ -188,9 +188,9 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <img src={bhsLogo.url} alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium leading-tight truncate">Udyam Ops OS</div>
+                <div className="text-sm font-medium leading-tight truncate">Business Help</div>
                 <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
-                  Admin
+                  ADMIN
                 </div>
               </div>
             </div>
