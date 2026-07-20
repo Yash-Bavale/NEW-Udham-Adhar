@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
+import { ChangeServiceButton } from "./ChangeServiceDialog";
 import { TabStatusHeader } from "./TabStatusHeader";
 
 import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
