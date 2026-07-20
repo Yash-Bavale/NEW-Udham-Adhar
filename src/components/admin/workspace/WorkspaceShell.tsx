@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
-  ShieldAlert, ShieldOff,
+  ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,6 +13,23 @@ import { toast } from "sonner";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { TabStatusHeader } from "./TabStatusHeader";
+
+import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
+import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
+import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
+
+import {
+  sendFormLink, markSubmittedToGovt, completeOrder, reopenOrder,
+} from "@/lib/orders/order-actions.functions";
+import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
+import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
+import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
+import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
+
+import {
+  deriveJourneyLiveState, derivePhase, PHASE_ENABLED_BUTTONS,
+  type ButtonCode, type JourneyPhase,
+} from "@/lib/orders/journey-map";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
@@ -47,11 +65,11 @@ interface Props {
 }
 
 const TAB_DEFS = [
-  { id: "workflow" as const, label: "Employee Task",                    icon: Workflow, tooltip: "Move the order through its workflow stages" },
-  { id: "form"     as const, label: "Forms & Docs",                     icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
-  { id: "emails"   as const, label: "Emails",                           icon: Mail,     tooltip: "All emails sent or received for this order" },
-  { id: "activity" as const, label: "Timeline / Activity Log",          icon: Activity, tooltip: "Full chronological activity log for this order" },
-  { id: "support"  as const, label: "Internal Help / Support Ticket",   icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
+  { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
+  { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
+  { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
+  { id: "activity" as const, label: "Timeline / Activity Log", icon: Activity, tooltip: "Full chronological activity log for this order" },
+  { id: "support" as const, label: "Internal Help / Support Ticket", icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
 ];
 type TabId = WorkspaceTabId;
 
@@ -60,6 +78,15 @@ export function WorkspaceShell(p: Props) {
   const [tab, setTab] = useState<TabId>("workflow");
   const [refundOpen, setRefundOpen] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
+  const [dialog, setDialog] = useState<
+    | null
+    | { kind: "customer_delay" }
+    | { kind: "technical_delay" }
+    | { kind: "force_close" }
+    | { kind: "govt_rejected" }
+    | { kind: "complete_with_cert" }
+  >(null);
+
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, emailLogs, stageMeta } = p.data;
   const govtPortalUrl: string | null = (service as any)?.govt_portal_url ?? null;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
@@ -67,15 +94,156 @@ export function WorkspaceShell(p: Props) {
   const meta = STAGE_META[p.stage];
   const availability = tabAvailability(orderStatus, !!lead?.id, p.showConsultationPanel);
 
+  // Gating & Journey Phase State Logic
+  const reminderCount = useMemo(
+    () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
+    [events],
+  );
+
+  const formLinkKey = `journey.b01Sent:${p.orderId}`;
+  const [formLinkSent, setFormLinkSent] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(formLinkKey) === "1"; } catch { return false; }
+  });
+
+  const techResumeKey = `journey.b03Resumed:${p.orderId}`;
+  const [techDelayResolved, setTechDelayResolved] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(techResumeKey) === "1"; } catch { return false; }
+  });
+
+  // Sync / clear local storage flags
+  useEffect(() => {
+    const live = deriveJourneyLiveState({
+      stage: p.stage,
+      workflowStatus: application.workflow_status,
+      closureStage: application.closure_stage,
+      closureReasonLabel: application.closure_reason_code,
+    });
+    const currentIdx = live.currentMainIndex;
+    if (formLinkSent && live.activeSubKey !== "form-not-submitted") {
+      try { window.localStorage.removeItem(formLinkKey); } catch { }
+      setFormLinkSent(false);
+    }
+    if (techDelayResolved && (live.activeSubKey === "technical-delay" || currentIdx >= 4)) {
+      try { window.localStorage.removeItem(techResumeKey); } catch { }
+      setTechDelayResolved(false);
+    }
+  }, [p.stage, application.workflow_status, application.closure_stage, application.closure_reason_code, formLinkSent, techDelayResolved, p.orderId]);
+
+  // Keep state variables in sync when window state is updated (since CustomerJourneyMap updates them too)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setFormLinkSent(window.localStorage.getItem(formLinkKey) === "1");
+        setTechDelayResolved(window.localStorage.getItem(techResumeKey) === "1");
+      } catch { }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    // Periodically sync just in case
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [formLinkKey, techResumeKey]);
+
+  const phase = useMemo(() => derivePhase({
+    stage: p.stage,
+    workflowStatus: application.workflow_status,
+    closureStage: application.closure_stage,
+    closureReasonLabel: application.closure_reason_code,
+    reminderCount,
+    formLinkSent,
+    techDelayResolved,
+    adminOverride,
+  }), [p.stage, application.workflow_status, application.closure_stage, application.closure_reason_code, reminderCount, formLinkSent, techDelayResolved, adminOverride]);
+
+  const live = useMemo(() => deriveJourneyLiveState({
+    stage: p.stage,
+    workflowStatus: application.workflow_status,
+    closureStage: application.closure_stage,
+    closureReasonLabel: application.closure_reason_code,
+  }), [p.stage, application.workflow_status, application.closure_stage, application.closure_reason_code]);
+
+  const closed = live.terminal === "closed";
+  const completed = live.terminal === "completed";
+  const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
+
+  const gate = (code: ButtonCode) => {
+    if (code === "B07" || code === "B08") {
+      return enabledCodes.includes(code);
+    }
+    return enabledCodes.includes(code) && !closed && !completed;
+  };
+
   // If the active tab becomes unavailable (status changed), fall back to Workflow.
   useEffect(() => {
     if (!availability[tab].enabled) setTab("workflow");
   }, [availability, tab]);
 
-  const invalidateOrder = useCallback(
-    () => qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] }),
-    [qc, p.orderId],
-  );
+  const invalidate = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["order-workflow-state", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["order-tickets", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["workflow-timers", p.orderId] });
+  }, [qc, p.orderId]);
+
+  const fnFormLink = useServerFn(sendFormLink);
+  const fnSubmit = useServerFn(markSubmittedToGovt);
+  const fnComplete = useServerFn(completeOrder);
+  const fnUpdateFF = useServerFn(updateFulfillmentStatus);
+  const fnResume = useServerFn(resumeFromHold);
+  const fnReopen = useServerFn(reopenOrder);
+
+  const mutResume = useMutation({
+    mutationFn: () => fnResume({ data: { orderId: p.orderId, target: "IN_PROCESSING" } }),
+    onSuccess: () => {
+      toast.success("E011 sent — technical delay resolved, order resumed");
+      try { window.localStorage.setItem(techResumeKey, "1"); } catch { }
+      setTechDelayResolved(true);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutFormLink = useMutation({
+    mutationFn: () => fnFormLink({ data: { orderId: p.orderId, transitionToWaiting: true } }),
+    onSuccess: (r: any) => {
+      toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated");
+      try { window.localStorage.setItem(formLinkKey, "1"); } catch { }
+      setFormLinkSent(true);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutSubmit = useMutation({
+    mutationFn: () => fnSubmit({ data: { orderId: p.orderId } }),
+    onSuccess: () => {
+      toast.success("E005 sent — application marked submitted to govt");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutConsultation = useMutation({
+    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed" } }),
+    onSuccess: () => {
+      toast.success("S08 · Consultation Completed");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutReopen = useMutation({
+    mutationFn: () => fnReopen({ data: { orderId: p.orderId } }),
+    onSuccess: () => {
+      toast.success("E09 sent — order reopened/restarted successfully");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const cName = customer?.name ?? lead?.name ?? "—";
   const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
@@ -89,8 +257,8 @@ export function WorkspaceShell(p: Props) {
   const waPhone = cMobile ? String(cMobile).replace(/\D/g, "") : "";
   const waUrl = waPhone
     ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}?text=${encodeURIComponent(
-        `Hi ${cName}, this is regarding your ${svcName} application (${application.application_code}).`,
-      )}`
+      `Hi ${cName}, this is regarding your ${svcName} application (${application.application_code}).`,
+    )}`
     : null;
 
   const paidAmt = (payments ?? [])
@@ -137,388 +305,577 @@ export function WorkspaceShell(p: Props) {
 
   const paymentPillCls =
     paymentStatus === "Paid" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" :
-    paymentStatus === "Refunded" || paymentStatus === "Failed" ? "bg-rose-50 text-rose-700 ring-rose-200" :
-    "bg-amber-50 text-amber-800 ring-amber-200";
+      paymentStatus === "Refunded" || paymentStatus === "Failed" ? "bg-rose-50 text-rose-700 ring-rose-200" :
+        "bg-amber-50 text-amber-800 ring-amber-200";
 
   const statusPillCls =
     meta.side === "exception" ? "bg-rose-50 text-rose-700 ring-rose-200" :
-    meta.tone === "emerald" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" :
-    meta.tone === "violet"  ? "bg-violet-50 text-violet-700 ring-violet-200" :
-    meta.tone === "amber"   ? "bg-amber-50 text-amber-800 ring-amber-200" :
-                              "bg-sky-50 text-sky-700 ring-sky-200";
+      meta.tone === "emerald" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" :
+        meta.tone === "violet" ? "bg-violet-50 text-violet-700 ring-violet-200" :
+          meta.tone === "amber" ? "bg-amber-50 text-amber-800 ring-amber-200" :
+            "bg-sky-50 text-sky-700 ring-sky-200";
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="space-y-5 pb-10 max-w-[1400px] mx-auto">
-      {/* Top row */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link
-          to="/admin/orders"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Orders
-        </Link>
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href={govtPortalUrl ?? undefined}
-                target={govtPortalUrl ? "_blank" : undefined}
-                rel="noopener noreferrer"
-                onClick={(e) => { if (!govtPortalUrl) { e.preventDefault(); toast.error("No government portal URL set for this service"); } }}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border ${govtPortalUrl ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"}`}
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> Govt Portal
-              </a>
-            </TooltipTrigger>
-            <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setRefundOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-              >
-                <BadgeDollarSign className="w-3.5 h-3.5" /> Refund
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Log a refund request received from the customer</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Add Task / Follow-up" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Schedule a follow-up task for this order</TooltipContent>
-          </Tooltip>
+      <div className="space-y-5 pb-10 max-w-[1400px] mx-auto">
+        {/* Top row */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Link
+            to="/admin/orders"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Orders
+          </Link>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={govtPortalUrl ?? undefined}
+                  target={govtPortalUrl ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  onClick={(e) => { if (!govtPortalUrl) { e.preventDefault(); toast.error("No government portal URL set for this service"); } }}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border ${govtPortalUrl ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"}`}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Govt Portal
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setRefundOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                >
+                  <BadgeDollarSign className="w-3.5 h-3.5" /> Refund
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Log a refund request received from the customer</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <AddTaskDialog defaultApplicationId={p.orderId} defaultLeadId={application.lead_id ?? null} triggerLabel="Add Task / Follow-up" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Schedule a follow-up task for this order</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
-      </div>
-      <RefundRequestDialog applicationId={p.orderId} open={refundOpen} onClose={() => setRefundOpen(false)} />
+        <RefundRequestDialog applicationId={p.orderId} open={refundOpen} onClose={() => setRefundOpen(false)} />
 
 
-      {/* Header card */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-        {/* Meta grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-          <HeaderMeta label="Order No.">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[15px] font-extrabold text-slate-900 tracking-tight">
-                {application.application_code}
+        {/* Header card */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
+          {/* Meta grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+            <HeaderMeta label="Order No.">
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[15px] font-extrabold text-slate-900 tracking-tight">
+                  {application.application_code}
+                </span>
+                <button onClick={() => copy(application.application_code)} className="text-slate-400 hover:text-indigo-600">
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </HeaderMeta>
+            <HeaderMeta label="Payment Status">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${paymentPillCls}`}>
+                {paymentStatus}
               </span>
-              <button onClick={() => copy(application.application_code)} className="text-slate-400 hover:text-indigo-600">
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </HeaderMeta>
-          <HeaderMeta label="Payment Status">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${paymentPillCls}`}>
-              {paymentStatus}
-            </span>
-          </HeaderMeta>
-          <HeaderMeta label="Order Status">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
-              {meta.label}
-            </span>
-          </HeaderMeta>
-          <HeaderMeta label="Order Created">
-            <div className="text-sm text-slate-800">
-              {formatIST(application.created_at)}
-              <span className="ml-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                {relativeIST(application.created_at)}
+            </HeaderMeta>
+            <HeaderMeta label="Order Status">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
+                {meta.label}
               </span>
-            </div>
-          </HeaderMeta>
-        </div>
-
-        <div className="mt-5 border-t border-slate-100 pt-5 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6">
-          {/* Customer fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
-            <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
-            <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
-            <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
-            <InfoRow label="State" value={cState} />
-            <InfoRow label="Language" value={cLanguage} />
-            <InfoRow label="Source" value={cSource} />
-            <InfoRow label="Selected Service" value={svcName} />
-            <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
+            </HeaderMeta>
+            <HeaderMeta label="Order Created">
+              <div className="text-sm text-slate-800">
+                {formatIST(application.created_at)}
+                <span className="ml-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                  {relativeIST(application.created_at)}
+                </span>
+              </div>
+            </HeaderMeta>
           </div>
 
-          {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
-          <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
-            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
-            <div className="grid grid-cols-6 gap-1.5">
-              {QUICK_ACTIONS.map((spec) => {
-                const built = spec.build(quickCtx);
-                const disabled = !!built.disabledReason;
-                const onClick = () => {
-                  if (spec.key === "print") {
-                    runQuickAction(spec.key, built, () => window.print());
-                  } else {
-                    // Contact / link tiles: navigate manually so we can toast first.
-                    runQuickAction(spec.key, built, () => {
-                      if (built.to) {
-                        window.location.assign(built.to);
-                      } else if (built.href) {
-                        if (built.external) {
-                          window.open(built.href, "_blank", "noopener,noreferrer");
-                        } else {
-                          window.location.assign(built.href);
+          <div className="mt-5 border-t border-slate-100 pt-5 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6">
+            {/* Customer fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
+              <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
+              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
+              <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
+              <InfoRow label="State" value={cState} />
+              <InfoRow label="Language" value={cLanguage} />
+              <InfoRow label="Source" value={cSource} />
+              <InfoRow label="Selected Service" value={svcName} />
+              <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
+            </div>
+
+            {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
+            <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
+              <div className="grid grid-cols-6 gap-1.5">
+                {QUICK_ACTIONS.map((spec) => {
+                  const built = spec.build(quickCtx);
+                  const disabled = !!built.disabledReason;
+                  const onClick = () => {
+                    if (spec.key === "print") {
+                      runQuickAction(spec.key, built, () => window.print());
+                    } else {
+                      // Contact / link tiles: navigate manually so we can toast first.
+                      runQuickAction(spec.key, built, () => {
+                        if (built.to) {
+                          window.location.assign(built.to);
+                        } else if (built.href) {
+                          if (built.external) {
+                            window.open(built.href, "_blank", "noopener,noreferrer");
+                          } else {
+                            window.location.assign(built.href);
+                          }
                         }
-                      }
-                    });
-                  }
-                };
-                return (
-                  <Tooltip key={spec.key}>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <QuickTile
-                          icon={spec.icon}
-                          label={spec.label}
-                          tint={spec.tint}
-                          disabled={disabled}
-                          onClick={onClick}
-                        />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
-                  </Tooltip>
-                );
-              })}
+                      });
+                    }
+                  };
+                  return (
+                    <Tooltip key={spec.key}>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <QuickTile
+                            icon={spec.icon}
+                            label={spec.label}
+                            tint={spec.tint}
+                            disabled={disabled}
+                            onClick={onClick}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-        {/* Employee actions live in one place only — inside the Employee Workflow tab
+          {/* Employee actions live in one place only — inside the Employee Workflow tab
             (OrderWorkflowPanel). This card is header info only. */}
-      </section>
+        </section>
 
-      {/* ── SINGLE SOURCE OF TRUTH: Customer Journey Map ────────────
+        {/* ── SINGLE SOURCE OF TRUTH: Customer Journey Map ────────────
           Replaces OrderActionRail + OrderStageActions + the old
           Customer Journey card. Every employee action lives here. */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
-              Customer Journey & Employee Actions
-            </div>
-            <div className="text-xs text-slate-500 mt-0.5">
-              Every stage, every button — one map. All action buttons are always visible; the highlighted node shows where the order is right now.
-            </div>
-          </div>
-        </div>
-        <CustomerJourneyMap
-          applicationId={application.id}
-          stage={p.stage}
-          isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
-          serviceCode={(service as any)?.service_code ?? (service as any)?.code ?? lead?.service ?? null}
-          workflowStatus={(application as any).workflow_status}
-          closureStage={(application as any).closure_stage}
-          closureNextAt={(application as any).closure_next_at}
-          closureReasonLabel={(application as any).closure_reason_code}
-          payments={payments}
-          hideAmount={p.hideAmount}
-          adminOverride={adminOverride}
-        />
-      </section>
-
-      {/* ── Admin Override (B09 / B10) ──────────────────────────── */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500">
-              Admin Override
-            </div>
-            <div className="mt-0.5 text-xs text-slate-500">
-              {adminOverride
-                ? "Override active — all journey buttons are unlocked regardless of stage."
-                : "Enable override to unlock all journey map buttons for manual correction."}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!adminOverride ? (
-              <button
-                type="button"
-                onClick={() => setAdminOverride(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 shadow-sm hover:bg-orange-100 transition"
-              >
-                <ShieldAlert className="size-3.5" />
-                B09 — Enable Override
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAdminOverride(false)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm hover:bg-emerald-100 transition"
-              >
-                <ShieldOff className="size-3.5" />
-                B10 — Disable Override
-              </button>
-            )}
-          </div>
-        </div>
-        {adminOverride && (
-          <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-800">
-            <ShieldAlert className="mr-1 inline size-3" />
-            <strong>Warning:</strong> Admin override is active. All journey map action buttons are unlocked.
-            Changes made in this mode bypass the normal stage gating rules. Click <strong>B10</strong> to return to the normal flow.
-          </div>
-        )}
-      </section>
-
-
-
-      {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
-        <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-          {TAB_DEFS.map((t) => {
-            const Icon = t.icon;
-            const state = availability[t.id];
-            const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
-            const trigger = (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                disabled={!state.enabled}
-                className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Icon className="size-4" />
-                {t.label}
-              </TabsTrigger>
-            );
-            return (
-              <Tooltip key={t.id}>
-                <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
-                <TooltipContent>{tip}</TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </TabsList>
-
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
-          {/* Main */}
-          <div className="min-w-0 space-y-5">
-            {/* Sticky "where are we + what's next" strip for every tab. Display-only —
-                the single action surface lives inside the Employee Workflow tab. */}
-            <TabStatusHeader
-              applicationCode={application.application_code}
-              orderStatus={orderStatus}
-              stage={p.stage}
-              updatedAt={application.updated_at ?? application.created_at}
-              fulfillmentStatus={current}
-            />
-            <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
-              {p.showConsultationPanel ? (
-                <ConvertConsultationPanel
-                  leadId={lead.id} leadCode={lead.lead_code}
-                  mode={p.consultationMode}
-                  customerName={cName}
-                  customerMobile={cMobile}
-                  service={svcName}
-                  totalAmount={total ?? (lead?.total_amount != null ? Number(lead.total_amount) : null)}
-                />
-              ) : (
-                <>
-                  {p.notesNode}
-
-                  <OrderWorkflowPanel
-                    applicationId={application.id}
-                    payments={payments}
-                    hideAmount={p.hideAmount}
-                    current={current}
-                    workflowStatus={(application as any).workflow_status}
-                    closureStage={(application as any).closure_stage}
-                    closureNextAt={(application as any).closure_next_at}
-                    cancellationRequestedAt={(application as any).cancellation_requested_at}
-                    reasonCode={(application as any).closure_reason_code}
-                    reasonText={(application as any).closure_reason_text}
-                  />
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="form" className="space-y-4 mt-0 animate-fade-in">
-              {p.showConsultationPanel ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-                  This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
-                </div>
-              ) : (
-                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
-              )}
-              <OrderDocumentsPanel
-                orderId={p.orderId}
-                documents={documents}
-                deletedAt={application.documents_deleted_at}
-                deletedReason={application.documents_deleted_reason}
-                hideMoney={p.hideAmount}
-              />
-            </TabsContent>
-
-            <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
-              {lead?.id ? (
-                <LeadEmailsTab leadId={lead.id} leadService={svcName} orderId={p.orderId} />
-              ) : (
-                <div className="rounded-2xl border bg-white p-6 text-sm text-slate-500">No lead linked.</div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
-              <UnifiedTimeline
-                applicationId={application.id}
-                events={events}
-                emailLogs={emailLogs ?? []}
-                payments={p.hideAmount ? [] : payments}
-                documents={documents}
-                createdAt={application.created_at}
-                hideMoney={p.hideAmount}
-              />
-            </TabsContent>
-
-            <TabsContent value="support" className="mt-0 animate-fade-in">
-              <OrderTicketsPanel
-                orderTickets={p.data.orderTickets ?? []}
-                customerTickets={p.data.customerTickets ?? []}
-              />
-            </TabsContent>
-          </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-3">
-                Order Summary
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
+                Customer Journey & Employee Actions
               </div>
-              <dl className="space-y-2.5 text-sm">
-                {!p.hideAmount && (
+              <div className="text-xs text-slate-500 mt-0.5">
+                Every stage, every button — one map. All action buttons are always visible; the highlighted node shows where the order is right now.
+              </div>
+            </div>
+          </div>
+          <CustomerJourneyMap
+            applicationId={application.id}
+            stage={p.stage}
+            isConsultationOrder={p.showConsultationPanel || !!lead?.lead_code?.startsWith?.("TX")}
+            serviceCode={(service as any)?.service_code ?? (service as any)?.code ?? lead?.service ?? null}
+            workflowStatus={(application as any).workflow_status}
+            closureStage={(application as any).closure_stage}
+            closureNextAt={(application as any).closure_next_at}
+            closureReasonLabel={(application as any).closure_reason_code}
+            payments={payments}
+            hideAmount={p.hideAmount}
+            adminOverride={adminOverride}
+          />
+        </section>
+
+        {/* ── Journey Action Panel (B01 - B10) ──────────────────────────── */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
+                Journey Action Panel (B01 – B10)
+              </div>
+              <div className="mt-0.5 text-xs text-slate-500">
+                Trigger actions directly based on the current customer journey state.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-medium">Admin Override:</span>
+              {!adminOverride ? (
+                <button
+                  type="button"
+                  onClick={() => setAdminOverride(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 shadow-sm hover:bg-orange-100 transition"
+                >
+                  <ShieldAlert className="size-3.5" />
+                  Enable Override
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAdminOverride(false)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-sm hover:bg-emerald-100 transition"
+                >
+                  <ShieldOff className="size-3.5" />
+                  Disable Override
+                </button>
+              )}
+            </div>
+          </div>
+
+          {adminOverride && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-800">
+              <ShieldAlert className="mr-1 inline size-3" />
+              <strong>Warning:</strong> Admin override is active. Journey actions (B01 – B08) are fully unlocked.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {(() => {
+              const isB09Enabled = closed || completed;
+              const isB10Enabled = !closed;
+
+              const gateWithOverride = (code: ButtonCode | "B09" | "B10") => {
+                if (code === "B09") return isB09Enabled;
+                if (code === "B10") return isB10Enabled;
+                return gate(code as ButtonCode);
+              };
+
+              const buttonHandlers: Record<string, { label: string; sub: string; badgeBottom: string; onClick: () => void; pending?: boolean; variant: string }> = {
+                B01: {
+                  label: "B01 — Form Not Submitted",
+                  sub: "Send Form Link / Incomplete mail",
+                  badgeBottom: "E002",
+                  onClick: () => mutFormLink.mutate(),
+                  pending: mutFormLink.isPending,
+                  variant: "amber",
+                },
+                B02: {
+                  label: "B02 — Technical Delay",
+                  sub: "Select Reason",
+                  badgeBottom: "E003",
+                  onClick: () => setDialog({ kind: "technical_delay" }),
+                  variant: "sky",
+                },
+                B03: {
+                  label: "B03 — Technical Delay Resolved",
+                  sub: "Issue Resolved & Resume",
+                  badgeBottom: "E011",
+                  onClick: () => mutResume.mutate(),
+                  pending: mutResume.isPending,
+                  variant: "emerald",
+                },
+                B04: {
+                  label: "B04 — Customer Side Delay",
+                  sub: "Select Reason",
+                  badgeBottom: "E004",
+                  onClick: () => setDialog({ kind: "customer_delay" }),
+                  variant: "amber",
+                },
+                B05: {
+                  label: "B05 — Application Submitted",
+                  sub: "Waiting for Govt. Approval",
+                  badgeBottom: "E006",
+                  onClick: () => mutSubmit.mutate(),
+                  pending: mutSubmit.isPending,
+                  variant: "violet",
+                },
+                B06: {
+                  label: "B06 — Consultation Completed",
+                  sub: "Fulfillment completed",
+                  badgeBottom: "E005",
+                  onClick: () => mutConsultation.mutate(),
+                  pending: mutConsultation.isPending,
+                  variant: "violet",
+                },
+                B07: {
+                  label: "B07 — Application Accepted",
+                  sub: "Upload PDF & Complete",
+                  badgeBottom: "E007",
+                  onClick: () => setDialog({ kind: "complete_with_cert" }),
+                  variant: "emerald",
+                },
+                B08: {
+                  label: "B08 — Application Rejected",
+                  sub: "Select Reason & Close",
+                  badgeBottom: "E008",
+                  onClick: () => setDialog({ kind: "govt_rejected" }),
+                  variant: "rose",
+                },
+                B09: {
+                  label: "B09 — Reopen/Restart Order",
+                  sub: "Restart a closed order",
+                  badgeBottom: "E09",
+                  onClick: () => mutReopen.mutate(),
+                  pending: mutReopen.isPending,
+                  variant: "indigo",
+                },
+                B10: {
+                  label: "B10 — Order Force Closed",
+                  sub: "Force Close order (Cat A)",
+                  badgeBottom: "E010",
+                  onClick: () => setDialog({ kind: "force_close" }),
+                  variant: "rose",
+                },
+              };
+
+              const TINT_STYLES: Record<string, { active: string }> = {
+                amber: { active: "border-amber-200 bg-amber-50 hover:bg-amber-100/80 text-amber-800 hover:border-amber-300 shadow-amber-100/50" },
+                sky: { active: "border-sky-200 bg-sky-50 hover:bg-sky-100/80 text-sky-800 hover:border-sky-300 shadow-sky-100/50" },
+                emerald: { active: "border-emerald-200 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 hover:border-emerald-300 shadow-emerald-100/50" },
+                rose: { active: "border-rose-200 bg-rose-50 hover:bg-rose-100/80 text-rose-800 hover:border-rose-300 shadow-rose-100/50" },
+                violet: { active: "border-violet-200 bg-violet-50 hover:bg-violet-100/80 text-violet-800 hover:border-violet-300 shadow-violet-100/50" },
+                indigo: { active: "border-indigo-200 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-800 hover:border-indigo-300 shadow-indigo-100/50" },
+              };
+
+              return Object.entries(buttonHandlers).map(([code, btn]) => {
+                const enabled = gateWithOverride(code as ButtonCode);
+                const style = TINT_STYLES[btn.variant] || TINT_STYLES.indigo;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={btn.onClick}
+                    disabled={!enabled || btn.pending}
+                    className={cn(
+                      "relative flex flex-col justify-between items-center text-center p-3 rounded-xl border transition shadow-xs disabled:cursor-not-allowed select-none group min-h-[96px]",
+                      enabled
+                        ? style.active
+                        : "border-slate-200 bg-slate-50 text-slate-400 opacity-60"
+                    )}
+                  >
+                    {/* Yellow Badge Top */}
+                    <span className="absolute -top-2 left-3 rounded-md bg-yellow-300 border border-yellow-400 px-1.5 py-px text-[9px] font-black text-slate-900 shadow-2xs font-mono">
+                      {code}
+                    </span>
+
+                    {/* Blue Badge Bottom */}
+                    <span className="absolute -bottom-2 right-3 rounded-md bg-blue-600 border border-blue-700 px-1.5 py-px text-[9px] font-black text-white shadow-2xs font-mono">
+                      {btn.badgeBottom}
+                    </span>
+
+                    <div className="text-[11px] font-extrabold tracking-tight mt-1 leading-snug">
+                      {btn.label.split(" — ")[1] || btn.label}
+                    </div>
+                    <div className="text-[9px] font-medium opacity-85 leading-normal mt-0.5 max-w-[90%] break-words">
+                      {btn.sub}
+                    </div>
+                    {btn.pending && (
+                      <span className="absolute inset-0 bg-white/60 flex items-center justify-center text-xs font-bold text-slate-800 rounded-xl">
+                        Processing…
+                      </span>
+                    )}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </section>
+
+        {/* Dialog Overlays */}
+        <ExternalDelayDialog
+          applicationId={application.id}
+          initialSide="customer"
+          open={dialog?.kind === "customer_delay"}
+          onClose={() => { setDialog(null); invalidate(); }}
+        />
+        <ExternalDelayDialog
+          applicationId={application.id}
+          initialSide="internal"
+          open={dialog?.kind === "technical_delay"}
+          onClose={() => { setDialog(null); invalidate(); }}
+        />
+        <CloseOrderDialog
+          applicationId={application.id}
+          open={dialog?.kind === "force_close"}
+          onClose={() => { setDialog(null); invalidate(); }}
+        />
+        {dialog?.kind === "govt_rejected" && (
+          <GovtRejectedInline
+            orderId={application.id}
+            onClose={() => { setDialog(null); invalidate(); }}
+          />
+        )}
+        <CompletionGateDialogStandalone
+          open={dialog?.kind === "complete_with_cert"}
+          onOpenChange={(v) => { if (!v) setDialog(null); }}
+          orderId={application.id}
+          busy={false}
+          onConfirm={async (payload) => {
+            try {
+              await fnUpdateFF({
+                data: {
+                  orderId: application.id,
+                  toStatus: "completed",
+                  certificateDocumentId: payload.certificateDocumentId,
+                  certificateNumber: payload.certificateNumber,
+                  completionNotes: payload.completionNotes,
+                } as any,
+              });
+              toast.success("E007 sent — order completed with certificate");
+              setDialog(null);
+              invalidate();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Completion failed");
+            }
+          }}
+        />
+
+
+
+        {/* Tabs */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
+          <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
+            {TAB_DEFS.map((t) => {
+              const Icon = t.icon;
+              const state = availability[t.id];
+              const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
+              const trigger = (
+                <TabsTrigger
+                  key={t.id}
+                  value={t.id}
+                  disabled={!state.enabled}
+                  className="gap-2 px-4 py-2.5 rounded-none border-b-2 border-transparent bg-transparent text-sm font-semibold text-slate-500 hover:text-slate-800 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Icon className="size-4" />
+                  {t.label}
+                </TabsTrigger>
+              );
+              return (
+                <Tooltip key={t.id}>
+                  <TooltipTrigger asChild><span>{trigger}</span></TooltipTrigger>
+                  <TooltipContent>{tip}</TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TabsList>
+
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 mt-5">
+            {/* Main */}
+            <div className="min-w-0 space-y-5">
+              {/* Sticky "where are we + what's next" strip for every tab. Display-only —
+                the single action surface lives inside the Employee Workflow tab. */}
+              <TabStatusHeader
+                applicationCode={application.application_code}
+                orderStatus={orderStatus}
+                stage={p.stage}
+                updatedAt={application.updated_at ?? application.created_at}
+                fulfillmentStatus={current}
+              />
+              <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
+                {p.showConsultationPanel ? (
+                  <ConvertConsultationPanel
+                    leadId={lead.id} leadCode={lead.lead_code}
+                    mode={p.consultationMode}
+                    customerName={cName}
+                    customerMobile={cMobile}
+                    service={svcName}
+                    totalAmount={total ?? (lead?.total_amount != null ? Number(lead.total_amount) : null)}
+                  />
+                ) : (
                   <>
-                    <SummaryRow label="Total Amount" value={`₹${Number(total ?? 0).toLocaleString("en-IN")}`} />
-                    <SummaryRow label="Paid Amount"  value={<span className="text-emerald-600 font-semibold">₹{paidAmt.toLocaleString("en-IN")}</span>} />
-                    <SummaryRow label="Due Amount"   value={<span className={`font-semibold ${dueAmt > 0 ? "text-rose-600" : "text-slate-500"}`}>₹{dueAmt.toLocaleString("en-IN")}</span>} />
-                    <div className="h-px bg-slate-100 my-1" />
+                    {p.notesNode}
+
+                    <OrderWorkflowPanel
+                      applicationId={application.id}
+                      payments={payments}
+                      hideAmount={p.hideAmount}
+                      current={current}
+                      workflowStatus={(application as any).workflow_status}
+                      closureStage={(application as any).closure_stage}
+                      closureNextAt={(application as any).closure_next_at}
+                      cancellationRequestedAt={(application as any).cancellation_requested_at}
+                      reasonCode={(application as any).closure_reason_code}
+                      reasonText={(application as any).closure_reason_text}
+                    />
                   </>
                 )}
-                <SummaryRow
-                  label="Assigned To"
-                  value={
-                    <select
-                      value={application.assigned_to ?? ""}
-                      onChange={(e) => p.onAssign(e.target.value || null)}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium max-w-[160px]"
-                    >
-                      <option value="">Unassigned</option>
-                      {p.staff.map((s: any) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
-                    </select>
-                  }
+              </TabsContent>
+
+              <TabsContent value="form" className="space-y-4 mt-0 animate-fade-in">
+                {p.showConsultationPanel ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+                    This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
+                  </div>
+                ) : (
+                  <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
+                )}
+                <OrderDocumentsPanel
+                  orderId={p.orderId}
+                  documents={documents}
+                  deletedAt={application.documents_deleted_at}
+                  deletedReason={application.documents_deleted_reason}
+                  hideMoney={p.hideAmount}
                 />
-                <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
-                <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
-              </dl>
+              </TabsContent>
+
+              <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">
+                {lead?.id ? (
+                  <LeadEmailsTab leadId={lead.id} leadService={svcName} orderId={p.orderId} />
+                ) : (
+                  <div className="rounded-2xl border bg-white p-6 text-sm text-slate-500">No lead linked.</div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
+                <UnifiedTimeline
+                  applicationId={application.id}
+                  events={events}
+                  emailLogs={emailLogs ?? []}
+                  payments={p.hideAmount ? [] : payments}
+                  documents={documents}
+                  createdAt={application.created_at}
+                  hideMoney={p.hideAmount}
+                />
+              </TabsContent>
+
+              <TabsContent value="support" className="mt-0 animate-fade-in">
+                <OrderTicketsPanel
+                  orderTickets={p.data.orderTickets ?? []}
+                  customerTickets={p.data.customerTickets ?? []}
+                />
+              </TabsContent>
+            </div>
+
+            {/* Sidebar */}
+            <aside className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600 mb-3">
+                  Order Summary
+                </div>
+                <dl className="space-y-2.5 text-sm">
+                  {!p.hideAmount && (
+                    <>
+                      <SummaryRow label="Total Amount" value={`₹${Number(total ?? 0).toLocaleString("en-IN")}`} />
+                      <SummaryRow label="Paid Amount" value={<span className="text-emerald-600 font-semibold">₹{paidAmt.toLocaleString("en-IN")}</span>} />
+                      <SummaryRow label="Due Amount" value={<span className={`font-semibold ${dueAmt > 0 ? "text-rose-600" : "text-slate-500"}`}>₹{dueAmt.toLocaleString("en-IN")}</span>} />
+                      <div className="h-px bg-slate-100 my-1" />
+                    </>
+                  )}
+                  <SummaryRow
+                    label="Assigned To"
+                    value={
+                      <select
+                        value={application.assigned_to ?? ""}
+                        onChange={(e) => p.onAssign(e.target.value || null)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium max-w-[160px]"
+                      >
+                        <option value="">Unassigned</option>
+                        {p.staff.map((s: any) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+                      </select>
+                    }
+                  />
+                  <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
+                  <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
+                </dl>
+              </div>
+            </aside>
           </div>
-        </aside>
-        </div>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
     </TooltipProvider>
   );
 }
@@ -564,9 +921,9 @@ function QuickTile({
 }) {
   const tintMap = {
     emerald: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100",
-    sky:     "text-sky-600 bg-sky-50 hover:bg-sky-100",
-    violet:  "text-violet-600 bg-violet-50 hover:bg-violet-100",
-    slate:   "text-slate-600 bg-slate-100 hover:bg-slate-200",
+    sky: "text-sky-600 bg-sky-50 hover:bg-sky-100",
+    violet: "text-violet-600 bg-violet-50 hover:bg-violet-100",
+    slate: "text-slate-600 bg-slate-100 hover:bg-slate-200",
   };
   // Note: we do NOT disable the button — it stays clickable so runQuickAction can
   // fire the "why disabled" toast. Visual affordance is dimmed instead.
@@ -584,17 +941,17 @@ function QuickTile({
 // ─────────────────────────── Order Tickets Panel ───────────────────────────
 
 const TICKET_STATUS_TINT: Record<string, string> = {
-  open:              "bg-sky-50 text-sky-700 ring-sky-200",
-  in_progress:       "bg-amber-50 text-amber-700 ring-amber-200",
-  waiting_customer:  "bg-violet-50 text-violet-700 ring-violet-200",
-  resolved:          "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  closed:            "bg-slate-100 text-slate-600 ring-slate-200",
+  open: "bg-sky-50 text-sky-700 ring-sky-200",
+  in_progress: "bg-amber-50 text-amber-700 ring-amber-200",
+  waiting_customer: "bg-violet-50 text-violet-700 ring-violet-200",
+  resolved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  closed: "bg-slate-100 text-slate-600 ring-slate-200",
 };
 const TICKET_PRIORITY_TINT: Record<string, string> = {
   urgent: "bg-rose-100 text-rose-700",
-  high:   "bg-orange-100 text-orange-700",
+  high: "bg-orange-100 text-orange-700",
   medium: "bg-amber-50 text-amber-700",
-  low:    "bg-slate-100 text-slate-600",
+  low: "bg-slate-100 text-slate-600",
 };
 
 function OrderTicketsPanel({ orderTickets, customerTickets }: { orderTickets: any[]; customerTickets: any[] }) {
@@ -686,6 +1043,73 @@ function TicketRow({ t, showOrderLink }: { t: any; showOrderLink?: boolean }) {
         </div>
       </Link>
     </li>
+  );
+}
+
+function GovtRejectedInline({ orderId, onClose }: { orderId: string; onClose: () => void }) {
+  const [reasonText, setReasonText] = useState("");
+  const fn = useServerFn(handleGovtRejected);
+  const listReasons = useServerFn(listCloseReasons);
+  const [busy, setBusy] = useState(false);
+
+  const { data: reasons = [] } = useQuery({
+    queryKey: ["close-reasons-all"],
+    queryFn: () => listReasons(),
+    staleTime: 60_000,
+  });
+  const catB = (reasons as any[]).filter((r) => r.category === "B");
+  const [reasonId, setReasonId] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!reasonId) return toast.error("Pick a Category B reason");
+    setBusy(true);
+    try {
+      await fn({ data: { orderId, reasonId, remarks: reasonText || null } });
+      toast.success("E008 sent — order closed (rejected)");
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <div className="w-full max-w-lg rounded-xl border bg-white p-5 shadow-xl space-y-3">
+        <div className="font-bold text-slate-900">E008 — Application Rejected by Govt</div>
+        <div className="text-xs text-slate-600">
+          Sends E008 to the customer and force-closes this order (no resubmit loop).
+        </div>
+        <div className="space-y-1">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Reason (Category B)</label>
+          <select
+            value={reasonId ?? ""}
+            onChange={(e) => setReasonId(e.target.value || null)}
+            className="w-full rounded-md border px-2 py-1.5 text-sm"
+          >
+            <option value="">Select a reason…</option>
+            {catB.map((r: any) => (
+              <option key={r.id} value={r.id}>B{r.number} — {r.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Extra remarks (optional)</label>
+          <textarea
+            value={reasonText}
+            onChange={(e) => setReasonText(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} disabled={busy} className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
+          <button onClick={submit} disabled={busy || !reasonId}
+            className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50">
+            Send E008 & Close
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
