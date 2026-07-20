@@ -50,13 +50,16 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
 
               const { data: app } = await supabaseAdmin
                 .from("applications")
-                .select("id, lead_id, application_code, workflow_status")
+                .select("id, lead_id, application_code, workflow_status, order_status, fulfillment_status")
                 .eq("id", r.application_id)
                 .maybeSingle();
               if (!app) continue;
 
-              // Skip if order is resumed/closed/cancelled
-              if (["processing_resumed","completed","closed","cancelled","refund_closed"].includes(app.workflow_status as string)) {
+              // Skip if order is already closed/completed/cancelled/refunded (any status field)
+              const skipWorkflow = ["processing_resumed","completed","closed","cancelled","refund_closed"].includes(app.workflow_status as string);
+              const skipOrder = ["CLOSED","COMPLETED","REFUND_PROCESSED"].includes(app.order_status as string);
+              const skipFulfillment = ["order_closed","order_completed","cancelled"].includes(app.fulfillment_status as string);
+              if (skipWorkflow || skipOrder || skipFulfillment) {
                 continue;
               }
 
@@ -73,6 +76,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   "bhs_e004_our_side_delay", "order_closure_confirmation", "order_completed",
                   "talk_to_expert_completed", "support_ticket_reply", "support_ticket_closed",
                   "support_ticket_closed_final", "refund_processed_confirmation", "bhs_e012_submitted_to_govt",
+                  "bhs_e010_ticket_closed_final",
                 ]);
                 if (!allowedTemplates.has(String(r.template_code))) continue;
                 await enqueueFromTemplateInternal(
@@ -110,18 +114,41 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                 } as never);
               }
 
-              // Auto-close the order when the 24h pending-closure window elapses.
+              // Auto-close the order when the 8h pending-closure window elapses.
               if (r.kind === "pending_closure_followup") {
-                await supabaseAdmin
-                  .from("applications")
-                  .update({ workflow_status: "closed", workflow_closed_at: nowIso } as never)
-                  .eq("id", app.id);
+                // Pick a default close reason (first active).
+                const { data: reason } = await supabaseAdmin
+                  .from("order_close_reasons")
+                  .select("id")
+                  .eq("is_active", true)
+                  .order("number")
+                  .limit(1)
+                  .maybeSingle();
+                const reasonId = (reason as any)?.id ?? null;
+
+                const { error: rpcErr } = await supabaseAdmin.rpc("transition_order_status" as any, {
+                  _order_id: app.id,
+                  _new_status: "CLOSED",
+                  _reason_id: reasonId,
+                  _remarks: "Auto-close: customer delay unresolved within 8 business hours",
+                  _force: true,
+                } as any);
+                if (rpcErr) {
+                  console.error("[workflow-cron] auto-close RPC failed", app.id, rpcErr.message);
+                } else {
+                  const { error: ffErr } = await supabaseAdmin
+                    .from("applications")
+                    .update({ fulfillment_status: "order_closed" } as never)
+                    .eq("id", app.id);
+                  if (ffErr) console.error("[workflow-cron] fulfillment update failed", app.id, ffErr.message);
+                }
+
                 await supabaseAdmin.from("workflow_events").insert({
                   application_id: app.id,
                   lead_id: app.lead_id,
                   event_type: "order_auto_closed",
-                  title: "Order auto-closed after pending-closure window",
-                  description: "No response received within the reasonable period after the pending-closure notice.",
+                  title: "Order auto-closed after 8h customer-delay window",
+                  description: "No response received within the 8-business-hour customer-delay window.",
                   customer_visible: false,
                   actor_name: "System",
                   is_system: true,
