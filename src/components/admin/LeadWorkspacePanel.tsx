@@ -75,44 +75,44 @@ export function LeadWorkspacePanel({
     (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed"].includes(a.application_status),
   ) || (applications ?? []).length > 0;
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
-      {/* Customer + Quick Actions come first on mobile for accessibility */}
-      <div className="space-y-5 lg:col-span-1 lg:order-2">
-        {isUnconvertedConsultationLead(lead) && (
-          <ConvertConsultationPanel
-            leadId={lead.id}
-            leadCode={lead.lead_code}
-            mode="select"
-            customerName={lead.name}
-            customerMobile={lead.mobile ?? null}
-            service={lead.service ?? null}
-            totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-          />
-        )}
+    <div className="space-y-5">
+      {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
+        <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
+      )}
+      {isUnconvertedConsultationLead(lead) && (
+        <ConvertConsultationPanel
+          leadId={lead.id}
+          leadCode={lead.lead_code}
+          mode="select"
+          customerName={lead.name}
+          customerMobile={lead.mobile ?? null}
+          service={lead.service ?? null}
+          totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+        />
+      )}
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <CustomerQuickCard lead={lead} />
         <QuickActionsCard lead={lead} currentStatus={currentStatus} />
-        {!hideMoney && (
-          <PaymentLinkPanel
-            leadId={lead.id}
-            leadCode={lead.lead_code}
-            mobile={lead.mobile ?? null}
-            customerName={lead.name}
-            service={lead.service ?? null}
-            baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
-            gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
-            totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-            leadStatusV2={currentStatus}
-          />
-        )}
         <FollowUpScheduler leadId={lead.id} staff={staff} />
-        {hasPaidOrder && applications.length > 0 && (
-          <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
+        {!hideMoney && (
+          <div className="sm:col-span-2 xl:col-span-3">
+            <PaymentLinkPanel
+              leadId={lead.id}
+              leadCode={lead.lead_code}
+              mobile={lead.mobile ?? null}
+              customerName={lead.name}
+              service={lead.service ?? null}
+              baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
+              gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
+              totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
+              leadStatusV2={currentStatus}
+            />
+          </div>
         )}
-      </div>
-
-      <div className="space-y-5 lg:col-span-2 lg:order-1">
-        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
-          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
+        {hasPaidOrder && applications.length > 0 && (
+          <div className="sm:col-span-2 xl:col-span-3">
+            <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
+          </div>
         )}
       </div>
     </div>
