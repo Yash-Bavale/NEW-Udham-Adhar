@@ -111,18 +111,41 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                 } as never);
               }
 
-              // Auto-close the order when the 24h pending-closure window elapses.
+              // Auto-close the order when the 8h pending-closure window elapses.
               if (r.kind === "pending_closure_followup") {
-                await supabaseAdmin
-                  .from("applications")
-                  .update({ workflow_status: "closed", workflow_closed_at: nowIso } as never)
-                  .eq("id", app.id);
+                // Pick a default close reason (first active).
+                const { data: reason } = await supabaseAdmin
+                  .from("order_close_reasons")
+                  .select("id")
+                  .eq("is_active", true)
+                  .order("number")
+                  .limit(1)
+                  .maybeSingle();
+                const reasonId = (reason as any)?.id ?? null;
+
+                const { error: rpcErr } = await supabaseAdmin.rpc("transition_order_status" as any, {
+                  _order_id: app.id,
+                  _new_status: "CLOSED",
+                  _reason_id: reasonId,
+                  _remarks: "Auto-close: customer delay unresolved within 8 business hours",
+                  _force: true,
+                } as any);
+                if (rpcErr) {
+                  console.error("[workflow-cron] auto-close RPC failed", app.id, rpcErr.message);
+                } else {
+                  const { error: ffErr } = await supabaseAdmin
+                    .from("applications")
+                    .update({ fulfillment_status: "order_closed" } as never)
+                    .eq("id", app.id);
+                  if (ffErr) console.error("[workflow-cron] fulfillment update failed", app.id, ffErr.message);
+                }
+
                 await supabaseAdmin.from("workflow_events").insert({
                   application_id: app.id,
                   lead_id: app.lead_id,
                   event_type: "order_auto_closed",
-                  title: "Order auto-closed after pending-closure window",
-                  description: "No response received within the reasonable period after the pending-closure notice.",
+                  title: "Order auto-closed after 8h customer-delay window",
+                  description: "No response received within the 8-business-hour customer-delay window.",
                   customer_visible: false,
                   actor_name: "System",
                   is_system: true,
