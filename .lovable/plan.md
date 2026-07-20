@@ -1,72 +1,71 @@
-# Adopt S01–S12 as the single source of truth
 
-Rewires the order lifecycle to the 12 canonical stages from the uploaded doc. Old orders are left as-is (their old enum values remain valid) — only new activity uses the new stages. No data backfill.
+## 1. Enable "My Dashboard" for employees + make KPI cards clickable
 
-## New canonical stages
+- `src/components/admin/AdminShell.tsx`: ensure the "My Dashboard" (My Work) sidebar item is visible for every staff role (executive, manager, support, accounts, finance, operations), not just admin.
+- `src/routes/admin.my-work.tsx`:
+  - Wrap each KPI card in a `<Link>` with a targeted route + filter:
+    - Assigned applications → `/admin/applications?assignee=me`
+    - Order received (act now) → `/admin/orders?stage=order_received&assignee=me`
+    - My active leads → `/admin/leads?assignee=me`
+    - Unread notifications → `/admin/notifications`
+    - SLA risk → `/admin/orders?sla=risk&assignee=me`
+    - Documents to review → `/admin/review`
+  - Add hover state (border/shadow) so cards read as interactive.
 
-| Code | `fulfillment_status_enum` value | Label |
-|------|--------------------------------|-------|
-| S01 | `order_received` (existing) | Order Received |
-| S02 | `awaiting_customer_form` (new) | Awaiting Customer Form |
-| S03 | `waiting_for_customer_submission` (new) | Waiting for Customer Submission |
-| S04 | `form_submitted` (existing) | Form Submitted |
-| S05 | `technical_delay` (existing) | Technical Delay |
-| S06 | `customer_delay` (existing) | Customer Side Delay |
-| S07 | `government_processing` (new) | Government Processing |
-| S08 | `consultation_completed` (existing) | Consultation Completed |
-| S09 | `application_approved` (new) | Application Approved |
-| S10 | `application_rejected` (new, replaces `certificate_rejected` for new orders) | Application Rejected |
-| S11 | `order_completed` (existing) — alias of `completed` for the new flow | Order Completed |
-| S12 | `order_closed` (existing) | Order Closed |
+## 2. Fix "Contacted" status not persisting
 
-Legacy enum values (`documents_received`, `verification_pending`, `application_submitted`, `under_processing`, `completed`, `cancelled`, `awaiting_govt`, `certificate_rejected`, `ticket_open`, `form_not_submitted`) stay in the enum for backward compat but are removed from the UI stage picker and journey map. `completed` is folded into `order_completed` for new writes.
+Investigate `src/lib/crm/lead-transitions.ts` `markContacted` — likely writing to a column not shown in the leads list, or transition guard rejects `new_lead → contacted`. Concrete fix:
+- Ensure the server fn updates `leads.status = 'contacted'` (and `contacted_at`) with `supabaseAdmin` and returns fresh row.
+- After the mutation in `LeadWorkspacePanel`, invalidate `["admin.leads"]`, `["admin.lead", leadId]`, `["my-work"]`, and `["admin.dashboard"]`.
+- Verify RLS grants let assignee update `status`; if not, use admin client already used elsewhere.
 
-## Database migration (single migration)
+## 3. Remove "Form" column in Leads list
 
-1. `ALTER TYPE public.fulfillment_status_enum ADD VALUE IF NOT EXISTS` for the 5 new values.
-2. New table `public.order_stage_catalog` (code S01–S12, enum_value, label, sort_order) seeded with the 12 rows — small reference table used by admin UI for labels/badges. GRANT SELECT to `authenticated`; ALL to `service_role`; RLS enabled with a read-any-authenticated policy.
-3. New SQL helper `public.next_fulfillment_stages(_from fulfillment_status_enum)` returning the allowed forward stages per the S01–S12 graph (see State machine below). Supersedes ad-hoc guards in code.
+- `src/routes/admin.leads.index.tsx`: drop the `FORM` `<th>` and matching `<td>` (form_submitted pill).
 
-No data backfill; old rows keep their existing enum values.
+## 4. Richer lead source (page path)
 
-## Code changes
+- `src/components/site/LeadForm.tsx`: at submit, include `source_page: window.location.pathname` (and `referrer`) into the lead insert payload / lead capture server fn.
+- `src/lib/leads.functions.ts` (capture): persist `lead_source_page` column (add via migration if missing) and set `lead_source` to `"Website · <path>"` when a page is provided.
+- Leads list + Customer card display `lead.lead_source_page` when present, else fall back to `lead_source`.
+- Migration: `alter table public.leads add column if not exists lead_source_page text;`
 
-Rewrite these files to key off the S01–S12 vocabulary. Business logic is unchanged where it already matches the doc — only labels and enum values change.
+## 5. Redesign Customer Details card
 
-- `src/lib/crm/fulfillment-transitions.ts` — replace `FulfillmentStatus` union, `FULFILLMENT_STAGES`, `FULFILLMENT_LABEL`, `FULFILLMENT_BADGE`, `FULFILLMENT_TRANSITIONS` with the S01–S12 set. Keep legacy values in a separate `LEGACY_FULFILLMENT_STATUSES` union so old rows still render (labelled from a fallback map) but aren't offered as forward targets.
-- `src/lib/orders/journey-map.ts` — retarget `JOURNEY_STAGES`, `stageToJourneyIndex`, `deriveJourneyLiveState`, `derivePhase` at S01–S12. Button gating (B01–B10) already matches the doc; only the stage keys the branches attach to are renamed (`order_received` → S01, `form_submitted` → S04, `app_submitted` → S07, `check_status` stays on S07, `completed` → S11).
-- `src/lib/orders/journey-graph.ts` — node labels + `currentStageNodeFor` remapped to S01–S12.
-- `src/lib/crm/workflow-closure.functions.ts` — `closeOrder` writes `fulfillment_status = 'order_closed'` (already correct), `handleGovtRejected` writes `application_rejected` instead of `certificate_rejected`.
-- `src/lib/orders/actions/hold-actions.functions.ts` — `startTechnicalHold` / customer delay actions write `technical_delay` / `customer_delay` and resume back to `form_submitted` when cleared (already the behavior; verified).
-- `src/lib/crm/orders-v2.functions.ts` — `complete_with_cert` writes `order_completed` (was `completed`). Certificate-attach guard unchanged.
-- `src/lib/crm/stageActionMap.ts` — regenerate stage→primary CTA map against S01–S12. Old `OrderStage` keys that map to legacy fulfillment values are collapsed.
-- `src/components/admin/FulfillmentStatusUpdater.tsx`, `src/components/admin/workspace/StageStepper.tsx`, `src/components/admin/workspace/CustomerJourneyMap.tsx` — read labels/colors from the new `FULFILLMENT_LABEL` / `FULFILLMENT_BADGE`.
-- Unit tests: extend `src/lib/orders/__tests__/journey-graph.test.ts` with cases for each S01–S12 transition. Add a small `fulfillment-transitions.test.ts` asserting the allowed-transitions graph matches the doc.
+- `src/components/admin/LeadWorkspacePanel.tsx` `CustomerQuickCard`:
+  - Two-tone header with avatar bubble, lead code + status pill, three big action buttons (Call primary, WhatsApp, Email) full-width on mobile.
+  - Info grid: label muted micro-caps, value bold; mobile = 1 col, sm = 2 col.
+  - Copy chips (mobile / email) as small pill-buttons next to values, not detached icons.
+  - Subtle gradient border + soft shadow; sticky on desktop within its column.
 
-## State machine (S01–S12)
+## 6. Follow-up notifications fire at scheduled time
 
-```text
-S01 Order Received
-  └─auto→ S02 Awaiting Customer Form
-S02 Awaiting Customer Form           (B01 available)
-  └─B01→ S03 Waiting for Customer Submission
-S03 Waiting for Customer Submission  (no buttons)
-  └─customer submits→ S04 Form Submitted
-S04 Form Submitted                   (B02, B04, B05, B06, B07, B08)
-  ├─B02→ S05 Technical Delay ──B03──▶ S04
-  ├─B04→ S06 Customer Side Delay ──resume──▶ S04
-  │                              └─8h auto──▶ S12 Order Closed
-  ├─B05→ S07 Government Processing
-  ├─B06→ S08 Consultation Completed
-  ├─B07→ S09 Application Approved ──cert upload──▶ S11 Order Completed
-  └─B08→ S10 Application Rejected ──▶ S12 Order Closed
-S07 Government Processing            (B04, B05, B06, B07, B08 same set)
-S09 → S11 Order Completed (terminal)
-S10 → S12 Order Closed (terminal)
-Admin B09/B10 override remains orthogonal (unlocks all buttons).
-```
+- Table `lead_followups` already exists (used by `FollowUpScheduler`). Add a pg_cron minute job that:
+  - Selects due follow-ups (`due_at <= now()`, `notified_at is null`).
+  - Inserts a row in `notifications` for the assignee (`type='followup_due'`, links to `/admin/leads/{id}`).
+  - Sets `notified_at = now()`.
+- SQL only — implemented in a single migration using `pg_cron` (Option 1 pattern). No new endpoint required.
 
-## Not doing
-- No migration of existing orders — they keep whatever legacy stage they had. New activity uses S01–S12.
-- No changes to ticket flow (T001/T002) beyond renaming stage references.
-- No UI redesign — same journey map, same buttons, only labels + enum values change.
+## 7. Two SLAs: Lead and Order — action-required at 1h and 3h
+
+New unified rule: any Lead or Order that is not yet "contacted / action taken" gets flagged.
+
+- Migration adds two enum values or a small `sla_config` table with:
+  - lead SLA: warn 1h, breach 3h since `created_at` while `status in ('new_lead','lead_created')`.
+  - order SLA: warn 1h, breach 3h since `created_at` while `fulfillment_status = 'order_received'` and no action recorded.
+- pg_cron minute job writes to a new `sla_alerts` table (or reuses `notifications`) at warn+breach thresholds, addressed to the assignee (fallback: all admins if unassigned).
+- `getMyWorkSummary`:
+  - `counters.slaRisk` = count of SLA rows for me currently in warn/breach.
+  - Split into `slaLead` / `slaOrder` on the card group so employee sees both.
+- Leads / Orders list rows show an amber "Take action (1h)" or red "Overdue (3h)" pill when the row is in warn/breach, driven by the same server-side computation returned in the list payload (no need to poll SLA table on the client).
+- Update "SLA risk (>48h idle)" copy on the My Work card to "SLA — action needed (1h / 3h)".
+
+## Verification
+
+- `tsgo --noEmit` after edits.
+- Manual: create a new lead, wait for cron tick locally (or call the SQL function directly), confirm notification appears and My Work counter increments; click "Contacted" and confirm the leads list badge changes to `contacted` and SLA pill clears.
+
+## Out of scope (flagging)
+
+- Redesigning the Orders SLA badge across every table variant — only the leads/orders index and My Work card get the new pill this pass.
+- Rewriting the notifications delivery channel (email/WhatsApp push) for follow-ups — DB notification only for now; ask if you also want an email/WhatsApp ping when due.
