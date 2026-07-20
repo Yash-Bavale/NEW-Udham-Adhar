@@ -246,9 +246,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
 
 function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
-  const reminderFn = useServerFn(queueDocumentReminder);
   const transitionFn = useServerFn(transitionLeadStatus);
-  const [busy, setBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
 
   const formLink =
@@ -267,16 +265,6 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
     `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
   );
   const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
-
-  const sendReminder = async () => {
-    setBusy(true);
-    try {
-      const res = await reminderFn({ data: { leadId: lead.id } });
-      toast.success(`Reminder queued to ${res.queuedTo}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to queue reminder");
-    } finally { setBusy(false); }
-  };
 
   const markContacted = async () => {
     setContactBusy(true);
@@ -327,20 +315,10 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
             <Mail className="size-3.5" /> Send Link via Email
           </a>
         )}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !lead.email}
-          onClick={sendReminder}
-          className="justify-start text-xs"
-        >
-          <BellRing className="size-3.5 mr-1.5" />
-          {busy ? "Sending…" : "Send Documents Reminder"}
-        </Button>
       </div>
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          Add a customer email to enable email reminders.
+          Add a customer email to enable email actions.
         </div>
       )}
     </div>
