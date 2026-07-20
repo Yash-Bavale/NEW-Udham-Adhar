@@ -348,6 +348,15 @@ export function WorkspaceShell(p: Props) {
               </TooltipTrigger>
               <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
             </Tooltip>
+            {isAdmin && (
+              <ChangeServiceButton
+                orderId={p.orderId}
+                currentServiceId={(service as any)?.id ?? null}
+                currentServiceName={(service as any)?.service_name ?? "—"}
+                fulfillmentStatus={String(current)}
+                formSubmittedAt={application?.form_submitted_at ?? null}
+              />
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
