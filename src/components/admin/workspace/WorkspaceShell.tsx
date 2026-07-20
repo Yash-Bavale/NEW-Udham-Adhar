@@ -33,6 +33,7 @@ import {
 } from "@/lib/orders/journey-map";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
+import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
 
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
