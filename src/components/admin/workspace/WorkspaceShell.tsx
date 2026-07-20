@@ -849,7 +849,14 @@ export function WorkspaceShell(p: Props) {
                   customerTickets={p.data.customerTickets ?? []}
                 />
               </TabsContent>
+
+              {!p.hideAmount && (
+                <TabsContent value="invoices" className="space-y-4 mt-0 animate-fade-in">
+                  <OrderPaymentsPanel payments={payments ?? []} />
+                </TabsContent>
+              )}
             </div>
+
 
             {/* Sidebar */}
             <aside className="space-y-4">
