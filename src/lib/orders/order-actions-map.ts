@@ -321,7 +321,7 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
 
 // ─────────────────────────── TAB AVAILABILITY ───────────────────────────
 
-export type WorkspaceTabId = "workflow" | "form" | "emails" | "activity" | "support";
+export type WorkspaceTabId = "workflow" | "form" | "emails" | "activity" | "support" | "invoices";
 
 export type TabAvailability = Record<WorkspaceTabId, { enabled: boolean; reason: string }>;
 
@@ -334,8 +334,6 @@ export function tabAvailability(
   return {
     workflow: { enabled: true, reason: "" },
     form: {
-      // Enable Forms & Docs whenever there's a lead and it's not a
-      // pre-payment consultation order. Panel itself handles empty/locked state.
       enabled: !showConsultation && hasLead,
       reason: showConsultation
         ? "Available after service is picked and second payment is received"
@@ -343,9 +341,10 @@ export function tabAvailability(
           ? "No lead linked to this order yet"
           : "",
     },
-
     emails: { enabled: hasLead, reason: hasLead ? "" : "No lead linked to this order" },
     activity: { enabled: true, reason: "" },
     support: { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
+    invoices: { enabled: true, reason: "" },
   };
+
 }
