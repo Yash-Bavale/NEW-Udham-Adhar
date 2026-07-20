@@ -122,7 +122,10 @@ export function assertTransitionAllowed(i: GuardInput): void {
       return;
     }
     case "talk_to_expert_done":
+      return;
     case "reminder":
+      // Reminders are always allowed — even after close — so the reminder
+      // button never throws a validation error at the operator.
       return;
   }
 }
