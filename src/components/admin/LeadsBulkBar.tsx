@@ -73,28 +73,36 @@ export function LeadsBulkBar({
               ))}
             </Pop>
           )}
-          {assignOpen && (
-            <Pop position="up">
-              <button
-                onClick={() => { setAssignOpen(false); onAssign(null); }}
-                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)]"
-              >
-                Unassign
-              </button>
-              {(staff?.rows ?? []).map((u) => (
+          {assignOpen && (() => {
+            // Defensive: tolerate either { rows: [...] } (current) or { profiles: [...] }
+            // (legacy cache shape from listStaff) so a stale cached entry never crashes render.
+            const rawRows = (staff as any)?.rows;
+            const rawProfiles = (staff as any)?.profiles;
+            const list: Array<{ id: string; name?: string; display_name?: string; email?: string }> =
+              Array.isArray(rawRows) ? rawRows : Array.isArray(rawProfiles) ? rawProfiles : [];
+            return (
+              <Pop position="up">
                 <button
-                  key={u.id}
-                  onClick={() => { setAssignOpen(false); onAssign(u.id); }}
+                  onClick={() => { setAssignOpen(false); onAssign(null); }}
                   className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)]"
                 >
-                  {u.name}
+                  Unassign
                 </button>
-              ))}
-              {staff && staff.rows.length === 0 && (
-                <div className="px-3 py-2 text-xs" style={{ color: "var(--admin-fg-muted)" }}>No staff found.</div>
-              )}
-            </Pop>
-          )}
+                {list.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => { setAssignOpen(false); onAssign(u.id); }}
+                    className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)]"
+                  >
+                    {u.name || u.display_name || u.email || "(unnamed)"}
+                  </button>
+                ))}
+                {staff && list.length === 0 && (
+                  <div className="px-3 py-2 text-xs" style={{ color: "var(--admin-fg-muted)" }}>No staff found.</div>
+                )}
+              </Pop>
+            );
+          })()}
         </motion.div>
       )}
       {emailOpen && (
