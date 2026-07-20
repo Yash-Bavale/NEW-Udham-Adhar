@@ -13,10 +13,16 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/refunds")({
-  beforeLoad: ({ context }) => {
-    if (!context.role?.hasAny(["admin", "super_admin", "finance", "accounts"])) {
-      throw redirect({ to: "/admin/my-work" });
-    }
+  beforeLoad: async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/admin-login" });
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["admin", "super_admin", "finance", "accounts"]);
+    if (!data || data.length === 0) throw redirect({ to: "/admin/my-work" });
   },
   component: RefundsPage,
 });

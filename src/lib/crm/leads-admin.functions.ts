@@ -489,7 +489,7 @@ export const updateLeadAssignee = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const { data: prev } = await admin
       .from("leads")
-      .select("assigned_to, customer_id")
+      .select("assigned_to, customer_id, name, lead_code")
       .eq("id", data.leadId)
       .single();
     if (!prev) throw new Error("Lead not found");

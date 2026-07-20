@@ -13,10 +13,16 @@ import { Award, Upload, Send, Eye, Loader2, Search, RefreshCw } from "lucide-rea
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/certificates")({
-  beforeLoad: ({ context }) => {
-    if (!context.role?.hasAny(["admin", "super_admin"])) {
-      throw redirect({ to: "/admin/my-work" });
-    }
+  beforeLoad: async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/admin-login" });
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["admin", "super_admin"]);
+    if (!data || data.length === 0) throw redirect({ to: "/admin/my-work" });
   },
   component: CertificatesPage,
 });
