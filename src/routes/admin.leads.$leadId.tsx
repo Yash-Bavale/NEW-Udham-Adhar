@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { formatIST } from "@/lib/datetime";
 import { getLead, updateLead, addLeadNote, listStaff } from "@/lib/crm/leads-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { AdminOnboardingPanel } from "@/components/admin/AdminOnboardingPanel";
@@ -120,7 +121,7 @@ function LeadDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="workspace" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-slate-100/50 border mb-6">
           <TabsTrigger value="workspace" className="gap-2 py-2 px-4"><LayoutGrid className="w-4 h-4" /> Workspace</TabsTrigger>
           <TabsTrigger value="overview" className="gap-2 py-2 px-4"><User className="w-4 h-4" /> Overview</TabsTrigger>
@@ -213,7 +214,7 @@ function LeadDetailPage() {
                           <td className="py-3 px-4">
                             <Badge variant="secondary" className="font-sans text-[10px] uppercase">{a.application_status.replace(/_/g, " ")}</Badge>
                           </td>
-                          <td className="py-3 px-4 text-xs text-slate-500">{new Date(a.created_at).toLocaleString("en-IN")}</td>
+                          <td className="py-3 px-4 text-xs text-slate-500">{formatIST(a.created_at)}</td>
                           <td className="py-3 px-4 text-right">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                               <Link to="/admin/applications/$applicationId" params={{ applicationId: a.id }}>View Details</Link>
@@ -288,7 +289,7 @@ function LeadDetailPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs text-slate-400 flex items-center gap-2">
-                        {n.user_id ? "Staff Member" : "System"} • {new Date(n.created_at).toLocaleString("en-IN")}
+                        {n.user_id ? "Staff Member" : "System"} • {formatIST(n.created_at)}
                       </div>
                       <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
                         {n.note}

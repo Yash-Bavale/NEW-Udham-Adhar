@@ -50,6 +50,7 @@ import {
   type WorkspaceTabId,
 } from "@/lib/orders/order-actions-map";
 import { formatIST, relativeIST } from "@/lib/datetime";
+import { useRole } from "@/hooks/useRole";
 
 interface Props {
   orderId: string;
@@ -76,6 +77,8 @@ type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
+  const role = useRole();
+  const isAdmin = role.hasAny(["super_admin", "admin"]);
   const [tab, setTab] = useState<TabId>("workflow");
   const [refundOpen, setRefundOpen] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
@@ -492,7 +495,8 @@ export function WorkspaceShell(p: Props) {
           />
         </section>
 
-        {/* ── Journey Action Panel (B01 - B10) ──────────────────────────── */}
+        {/* ── Journey Action Panel (B01 - B10) — admin only ─────────── */}
+        {isAdmin && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
             <div>
@@ -675,6 +679,9 @@ export function WorkspaceShell(p: Props) {
             })()}
           </div>
         </section>
+        )}
+
+
 
         {/* Dialog Overlays */}
         <ExternalDelayDialog

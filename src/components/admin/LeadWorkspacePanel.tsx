@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
+import { formatIST } from "@/lib/datetime";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -70,16 +71,13 @@ export function LeadWorkspacePanel({
   const currentStatus: LeadStatusV2 = (lead.lead_status_v2 ?? "new_lead") as LeadStatusV2;
   const role = useRole();
   const hideMoney = role.hideMoney();
+  const hasPaidOrder = (applications ?? []).some(
+    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed"].includes(a.application_status),
+  ) || (applications ?? []).length > 0;
   return (
-    <div className="grid lg:grid-cols-3 gap-5">
-      <div className="lg:col-span-2 space-y-5">
-        <StatusControlPanel lead={lead} currentStatus={currentStatus} />
-        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
-          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
-        )}
-        <EventsTimeline leadId={lead.id} />
-      </div>
-      <div className="space-y-5">
+    <div className="grid gap-5 lg:grid-cols-3">
+      {/* Customer + Quick Actions come first on mobile for accessibility */}
+      <div className="space-y-5 lg:col-span-1 lg:order-2">
         {isUnconvertedConsultationLead(lead) && (
           <ConvertConsultationPanel
             leadId={lead.id}
@@ -92,7 +90,7 @@ export function LeadWorkspacePanel({
           />
         )}
         <CustomerQuickCard lead={lead} />
-        <QuickActionsCard lead={lead} />
+        <QuickActionsCard lead={lead} currentStatus={currentStatus} />
         {!hideMoney && (
           <PaymentLinkPanel
             leadId={lead.id}
@@ -107,8 +105,15 @@ export function LeadWorkspacePanel({
           />
         )}
         <FollowUpScheduler leadId={lead.id} staff={staff} />
-        <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
-        <DocumentsPanel applications={applications} />
+        {hasPaidOrder && applications.length > 0 && (
+          <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
+        )}
+      </div>
+
+      <div className="space-y-5 lg:col-span-2 lg:order-1">
+        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
+          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
+        )}
       </div>
     </div>
   );
@@ -182,14 +187,29 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
 
 /* ------------------- Quick Actions Card ------------------- */
 
-function QuickActionsCard({ lead }: { lead: LeadShape }) {
+function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+  const qc = useQueryClient();
   const reminderFn = useServerFn(queueDocumentReminder);
+  const transitionFn = useServerFn(transitionLeadStatus);
   const [busy, setBusy] = useState(false);
+  const [contactBusy, setContactBusy] = useState(false);
 
   const formLink =
     typeof window !== "undefined"
       ? `${window.location.origin}/onboarding/${lead.lead_code}`
       : `/onboarding/${lead.lead_code}`;
+
+  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
+  const waNumber = waPhone ? (waPhone.length === 10 ? "91" + waPhone : waPhone) : "";
+  const waMessage = encodeURIComponent(
+    `Hi ${lead.name}, please complete your application & payment here: ${formLink}`,
+  );
+  const waSendUrl = waNumber ? `https://wa.me/${waNumber}?text=${waMessage}` : null;
+  const mailSubject = encodeURIComponent("Complete your application");
+  const mailBody = encodeURIComponent(
+    `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
+  );
+  const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
 
   const sendReminder = async () => {
     setBusy(true);
@@ -201,6 +221,18 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
     } finally { setBusy(false); }
   };
 
+  const markContacted = async () => {
+    setContactBusy(true);
+    try {
+      await transitionFn({ data: { leadId: lead.id, toStatus: "contacted" } });
+      toast.success("Marked as Contacted");
+      qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally { setContactBusy(false); }
+  };
+
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
@@ -208,6 +240,36 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
         <h3 className="text-sm font-semibold">Quick Actions</h3>
       </div>
       <div className="flex flex-col gap-2">
+        {currentStatus === "new_lead" && (
+          <Button
+            size="sm"
+            disabled={contactBusy}
+            onClick={markContacted}
+            className="justify-start text-xs bg-indigo-600 hover:bg-indigo-700"
+          >
+            <CheckCircle2 className="size-3.5 mr-1.5" />
+            {contactBusy ? "Updating…" : "Mark as Contacted"}
+          </Button>
+        )}
+        <CopyButton value={formLink} label="Copy Payment Link" className="justify-start" />
+        {waSendUrl && (
+          <a
+            href={waSendUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-xs font-medium hover:bg-emerald-100 justify-start"
+          >
+            <MessageCircle className="size-3.5" /> Send Link via WhatsApp
+          </a>
+        )}
+        {mailUrl && (
+          <a
+            href={mailUrl}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 justify-start"
+          >
+            <Mail className="size-3.5" /> Send Link via Email
+          </a>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -218,11 +280,10 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
           <BellRing className="size-3.5 mr-1.5" />
           {busy ? "Sending…" : "Send Documents Reminder"}
         </Button>
-        <CopyButton value={formLink} label="Copy Onboarding Link" className="justify-start" />
       </div>
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          Add a customer email to enable reminders.
+          Add a customer email to enable email reminders.
         </div>
       )}
     </div>
@@ -512,11 +573,7 @@ function EventsTimeline({ leadId }: { leadId: string }) {
     } finally { setBusy(false); }
   };
 
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString("en-IN", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: true,
-    });
+  const fmt = (iso: string) => formatIST(iso);
 
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4" style={{ borderColor: "var(--admin-border)" }}>
@@ -640,7 +697,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
               <li key={f.id} className="text-xs flex items-start gap-1.5">
                 <Phone className="size-3 mt-0.5 text-slate-400" />
                 <div>
-                  <div className="font-medium">{new Date(f.scheduled_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</div>
+                  <div className="font-medium">{formatIST(f.scheduled_at)}</div>
                   <div className="text-slate-500 capitalize">{f.reason.replace(/_/g, " ")}</div>
                 </div>
               </li>
@@ -707,7 +764,7 @@ function DocumentsPanel({ applications }: { applications: any[] }) {
       ) : deleted ? (
         <div className="rounded-md bg-rose-50 border border-rose-200 p-2 text-xs text-rose-800">
           Documents deleted on{" "}
-          <b>{new Date(deleted).toLocaleString("en-IN")}</b>
+          <b>{formatIST(deleted)}</b>
           {app.documents_deleted_reason ? <> — reason: <b>{app.documents_deleted_reason}</b></> : null}.
         </div>
       ) : (
