@@ -149,6 +149,16 @@ export const transitionLeadStatus = createServerFn({ method: "POST" })
       staff_role,
     } as never);
 
+    // Also mirror to activity_logs so it appears in the lead timeline UI.
+    const pretty = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    await admin.from("activity_logs").insert({
+      lead_id: leadId,
+      application_id: latestApp?.id ?? null,
+      activity_type: "lead_status_change",
+      activity_description: `Lead status: ${pretty(fromStatus)} → ${pretty(toStatus)}${data.reason ? ` — ${data.reason}` : ""}`,
+      user_id: context.userId,
+    } as never);
+
     // Email side effect.
     if (lead.email) {
       await queueEmailForStatus({

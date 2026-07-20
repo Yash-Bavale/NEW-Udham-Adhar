@@ -22,7 +22,7 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { leadId } = data;
 
-    const [acts, notes, emails, payments, onb, docs, analytics] = await Promise.all([
+    const [acts, notes, emails, payments, onb, docs, analytics, leadRow] = await Promise.all([
       supabase.from("activity_logs")
         .select("id, activity_type, activity_description, user_id, created_at")
         .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(200),
@@ -44,6 +44,9 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
       supabase.from("analytics_events")
         .select("id, event_name, page_url, created_at")
         .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(200),
+      supabase.from("leads")
+        .select("id, lead_source, created_at, name")
+        .eq("id", leadId).maybeSingle(),
     ]);
 
     const items: TimelineItem[] = [];
@@ -83,6 +86,20 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
       title: r.event_name as string,
       detail: r.page_url as string | undefined,
     }));
+
+    // Synthetic "lead created" entry with full source (e.g. "website:/print-udyam-certificate").
+    if (leadRow.data) {
+      const src = (leadRow.data.lead_source as string | null) ?? "unknown";
+      const [channel, ...pathParts] = src.split(":");
+      const path = pathParts.join(":");
+      items.push({
+        id: `src-${leadRow.data.id}`,
+        kind: "activity",
+        at: leadRow.data.created_at as string,
+        title: `Lead created — Source: ${channel || "unknown"}`,
+        detail: path ? `Landing page: ${path}` : undefined,
+      });
+    }
 
     items.sort((a, b) => (a.at < b.at ? 1 : -1));
     return { items: items.slice(0, 500) };
