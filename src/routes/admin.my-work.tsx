@@ -37,15 +37,15 @@ function MyWorkPage() {
 
   const cards = useMemo(
     () => {
-      const base = [
-        { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)" },
-        { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316" },
-        { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)" },
-        { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)" },
-        { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)" },
+      const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string> }> = [
+        { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/orders", search: { assignee: "me" } },
+        { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
+        { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me" } },
+        { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications" },
+        { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)", to: "/admin/orders", search: { assignee: "me", sla: "risk" } },
       ];
       if (role.hasAny(["super_admin", "admin"])) {
-        base.splice(2, 0, { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)" });
+        base.splice(2, 0, { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)", to: "/admin/review" });
       }
       return base;
     },
@@ -66,9 +66,11 @@ function MyWorkPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {cards.map((c) => (
-          <div
+          <Link
             key={c.label}
-            className="rounded-xl border p-4"
+            to={c.to}
+            search={c.search as never}
+            className="rounded-xl border p-4 transition-colors hover:border-[var(--admin-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]"
             style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}
           >
             <div className="flex items-center justify-between">
@@ -80,7 +82,7 @@ function MyWorkPage() {
             <div className="text-2xl font-semibold mt-1" style={{ color: "var(--admin-fg)" }}>
               {isLoading ? "—" : c.value}
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 

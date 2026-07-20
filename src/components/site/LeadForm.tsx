@@ -27,6 +27,10 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     setBusy(true);
 
     const fd = new FormData(e.currentTarget);
+    const sourcePage =
+      typeof window !== "undefined"
+        ? (window.location.pathname + window.location.search).slice(0, 240)
+        : undefined;
     const payload = {
       name: String(fd.get("name") ?? "").trim(),
       email: String(fd.get("email") ?? "").trim(),
@@ -35,6 +39,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
       language: String(fd.get("language") ?? ""),
       service: String(fd.get("service") ?? ""),
       consent: fd.get("consent") === "on",
+      source_page: sourcePage,
     };
 
     trackEvent("form_submitted", { service: payload.service, state: payload.state });

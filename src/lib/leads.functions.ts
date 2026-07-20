@@ -10,6 +10,7 @@ const LeadInput = z.object({
   language: z.enum(LANGUAGES as [string, ...string[]]),
   service: z.enum(SERVICE_LABELS as unknown as [string, ...string[]]),
   consent: z.literal(true, { message: "You must accept the terms to proceed" }),
+  source_page: z.string().trim().max(300).optional(),
 });
 
 /**
@@ -96,7 +97,7 @@ export const createLead = createServerFn({ method: "POST" })
           gst_amount: gstAmount,
           total_amount: totalAmount,
           status: "new_lead",
-          lead_source: "website",
+          lead_source: data.source_page ? `website:${data.source_page.slice(0, 240)}` : "website",
           is_duplicate: isDuplicate,
           duplicate_of: duplicateOf,
           customer_id: customerId,
