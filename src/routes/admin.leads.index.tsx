@@ -688,6 +688,20 @@ function AddLeadDialog({
         <DialogHeader>
           <DialogTitle>Add Lead</DialogTitle>
         </DialogHeader>
+        <div className="mb-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2">
+          <Label className="text-[11px] uppercase tracking-wider text-slate-500">Prefill from existing lead</Label>
+          <div className="mt-1 flex gap-2">
+            <Input
+              value={fetchId}
+              onChange={(e) => setFetchId(e.target.value)}
+              placeholder="Lead code (LD-1234), UUID, mobile, or email"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doFetch(); } }}
+            />
+            <Button type="button" variant="outline" onClick={doFetch} disabled={fetching || !fetchId.trim()}>
+              {fetching ? "Fetching…" : "Fetch"}
+            </Button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 py-2">
           <Row label="Full Name" required>
             <Input value={form.name} onChange={(e) => setField("name", e.target.value)} />
