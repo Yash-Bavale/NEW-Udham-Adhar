@@ -57,9 +57,28 @@ export function assertTransitionAllowed(i: GuardInput): void {
     throw new TransitionGuardError("Order is already closed. Reopen it before running new actions.");
   }
 
+  // Fulfillment stage (S01–S12) is the source of truth for send/remind gating.
+  // Anything at S04 (form_submitted) or beyond means the form is in — no form
+  // link, no reminder needed.
+  const S04_PLUS = new Set([
+    "form_submitted", "technical_delay", "customer_delay",
+    "government_processing", "application_submitted", "under_processing",
+    "awaiting_govt", "consultation_completed", "application_approved",
+    "application_rejected", "certificate_rejected",
+    "order_completed", "order_closed", "completed", "cancelled",
+  ]);
+  const S02_S03 = new Set([
+    "order_received", "awaiting_customer_form", "waiting_for_customer_submission",
+    "form_not_submitted", // legacy
+  ]);
+
   switch (i.action) {
     case "send_form_link": {
-      if (!/lead_received|payment|order|consult|awaiting|form_pending|form_not_submitted|waiting_customer|info_received|new_order/i.test(stage)) {
+      if (S04_PLUS.has(ws)) {
+        throw new TransitionGuardError("Form link only sends while the customer form is still pending (S02/S03).");
+      }
+      if (ws && !S02_S03.has(ws) &&
+          !/lead_received|payment|order|consult|awaiting|form_pending|form_not_submitted|waiting_customer|info_received|new_order/i.test(stage)) {
         throw new TransitionGuardError("Form link only sends before the form is submitted.");
       }
       return;
