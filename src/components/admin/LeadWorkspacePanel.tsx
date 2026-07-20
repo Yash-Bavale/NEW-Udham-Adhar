@@ -186,14 +186,29 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
 
 /* ------------------- Quick Actions Card ------------------- */
 
-function QuickActionsCard({ lead }: { lead: LeadShape }) {
+function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+  const qc = useQueryClient();
   const reminderFn = useServerFn(queueDocumentReminder);
+  const transitionFn = useServerFn(transitionLeadStatus);
   const [busy, setBusy] = useState(false);
+  const [contactBusy, setContactBusy] = useState(false);
 
   const formLink =
     typeof window !== "undefined"
       ? `${window.location.origin}/onboarding/${lead.lead_code}`
       : `/onboarding/${lead.lead_code}`;
+
+  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
+  const waNumber = waPhone ? (waPhone.length === 10 ? "91" + waPhone : waPhone) : "";
+  const waMessage = encodeURIComponent(
+    `Hi ${lead.name}, please complete your application & payment here: ${formLink}`,
+  );
+  const waSendUrl = waNumber ? `https://wa.me/${waNumber}?text=${waMessage}` : null;
+  const mailSubject = encodeURIComponent("Complete your application");
+  const mailBody = encodeURIComponent(
+    `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
+  );
+  const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
 
   const sendReminder = async () => {
     setBusy(true);
@@ -205,6 +220,18 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
     } finally { setBusy(false); }
   };
 
+  const markContacted = async () => {
+    setContactBusy(true);
+    try {
+      await transitionFn({ data: { leadId: lead.id, toStatus: "contacted" } });
+      toast.success("Marked as Contacted");
+      qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally { setContactBusy(false); }
+  };
+
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
@@ -212,6 +239,36 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
         <h3 className="text-sm font-semibold">Quick Actions</h3>
       </div>
       <div className="flex flex-col gap-2">
+        {currentStatus === "new_lead" && (
+          <Button
+            size="sm"
+            disabled={contactBusy}
+            onClick={markContacted}
+            className="justify-start text-xs bg-indigo-600 hover:bg-indigo-700"
+          >
+            <CheckCircle2 className="size-3.5 mr-1.5" />
+            {contactBusy ? "Updating…" : "Mark as Contacted"}
+          </Button>
+        )}
+        <CopyButton value={formLink} label="Copy Payment Link" className="justify-start" />
+        {waSendUrl && (
+          <a
+            href={waSendUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-xs font-medium hover:bg-emerald-100 justify-start"
+          >
+            <MessageCircle className="size-3.5" /> Send Link via WhatsApp
+          </a>
+        )}
+        {mailUrl && (
+          <a
+            href={mailUrl}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 justify-start"
+          >
+            <Mail className="size-3.5" /> Send Link via Email
+          </a>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -222,11 +279,10 @@ function QuickActionsCard({ lead }: { lead: LeadShape }) {
           <BellRing className="size-3.5 mr-1.5" />
           {busy ? "Sending…" : "Send Documents Reminder"}
         </Button>
-        <CopyButton value={formLink} label="Copy Onboarding Link" className="justify-start" />
       </div>
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          Add a customer email to enable reminders.
+          Add a customer email to enable email reminders.
         </div>
       )}
     </div>
