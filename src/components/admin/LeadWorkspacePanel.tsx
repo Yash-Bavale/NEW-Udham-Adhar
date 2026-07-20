@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
+import { formatIST } from "@/lib/datetime";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
