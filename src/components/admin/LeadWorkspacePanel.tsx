@@ -75,8 +75,8 @@ export function LeadWorkspacePanel({
   const role = useRole();
   const hideMoney = role.hideMoney();
   const hasPaidOrder = (applications ?? []).some(
-    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed"].includes(a.application_status),
-  ) || (applications ?? []).length > 0;
+    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed", "cancelled"].includes(a.application_status),
+  );
   return (
     <div className="space-y-5">
       {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
