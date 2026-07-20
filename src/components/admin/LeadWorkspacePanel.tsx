@@ -92,12 +92,18 @@ export function LeadWorkspacePanel({
           totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
         />
       )}
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        <CustomerQuickCard lead={lead} />
-        <QuickActionsCard lead={lead} currentStatus={currentStatus} />
-        <FollowUpScheduler leadId={lead.id} staff={staff} />
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <CustomerQuickCard lead={lead} />
+        </div>
+        <div className="lg:col-span-4">
+          <QuickActionsCard lead={lead} currentStatus={currentStatus} />
+        </div>
+        <div className="lg:col-span-3">
+          <FollowUpScheduler leadId={lead.id} staff={staff} />
+        </div>
         {!hideMoney && (
-          <div className="sm:col-span-2 xl:col-span-3">
+          <div className="lg:col-span-12">
             <PaymentLinkPanel
               leadId={lead.id}
               leadCode={lead.lead_code}
@@ -112,7 +118,7 @@ export function LeadWorkspacePanel({
           </div>
         )}
         {hasPaidOrder && applications.length > 0 && (
-          <div className="sm:col-span-2 xl:col-span-3">
+          <div className="lg:col-span-12">
             <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
           </div>
         )}
@@ -172,7 +178,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
       </div>
 
       {/* Submitted details */}
-      <dl className="grid grid-cols-1 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
         {lead.mobile && (
           <div className="flex items-center justify-between gap-2 pt-2">
             <dt className="text-slate-500">Mobile</dt>
