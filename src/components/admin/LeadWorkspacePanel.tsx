@@ -178,7 +178,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
       </div>
 
       {/* Submitted details */}
-      <dl className="grid grid-cols-1 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
         {lead.mobile && (
           <div className="flex items-center justify-between gap-2 pt-2">
             <dt className="text-slate-500">Mobile</dt>
