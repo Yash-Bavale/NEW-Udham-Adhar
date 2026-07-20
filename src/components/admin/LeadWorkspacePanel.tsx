@@ -56,9 +56,12 @@ type LeadShape = {
   customer_id?: string | null;
   service?: string | null;
   lead_source?: string | null;
+  state?: string | null;
+  language?: string | null;
   base_amount?: number | string | null;
   gst_amount?: number | string | null;
   total_amount?: number | string | null;
+  created_at?: string | null;
 };
 
 export function LeadWorkspacePanel({
