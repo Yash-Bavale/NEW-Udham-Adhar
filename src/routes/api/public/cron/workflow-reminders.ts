@@ -50,13 +50,16 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
 
               const { data: app } = await supabaseAdmin
                 .from("applications")
-                .select("id, lead_id, application_code, workflow_status")
+                .select("id, lead_id, application_code, workflow_status, order_status, fulfillment_status")
                 .eq("id", r.application_id)
                 .maybeSingle();
               if (!app) continue;
 
-              // Skip if order is resumed/closed/cancelled
-              if (["processing_resumed","completed","closed","cancelled","refund_closed"].includes(app.workflow_status as string)) {
+              // Skip if order is already closed/completed/cancelled/refunded (any status field)
+              const skipWorkflow = ["processing_resumed","completed","closed","cancelled","refund_closed"].includes(app.workflow_status as string);
+              const skipOrder = ["CLOSED","COMPLETED","REFUND_PROCESSED"].includes(app.order_status as string);
+              const skipFulfillment = ["order_closed","order_completed","cancelled"].includes(app.fulfillment_status as string);
+              if (skipWorkflow || skipOrder || skipFulfillment) {
                 continue;
               }
 
