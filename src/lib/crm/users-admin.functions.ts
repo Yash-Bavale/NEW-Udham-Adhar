@@ -193,7 +193,15 @@ const InviteInput = z.object({
   email: z.string().trim().email().max(255),
   mobile: z.string().trim().max(20).optional().nullable(),
   role: z.enum(ROLE_VALUES),
+  password: z.string().min(8).max(72).optional(),
 });
+
+function generateTempPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out + "!9";
+}
 
 export const inviteEmployee = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -202,13 +210,17 @@ export const inviteEmployee = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const admin = await getAdmin();
 
-    // Invite via Supabase Auth (sends magic invite email)
-    const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(data.email, {
-      data: { display_name: data.full_name },
+    // Create user directly with confirmed email — no verification/confirmation required.
+    const tempPassword = data.password ?? generateTempPassword();
+    const { data: created, error: cErr } = await admin.auth.admin.createUser({
+      email: data.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { display_name: data.full_name },
     });
-    if (invErr) throw new Error(invErr.message);
-    const newUser = invited.user;
-    if (!newUser) throw new Error("Invite did not return a user.");
+    if (cErr) throw new Error(cErr.message);
+    const newUser = created.user;
+    if (!newUser) throw new Error("User creation did not return a user.");
 
     // Upsert profile
     const { error: pErr } = await admin.from("profiles").upsert({
@@ -228,7 +240,7 @@ export const inviteEmployee = createServerFn({ method: "POST" })
     );
     if (rErr) throw new Error(rErr.message);
 
-    return { ok: true, user_id: newUser.id };
+    return { ok: true, user_id: newUser.id, email: data.email, temp_password: tempPassword };
   });
 
 const UpdateInput = z.object({
