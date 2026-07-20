@@ -70,16 +70,13 @@ export function LeadWorkspacePanel({
   const currentStatus: LeadStatusV2 = (lead.lead_status_v2 ?? "new_lead") as LeadStatusV2;
   const role = useRole();
   const hideMoney = role.hideMoney();
+  const hasPaidOrder = (applications ?? []).some(
+    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed"].includes(a.application_status),
+  ) || (applications ?? []).length > 0;
   return (
-    <div className="grid lg:grid-cols-3 gap-5">
-      <div className="lg:col-span-2 space-y-5">
-        <StatusControlPanel lead={lead} currentStatus={currentStatus} />
-        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
-          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
-        )}
-        <EventsTimeline leadId={lead.id} />
-      </div>
-      <div className="space-y-5">
+    <div className="grid gap-5 lg:grid-cols-3">
+      {/* Customer + Quick Actions come first on mobile for accessibility */}
+      <div className="space-y-5 lg:col-span-1 lg:order-2">
         {isUnconvertedConsultationLead(lead) && (
           <ConvertConsultationPanel
             leadId={lead.id}
@@ -92,7 +89,7 @@ export function LeadWorkspacePanel({
           />
         )}
         <CustomerQuickCard lead={lead} />
-        <QuickActionsCard lead={lead} />
+        <QuickActionsCard lead={lead} currentStatus={currentStatus} />
         {!hideMoney && (
           <PaymentLinkPanel
             leadId={lead.id}
@@ -107,8 +104,15 @@ export function LeadWorkspacePanel({
           />
         )}
         <FollowUpScheduler leadId={lead.id} staff={staff} />
-        <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
-        <DocumentsPanel applications={applications} />
+        {hasPaidOrder && applications.length > 0 && (
+          <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
+        )}
+      </div>
+
+      <div className="space-y-5 lg:col-span-2 lg:order-1">
+        {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
+          <RefundDecisionPanel lead={lead} currentStatus={currentStatus} />
+        )}
       </div>
     </div>
   );
