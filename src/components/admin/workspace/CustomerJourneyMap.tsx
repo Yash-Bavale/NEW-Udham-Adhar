@@ -238,7 +238,7 @@ export function CustomerJourneyMap(p: Props) {
   const mutConsultation = useMutation({
     // B06 → S08 Consultation Completed. Stamp fulfillment stage; skip the E005
     // resubmit email so we don't double-notify the customer.
-    mutationFn: () => fnUpdateFF({ data: { applicationId: p.applicationId, fulfillmentStatus: "consultation_completed" as never } }),
+    mutationFn: () => fnUpdateFF({ data: { orderId: p.applicationId, toStatus: "consultation_completed" } }),
     onSuccess: () => { toast.success("S08 · Consultation Completed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
