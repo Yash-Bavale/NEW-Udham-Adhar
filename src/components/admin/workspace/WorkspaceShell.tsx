@@ -70,9 +70,11 @@ const TAB_DEFS = [
   { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
   { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
   { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
+  { id: "invoices" as const, label: "Invoices", icon: BadgeDollarSign, tooltip: "View, download, resend, or replace invoices for this order", moneyOnly: true },
   { id: "activity" as const, label: "Timeline / Activity Log", icon: Activity, tooltip: "Full chronological activity log for this order" },
   { id: "support" as const, label: "Internal Help / Support Ticket", icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
 ];
+
 type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
