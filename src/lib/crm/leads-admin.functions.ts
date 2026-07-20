@@ -303,6 +303,37 @@ export const getLead = createServerFn({ method: "GET" })
     };
   });
 
+// Fetch a lead by code (e.g. "LD-1234") OR uuid so the Add-Lead dialog can
+// prefill from an existing customer profile.
+export const findLeadByCodeOrId = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ query: z.string().min(2).max(64) }))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, STAFF_READ_ROLES);
+    const admin = await getAdmin();
+    const q = data.query.trim();
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let row: any = null;
+    if (uuidRe.test(q)) {
+      const { data: r } = await admin.from("leads").select("*").eq("id", q).maybeSingle();
+      row = r;
+    }
+    if (!row) {
+      const { data: r } = await admin.from("leads").select("*").ilike("lead_code", q).maybeSingle();
+      row = r;
+    }
+    if (!row) {
+      const { data: rs } = await admin.from("leads")
+        .select("*")
+        .or(`mobile.eq.${q},email.ilike.${q}`)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      row = rs?.[0] ?? null;
+    }
+    if (!row) throw new Error("No lead found for that ID / code / mobile / email");
+    return { lead: row };
+  });
+
 export const addLeadNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ lead_id: z.string().uuid(), note: z.string().min(1) }))

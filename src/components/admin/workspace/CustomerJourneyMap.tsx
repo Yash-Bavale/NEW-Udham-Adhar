@@ -193,9 +193,11 @@ export function CustomerJourneyMap(p: Props) {
   const hasOpenTicket = !!openTicket;
 
   const currentStageLabel = useMemo(() => {
+    if (live.terminal === "closed") return "Order Closed";
+    if (live.terminal === "completed") return "Order Completed";
     const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
     return s?.label ?? "Order Received";
-  }, [currentIdx]);
+  }, [currentIdx, live.terminal]);
 
   const [dialog, setDialog] = useState<
     | null

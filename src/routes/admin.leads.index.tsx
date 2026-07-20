@@ -6,7 +6,7 @@ import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
-  listLeads, listStaff, addLead, getLeadCounts, getLead,
+  listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
 } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
@@ -340,7 +340,7 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
                   <th className="px-4 py-2.5 text-left font-medium">Email</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Source</th>
+                  {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
@@ -416,9 +416,9 @@ function LeadsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-xs">{l.mobile || "—"}</td>
+                      <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
                       <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
-                      <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>
+                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
@@ -592,6 +592,37 @@ function AddLeadDialog({
   onCreated: () => void;
 }) {
   const addFn = useServerFn(addLead);
+  const findFn = useServerFn(findLeadByCodeOrId);
+  const [fetchId, setFetchId] = useState("");
+  const [fetching, setFetching] = useState(false);
+
+  const doFetch = async () => {
+    const q = fetchId.trim();
+    if (!q) return;
+    setFetching(true);
+    try {
+      const { lead } = await findFn({ data: { query: q } });
+      setForm((f) => ({
+        ...f,
+        name: lead.name ?? f.name,
+        email: lead.email ?? f.email,
+        mobile: lead.mobile ?? f.mobile,
+        state: lead.state ?? f.state,
+        district: lead.district ?? f.district,
+        language: lead.language ?? f.language,
+        service: lead.service ?? f.service,
+        lead_source: lead.lead_source ?? f.lead_source,
+        base_amount: Number(lead.base_amount ?? f.base_amount) || 0,
+        gst_amount: Number(lead.gst_amount ?? f.gst_amount) || 0,
+        total_amount: Number(lead.total_amount ?? f.total_amount) || 0,
+      }));
+      toast.success(`Prefilled from ${lead.lead_code ?? lead.id.slice(0, 8)}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Lead not found");
+    } finally {
+      setFetching(false);
+    }
+  };
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({
     queryKey: ["admin.services"],
@@ -657,6 +688,20 @@ function AddLeadDialog({
         <DialogHeader>
           <DialogTitle>Add Lead</DialogTitle>
         </DialogHeader>
+        <div className="mb-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2">
+          <Label className="text-[11px] uppercase tracking-wider text-slate-500">Prefill from existing lead</Label>
+          <div className="mt-1 flex gap-2">
+            <Input
+              value={fetchId}
+              onChange={(e) => setFetchId(e.target.value)}
+              placeholder="Lead code (LD-1234), UUID, mobile, or email"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doFetch(); } }}
+            />
+            <Button type="button" variant="outline" onClick={doFetch} disabled={fetching || !fetchId.trim()}>
+              {fetching ? "Fetching…" : "Fetch"}
+            </Button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 py-2">
           <Row label="Full Name" required>
             <Input value={form.name} onChange={(e) => setField("name", e.target.value)} />
