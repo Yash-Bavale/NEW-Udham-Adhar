@@ -58,7 +58,10 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const isAdmin = await isUserAdmin(supabase, userId);
 
-    const [appsRes, docsRes, leadsRes, notifRes] = await Promise.all([
+    // "Act now" = fresh orders with no employee action yet (S01/S02 or legacy order_received/null)
+    const ACT_NOW_STATUSES = ["order_received", "S01", "S02", "awaiting_customer_form"];
+
+    const [appsRes, assignedAppsCountRes, docsRes, leadsRes, notifRes] = await Promise.all([
       supabase
         .from("applications")
         .select(
@@ -67,7 +70,10 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .eq("assigned_to", userId)
         .order("updated_at", { ascending: true })
         .limit(100),
-
+      supabase
+        .from("applications")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", userId),
       isAdmin
         ? supabase
             .from("documents")
@@ -76,12 +82,13 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
             .order("uploaded_at", { ascending: true })
             .limit(50)
         : Promise.resolve({ data: [], error: null } as any),
+      // Active = not-yet-contacted leads only (new/lead_created), oldest first so urgent ones surface
       supabase
         .from("leads")
         .select("id, lead_code, name, email, mobile, service, status, created_at")
         .eq("assigned_to", userId)
-        .in("status", ["lead_created", "new_lead", "payment_successful", "details_pending", "payment_pending"])
-        .order("created_at", { ascending: false })
+        .in("status", ["lead_created", "new_lead"])
+        .order("created_at", { ascending: true })
         .limit(50),
       supabase
         .from("notifications")
@@ -106,8 +113,8 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
 
     return {
       counters: {
-        assignedApps: apps.length,
-        orderReceived: apps.filter((a) => a.fulfillment_status === "order_received").length,
+        assignedApps: assignedAppsCountRes.count ?? apps.length,
+        orderReceived: apps.filter((a) => ACT_NOW_STATUSES.includes(a.fulfillment_status ?? "order_received")).length,
         pendingDocs: docs.length,
         assignedLeads: leads.length,
         unreadNotifications: notifRes.count ?? 0,

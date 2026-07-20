@@ -39,8 +39,8 @@ function MyWorkPage() {
     () => {
       const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string> }> = [
         { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/orders", search: { assignee: "me" } },
-        { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
-        { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me" } },
+        { label: "Act now · no action yet", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
+        { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" } },
         { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications" },
         { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)", to: "/admin/orders", search: { assignee: "me", sla: "risk" } },
       ];
@@ -88,19 +88,22 @@ function MyWorkPage() {
 
       <Section
         title="Next-best actions"
-        subtitle="Order Received items shown first — these are ready to work on now"
+        subtitle="Fresh orders with no action yet — shown first"
         empty="No assigned applications — you're clear."
         href="/admin/applications"
       >
         {[...(data?.assignedApplications ?? [])]
           .sort((a, b) => {
-            const aFresh = a.fulfillment_status === "order_received" ? 0 : 1;
-            const bFresh = b.fulfillment_status === "order_received" ? 0 : 1;
-            return aFresh - bFresh;
+            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+            const aFresh = actNow.includes(a.fulfillment_status ?? "order_received") ? 0 : 1;
+            const bFresh = actNow.includes(b.fulfillment_status ?? "order_received") ? 0 : 1;
+            if (aFresh !== bFresh) return aFresh - bFresh;
+            return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
           })
           .slice(0, 12)
           .map((a) => {
-            const fresh = a.fulfillment_status === "order_received";
+            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+            const fresh = actNow.includes(a.fulfillment_status ?? "order_received");
             return (
               <Link
                 key={a.id}
@@ -167,26 +170,46 @@ function MyWorkPage() {
       )}
 
       <Section
-        title="My active leads"
-        subtitle="Leads currently assigned to you"
-        empty="No leads assigned."
+        title="Active leads — contact now"
+        subtitle="Not-contacted leads, oldest first. Red = >3h, amber = >1h"
+        empty="No uncontacted leads assigned."
         href="/admin/leads"
       >
-        {(data?.assignedLeads ?? []).slice(0, 8).map((l) => (
-          <Link
-            key={l.id}
-            to="/admin/leads/$leadId"
-            params={{ leadId: l.id }}
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm"
-          >
-            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
-              {l.lead_code ?? l.id.slice(0, 8)}
-            </code>
-            <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>{l.name}</span>
-            <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
-            <StatusPill status={l.status} />
-          </Link>
-        ))}
+        {(data?.assignedLeads ?? []).slice(0, 12).map((l) => {
+          const ageMs = Date.now() - new Date(l.created_at).getTime();
+          const overdue3h = ageMs > 3 * 3600 * 1000;
+          const overdue1h = !overdue3h && ageMs > 1 * 3600 * 1000;
+          const tone = overdue3h
+            ? { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", fg: "#EF4444", label: "3h+" }
+            : overdue1h
+            ? { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.45)", fg: "#F59E0B", label: "1h+" }
+            : null;
+          return (
+            <Link
+              key={l.id}
+              to="/admin/leads/$leadId"
+              params={{ leadId: l.id }}
+              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm border"
+              style={tone ? { background: tone.bg, borderColor: tone.border } : { borderColor: "transparent" }}
+            >
+              {tone && (
+                <span
+                  className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: tone.fg, color: "white" }}
+                >
+                  {tone.label}
+                </span>
+              )}
+              <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
+                {l.lead_code ?? l.id.slice(0, 8)}
+              </code>
+              <span className="font-medium truncate flex-1" style={{ color: tone ? tone.fg : "var(--admin-fg)" }}>{l.name}</span>
+              <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
+              <StatusPill status={l.status} />
+              <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{formatRelative(l.created_at)}</span>
+            </Link>
+          );
+        })}
       </Section>
     </div>
   );
