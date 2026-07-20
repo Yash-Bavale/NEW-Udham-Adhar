@@ -142,4 +142,6 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   uninterested:      "bg-rose-100 text-rose-800 border-rose-200",
   refund_requested:  "bg-rose-100 text-rose-800 border-rose-200",
   refunded:          "bg-slate-200 text-slate-800 border-slate-300",
+  closed:            "bg-rose-100 text-rose-800 border-rose-200",
 };
+
