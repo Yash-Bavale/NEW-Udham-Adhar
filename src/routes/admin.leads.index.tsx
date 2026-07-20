@@ -6,7 +6,7 @@ import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
-  listLeads, listStaff, addLead, getLeadCounts, getLead,
+  listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
 } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { LEAD_STATUSES } from "@/lib/crm/types";
