@@ -757,14 +757,28 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
-          <Row label="Base ₹">
-            <Input type="number" value={form.base_amount} onChange={(e) => setField("base_amount", Number(e.target.value))} />
+          <Row label="Total ₹ (inclusive 18% GST)" full>
+            <Input
+              type="number"
+              value={form.total_amount}
+              onChange={(e) => {
+                const { base, gst, total } = fromTotal(Number(e.target.value));
+                setForm((f) => ({ ...f, total_amount: total, base_amount: base, gst_amount: gst }));
+              }}
+            />
           </Row>
-          <Row label="GST ₹">
-            <Input type="number" value={form.gst_amount} onChange={(e) => setField("gst_amount", Number(e.target.value))} />
+          <Row label="Base ₹ (auto)">
+            <Input
+              type="number"
+              value={form.base_amount}
+              onChange={(e) => {
+                const { base, gst, total } = fromBase(Number(e.target.value));
+                setForm((f) => ({ ...f, base_amount: base, gst_amount: gst, total_amount: total }));
+              }}
+            />
           </Row>
-          <Row label="Total ₹" full>
-            <Input type="number" value={form.total_amount} onChange={(e) => setField("total_amount", Number(e.target.value))} />
+          <Row label="GST 18% ₹ (auto)">
+            <Input type="number" value={form.gst_amount} readOnly />
           </Row>
           <Row label="Assign to" full>
             <select
