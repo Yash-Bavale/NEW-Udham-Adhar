@@ -132,7 +132,14 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "none",
     exceptions: [],
   },
+  closed: {
+    hint: "Order closed. Reopen from the closure panel if needed.",
+    primary: null,
+    primaryKind: "none",
+    exceptions: [],
+  },
 };
+
 
 export const EXCEPTION_META: Record<
   ExceptionKind,

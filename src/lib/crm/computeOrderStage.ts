@@ -15,9 +15,11 @@ export type OrderStage =
   | "under_processing"
   | "certificate_ready"
   | "completed"
+  | "closed"
   | "uninterested"
   | "refund_requested"
   | "refunded";
+
 
 export interface ComputeStageLead {
   lead_status_v2?: string | null;
@@ -62,7 +64,7 @@ export function computeOrderStage(
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
-  if (fs === "order_closed" || fs === "cancelled") return "refund_requested"; // closed → shown via closure UI; keep exception-side flag off happy path
+  if (fs === "order_closed" || fs === "cancelled") return "closed";
 
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";
@@ -108,7 +110,9 @@ export const STAGE_META: Record<
   uninterested:      { label: "Uninterested",       short: "Uninterested", order: -1, tone: "rose", side: "exception" },
   refund_requested:  { label: "Refund Requested",   short: "Refund Req", order: -1, tone: "rose",   side: "exception" },
   refunded:          { label: "Refunded",           short: "Refunded",   order: -1, tone: "slate",  side: "exception" },
+  closed:            { label: "Order Closed",       short: "Closed",     order: -1, tone: "rose",   side: "exception" },
 };
+
 
 // Stages shown on the horizontal journey strip, in order.
 export const JOURNEY_STAGES: OrderStage[] = [
@@ -138,4 +142,6 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   uninterested:      "bg-rose-100 text-rose-800 border-rose-200",
   refund_requested:  "bg-rose-100 text-rose-800 border-rose-200",
   refunded:          "bg-slate-200 text-slate-800 border-slate-300",
+  closed:            "bg-rose-100 text-rose-800 border-rose-200",
 };
+
