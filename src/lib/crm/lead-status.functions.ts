@@ -129,6 +129,12 @@ export const transitionLeadStatus = createServerFn({ method: "POST" })
       .eq("id", leadId);
     if (updErr) throw new Error(updErr.message);
 
+    // Mirror to legacy `status` column so leads list/dashboards reflect the change.
+    // Silently ignore if the target enum value isn't allowed on the legacy column.
+    try {
+      await admin.from("leads").update({ status: toStatus } as never).eq("id", leadId);
+    } catch { /* legacy enum mismatch — safe to ignore */ }
+
     // Log event.
     await admin.from("application_events").insert({
       application_id: latestApp?.id ?? null,
