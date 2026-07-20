@@ -22,7 +22,7 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { leadId } = data;
 
-    const [acts, notes, emails, payments, onb, docs, analytics] = await Promise.all([
+    const [acts, notes, emails, payments, onb, docs, analytics, leadRow] = await Promise.all([
       supabase.from("activity_logs")
         .select("id, activity_type, activity_description, user_id, created_at")
         .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(200),
@@ -44,6 +44,9 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
       supabase.from("analytics_events")
         .select("id, event_name, page_url, created_at")
         .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(200),
+      supabase.from("leads")
+        .select("id, lead_source, created_at, name")
+        .eq("id", leadId).maybeSingle(),
     ]);
 
     const items: TimelineItem[] = [];
