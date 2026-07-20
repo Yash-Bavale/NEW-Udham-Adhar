@@ -23,6 +23,7 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
   const resendFn = useServerFn(resendInvoiceEmail);
   const previewFn = useServerFn(previewInvoice);
   const replaceFn = useServerFn(replaceInvoice);
+  const reconcileFn = useServerFn(reconcilePaymentStatus);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
