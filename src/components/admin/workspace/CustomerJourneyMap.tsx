@@ -357,7 +357,7 @@ export function CustomerJourneyMap(p: Props) {
                 data-testid="journey-svg"
               >
                 <defs>
-                  {(["idle", "done", "active", "closed"] as const).map((s) => (
+                  {(["idle", "done", "active", "warning", "closed"] as const).map((s) => (
                     <marker
                       key={s}
                       id={`arrow-${s}`}
@@ -373,8 +373,9 @@ export function CustomerJourneyMap(p: Props) {
                         className={
                           s === "done" ? "fill-emerald-500"
                             : s === "active" ? "fill-indigo-500"
-                              : s === "closed" ? "fill-rose-500"
-                                : "fill-slate-300"
+                              : s === "warning" ? "fill-amber-500"
+                                : s === "closed" ? "fill-rose-500"
+                                  : "fill-slate-300"
                         }
                       />
                     </marker>
@@ -395,10 +396,11 @@ export function CustomerJourneyMap(p: Props) {
                   const cls =
                     state === "done" ? "stroke-emerald-500"
                       : state === "active" ? "stroke-indigo-500 edge-active"
-                        : state === "closed" ? "stroke-rose-500 edge-active"
-                          : "stroke-slate-300";
+                        : state === "warning" ? "stroke-amber-500 edge-active"
+                          : state === "closed" ? "stroke-rose-500 edge-active"
+                            : "stroke-slate-300";
                   const strokeWidth = state === "idle" ? 1.5 : 2.5;
-                  const dash = state === "active" || state === "closed" ? "8 4" : undefined;
+                  const dash = state === "active" || state === "warning" || state === "closed" ? "8 4" : undefined;
                   return (
                     <path
                       key={e.id}
@@ -624,10 +626,14 @@ function FlowNode({
   let tone: Tone = node.tone;
   if (state === "terminal-ok") tone = "emerald";
   else if (state === "terminal-bad") tone = "rose";
+  else if (state === "active" && node.id === "form_not") tone = "amber";
   else if (state === "active" && node.kind === "stage") tone = "indigo";
   else if (state === "done" && node.kind === "stage") tone = "emerald";
   else if (state === "idle" && node.kind === "stage" && node.tone !== "maroon") tone = "slate";
-  else if (state === "idle" && node.kind === "action" && !buttonEnabled && node.tone !== "emerald") tone = "slate";
+  else if (state === "idle" && node.kind === "action" && !buttonEnabled) tone = "slate";
+  // Success-path action nodes go green once their branch is done / completed.
+  if ((node.id === "b06_consult" || node.id === "b07_accept") && (state === "done")) tone = "emerald";
+
 
   const t = TONE_STYLES[tone];
   const dim = state === "idle" && !buttonEnabled;

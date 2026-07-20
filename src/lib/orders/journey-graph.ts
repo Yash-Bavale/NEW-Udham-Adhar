@@ -58,7 +58,7 @@ export interface EdgeDef {
   waypoints?: Array<{ x: number; y: number }>;
 }
 
-export type EdgeState = "done" | "active" | "closed" | "idle";
+export type EdgeState = "done" | "active" | "warning" | "closed" | "idle";
 export type NodeState = "done" | "active" | "terminal-ok" | "terminal-bad" | "idle";
 
 /* ─── Dimension helpers ─── */
@@ -162,7 +162,7 @@ export const NODES: NodeDef[] = [
     label: "Consultation Completed",
     subtitle: "Application Submitted to Govt Portal",
     highlightText: "Order Completed",
-    icon: "clipboard", kind: "action", tone: "emerald",
+    icon: "clipboard", kind: "action", tone: "slate",
     buttonCode: "B06", emailCode: "E005",
     badgeTop: "B06", badgeBottom: "E005",
   },
@@ -173,7 +173,7 @@ export const NODES: NodeDef[] = [
     label: "Application Accepted",
     subtitle: "Upload PDF",
     highlightText: "Add Note- Order Completed",
-    icon: "upload", kind: "action", tone: "emerald",
+    icon: "upload", kind: "action", tone: "slate",
     buttonCode: "B07", emailCode: "E007",
     badgeTop: "B07", badgeBottom: "E007",
   },
@@ -182,7 +182,7 @@ export const NODES: NodeDef[] = [
     label: "Application Rejected",
     subtitle: "Select Reason",
     highlightText: "Add Note- Order Closed",
-    icon: "xCircle", kind: "action", tone: "emerald",
+    icon: "xCircle", kind: "action", tone: "rose",
     buttonCode: "B08", emailCode: "E008",
     badgeTop: "B08", badgeBottom: "E008",
   },
@@ -202,14 +202,14 @@ export const NODES: NodeDef[] = [
     label: "Customer Side Delay",
     subtitle: "Select Reason",
     highlightText: "Order Autoclosed in 8 hrs",
-    icon: "userX", kind: "action", tone: "slate",
+    icon: "userX", kind: "action", tone: "amber",
     buttonCode: "B04", emailCode: "E004",
     badgeTop: "B04", badgeBottom: "E004",
   },
   {
     id: "closed_e010", x: 1125, y: 415, w: 180, h: 110,
     label: "Order Closed with previous Selected Reason",
-    icon: "xCircle", kind: "terminal", tone: "emerald",
+    icon: "xCircle", kind: "terminal", tone: "rose",
     badgeBottom: "E010",
   },
 ];
@@ -453,19 +453,20 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   if (i.currentMainEdges && i.currentMainEdges.has(e.id)) return "active";
   // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
-    if (i.terminal === "closed" &&
-        (e.branch === "form-nag" ||
-         e.branch === "customer-delay" ||
-         e.branch === "customer-delay-main" ||
-         e.branch === "customer-delay-tech" ||
-         e.branch === "customer-delay-govt" ||
-         e.branch === "reject")) {
-      return "closed";
-    }
+    const isClosurePath =
+      e.branch === "form-nag" ||
+      e.branch === "customer-delay" ||
+      e.branch === "customer-delay-main" ||
+      e.branch === "customer-delay-tech" ||
+      e.branch === "customer-delay-govt" ||
+      e.branch === "reject";
+    if (i.terminal === "closed" && isClosurePath) return "closed";
     if (i.terminal === "completed" &&
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
+    // Pending-closure paths flow amber (warning) until they actually terminate.
+    if (isClosurePath && !i.terminal) return "warning";
     return "active";
   }
   // 4. Technical loop edges go green once order is past form_submitted into govt flow
