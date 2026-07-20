@@ -1,10 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getGstReport, exportGstReportCsv } from "@/lib/finance/gst-report.functions";
 
-export const Route = createFileRoute("/admin/finance/gst")({ component: GstReportPage });
+export const Route = createFileRoute("/admin/finance/gst")({
+  beforeLoad: ({ context }) => {
+    if (!context.role?.hasAny(["admin", "super_admin", "finance", "accounts"])) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
+  component: GstReportPage,
+});
 
 function GstReportPage() {
   const today = new Date();

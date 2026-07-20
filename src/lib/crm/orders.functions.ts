@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertRole, writeAudit } from "@/lib/audit";
+import { assertRole, writeAudit, isUserAdmin } from "@/lib/audit";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -41,13 +41,18 @@ export const listOrders = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "operations", "admin", "support", "accounts"]);
     const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
     let q = admin
       .from("applications")
       .select("id, application_code, application_status, created_at, assigned_to, lead_id", { count: "exact" })
       .order("created_at", { ascending: false });
     if (data.status) q = q.eq("application_status", data.status as never);
-    if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (!isAdmin) {
+      q = q.eq("assigned_to", context.userId);
+    } else if (data.assignedTo) {
+      q = q.eq("assigned_to", data.assignedTo);
+    }
 
     const { data: apps, count, error } = await q.range(
       (data.page - 1) * data.pageSize,

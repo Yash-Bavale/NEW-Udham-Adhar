@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,6 +13,11 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/refunds")({
+  beforeLoad: ({ context }) => {
+    if (!context.role?.hasAny(["admin", "super_admin", "finance", "accounts"])) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   component: RefundsPage,
 });
 

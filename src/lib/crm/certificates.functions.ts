@@ -40,7 +40,7 @@ export const listCertificates = createServerFn({ method: "GET" })
     search: z.string().optional(),
   }))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "admin", "operations", "support", "accounts", "finance", "manager", "executive"]);
+    await assertRole(context.supabase, ["super_admin", "admin"]);
     let q = (await getAdmin()).from("certificates").select("*").order("created_at", { ascending: false });
     if (data.delivered === "yes") q = q.not("delivered_at", "is", null);
     if (data.delivered === "no") q = q.is("delivered_at", null);
@@ -208,18 +208,18 @@ export const deliverCertificate = createServerFn({ method: "POST" })
 </body></html>`;
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       await enqueueFromTemplateInternal("order_completed", lead.email, {
-          customer_name: customerName,
-          customerName,
-          service_name: "Service",
-          serviceName: "Service",
-          order_number: orderId,
-          orderNumber: orderId,
-          certificateId: cert.id,
-          certificate_number: cert.certificate_number ?? "",
-          certificate_url: signed.signedUrl,
-          document_name: attachment?.filename ?? "Certificate",
-          order_code: app?.application_code ?? "",
-        },
+        customer_name: customerName,
+        customerName,
+        service_name: "Service",
+        serviceName: "Service",
+        order_number: orderId,
+        orderNumber: orderId,
+        certificateId: cert.id,
+        certificate_number: cert.certificate_number ?? "",
+        certificate_url: signed.signedUrl,
+        document_name: attachment?.filename ?? "Certificate",
+        order_code: app?.application_code ?? "",
+      },
         {
           toName: lead.name,
           leadId: lead.id,

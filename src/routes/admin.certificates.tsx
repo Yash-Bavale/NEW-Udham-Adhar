@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -12,7 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Award, Upload, Send, Eye, Loader2, Search, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/admin/certificates")({ component: CertificatesPage });
+export const Route = createFileRoute("/admin/certificates")({
+  beforeLoad: ({ context }) => {
+    if (!context.role?.hasAny(["admin", "super_admin"])) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
+  component: CertificatesPage,
+});
 
 function CertificatesPage() {
   const qc = useQueryClient();

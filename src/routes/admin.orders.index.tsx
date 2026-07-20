@@ -220,15 +220,17 @@ function OrdersListPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={assignedTo} onValueChange={setAssignedTo}>
-          <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All assignees" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All assignees</SelectItem>
-            {(staffData?.profiles ?? []).map((s: any) => (
-              <SelectItem key={s.id} value={s.id}>{s.display_name || s.email}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {role.hasAny(["admin", "super_admin"]) && (
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All assignees" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All assignees</SelectItem>
+              {(staffData?.profiles ?? []).map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>{s.display_name || s.email}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={paymentStatus} onValueChange={setPaymentStatus}>
           <SelectTrigger className="h-9 w-[140px] text-sm bg-white"><SelectValue placeholder="All payment" /></SelectTrigger>
           <SelectContent>

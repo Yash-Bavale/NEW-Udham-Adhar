@@ -54,7 +54,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-      
+
       { to: "/admin/activity", label: "Activity", icon: Activity },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
     ],
@@ -91,7 +91,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/refunds", label: "Refund Review", icon: Banknote, requireAnyRole: FINANCE_ROLES },
-      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: OPS_ROLES },
+      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -153,7 +153,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   }, [sidebarCollapsed]);
   const { unseen: newLeads } = useNewLeadsWatcher();
 
-  useKeyboardShortcuts(() => setPaletteOpen(true), () => {});
+  useKeyboardShortcuts(() => setPaletteOpen(true), () => { });
 
   const isActive = (to: string) =>
     path === to || (to !== "/admin/dashboard" && path.startsWith(to + "/"));
@@ -443,7 +443,7 @@ function playChime() {
     osc.connect(gain).connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.36);
-    osc.onended = () => ctx.close().catch(() => {});
+    osc.onended = () => ctx.close().catch(() => { });
   } catch { /* ignore */ }
 }
 
@@ -561,7 +561,7 @@ function NotificationsBell() {
         onClick={() => {
           const next = !muted;
           setMuted(next);
-          try { localStorage.setItem(MUTE_KEY, next ? "1" : "0"); } catch {}
+          try { localStorage.setItem(MUTE_KEY, next ? "1" : "0"); } catch { }
         }}
         className="rounded-md p-1.5 hover:bg-[var(--admin-surface-2)] transition-colors text-[10px]"
         style={{ color: "var(--admin-fg-muted)" }}

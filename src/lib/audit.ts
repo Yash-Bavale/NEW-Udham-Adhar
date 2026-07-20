@@ -27,7 +27,7 @@ export async function writeAudit(
   }
 ) {
   const { data: { user } } = await params.supabase.auth.getUser();
-  
+
   await params.supabase.from("audit_logs").insert({
     entity_type: params.entityType,
     entity_id: params.entityId,

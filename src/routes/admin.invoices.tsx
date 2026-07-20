@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
@@ -14,6 +14,11 @@ import {
 } from "@/lib/crm/invoices.functions";
 
 export const Route = createFileRoute("/admin/invoices")({
+  beforeLoad: ({ context }) => {
+    if (!context.role?.hasAny(["admin", "super_admin", "finance", "accounts"])) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   head: () => ({ meta: [{ title: "Invoices — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: InvoicesPage,
 });

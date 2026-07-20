@@ -156,6 +156,17 @@ export const updateLead = createServerFn({ method: "POST" })
           created_by: context.userId,
           staff_name, staff_role,
         } as never);
+        if (patch.assigned_to) {
+          const { emitToUsers } = await import("@/lib/notifications/emit.server");
+          await emitToUsers([patch.assigned_to], {
+            kind: "order_assigned",
+            title: "New Lead Assigned",
+            body: `Lead ${prev.name || prev.lead_code || "New Lead"} has been assigned to your queue.`,
+            href: `/admin/leads/${leadId}`,
+            entityKind: "lead",
+            entityId: leadId,
+          });
+        }
       }
     }
 
@@ -502,6 +513,18 @@ export const updateLeadAssignee = createServerFn({ method: "POST" })
       staff_name: profile?.display_name || profile?.email || "Staff",
       staff_role: roleRows?.[0]?.role ?? "staff",
     } as never);
+
+    if (data.assignedTo) {
+      const { emitToUsers } = await import("@/lib/notifications/emit.server");
+      await emitToUsers([data.assignedTo], {
+        kind: "order_assigned",
+        title: "New Lead Assigned",
+        body: `Lead ${prev.name || prev.lead_code || "New Lead"} has been assigned to your queue.`,
+        href: `/admin/leads/${data.leadId}`,
+        entityKind: "lead",
+        entityId: data.leadId,
+      });
+    }
 
     return { ok: true };
   });

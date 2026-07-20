@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isUserAdmin } from "@/lib/audit";
 import {
   FULFILLMENT_STAGES,
   FULFILLMENT_LABEL,
@@ -77,6 +78,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
     // Orders surface = applications with at least one successful payment.
     // Pre-resolve paid application IDs from the payments table, then filter.
@@ -106,7 +108,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
     if (data.serviceId) q = q.eq("service_id", data.serviceId);
-    if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
+    if (!isAdmin) {
+      q = q.eq("assigned_to", context.userId);
+    } else if (data.assignedTo) {
+      q = q.eq("assigned_to", data.assignedTo);
+    }
     if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
     if (data.dateTo) q = q.lte("created_at", data.dateTo);
 
@@ -383,11 +389,30 @@ export const updateOrderAssignee = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { data: app } = await admin
+      .from("applications")
+      .select("lead_id, application_code")
+      .eq("id", data.orderId)
+      .maybeSingle();
     const { error } = await admin
       .from("applications")
       .update({ assigned_to: data.assignedTo } as never)
       .eq("id", data.orderId);
     if (error) throw new Error(error.message);
+    if (app?.lead_id && data.assignedTo) {
+      await admin.from("leads").update({ assigned_to: data.assignedTo } as never).eq("id", app.lead_id);
+    }
+    if (data.assignedTo) {
+      const { emitToUsers } = await import("@/lib/notifications/emit.server");
+      await emitToUsers([data.assignedTo], {
+        kind: "order_assigned",
+        title: "New Order Assigned",
+        body: `Order ${app?.application_code || ""} has been assigned to your queue.`,
+        href: `/admin/orders/${data.orderId}`,
+        entityKind: "application",
+        entityId: data.orderId,
+      });
+    }
     return { ok: true };
   });
 
