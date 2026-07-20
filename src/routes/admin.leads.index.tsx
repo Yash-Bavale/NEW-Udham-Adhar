@@ -372,7 +372,10 @@ function LeadsPage() {
                     <tr
                       key={l.id}
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).closest("input,a,button")) return;
+                        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+                        // Don't hijack text selection / copy
+                        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+                        if (sel && sel.toString().trim().length > 0) return;
                         navigate({ to: "/admin/leads/$leadId", params: { leadId: l.id } });
                       }}
                       className="border-t cursor-pointer hover:bg-[var(--admin-surface-2)] transition-colors"
