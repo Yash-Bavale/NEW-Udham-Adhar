@@ -29,7 +29,7 @@ export function LeadsBulkBar({
   const role = useRole();
   const staffFn = useServerFn(listAssignableStaff);
   const { data: staff } = useQuery({
-    queryKey: ["admin.staff"],
+    queryKey: ["admin.assignableStaff"],
     queryFn: () => staffFn(),
     enabled: assignOpen,
   });
