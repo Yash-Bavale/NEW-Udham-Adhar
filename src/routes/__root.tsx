@@ -94,22 +94,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Consultancy assistance for Udyam Registration, certificate updates, downloads, migration and corrections.",
+          "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://udyamadhar.in/" },
       { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Udyam Registration | MSME Registration Assistance" },
-      { name: "twitter:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c285be05-7fdf-48a5-9f94-2cb31d82485e" },
-      { name: "description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
-      { property: "og:description", content: "Expert assistance for Udyam Registration, MSME Certificate, certificate download, updates, migration, and business compliance services. PAN India support." },
+      { name: "twitter:description", content: "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
+      { name: "description", content: "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance." },
+      { property: "og:description", content: "Private consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration, and related registration assistance." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" },
+      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
     ],
 
     scripts: [
@@ -129,13 +130,13 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18336340451" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-16801746830" />
         <script dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'AW-18336340451');
+            gtag('config', 'AW-16801746830');
           `
         }} />
         <script dangerouslySetInnerHTML={{
@@ -147,7 +148,7 @@ function RootShell({ children }: { children: ReactNode }) {
                 }
               };
               gtag('event', 'conversion', {
-                  'send_to': 'AW-18336340451/1BGJCNDNmPEZEI6f2cs-',
+                  'send_to': 'AW-16801746830/1BGJCNDNmPEZEI6f2cs-',
                   'event_callback': callback
               });
               return false;
