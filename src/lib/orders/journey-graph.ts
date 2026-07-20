@@ -453,19 +453,20 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   if (i.currentMainEdges && i.currentMainEdges.has(e.id)) return "active";
   // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
-    if (i.terminal === "closed" &&
-        (e.branch === "form-nag" ||
-         e.branch === "customer-delay" ||
-         e.branch === "customer-delay-main" ||
-         e.branch === "customer-delay-tech" ||
-         e.branch === "customer-delay-govt" ||
-         e.branch === "reject")) {
-      return "closed";
-    }
+    const isClosurePath =
+      e.branch === "form-nag" ||
+      e.branch === "customer-delay" ||
+      e.branch === "customer-delay-main" ||
+      e.branch === "customer-delay-tech" ||
+      e.branch === "customer-delay-govt" ||
+      e.branch === "reject";
+    if (i.terminal === "closed" && isClosurePath) return "closed";
     if (i.terminal === "completed" &&
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
+    // Pending-closure paths flow amber (warning) until they actually terminate.
+    if (isClosurePath && !i.terminal) return "warning";
     return "active";
   }
   // 4. Technical loop edges go green once order is past form_submitted into govt flow
