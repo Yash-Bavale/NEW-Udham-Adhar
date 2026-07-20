@@ -64,7 +64,7 @@ export function computeOrderStage(
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
-  if (fs === "order_closed" || fs === "cancelled") return "refund_requested"; // closed → shown via closure UI; keep exception-side flag off happy path
+  if (fs === "order_closed" || fs === "cancelled") return "closed";
 
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";
