@@ -459,10 +459,24 @@ export const addLead = createServerFn({ method: "POST" })
 
     const { notes, district, ...rest } = data;
     const composedNotes = [notes, district ? `District: ${district}` : null].filter(Boolean).join("\n") || null;
+
+    // Resolve service_id from the selected service name so downstream views
+    // (orders list, invoices, govt portal link) resolve correctly.
+    let serviceId: string | null = null;
+    if (rest.service) {
+      const { data: svc } = await admin
+        .from("services")
+        .select("id")
+        .eq("service_name", rest.service)
+        .maybeSingle();
+      serviceId = (svc?.id as string) ?? null;
+    }
+
     const { data: inserted, error } = await admin
       .from("leads")
       .insert({
         ...rest,
+        service_id: serviceId,
         customer_id: customerId as string,
         notes: composedNotes,
         status: "new_lead",

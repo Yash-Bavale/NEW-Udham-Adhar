@@ -9,6 +9,7 @@ import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
 } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
+import { fromBase, fromTotal } from "@/lib/pricing/gst";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import { LeadsBulkBar } from "@/components/admin/LeadsBulkBar";
@@ -372,7 +373,10 @@ function LeadsPage() {
                     <tr
                       key={l.id}
                       onClick={(e) => {
-                        if ((e.target as HTMLElement).closest("input,a,button")) return;
+                        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+                        // Don't hijack text selection / copy
+                        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+                        if (sel && sel.toString().trim().length > 0) return;
                         navigate({ to: "/admin/leads/$leadId", params: { leadId: l.id } });
                       }}
                       className="border-t cursor-pointer hover:bg-[var(--admin-surface-2)] transition-colors"
@@ -753,14 +757,28 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
-          <Row label="Base ₹">
-            <Input type="number" value={form.base_amount} onChange={(e) => setField("base_amount", Number(e.target.value))} />
+          <Row label="Total ₹ (inclusive 18% GST)" full>
+            <Input
+              type="number"
+              value={form.total_amount}
+              onChange={(e) => {
+                const { base, gst, total } = fromTotal(Number(e.target.value));
+                setForm((f) => ({ ...f, total_amount: total, base_amount: base, gst_amount: gst }));
+              }}
+            />
           </Row>
-          <Row label="GST ₹">
-            <Input type="number" value={form.gst_amount} onChange={(e) => setField("gst_amount", Number(e.target.value))} />
+          <Row label="Base ₹ (auto)">
+            <Input
+              type="number"
+              value={form.base_amount}
+              onChange={(e) => {
+                const { base, gst, total } = fromBase(Number(e.target.value));
+                setForm((f) => ({ ...f, base_amount: base, gst_amount: gst, total_amount: total }));
+              }}
+            />
           </Row>
-          <Row label="Total ₹" full>
-            <Input type="number" value={form.total_amount} onChange={(e) => setField("total_amount", Number(e.target.value))} />
+          <Row label="GST 18% ₹ (auto)">
+            <Input type="number" value={form.gst_amount} readOnly />
           </Row>
           <Row label="Assign to" full>
             <select

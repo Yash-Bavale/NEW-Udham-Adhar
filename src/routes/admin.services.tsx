@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
+import { fromBase, fromTotal } from "@/lib/pricing/gst";
 
 export const Route = createFileRoute("/admin/services")({ component: ServicesPage });
 
@@ -45,9 +46,25 @@ function ServicesPage() {
           <div className="grid md:grid-cols-2 gap-3">
             <Input label="Service code" value={form.service_code} onChange={(v) => setForm({ ...form, service_code: v })} />
             <Input label="Service name" value={form.service_name} onChange={(v) => setForm({ ...form, service_name: v })} />
-            <Input label="Base (₹)" type="number" value={String(form.base_amount)} onChange={(v) => setForm({ ...form, base_amount: Number(v) })} />
-            <Input label="GST (₹)" type="number" value={String(form.gst_amount)} onChange={(v) => setForm({ ...form, gst_amount: Number(v) })} />
-            <Input label="Total (₹)" type="number" value={String(form.total_amount)} onChange={(v) => setForm({ ...form, total_amount: Number(v) })} />
+            <Input
+              label="Total (₹ inclusive of 18% GST)"
+              type="number"
+              value={String(form.total_amount)}
+              onChange={(v) => {
+                const { base, gst, total } = fromTotal(Number(v));
+                setForm({ ...form, total_amount: total, base_amount: base, gst_amount: gst });
+              }}
+            />
+            <Input
+              label="Base (₹) — auto from total"
+              type="number"
+              value={String(form.base_amount)}
+              onChange={(v) => {
+                const { base, gst, total } = fromBase(Number(v));
+                setForm({ ...form, base_amount: base, gst_amount: gst, total_amount: total });
+              }}
+            />
+            <Input label="GST 18% (₹) — auto" type="number" value={String(form.gst_amount)} onChange={() => {}} />
             <Input label="Govt Portal URL" value={form.govt_portal_url ?? ""} onChange={(v) => setForm({ ...form, govt_portal_url: v })} />
             <Input label="Sort order" type="number" value={String(form.sort_order)} onChange={(v) => setForm({ ...form, sort_order: Number(v) })} />
             <label className="flex items-center gap-2 text-sm md:col-span-2">

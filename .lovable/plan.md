@@ -1,71 +1,83 @@
+# Plan: Ops fixes + service-change workflow
 
-## 1. Enable "My Dashboard" for employees + make KPI cards clickable
+## 1. Leads table — stop row-click when copying
 
-- `src/components/admin/AdminShell.tsx`: ensure the "My Dashboard" (My Work) sidebar item is visible for every staff role (executive, manager, support, accounts, finance, operations), not just admin.
-- `src/routes/admin.my-work.tsx`:
-  - Wrap each KPI card in a `<Link>` with a targeted route + filter:
-    - Assigned applications → `/admin/applications?assignee=me`
-    - Order received (act now) → `/admin/orders?stage=order_received&assignee=me`
-    - My active leads → `/admin/leads?assignee=me`
-    - Unread notifications → `/admin/notifications`
-    - SLA risk → `/admin/orders?sla=risk&assignee=me`
-    - Documents to review → `/admin/review`
-  - Add hover state (border/shadow) so cards read as interactive.
+Copy buttons (mobile, email, lead code) inside the leads table currently bubble up to the row and open lead detail.
 
-## 2. Fix "Contacted" status not persisting
+- In the leads list row + `CopyButton` primitive, wrap the copy action with `onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}` and `onMouseDown` stop-prop so the row navigation doesn't fire.
+- Apply the same fix anywhere a `CopyButton` sits inside a clickable row (orders list, ticket list) for consistency.
 
-Investigate `src/lib/crm/lead-transitions.ts` `markContacted` — likely writing to a column not shown in the leads list, or transition guard rejects `new_lead → contacted`. Concrete fix:
-- Ensure the server fn updates `leads.status = 'contacted'` (and `contacted_at`) with `supabaseAdmin` and returns fresh row.
-- After the mutation in `LeadWorkspacePanel`, invalidate `["admin.leads"]`, `["admin.lead", leadId]`, `["my-work"]`, and `["admin.dashboard"]`.
-- Verify RLS grants let assignee update `status`; if not, use admin client already used elsewhere.
+## 2. Orders — show selected service + invoice number for manual leads
 
-## 3. Remove "Form" column in Leads list
+Root cause: manual leads created via Add Lead don't always persist `selected_service` on the application, and invoice isn't generated at manual-payment finalize time.
 
-- `src/routes/admin.leads.index.tsx`: drop the `FORM` `<th>` and matching `<td>` (form_submitted pill).
+- `finalizePaidPayment` (`src/lib/payments/finalize-paid.server.ts`): when creating/updating the application from a manually-created lead, copy `lead.selected_service` → `application.service_type` and `application.service_label`. If missing, fall back to the lead's `service_name` field.
+- Ensure invoice generation runs for every paid payment, not just gateway webhooks. Add invoice creation call (`createInvoiceForPayment`) inside `finalizePaidPayment` regardless of source (`webhook | reconcile | manual`). Guard against duplicates with `unique(payment_id)`.
+- Orders list column: if `service_label` empty, display `lead.service_name` / `service_selected` as fallback (already exists) — verify the column reads the same shape as manual leads.
+- Order detail header: surface `invoice_number` from latest paid payment; show "Invoice #—" if truly missing with a "Generate invoice" button for admins.
 
-## 4. Richer lead source (page path)
+## 3. Change-service mid-flow (until form submitted)
 
-- `src/components/site/LeadForm.tsx`: at submit, include `source_page: window.location.pathname` (and `referrer`) into the lead insert payload / lead capture server fn.
-- `src/lib/leads.functions.ts` (capture): persist `lead_source_page` column (add via migration if missing) and set `lead_source` to `"Website · <path>"` when a page is provided.
-- Leads list + Customer card display `lead.lead_source_page` when present, else fall back to `lead_source`.
-- Migration: `alter table public.leads add column if not exists lead_source_page text;`
+New capability on active orders where `fulfillment_status ∈ {S01, S02, S03}` (i.e., not yet form submitted / not in later stages).
 
-## 5. Redesign Customer Details card
+**UI**
 
-- `src/components/admin/LeadWorkspacePanel.tsx` `CustomerQuickCard`:
-  - Two-tone header with avatar bubble, lead code + status pill, three big action buttons (Call primary, WhatsApp, Email) full-width on mobile.
-  - Info grid: label muted micro-caps, value bold; mobile = 1 col, sm = 2 col.
-  - Copy chips (mobile / email) as small pill-buttons next to values, not detached icons.
-  - Subtle gradient border + soft shadow; sticky on desktop within its column.
+- New button in `WorkspaceShell` header actions: **"Change Service"** (admin/super_admin/operations only), visible only when stage allows.
+- Opens `ChangeServiceDialog`: pick new service, enter new total amount (auto-derive base + GST, see §5), show diff vs already-paid, and choose:
+  - **Top-up**: new amount > paid → generate new payment link for the delta.
+  - **Refund**: new amount < paid → single "Process refund" button that triggers `refundPayment` for the delta.
+  - **Even**: no financial action, just swap service.
 
-## 6. Follow-up notifications fire at scheduled time
+**Backend** — new `changeOrderService` server fn in `src/lib/crm/orders-v2.functions.ts`:
 
-- Table `lead_followups` already exists (used by `FollowUpScheduler`). Add a pg_cron minute job that:
-  - Selects due follow-ups (`due_at <= now()`, `notified_at is null`).
-  - Inserts a row in `notifications` for the assignee (`type='followup_due'`, links to `/admin/leads/{id}`).
-  - Sets `notified_at = now()`.
-- SQL only — implemented in a single migration using `pg_cron` (Option 1 pattern). No new endpoint required.
+1. Validate stage guard (must be pre-form-submitted).
+2. Update `applications.service_type/label/pricing_*` and `leads.selected_service`.
+3. Insert a new `invoices` row with:
+  - Same `application_id` (order ID unchanged).
+  - New `invoice_number` (next in sequence).
+  - Line items: new service full price + credit line "Adjustment: previous payment received (-₹X)".
+  - Net payable = delta.
+4. If delta > 0: create payment link via existing `createPaymentLink` helper; return URL.
+5. If delta < 0: call `refundPayment` internally for the absolute delta, mark parent link with `service_changed` audit action.
+6. Write audit row (`service_changed`, old/new service, delta, invoice ids).
 
-## 7. Two SLAs: Lead and Order — action-required at 1h and 3h
+Timeline entry auto-appears via audit hook.
 
-New unified rule: any Lead or Order that is not yet "contacted / action taken" gets flagged.
+## 4. Govt Portal button uses service dynamic_link
 
-- Migration adds two enum values or a small `sla_config` table with:
-  - lead SLA: warn 1h, breach 3h since `created_at` while `status in ('new_lead','lead_created')`.
-  - order SLA: warn 1h, breach 3h since `created_at` while `fulfillment_status = 'order_received'` and no action recorded.
-- pg_cron minute job writes to a new `sla_alerts` table (or reuses `notifications`) at warn+breach thresholds, addressed to the assignee (fallback: all admins if unassigned).
-- `getMyWorkSummary`:
-  - `counters.slaRisk` = count of SLA rows for me currently in warn/breach.
-  - Split into `slaLead` / `slaOrder` on the card group so employee sees both.
-- Leads / Orders list rows show an amber "Take action (1h)" or red "Overdue (3h)" pill when the row is in warn/breach, driven by the same server-side computation returned in the list payload (no need to poll SLA table on the client).
-- Update "SLA risk (>48h idle)" copy on the My Work card to "SLA — action needed (1h / 3h)".
+Currently the "Govt Portal" button in `WorkspaceShell` is static/disabled.
 
-## Verification
+- Add `dynamic_link` (already stored on `services`) lookup at load time in `getOrderDetailV2` — join `services` by `service_type` and return `service.dynamic_link`.
+- In `WorkspaceShell`, when `data.service?.dynamic_link` is present, render Govt Portal as `<a href={link} target="_blank" rel="noopener">`; else keep it disabled with tooltip "No portal link configured for this service".
+- Remove/hide the per-service inline link display in the services admin page (keep the field only as configuration for the button).
 
-- `tsgo --noEmit` after edits.
-- Manual: create a new lead, wait for cron tick locally (or call the SQL function directly), confirm notification appears and My Work counter increments; click "Contacted" and confirm the leads list badge changes to `contacted` and SLA pill clears.
+## 5. Inclusive GST auto-compute in pricing form
 
-## Out of scope (flagging)
+Wherever service pricing is entered (Add/Edit service dialog, Add Lead manual pricing, Change Service dialog):
 
-- Redesigning the Orders SLA badge across every table variant — only the leads/orders index and My Work card get the new pill this pass.
-- Rewriting the notifications delivery channel (email/WhatsApp push) for follow-ups — DB notification only for now; ask if you also want an email/WhatsApp ping when due.
+- Add three fields: **Base**, **GST (18%)**, **Total (inclusive)**.
+- Wire computed relationship — editing any one recalculates the others:
+  - Total → Base = round(Total / 1.18, 2); GST = Total − Base.
+  - Base → GST = Base × 0.18; Total = Base + GST.
+  - GST field read-only in most places; editable only for edge cases (admins).
+- Extract into a shared helper `computeGstBreakdown(total)` / `fromBase(base)` used by all three forms.
+
+## Technical notes
+
+- No schema changes required for §1, §2, §4, §5.
+- §3 adds no new tables; reuses `invoices`, `payments`, `payment_links`, `audit_logs`.
+- `refundPayment` already supports partial refunds — reuse it.
+- Guard `changeOrderService` behind `assertRole(['super_admin','admin','operations'])`.
+- All new UI respects existing role gating (executives don't see the button).
+
+## Files touched (approx)
+
+- `src/components/admin/LeadsTable.tsx` (or wherever rows/copy buttons live), `src/components/admin/primitives/CopyButton.tsx`
+- `src/lib/payments/finalize-paid.server.ts`, `src/lib/invoices/*`
+- `src/lib/crm/orders-v2.functions.ts` (new `changeOrderService`), `getOrderDetailV2` (join service)
+- `src/components/admin/workspace/WorkspaceShell.tsx` (Change Service button, Govt Portal link)
+- `src/components/admin/ChangeServiceDialog.tsx` (new)
+- `src/components/admin/AddLeadDialog.tsx`, services admin dialog — inclusive-GST inputs
+- `src/lib/pricing/gst.ts` (new helper)
+
+Shall I implement all five in one pass?
