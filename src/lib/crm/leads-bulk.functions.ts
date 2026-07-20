@@ -310,7 +310,7 @@ export const listAssignableStaff = createServerFn({ method: "GET" })
     const { data: roles } = await (await getAdmin())
       .from("user_roles")
       .select("user_id")
-      .in("role", ["admin", "super_admin", "operations", "support"]);
+      .in("role", ["admin", "super_admin", "operations", "support", "manager", "executive", "accounts", "finance"]);
     const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id as string)));
     if (ids.length === 0) return { rows: [] };
     const { data: profs } = await (await getAdmin())
