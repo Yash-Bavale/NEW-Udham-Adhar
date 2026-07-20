@@ -353,6 +353,16 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
       remarks: data.referenceNumber ? `Ref: ${data.referenceNumber}` : null,
     });
     let emailQueued = false;
+    // Stamp S07 Government Processing so the journey map reflects the move.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("applications")
+        .update({ fulfillment_status: "government_processing" } as never)
+        .eq("id", data.orderId);
+    } catch (e) {
+      console.error("[markSubmittedToGovt] stamp fulfillment_status failed", e);
+    }
     if (customer?.primary_email) {
       emailQueued = await queueTemplateEmail(
         "bhs_e012_submitted_to_govt",
