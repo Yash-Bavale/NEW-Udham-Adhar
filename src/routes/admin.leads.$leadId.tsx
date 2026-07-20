@@ -121,7 +121,7 @@ function LeadDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="workspace" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-slate-100/50 border mb-6">
           <TabsTrigger value="workspace" className="gap-2 py-2 px-4"><LayoutGrid className="w-4 h-4" /> Workspace</TabsTrigger>
           <TabsTrigger value="overview" className="gap-2 py-2 px-4"><User className="w-4 h-4" /> Overview</TabsTrigger>

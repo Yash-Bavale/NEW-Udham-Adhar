@@ -6,9 +6,8 @@ import {
   AlertTriangle, CheckCircle2, XCircle, Loader2,
   Calendar as CalendarIcon, FileText, Receipt, Trash2,
   Phone, FileWarning, Repeat2, Sparkles,
-  Copy, Mail, MessageCircle, BellRing, User as UserIcon,
+  Copy, Mail, MessageCircle, User as UserIcon,
 } from "lucide-react";
-import { queueDocumentReminder } from "@/lib/crm/reminders.functions";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
 import { formatIST } from "@/lib/datetime";
 
@@ -56,9 +55,12 @@ type LeadShape = {
   customer_id?: string | null;
   service?: string | null;
   lead_source?: string | null;
+  state?: string | null;
+  language?: string | null;
   base_amount?: number | string | null;
   gst_amount?: number | string | null;
   total_amount?: number | string | null;
+  created_at?: string | null;
 };
 
 export function LeadWorkspacePanel({
@@ -72,8 +74,8 @@ export function LeadWorkspacePanel({
   const role = useRole();
   const hideMoney = role.hideMoney();
   const hasPaidOrder = (applications ?? []).some(
-    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed"].includes(a.application_status),
-  ) || (applications ?? []).length > 0;
+    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed", "cancelled"].includes(a.application_status),
+  );
   return (
     <div className="space-y-5">
       {(currentStatus === "refund_requested" || currentStatus === "refund_approved") && (
@@ -124,28 +126,23 @@ export function LeadWorkspacePanel({
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
   const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  const total = lead.total_amount != null ? Number(lead.total_amount) : null;
   return (
     <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
-      <div className="flex items-center gap-2">
-        <UserIcon className="size-4 text-slate-600" />
-        <h3 className="text-sm font-semibold">Customer</h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <UserIcon className="size-4 text-slate-600" />
+          <h3 className="text-sm font-semibold">Customer Details</h3>
+        </div>
+        <span className="text-[10px] font-mono text-slate-500">{lead.lead_code}</span>
       </div>
-      <div className="text-sm space-y-1.5">
-        <div className="font-medium text-slate-900">{lead.name}</div>
-        {lead.mobile && (
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-slate-600 tabular-nums">{lead.mobile}</span>
-            <CopyButton value={lead.mobile} label="Copy" />
-          </div>
-        )}
-        {lead.email && (
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-slate-600 truncate" title={lead.email}>{lead.email}</span>
-            <CopyButton value={lead.email} label="Copy" />
-          </div>
-        )}
+
+      <div className="text-sm">
+        <div className="font-semibold text-slate-900 text-base">{lead.name}</div>
       </div>
-      <div className="flex flex-wrap gap-2 pt-1">
+
+      {/* Contact quick actions */}
+      <div className="flex flex-wrap gap-2">
         {waUrl && (
           <a
             href={waUrl}
@@ -156,14 +153,6 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
             <MessageCircle className="size-3.5" /> WhatsApp
           </a>
         )}
-        {lead.email && (
-          <a
-            href={`mailto:${lead.email}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Mail className="size-3.5" /> Email
-          </a>
-        )}
         {lead.mobile && (
           <a
             href={`tel:${lead.mobile}`}
@@ -172,7 +161,74 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
             <Phone className="size-3.5" /> Call
           </a>
         )}
+        {lead.email && (
+          <a
+            href={`mailto:${lead.email}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Mail className="size-3.5" /> Email
+          </a>
+        )}
       </div>
+
+      {/* Submitted details */}
+      <dl className="grid grid-cols-1 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
+        {lead.mobile && (
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <dt className="text-slate-500">Mobile</dt>
+            <dd className="flex items-center gap-1.5 text-slate-800 tabular-nums">
+              {lead.mobile}
+              <CopyButton value={lead.mobile} label="" />
+            </dd>
+          </div>
+        )}
+        {lead.email && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Email</dt>
+            <dd className="flex items-center gap-1.5 text-slate-800 truncate max-w-[60%]" title={lead.email}>
+              <span className="truncate">{lead.email}</span>
+              <CopyButton value={lead.email} label="" />
+            </dd>
+          </div>
+        )}
+        {lead.service && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Service</dt>
+            <dd className="text-slate-800 text-right">{lead.service}</dd>
+          </div>
+        )}
+        {lead.state && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">State</dt>
+            <dd className="text-slate-800">{lead.state}</dd>
+          </div>
+        )}
+        {lead.language && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Language</dt>
+            <dd className="text-slate-800">{lead.language}</dd>
+          </div>
+        )}
+        {lead.lead_source && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Source</dt>
+            <dd className="text-slate-800 capitalize">{lead.lead_source}</dd>
+          </div>
+        )}
+        {total != null && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Total</dt>
+            <dd className="text-slate-800 tabular-nums">₹{total.toLocaleString("en-IN")}</dd>
+          </div>
+        )}
+        {lead.created_at && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-slate-500">Submitted</dt>
+            <dd className="text-slate-800">{formatIST(lead.created_at)}</dd>
+          </div>
+        )}
+      </dl>
+
       {lead.customer_id && (
         <a
           href={`/admin/customers/${lead.customer_id}`}
@@ -189,9 +245,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
 
 function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
-  const reminderFn = useServerFn(queueDocumentReminder);
   const transitionFn = useServerFn(transitionLeadStatus);
-  const [busy, setBusy] = useState(false);
   const [contactBusy, setContactBusy] = useState(false);
 
   const formLink =
@@ -210,16 +264,6 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
     `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
   );
   const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
-
-  const sendReminder = async () => {
-    setBusy(true);
-    try {
-      const res = await reminderFn({ data: { leadId: lead.id } });
-      toast.success(`Reminder queued to ${res.queuedTo}`);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to queue reminder");
-    } finally { setBusy(false); }
-  };
 
   const markContacted = async () => {
     setContactBusy(true);
@@ -270,20 +314,10 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
             <Mail className="size-3.5" /> Send Link via Email
           </a>
         )}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !lead.email}
-          onClick={sendReminder}
-          className="justify-start text-xs"
-        >
-          <BellRing className="size-3.5 mr-1.5" />
-          {busy ? "Sending…" : "Send Documents Reminder"}
-        </Button>
       </div>
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          Add a customer email to enable email reminders.
+          Add a customer email to enable email actions.
         </div>
       )}
     </div>
