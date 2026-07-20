@@ -236,8 +236,10 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
   const mutConsultation = useMutation({
-    mutationFn: () => fnSubmit({ data: { orderId: p.applicationId } }),
-    onSuccess: () => { toast.success("E005 sent — consultation completed"); invalidate(); },
+    // B06 → S08 Consultation Completed. Stamp fulfillment stage; skip the E005
+    // resubmit email so we don't double-notify the customer.
+    mutationFn: () => fnUpdateFF({ data: { orderId: p.applicationId, toStatus: "consultation_completed" } }),
+    onSuccess: () => { toast.success("S08 · Consultation Completed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutReminder = useMutation({

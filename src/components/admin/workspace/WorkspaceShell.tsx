@@ -406,6 +406,7 @@ export function WorkspaceShell(p: Props) {
               orderStatus={orderStatus}
               stage={p.stage}
               updatedAt={application.updated_at ?? application.created_at}
+              fulfillmentStatus={current}
             />
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {p.showConsultationPanel ? (

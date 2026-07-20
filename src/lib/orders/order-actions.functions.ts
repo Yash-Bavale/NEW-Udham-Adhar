@@ -303,6 +303,18 @@ export const sendFormLink = createServerFn({ method: "POST" })
     if (data.transitionToWaiting && order.order_status === "NEW_ORDER") {
       updated = await transition(context.supabase, order.id, "WAITING_CUSTOMER_INFO");
     }
+    // Stamp S02/S03 fulfillment stage so the journey map + UI badges reflect
+    // "Awaiting Customer Form" (link armed) → "Waiting for Customer Submission"
+    // (link delivered) without waiting for another action.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("applications")
+        .update({ fulfillment_status: (emailQueued ? "waiting_for_customer_submission" : "awaiting_customer_form") } as never)
+        .eq("id", order.id);
+    } catch (e) {
+      console.error("[sendFormLink] stamp fulfillment_status failed", e);
+    }
     if (emailQueued) {
       await notifyOrderEvent({
         order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
@@ -341,6 +353,16 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
       remarks: data.referenceNumber ? `Ref: ${data.referenceNumber}` : null,
     });
     let emailQueued = false;
+    // Stamp S07 Government Processing so the journey map reflects the move.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("applications")
+        .update({ fulfillment_status: "government_processing" } as never)
+        .eq("id", data.orderId);
+    } catch (e) {
+      console.error("[markSubmittedToGovt] stamp fulfillment_status failed", e);
+    }
     if (customer?.primary_email) {
       emailQueued = await queueTemplateEmail(
         "bhs_e012_submitted_to_govt",
