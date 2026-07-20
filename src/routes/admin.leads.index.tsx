@@ -340,7 +340,7 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
                   <th className="px-4 py-2.5 text-left font-medium">Email</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Source</th>
+                  {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
