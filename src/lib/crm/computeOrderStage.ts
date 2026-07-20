@@ -110,7 +110,9 @@ export const STAGE_META: Record<
   uninterested:      { label: "Uninterested",       short: "Uninterested", order: -1, tone: "rose", side: "exception" },
   refund_requested:  { label: "Refund Requested",   short: "Refund Req", order: -1, tone: "rose",   side: "exception" },
   refunded:          { label: "Refunded",           short: "Refunded",   order: -1, tone: "slate",  side: "exception" },
+  closed:            { label: "Order Closed",       short: "Closed",     order: -1, tone: "rose",   side: "exception" },
 };
+
 
 // Stages shown on the horizontal journey strip, in order.
 export const JOURNEY_STAGES: OrderStage[] = [
