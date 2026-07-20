@@ -102,7 +102,8 @@ function MyWorkPage() {
           })
           .slice(0, 12)
           .map((a) => {
-            const fresh = a.fulfillment_status === "order_received";
+            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+            const fresh = actNow.includes(a.fulfillment_status ?? "order_received");
             return (
               <Link
                 key={a.id}
