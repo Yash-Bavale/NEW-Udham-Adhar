@@ -58,7 +58,7 @@ export interface EdgeDef {
   waypoints?: Array<{ x: number; y: number }>;
 }
 
-export type EdgeState = "done" | "active" | "closed" | "idle";
+export type EdgeState = "done" | "active" | "warning" | "closed" | "idle";
 export type NodeState = "done" | "active" | "terminal-ok" | "terminal-bad" | "idle";
 
 /* ─── Dimension helpers ─── */
