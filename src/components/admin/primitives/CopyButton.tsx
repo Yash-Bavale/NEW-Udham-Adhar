@@ -14,7 +14,10 @@ export function CopyButton({ value, label = "Copy", className }: CopyButtonProps
   return (
     <button
       type="button"
-      onClick={async () => {
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         try {
           await navigator.clipboard.writeText(value);
           setDone(true);
