@@ -33,6 +33,7 @@ import {
 } from "@/lib/orders/journey-map";
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
+import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
 import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
 
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
@@ -70,9 +71,11 @@ const TAB_DEFS = [
   { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
   { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
   { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
+  { id: "invoices" as const, label: "Invoices", icon: BadgeDollarSign, tooltip: "View, download, resend, or replace invoices for this order", moneyOnly: true },
   { id: "activity" as const, label: "Timeline / Activity Log", icon: Activity, tooltip: "Full chronological activity log for this order" },
   { id: "support" as const, label: "Internal Help / Support Ticket", icon: LifeBuoy, tooltip: "Raise or track internal tickets tied to this order" },
 ];
+
 type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
@@ -737,7 +740,7 @@ export function WorkspaceShell(p: Props) {
         {/* Tabs */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
           <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-            {TAB_DEFS.map((t) => {
+            {TAB_DEFS.filter((t) => !(t as any).moneyOnly || !p.hideAmount).map((t) => {
               const Icon = t.icon;
               const state = availability[t.id];
               const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
@@ -846,7 +849,14 @@ export function WorkspaceShell(p: Props) {
                   customerTickets={p.data.customerTickets ?? []}
                 />
               </TabsContent>
+
+              {!p.hideAmount && (
+                <TabsContent value="invoices" className="space-y-4 mt-0 animate-fade-in">
+                  <OrderPaymentsPanel payments={payments ?? []} />
+                </TabsContent>
+              )}
             </div>
+
 
             {/* Sidebar */}
             <aside className="space-y-4">
