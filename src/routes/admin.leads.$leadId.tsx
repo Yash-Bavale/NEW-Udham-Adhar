@@ -213,7 +213,7 @@ function LeadDetailPage() {
                           <td className="py-3 px-4">
                             <Badge variant="secondary" className="font-sans text-[10px] uppercase">{a.application_status.replace(/_/g, " ")}</Badge>
                           </td>
-                          <td className="py-3 px-4 text-xs text-slate-500">{new Date(a.created_at).toLocaleString("en-IN")}</td>
+                          <td className="py-3 px-4 text-xs text-slate-500">{formatIST(a.created_at)}</td>
                           <td className="py-3 px-4 text-right">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                               <Link to="/admin/applications/$applicationId" params={{ applicationId: a.id }}>View Details</Link>
@@ -288,7 +288,7 @@ function LeadDetailPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs text-slate-400 flex items-center gap-2">
-                        {n.user_id ? "Staff Member" : "System"} • {new Date(n.created_at).toLocaleString("en-IN")}
+                        {n.user_id ? "Staff Member" : "System"} • {formatIST(n.created_at)}
                       </div>
                       <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
                         {n.note}
