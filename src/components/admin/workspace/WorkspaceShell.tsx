@@ -77,6 +77,8 @@ type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
+  const role = useRole();
+  const isAdmin = role.hasAny(["super_admin", "admin"]);
   const [tab, setTab] = useState<TabId>("workflow");
   const [refundOpen, setRefundOpen] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
