@@ -133,54 +133,66 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
   const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
   const total = lead.total_amount != null ? Number(lead.total_amount) : null;
+  const initials = (lead.name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
+  const sourceRaw = lead.lead_source ?? "";
+  const sourceLabel = sourceRaw.startsWith("website:")
+    ? sourceRaw.slice("website:".length) || "website"
+    : sourceRaw || "—";
+
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <UserIcon className="size-4 text-slate-600" />
-          <h3 className="text-sm font-semibold">Customer Details</h3>
+    <div className="rounded-xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
+      {/* Gradient header */}
+      <div className="bg-gradient-to-br from-indigo-600 via-indigo-500 to-sky-500 text-white px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="size-12 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-lg font-bold shrink-0">
+            {initials || <UserIcon className="size-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base font-semibold truncate">{lead.name}</div>
+            <div className="text-[11px] font-mono opacity-80 truncate">{lead.lead_code}</div>
+          </div>
         </div>
-        <span className="text-[10px] font-mono text-slate-500">{lead.lead_code}</span>
+
+        {/* Big-touch actions inside the header */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          {lead.mobile ? (
+            <a
+              href={`tel:${lead.mobile}`}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
+            >
+              <Phone className="size-3.5" /> Call
+            </a>
+          ) : <span />}
+          {waUrl ? (
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
+            >
+              <MessageCircle className="size-3.5" /> WhatsApp
+            </a>
+          ) : <span />}
+          {lead.email ? (
+            <a
+              href={`mailto:${lead.email}`}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
+            >
+              <Mail className="size-3.5" /> Email
+            </a>
+          ) : <span />}
+        </div>
       </div>
 
-      <div className="text-sm">
-        <div className="font-semibold text-slate-900 text-base">{lead.name}</div>
-      </div>
-
-      {/* Contact quick actions */}
-      <div className="flex flex-wrap gap-2">
-        {waUrl && (
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100"
-          >
-            <MessageCircle className="size-3.5" /> WhatsApp
-          </a>
-        )}
+      {/* Body: dense two-column key/value grid */}
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs p-4">
         {lead.mobile && (
-          <a
-            href={`tel:${lead.mobile}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Phone className="size-3.5" /> Call
-          </a>
-        )}
-        {lead.email && (
-          <a
-            href={`mailto:${lead.email}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Mail className="size-3.5" /> Email
-          </a>
-        )}
-      </div>
-
-      {/* Submitted details */}
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs pt-1 border-t" style={{ borderColor: "var(--admin-border)" }}>
-        {lead.mobile && (
-          <div className="flex items-center justify-between gap-2 pt-2">
+          <div className="flex items-center justify-between gap-2">
             <dt className="text-slate-500">Mobile</dt>
             <dd className="flex items-center gap-1.5 text-slate-800 tabular-nums">
               {lead.mobile}
@@ -189,18 +201,18 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           </div>
         )}
         {lead.email && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Email</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 truncate max-w-[60%]" title={lead.email}>
-              <span className="truncate">{lead.email}</span>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <dt className="text-slate-500 shrink-0">Email</dt>
+            <dd className="flex items-center gap-1.5 text-slate-800 min-w-0" title={lead.email}>
+              <span className="truncate max-w-[160px]">{lead.email}</span>
               <CopyButton value={lead.email} label="" />
             </dd>
           </div>
         )}
         {lead.service && (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 sm:col-span-2">
             <dt className="text-slate-500">Service</dt>
-            <dd className="text-slate-800 text-right">{lead.service}</dd>
+            <dd className="text-slate-800 text-right truncate ml-2">{lead.service}</dd>
           </div>
         )}
         {lead.state && (
@@ -215,16 +227,16 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
             <dd className="text-slate-800">{lead.language}</dd>
           </div>
         )}
-        {lead.lead_source && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Source</dt>
-            <dd className="text-slate-800 capitalize">{lead.lead_source}</dd>
+        {sourceLabel !== "—" && (
+          <div className="flex items-center justify-between gap-2 sm:col-span-2 min-w-0">
+            <dt className="text-slate-500 shrink-0">Source</dt>
+            <dd className="text-slate-800 truncate ml-2 font-mono text-[11px]" title={sourceLabel}>{sourceLabel}</dd>
           </div>
         )}
         {total != null && (
           <div className="flex items-center justify-between gap-2">
             <dt className="text-slate-500">Total</dt>
-            <dd className="text-slate-800 tabular-nums">₹{total.toLocaleString("en-IN")}</dd>
+            <dd className="text-slate-800 tabular-nums font-semibold">₹{total.toLocaleString("en-IN")}</dd>
           </div>
         )}
         {lead.created_at && (
@@ -238,7 +250,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
       {lead.customer_id && (
         <a
           href={`/admin/customers/${lead.customer_id}`}
-          className="block text-xs text-blue-600 hover:underline pt-1"
+          className="block text-xs text-indigo-600 hover:underline px-4 pb-3 -mt-1"
         >
           Open customer 360 →
         </a>
