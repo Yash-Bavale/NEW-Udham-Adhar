@@ -592,6 +592,37 @@ function AddLeadDialog({
   onCreated: () => void;
 }) {
   const addFn = useServerFn(addLead);
+  const findFn = useServerFn(findLeadByCodeOrId);
+  const [fetchId, setFetchId] = useState("");
+  const [fetching, setFetching] = useState(false);
+
+  const doFetch = async () => {
+    const q = fetchId.trim();
+    if (!q) return;
+    setFetching(true);
+    try {
+      const { lead } = await findFn({ data: { query: q } });
+      setForm((f) => ({
+        ...f,
+        name: lead.name ?? f.name,
+        email: lead.email ?? f.email,
+        mobile: lead.mobile ?? f.mobile,
+        state: lead.state ?? f.state,
+        district: lead.district ?? f.district,
+        language: lead.language ?? f.language,
+        service: lead.service ?? f.service,
+        lead_source: lead.lead_source ?? f.lead_source,
+        base_amount: Number(lead.base_amount ?? f.base_amount) || 0,
+        gst_amount: Number(lead.gst_amount ?? f.gst_amount) || 0,
+        total_amount: Number(lead.total_amount ?? f.total_amount) || 0,
+      }));
+      toast.success(`Prefilled from ${lead.lead_code ?? lead.id.slice(0, 8)}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Lead not found");
+    } finally {
+      setFetching(false);
+    }
+  };
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({
     queryKey: ["admin.services"],
