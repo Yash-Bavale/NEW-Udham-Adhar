@@ -87,6 +87,20 @@ export const getLeadTimeline = createServerFn({ method: "POST" })
       detail: r.page_url as string | undefined,
     }));
 
+    // Synthetic "lead created" entry with full source (e.g. "website:/print-udyam-certificate").
+    if (leadRow.data) {
+      const src = (leadRow.data.lead_source as string | null) ?? "unknown";
+      const [channel, ...pathParts] = src.split(":");
+      const path = pathParts.join(":");
+      items.push({
+        id: `src-${leadRow.data.id}`,
+        kind: "activity",
+        at: leadRow.data.created_at as string,
+        title: `Lead created — Source: ${channel || "unknown"}`,
+        detail: path ? `Landing page: ${path}` : undefined,
+      });
+    }
+
     items.sort((a, b) => (a.at < b.at ? 1 : -1));
     return { items: items.slice(0, 500) };
   });
