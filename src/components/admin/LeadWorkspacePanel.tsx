@@ -700,7 +700,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
               <li key={f.id} className="text-xs flex items-start gap-1.5">
                 <Phone className="size-3 mt-0.5 text-slate-400" />
                 <div>
-                  <div className="font-medium">{new Date(f.scheduled_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })}</div>
+                  <div className="font-medium">{formatIST(f.scheduled_at)}</div>
                   <div className="text-slate-500 capitalize">{f.reason.replace(/_/g, " ")}</div>
                 </div>
               </li>
@@ -767,7 +767,7 @@ function DocumentsPanel({ applications }: { applications: any[] }) {
       ) : deleted ? (
         <div className="rounded-md bg-rose-50 border border-rose-200 p-2 text-xs text-rose-800">
           Documents deleted on{" "}
-          <b>{new Date(deleted).toLocaleString("en-IN")}</b>
+          <b>{formatIST(deleted)}</b>
           {app.documents_deleted_reason ? <> — reason: <b>{app.documents_deleted_reason}</b></> : null}.
         </div>
       ) : (
