@@ -39,8 +39,8 @@ function MyWorkPage() {
     () => {
       const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string> }> = [
         { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/orders", search: { assignee: "me" } },
-        { label: "Order received (act now)", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
-        { label: "My active leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me" } },
+        { label: "Act now · no action yet", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
+        { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" } },
         { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications" },
         { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)", to: "/admin/orders", search: { assignee: "me", sla: "risk" } },
       ];
