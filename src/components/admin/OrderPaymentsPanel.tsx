@@ -181,7 +181,27 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
                         <IconBtn title="History"     icon={History}  disabled={!p.invoice_id} onClick={() => p.invoice_id && setHistoryId(p.invoice_id)} />
                       </div>
                     ) : (
-                      <span className="text-slate-400 text-[10px]">—</span>
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[10px]"
+                          disabled={busy === `rec-${p.id}`}
+                          onClick={async () => {
+                            try {
+                              setBusy(`rec-${p.id}`);
+                              const r = await reconcileFn({ data: { paymentId: p.id } });
+                              if (r.status === "paid") toast.success("Payment verified & marked paid. Invoice + email queued.");
+                              else if (r.status === "failed") toast.error("Gateway confirmed this payment failed.");
+                              else toast.info(`Still pending at gateway (status: ${r.status}).`);
+                            } catch (e: any) { toast.error(e?.message ?? "Verify failed"); }
+                            finally { setBusy(null); }
+                          }}
+                          title="Ask the payment gateway for the authoritative status"
+                        >
+                          <ShieldCheck className="size-3 mr-1" /> Verify
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>
