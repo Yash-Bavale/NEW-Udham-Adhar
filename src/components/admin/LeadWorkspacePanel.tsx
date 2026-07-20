@@ -703,6 +703,8 @@ function EventsTimeline({ leadId }: { leadId: string }) {
 /* ------------------- Follow-up Scheduler ------------------- */
 
 function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }) {
+  const role = useRole();
+  const canAssign = role.hasAny(["super_admin", "admin", "manager"]);
   const qc = useQueryClient();
   const createFn = useServerFn(createFollowUp);
   const listFn = useServerFn(listFollowUpsForLead);
@@ -745,10 +747,12 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
           <option value="refund_followup">Refund Follow-up</option>
           <option value="general">General</option>
         </select>
-        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
-          <option value="">Assign to…</option>
-          {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
-        </select>
+        {canAssign && (
+          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
+            <option value="">Assign to…</option>
+            {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+          </select>
+        )}
         <Button size="sm" className="w-full" disabled={busy} onClick={submit}>
           {busy ? "Saving…" : "Schedule"}
         </Button>
