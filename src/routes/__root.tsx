@@ -130,13 +130,13 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-16801746830" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18336340451" />
         <script dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'AW-16801746830');
+            gtag('config', 'AW-18336340451');
           `
         }} />
         <script dangerouslySetInnerHTML={{
@@ -148,7 +148,7 @@ function RootShell({ children }: { children: ReactNode }) {
                 }
               };
               gtag('event', 'conversion', {
-                  'send_to': 'AW-16801746830/1BGJCNDNmPEZEI6f2cs-',
+                  'send_to': 'AW-18336340451/1BGJCNDNmPEZEI6f2cs-',
                   'event_callback': callback
               });
               return false;
