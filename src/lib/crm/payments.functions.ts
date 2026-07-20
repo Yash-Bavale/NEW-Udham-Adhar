@@ -285,7 +285,7 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
         });
       }
 
-      return { ok: true, status: newStatus, raw: result.raw };
+      return { ok: true, status: newStatus, raw: result.raw as any };
     }
 
     throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
