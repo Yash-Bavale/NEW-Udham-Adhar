@@ -274,7 +274,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
         >
           <div className="md:hidden font-medium text-sm" style={{ color: "var(--admin-primary)" }}>
-            Udyam Ops OS
+            Business Help
           </div>
           <div className="flex-1 max-w-2xl">
             <GlobalSearchInput onOpenPalette={() => setPaletteOpen(true)} />
