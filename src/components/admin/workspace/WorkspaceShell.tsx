@@ -495,7 +495,8 @@ export function WorkspaceShell(p: Props) {
           />
         </section>
 
-        {/* ── Journey Action Panel (B01 - B10) ──────────────────────────── */}
+        {/* ── Journey Action Panel (B01 - B10) — admin only ─────────── */}
+        {isAdmin && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
             <div>
