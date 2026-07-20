@@ -447,9 +447,11 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
         </span>
       </td>
       <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
-      <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
-        {hideMoney ? "—" : `₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
-      </td>
+      {!hideMoney && (
+        <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
+          {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
+        </td>
+      )}
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div>{formatIST(order.created_at, { dateOnly: true })}</div>
         <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
