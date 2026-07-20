@@ -739,7 +739,7 @@ export function WorkspaceShell(p: Props) {
         {/* Tabs */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
           <TabsList className="w-full justify-start bg-transparent border-b border-slate-200 p-0 h-auto rounded-none gap-1 overflow-x-auto flex-nowrap">
-            {TAB_DEFS.map((t) => {
+            {TAB_DEFS.filter((t) => !(t as any).moneyOnly || !p.hideAmount).map((t) => {
               const Icon = t.icon;
               const state = availability[t.id];
               const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
