@@ -73,6 +73,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   "bhs_e004_our_side_delay", "order_closure_confirmation", "order_completed",
                   "talk_to_expert_completed", "support_ticket_reply", "support_ticket_closed",
                   "support_ticket_closed_final", "refund_processed_confirmation", "bhs_e012_submitted_to_govt",
+                  "bhs_e010_ticket_closed_final",
                 ]);
                 if (!allowedTemplates.has(String(r.template_code))) continue;
                 await enqueueFromTemplateInternal(
