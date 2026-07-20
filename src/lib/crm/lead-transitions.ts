@@ -40,7 +40,7 @@ export const LEAD_STATUSES_V2: LeadStatusV2[] = [
 // Allowed transitions per spec. Terminal states map to [].
 export const LEAD_TRANSITIONS_V2: Record<LeadStatusV2, LeadStatusV2[]> = {
   new_lead:           ["contacted", "follow_up_required", "payment_pending"],
-  contacted:          ["follow_up_required", "payment_pending", "payment_successful", "uninterested"],
+  contacted:          ["new_lead", "follow_up_required", "payment_pending", "payment_successful", "uninterested"],
   follow_up_required: ["contacted", "payment_pending", "uninterested"],
   payment_pending:    ["payment_successful", "payment_failed", "uninterested"],
   payment_failed:     ["payment_pending", "uninterested", "closed"],
