@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Download, Eye, History, Mail, Printer, RefreshCw, Replace } from "lucide-react";
+import { CreditCard, Download, Eye, History, Mail, Printer, RefreshCw, Replace, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
@@ -11,6 +11,7 @@ import {
   replaceInvoice,
   resendInvoiceEmail,
 } from "@/lib/crm/invoices.functions";
+import { reconcilePaymentStatus } from "@/lib/crm/payments.functions";
 import { InvoiceHistoryDrawer } from "./InvoiceHistoryDrawer";
 
 const fmtDate = (s?: string | null) =>
