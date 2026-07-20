@@ -8,7 +8,6 @@ import {
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
   Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
   Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert,
-  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
