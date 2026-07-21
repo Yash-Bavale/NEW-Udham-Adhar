@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import {
   AlertTriangle, CheckCircle2, XCircle, Loader2,
   Calendar as CalendarIcon, FileText, Receipt, Trash2,
-  Phone, FileWarning, Repeat2, Sparkles,
-  Copy, Mail, MessageCircle, User as UserIcon,
+  Phone, FileWarning, Sparkles, Clock,
+  Copy, Mail, MessageCircle, Link2,
 } from "lucide-react";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
 import { formatIST } from "@/lib/datetime";
@@ -19,6 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import {
   LEAD_STATUS_BADGE,
@@ -37,10 +41,13 @@ import {
 import {
   createFollowUp, listFollowUpsForLead,
 } from "@/lib/crm/follow-ups.functions";
+import {
+  createPaymentLink, getPaymentLinkStatusForLead,
+} from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
-import { PaymentLinkPanel } from "./PaymentLinkPanel";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
+
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
@@ -93,30 +100,15 @@ export function LeadWorkspacePanel({
         />
       )}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-7">
           <CustomerQuickCard lead={lead} />
         </div>
-        <div className="lg:col-span-4">
-          <QuickActionsCard lead={lead} currentStatus={currentStatus} />
+        <div className="lg:col-span-5">
+          <QuickActionsCard lead={lead} currentStatus={currentStatus} hideMoney={hideMoney} />
         </div>
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-12">
           <FollowUpScheduler leadId={lead.id} staff={staff} />
         </div>
-        {!hideMoney && (
-          <div className="lg:col-span-12">
-            <PaymentLinkPanel
-              leadId={lead.id}
-              leadCode={lead.lead_code}
-              mobile={lead.mobile ?? null}
-              customerName={lead.name}
-              service={lead.service ?? null}
-              baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
-              gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
-              totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-              leadStatusV2={currentStatus}
-            />
-          </div>
-        )}
         {hasPaidOrder && applications.length > 0 && (
           <div className="lg:col-span-12">
             <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
@@ -127,130 +119,166 @@ export function LeadWorkspacePanel({
   );
 }
 
+
 /* ------------------- Customer Quick Card ------------------- */
 
+function relativeTime(iso?: string | null) {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 0) return null;
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  return `${d}d ago`;
+}
+
+function buildIntroMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null) {
+  const emp = employeeName || "the Udyam Aadhar Advisory team";
+  return (
+    `Hi *${customerName}* 👋\n\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Lead ID: ${leadCode}\n` +
+    `Service: *${service ?? "your service"}*\n\n` +
+    `I'm here to assist you with any questions regarding your service.\n\n` +
+    `📞 Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Simply reply to this message or contact us anytime during office hours.`
+  );
+}
+
+function buildPaymentLinkMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null, paymentUrl: string) {
+  const emp = employeeName || "the Udyam Aadhar Advisory team";
+  return (
+    `Hi *${customerName}* 👋\n\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Lead ID: ${leadCode}\n` +
+    `Service: *${service ?? "your service"}*\n` +
+    `Payment Link: ${paymentUrl}\n\n` +
+    `I'm here to assist you with any questions regarding your service.\n\n` +
+    `📞 Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Simply reply to this message or contact us anytime during office hours.`
+  );
+}
+
+function waNumber(mobile?: string | null) {
+  const digits = (mobile ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length === 10 ? "91" + digits : digits;
+}
+
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
-  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
-  const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  const number = waNumber(lead.mobile);
+  const waUrl = number ? `https://wa.me/${number}` : null;
   const total = lead.total_amount != null ? Number(lead.total_amount) : null;
-  const initials = (lead.name || "?")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("");
   const sourceRaw = lead.lead_source ?? "";
   const sourceLabel = sourceRaw.startsWith("website:")
     ? sourceRaw.slice("website:".length) || "website"
-    : sourceRaw || "—";
+    : sourceRaw || null;
+  const rel = relativeTime(lead.created_at);
+
+  const cell = "flex flex-col gap-0.5 min-w-0";
+  const labelCls = "text-[10px] uppercase tracking-wider text-slate-500 font-semibold";
+  const valueCls = "text-sm font-semibold text-slate-900 truncate";
 
   return (
     <div className="rounded-xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
-      {/* Gradient header */}
-      <div className="bg-gradient-to-br from-indigo-600 via-indigo-500 to-sky-500 text-white px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="size-12 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-lg font-bold shrink-0">
-            {initials || <UserIcon className="size-5" />}
+      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        {/* Left column */}
+        <div className="p-4 space-y-3">
+          <div className={cell}>
+            <span className={labelCls}>Name</span>
+            <span className="text-base font-bold text-slate-900 truncate">{lead.name}</span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold truncate">{lead.name}</div>
-            <div className="text-[11px] font-mono opacity-80 truncate">{lead.lead_code}</div>
+          <div className={cell}>
+            <span className={labelCls}>Service</span>
+            <span className={valueCls}>{lead.service ?? "—"}</span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>State</span>
+            <span className={valueCls}>{lead.state ?? "—"}</span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Language</span>
+            <span className={valueCls}>{lead.language ?? "—"}</span>
           </div>
         </div>
 
-        {/* Big-touch actions inside the header */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {lead.mobile ? (
-            <a
-              href={`tel:${lead.mobile}`}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <Phone className="size-3.5" /> Call
-            </a>
-          ) : <span />}
-          {waUrl ? (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <MessageCircle className="size-3.5" /> WhatsApp
-            </a>
-          ) : <span />}
-          {lead.email ? (
-            <a
-              href={`mailto:${lead.email}`}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <Mail className="size-3.5" /> Email
-            </a>
-          ) : <span />}
+        {/* Right column */}
+        <div className="p-4 space-y-3">
+          <div className={cell}>
+            <span className={labelCls}>Mobile Number</span>
+            <span className="flex items-center gap-1.5 text-base font-bold text-slate-900 tabular-nums">
+              {lead.mobile ?? "—"}
+              {lead.mobile && <CopyButton value={lead.mobile} label="" />}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Submitted</span>
+            <span className="text-sm font-semibold text-slate-900">
+              {lead.created_at ? formatIST(lead.created_at) : "—"}
+              {rel && <span className="ml-2 text-xs font-normal text-slate-500">{rel}</span>}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Email</span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="text-sm font-semibold text-slate-900 truncate" title={lead.email ?? ""}>
+                {lead.email ?? "—"}
+              </span>
+              {lead.email && <CopyButton value={lead.email} label="" />}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Price</span>
+            <span className="text-base font-bold text-slate-900 tabular-nums">
+              {total != null ? `₹${total.toLocaleString("en-IN")}` : "—"}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Body: dense two-column key/value grid */}
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs p-4">
-        {lead.mobile && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Mobile</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 tabular-nums">
-              {lead.mobile}
-              <CopyButton value={lead.mobile} label="" />
-            </dd>
-          </div>
-        )}
-        {lead.email && (
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <dt className="text-slate-500 shrink-0">Email</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 min-w-0" title={lead.email}>
-              <span className="truncate max-w-[160px]">{lead.email}</span>
-              <CopyButton value={lead.email} label="" />
-            </dd>
-          </div>
-        )}
-        {lead.service && (
-          <div className="flex items-center justify-between gap-2 sm:col-span-2">
-            <dt className="text-slate-500">Service</dt>
-            <dd className="text-slate-800 text-right truncate ml-2">{lead.service}</dd>
-          </div>
-        )}
-        {lead.state && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">State</dt>
-            <dd className="text-slate-800">{lead.state}</dd>
-          </div>
-        )}
-        {lead.language && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Language</dt>
-            <dd className="text-slate-800">{lead.language}</dd>
-          </div>
-        )}
-        {sourceLabel !== "—" && (
-          <div className="flex items-center justify-between gap-2 sm:col-span-2 min-w-0">
-            <dt className="text-slate-500 shrink-0">Source</dt>
-            <dd className="text-slate-800 truncate ml-2 font-mono text-[11px]" title={sourceLabel}>{sourceLabel}</dd>
-          </div>
-        )}
-        {total != null && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Total</dt>
-            <dd className="text-slate-800 tabular-nums font-semibold">₹{total.toLocaleString("en-IN")}</dd>
-          </div>
-        )}
-        {lead.created_at && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Submitted</dt>
-            <dd className="text-slate-800">{formatIST(lead.created_at)}</dd>
-          </div>
-        )}
-      </dl>
+      {sourceLabel && (
+        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate" title={sourceLabel}>
+          Source: {sourceLabel}
+        </div>
+      )}
+
+      {/* Communication buttons row */}
+      <div className="grid grid-cols-3 border-t border-slate-100">
+        {lead.mobile ? (
+          <a
+            href={`tel:${lead.mobile}`}
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors border-r border-slate-100"
+          >
+            <Phone className="size-4" /> Call
+          </a>
+        ) : <span className="border-r border-slate-100" />}
+        {waUrl ? (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors border-r border-slate-100"
+          >
+            <MessageCircle className="size-4" /> WhatsApp
+          </a>
+        ) : <span className="border-r border-slate-100" />}
+        {lead.email ? (
+          <a
+            href={`mailto:${lead.email}`}
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition-colors"
+          >
+            <Mail className="size-4" /> Email
+          </a>
+        ) : <span />}
+      </div>
 
       {lead.customer_id && (
         <a
           href={`/admin/customers/${lead.customer_id}`}
-          className="block text-xs text-indigo-600 hover:underline px-4 pb-3 -mt-1"
+          className="block text-xs text-indigo-600 hover:underline px-4 py-2 border-t border-slate-100"
         >
           Open customer 360 →
         </a>
@@ -259,29 +287,45 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   );
 }
 
+
 /* ------------------- Quick Actions Card ------------------- */
 
-function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+function QuickActionsCard({
+  lead,
+  currentStatus,
+  hideMoney,
+}: {
+  lead: LeadShape;
+  currentStatus: LeadStatusV2;
+  hideMoney: boolean;
+}) {
   const qc = useQueryClient();
   const transitionFn = useServerFn(transitionLeadStatus);
+  const createLinkFn = useServerFn(createPaymentLink);
+  const linkStatusFn = useServerFn(getPaymentLinkStatusForLead);
+  const role = useRole();
+  const employeeName = role.displayName;
+
   const [contactBusy, setContactBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
-  const formLink =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/onboarding/${lead.lead_code}`
-      : `/onboarding/${lead.lead_code}`;
+  const { data: linkStatus } = useQuery({
+    queryKey: ["lead.paymentLink", lead.id],
+    queryFn: () => linkStatusFn({ data: { leadId: lead.id } }),
+    staleTime: 30_000,
+  });
+  const paymentUrl: string | null = (linkStatus as any)?.url ?? (linkStatus as any)?.short_url ?? null;
 
-  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
-  const waNumber = waPhone ? (waPhone.length === 10 ? "91" + waPhone : waPhone) : "";
-  const waMessage = encodeURIComponent(
-    `Hi ${lead.name}, please complete your application & payment here: ${formLink}`,
-  );
-  const waSendUrl = waNumber ? `https://wa.me/${waNumber}?text=${waMessage}` : null;
-  const mailSubject = encodeURIComponent("Complete your application");
-  const mailBody = encodeURIComponent(
-    `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
-  );
-  const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
+  const number = waNumber(lead.mobile);
+  const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
+  const introWaUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}` : null;
+
+  const payMsg = paymentUrl
+    ? buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl)
+    : null;
+  const payWaUrl = number && payMsg ? `https://wa.me/${number}?text=${encodeURIComponent(payMsg)}` : null;
+  const paySubject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
+  const payEmailUrl = lead.email && payMsg ? `mailto:${lead.email}?subject=${paySubject}&body=${encodeURIComponent(payMsg)}` : null;
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
@@ -292,17 +336,28 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
-      qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
   };
 
+  const generateLink = async () => {
+    setLinkBusy(true);
+    try {
+      await createLinkFn({ data: { leadId: lead.id } });
+      toast.success("Payment link generated");
+      qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to generate link");
+    } finally { setLinkBusy(false); }
+  };
+
   const isContacted = currentStatus === "contacted";
   const showContactToggle = currentStatus === "new_lead" || currentStatus === "contacted";
+  const btnBase = "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium justify-start transition-colors";
 
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+    <div className="rounded-xl border bg-white p-4 space-y-3 h-full shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Quick Actions</h3>
@@ -314,45 +369,69 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
             disabled={contactBusy}
             onClick={toggleContacted}
             className={`justify-start text-xs ${isContacted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
-            title={isContacted ? "Click to revert to New Lead" : "Mark as Contacted"}
           >
             <CheckCircle2 className="size-3.5 mr-1.5" />
-            {contactBusy
-              ? "Updating…"
-              : isContacted
-                ? "Contacted ✓ (click to undo)"
-                : "Mark as Contacted"}
+            {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
 
-        <CopyButton value={formLink} label="Copy Payment Link" className="justify-start" />
-        {waSendUrl && (
-          <a
-            href={waSendUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-xs font-medium hover:bg-emerald-100 justify-start"
-          >
-            <MessageCircle className="size-3.5" /> Send Link via WhatsApp
+        {introWaUrl && (
+          <a href={introWaUrl} target="_blank" rel="noopener noreferrer"
+             className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
+            <MessageCircle className="size-3.5" /> Contact on WhatsApp
           </a>
         )}
-        {mailUrl && (
-          <a
-            href={mailUrl}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 justify-start"
-          >
-            <Mail className="size-3.5" /> Send Link via Email
-          </a>
+
+        {!hideMoney && (
+          <>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+              Payment Link
+            </div>
+
+            {paymentUrl ? (
+              <>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
+                  <Link2 className="size-3 shrink-0" />
+                  <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
+                  <CopyButton value={paymentUrl} label="" />
+                </div>
+                {payWaUrl && (
+                  <a href={payWaUrl} target="_blank" rel="noopener noreferrer"
+                     className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
+                    <MessageCircle className="size-3.5" /> Send Payment Link via WhatsApp
+                  </a>
+                )}
+                {payEmailUrl && (
+                  <a href={payEmailUrl}
+                     className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`}>
+                    <Mail className="size-3.5" /> Send Payment Link via Email
+                  </a>
+                )}
+              </>
+            ) : (
+              <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
+                <Link2 className="size-3.5 mr-1.5" />
+                {linkBusy ? "Generating…" : "Generate Payment Link"}
+              </Button>
+            )}
+          </>
         )}
       </div>
+
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
           Add a customer email to enable email actions.
         </div>
       )}
+      {!lead.mobile && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          Add a mobile number to enable WhatsApp actions.
+        </div>
+      )}
     </div>
   );
 }
+
 
 /* ------------------- Status Control Panel ------------------- */
 
@@ -713,17 +792,37 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     queryFn: () => listFn({ data: { leadId } }),
   });
 
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [time, setTime] = useState<string>("10:00");
   const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
   const [assignedTo, setAssignedTo] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+
+  const scheduledAt = useMemo(() => {
+    if (!date) return "";
+    const [h, m] = time.split(":").map((n) => parseInt(n, 10) || 0);
+    const dt = new Date(date);
+    dt.setHours(h, m, 0, 0);
+    return dt.toISOString();
+  }, [date, time]);
+
+  const timeOptions = useMemo(() => {
+    const out: string[] = [];
+    for (let h = 9; h <= 19; h++) {
+      for (const m of [0, 15, 30, 45]) {
+        out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
+    }
+    return out;
+  }, []);
 
   const submit = async () => {
     if (!scheduledAt) { toast.error("Pick a date & time"); return; }
     setBusy(true);
     try {
       await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
-      setScheduledAt(""); setReason("call_back"); setAssignedTo("");
+      setDate(undefined); setTime("10:00"); setReason("call_back"); setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
       toast.success("Follow-up scheduled");
@@ -734,29 +833,82 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
   const upcoming = (data?.rows ?? []).filter((r: any) => !r.is_completed);
 
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+    <div className="rounded-xl border bg-white p-4 space-y-3 shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
         <CalendarIcon className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Schedule Follow-up</h3>
       </div>
-      <div className="space-y-2">
-        <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="text-xs" />
-        <select value={reason} onChange={(e) => setReason(e.target.value as any)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
-          <option value="call_back">Call Back</option>
-          <option value="documents_pending">Documents Pending</option>
-          <option value="refund_followup">Refund Follow-up</option>
-          <option value="general">General</option>
-        </select>
-        {canAssign && (
-          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
-            <option value="">Assign to…</option>
-            {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Date</Label>
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm"
+                className={cn("w-full justify-start text-left font-normal text-xs", !date && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1.5 size-3.5" />
+                {date ? format(date, "dd/MM/yyyy") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => { setDate(d); setDateOpen(false); }}
+                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Time (IST)</Label>
+          <div className="relative">
+            <Clock className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+            <select value={time} onChange={(e) => setTime(e.target.value)}
+              className="w-full rounded-md border px-7 py-1.5 text-xs bg-white h-8 tabular-nums">
+              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Reason</Label>
+          <select value={reason} onChange={(e) => setReason(e.target.value as any)}
+            className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+            <option value="call_back">Call Back</option>
+            <option value="documents_pending">Documents Pending</option>
+            <option value="refund_followup">Refund Follow-up</option>
+            <option value="general">General</option>
           </select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
+          {canAssign ? (
+            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+              <option value="">Myself</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+            </select>
+          ) : (
+            <Button size="sm" className="w-full h-8" disabled={busy || !date} onClick={submit}>
+              {busy ? "Saving…" : "Schedule"}
+            </Button>
+          )}
+        </div>
+
+        {canAssign && (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Button size="sm" className="w-full" disabled={busy || !date} onClick={submit}>
+              {busy ? "Saving…" : "Schedule Follow-up"}
+            </Button>
+          </div>
         )}
-        <Button size="sm" className="w-full" disabled={busy} onClick={submit}>
-          {busy ? "Saving…" : "Schedule"}
-        </Button>
       </div>
+
       {upcoming.length > 0 && (
         <div className="pt-2 border-t" style={{ borderColor: "var(--admin-border)" }}>
           <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Upcoming</div>
@@ -776,6 +928,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     </div>
   );
 }
+
 
 /* ------------------- Linked Order Panel ------------------- */
 

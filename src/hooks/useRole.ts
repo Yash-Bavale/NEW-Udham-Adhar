@@ -18,6 +18,7 @@ export function useRole() {
   return {
     loading: isLoading,
     roles,
+    displayName: data?.displayName ?? null,
     has: (r: string) => roles.includes(r),
     hasAny: (rs: string[]) => rs.some((r) => roles.includes(r)),
     access: (m: Module): Access => bestAccess(roles, m),

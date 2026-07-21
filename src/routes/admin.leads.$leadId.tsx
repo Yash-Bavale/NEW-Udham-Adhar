@@ -65,61 +65,47 @@ function LeadDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div>
-          <Link to="/admin/leads" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 transition-colors">
-            <ChevronLeft className="w-4 h-4" /> Back to leads
-          </Link>
-        </div>
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg">
-              {lead.name.charAt(0)}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">{lead.name}</h1>
-              <div className="flex items-center gap-2 text-sm text-slate-500 font-mono">
-                {lead.lead_code}
-                <Badge variant="outline" className="font-sans text-[10px] uppercase tracking-wider">
-                  {lead.status.replace(/_/g, " ")}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <select
-              value={lead.status}
-              disabled={busy || !canEditLead}
-              onChange={async (e) => {
-                setBusy(true);
-                try {
-                  await updateFn({ data: { id: leadId, status: e.target.value as any } });
-                  toast.success("Status updated");
-                  await qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
-                } catch (err) {
-                  toast.error("Failed to update status");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-            >
-              {LEAD_STATUSES.map((s) => (
-                <option
-                  key={s}
-                  value={s}
-                  disabled={s === "completed" && lead.status !== "completed"}
-                >
-                  {s.replace(/_/g, " ")}{s === "completed" && lead.status !== "completed" ? " (via fulfillment)" : ""}
-                </option>
-              ))}
-            </select>
-            <AddTaskDialog defaultLeadId={leadId} />
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <Link to="/admin/leads" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 transition-colors">
+          <ChevronLeft className="w-4 h-4" /> Back to leads
+        </Link>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="font-mono text-[11px]">{lead.lead_code}</Badge>
+          <Badge variant="outline" className="font-sans text-[10px] uppercase tracking-wider">
+            {lead.status.replace(/_/g, " ")}
+          </Badge>
+          <select
+            value={lead.status}
+            disabled={busy || !canEditLead}
+            onChange={async (e) => {
+              setBusy(true);
+              try {
+                await updateFn({ data: { id: leadId, status: e.target.value as any } });
+                toast.success("Status updated");
+                await qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
+              } catch (err) {
+                toast.error("Failed to update status");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          >
+            {LEAD_STATUSES.map((s) => (
+              <option
+                key={s}
+                value={s}
+                disabled={s === "completed" && lead.status !== "completed"}
+              >
+                {s.replace(/_/g, " ")}{s === "completed" && lead.status !== "completed" ? " (via fulfillment)" : ""}
+              </option>
+            ))}
+          </select>
+          <AddTaskDialog defaultLeadId={leadId} />
         </div>
       </div>
+
 
       <Tabs defaultValue="workspace" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto h-auto p-1 bg-slate-100/50 border mb-6">
