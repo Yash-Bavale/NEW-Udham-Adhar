@@ -516,12 +516,15 @@ const STAGE_IDX: Record<string, number> = {
 };
 
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
-  // S08 Consultation Completed: only govt_portal + b06_consult go green;
-  // everything else stays idle. No blue LIVE glow anywhere.
+  // S08 Consultation Completed: upstream stages + govt_portal + b06_consult all done.
   if (i.phase === "consultation_done") {
-    if (nodeId === "govt_portal" || nodeId === "b06_consult") return "done";
+    if (nodeId === "b06_consult") return "done";
+    if (nodeId === "govt_portal") return "done";
+    const stageIdx = STAGE_IDX[nodeId];
+    if (stageIdx !== undefined && stageIdx <= 4) return "done";
     return "idle";
   }
+
 
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
