@@ -121,16 +121,16 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
     }).format(new Date());
 
     const vars = {
-      customerName: (cust as any)?.name || "Customer",
-      customer_name: (cust as any)?.name || "Customer",
+      customerName,
+      customer_name: customerName,
       orderNumber: app.application_code || app.id.slice(0, 8),
       order_number: app.application_code || app.id.slice(0, 8),
       serviceName: (svc as any)?.name || "—",
       service_name: (svc as any)?.name || "—",
       customerEmail,
       customer_email: customerEmail,
-      customerMobile: (cust as any)?.primary_mobile || "—",
-      customer_mobile: (cust as any)?.primary_mobile || "—",
+      customerMobile: customerMobile,
+      customer_mobile: customerMobile,
       closureDate: istDate,
       closure_date: istDate,
       employeeRemarks: (data.remarks && data.remarks.trim()) || "—",
