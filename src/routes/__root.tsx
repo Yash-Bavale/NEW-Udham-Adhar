@@ -88,20 +88,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Cnsultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
+          "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
       },
       { property: "og:title", content: "Udyam Aadhar | MSME Certificate Download" },
       {
         property: "og:description",
         content:
-          "Cnsultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
+          "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://udyamadhar.in/" },
       { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Udyam Aadhar | MSME Certificate Download" },
-      { name: "twitter:description", content: "Cnsultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance." },
+      { name: "twitter:description", content: "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
 
