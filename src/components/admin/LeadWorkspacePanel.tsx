@@ -290,27 +290,42 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
 
 /* ------------------- Quick Actions Card ------------------- */
 
-function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+function QuickActionsCard({
+  lead,
+  currentStatus,
+  hideMoney,
+}: {
+  lead: LeadShape;
+  currentStatus: LeadStatusV2;
+  hideMoney: boolean;
+}) {
   const qc = useQueryClient();
   const transitionFn = useServerFn(transitionLeadStatus);
+  const createLinkFn = useServerFn(createPaymentLink);
+  const linkStatusFn = useServerFn(getPaymentLinkStatusForLead);
+  const role = useRole();
+  const employeeName = role.displayName;
+
   const [contactBusy, setContactBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
 
-  const formLink =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/onboarding/${lead.lead_code}`
-      : `/onboarding/${lead.lead_code}`;
+  const { data: linkStatus } = useQuery({
+    queryKey: ["lead.paymentLink", lead.id],
+    queryFn: () => linkStatusFn({ data: { leadId: lead.id } }),
+    staleTime: 30_000,
+  });
+  const paymentUrl: string | null = (linkStatus as any)?.url ?? (linkStatus as any)?.short_url ?? null;
 
-  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
-  const waNumber = waPhone ? (waPhone.length === 10 ? "91" + waPhone : waPhone) : "";
-  const waMessage = encodeURIComponent(
-    `Hi ${lead.name}, please complete your application & payment here: ${formLink}`,
-  );
-  const waSendUrl = waNumber ? `https://wa.me/${waNumber}?text=${waMessage}` : null;
-  const mailSubject = encodeURIComponent("Complete your application");
-  const mailBody = encodeURIComponent(
-    `Hi ${lead.name},\n\nPlease complete your application & payment here:\n${formLink}\n\nThanks.`,
-  );
-  const mailUrl = lead.email ? `mailto:${lead.email}?subject=${mailSubject}&body=${mailBody}` : null;
+  const number = waNumber(lead.mobile);
+  const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
+  const introWaUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}` : null;
+
+  const payMsg = paymentUrl
+    ? buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl)
+    : null;
+  const payWaUrl = number && payMsg ? `https://wa.me/${number}?text=${encodeURIComponent(payMsg)}` : null;
+  const paySubject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
+  const payEmailUrl = lead.email && payMsg ? `mailto:${lead.email}?subject=${paySubject}&body=${encodeURIComponent(payMsg)}` : null;
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
@@ -321,17 +336,28 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
-      qc.invalidateQueries();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
   };
 
+  const generateLink = async () => {
+    setLinkBusy(true);
+    try {
+      await createLinkFn({ data: { leadId: lead.id } });
+      toast.success("Payment link generated");
+      qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to generate link");
+    } finally { setLinkBusy(false); }
+  };
+
   const isContacted = currentStatus === "contacted";
   const showContactToggle = currentStatus === "new_lead" || currentStatus === "contacted";
+  const btnBase = "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium justify-start transition-colors";
 
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+    <div className="rounded-xl border bg-white p-4 space-y-3 h-full shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Quick Actions</h3>
@@ -343,45 +369,69 @@ function QuickActionsCard({ lead, currentStatus }: { lead: LeadShape; currentSta
             disabled={contactBusy}
             onClick={toggleContacted}
             className={`justify-start text-xs ${isContacted ? "bg-emerald-600 hover:bg-emerald-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
-            title={isContacted ? "Click to revert to New Lead" : "Mark as Contacted"}
           >
             <CheckCircle2 className="size-3.5 mr-1.5" />
-            {contactBusy
-              ? "Updating…"
-              : isContacted
-                ? "Contacted ✓ (click to undo)"
-                : "Mark as Contacted"}
+            {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
 
-        <CopyButton value={formLink} label="Copy Payment Link" className="justify-start" />
-        {waSendUrl && (
-          <a
-            href={waSendUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-xs font-medium hover:bg-emerald-100 justify-start"
-          >
-            <MessageCircle className="size-3.5" /> Send Link via WhatsApp
+        {introWaUrl && (
+          <a href={introWaUrl} target="_blank" rel="noopener noreferrer"
+             className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
+            <MessageCircle className="size-3.5" /> Contact on WhatsApp
           </a>
         )}
-        {mailUrl && (
-          <a
-            href={mailUrl}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 justify-start"
-          >
-            <Mail className="size-3.5" /> Send Link via Email
-          </a>
+
+        {!hideMoney && (
+          <>
+            <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+              Payment Link
+            </div>
+
+            {paymentUrl ? (
+              <>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
+                  <Link2 className="size-3 shrink-0" />
+                  <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
+                  <CopyButton value={paymentUrl} label="" />
+                </div>
+                {payWaUrl && (
+                  <a href={payWaUrl} target="_blank" rel="noopener noreferrer"
+                     className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
+                    <MessageCircle className="size-3.5" /> Send Payment Link via WhatsApp
+                  </a>
+                )}
+                {payEmailUrl && (
+                  <a href={payEmailUrl}
+                     className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`}>
+                    <Mail className="size-3.5" /> Send Payment Link via Email
+                  </a>
+                )}
+              </>
+            ) : (
+              <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
+                <Link2 className="size-3.5 mr-1.5" />
+                {linkBusy ? "Generating…" : "Generate Payment Link"}
+              </Button>
+            )}
+          </>
         )}
       </div>
+
       {!lead.email && (
         <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
           Add a customer email to enable email actions.
         </div>
       )}
+      {!lead.mobile && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          Add a mobile number to enable WhatsApp actions.
+        </div>
+      )}
     </div>
   );
 }
+
 
 /* ------------------- Status Control Panel ------------------- */
 
