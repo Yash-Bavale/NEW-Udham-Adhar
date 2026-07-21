@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { createLead } from "@/lib/leads.functions";
+import { getCaptchaSiteKey, verifyCaptcha } from "@/lib/captcha.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { trackEvent } from "@/lib/analytics/track";
@@ -12,10 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// Google reCAPTCHA v2 (checkbox). TODO: replace with your production key
-// from https://www.google.com/recaptcha/admin — currently using Google's
-// public test key that always passes (v2 checkbox).
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 declare global {
   interface Window {
@@ -30,6 +27,8 @@ declare global {
 export function LeadForm({ title = "Fill application" }: { title?: string } = {}) {
   const navigate = useNavigate();
   const submitLead = useServerFn(createLead);
+  const fetchSiteKey = useServerFn(getCaptchaSiteKey);
+  const verifyToken = useServerFn(verifyCaptcha);
   const baseId = useId();
 
   const [busy, setBusy] = useState(false);
@@ -44,7 +43,14 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   // reCAPTCHA widget
   const captchaRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<number | null>(null);
+  const [siteKey, setSiteKey] = useState<string>("");
+
   useEffect(() => {
+    fetchSiteKey().then((r) => setSiteKey(r.siteKey)).catch(() => {});
+  }, [fetchSiteKey]);
+
+  useEffect(() => {
+    if (!siteKey) return;
     let cancelled = false;
     function tryRender() {
       if (cancelled) return;
@@ -56,7 +62,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
       }
       try {
         widgetIdRef.current = window.grecaptcha.render(captchaRef.current, {
-          sitekey: RECAPTCHA_SITE_KEY,
+          sitekey: siteKey,
         });
       } catch {
         // Already rendered — ignore.
@@ -66,7 +72,8 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [siteKey]);
+
 
   const districts = useMemo(
     () => (selectedState ? INDIA_DISTRICTS[selectedState] ?? [] : []),
@@ -118,6 +125,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     }
 
     try {
+      await verifyToken({ data: { token } });
       const lead = await submitLead({ data: payload as never });
       trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });
       navigate({
