@@ -4,6 +4,9 @@ import type {} from "@tanstack/react-start";
 import { BASE_URL } from "@/lib/brand";
 
 // Path prefixes that must never appear in the sitemap.
+// Intentional exclusions (not bugs — scanner may flag these as "missing"):
+//   /admin-login, /llms.txt, /llms-full.txt — not indexable pages.
+//   /$ (splat 404) — catch-all, not a real URL.
 const EXCLUDED_PREFIXES = [
   "/api",
   "/admin",
@@ -18,8 +21,8 @@ const EXCLUDED_PREFIXES = [
   "/apply",
   "/email",
   "/lovable",
-  "/complaint",
 ];
+
 
 // Top-funnel high-priority paths (includes Batch 1 SEO landing pages).
 const HIGH_PRIORITY = new Set<string>([
