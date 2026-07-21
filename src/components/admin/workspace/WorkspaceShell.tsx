@@ -236,7 +236,7 @@ export function WorkspaceShell(p: Props) {
   });
 
   const mutConsultation = useMutation({
-    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed" } }),
+    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed", adminOverride: adminOverride || undefined } }),
     onSuccess: () => {
       toast.success("S08 · Consultation Completed");
       invalidate();
