@@ -1,47 +1,66 @@
+## Goal
 
-## Heads-up on the E002 upload
+Fix the two completion paths so both **B06 Consultation Completed (S08)** and **B07 Application Accepted (S11)** are treated as valid completed orders, with correct journey highlighting and correct follow-up buttons.
 
-The file `E002-incomplete-information-link-mail-2.html` you attached actually contains Jest test code (`describe("activeBranchesFor", …)`), not the E002 HTML. I can't update E002 without the real HTML — please re-upload the correct file and I'll apply it in the same pass. The rest of the plan below proceeds regardless.
+## Current problems
 
-## What's wrong today
-
-1. **B06 "Consultation Completed" does NOT send any email.** In `CustomerJourneyMap.tsx` the `mutConsultation` handler only calls `updateFulfillmentStatus` — the comment says "skip the E005 resubmit email so we don't double-notify". That's why no mail goes out when Consultation Completed is clicked. You now want B06 to send E005 with an operator-entered **Note / Employee Remarks** merged in.
-2. **E005 template** in the DB has no `{{employee_remarks}}` placeholder — the new HTML you uploaded adds it as a "Note" row in the Order Summary and `{{executive_name}}` in the sign-off.
+1. After B06, the journey highlight jumps to "Application Submitted / Govt Portal" instead of glowing the **Consultation Completed (B06)** card.
+2. Post-B06, follow-up buttons include unrelated ones (B04, B05, etc.) instead of only **B07** and **B08**.
+3. Dashboards/KPIs treat S08 differently from S11; both should count as Completed.
+4. Force Close visibility/behaviour needs to remain across both terminal-completed states.
 
 ## Changes
 
-### 1. Update E005 template (DB)
-- Migration replaces `email_templates.body_html` for `code = 'E005'` with the exact HTML from `E005-consultation-completed-application-submitted-govt-portal.html`.
-- Subject → `Your Order {{order_number}} Has Been Completed`.
-- Ensure the placeholder list on that row includes: `customer_name`, `order_number`, `service_name`, `closure_date`, `customer_email`, `customer_mobile`, `employee_remarks`, `executive_name`.
+### 1. Stage mapping (`src/lib/crm/computeOrderStage.ts`)
+- Keep `consultation_completed` as a distinct `OrderStage` (already added).
+- Ensure fulfillment `S08 → consultation_completed`, `S11 → order_completed`.
+- Mark both `consultation_completed` and `order_completed` as `isCompleted = true` for KPI/list rollups.
 
-### 2. Update E002 template (DB) — pending correct upload
-- Same migration pattern, once you re-upload the real HTML. Placeholders will match whatever `{{…}}` tokens are in that file.
+### 2. Button gating (`src/lib/orders/journey-map.ts`)
+- Add phase `CONSULTATION_DONE` triggered when fulfillment = `S08`.
+- `PHASE_ENABLED_BUTTONS[CONSULTATION_DONE] = ['B07', 'B08']` only (plus Force Close E010 always).
+- Remove B04/B05/B09/B10 from post-B06 allowed set.
+- `derivePhase()`: if `fulfillment_status === 'consultation_completed'` return `CONSULTATION_DONE`.
 
-### 3. Add "Consultation Note" dialog for B06
-- New small dialog in `CustomerJourneyMap.tsx` (same pattern as the customer-delay / tech-delay dialogs), triggered by B06 instead of firing the mutation directly.
-- Fields: single `Textarea` labelled "Note to customer (appears in the email)", optional, max 1000 chars.
-- Submit runs a new server fn `markConsultationCompleted({ orderId, remarks })` that:
-  - Calls `transition_order_status` → `consultation_completed` fulfillment stage (same as today).
-  - Enqueues `BHS_EMAILS.E005_CONSULTATION_SUBMITTED` via `enqueueFromTemplateInternal` with variables `{ customerName, orderNumber, serviceName, closureDate (IST), customerEmail, customerMobile, employeeRemarks: remarks || '—', executiveName: current-user display name }`.
-- Toast: "S08 · Consultation Completed — E005 sent".
+### 3. Journey highlight (`src/lib/orders/journey-graph.ts` + `CustomerJourneyMap.tsx`)
+- `currentStageNodeFor(order)`: when stage = `consultation_completed`, return the **B06 sub-branch card node id** (not the govt-portal main node).
+- Mark main-line edge into "Application Submitted / Govt Portal" as `done` (path traversed) but not `active`.
+- B06 card gets `active` emerald glow + LIVE badge; B07/B08 cards render active buttons.
 
-### 4. Wire location
-- New server fn lives in `src/lib/orders/actions/consultation.functions.ts` and is re-exported from `src/lib/orders/actions/index.ts`.
-- `CustomerJourneyMap.tsx` gets:
-  - `dialog?.kind === "consultation_completed"` branch,
-  - `mutConsultation` refactored to accept `{ remarks }`,
-  - B06 handler → `setDialog({ kind: "consultation_completed" })`.
+### 4. Action handlers
+- `B07` (Application Accepted): allow transition from `S08 → S11` in `fulfillment-transitions.ts` (currently only from S07/S09). Sends E007 with certificate.
+- `B08` (Application Rejected): allow transition from `S08 → S12` similarly. Sends E008 with reason.
+- Both close order and stop schedulers.
 
-### 5. Sanity pass on the rest of the button→email map (no behaviour change unless broken)
-While in the file I'll verify each of B01/B02/B03/B04/B05/B07/B08 actually enqueues its documented template (E002/E003/E011/E004/E005/E007/E008) end-to-end — if any silently skip the email like B06 did, I'll flag them back to you in the reply with a proposed fix rather than change scope silently.
+### 5. Completion semantics
+- `isOrderCompleted(order)` helper: returns true for `S08` OR `S11`.
+- Update:
+  - My Work / Dashboard KPI queries (`get_dashboard_metrics` RPC + client counters)
+  - Orders list "Completed" filter
+  - Any "active orders" query excludes both S08 and S11.
+
+### 6. Force Close
+- Remains available across all non-terminal + S08 (allow reopening/closing consult-completed if needed). Terminal S11/S12/S10 hide it (already the case).
 
 ## Files touched
-- `supabase/migrations/<new>.sql` — E005 body_html + (E002 pending upload).
-- `src/lib/orders/actions/consultation.functions.ts` (new).
-- `src/lib/orders/actions/index.ts` — export.
-- `src/components/admin/workspace/CustomerJourneyMap.tsx` — dialog + wiring.
+
+- `src/lib/crm/computeOrderStage.ts`
+- `src/lib/orders/journey-map.ts`
+- `src/lib/orders/journey-graph.ts`
+- `src/components/admin/workspace/CustomerJourneyMap.tsx`
+- `src/lib/orders/fulfillment-transitions.ts`
+- `src/lib/orders/actions/*.functions.ts` (B07, B08 handlers)
+- `src/lib/crm/stageActionMap.ts`
+- DB migration: update `get_dashboard_metrics` to count S08+S11 as completed.
 
 ## Out of scope
-- No changes to journey graph, stage machine, ticket flow, or other templates.
-- No retroactive resend for orders already marked Consultation Completed.
+
+Email template edits, UI redesign of the map, and ticket-system changes.
+
+## Verification
+
+- Order at S08: journey highlights B06 card; only B07, B08, Force Close visible.
+- B07 from S08 → S11, order marked Completed, E007 sent.
+- B08 from S08 → S12, order Closed-Rejected, E008 sent.
+- Dashboard "Completed" count includes both S08-only and S11 orders.
+- AP-2026-007376 (currently S08) renders correctly.
