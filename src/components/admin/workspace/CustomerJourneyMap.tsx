@@ -273,7 +273,7 @@ export function CustomerJourneyMap(p: Props) {
     B03: { onClick: () => mutResume.mutate(), pending: mutResume.isPending },
     B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
     B05: { onClick: () => mutSubmit.mutate(), pending: mutSubmit.isPending },
-    B06: { onClick: () => mutConsultation.mutate(), pending: mutConsultation.isPending },
+    B06: { onClick: () => setDialog({ kind: "consultation_completed" }), pending: mutConsultation.isPending },
     B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
     B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
