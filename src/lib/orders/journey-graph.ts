@@ -350,9 +350,6 @@ export function activeBranchesFor(
     case "closed": {
       const rc = reasonCode?.toUpperCase() ?? "";
       const ws = workflowStatus ?? "";
-      // Reason code first (C* customer-delay, B* rejected, A* form-nag), fall
-      // back to fulfillment/workflow hints so the closure path lights up even
-      // when the reason label was cleared during close.
       const isCustomerClose = rc.startsWith("C") || /customer|external_dependency|customer_hold|customer_delay|waiting_for_customer/i.test(ws);
       const isRejectClose = rc.startsWith("B") || /reject/i.test(ws);
       if (isRejectClose) s.add("reject");
@@ -364,9 +361,12 @@ export function activeBranchesFor(
       break;
     }
   }
-  if (terminal === "completed") s.add("accept");
+  // S08 Consultation Completed is terminal-completed but must NOT light up
+  // the "accept" (B07) branch — only the B06 consult drop stays green.
+  if (terminal === "completed" && phase !== "consultation_done") s.add("accept");
   return s;
 }
+
 
 export function mainDoneEdgesFor(
   currentIdx: number,
@@ -374,6 +374,9 @@ export function mainDoneEdgesFor(
   techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
+  // S08 Consultation Completed: upstream path stays idle per spec — only the
+  // govt_portal → b06_consult drop lights up (handled in edgeState).
+  if (phase === "consultation_done") return s;
   const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
   const idx = holding && phase === "form_not_submitted" ? 2
             : holding ? 3
@@ -393,6 +396,7 @@ export function mainDoneEdgesFor(
   if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
+
 
 export function currentMainEdgesFor(
   currentIdx: number,
@@ -426,11 +430,11 @@ export function currentStageNodeFor(
   phase: JourneyPhase,
   terminal: "completed" | "closed" | null,
 ): string | null {
+  // S08 Consultation Completed: no LIVE/active glow — the govt_portal and
+  // b06_consult cards render solid green (done) instead.
+  if (phase === "consultation_done") return null;
   if (terminal === "completed") return "b07_accept";
   if (terminal === "closed") return "closed_e010";
-  // B06 Consultation Completed (S08) is a valid completion path — highlight
-  // the B06 sub-card so operators see exactly which branch the order took.
-  if (phase === "consultation_done") return "b06_consult";
   if (phase === "form_not_submitted") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
@@ -439,6 +443,7 @@ export function currentStageNodeFor(
   if (currentIdx >= 5) return "consult_stage";
   return null;
 }
+
 
 export interface EdgeStateInput {
   activeBranches: Set<BranchKey>;
@@ -453,6 +458,10 @@ export interface EdgeStateInput {
 const RESOLVED_TECH_EDGES = new Set(["e_fs_b02", "e_b02_b03", "e_b03_gv"]);
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
+  // S08 Consultation Completed: only govt_portal → b06_consult renders green.
+  if (i.phase === "consultation_done") {
+    return e.id === "e_gv_b06" ? "done" : "idle";
+  }
   // 1. Already-completed main path edges
   if (i.doneMainEdges.has(e.id)) return "done";
   // 2. Currently traversing this edge
@@ -467,12 +476,6 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
       e.branch === "customer-delay-govt" ||
       e.branch === "reject";
     if (i.terminal === "closed" && isClosurePath) return "closed";
-    if (i.terminal === "completed" &&
-        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
-      return "done";
-    }
-    // B06 Consultation Completed (S08) is a valid completion path — green.
-    if (i.phase === "consultation_done" && e.branch === "consult") return "done";
     if (i.terminal === "completed" &&
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
@@ -497,6 +500,7 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   return "idle";
 }
 
+
 export interface NodeStateInput {
   currentIdx: number;
   activeBranches: Set<BranchKey>;
@@ -514,10 +518,15 @@ const STAGE_IDX: Record<string, number> = {
 };
 
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
+  // S08 Consultation Completed: only govt_portal + b06_consult go green;
+  // everything else stays idle. No blue LIVE glow anywhere.
+  if (i.phase === "consultation_done") {
+    if (nodeId === "govt_portal" || nodeId === "b06_consult") return "done";
+    return "idle";
+  }
+
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
-  // B06 Consultation Completed (S08) — treat as a terminal completion node.
-  if (nodeId === "b06_consult" && i.phase === "consultation_done") return "terminal-ok";
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
@@ -538,3 +547,4 @@ export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
 
   return "idle";
 }
+

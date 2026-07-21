@@ -194,11 +194,13 @@ export function CustomerJourneyMap(p: Props) {
   const hasOpenTicket = !!openTicket;
 
   const currentStageLabel = useMemo(() => {
+    if (p.stage === "consultation_completed") return "Consultation Completed";
     if (live.terminal === "closed") return "Order Closed";
     if (live.terminal === "completed") return "Order Completed";
     const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
     return s?.label ?? "Order Received";
-  }, [currentIdx, live.terminal]);
+  }, [currentIdx, live.terminal, p.stage]);
+
 
   const [dialog, setDialog] = useState<
     | null
@@ -315,17 +317,19 @@ export function CustomerJourneyMap(p: Props) {
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                   closed ? "bg-rose-100 text-rose-700"
-                    : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
-                      : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
-                        : phase === "govt_processing" || phase === "consultation_done" ? "bg-violet-100 text-violet-800"
-                          : completed ? "bg-emerald-100 text-emerald-800"
-                            : p.adminOverride ? "bg-orange-100 text-orange-800"
-                              : "bg-indigo-100 text-indigo-800",
+                    : phase === "consultation_done" ? "bg-emerald-100 text-emerald-800"
+                      : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
+                        : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
+                          : phase === "govt_processing" ? "bg-violet-100 text-violet-800"
+                            : completed ? "bg-emerald-100 text-emerald-800"
+                              : p.adminOverride ? "bg-orange-100 text-orange-800"
+                                : "bg-indigo-100 text-indigo-800",
                 )}
               >
                 {closed ? <XCircle className="size-3" /> : <ClipboardCheck className="size-3" />}
                 {p.adminOverride ? "ADMIN OVERRIDE" : live.subStateLabel}
               </span>
+
               {hasOpenTicket && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
                   <LifeBuoy className="size-3" /> Ticket open
