@@ -95,6 +95,8 @@ function OrdersListPage() {
   const svcFn = useServerFn(listServices);
   const role = useRole();
   const hideMoney = role.hideMoney();
+  const navigate = useNavigate();
+
 
   const [search, setSearch] = useState("");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>("all");
