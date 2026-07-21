@@ -182,75 +182,55 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const labelCls = "text-[10px] uppercase tracking-wider text-slate-500 font-semibold";
   const valueCls = "text-sm font-semibold text-slate-900 truncate";
 
-  return (
-    <div className="rounded-xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-        {/* Left column */}
-        <div className="p-4 space-y-3">
-          <div className={cell}>
-            <span className={labelCls}>Name</span>
-            <span className="text-base font-bold text-slate-900 truncate">{lead.name}</span>
-          </div>
-          <div className={cell}>
-            <span className={labelCls}>Service</span>
-            <span className={valueCls}>{lead.service ?? "—"}</span>
-          </div>
-          <div className={cell}>
-            <span className={labelCls}>State</span>
-            <span className={valueCls}>{lead.state ?? "—"}</span>
-          </div>
-          <div className={cell}>
-            <span className={labelCls}>Language</span>
-            <span className={valueCls}>{lead.language ?? "—"}</span>
-          </div>
-        </div>
+  const initials = (lead.name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
 
-        {/* Right column */}
-        <div className="p-4 space-y-3">
-          <div className={cell}>
-            <span className={labelCls}>Mobile Number</span>
-            <span className="flex items-center gap-1.5 text-base font-bold text-slate-900 tabular-nums">
-              {lead.mobile ?? "—"}
-              {lead.mobile && <CopyButton value={lead.mobile} label="" />}
-            </span>
+  const kv = (label: string, value: React.ReactNode) => (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className={labelCls}>{label}</span>
+      <span className={valueCls}>{value ?? "—"}</span>
+    </div>
+  );
+
+  return (
+    <div className="rounded-2xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
+      {/* Hero: Name + Mobile — highlighted, always full-width so nothing is split on mobile */}
+      <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-500 to-sky-500 text-white px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex items-start gap-3">
+          <div className="size-12 sm:size-14 shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-lg sm:text-xl font-bold">
+            {initials}
           </div>
-          <div className={cell}>
-            <span className={labelCls}>Submitted</span>
-            <span className="text-sm font-semibold text-slate-900">
-              {lead.created_at ? formatIST(lead.created_at) : "—"}
-              {rel && <span className="ml-2 text-xs font-normal text-slate-500">{rel}</span>}
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wider text-white/70 font-semibold">Customer</div>
+            <div className="text-lg sm:text-xl font-bold leading-tight truncate">{lead.name}</div>
+            {lead.mobile ? (
+              <a
+                href={`tel:${lead.mobile}`}
+                className="mt-1 inline-flex items-center gap-1.5 text-base sm:text-lg font-semibold tabular-nums hover:underline"
+              >
+                <Phone className="size-4 opacity-80" />
+                {lead.mobile}
+              </a>
+            ) : (
+              <div className="mt-1 text-sm text-white/70">No mobile on file</div>
+            )}
           </div>
-          <div className={cell}>
-            <span className={labelCls}>Email</span>
-            <span className="flex items-center gap-1.5 min-w-0">
-              <span className="text-sm font-semibold text-slate-900 truncate" title={lead.email ?? ""}>
-                {lead.email ?? "—"}
-              </span>
-              {lead.email && <CopyButton value={lead.email} label="" />}
-            </span>
-          </div>
-          <div className={cell}>
-            <span className={labelCls}>Price</span>
-            <span className="text-base font-bold text-slate-900 tabular-nums">
-              {total != null ? `₹${total.toLocaleString("en-IN")}` : "—"}
-            </span>
-          </div>
+          {lead.mobile && (
+            <CopyButton value={lead.mobile} label="" className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border-white/25" />
+          )}
         </div>
       </div>
 
-      {sourceLabel && (
-        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate" title={sourceLabel}>
-          Source: {sourceLabel}
-        </div>
-      )}
-
-      {/* Communication buttons row */}
-      <div className="grid grid-cols-3 border-t border-slate-100">
+      {/* Communication buttons — right under the highlighted identity, so actions are inline on mobile */}
+      <div className="grid grid-cols-3 border-b border-slate-100">
         {lead.mobile ? (
           <a
             href={`tel:${lead.mobile}`}
-            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors border-r border-slate-100"
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-3 text-xs sm:text-sm font-semibold text-indigo-700 bg-indigo-50 active:bg-indigo-100 hover:bg-indigo-100 transition-colors border-r border-slate-100"
           >
             <Phone className="size-4" /> Call
           </a>
@@ -260,7 +240,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors border-r border-slate-100"
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-3 text-xs sm:text-sm font-semibold text-emerald-700 bg-emerald-50 active:bg-emerald-100 hover:bg-emerald-100 transition-colors border-r border-slate-100"
           >
             <MessageCircle className="size-4" /> WhatsApp
           </a>
@@ -268,12 +248,44 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
         {lead.email ? (
           <a
             href={`mailto:${lead.email}`}
-            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition-colors"
+            className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-3 text-xs sm:text-sm font-semibold text-sky-700 bg-sky-50 active:bg-sky-100 hover:bg-sky-100 transition-colors"
           >
             <Mail className="size-4" /> Email
           </a>
         ) : <span />}
       </div>
+
+      {/* Details — single column on mobile so labels & values stay aligned, two cols on ≥sm */}
+      <div className="p-4 grid gap-3 grid-cols-1 sm:grid-cols-2">
+        {kv("Service", lead.service)}
+        {kv("Price", total != null ? <span className="tabular-nums">₹{total.toLocaleString("en-IN")}</span> : null)}
+        {kv("State", lead.state)}
+        {kv("Language", lead.language)}
+        {kv(
+          "Email",
+          lead.email ? (
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate" title={lead.email}>{lead.email}</span>
+              <CopyButton value={lead.email} label="" />
+            </span>
+          ) : null,
+        )}
+        {kv(
+          "Submitted",
+          lead.created_at ? (
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span>{formatIST(lead.created_at)}</span>
+              {rel && <span className="text-xs font-normal text-slate-500">{rel}</span>}
+            </span>
+          ) : null,
+        )}
+      </div>
+
+      {sourceLabel && (
+        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate" title={sourceLabel}>
+          Source: {sourceLabel}
+        </div>
+      )}
 
       {lead.customer_id && (
         <a
@@ -286,6 +298,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
     </div>
   );
 }
+
 
 
 /* ------------------- Quick Actions Card ------------------- */
