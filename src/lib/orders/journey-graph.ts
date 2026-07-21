@@ -430,11 +430,11 @@ export function currentStageNodeFor(
   phase: JourneyPhase,
   terminal: "completed" | "closed" | null,
 ): string | null {
+  // S08 Consultation Completed: no LIVE/active glow — the govt_portal and
+  // b06_consult cards render solid green (done) instead.
+  if (phase === "consultation_done") return null;
   if (terminal === "completed") return "b07_accept";
   if (terminal === "closed") return "closed_e010";
-  // B06 Consultation Completed (S08) is a valid completion path — highlight
-  // the B06 sub-card so operators see exactly which branch the order took.
-  if (phase === "consultation_done") return "b06_consult";
   if (phase === "form_not_submitted") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
@@ -443,6 +443,7 @@ export function currentStageNodeFor(
   if (currentIdx >= 5) return "consult_stage";
   return null;
 }
+
 
 export interface EdgeStateInput {
   activeBranches: Set<BranchKey>;
