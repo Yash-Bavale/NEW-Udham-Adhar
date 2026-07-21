@@ -61,6 +61,12 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "open_consultation_tab",
     exceptions: ["mark_uninterested", "cancel_refund"],
   },
+  consultation_completed: {
+    hint: "Consultation completed. Proceed to next step or close the order.",
+    primary: null,
+    primaryKind: "none",
+    exceptions: ["our_side_delay", "customer_hold", "cancel_refund"],
+  },
 
   // ── Employee-side (fulfillment lifecycle) ─────────────────────────
   // form_submitted → fulfillment_status = order_received. Next: documents_received.
