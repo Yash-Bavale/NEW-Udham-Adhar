@@ -342,6 +342,8 @@ function QuickActionsCard({
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
+    // Pre-open a blank tab synchronously to avoid popup blockers when moving to contacted
+    const waWin = next === "contacted" && number ? window.open("", "_blank", "noopener,noreferrer") : null;
     setContactBusy(true);
     try {
       await transitionFn({ data: { leadId: lead.id, toStatus: next } });
@@ -349,20 +351,50 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
+      if (waWin && next === "contacted") {
+        waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}`;
+      }
     } catch (e: any) {
+      if (waWin) waWin.close();
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
   };
 
-  const generateLink = async () => {
+  const ensurePaymentUrl = async (): Promise<string | null> => {
+    if (paymentUrl) return paymentUrl;
     setLinkBusy(true);
     try {
-      await createLinkFn({ data: { leadId: lead.id } });
-      toast.success("Payment link generated");
-      qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+      const res: any = await createLinkFn({ data: { leadId: lead.id } });
+      const url = res?.url ?? res?.short_url ?? null;
+      await qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+      return url;
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate link");
+      return null;
     } finally { setLinkBusy(false); }
+  };
+
+  const generateLink = async () => {
+    const url = await ensurePaymentUrl();
+    if (url) toast.success("Payment link generated");
+  };
+
+  const sendPaymentLinkWhatsApp = async () => {
+    if (!number) { toast.error("Add a mobile number first"); return; }
+    const waWin = window.open("", "_blank", "noopener,noreferrer");
+    const url = paymentUrl ?? await ensurePaymentUrl();
+    if (!url) { waWin?.close(); return; }
+    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
+    if (waWin) waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const sendPaymentLinkEmail = async () => {
+    if (!lead.email) { toast.error("Add a customer email first"); return; }
+    const url = paymentUrl ?? await ensurePaymentUrl();
+    if (!url) return;
+    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
+    const subject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
+    window.location.href = `mailto:${lead.email}?subject=${subject}&body=${encodeURIComponent(msg)}`;
   };
 
   const isContacted = currentStatus === "contacted";
