@@ -25,18 +25,20 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "pending" | "completed" | "exception";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
 
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 const COMPLETED_STAGES: OrderStage[] = ["completed"];
+const CLOSED_STAGES: OrderStage[] = ["closed"];
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-// Pending = anything not completed and not a terminal exception (closed / refunded / uninterested).
+// Pending = anything not completed, not closed, and not a terminal exception.
 function isPending(stage: OrderStage): boolean {
-  return !COMPLETED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
+  return !COMPLETED_STAGES.includes(stage) && !CLOSED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
 }
 
 function bucketOf(stage: OrderStage): Exclude<Bucket, "all"> {
   if (COMPLETED_STAGES.includes(stage)) return "completed";
+  if (CLOSED_STAGES.includes(stage)) return "closed";
   if (EXCEPTION_STAGES.includes(stage)) return "exception";
   if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
   return "pending";
@@ -47,8 +49,10 @@ const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "needs_action", label: "Needs Action" },
   { id: "pending",      label: "Pending" },
   { id: "completed",    label: "Completed" },
+  { id: "closed",       label: "Closed" },
   { id: "exception",    label: "Exception" },
 ];
+
 
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
 const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
