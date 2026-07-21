@@ -483,7 +483,15 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
     // the strict stepwise map.
     const isCompleteWithCert = target === "completed" && current !== "cancelled" && current !== "completed";
 
-    if (!isAdminOverride && !allowed.includes(target) && !isOneStepBack && !isCompleteWithCert) {
+    // B06 "Consultation Completed" is an intentional jump the operator can
+    // trigger from any active stage — do not force it through the stepwise map.
+    const isConsultationJump =
+      target === "consultation_completed" &&
+      current !== "cancelled" &&
+      current !== "completed" &&
+      current !== "order_closed";
+
+    if (!isAdminOverride && !allowed.includes(target) && !isOneStepBack && !isCompleteWithCert && !isConsultationJump) {
       const allowedLabel = allowed.length ? allowed.join(", ") : "none";
       throw new Error(
         `Cannot move order from "${FULFILLMENT_LABEL[current] ?? current}" to "${FULFILLMENT_LABEL[target] ?? target}". Allowed next stages: ${allowedLabel}.`,
