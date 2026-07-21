@@ -454,6 +454,11 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
   // Admin override trumps everything
   if (i.adminOverride) return "admin_override";
 
+  // S08 Consultation Completed is a terminal-completed state that still
+  // exposes B07/B08 follow-ups — keep the phase distinct from the generic
+  // `completed` phase (which disables all buttons).
+  if (i.stage === "consultation_completed") return "consultation_done";
+
   const live = deriveJourneyLiveState({
     stage: i.stage,
     workflowStatus: i.workflowStatus,
@@ -467,6 +472,7 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
     return "closed";
   }
   if (live.terminal === "completed") return "completed";
+
   if (live.activeSubKey === "technical-delay") return "technical_delay";
   if (live.activeSubKey === "customer-delay") return "customer_delay";
   if (live.activeSubKey === "form-not-submitted") {
