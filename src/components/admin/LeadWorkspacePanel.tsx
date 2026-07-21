@@ -100,30 +100,15 @@ export function LeadWorkspacePanel({
         />
       )}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-7">
           <CustomerQuickCard lead={lead} />
         </div>
-        <div className="lg:col-span-4">
-          <QuickActionsCard lead={lead} currentStatus={currentStatus} />
+        <div className="lg:col-span-5">
+          <QuickActionsCard lead={lead} currentStatus={currentStatus} hideMoney={hideMoney} />
         </div>
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-12">
           <FollowUpScheduler leadId={lead.id} staff={staff} />
         </div>
-        {!hideMoney && (
-          <div className="lg:col-span-12">
-            <PaymentLinkPanel
-              leadId={lead.id}
-              leadCode={lead.lead_code}
-              mobile={lead.mobile ?? null}
-              customerName={lead.name}
-              service={lead.service ?? null}
-              baseAmount={lead.base_amount != null ? Number(lead.base_amount) : null}
-              gstAmount={lead.gst_amount != null ? Number(lead.gst_amount) : null}
-              totalAmount={lead.total_amount != null ? Number(lead.total_amount) : null}
-              leadStatusV2={currentStatus}
-            />
-          </div>
-        )}
         {hasPaidOrder && applications.length > 0 && (
           <div className="lg:col-span-12">
             <LinkedOrderPanel applications={applications} hideMoney={hideMoney} />
@@ -133,6 +118,7 @@ export function LeadWorkspacePanel({
     </div>
   );
 }
+
 
 /* ------------------- Customer Quick Card ------------------- */
 
