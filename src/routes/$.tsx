@@ -21,8 +21,39 @@ const GONE_EXACT = new Set<string>([
   "annasaheb-patil-customer-care",
   "annasaheb-patil-business-loan",
   "annasaheb-patil-loi",
+  "udyam-msme-government-portal-for-msme-registration",
+  "udyam-register-how-to-register-your-business-as-msme",
+  "kviconline-all-services-united-in-one-place",
+  "online-kvic-the-new-face-of-digital-khadi",
+  "home-3",
+  "home-2",
+  "shop-act",
+  "nlm-scheme",
+  "cmegp-scheme",
+  "udyam-registration-form-2",
+  "udyam-registration-certificate-download-2",
 ]);
-const GONE_PREFIXES = ["annasaheb-patil-", "wp-", "xmlrpc"];
+// Anything starting with these prefixes is retired legacy content → 410.
+const GONE_PREFIXES = [
+  "annasaheb-patil-",
+  "wp-",
+  "wp_",
+  "xmlrpc",
+  "pmegp",
+  "pmgp-",
+  "pm-egp",
+  "prime-minister-employment-",
+  "kvic-",
+  "kvic_",
+  "kviconline",
+  "elementor-hf",
+  "feed",
+  "category/",
+  "author/",
+  "tag/",
+  "page/",
+  "?p=",
+];
 
 function isGone(slug: string) {
   if (GONE_EXACT.has(slug)) return true;
@@ -42,8 +73,12 @@ export const Route = createFileRoute("/$")({
     const stripped = raw.replace(/\/+$/, "");
     const lower = stripped.toLowerCase();
 
-    // 410 Gone for retired legacy paths.
-    if (isGone(lower)) {
+    // First segment (for multi-segment paths like /wp-content/uploads/foo).
+    const firstSeg = lower.split("/")[0] ?? lower;
+
+    // 410 Gone for retired legacy paths — check BEFORE multi-segment handoff
+    // so /wp-content/*, /feed/*, /category/* return 410 instead of redirecting.
+    if (isGone(lower) || isGone(firstSeg)) {
       throw new Response("Gone", { status: 410 });
     }
 
@@ -66,6 +101,7 @@ export const Route = createFileRoute("/$")({
     if (legacy) {
       throw redirect({ to: legacy, statusCode: 301 });
     }
+
 
 
 
