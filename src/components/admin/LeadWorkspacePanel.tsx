@@ -122,128 +122,163 @@ export function LeadWorkspacePanel({
 
 /* ------------------- Customer Quick Card ------------------- */
 
+function relativeTime(iso?: string | null) {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  if (diffMs < 0) return null;
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  return `${d}d ago`;
+}
+
+function buildIntroMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null) {
+  const emp = employeeName || "the Udyam Aadhar Advisory team";
+  return (
+    `Hi *${customerName}* 👋\n\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Lead ID: ${leadCode}\n` +
+    `Service: *${service ?? "your service"}*\n\n` +
+    `I'm here to assist you with any questions regarding your service.\n\n` +
+    `📞 Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Simply reply to this message or contact us anytime during office hours.`
+  );
+}
+
+function buildPaymentLinkMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null, paymentUrl: string) {
+  const emp = employeeName || "the Udyam Aadhar Advisory team";
+  return (
+    `Hi *${customerName}* 👋\n\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Lead ID: ${leadCode}\n` +
+    `Service: *${service ?? "your service"}*\n` +
+    `Payment Link: ${paymentUrl}\n\n` +
+    `I'm here to assist you with any questions regarding your service.\n\n` +
+    `📞 Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Simply reply to this message or contact us anytime during office hours.`
+  );
+}
+
+function waNumber(mobile?: string | null) {
+  const digits = (mobile ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length === 10 ? "91" + digits : digits;
+}
+
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
-  const waPhone = (lead.mobile ?? "").replace(/[^0-9]/g, "");
-  const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
+  const number = waNumber(lead.mobile);
+  const waUrl = number ? `https://wa.me/${number}` : null;
   const total = lead.total_amount != null ? Number(lead.total_amount) : null;
-  const initials = (lead.name || "?")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("");
   const sourceRaw = lead.lead_source ?? "";
   const sourceLabel = sourceRaw.startsWith("website:")
     ? sourceRaw.slice("website:".length) || "website"
-    : sourceRaw || "—";
+    : sourceRaw || null;
+  const rel = relativeTime(lead.created_at);
+
+  const cell = "flex flex-col gap-0.5 min-w-0";
+  const labelCls = "text-[10px] uppercase tracking-wider text-slate-500 font-semibold";
+  const valueCls = "text-sm font-semibold text-slate-900 truncate";
 
   return (
     <div className="rounded-xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
-      {/* Gradient header */}
-      <div className="bg-gradient-to-br from-indigo-600 via-indigo-500 to-sky-500 text-white px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="size-12 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-lg font-bold shrink-0">
-            {initials || <UserIcon className="size-5" />}
+      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        {/* Left column */}
+        <div className="p-4 space-y-3">
+          <div className={cell}>
+            <span className={labelCls}>Name</span>
+            <span className="text-base font-bold text-slate-900 truncate">{lead.name}</span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-semibold truncate">{lead.name}</div>
-            <div className="text-[11px] font-mono opacity-80 truncate">{lead.lead_code}</div>
+          <div className={cell}>
+            <span className={labelCls}>Service</span>
+            <span className={valueCls}>{lead.service ?? "—"}</span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>State</span>
+            <span className={valueCls}>{lead.state ?? "—"}</span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Language</span>
+            <span className={valueCls}>{lead.language ?? "—"}</span>
           </div>
         </div>
 
-        {/* Big-touch actions inside the header */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {lead.mobile ? (
-            <a
-              href={`tel:${lead.mobile}`}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <Phone className="size-3.5" /> Call
-            </a>
-          ) : <span />}
-          {waUrl ? (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <MessageCircle className="size-3.5" /> WhatsApp
-            </a>
-          ) : <span />}
-          {lead.email ? (
-            <a
-              href={`mailto:${lead.email}`}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-medium py-2 transition-colors"
-            >
-              <Mail className="size-3.5" /> Email
-            </a>
-          ) : <span />}
+        {/* Right column */}
+        <div className="p-4 space-y-3">
+          <div className={cell}>
+            <span className={labelCls}>Mobile Number</span>
+            <span className="flex items-center gap-1.5 text-base font-bold text-slate-900 tabular-nums">
+              {lead.mobile ?? "—"}
+              {lead.mobile && <CopyButton value={lead.mobile} label="" />}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Submitted</span>
+            <span className="text-sm font-semibold text-slate-900">
+              {lead.created_at ? formatIST(lead.created_at) : "—"}
+              {rel && <span className="ml-2 text-xs font-normal text-slate-500">{rel}</span>}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Email</span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="text-sm font-semibold text-slate-900 truncate" title={lead.email ?? ""}>
+                {lead.email ?? "—"}
+              </span>
+              {lead.email && <CopyButton value={lead.email} label="" />}
+            </span>
+          </div>
+          <div className={cell}>
+            <span className={labelCls}>Price</span>
+            <span className="text-base font-bold text-slate-900 tabular-nums">
+              {total != null ? `₹${total.toLocaleString("en-IN")}` : "—"}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Body: dense two-column key/value grid */}
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs p-4">
-        {lead.mobile && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Mobile</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 tabular-nums">
-              {lead.mobile}
-              <CopyButton value={lead.mobile} label="" />
-            </dd>
-          </div>
-        )}
-        {lead.email && (
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <dt className="text-slate-500 shrink-0">Email</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 min-w-0" title={lead.email}>
-              <span className="truncate max-w-[160px]">{lead.email}</span>
-              <CopyButton value={lead.email} label="" />
-            </dd>
-          </div>
-        )}
-        {lead.service && (
-          <div className="flex items-center justify-between gap-2 sm:col-span-2">
-            <dt className="text-slate-500">Service</dt>
-            <dd className="text-slate-800 text-right truncate ml-2">{lead.service}</dd>
-          </div>
-        )}
-        {lead.state && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">State</dt>
-            <dd className="text-slate-800">{lead.state}</dd>
-          </div>
-        )}
-        {lead.language && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Language</dt>
-            <dd className="text-slate-800">{lead.language}</dd>
-          </div>
-        )}
-        {sourceLabel !== "—" && (
-          <div className="flex items-center justify-between gap-2 sm:col-span-2 min-w-0">
-            <dt className="text-slate-500 shrink-0">Source</dt>
-            <dd className="text-slate-800 truncate ml-2 font-mono text-[11px]" title={sourceLabel}>{sourceLabel}</dd>
-          </div>
-        )}
-        {total != null && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Total</dt>
-            <dd className="text-slate-800 tabular-nums font-semibold">₹{total.toLocaleString("en-IN")}</dd>
-          </div>
-        )}
-        {lead.created_at && (
-          <div className="flex items-center justify-between gap-2">
-            <dt className="text-slate-500">Submitted</dt>
-            <dd className="text-slate-800">{formatIST(lead.created_at)}</dd>
-          </div>
-        )}
-      </dl>
+      {sourceLabel && (
+        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate" title={sourceLabel}>
+          Source: {sourceLabel}
+        </div>
+      )}
+
+      {/* Communication buttons row */}
+      <div className="grid grid-cols-3 border-t border-slate-100">
+        {lead.mobile ? (
+          <a
+            href={`tel:${lead.mobile}`}
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors border-r border-slate-100"
+          >
+            <Phone className="size-4" /> Call
+          </a>
+        ) : <span className="border-r border-slate-100" />}
+        {waUrl ? (
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors border-r border-slate-100"
+          >
+            <MessageCircle className="size-4" /> WhatsApp
+          </a>
+        ) : <span className="border-r border-slate-100" />}
+        {lead.email ? (
+          <a
+            href={`mailto:${lead.email}`}
+            className="flex items-center justify-center gap-1.5 py-3 text-sm font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 transition-colors"
+          >
+            <Mail className="size-4" /> Email
+          </a>
+        ) : <span />}
+      </div>
 
       {lead.customer_id && (
         <a
           href={`/admin/customers/${lead.customer_id}`}
-          className="block text-xs text-indigo-600 hover:underline px-4 pb-3 -mt-1"
+          className="block text-xs text-indigo-600 hover:underline px-4 py-2 border-t border-slate-100"
         >
           Open customer 360 →
         </a>
@@ -251,6 +286,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
     </div>
   );
 }
+
 
 /* ------------------- Quick Actions Card ------------------- */
 
