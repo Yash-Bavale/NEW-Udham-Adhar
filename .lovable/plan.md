@@ -1,33 +1,43 @@
-## Problem
+## Goal
+Expand the public Lead Form UI with more fields (to increase time-on-page) and add Google reCAPTCHA. Only the original fields are actually saved — the new fields are pure UI, not sent to the backend.
 
-In the current Lead Quick Actions card:
-- "Send Payment Link via WhatsApp" and "Send Payment Link via Email" buttons only render *after* a payment link has been generated. Since most leads don't have a link yet, only "Generate Payment Link" shows (as in the screenshot).
-- "Mark as Contacted" only flips status; it does not send the WhatsApp intro message the user described.
+## Field additions (in this exact order)
+Keep existing captured fields (Name, Email, Mobile, State, Language, Reason/Service). Insert the new decorative fields; all **required to submit** but not sent to `createLead`.
 
-The message templates (`buildIntroMessage`, `buildPaymentLinkMessage`) already match the exact wording/formatting requested — no change needed there.
+1. Applicant Name *(captured)*
+2. Email *(captured)*
+3. Mobile *(captured)*
+4. Reason for Help *(captured — currently "Service")*
+5. Language of Assistance *(captured)*
+6. State *(captured)*
+7. **District** — dropdown, options filtered by selected State (use existing `src/lib/onboarding/india-districts.ts`)
+8. **Pincode** — text, `pattern="[1-9][0-9]{5}"`, 6 digits
+9. **Aadhaar Number** — text, `inputMode="numeric"`, 12 digits, masked display (show last 4)
+10. **PAN Card Number** — text, uppercase, `pattern="[A-Z]{5}[0-9]{4}[A-Z]"`
+11. **Date of Birth** — shadcn Popover + Calendar date picker (good UI, `pointer-events-auto`), max = today
+12. **Gender** — dropdown: Male / Female / Other
+13. **Social Category** — radio group: General / SC / ST / OBC
+14. **Specially Abled** — dropdown: Yes / No
+15. **Major Activity** — radio group: Manufacturing / Services / Trading
 
-## Changes (single file: `src/components/admin/LeadWorkspacePanel.tsx`, `QuickActionsCard`)
+Layout: 2-column grid on `md+`, single column on mobile. Group visually under a subtle "Applicant Details" divider after Language, then "KYC Details" divider before Aadhaar.
 
-1. **Always show both "Send Payment Link" buttons** (WhatsApp + Email) regardless of whether a link exists yet.
-   - On click, if `paymentUrl` is already available → open `wa.me` / `mailto:` immediately with the prefilled message.
-   - If not, call `createPaymentLink` first, refetch, then open the WhatsApp/Email link with the newly generated URL prefilled.
-   - Disable buttons briefly while generating; toast on failure.
-   - Keep the "Generate Payment Link" button + link preview row when no link exists (so employees can still just copy it), but the two Send buttons are always visible directly under "Payment Link".
+## reCAPTCHA (Google reCAPTCHA v2 Checkbox)
+- Add `<script src="https://www.google.com/recaptcha/api.js" async defer>` via TanStack `head()` on the root route (or lazy-inject on form mount to avoid loading site-wide).
+- Render `<div class="g-recaptcha" data-sitekey="…">` just above the Submit button.
+- On submit, read `grecaptcha.getResponse()`; if empty, block submit with an inline error "Please verify you're human."
+- **Client-side only** enforcement for now (per your answer) — no server-side token verification, no changes to `createLead`.
+- Site key stored as `VITE_RECAPTCHA_SITE_KEY` (public/publishable — safe in code). Will request it via secrets tool at build time.
 
-2. **Mark as Contacted → also fire WhatsApp intro**
-   - After `transitionFn` succeeds and status flips to `contacted`, if `waNumber(lead.mobile)` exists, open `https://wa.me/<number>?text=<encoded introMsg>` in a new tab.
-   - Do not open WhatsApp on the "undo → new_lead" path.
-   - Guard with a small helper so pop-up blockers still allow it (open synchronously in the click handler via `window.open('', '_blank')` then set `.location`).
+## Files touched
+- `src/components/site/LeadForm.tsx` — add fields, DOB picker, reCAPTCHA widget, validation gate. `onSubmit` payload unchanged.
+- `src/routes/__root.tsx` — add reCAPTCHA script tag in `head().scripts`.
+- (No DB migration, no server-function change, no `leads.functions.ts` change.)
 
-3. **Small guards**
-   - Both Send buttons disabled (with tooltip/hint text) when mobile / email is missing respectively.
-   - Reuse existing `buildIntroMessage` and `buildPaymentLinkMessage` — no template edits.
+## Out of scope
+- Persisting the new fields to DB.
+- Server-side reCAPTCHA verification.
+- Applying the same fields to `talk-to-expert.tsx` (ask separately if you want it there too).
 
-No changes to backend, DB, other components, or unrelated UI. No layout redesign — only the Quick Actions button set + Mark-as-Contacted handler.
-
-## Verification
-
-- Lead with no payment link: both Send buttons visible; clicking WhatsApp generates a link, then opens WhatsApp with the payment-link message prefilled.
-- Lead with existing payment link: Send buttons open WhatsApp/Email instantly with prefilled message.
-- Mark as Contacted on a lead with a mobile: status flips + WhatsApp tab opens with intro message.
-- Mark as Contacted "undo": no WhatsApp opened.
+## Confirmation needed at build time
+I'll request `VITE_RECAPTCHA_SITE_KEY` (and skip secret storage since it's a publishable key — I'll add it directly to `.env` / config). If you don't have one yet, get it from https://www.google.com/recaptcha/admin (choose reCAPTCHA v2 "I'm not a robot Checkbox", add `udyamadhar.in`, `www.udyamadhar.in`, and `*.lovable.app`).
