@@ -333,15 +333,13 @@ function QuickActionsCard({
   const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
   const introWaUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}` : null;
 
-  const payMsg = paymentUrl
-    ? buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl)
-    : null;
-  const payWaUrl = number && payMsg ? `https://wa.me/${number}?text=${encodeURIComponent(payMsg)}` : null;
-  const paySubject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
-  const payEmailUrl = lead.email && payMsg ? `mailto:${lead.email}?subject=${paySubject}&body=${encodeURIComponent(payMsg)}` : null;
+
+
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
+    // Pre-open a blank tab synchronously to avoid popup blockers when moving to contacted
+    const waWin = next === "contacted" && number ? window.open("", "_blank", "noopener,noreferrer") : null;
     setContactBusy(true);
     try {
       await transitionFn({ data: { leadId: lead.id, toStatus: next } });
@@ -349,20 +347,50 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
+      if (waWin && next === "contacted") {
+        waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}`;
+      }
     } catch (e: any) {
+      if (waWin) waWin.close();
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
   };
 
-  const generateLink = async () => {
+  const ensurePaymentUrl = async (): Promise<string | null> => {
+    if (paymentUrl) return paymentUrl;
     setLinkBusy(true);
     try {
-      await createLinkFn({ data: { leadId: lead.id } });
-      toast.success("Payment link generated");
-      qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+      const res: any = await createLinkFn({ data: { leadId: lead.id } });
+      const url = res?.url ?? res?.short_url ?? null;
+      await qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+      return url;
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate link");
+      return null;
     } finally { setLinkBusy(false); }
+  };
+
+  const generateLink = async () => {
+    const url = await ensurePaymentUrl();
+    if (url) toast.success("Payment link generated");
+  };
+
+  const sendPaymentLinkWhatsApp = async () => {
+    if (!number) { toast.error("Add a mobile number first"); return; }
+    const waWin = window.open("", "_blank", "noopener,noreferrer");
+    const url = paymentUrl ?? await ensurePaymentUrl();
+    if (!url) { waWin?.close(); return; }
+    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
+    if (waWin) waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const sendPaymentLinkEmail = async () => {
+    if (!lead.email) { toast.error("Add a customer email first"); return; }
+    const url = paymentUrl ?? await ensurePaymentUrl();
+    if (!url) return;
+    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
+    const subject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
+    window.location.href = `mailto:${lead.email}?subject=${subject}&body=${encodeURIComponent(msg)}`;
   };
 
   const isContacted = currentStatus === "contacted";
@@ -402,31 +430,36 @@ function QuickActionsCard({
             </div>
 
             {paymentUrl ? (
-              <>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
-                  <Link2 className="size-3 shrink-0" />
-                  <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
-                  <CopyButton value={paymentUrl} label="" />
-                </div>
-                {payWaUrl && (
-                  <a href={payWaUrl} target="_blank" rel="noopener noreferrer"
-                     className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}>
-                    <MessageCircle className="size-3.5" /> Send Payment Link via WhatsApp
-                  </a>
-                )}
-                {payEmailUrl && (
-                  <a href={payEmailUrl}
-                     className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100`}>
-                    <Mail className="size-3.5" /> Send Payment Link via Email
-                  </a>
-                )}
-              </>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
+                <Link2 className="size-3 shrink-0" />
+                <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
+                <CopyButton value={paymentUrl} label="" />
+              </div>
             ) : (
               <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
                 <Link2 className="size-3.5 mr-1.5" />
                 {linkBusy ? "Generating…" : "Generate Payment Link"}
               </Button>
             )}
+
+            <button
+              type="button"
+              disabled={!number || linkBusy}
+              onClick={sendPaymentLinkWhatsApp}
+              className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <MessageCircle className="size-3.5" />
+              {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via WhatsApp"}
+            </button>
+            <button
+              type="button"
+              disabled={!lead.email || linkBusy}
+              onClick={sendPaymentLinkEmail}
+              className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <Mail className="size-3.5" />
+              {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
+            </button>
           </>
         )}
       </div>
