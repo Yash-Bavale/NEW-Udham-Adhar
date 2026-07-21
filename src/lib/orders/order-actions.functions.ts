@@ -43,6 +43,17 @@ export const customerSideDelay = createServerFn({ method: "POST" })
     ]);
     const { BHS_EMAILS } = await import("@/lib/emails/bhs-templates");
 
+    // Stamp S06 Customer Delay fulfillment stage so header + journey reflect it.
+    await supabaseAdmin
+      .from("applications")
+      .update({
+        customer_hold_started_at: new Date().toISOString(),
+        active_reason_id: data.reasonId,
+        fulfillment_status: "customer_delay",
+      } as never)
+      .eq("id", data.orderId);
+
+
     // Reason label for E003
     const { data: reason } = await supabaseAdmin
       .from("delay_reasons")
