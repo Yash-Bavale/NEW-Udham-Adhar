@@ -471,6 +471,12 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
+    // B06 Consultation Completed (S08) is a valid completion path — green.
+    if (i.phase === "consultation_done" && e.branch === "consult") return "done";
+    if (i.terminal === "completed" &&
+        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
+      return "done";
+    }
     // Pending-closure paths flow amber (warning) until they actually terminate.
     if (isClosurePath && !i.terminal) return "warning";
     return "active";
