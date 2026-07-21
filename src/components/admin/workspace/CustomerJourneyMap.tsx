@@ -562,6 +562,7 @@ export function CustomerJourneyMap(p: Props) {
                 certificateDocumentId: payload.certificateDocumentId,
                 certificateNumber: payload.certificateNumber,
                 completionNotes: payload.completionNotes,
+                adminOverride: p.adminOverride || undefined,
               } as any,
             });
             toast.success("E007 sent — order completed with certificate");
