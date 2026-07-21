@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import {
   AlertTriangle, CheckCircle2, XCircle, Loader2,
   Calendar as CalendarIcon, FileText, Receipt, Trash2,
-  Phone, FileWarning, Repeat2, Sparkles,
-  Copy, Mail, MessageCircle, User as UserIcon,
+  Phone, FileWarning, Sparkles, Clock,
+  Copy, Mail, MessageCircle, Link2,
 } from "lucide-react";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
 import { formatIST } from "@/lib/datetime";
@@ -19,6 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import {
   LEAD_STATUS_BADGE,
@@ -37,10 +41,13 @@ import {
 import {
   createFollowUp, listFollowUpsForLead,
 } from "@/lib/crm/follow-ups.functions";
+import {
+  createPaymentLink, getPaymentLinkStatusForLead,
+} from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
-import { PaymentLinkPanel } from "./PaymentLinkPanel";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
+
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
