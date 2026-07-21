@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { createLead } from "@/lib/leads.functions";
+import { getCaptchaSiteKey, verifyCaptcha } from "@/lib/captcha.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { trackEvent } from "@/lib/analytics/track";
@@ -12,10 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// Google reCAPTCHA v2 (checkbox). TODO: replace with your production key
-// from https://www.google.com/recaptcha/admin — currently using Google's
-// public test key that always passes (v2 checkbox).
-const RECAPTCHA_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 declare global {
   interface Window {
