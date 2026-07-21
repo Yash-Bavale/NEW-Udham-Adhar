@@ -120,13 +120,18 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
       timeZone: "Asia/Kolkata",
     }).format(new Date());
 
+    const svcName =
+      ((svc as any)?.service_name as string | undefined) ||
+      ((lead as any)?.service as string | undefined) ||
+      "—";
+
     const vars = {
       customerName,
       customer_name: customerName,
       orderNumber: app.application_code || app.id.slice(0, 8),
       order_number: app.application_code || app.id.slice(0, 8),
-      serviceName: (svc as any)?.name || "—",
-      service_name: (svc as any)?.name || "—",
+      serviceName: svcName,
+      service_name: svcName,
       customerEmail,
       customer_email: customerEmail,
       customerMobile: customerMobile,
