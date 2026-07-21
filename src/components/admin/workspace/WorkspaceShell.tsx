@@ -25,6 +25,7 @@ import {
 } from "@/lib/orders/order-actions.functions";
 import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
+import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 
@@ -203,6 +204,7 @@ export function WorkspaceShell(p: Props) {
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeFromHold);
   const fnReopen = useServerFn(reopenOrder);
+  const fnConsultation = useServerFn(markConsultationCompleted);
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.orderId, target: "IN_PROCESSING" } }),
@@ -236,9 +238,11 @@ export function WorkspaceShell(p: Props) {
   });
 
   const mutConsultation = useMutation({
-    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed", adminOverride: adminOverride || undefined } }),
-    onSuccess: () => {
-      toast.success("S08 · Consultation Completed");
+    mutationFn: () => fnConsultation({ data: { orderId: p.orderId, remarks: null } }),
+    onSuccess: (result) => {
+      toast.success(result.emailQueued
+        ? "S08 · Consultation Completed — E005 sent"
+        : "S08 · Consultation Completed — no email found");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
