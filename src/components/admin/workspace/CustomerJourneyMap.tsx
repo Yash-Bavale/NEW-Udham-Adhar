@@ -223,6 +223,7 @@ export function CustomerJourneyMap(p: Props) {
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeFromHold);
+  const fnConsultation = useServerFn(markConsultationCompleted);
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
