@@ -434,6 +434,10 @@ export function currentStageNodeFor(
   if (phase === "consultation_done") return null;
   if (terminal === "completed") return "b07_accept";
   if (terminal === "closed") return "closed_e010";
+  // Sub-card LIVE glow for delay/reject phases
+  if (phase === "technical_delay") return "b02_tech";
+  if (phase === "customer_delay") return "b04_cust";
+  if (phase === "application_rejected") return "b08_reject";
   if (phase === "form_not_submitted") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
@@ -466,6 +470,13 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   if (i.currentMainEdges && i.currentMainEdges.has(e.id)) return "active";
   // 3. Branch is currently active
   if (i.activeBranches.has(e.branch)) {
+    // S05 Technical Delay: only the form_sub→B02 and B02→B03 edges should
+    // light up. Everything else in the "technical" branch (e_top_gv, e_top_cs,
+    // e_b03_gv) must remain idle until B03 resolves.
+    if (i.phase === "technical_delay" && e.branch === "technical"
+        && e.id !== "e_fs_b02" && e.id !== "e_b02_b03") {
+      return "idle";
+    }
     const isClosurePath =
       e.branch === "form-nag" ||
       e.branch === "customer-delay" ||
