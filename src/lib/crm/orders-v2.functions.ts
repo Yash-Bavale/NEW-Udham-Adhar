@@ -429,6 +429,9 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         // Allow a single-step backward move (revert). One stage only,
         // never from `completed` or `cancelled`.
         allowBackward: z.boolean().optional(),
+        // Admin/super-admin override: skip the strict stepwise map so any
+        // stage can be set. Verified server-side against the caller's role.
+        adminOverride: z.boolean().optional(),
         // Required when transitioning to `completed`
         certificateDocumentId: z.string().uuid().optional(),
         certificateNumber: z.string().trim().min(1).max(120).optional(),
@@ -451,6 +454,18 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
     const target = data.toStatus as FulfillmentStatus;
     if (current === target) return { ok: true, noop: true };
 
+    // Verify admin override request against the caller's actual role.
+    let isAdminOverride = false;
+    if (data.adminOverride) {
+      const { data: roles } = await context.supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", context.userId);
+      isAdminOverride = (roles ?? []).some(
+        (r: any) => r.role === "admin" || r.role === "super_admin",
+      );
+    }
+
     const allowed = getAllowedFulfillmentTransitions(current);
     const curIdx = FULFILLMENT_STAGES.indexOf(current);
     const tgtIdx = FULFILLMENT_STAGES.indexOf(target);
@@ -468,7 +483,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
     // the strict stepwise map.
     const isCompleteWithCert = target === "completed" && current !== "cancelled" && current !== "completed";
 
-    if (!allowed.includes(target) && !isOneStepBack && !isCompleteWithCert) {
+    if (!isAdminOverride && !allowed.includes(target) && !isOneStepBack && !isCompleteWithCert) {
       const allowedLabel = allowed.length ? allowed.join(", ") : "none";
       throw new Error(
         `Cannot move order from "${FULFILLMENT_LABEL[current] ?? current}" to "${FULFILLMENT_LABEL[target] ?? target}". Allowed next stages: ${allowedLabel}.`,
