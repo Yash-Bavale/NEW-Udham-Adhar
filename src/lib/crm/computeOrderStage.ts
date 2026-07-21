@@ -134,6 +134,7 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   payment_pending:   "bg-amber-100 text-amber-900 border-amber-200",
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
+  consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
   under_review:      "bg-violet-100 text-violet-800 border-violet-200",
   in_progress:       "bg-violet-100 text-violet-800 border-violet-200",
