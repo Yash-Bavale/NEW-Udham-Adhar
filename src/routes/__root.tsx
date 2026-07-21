@@ -191,28 +191,11 @@ function RootComponent() {
   }, [router, queryClient]);
 
 
-  // Lazy-load Google Analytics on idle so it doesn't compete with the LCP.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (document.getElementById("ga4-script")) return;
-    const load = () => {
-      if (document.getElementById("ga4-script")) return;
-      const s = document.createElement("script");
-      s.id = "ga4-script";
-      s.async = true;
-      s.src = "https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM";
-      document.head.appendChild(s);
-      const w = window as unknown as { dataLayer?: unknown[] };
-      w.dataLayer = w.dataLayer || [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      function gtag(...args: any[]) { (w.dataLayer as unknown[]).push(args); }
-      gtag("js", new Date());
-      gtag("config", "G-62JC7PRPMM");
-    };
-    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
-    if (typeof ric === "function") ric(load);
-    else setTimeout(load, 1500);
-  }, []);
+  // GA4 is loaded eagerly via the standard gtag snippet in RootShell so that
+  // page_view fires on first paint. No lazy loader here — the old idle loader
+  // pushed `args` (array) instead of `arguments`, so GA4 never registered the
+  // config command and Realtime stayed empty even though the tag "verified".
+
 
 
   return (
