@@ -81,7 +81,7 @@ export function computeOrderStage(
 
   // S05/S06 delay stages keep the operator on form_submitted (main working stage)
   if (fs === "technical_delay" || fs === "customer_delay") return "form_submitted";
-  if (fs === "consultation_completed") return "submitted_to_govt";
+  if (fs === "consultation_completed") return "consultation_completed";
 
   if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
     return "consultation_pending";
