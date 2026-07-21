@@ -150,8 +150,9 @@ function OrdersListPage() {
   }, [allRows, minDays]);
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, exception: 0 };
+    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0 };
     for (const r of ageFiltered) c[bucketOf(r.stage as OrderStage)]++;
+
     return c;
   }, [ageFiltered]);
 
