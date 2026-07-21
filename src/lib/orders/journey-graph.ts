@@ -374,12 +374,10 @@ export function mainDoneEdgesFor(
   techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
-  // S08 Consultation Completed: upstream path stays idle per spec — only the
-  // govt_portal → b06_consult drop lights up (handled in edgeState).
-  if (phase === "consultation_done") return s;
   const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
   const idx = holding && phase === "form_not_submitted" ? 2
             : holding ? 3
+            : phase === "consultation_done" ? 4
             : currentIdx;
 
   if (idx >= 2) s.add("e_or_fn");
@@ -396,6 +394,7 @@ export function mainDoneEdgesFor(
   if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
+
 
 
 export function currentMainEdgesFor(
