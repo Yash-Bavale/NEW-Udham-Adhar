@@ -458,6 +458,10 @@ export interface EdgeStateInput {
 const RESOLVED_TECH_EDGES = new Set(["e_fs_b02", "e_b02_b03", "e_b03_gv"]);
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
+  // S08 Consultation Completed: only govt_portal → b06_consult renders green.
+  if (i.phase === "consultation_done") {
+    return e.id === "e_gv_b06" ? "done" : "idle";
+  }
   // 1. Already-completed main path edges
   if (i.doneMainEdges.has(e.id)) return "done";
   // 2. Currently traversing this edge
@@ -472,12 +476,6 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
       e.branch === "customer-delay-govt" ||
       e.branch === "reject";
     if (i.terminal === "closed" && isClosurePath) return "closed";
-    if (i.terminal === "completed" &&
-        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
-      return "done";
-    }
-    // B06 Consultation Completed (S08) is a valid completion path — green.
-    if (i.phase === "consultation_done" && e.branch === "consult") return "done";
     if (i.terminal === "completed" &&
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
@@ -501,6 +499,7 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   }
   return "idle";
 }
+
 
 export interface NodeStateInput {
   currentIdx: number;
