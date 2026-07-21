@@ -717,7 +717,7 @@ function FlowNode({
 
   const t = TONE_STYLES[tone];
   const dim = state === "idle" && !buttonEnabled;
-  const active = state === "active" || (node.kind === "action" && buttonEnabled && state !== "done");
+  const active = state === "active" || state === "terminal-ok" || state === "terminal-bad" || (node.kind === "action" && buttonEnabled && state !== "done");
 
   let badgeTopClass = "absolute -top-3 left-1/2 -translate-x-1/2";
   if (node.id === "b05_submit") {
