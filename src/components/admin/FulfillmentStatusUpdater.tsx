@@ -22,11 +22,17 @@ import {
 } from "@/lib/crm/orders-v2.functions";
 
 export function FulfillmentStatusUpdater({
-  orderId, current,
-}: { orderId: string; current: FulfillmentStatus }) {
+  orderId, current, adminOverride = false,
+}: { orderId: string; current: FulfillmentStatus; adminOverride?: boolean }) {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateFulfillmentStatus);
-  const allowed = getAllowedFulfillmentTransitions(current);
+  const strictAllowed = getAllowedFulfillmentTransitions(current);
+  // With admin override on, expose every stage in the dropdown so the operator
+  // can jump to any point in the fulfillment flow.
+  const ALL_STAGES: FulfillmentStatus[] = Object.keys(FULFILLMENT_LABEL) as FulfillmentStatus[];
+  const allowed = adminOverride
+    ? ALL_STAGES.filter((s) => s !== current)
+    : strictAllowed;
 
   const [target, setTarget] = useState<FulfillmentStatus | "">("");
   const [note, setNote] = useState("");
@@ -50,6 +56,7 @@ export function FulfillmentStatusUpdater({
           orderId,
           toStatus: target,
           note: note || undefined,
+          adminOverride: adminOverride || undefined,
           ...extra,
         },
       });
