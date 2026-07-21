@@ -10,8 +10,6 @@ export type OrderStage =
   | "consultation_pending"
   | "consultation_completed"
   | "form_submitted"
-  | "technical_delay"
-  | "customer_delay"
   | "under_review"
   | "in_progress"
   | "submitted_to_govt"
@@ -22,6 +20,7 @@ export type OrderStage =
   | "uninterested"
   | "refund_requested"
   | "refunded";
+
 
 
 
