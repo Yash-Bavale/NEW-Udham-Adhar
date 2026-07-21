@@ -98,6 +98,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          customer_delay_autoclose_minutes: number
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          customer_delay_autoclose_minutes?: number
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          customer_delay_autoclose_minutes?: number
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       application_events: {
         Row: {
           application_id: string | null
