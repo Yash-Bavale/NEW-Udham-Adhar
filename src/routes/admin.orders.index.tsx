@@ -378,9 +378,10 @@ function OrdersListPage() {
                       {formatDayHeader(day)}
                     </td>
                   </tr>
-                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} />)}
+                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />)}
                 </>
               ))}
+
             </tbody>
           </table>
         </ScrollableTable>
