@@ -8,6 +8,7 @@ export type OrderStage =
   | "payment_pending"
   | "payment_done"
   | "consultation_pending"
+  | "consultation_completed"
   | "form_submitted"
   | "under_review"
   | "in_progress"
