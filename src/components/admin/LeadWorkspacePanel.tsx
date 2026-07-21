@@ -333,12 +333,8 @@ function QuickActionsCard({
   const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
   const introWaUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}` : null;
 
-  const payMsg = paymentUrl
-    ? buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl)
-    : null;
-  const payWaUrl = number && payMsg ? `https://wa.me/${number}?text=${encodeURIComponent(payMsg)}` : null;
-  const paySubject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
-  const payEmailUrl = lead.email && payMsg ? `mailto:${lead.email}?subject=${paySubject}&body=${encodeURIComponent(payMsg)}` : null;
+
+
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
