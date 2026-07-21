@@ -141,6 +141,8 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
   consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
+  technical_delay:   "bg-amber-100 text-amber-900 border-amber-200",
+  customer_delay:    "bg-amber-100 text-amber-900 border-amber-200",
   under_review:      "bg-violet-100 text-violet-800 border-violet-200",
   in_progress:       "bg-violet-100 text-violet-800 border-violet-200",
   submitted_to_govt: "bg-indigo-100 text-indigo-800 border-indigo-200",
