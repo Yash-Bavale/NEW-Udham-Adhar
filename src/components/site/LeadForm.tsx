@@ -273,7 +273,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
                 <Calendar
                   mode="single"
                   selected={dob}
-                  onSelect={(d) => { setDob(d); setDobOpen(false); }}
+                  onSelect={(d) => setDob(d)}
                   disabled={(d) => d > new Date()}
                   captionLayout="dropdown"
                   fromYear={1930}
@@ -281,7 +281,26 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
                   initialFocus
                   className={cn("p-3 pointer-events-auto")}
                 />
+                <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-3 py-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setDob(undefined); setDobOpen(false); }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!dob}
+                    onClick={() => setDobOpen(false)}
+                  >
+                    Confirm
+                  </Button>
+                </div>
               </PopoverContent>
+
             </Popover>
             {/* hidden required proxy so browser enforces selection */}
             <input
