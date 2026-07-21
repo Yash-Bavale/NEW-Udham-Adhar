@@ -792,17 +792,37 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     queryFn: () => listFn({ data: { leadId } }),
   });
 
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [time, setTime] = useState<string>("10:00");
   const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
   const [assignedTo, setAssignedTo] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+
+  const scheduledAt = useMemo(() => {
+    if (!date) return "";
+    const [h, m] = time.split(":").map((n) => parseInt(n, 10) || 0);
+    const dt = new Date(date);
+    dt.setHours(h, m, 0, 0);
+    return dt.toISOString();
+  }, [date, time]);
+
+  const timeOptions = useMemo(() => {
+    const out: string[] = [];
+    for (let h = 9; h <= 19; h++) {
+      for (const m of [0, 15, 30, 45]) {
+        out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
+    }
+    return out;
+  }, []);
 
   const submit = async () => {
     if (!scheduledAt) { toast.error("Pick a date & time"); return; }
     setBusy(true);
     try {
       await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
-      setScheduledAt(""); setReason("call_back"); setAssignedTo("");
+      setDate(undefined); setTime("10:00"); setReason("call_back"); setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
       toast.success("Follow-up scheduled");
@@ -813,29 +833,82 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
   const upcoming = (data?.rows ?? []).filter((r: any) => !r.is_completed);
 
   return (
-    <div className="rounded-lg border bg-white p-4 space-y-3" style={{ borderColor: "var(--admin-border)" }}>
+    <div className="rounded-xl border bg-white p-4 space-y-3 shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
       <div className="flex items-center gap-2">
         <CalendarIcon className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Schedule Follow-up</h3>
       </div>
-      <div className="space-y-2">
-        <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="text-xs" />
-        <select value={reason} onChange={(e) => setReason(e.target.value as any)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
-          <option value="call_back">Call Back</option>
-          <option value="documents_pending">Documents Pending</option>
-          <option value="refund_followup">Refund Follow-up</option>
-          <option value="general">General</option>
-        </select>
-        {canAssign && (
-          <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-xs bg-white">
-            <option value="">Assign to…</option>
-            {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Date</Label>
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm"
+                className={cn("w-full justify-start text-left font-normal text-xs", !date && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1.5 size-3.5" />
+                {date ? format(date, "dd/MM/yyyy") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => { setDate(d); setDateOpen(false); }}
+                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Time (IST)</Label>
+          <div className="relative">
+            <Clock className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+            <select value={time} onChange={(e) => setTime(e.target.value)}
+              className="w-full rounded-md border px-7 py-1.5 text-xs bg-white h-8 tabular-nums">
+              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">Reason</Label>
+          <select value={reason} onChange={(e) => setReason(e.target.value as any)}
+            className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+            <option value="call_back">Call Back</option>
+            <option value="documents_pending">Documents Pending</option>
+            <option value="refund_followup">Refund Follow-up</option>
+            <option value="general">General</option>
           </select>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
+          {canAssign ? (
+            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+              <option value="">Myself</option>
+              {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+            </select>
+          ) : (
+            <Button size="sm" className="w-full h-8" disabled={busy || !date} onClick={submit}>
+              {busy ? "Saving…" : "Schedule"}
+            </Button>
+          )}
+        </div>
+
+        {canAssign && (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Button size="sm" className="w-full" disabled={busy || !date} onClick={submit}>
+              {busy ? "Saving…" : "Schedule Follow-up"}
+            </Button>
+          </div>
         )}
-        <Button size="sm" className="w-full" disabled={busy} onClick={submit}>
-          {busy ? "Saving…" : "Schedule"}
-        </Button>
       </div>
+
       {upcoming.length > 0 && (
         <div className="pt-2 border-t" style={{ borderColor: "var(--admin-border)" }}>
           <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Upcoming</div>
@@ -855,6 +928,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     </div>
   );
 }
+
 
 /* ------------------- Linked Order Panel ------------------- */
 
