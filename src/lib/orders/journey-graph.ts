@@ -516,6 +516,8 @@ const STAGE_IDX: Record<string, number> = {
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
+  // B06 Consultation Completed (S08) — treat as a terminal completion node.
+  if (nodeId === "b06_consult" && i.phase === "consultation_done") return "terminal-ok";
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
