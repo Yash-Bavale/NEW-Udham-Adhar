@@ -8,6 +8,7 @@ export type OrderStage =
   | "payment_pending"
   | "payment_done"
   | "consultation_pending"
+  | "consultation_completed"
   | "form_submitted"
   | "under_review"
   | "in_progress"
@@ -80,7 +81,7 @@ export function computeOrderStage(
 
   // S05/S06 delay stages keep the operator on form_submitted (main working stage)
   if (fs === "technical_delay" || fs === "customer_delay") return "form_submitted";
-  if (fs === "consultation_completed") return "submitted_to_govt";
+  if (fs === "consultation_completed") return "consultation_completed";
 
   if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
     return "consultation_pending";
@@ -100,6 +101,7 @@ export const STAGE_META: Record<
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
   payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
+  consultation_completed: { label: "Consultation Completed", short: "Consult Done", order: 3, tone: "emerald", side: "employee" },
   form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
   under_review:      { label: "Under Review",       short: "Review",     order: 5, tone: "violet",  side: "employee" },
   in_progress:       { label: "In Progress",        short: "Progress",   order: 6, tone: "violet",  side: "employee" },
@@ -132,6 +134,7 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   payment_pending:   "bg-amber-100 text-amber-900 border-amber-200",
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
+  consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
   under_review:      "bg-violet-100 text-violet-800 border-violet-200",
   in_progress:       "bg-violet-100 text-violet-800 border-violet-200",
