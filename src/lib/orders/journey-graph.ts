@@ -350,9 +350,6 @@ export function activeBranchesFor(
     case "closed": {
       const rc = reasonCode?.toUpperCase() ?? "";
       const ws = workflowStatus ?? "";
-      // Reason code first (C* customer-delay, B* rejected, A* form-nag), fall
-      // back to fulfillment/workflow hints so the closure path lights up even
-      // when the reason label was cleared during close.
       const isCustomerClose = rc.startsWith("C") || /customer|external_dependency|customer_hold|customer_delay|waiting_for_customer/i.test(ws);
       const isRejectClose = rc.startsWith("B") || /reject/i.test(ws);
       if (isRejectClose) s.add("reject");
@@ -364,9 +361,12 @@ export function activeBranchesFor(
       break;
     }
   }
-  if (terminal === "completed") s.add("accept");
+  // S08 Consultation Completed is terminal-completed but must NOT light up
+  // the "accept" (B07) branch — only the B06 consult drop stays green.
+  if (terminal === "completed" && phase !== "consultation_done") s.add("accept");
   return s;
 }
+
 
 export function mainDoneEdgesFor(
   currentIdx: number,
