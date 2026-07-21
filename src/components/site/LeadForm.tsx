@@ -27,6 +27,8 @@ declare global {
 export function LeadForm({ title = "Fill application" }: { title?: string } = {}) {
   const navigate = useNavigate();
   const submitLead = useServerFn(createLead);
+  const fetchSiteKey = useServerFn(getCaptchaSiteKey);
+  const verifyToken = useServerFn(verifyCaptcha);
   const baseId = useId();
 
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,14 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   // reCAPTCHA widget
   const captchaRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<number | null>(null);
+  const [siteKey, setSiteKey] = useState<string>("");
+
   useEffect(() => {
+    fetchSiteKey().then((r) => setSiteKey(r.siteKey)).catch(() => {});
+  }, [fetchSiteKey]);
+
+  useEffect(() => {
+    if (!siteKey) return;
     let cancelled = false;
     function tryRender() {
       if (cancelled) return;
@@ -53,7 +62,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
       }
       try {
         widgetIdRef.current = window.grecaptcha.render(captchaRef.current, {
-          sitekey: RECAPTCHA_SITE_KEY,
+          sitekey: siteKey,
         });
       } catch {
         // Already rendered — ignore.
@@ -63,7 +72,8 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [siteKey]);
+
 
   const districts = useMemo(
     () => (selectedState ? INDIA_DISTRICTS[selectedState] ?? [] : []),
