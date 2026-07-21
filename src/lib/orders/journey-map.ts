@@ -338,13 +338,16 @@ export function deriveJourneyLiveState(input: {
   const idx = stageToJourneyIndex(input.stage);
   const closureStageValue = (input.closureStage ?? "").toLowerCase();
   const isClosed = /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
-  const isCompleted = input.stage === "completed";
+  const isConsultationCompleted = input.stage === "consultation_completed";
+  const isCompleted = input.stage === "completed" || isConsultationCompleted;
   const ws = (input.workflowStatus ?? "").toLowerCase();
   const reasonMatch = (input.closureReasonLabel ?? "").match(/\b([ABC]\d{1,2})\b/i);
   const reasonCode = reasonMatch ? reasonMatch[1].toUpperCase() : null;
 
   let activeSubKey: JourneyLiveSubKey = null;
-  if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
+  if (isConsultationCompleted) {
+    activeSubKey = null;
+  } else if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
     activeSubKey = "form-not-submitted";
   } else if (/customer_hold|customer_side|customer_delay|waiting_for_customer|external_dependency/.test(ws)) {
     activeSubKey = "customer-delay";
@@ -359,6 +362,7 @@ export function deriveJourneyLiveState(input: {
 
   let subStateLabel = "In progress";
   if (isClosed) subStateLabel = `Closed${reasonCode ? ` · ${reasonCode}` : ""}`;
+  else if (isConsultationCompleted) subStateLabel = "Order Completed";
   else if (activeSubKey === "form-not-submitted") subStateLabel = "Form Not Submitted";
   else if (activeSubKey === "customer-delay") subStateLabel = `Customer Delay${reasonCode ? ` (${reasonCode})` : ""}`;
   else if (activeSubKey === "technical-delay") subStateLabel = `Technical Delay${reasonCode ? ` (${reasonCode})` : ""}`;
@@ -373,6 +377,7 @@ export function deriveJourneyLiveState(input: {
     subStateLabel,
   };
 }
+
 
 
 /* ─────────────────── Journey Phase → Button gating ─────────────────── */
