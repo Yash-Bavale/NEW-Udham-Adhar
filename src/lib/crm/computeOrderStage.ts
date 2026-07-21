@@ -106,8 +106,6 @@ export const STAGE_META: Record<
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
   consultation_completed: { label: "Consultation Completed", short: "Consult Done", order: 3, tone: "emerald", side: "employee" },
   form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
-  technical_delay:   { label: "Technical Delay",    short: "Tech Delay", order: 4, tone: "amber",   side: "employee" },
-  customer_delay:    { label: "Customer Delay",     short: "Cust Delay", order: 4, tone: "amber",   side: "employee" },
   under_review:      { label: "Under Review",       short: "Review",     order: 5, tone: "violet",  side: "employee" },
   in_progress:       { label: "In Progress",        short: "Progress",   order: 6, tone: "violet",  side: "employee" },
   submitted_to_govt: { label: "Submitted to Govt",  short: "Govt",       order: 7, tone: "indigo",  side: "employee" },
