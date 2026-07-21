@@ -50,6 +50,7 @@ function SuperAdminPage() {
         }
       />
       <WorkflowStatusWidgets />
+      <AppSettingsCard />
     </div>
   );
 }
