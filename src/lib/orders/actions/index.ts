@@ -10,3 +10,4 @@ export {
 } from "./hold-actions.functions";
 export { closeOrderSystem, handleGovtRejected } from "./close-actions.functions";
 export { findOrReopenTicket } from "./ticket-merge.functions";
+export { markConsultationCompleted } from "./consultation.functions";
