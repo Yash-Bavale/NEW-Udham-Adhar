@@ -10,8 +10,6 @@ export type OrderStage =
   | "consultation_pending"
   | "consultation_completed"
   | "form_submitted"
-  | "technical_delay"
-  | "customer_delay"
   | "under_review"
   | "in_progress"
   | "submitted_to_govt"
@@ -22,6 +20,7 @@ export type OrderStage =
   | "uninterested"
   | "refund_requested"
   | "refunded";
+
 
 
 
@@ -83,8 +82,8 @@ export function computeOrderStage(
   if (fs === "documents_received") return "in_progress";
 
   // S05/S06 delay stages keep the operator on form_submitted (main working stage)
-  if (fs === "technical_delay") return "technical_delay";
-  if (fs === "customer_delay") return "customer_delay";
+  if (fs === "technical_delay" || fs === "customer_delay") return "form_submitted";
+
   if (fs === "consultation_completed") return "consultation_completed";
 
   if (application.application_status === "consultation_pending" || application.application_status === "consultation_scheduled" || isUnconvertedConsultationLead(lead)) {
@@ -107,8 +106,6 @@ export const STAGE_META: Record<
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
   consultation_completed: { label: "Consultation Completed", short: "Consult Done", order: 3, tone: "emerald", side: "employee" },
   form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
-  technical_delay:   { label: "Technical Delay",    short: "Tech Delay", order: 4, tone: "amber",   side: "employee" },
-  customer_delay:    { label: "Customer Delay",     short: "Cust Delay", order: 4, tone: "amber",   side: "employee" },
   under_review:      { label: "Under Review",       short: "Review",     order: 5, tone: "violet",  side: "employee" },
   in_progress:       { label: "In Progress",        short: "Progress",   order: 6, tone: "violet",  side: "employee" },
   submitted_to_govt: { label: "Submitted to Govt",  short: "Govt",       order: 7, tone: "indigo",  side: "employee" },
@@ -142,8 +139,6 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
   consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
-  technical_delay:   "bg-amber-100 text-amber-900 border-amber-200",
-  customer_delay:    "bg-amber-100 text-amber-900 border-amber-200",
   under_review:      "bg-violet-100 text-violet-800 border-violet-200",
   in_progress:       "bg-violet-100 text-violet-800 border-violet-200",
   submitted_to_govt: "bg-indigo-100 text-indigo-800 border-indigo-200",
