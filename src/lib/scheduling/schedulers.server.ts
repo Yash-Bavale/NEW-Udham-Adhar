@@ -52,8 +52,24 @@ export async function readBusinessHoursConfig(): Promise<BusinessHoursConfig> {
   };
 }
 
+/** Read the configured customer-delay auto-close duration (seconds). */
+export async function readCustomerDelayAutocloseSeconds(): Promise<number> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("app_settings")
+      .select("customer_delay_autoclose_minutes")
+      .eq("id", 1)
+      .maybeSingle();
+    const mins = (data as { customer_delay_autoclose_minutes?: number } | null)?.customer_delay_autoclose_minutes;
+    if (typeof mins === "number" && mins >= 15) return mins * 60;
+  } catch {
+    /* fall through to default */
+  }
+  return DEFAULT_CLOSURE_SECONDS;
+}
+
 /**
- * Start Scheduler 2 (Customer-Side Delay → auto-close in 8 business hours).
+ * Start Scheduler 2 (Customer-Side Delay → auto-close after configured business hours).
  * Cancels any existing active `customer_closure_24h` scheduler for the order first.
  */
 export async function startCustomerClosureScheduler(input: {
@@ -64,9 +80,11 @@ export async function startCustomerClosureScheduler(input: {
   totalSeconds?: number;
 }) {
   const cfg = await readBusinessHoursConfig();
-  const total = input.totalSeconds ?? DEFAULT_CLOSURE_SECONDS;
+  const total = input.totalSeconds ?? (await readCustomerDelayAutocloseSeconds());
   const now = new Date();
   const firesAt = addBusinessSeconds(now, total, cfg);
+
+
 
   // Cancel any existing active row for this order/type
   await supabaseAdmin
