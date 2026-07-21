@@ -374,12 +374,10 @@ export function mainDoneEdgesFor(
   techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
-  // S08 Consultation Completed: upstream path stays idle per spec — only the
-  // govt_portal → b06_consult drop lights up (handled in edgeState).
-  if (phase === "consultation_done") return s;
   const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
   const idx = holding && phase === "form_not_submitted" ? 2
             : holding ? 3
+            : phase === "consultation_done" ? 4
             : currentIdx;
 
   if (idx >= 2) s.add("e_or_fn");
@@ -396,6 +394,7 @@ export function mainDoneEdgesFor(
   if (idx >= 5) s.add("e_gv_cs");
   return s;
 }
+
 
 
 export function currentMainEdgesFor(
@@ -458,10 +457,9 @@ export interface EdgeStateInput {
 const RESOLVED_TECH_EDGES = new Set(["e_fs_b02", "e_b02_b03", "e_b03_gv"]);
 
 export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
-  // S08 Consultation Completed: only govt_portal → b06_consult renders green.
-  if (i.phase === "consultation_done") {
-    return e.id === "e_gv_b06" ? "done" : "idle";
-  }
+  // S08 Consultation Completed: light up the drop into b06_consult as done.
+  if (i.phase === "consultation_done" && e.id === "e_gv_b06") return "done";
+
   // 1. Already-completed main path edges
   if (i.doneMainEdges.has(e.id)) return "done";
   // 2. Currently traversing this edge
@@ -518,12 +516,15 @@ const STAGE_IDX: Record<string, number> = {
 };
 
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
-  // S08 Consultation Completed: only govt_portal + b06_consult go green;
-  // everything else stays idle. No blue LIVE glow anywhere.
+  // S08 Consultation Completed: upstream stages + govt_portal + b06_consult all done.
   if (i.phase === "consultation_done") {
-    if (nodeId === "govt_portal" || nodeId === "b06_consult") return "done";
+    if (nodeId === "b06_consult") return "done";
+    if (nodeId === "govt_portal") return "done";
+    const stageIdx = STAGE_IDX[nodeId];
+    if (stageIdx !== undefined && stageIdx <= 4) return "done";
     return "idle";
   }
+
 
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
