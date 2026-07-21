@@ -76,18 +76,6 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "advance_fulfillment",
     exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
   },
-  technical_delay: {
-    hint: "Technical delay in progress. Resolve to resume the order.",
-    primary: null,
-    primaryKind: "none",
-    exceptions: ["cancel_refund"],
-  },
-  customer_delay: {
-    hint: "Waiting on customer. Order auto-closes if unresolved.",
-    primary: null,
-    primaryKind: "none",
-    exceptions: ["cancel_refund"],
-  },
   // in_progress → fulfillment_status = documents_received. Next: verification_pending.
   in_progress: {
     hint: "Documents received. Send for verification.",
