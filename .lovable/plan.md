@@ -1,40 +1,33 @@
-## Goal
-Fix journey rendering at S08 (Consultation Completed) so it visually reads as a completed order with only B07/B08 actionable.
+## Problem
 
-## Rules confirmed
-- **Path highlight**: ONLY the `Application Submitted (Govt Portal)` card AND the `Consultation Completed (B06)` card render green/done. All upstream nodes (Order Received, Form Not Submitted, Form Submitted) and their connectors stay idle (grey). No blue Active/LIVE glow anywhere at S08.
-- **Buttons**: Only B07 (Application Accepted) and B08 (Application Rejected) are clickable. Force Close remains visible as always. Everything else disabled/idle tone.
-- **Header chip**: `Current: Consultation Completed · ORDER COMPLETED` (emerald tone).
+In the current Lead Quick Actions card:
+- "Send Payment Link via WhatsApp" and "Send Payment Link via Email" buttons only render *after* a payment link has been generated. Since most leads don't have a link yet, only "Generate Payment Link" shows (as in the screenshot).
+- "Mark as Contacted" only flips status; it does not send the WhatsApp intro message the user described.
 
-## Changes
+The message templates (`buildIntroMessage`, `buildPaymentLinkMessage`) already match the exact wording/formatting requested — no change needed there.
 
-### 1. `src/lib/orders/journey-graph.ts`
-- `nodeState(nodeId, ...)` when phase = `consultation_done`:
-  - `govt_portal` → `done` (green, no glow)
-  - `b06_consult` → `done` (green, no glow, no LIVE badge)
-  - all other main-line nodes (`order_rec`, `form_not`, `form_sub`) → `idle`
-  - `b07_accept`, `b08_reject` → `active-actionable` (buttons lit)
-  - every other branch card → `idle`
-- `edgeState(...)` when phase = `consultation_done`:
-  - Only the edge `govt_portal → b06_consult` renders `done` (green).
-  - All other edges → `idle` (grey).
-- `currentStageNodeFor(...)` when phase = `consultation_done`: return `null` (no LIVE/active glow node; both target cards read as `done` instead).
+## Changes (single file: `src/components/admin/LeadWorkspacePanel.tsx`, `QuickActionsCard`)
 
-### 2. `src/lib/orders/journey-map.ts`
-- `deriveJourneyLiveState`: when `stage === "consultation_completed"`, set `terminal = "completed"` and `subStateLabel = "Order Completed"` so the header chip renders emerald "ORDER COMPLETED".
-- Keep `derivePhase` returning `consultation_done` for S08 (already correct); button gating already limited to B07/B08.
+1. **Always show both "Send Payment Link" buttons** (WhatsApp + Email) regardless of whether a link exists yet.
+   - On click, if `paymentUrl` is already available → open `wa.me` / `mailto:` immediately with the prefilled message.
+   - If not, call `createPaymentLink` first, refetch, then open the WhatsApp/Email link with the newly generated URL prefilled.
+   - Disable buttons briefly while generating; toast on failure.
+   - Keep the "Generate Payment Link" button + link preview row when no link exists (so employees can still just copy it), but the two Send buttons are always visible directly under "Payment Link".
 
-### 3. `src/components/admin/workspace/CustomerJourneyMap.tsx`
-- Header "Current" label: when phase = `consultation_done`, show `Consultation Completed` + emerald `ORDER COMPLETED` chip (drop the "Awaiting Govt Response" chip).
-- Ensure no node renders the LIVE badge when `currentStageNodeFor` returns null.
+2. **Mark as Contacted → also fire WhatsApp intro**
+   - After `transitionFn` succeeds and status flips to `contacted`, if `waNumber(lead.mobile)` exists, open `https://wa.me/<number>?text=<encoded introMsg>` in a new tab.
+   - Do not open WhatsApp on the "undo → new_lead" path.
+   - Guard with a small helper so pop-up blockers still allow it (open synchronously in the click handler via `window.open('', '_blank')` then set `.location`).
 
-## Out of scope
-B07/B08 handler wiring (already done previous turn), dashboard KPIs (already counted), email templates, force-close.
+3. **Small guards**
+   - Both Send buttons disabled (with tooltip/hint text) when mobile / email is missing respectively.
+   - Reuse existing `buildIntroMessage` and `buildPaymentLinkMessage` — no template edits.
+
+No changes to backend, DB, other components, or unrelated UI. No layout redesign — only the Quick Actions button set + Mark-as-Contacted handler.
 
 ## Verification
-Load AP-2026-007376 (S08):
-- Only `Application Submitted (Govt Portal)` and `Consultation Completed` cards are green.
-- Upstream cards & connectors are grey/idle.
-- No blue LIVE glow.
-- Only B07 & B08 buttons clickable; Force Close visible.
-- Header: `Current: Consultation Completed` + emerald `ORDER COMPLETED` chip.
+
+- Lead with no payment link: both Send buttons visible; clicking WhatsApp generates a link, then opens WhatsApp with the payment-link message prefilled.
+- Lead with existing payment link: Send buttons open WhatsApp/Email instantly with prefilled message.
+- Mark as Contacted on a lead with a mobile: status flips + WhatsApp tab opens with intro message.
+- Mark as Contacted "undo": no WhatsApp opened.
