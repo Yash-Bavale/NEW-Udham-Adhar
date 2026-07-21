@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
+
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
@@ -24,18 +25,20 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "pending" | "completed" | "exception";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
 
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 const COMPLETED_STAGES: OrderStage[] = ["completed"];
+const CLOSED_STAGES: OrderStage[] = ["closed"];
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-// Pending = anything not completed and not a terminal exception (closed / refunded / uninterested).
+// Pending = anything not completed, not closed, and not a terminal exception.
 function isPending(stage: OrderStage): boolean {
-  return !COMPLETED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
+  return !COMPLETED_STAGES.includes(stage) && !CLOSED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
 }
 
 function bucketOf(stage: OrderStage): Exclude<Bucket, "all"> {
   if (COMPLETED_STAGES.includes(stage)) return "completed";
+  if (CLOSED_STAGES.includes(stage)) return "closed";
   if (EXCEPTION_STAGES.includes(stage)) return "exception";
   if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
   return "pending";
@@ -46,8 +49,10 @@ const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "needs_action", label: "Needs Action" },
   { id: "pending",      label: "Pending" },
   { id: "completed",    label: "Completed" },
+  { id: "closed",       label: "Closed" },
   { id: "exception",    label: "Exception" },
 ];
+
 
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
 const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
@@ -90,6 +95,8 @@ function OrdersListPage() {
   const svcFn = useServerFn(listServices);
   const role = useRole();
   const hideMoney = role.hideMoney();
+  const navigate = useNavigate();
+
 
   const [search, setSearch] = useState("");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>("all");
@@ -145,8 +152,9 @@ function OrdersListPage() {
   }, [allRows, minDays]);
 
   const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, exception: 0 };
+    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0 };
     for (const r of ageFiltered) c[bucketOf(r.stage as OrderStage)]++;
+
     return c;
   }, [ageFiltered]);
 
@@ -370,9 +378,10 @@ function OrdersListPage() {
                       {formatDayHeader(day)}
                     </td>
                   </tr>
-                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} />)}
+                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />)}
                 </>
               ))}
+
             </tbody>
           </table>
         </ScrollableTable>
@@ -392,7 +401,7 @@ function formatDayHeader(day: string): string {
   return base;
 }
 
-function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
+function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const fs = (order.fulfillment_status ?? "order_received") as FulfillmentStatus;
@@ -410,7 +419,16 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
   const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700";
 
   return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50/60">
+    <tr
+      className="border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+        if (sel && sel.toString().trim().length > 0) return;
+        onOpen(order.id);
+      }}
+    >
+
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
