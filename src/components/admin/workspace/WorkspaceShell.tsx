@@ -236,7 +236,7 @@ export function WorkspaceShell(p: Props) {
   });
 
   const mutConsultation = useMutation({
-    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed" } }),
+    mutationFn: () => fnUpdateFF({ data: { orderId: p.orderId, toStatus: "consultation_completed", adminOverride: adminOverride || undefined } }),
     onSuccess: () => {
       toast.success("S08 · Consultation Completed");
       invalidate();
@@ -734,6 +734,7 @@ export function WorkspaceShell(p: Props) {
                   certificateDocumentId: payload.certificateDocumentId,
                   certificateNumber: payload.certificateNumber,
                   completionNotes: payload.completionNotes,
+                  adminOverride: adminOverride || undefined,
                 } as any,
               });
               toast.success("E007 sent — order completed with certificate");
