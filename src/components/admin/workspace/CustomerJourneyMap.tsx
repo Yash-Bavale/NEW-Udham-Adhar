@@ -207,6 +207,7 @@ export function CustomerJourneyMap(p: Props) {
     | { kind: "force_close" }
     | { kind: "govt_rejected" }
     | { kind: "complete_with_cert" }
+    | { kind: "consultation_completed" }
   >(null);
 
   const invalidate = () => {
