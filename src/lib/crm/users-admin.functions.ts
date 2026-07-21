@@ -311,7 +311,16 @@ export const getMyStaffRoles = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     if (error) throw new Error(error.message);
-    return { userId, roles: (data ?? []).map((r) => r.role as string) };
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("display_name, full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    return {
+      userId,
+      roles: (data ?? []).map((r) => r.role as string),
+      displayName: (prof?.display_name || prof?.full_name || null) as string | null,
+    };
   });
 
 const ResetPasswordInput = z.object({
