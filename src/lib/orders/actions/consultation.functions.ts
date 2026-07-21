@@ -58,7 +58,7 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
       app.service_id
         ? supabaseAdmin
             .from("services")
-            .select("name")
+            .select("service_name")
             .eq("id", app.service_id)
             .maybeSingle()
         : Promise.resolve({ data: null } as any),
