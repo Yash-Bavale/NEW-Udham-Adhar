@@ -129,22 +129,27 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
       fromName: process.env.ZOHO_FROM_NAME || "Care | Business Help Services",
     };
 
-    let emailQueued = false;
+    const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
+      import("@/lib/emails/emails.server"),
+      import("@/lib/emails/bhs-templates"),
+    ]);
     try {
-      const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
-        import("@/lib/emails/emails.server"),
-        import("@/lib/emails/bhs-templates"),
-      ]);
       await enqueueFromTemplateInternal(
         BHS_EMAILS.E005_CONSULTATION_SUBMITTED,
         customerEmail,
         vars,
-        { applicationId: app.id, leadId: app.lead_id ?? undefined, trigger: "manual" },
+        {
+          applicationId: app.id,
+          leadId: app.lead_id ?? undefined,
+          trigger: "manual",
+          requireImmediateSuccess: true,
+        },
       );
-      emailQueued = true;
     } catch (e) {
       console.error("[markConsultationCompleted] E005 enqueue failed", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`E005 email could not be sent: ${msg}`);
     }
 
-    return { ok: true, emailQueued };
+    return { ok: true, emailQueued: true };
   });
