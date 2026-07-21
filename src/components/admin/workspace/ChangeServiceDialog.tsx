@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { changeOrderService } from "@/lib/crm/orders-v2.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 
-const ALLOWED = new Set(["order_received", "awaiting_customer_form", "waiting_customer_submission", "S01", "S02", "S03"]);
+const ALLOWED = new Set(["order_received", "awaiting_customer_form", "waiting_for_customer_submission", "waiting_customer_submission", "S01", "S02", "S03"]);
 
 interface Props {
   orderId: string;

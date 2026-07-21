@@ -1051,6 +1051,7 @@ const ChangeServiceInput = z.object({
 const CHANGE_SERVICE_ALLOWED_STAGES = new Set<string>([
   "order_received",
   "awaiting_customer_form",
+  "waiting_for_customer_submission",
   "waiting_customer_submission",
   // legacy fallbacks
   "S01", "S02", "S03",
