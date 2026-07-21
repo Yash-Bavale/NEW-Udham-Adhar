@@ -434,6 +434,10 @@ export function currentStageNodeFor(
   if (phase === "consultation_done") return null;
   if (terminal === "completed") return "b07_accept";
   if (terminal === "closed") return "closed_e010";
+  // Sub-card LIVE glow for delay/reject phases
+  if (phase === "technical_delay") return "b02_tech";
+  if (phase === "customer_delay") return "b04_cust";
+  if (phase === "application_rejected") return "b08_reject";
   if (phase === "form_not_submitted") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
