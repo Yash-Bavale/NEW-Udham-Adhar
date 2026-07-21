@@ -46,6 +46,7 @@ import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
+import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 
 interface Props {
   applicationId: string;
