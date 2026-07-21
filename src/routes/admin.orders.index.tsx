@@ -401,7 +401,7 @@ function formatDayHeader(day: string): string {
   return base;
 }
 
-function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
+function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const fs = (order.fulfillment_status ?? "order_received") as FulfillmentStatus;
@@ -419,7 +419,16 @@ function OrderRow({ order, hideMoney }: { order: any; hideMoney: boolean }) {
   const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700";
 
   return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50/60">
+    <tr
+      className="border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+        if (sel && sel.toString().trim().length > 0) return;
+        onOpen(order.id);
+      }}
+    >
+
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
