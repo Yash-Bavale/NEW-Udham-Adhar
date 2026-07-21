@@ -428,6 +428,9 @@ export function currentStageNodeFor(
 ): string | null {
   if (terminal === "completed") return "b07_accept";
   if (terminal === "closed") return "closed_e010";
+  // B06 Consultation Completed (S08) is a valid completion path — highlight
+  // the B06 sub-card so operators see exactly which branch the order took.
+  if (phase === "consultation_done") return "b06_consult";
   if (phase === "form_not_submitted") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
@@ -464,6 +467,12 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
       e.branch === "customer-delay-govt" ||
       e.branch === "reject";
     if (i.terminal === "closed" && isClosurePath) return "closed";
+    if (i.terminal === "completed" &&
+        (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
+      return "done";
+    }
+    // B06 Consultation Completed (S08) is a valid completion path — green.
+    if (i.phase === "consultation_done" && e.branch === "consult") return "done";
     if (i.terminal === "completed" &&
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
@@ -507,6 +516,8 @@ const STAGE_IDX: Record<string, number> = {
 export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
+  // B06 Consultation Completed (S08) — treat as a terminal completion node.
+  if (nodeId === "b06_consult" && i.phase === "consultation_done") return "terminal-ok";
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
