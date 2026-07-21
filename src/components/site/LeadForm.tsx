@@ -125,6 +125,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     }
 
     try {
+      await verifyToken({ data: { token } });
       const lead = await submitLead({ data: payload as never });
       trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });
       navigate({
