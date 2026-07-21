@@ -14,9 +14,10 @@ import {
 } from "@/lib/seo/jsonld";
 
 const HOMEPAGE_TITLE =
-  "Udyam Registration Assistance | MSME Certificate Help — Business Help Services";
+  "Udyam Registration & MSME Certificate Help";
 const HOMEPAGE_DESC =
   "Get expert assistance for Udyam registration, MSME certificate download, Udyog Aadhar update and migration. Private consultancy service. Apply online today.";
+
 
 const FAQS: Array<{ q: string; a: string }> = [
   {
