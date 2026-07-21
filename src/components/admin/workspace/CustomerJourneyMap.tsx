@@ -46,6 +46,7 @@ import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
+import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 
 interface Props {
   applicationId: string;
@@ -206,6 +207,7 @@ export function CustomerJourneyMap(p: Props) {
     | { kind: "force_close" }
     | { kind: "govt_rejected" }
     | { kind: "complete_with_cert" }
+    | { kind: "consultation_completed" }
   >(null);
 
   const invalidate = () => {
@@ -221,6 +223,7 @@ export function CustomerJourneyMap(p: Props) {
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeFromHold);
+  const fnConsultation = useServerFn(markConsultationCompleted);
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.applicationId, target: "IN_PROCESSING" } }),
@@ -238,10 +241,19 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
   const mutConsultation = useMutation({
-    // B06 → S08 Consultation Completed. Stamp fulfillment stage; skip the E005
-    // resubmit email so we don't double-notify the customer.
-    mutationFn: () => fnUpdateFF({ data: { orderId: p.applicationId, toStatus: "consultation_completed", adminOverride: p.adminOverride || undefined } }),
-    onSuccess: () => { toast.success("S08 · Consultation Completed"); invalidate(); },
+    // B06 → S08 Consultation Completed. Stamps fulfillment stage AND enqueues
+    // the E005 email with an operator-entered Note ({{employee_remarks}}).
+    mutationFn: (remarks: string) =>
+      fnConsultation({ data: { orderId: p.applicationId, remarks: remarks || null } }),
+    onSuccess: (r: any) => {
+      toast.success(
+        r?.emailQueued
+          ? "S08 · Consultation Completed — E005 sent"
+          : "S08 · Consultation Completed (no customer email on file)",
+      );
+      setDialog(null);
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutReminder = useMutation({
@@ -261,7 +273,7 @@ export function CustomerJourneyMap(p: Props) {
     B03: { onClick: () => mutResume.mutate(), pending: mutResume.isPending },
     B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
     B05: { onClick: () => mutSubmit.mutate(), pending: mutSubmit.isPending },
-    B06: { onClick: () => mutConsultation.mutate(), pending: mutConsultation.isPending },
+    B06: { onClick: () => setDialog({ kind: "consultation_completed" }), pending: mutConsultation.isPending },
     B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
     B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
@@ -572,9 +584,70 @@ export function CustomerJourneyMap(p: Props) {
           }
         }}
       />
+      {dialog?.kind === "consultation_completed" && (
+        <ConsultationCompletedInline
+          orderId={p.applicationId}
+          pending={mutConsultation.isPending}
+          onSubmit={(remarks) => mutConsultation.mutate(remarks)}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }
+
+function ConsultationCompletedInline({
+  orderId, pending, onSubmit, onClose,
+}: {
+  orderId: string;
+  pending: boolean;
+  onSubmit: (remarks: string) => void;
+  onClose: () => void;
+}) {
+  const [remarks, setRemarks] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-1 text-xs font-medium uppercase tracking-wider text-emerald-700">B06 · S08</div>
+        <div className="mb-1 text-lg font-bold text-slate-900">Consultation Completed — send E005</div>
+        <div className="mb-4 text-sm text-slate-600">
+          Marks order <b>{orderId.slice(0, 8)}</b> as <b>Consultation Completed</b> and emails the customer.
+          Anything you type below appears in the email as the <b>Note</b> row.
+        </div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Note to customer (optional)
+        </label>
+        <textarea
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value.slice(0, 1000))}
+          rows={5}
+          placeholder="e.g. Application filed on the Udyam portal on 21 Jul 2026. Kindly monitor your registered mobile/email for OTP or govt communication."
+          className="w-full resize-y rounded-lg border border-slate-300 p-3 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        />
+        <div className="mt-1 text-right text-[11px] text-slate-400">{remarks.length}/1000</div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSubmit(remarks.trim())}
+            disabled={pending}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {pending ? "Sending…" : "Send E005 & mark completed"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function getButtonLabel(code?: string): string {
   switch (code) {
