@@ -119,8 +119,9 @@ export function ContactPage() {
         ) : (
 
           <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
-            <Field label="Applicant Name / आवेदक का नाम">
+            <Field label="Applicant Name / आवेदक का नाम" htmlFor="contact-name">
               <input
+                id="contact-name"
                 name="name"
                 required
                 maxLength={120}
@@ -129,8 +130,9 @@ export function ContactPage() {
               />
             </Field>
 
-            <Field label="Email / ईमेल">
+            <Field label="Email / ईमेल" htmlFor="contact-email">
               <input
+                id="contact-email"
                 name="email"
                 type="email"
                 required
@@ -140,12 +142,13 @@ export function ContactPage() {
               />
             </Field>
 
-            <Field label="Mobile No / मोबाइल नंबर">
+            <Field label="Mobile No / मोबाइल नंबर" htmlFor="contact-mobile">
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm text-foreground/80 font-medium">
                   +91
                 </span>
                 <input
+                  id="contact-mobile"
                   name="mobile"
                   required
                   inputMode="numeric"
@@ -157,8 +160,8 @@ export function ContactPage() {
               </div>
             </Field>
 
-            <Field label="State / राज्य">
-              <select name="state" required defaultValue="" className={inputCls}>
+            <Field label="State / राज्य" htmlFor="contact-state">
+              <select id="contact-state" name="state" required defaultValue="" className={inputCls}>
                 <option value="" disabled>Select Your State</option>
                 {INDIAN_STATES.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -166,15 +169,16 @@ export function ContactPage() {
               </select>
             </Field>
 
-            <Field label="Language / भाषा">
-              <select name="language" required defaultValue="" className={inputCls}>
+            <Field label="Language / भाषा" htmlFor="contact-language">
+              <select id="contact-language" name="language" required defaultValue="" className={inputCls}>
                 <option value="" disabled>Select Language</option>
                 {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </Field>
 
-            <Field label="Purpose of Contact / संपर्क का उद्देश्य">
+            <Field label="Purpose of Contact / संपर्क का उद्देश्य" htmlFor="contact-message">
               <textarea
+                id="contact-message"
                 name="message"
                 required
                 rows={5}
