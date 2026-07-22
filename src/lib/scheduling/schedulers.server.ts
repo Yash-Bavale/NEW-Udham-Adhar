@@ -550,7 +550,7 @@ async function fireCustomerClosure(s: {
     event_type: "order_status_change",
     old_value: order.order_status as string,
     new_value: "CLOSED",
-    notes: "Scheduler 2 auto-close (8h business time)",
+    notes: "Scheduler 2 auto-close (configured wall-clock timer)",
     staff_name: "System",
     staff_role: "system",
   } as never);
