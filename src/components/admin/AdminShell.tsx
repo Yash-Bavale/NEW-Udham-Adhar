@@ -58,6 +58,7 @@ const NAV: NavGroup[] = [
 
       { to: "/admin/activity", label: "Activity", icon: Activity },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
+      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3 },
     ],
   },
   {
