@@ -171,9 +171,11 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     // Snapshot pre-resume state so we know whether the customer was notified
     // of a technical hold (external) and therefore needs the E011 resume email.
+    // Pull the lead email too — leads are the source of truth for the specific
+    // order's recipient (customers.primary_email can be stale across orders).
     const { data: preRow } = await supabaseAdmin
       .from("applications")
-      .select("technical_hold_kind, workflow_status, lead_id, application_code, customers(primary_email, name)")
+      .select("technical_hold_kind, workflow_status, lead_id, application_code, leads(email, name), customers(primary_email, name)")
       .eq("id", data.orderId)
       .maybeSingle();
     // Send E011 whenever we're resuming from a technical/our-side hold. The new
