@@ -63,24 +63,6 @@ export const upsertService = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const upsertService = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => ServiceInput.parse(i))
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    await assertRole(supabase, ["super_admin", "admin"]);
-    if (data.id) {
-      const { id, ...patch } = data;
-      const { error } = await supabase.from("services").update(patch).eq("id", id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { getDefaultWebsiteId } = await import("@/lib/websites/default-website.server");
-      const website_id = await getDefaultWebsiteId();
-      const { error } = await supabase.from("services").insert({ ...data, website_id });
-      if (error) throw new Error(error.message);
-    }
-    return { ok: true };
-  });
 
 export const deleteService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
