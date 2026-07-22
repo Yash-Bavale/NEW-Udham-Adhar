@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle2, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
+import { CheckCircle2, Download, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
 import { requestDocumentUpload, confirmDocumentUpload } from "@/lib/onboarding/onboarding.functions";
 import { ALLOWED_DOC_MIME, MAX_DOC_SIZE_BYTES, type DocDef } from "@/lib/onboarding/schemas";
 
@@ -212,6 +212,17 @@ function DocRow({
         </p>
       )}
       {def.help && <p className="text-xs text-muted-foreground">{def.help}</p>}
+      {def.sample_url && (
+        <a
+          href={def.sample_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline w-fit"
+        >
+          <Download className="w-3.5 h-3.5" />
+          {def.sample_label || "Download template"}
+        </a>
+      )}
 
       <AnimatePresence>
         {busy && (

@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
-  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2,
+  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin,
 } from "lucide-react";
 import {
   getBuilderSchema,
   getBuilderSchemaVersion,
   saveBuilderSchema,
+  listCopyableForms,
   type BuilderSaveInput,
 } from "@/lib/crm/form-builder.functions";
 import { getSchema as getFallbackSchema } from "@/lib/onboarding/schemas";
@@ -36,6 +37,8 @@ const FIELD_META: Record<Field["type"], { label: string; icon: typeof Type; hint
   nic:      { label: "NIC code",     icon: Layers,    hint: "Business activity NIC picker" },
   plants:   { label: "Plants/Units", icon: Building2, hint: "Repeating plants section" },
   section:  { label: "Section",      icon: FileText,  hint: "Group a set of fields" },
+  state:    { label: "State",        icon: MapPin,    hint: "Indian state dropdown" },
+  district: { label: "District",     icon: MapPin,    hint: "District dropdown linked to state" },
 };
 
 const FIELD_TYPES = Object.keys(FIELD_META) as Field["type"][];
@@ -51,6 +54,8 @@ const NEW_FIELD: Record<Field["type"], () => Field> = {
   nic:      () => ({ key: newKey("nic"),     label: "NIC Code",       type: "nic", nicDigits: 5, activityFrom: "major_activity" }),
   plants:   () => ({ key: newKey("plants"),  label: "Plants / Units", type: "plants" }),
   section:  () => ({ key: newKey("section"), label: "Section header", type: "section" }),
+  state:    () => ({ key: "state",           label: "State",          type: "state" }),
+  district: () => ({ key: "district",        label: "District",       type: "district" }),
 };
 
 function newKey(prefix: string): string {
@@ -73,6 +78,8 @@ function FormBuilderPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [sampleFormUrl, setSampleFormUrl] = useState("");
+  const [sampleFormLabel, setSampleFormLabel] = useState("");
   const [sections, setSections] = useState<Section[]>([]);
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [activeSection, setActiveSection] = useState(0);
@@ -82,6 +89,7 @@ function FormBuilderPage() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCopy, setShowCopy] = useState(false);
   const [tab, setTab] = useState<"fields" | "documents">("fields");
   const [paletteQuery, setPaletteQuery] = useState("");
 
@@ -92,7 +100,9 @@ function FormBuilderPage() {
       setTitle(active.title || "");
       setDescription(active.description || "");
       setDocuments(Array.isArray(active.documents) ? (active.documents as Doc[]) : []);
-      const schemaAny = active.schema as { sections?: Section[]; fields?: Field[] } | null;
+      const schemaAny = active.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
+      setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
+      setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
       if (schemaAny?.sections?.length) setSections(schemaAny.sections);
       else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
       else setSections([{ key: "default", label: "Details", fields: [] }]);
@@ -100,6 +110,8 @@ function FormBuilderPage() {
       const fb = getFallbackSchema(serviceCode);
       setTitle(fb.title);
       setDescription(fb.description);
+      setSampleFormUrl(fb.sample_form_url ?? "");
+      setSampleFormLabel(fb.sample_form_label ?? "");
       setDocuments(fb.documents.map((d) => ({ key: d.key, label: d.label, required: d.required, help: d.help })));
       setSections(flatFieldsToSections(fb.fields as unknown as Field[]));
     }
@@ -199,7 +211,17 @@ function FormBuilderPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveFn({ data: { service_code: serviceCode, title, description, sections, documents } });
+      await saveFn({
+        data: {
+          service_code: serviceCode,
+          title,
+          description,
+          sections,
+          documents,
+          sample_form_url: sampleFormUrl || undefined,
+          sample_form_label: sampleFormLabel || undefined,
+        },
+      });
       await refetch();
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2200);
@@ -217,11 +239,30 @@ function FormBuilderPage() {
     setTitle(row.title || "");
     setDescription(row.description || "");
     setDocuments(Array.isArray(row.documents) ? (row.documents as Doc[]) : []);
-    const schemaAny = row.schema as { sections?: Section[]; fields?: Field[] } | null;
+    const schemaAny = row.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
+    setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
+    setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
     if (schemaAny?.sections?.length) setSections(schemaAny.sections);
     else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
     setShowHistory(false);
     setActiveSection(0);
+  }
+
+  function applyCopy(rawSections: Section[], newDocs: Doc[], mode: "append" | "replace") {
+    if (mode === "replace") {
+      setSections(rawSections.length ? rawSections : [{ key: "default", label: "Details", fields: [] }]);
+      setDocuments(newDocs);
+      setActiveSection(0);
+    } else {
+      setSections((prev) => [...prev, ...rawSections]);
+      setDocuments((prev) => {
+        const keys = new Set(prev.map((d) => d.key));
+        const filtered = newDocs.filter((d) => !keys.has(d.key));
+        return [...prev, ...filtered];
+      });
+    }
+    setSelected(null);
+    setShowCopy(false);
   }
 
   if (isLoading) return <div className="p-8 text-slate-500">Loading form builder…</div>;
@@ -244,6 +285,9 @@ function FormBuilderPage() {
             <span className="inline-flex items-center gap-1"><Type className="size-3.5" /> {totalFields} fields</span>
             <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {documents.length} docs</span>
           </div>
+          <button onClick={() => setShowCopy(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
+            <Copy className="size-4" /> Copy from service
+          </button>
           <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
             <History className="size-4" /> History
             <span className="ml-1 rounded bg-slate-100 px-1.5 text-[11px] text-slate-600">{data?.versions.length ?? 0}</span>
@@ -358,6 +402,26 @@ function FormBuilderPage() {
               placeholder="Short description shown to customers…"
               className="w-full rounded-lg border px-3 py-2 text-sm resize-none"
             />
+            <div className="grid md:grid-cols-[1fr_220px] gap-2 pt-2 border-t">
+              <label className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">Sample form URL (PDF/link) — shown to customer as a download button</div>
+                <input
+                  value={sampleFormUrl}
+                  onChange={(e) => setSampleFormUrl(e.target.value)}
+                  placeholder="https://…/sample-form.pdf"
+                  className="w-full rounded-md border px-2.5 py-1.5 text-sm font-mono"
+                />
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">Button label (optional)</div>
+                <input
+                  value={sampleFormLabel}
+                  onChange={(e) => setSampleFormLabel(e.target.value)}
+                  placeholder="Download sample form"
+                  className="w-full rounded-md border px-2.5 py-1.5 text-sm"
+                />
+              </label>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -454,24 +518,46 @@ function FormBuilderPage() {
               </div>
               <div className="p-3 space-y-2">
                 {documents.map((d, i) => (
-                  <div key={i} className="rounded-lg border bg-white px-3 py-2.5 grid grid-cols-12 gap-2 items-center">
+                  <div key={i} className="rounded-lg border bg-white px-3 py-2.5 space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-center">
+                      <input
+                        value={d.label}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                        placeholder="Document label"
+                        className="col-span-12 md:col-span-5 rounded-md border px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        value={d.key}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, key: slugify(e.target.value) } : x))}
+                        placeholder="key"
+                        className="col-span-6 md:col-span-3 rounded-md border px-2 py-1.5 text-sm font-mono"
+                      />
+                      <label className="col-span-4 md:col-span-2 text-xs flex items-center gap-1.5">
+                        <input type="checkbox" checked={!!d.required} onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))} />
+                        Required
+                      </label>
+                      <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-2">
+                      <input
+                        value={d.sample_url ?? ""}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: e.target.value || undefined } : x))}
+                        placeholder="Template / sample URL (optional)"
+                        className="rounded-md border px-2 py-1.5 text-xs font-mono"
+                      />
+                      <input
+                        value={d.sample_label ?? ""}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
+                        placeholder="Template button label"
+                        className="rounded-md border px-2 py-1.5 text-xs"
+                      />
+                    </div>
                     <input
-                      value={d.label}
-                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
-                      placeholder="Document label"
-                      className="col-span-12 md:col-span-5 rounded-md border px-2 py-1.5 text-sm"
+                      value={d.help ?? ""}
+                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, help: e.target.value || undefined } : x))}
+                      placeholder="Help text shown under the document (optional)"
+                      className="w-full rounded-md border px-2 py-1.5 text-xs"
                     />
-                    <input
-                      value={d.key}
-                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, key: slugify(e.target.value) } : x))}
-                      placeholder="key"
-                      className="col-span-6 md:col-span-3 rounded-md border px-2 py-1.5 text-sm font-mono"
-                    />
-                    <label className="col-span-4 md:col-span-2 text-xs flex items-center gap-1.5">
-                      <input type="checkbox" checked={!!d.required} onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))} />
-                      Required
-                    </label>
-                    <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
                   </div>
                 ))}
                 {documents.length === 0 && (
@@ -556,6 +642,7 @@ function FormBuilderPage() {
                       <Tf label="Activity source key" mono value={activeField.activityFrom ?? ""} onChange={(v) => updateField({ activityFrom: v || undefined })} />
                     </>
                   )}
+                  <Tf label="Default value" value={activeField.default ?? ""} onChange={(v) => updateField({ default: v || undefined })} />
                   <Tf label="Help text" value={activeField.help ?? ""} onChange={(v) => updateField({ help: v || undefined })} />
                 </div>
               )}
@@ -622,6 +709,118 @@ function FormBuilderPage() {
           </div>
         </div>
       )}
+
+      {showCopy && (
+        <CopyFromServiceDialog
+          serviceCode={serviceCode}
+          onClose={() => setShowCopy(false)}
+          onApply={applyCopy}
+        />
+      )}
+    </div>
+  );
+}
+
+function CopyFromServiceDialog({
+  serviceCode,
+  onClose,
+  onApply,
+}: {
+  serviceCode: string;
+  onClose: () => void;
+  onApply: (sections: Section[], docs: Doc[], mode: "append" | "replace") => void;
+}) {
+  const listFn = useServerFn(listCopyableForms);
+  const { data, isLoading } = useQuery({
+    queryKey: ["copyable-forms", serviceCode],
+    queryFn: () => listFn({ data: { exclude_service_code: serviceCode } }),
+  });
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const [mode, setMode] = useState<"append" | "replace">("append");
+  const [includeDocs, setIncludeDocs] = useState(true);
+
+  const picked = data?.rows.find((r) => r.service_code === pickedCode) ?? null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">Copy from another service</div>
+            <div className="font-semibold text-slate-900">Reuse sections & documents</div>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><X className="size-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 grid md:grid-cols-[240px_1fr] gap-4">
+          <div className="rounded-lg border bg-slate-50/50 overflow-y-auto max-h-[55vh]">
+            {isLoading && <div className="p-4 text-sm text-slate-500">Loading…</div>}
+            {!isLoading && (data?.rows.length ?? 0) === 0 && (
+              <div className="p-4 text-sm text-slate-500">No other services have a published form yet.</div>
+            )}
+            {(data?.rows ?? []).map((r) => (
+              <button
+                key={r.service_code}
+                onClick={() => setPickedCode(r.service_code)}
+                className={`w-full text-left px-3 py-2 border-b text-sm ${pickedCode === r.service_code ? "bg-indigo-50 text-indigo-900" : "hover:bg-white"}`}
+              >
+                <div className="font-medium truncate">{r.title}</div>
+                <div className="text-[11px] text-slate-500 font-mono">{r.service_code}</div>
+              </button>
+            ))}
+          </div>
+          <div className="min-w-0 space-y-3">
+            {!picked && <div className="text-sm text-slate-500">Pick a service on the left to preview its sections.</div>}
+            {picked && (
+              <>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Sections ({picked.sections.length})</div>
+                  <ul className="rounded-lg border divide-y bg-white">
+                    {picked.sections.map((s) => (
+                      <li key={s.key} className="px-3 py-2 text-sm flex items-center justify-between gap-3">
+                        <span className="truncate">{s.label}</span>
+                        <span className="text-[11px] text-slate-500 shrink-0">{s.fieldCount} fields</span>
+                      </li>
+                    ))}
+                    {picked.sections.length === 0 && <li className="px-3 py-3 text-sm text-slate-500">No sections</li>}
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Documents ({picked.documents.length})</div>
+                  <label className="inline-flex items-center gap-1.5 text-xs">
+                    <input type="checkbox" checked={includeDocs} onChange={(e) => setIncludeDocs(e.target.checked)} />
+                    Include documents
+                  </label>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Mode</div>
+                  <div className="flex gap-2 text-sm">
+                    <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer ${mode === "append" ? "border-indigo-500 bg-indigo-50" : "hover:bg-slate-50"}`}>
+                      <input type="radio" className="hidden" checked={mode === "append"} onChange={() => setMode("append")} />
+                      <div className="font-medium">Append</div>
+                      <div className="text-[11px] text-slate-500">Add these sections after existing ones.</div>
+                    </label>
+                    <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer ${mode === "replace" ? "border-rose-500 bg-rose-50" : "hover:bg-slate-50"}`}>
+                      <input type="radio" className="hidden" checked={mode === "replace"} onChange={() => setMode("replace")} />
+                      <div className="font-medium">Replace</div>
+                      <div className="text-[11px] text-slate-500">Wipe current form and use these instead.</div>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="border-t px-5 py-3 flex items-center justify-end gap-2 bg-slate-50">
+          <button onClick={onClose} className="rounded-md border bg-white px-3 py-1.5 text-sm hover:bg-slate-100">Cancel</button>
+          <button
+            disabled={!picked}
+            onClick={() => picked && onApply(picked.rawSections as unknown as Section[], (includeDocs ? picked.documents : []) as unknown as Doc[], mode)}
+            className="rounded-md bg-slate-900 text-white px-4 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-slate-800"
+          >
+            {mode === "replace" ? "Replace form" : "Append to form"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

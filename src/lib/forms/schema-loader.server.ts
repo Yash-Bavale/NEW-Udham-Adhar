@@ -12,7 +12,11 @@ import {
 type DbSchemaRow = {
   title: string;
   description: string | null;
-  schema: { fields?: FieldDef[]; sections?: Array<{ key: string; label: string; fields: FieldDef[] }> } | null;
+  schema: {
+    fields?: FieldDef[];
+    sections?: Array<{ key: string; label: string; fields: FieldDef[] }>;
+    meta?: { sample_form_url?: string | null; sample_form_label?: string | null };
+  } | null;
   documents: DocDef[] | null;
 };
 
@@ -44,6 +48,8 @@ function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSche
     description: row.description ?? fallback.description,
     fields: normalizedFields,
     documents: row.documents ?? fallback.documents,
+    sample_form_url: row.schema?.meta?.sample_form_url ?? undefined,
+    sample_form_label: row.schema?.meta?.sample_form_label ?? undefined,
   };
 }
 

@@ -11,7 +11,9 @@ export type FieldType =
   | "textarea"
   | "nic"
   | "plants"
-  | "section";
+  | "section"
+  | "state"
+  | "district";
 
 
 export type FieldDef = {
@@ -27,6 +29,8 @@ export type FieldDef = {
   nicDigits?: 2 | 4 | 5;
   /** For nic fields: read activity_type from this sibling field key */
   activityFrom?: string;
+  /** Optional default value pre-filled when the form loads. */
+  default?: string;
 };
 
 export type DocDef = {
@@ -34,6 +38,10 @@ export type DocDef = {
   label: string;
   required?: boolean;
   help?: string;
+  /** Optional URL to a template/sample the customer can download. */
+  sample_url?: string;
+  /** Label for the sample link; defaults to "Download template". */
+  sample_label?: string;
 };
 
 export type DocumentsInstructions = {
@@ -50,6 +58,10 @@ export type OnboardingSchema = {
   fields: FieldDef[];
   documents: DocDef[];
   documentsInstructions?: DocumentsInstructions;
+  /** Optional URL to a printable/sample version of the whole form. */
+  sample_form_url?: string;
+  /** Optional label for the sample form download button. */
+  sample_form_label?: string;
 };
 
 const BUSINESS_TYPES = [

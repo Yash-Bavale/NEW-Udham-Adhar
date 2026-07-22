@@ -108,6 +108,8 @@ function OnboardingDetailsPage() {
       totalSteps={totalSteps}
       title={activeSchema.title}
       subtitle={activeSchema.description}
+      sampleFormUrl={data.schema.sample_form_url}
+      sampleFormLabel={data.schema.sample_form_label}
     >
       {hasStage2 && (
         <div className="mb-4 flex items-center gap-2 text-xs font-medium">

@@ -1,93 +1,52 @@
-## Goals
 
-1. Wire the new RBAC (`<Can>` + `scopeIds()`) into pages so unauthorized users don't see actions/rows.
-2. Build the Employee Performance dashboard (Part 1 of the earlier 3-part CRM enhancement) — contact tracking, conversion attribution, unique/repeat detection, and reporting UI.
+## Goal
+Make the admin form builder more powerful and remove hardcoding, so admins can fully configure each service's onboarding form and helper resources without dev work.
 
----
+## 1. Copy sections from another service
+- Add "Copy from service…" button in the builder toolbar (`src/routes/admin.services.forms.$serviceCode.tsx`).
+- Dialog: pick source service → load its active schema → checkboxes for each section + documents → radio "Append" or "Replace entire form".
+- New server fn `copyFromService` in `src/lib/crm/form-builder.functions.ts` returns the source schema for preview; actual merge happens client-side, then existing `saveBuilderSchema` persists as a new version.
+- Auto-dedupe field keys on Append (suffix `_2`, `_3`) and warn the admin.
 
-## Part A — Wire RBAC into the app
+## 2. State & District field types
+- Add two new field types `state` and `district` to `FIELD_TYPES` in `form-builder.functions.ts` and to the palette.
+- Renderer (`OnboardingForm.tsx`) uses the existing `src/lib/onboarding/india-districts.ts` data:
+  - `state`: select of all Indian states/UTs.
+  - `district`: independent select of all districts (flat list) — not linked to state, per your choice.
+- Both support required/placeholder/help like other selects.
 
-### A1. UI gating with `<Can>` (client-side hide)
-Wrap destructive/admin actions in the existing `<Can module="…" action="…">` component across:
+## 3. Sample form download (one PDF per service)
+- New column `services.sample_form_url text` (migration + GRANTs unchanged, RLS already permissive).
+- In service edit page, add "Sample form PDF" uploader → uploads to a new **public** storage bucket `service-samples` via `supabase--storage_create_bucket` + `storage.objects` RLS (admins write, anyone read).
+- On `/onboarding/$leadCode`, when `sample_form_url` exists, show a prominent "Download sample form" button in `OnboardingShell` header.
 
-- **Leads** (`admin.leads.index.tsx`, `admin.leads.$leadId.tsx`, `LeadWorkspacePanel.tsx`): bulk delete, "Assign to…", edit customer, delete lead.
-- **Orders** (`admin.orders.index.tsx`, `admin.orders.$orderId.tsx`, `OrderWorkflowPanel.tsx`): close order, refund, change service, admin override, delete docs.
-- **Customers, Applications, Tickets, Invoices, Payments, Services, Websites, Employees, Permissions, Email Templates, SEO, Automations** index + detail pages: hide Create / Edit / Delete buttons per module key.
-- **Sidebar** (`AdminShell.tsx`): hide nav entries when the user has zero `view` permission on that module (admins always pass).
+## 4. Admin-uploaded resources beside document fields
+- Extend `DocSchema` in `form-builder.functions.ts` with optional `sample_url: string` and `sample_label: string`.
+- Builder Documents tab: per-document row, add "Upload sample/template" (uploads to same `service-samples` bucket under `{service_code}/docs/{doc_key}/…`).
+- `DocumentUploader.tsx` renders a "Download template" link next to the upload input when `sample_url` is set.
 
-Module keys align with rows already in `permission_modules`.
+## 5. Additional improvements found during analysis
+- **Default value** per field: add optional `default` string to `FieldSchema`; renderer prefills when submission is empty.
+- **Field-level visibility rule** (simple): optional `showIf: { key, equals }` so e.g. "Other business type" only appears when `business_type == "Other"`.
+- **Section description**: optional `description` on `SectionSchema`, rendered under the section title.
+- **Reorder** sections/fields via up/down buttons in the canvas (drag-free, keyboard accessible).
+- **Duplicate field/section** buttons in the canvas.
+- **Publish vs Draft**: existing save creates a new active version; add "Save as draft" that inserts with `is_active=false` so admins can iterate without exposing to customers. History drawer already lists versions — add "Activate" button per row.
+- **Field key auto-generation** from label (slugify) with manual override, to prevent the "invalid key" foot-gun.
+- **Live preview** already exists; ensure new field types (state/district, showIf, default) render there too.
 
-### A2. List scoping with `scopeIds()`
-When `scopeAll === false`, pass the resolved website/category/service ID lists into list queries. Two-tier approach:
+## 6. Schema/data changes
+- Migration:
+  - `alter table public.services add column sample_form_url text;`
+  - Create bucket `service-samples` (public) via tool; add `storage.objects` policies: admins insert/update/delete, anyone select.
+- No changes to `service_form_schemas` table — new field/doc keys live inside existing `schema` / `documents` JSON.
 
-- **Client filter (fast win)**: in list routes (leads, orders, applications, tickets, services) call `scopeIds(module)` and, when not `all`, filter the returned rows by matching `service_id` / `website_id` / `category_id` before rendering.
-- **Server filter (defence-in-depth)**: add an optional `scopeFilter` arg to the corresponding list server functions (`listLeads`, `listOrders`, `listApplications`, `listTickets`, `listServices`). When provided, apply `.in('service_id', ids)` etc. Admins skip the filter.
+## Technical touch points
+- Server fns: `src/lib/crm/form-builder.functions.ts`, `src/lib/crm/services-admin.functions.ts`.
+- Loader: `src/lib/forms/schema-loader.server.ts` — pass through new doc `sample_url` and field `default`/`showIf`.
+- UI: `src/routes/admin.services.forms.$serviceCode.tsx`, `src/routes/admin.services.$serviceCode.tsx` (sample PDF upload), `src/components/onboarding/OnboardingForm.tsx`, `src/components/onboarding/OnboardingShell.tsx`, `src/components/onboarding/DocumentUploader.tsx`.
 
-RLS policies stay unchanged for this pass (as previously agreed) — enforcement is UI + server-fn scoped queries. Add a TODO comment linking the follow-up RLS migration.
-
-### A3. Verification
-- Sign in as admin: everything visible (unchanged).
-- Sign in as a scoped employee: hidden buttons, filtered lists, sidebar reflects modules.
-- Typecheck + smoke click through Leads, Orders, Services.
-
----
-
-## Part B — Employee Performance Tracking
-
-### B1. Data model (one migration)
-Reuse existing tables; only two additions:
-
-- `public.lead_contact_events` — one row per outbound contact attempt.
-  - fields: `lead_id`, `user_id`, `channel` (`whatsapp | email | call | note`), `outcome` (`connected | no_answer | wrong_number | not_interested | callback | converted_intent`), `notes`, `created_at`.
-  - RLS: staff insert their own; admins read all; employees read own.
-  - GRANTs for authenticated + service_role.
-- `public.lead_attribution` — one row per lead capturing conversion source.
-  - fields: `lead_id UNIQUE`, `first_contact_user_id`, `first_contact_at`, `converted_user_id` (nullable), `converted_at`, `conversion_kind` (`system_paid | employee_handled | organic`), `is_unique_lead` (bool, false when same email/mobile already exists), `repeat_of_lead_id` (nullable).
-  - Trigger on `leads INSERT`: set `is_unique_lead` + `repeat_of_lead_id` by matching normalized email/mobile.
-  - Trigger on `lead_contact_events INSERT`: populate `first_contact_user_id/at` if null.
-  - Trigger on `applications UPDATE` when `fulfillment_status` transitions to a paid/completed state: set `converted_user_id` = current `assigned_to` (or first contact user if system-paid before any contact) and `conversion_kind` accordingly.
-
-### B2. Server functions (`src/lib/crm/performance.functions.ts`)
-All `requireSupabaseAuth`, admin-only via `assertRole`:
-
-- `logLeadContact({ leadId, channel, outcome, notes })` — inserts a `lead_contact_events` row; also mirrors an `activity_logs` row for the existing timeline.
-- `getPerformanceOverview({ from, to, userId? })` — returns per-employee KPI rows: leads assigned, contacted, avg time-to-first-contact, conversions (employee-handled vs system-paid), conversion rate, repeat vs unique split, revenue attributed (join `payments`/`invoices` on converted leads).
-- `getEmployeeDetail({ userId, from, to })` — contact log, funnel counts by service, daily trend.
-- `getMyPerformance({ from, to })` — same shape but scoped to `auth.uid()` for self-view.
-
-### B3. UI wiring
-
-- **Log contact (staff surface)**: in `LeadWorkspacePanel.tsx`, replace/augment the existing "Mark as Contacted" quick action with a small dialog that calls `logLeadContact` (channel + outcome dropdowns + optional note). Existing WhatsApp/Email quick actions also call `logLeadContact` automatically on click.
-- **Employee self view**: new route `/admin/my-performance` — KPI cards + funnel chart from `getMyPerformance`. Linked from the sidebar under "My Work".
-- **Admin performance dashboard**: new route `/admin/performance` — leaderboard table (sortable columns), per-employee drilldown drawer, date-range picker reusing `DateRangePicker`, filters for service/website (respects `scopeIds`). Sidebar entry gated with `<Can module="performance">`; add a `performance` row to `permission_modules` in the same migration.
-
-### B4. Verification
-
-- Insert a lead, log contacts, mark paid — attribution row reflects `employee_handled`.
-- Insert a webhook-paid lead with no contact — shows `system_paid`.
-- Duplicate email → `is_unique_lead=false`, `repeat_of_lead_id` set.
-- Admin sees leaderboard; employee sees only their own metrics.
-- Typecheck clean.
-
----
-
-## Deliverables (files touched)
-
-```text
-supabase/migrations/*.sql              # tables, triggers, GRANTs, permission_modules row
-src/lib/crm/performance.functions.ts   # new
-src/routes/admin.performance.tsx       # admin dashboard
-src/routes/admin.my-performance.tsx    # self view
-src/components/admin/AdminShell.tsx    # sidebar gating + new links
-src/components/admin/LeadWorkspacePanel.tsx  # log-contact dialog
-src/routes/admin.leads.index.tsx, admin.orders.index.tsx,
-src/routes/admin.applications.tsx, admin.tickets.index.tsx,
-src/routes/admin.services.index.tsx, admin.websites.tsx,
-src/routes/admin.customers.tsx, admin.invoices.tsx,
-src/routes/admin.payments.tsx, admin.employees.tsx,
-src/routes/admin.email-templates.tsx, admin.seo.tsx      # <Can> wrapping + scopeIds filtering
-src/lib/crm/leads-admin.functions.ts, orders-v2.functions.ts,
-src/lib/crm/services-admin.functions.ts, tickets.functions.ts   # optional scopeFilter arg
-```
-
-Once approved, I'll ship it in that order: migration first, then server functions, then UI (RBAC wiring and performance screens in parallel).
+## Out of scope
+- Multi-file sample uploads (chose single PDF).
+- Linked state→district cascade (chose independent dropdowns).
+- Per-field sample attachments on non-document fields.

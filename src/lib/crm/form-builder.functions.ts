@@ -16,6 +16,8 @@ const FIELD_TYPES = [
   "nic",
   "plants",
   "section",
+  "state",
+  "district",
 ] as const;
 
 const FieldSchema = z.object({
@@ -30,11 +32,13 @@ const FieldSchema = z.object({
   options: z.array(z.string().max(200)).max(200).optional(),
   nicDigits: z.union([z.literal(2), z.literal(4), z.literal(5)]).optional(),
   activityFrom: z.string().max(80).optional(),
+  default: z.string().max(500).optional(),
 });
 
 const SectionSchema = z.object({
   key: z.string().trim().min(1).max(80),
   label: z.string().trim().min(1).max(200),
+  description: z.string().max(1000).optional(),
   fields: z.array(FieldSchema).max(200),
 });
 
@@ -43,6 +47,8 @@ const DocSchema = z.object({
   label: z.string().trim().min(1).max(200),
   required: z.boolean().optional(),
   help: z.string().max(500).optional(),
+  sample_url: z.string().trim().max(2000).url().optional().or(z.literal("").transform(() => undefined)),
+  sample_label: z.string().max(200).optional(),
 });
 
 const SaveInput = z.object({
@@ -51,6 +57,8 @@ const SaveInput = z.object({
   description: z.string().max(2000).optional().nullable(),
   sections: z.array(SectionSchema).min(1).max(30),
   documents: z.array(DocSchema).max(40).default([]),
+  sample_form_url: z.string().trim().max(2000).url().optional().or(z.literal("").transform(() => undefined)),
+  sample_form_label: z.string().max(200).optional(),
 });
 
 export type BuilderSaveInput = z.infer<typeof SaveInput>;
@@ -132,7 +140,13 @@ export const saveBuilderSchema = createServerFn({ method: "POST" })
       }
     }
 
-    const schemaJson = { sections: data.sections };
+    const schemaJson = {
+      sections: data.sections,
+      meta: {
+        sample_form_url: data.sample_form_url ?? null,
+        sample_form_label: data.sample_form_label ?? null,
+      },
+    };
 
     const { data: result, error } = await context.supabase.rpc("upsert_service_form_schema", {
       _service_code: data.service_code,
@@ -143,4 +157,47 @@ export const saveBuilderSchema = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     return result as { id: string; version: number };
+  });
+
+// List other services (with an active schema) the admin can copy sections from.
+export const listCopyableForms = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ exclude_service_code: z.string().min(1).max(80) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const { data: rows, error } = await context.supabase
+      .from("service_form_schemas")
+      .select("service_code, title, schema, documents")
+      .eq("is_active", true)
+      .neq("service_code", data.exclude_service_code)
+      .order("service_code", { ascending: true });
+    if (error) throw new Error(error.message);
+
+    type JsonScalar = string | number | boolean | null;
+    type JsonValue = JsonScalar | JsonValue[] | { [k: string]: JsonValue };
+    type Sec = { key: string; label: string; description?: string; fields: JsonValue[] };
+    return {
+      rows: (rows ?? []).map((r) => {
+        const schema = (r.schema ?? {}) as { sections?: Sec[]; fields?: JsonValue[] };
+        const sections: Sec[] = schema.sections?.length
+          ? schema.sections
+          : schema.fields?.length
+            ? [{ key: "default", label: "Details", fields: schema.fields }]
+            : [];
+        return {
+          service_code: r.service_code as string,
+          title: (r.title as string) || (r.service_code as string),
+          sections: sections.map((s) => ({
+            key: s.key,
+            label: s.label,
+            description: s.description ?? "",
+            fieldCount: Array.isArray(s.fields) ? s.fields.length : 0,
+          })),
+          documents: (Array.isArray(r.documents) ? (r.documents as JsonValue[]) : []),
+          rawSections: sections,
+        };
+      }),
+    };
   });
