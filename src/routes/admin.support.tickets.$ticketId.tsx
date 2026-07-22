@@ -702,7 +702,7 @@ function TicketWorkspace() {
       {reasonOpen && (
         <ReasonPickerDialog
           onCancel={() => setReasonOpen(false)}
-          onSend={(v) => {
+          onSend={(v: { reasonId: string | null; reasonLabel: string; replyBody: string }) => {
             setReasonOpen(false);
             doCloseReply.mutate(v);
           }}
