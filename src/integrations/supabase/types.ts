@@ -2654,6 +2654,30 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -3351,6 +3375,109 @@ export type Database = {
           },
         ]
       }
+      user_permission_scopes: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          module_key: string
+          service_id: string | null
+          user_id: string
+          website_id: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          module_key: string
+          service_id?: string | null
+          user_id: string
+          website_id?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          module_key?: string
+          service_id?: string | null
+          user_id?: string
+          website_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_scopes_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_scopes_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "permission_modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permission_scopes_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_permission_scopes_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permissions: {
+        Row: {
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          module_key: string
+          scope_all: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          module_key: string
+          scope_all?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          module_key?: string
+          scope_all?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "permission_modules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3963,6 +4090,10 @@ export type Database = {
       }
       get_dashboard_metrics: { Args: never; Returns: Json }
       has_any_staff_role: { Args: { _user_id: string }; Returns: boolean }
+      has_permission: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
