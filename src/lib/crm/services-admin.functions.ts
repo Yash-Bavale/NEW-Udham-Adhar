@@ -37,7 +37,31 @@ const ServiceInput = z.object({
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
   govt_portal_url: z.string().trim().max(1000).nullable().optional(),
+  website_id: z.string().uuid().optional(),
+  category_id: z.string().uuid().nullable().optional(),
 });
+
+export const upsertService = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ServiceInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
+    if (data.id) {
+      const { id, ...patch } = data;
+      const { error } = await supabase.from("services").update(patch).eq("id", id);
+      if (error) throw new Error(error.message);
+    } else {
+      let website_id = data.website_id;
+      if (!website_id) {
+        const { getDefaultWebsiteId } = await import("@/lib/websites/default-website.server");
+        website_id = await getDefaultWebsiteId();
+      }
+      const { error } = await supabase.from("services").insert({ ...data, website_id });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
 
 export const upsertService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
