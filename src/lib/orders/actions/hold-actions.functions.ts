@@ -171,9 +171,11 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     // Snapshot pre-resume state so we know whether the customer was notified
     // of a technical hold (external) and therefore needs the E011 resume email.
+    // Pull the lead email too — leads are the source of truth for the specific
+    // order's recipient (customers.primary_email can be stale across orders).
     const { data: preRow } = await supabaseAdmin
       .from("applications")
-      .select("technical_hold_kind, workflow_status, lead_id, application_code, customers(primary_email, name)")
+      .select("technical_hold_kind, workflow_status, lead_id, application_code, leads(email, name), customers(primary_email, name)")
       .eq("id", data.orderId)
       .maybeSingle();
     // Send E011 whenever we're resuming from a technical/our-side hold. The new
@@ -206,7 +208,7 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         awaiting_govt_started_at: null,
         active_reason_id: null,
         active_reason_text: null,
-        workflow_status: "in_processing",
+        workflow_status: "processing",
         workflow_delay_reason: null,
         workflow_expected_review_at: null,
         // Delay resolved → revert to S04 Form Submitted (happy-flow hub)
@@ -216,7 +218,16 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     // E011 — Technical Delay Resolved: notify the customer that we've resumed.
     if (wasExternalTechHold) {
-      const email = (preRow as any)?.customers?.primary_email as string | undefined;
+      // Prefer the lead's email (per-order source of truth) and fall back to
+      // customers.primary_email only when the lead has none. Same rule as the
+      // other order emails so E011 always lands in the right inbox.
+      const leadEmail = (preRow as any)?.leads?.email as string | undefined;
+      const custEmail = (preRow as any)?.customers?.primary_email as string | undefined;
+      const email = leadEmail || custEmail;
+      const recipientName =
+        ((preRow as any)?.leads?.name as string) ||
+        ((preRow as any)?.customers?.name as string) ||
+        "Customer";
       if (email) {
         try {
           const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
@@ -231,17 +242,24 @@ export const resumeFromHold = createServerFn({ method: "POST" })
             BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
             email,
             {
-              customerName: ((preRow as any)?.customers?.name as string) || "Customer",
+              customerName: recipientName,
               orderNumber: ((preRow as any)?.application_code as string) || data.orderId.slice(0, 8),
               resolved_at: resolvedAt,
               resolvedAt,
               fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
             },
-            { applicationId: data.orderId, leadId: ((preRow as any)?.lead_id as string) ?? undefined },
+            {
+              applicationId: data.orderId,
+              leadId: ((preRow as any)?.lead_id as string) ?? undefined,
+              requireImmediateSuccess: true,
+            },
           );
         } catch (e) {
           console.error("[resumeFromHold] E011 enqueue failed", e);
+          throw e instanceof Error ? e : new Error(String(e));
         }
+      } else {
+        console.warn("[resumeFromHold] no recipient email — E011 skipped", { orderId: data.orderId });
       }
     }
 
