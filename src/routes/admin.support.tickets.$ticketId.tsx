@@ -134,7 +134,7 @@ function TicketWorkspace() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const role = useRole();
-  const isSupportOnly = role?.role === "support";
+  const isSupportOnly = role.roles.includes("support") && role.roles.length === 1;
 
   const loadFn = useServerFn(getTicketWorkspace);
   const replyFn = useServerFn(replyToTicket);
