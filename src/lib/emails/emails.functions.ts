@@ -430,9 +430,10 @@ export const sendTestTemplateEmail = createServerFn({ method: "POST" })
       const { renderTemplate, renderTemplateHtml } = await import("./smtp.server");
       // Subject is plain text; body_html gets HTML-escaped variable substitution
       // to prevent injection from user-supplied fields (contact/complaint forms).
-      const result = await enqueueEmailInternal({
-        templateCode: `TEST_${code}`,
-        toEmail,
+      const { enqueueEmailInternal } = await import("./emails.server");
+      await enqueueEmailInternal({
+        templateCode: `TEST_${tpl.code}`,
+        toEmail: data.toEmail,
         subject: `[TEST] ${renderTemplate(tpl.subject, variables)}`,
         bodyHtml: renderTemplateHtml(tpl.body_html, variables),
         bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
