@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
-  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2,
+  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin,
 } from "lucide-react";
 import {
   getBuilderSchema,
   getBuilderSchemaVersion,
   saveBuilderSchema,
+  listCopyableForms,
   type BuilderSaveInput,
 } from "@/lib/crm/form-builder.functions";
 import { getSchema as getFallbackSchema } from "@/lib/onboarding/schemas";
@@ -36,6 +37,8 @@ const FIELD_META: Record<Field["type"], { label: string; icon: typeof Type; hint
   nic:      { label: "NIC code",     icon: Layers,    hint: "Business activity NIC picker" },
   plants:   { label: "Plants/Units", icon: Building2, hint: "Repeating plants section" },
   section:  { label: "Section",      icon: FileText,  hint: "Group a set of fields" },
+  state:    { label: "State",        icon: MapPin,    hint: "Indian state dropdown" },
+  district: { label: "District",     icon: MapPin,    hint: "District dropdown linked to state" },
 };
 
 const FIELD_TYPES = Object.keys(FIELD_META) as Field["type"][];
@@ -51,6 +54,8 @@ const NEW_FIELD: Record<Field["type"], () => Field> = {
   nic:      () => ({ key: newKey("nic"),     label: "NIC Code",       type: "nic", nicDigits: 5, activityFrom: "major_activity" }),
   plants:   () => ({ key: newKey("plants"),  label: "Plants / Units", type: "plants" }),
   section:  () => ({ key: newKey("section"), label: "Section header", type: "section" }),
+  state:    () => ({ key: "state",           label: "State",          type: "state" }),
+  district: () => ({ key: "district",        label: "District",       type: "district" }),
 };
 
 function newKey(prefix: string): string {

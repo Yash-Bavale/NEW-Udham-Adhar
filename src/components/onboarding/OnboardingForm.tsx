@@ -59,6 +59,17 @@ function toTitleCase(input: string): string {
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
 
+function mergeDefaults(initial: Record<string, string>, fields: FieldDef[]): Record<string, string> {
+  const merged: Record<string, string> = { ...initial };
+  for (const f of fields) {
+    const current = merged[f.key];
+    if ((current === undefined || current === "") && f.default) {
+      merged[f.key] = f.default;
+    }
+  }
+  return merged;
+}
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function OnboardingForm({
@@ -82,7 +93,7 @@ export function OnboardingForm({
   submittingLabel?: string;
   successMessage?: string;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(initial);
+  const [values, setValues] = useState<Record<string, string>>(() => mergeDefaults(initial, schema.fields));
   const [err, setErr] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -105,12 +116,12 @@ export function OnboardingForm({
     lastInitialJson.current = nextInitialJson;
     lastSavedJson.current = nextInitialJson;
     mounted.current = false;
-    setValues(initial);
+    setValues(mergeDefaults(initial, schema.fields));
     setErr(null);
     setSubmitSuccess(false);
     setSaveState("idle");
     setSavedAt(null);
-  }, [initial]);
+  }, [initial, schema.fields]);
 
   useEffect(() => {
     if (!onSaveDraftRef.current) return;
@@ -305,8 +316,8 @@ function FieldRenderer({
       : "";
   const id = `f-${field.key}`;
 
-  const isState = field.key === "state";
-  const isDistrict = field.key === "district";
+  const isState = field.type === "state" || field.key === "state";
+  const isDistrict = field.type === "district" || field.key === "district";
   const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
   const isMobile = field.type === "tel" && field.pattern === "^[6-9]\\d{9}$";
   const isAadhaar = field.pattern === "^\\d{12}$";

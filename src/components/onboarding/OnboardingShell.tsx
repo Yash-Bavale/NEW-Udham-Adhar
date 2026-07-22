@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Download, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { requestFormHelp } from "@/lib/onboarding/onboarding.functions";
 
@@ -19,6 +19,8 @@ export function OnboardingShell({
   totalSteps = 3,
   title,
   subtitle,
+  sampleFormUrl,
+  sampleFormLabel,
   children,
 }: {
   leadCode: string;
@@ -26,6 +28,8 @@ export function OnboardingShell({
   totalSteps?: 2 | 3;
   title: string;
   subtitle?: string;
+  sampleFormUrl?: string;
+  sampleFormLabel?: string;
   children: React.ReactNode;
 }) {
   const STEPS = totalSteps === 2
