@@ -1211,7 +1211,7 @@ function ReasonPickerDialog({
             value={reasonId}
             onChange={(id, reason) => {
               setReasonId(id);
-              setReasonLabel(reason?.reason_text ?? reason?.reason_code ?? "");
+              setReasonLabel(reason?.label ?? "");
             }}
             reply={reply}
             onReplyChange={setReply}
