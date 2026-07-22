@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { renderTemplate } from "./smtp.server";
+import { renderTemplate, renderTemplateHtml } from "./smtp.server";
 import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 
 /**
