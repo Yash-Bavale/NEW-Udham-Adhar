@@ -13,8 +13,8 @@ export const Route = createFileRoute("/api/public/cron/payu-reconcile")({
         const secret = process.env.CRON_SECRET;
         const auth = request.headers.get("authorization") ?? "";
         const apikey = request.headers.get("apikey") ?? "";
-        if (secret && auth !== `Bearer ${secret}` && apikey !== secret) {
-          if (!apikey) return new Response("Unauthorized", { status: 401 });
+        if (!secret || (auth !== `Bearer ${secret}` && apikey !== secret)) {
+          return new Response("Unauthorized", { status: 401 });
         }
 
         try {
