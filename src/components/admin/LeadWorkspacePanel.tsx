@@ -384,8 +384,15 @@ function QuickActionsCard({
 
   const generateLink = async () => {
     const url = await ensurePaymentUrl();
-    if (url) toast.success("Payment link generated");
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Payment link copied");
+    } catch {
+      toast.success("Payment link generated");
+    }
   };
+
 
   const sendPaymentLinkWhatsApp = async () => {
     if (!number) { toast.error("Add a mobile number first"); return; }
