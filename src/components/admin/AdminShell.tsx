@@ -102,6 +102,7 @@ const NAV: NavGroup[] = [
     label: "Insights",
     items: [
       { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/performance", label: "Employee Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/seo", label: "SEO", icon: Globe, requireAnyRole: ADMIN_ROLES },
     ],
