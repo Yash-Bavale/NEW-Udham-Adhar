@@ -351,7 +351,7 @@ function QuickActionsCard({
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
     // Pre-open a blank tab synchronously to avoid popup blockers when moving to contacted
-    const waWin = next === "contacted" && number ? window.open("", "_blank", "noopener,noreferrer") : null;
+    const waWin = next === "contacted" && number ? window.open("about:blank", "_blank") : null;
     setContactBusy(true);
     try {
       await transitionFn({ data: { leadId: lead.id, toStatus: next } });
@@ -396,7 +396,7 @@ function QuickActionsCard({
 
   const sendPaymentLinkWhatsApp = async () => {
     if (!number) { toast.error("Add a mobile number first"); return; }
-    const waWin = window.open("", "_blank", "noopener,noreferrer");
+    const waWin = window.open("about:blank", "_blank");
     const url = paymentUrl ?? await ensurePaymentUrl();
     if (!url) { waWin?.close(); return; }
     const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
