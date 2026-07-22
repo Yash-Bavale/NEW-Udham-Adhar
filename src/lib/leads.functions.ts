@@ -24,6 +24,8 @@ export const createLead = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LeadInput.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getDefaultWebsiteId } = await import("./websites/default-website.server");
+    const websiteId = await getDefaultWebsiteId();
     // 1. Map form label -> internal slug -> DB service row
     const slug = SERVICES.find((s) => s.label === data.service)?.slug;
     if (!slug) {
@@ -101,6 +103,7 @@ export const createLead = createServerFn({ method: "POST" })
           is_duplicate: isDuplicate,
           duplicate_of: duplicateOf,
           customer_id: customerId,
+          website_id: websiteId,
         })
         .select("id, lead_code")
         .single();
@@ -132,6 +135,7 @@ export const createLead = createServerFn({ method: "POST" })
       .insert({
         lead_id: leadId,
         service_id: service.id,
+        website_id: websiteId,
         application_status: "awaiting_payment",
       });
     if (appErr) {

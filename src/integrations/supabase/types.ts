@@ -325,6 +325,7 @@ export type Database = {
           technical_hold_kind: string | null
           technical_hold_started_at: string | null
           updated_at: string
+          website_id: string
           workflow_delay_reason: string | null
           workflow_expected_review_at: string | null
           workflow_priority: string | null
@@ -384,6 +385,7 @@ export type Database = {
           technical_hold_kind?: string | null
           technical_hold_started_at?: string | null
           updated_at?: string
+          website_id: string
           workflow_delay_reason?: string | null
           workflow_expected_review_at?: string | null
           workflow_priority?: string | null
@@ -445,6 +447,7 @@ export type Database = {
           technical_hold_kind?: string | null
           technical_hold_started_at?: string | null
           updated_at?: string
+          website_id?: string
           workflow_delay_reason?: string | null
           workflow_expected_review_at?: string | null
           workflow_priority?: string | null
@@ -493,6 +496,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
             referencedColumns: ["id"]
           },
           {
@@ -1887,6 +1897,7 @@ export type Database = {
           status: Database["public"]["Enums"]["lead_status"]
           total_amount: number
           updated_at: string
+          website_id: string
         }
         Insert: {
           assigned_at?: string | null
@@ -1924,6 +1935,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           total_amount?: number
           updated_at?: string
+          website_id: string
         }
         Update: {
           assigned_at?: string | null
@@ -1961,6 +1973,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["lead_status"]
           total_amount?: number
           updated_at?: string
+          website_id?: string
         }
         Relationships: [
           {
@@ -2003,6 +2016,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
             referencedColumns: ["id"]
           },
         ]
@@ -2840,6 +2860,44 @@ export type Database = {
         }
         Relationships: []
       }
+      service_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_categories_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_form_schemas: {
         Row: {
           created_at: string
@@ -2918,6 +2976,7 @@ export type Database = {
       services: {
         Row: {
           base_amount: number
+          category_id: string | null
           created_at: string
           description: string | null
           govt_portal_url: string | null
@@ -2930,9 +2989,11 @@ export type Database = {
           sort_order: number
           total_amount: number
           updated_at: string
+          website_id: string
         }
         Insert: {
           base_amount: number
+          category_id?: string | null
           created_at?: string
           description?: string | null
           govt_portal_url?: string | null
@@ -2945,9 +3006,11 @@ export type Database = {
           sort_order?: number
           total_amount: number
           updated_at?: string
+          website_id: string
         }
         Update: {
           base_amount?: number
+          category_id?: string | null
           created_at?: string
           description?: string | null
           govt_portal_url?: string | null
@@ -2960,8 +3023,24 @@ export type Database = {
           sort_order?: number
           total_amount?: number
           updated_at?: string
+          website_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       smtp_settings: {
         Row: {
@@ -3314,6 +3393,36 @@ export type Database = {
           id?: string
           raw_payload?: Json | null
           webhook_type?: string
+        }
+        Relationships: []
+      }
+      websites: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3986,6 +4095,7 @@ export type Database = {
           technical_hold_kind: string | null
           technical_hold_started_at: string | null
           updated_at: string
+          website_id: string
           workflow_delay_reason: string | null
           workflow_expected_review_at: string | null
           workflow_priority: string | null

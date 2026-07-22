@@ -50,7 +50,9 @@ export const upsertService = createServerFn({ method: "POST" })
       const { error } = await supabase.from("services").update(patch).eq("id", id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabase.from("services").insert(data);
+      const { getDefaultWebsiteId } = await import("@/lib/websites/default-website.server");
+      const website_id = await getDefaultWebsiteId();
+      const { error } = await supabase.from("services").insert({ ...data, website_id });
       if (error) throw new Error(error.message);
     }
     return { ok: true };
