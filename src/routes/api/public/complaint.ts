@@ -80,6 +80,7 @@ export const Route = createFileRoute("/api/public/complaint")({
               total_amount: 0,
               gst_amount: 0,
               base_amount: 0,
+              website_id: websiteId,
             })
             .select("id")
             .single();
