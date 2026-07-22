@@ -407,7 +407,7 @@ export function currentMainEdgesFor(
   const s = new Set<string>();
   if (terminal) return s;
   if (phase === "customer_delay") return s;
-  if (phase === "form_not_submitted") {
+  if (phase === "form_not_submitted" || phase === "form_link_sent") {
     // Trace: order_rec → form_not is done; the closure path (form_not→B01→closed)
     // is highlighted separately via the form-nag active branch.
     s.add("e_or_fn");
