@@ -24,7 +24,7 @@ export const getAppSettings = createServerFn({ method: "GET" })
 export const updateCustomerDelayAutocloseMinutes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
-    z.object({ minutes: z.number().int().min(15).max(10080) }).parse(raw),
+    z.object({ minutes: z.number().int().min(1).max(10080) }).parse(raw),
   )
   .handler(async ({ data, context }) => {
     // Verify super_admin role using the caller's own RLS context.

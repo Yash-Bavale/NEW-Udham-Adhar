@@ -61,7 +61,7 @@ export async function readCustomerDelayAutocloseSeconds(): Promise<number> {
       .eq("id", 1)
       .maybeSingle();
     const mins = (data as { customer_delay_autoclose_minutes?: number } | null)?.customer_delay_autoclose_minutes;
-    if (typeof mins === "number" && mins >= 15) return mins * 60;
+    if (typeof mins === "number" && mins >= 1) return mins * 60;
   } catch {
     /* fall through to default */
   }
