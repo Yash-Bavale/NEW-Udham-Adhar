@@ -427,13 +427,14 @@ export const sendTestTemplateEmail = createServerFn({ method: "POST" })
     // Temporarily allow disabled templates for testing by setting enable=true in memory only.
     if (!tpl.is_enabled) {
       // enqueueFromTemplateInternal would no-op for disabled templates; bypass with raw render.
-      const { renderTemplate } = await import("./smtp.server");
-      const { enqueueEmailInternal } = await import("./emails.server");
-      await enqueueEmailInternal({
-        templateCode: tpl.code,
-        toEmail: data.toEmail,
+      const { renderTemplate, renderTemplateHtml } = await import("./smtp.server");
+      // Subject is plain text; body_html gets HTML-escaped variable substitution
+      // to prevent injection from user-supplied fields (contact/complaint forms).
+      const result = await enqueueEmailInternal({
+        templateCode: `TEST_${code}`,
+        toEmail,
         subject: `[TEST] ${renderTemplate(tpl.subject, variables)}`,
-        bodyHtml: renderTemplate(tpl.body_html, variables),
+        bodyHtml: renderTemplateHtml(tpl.body_html, variables),
         bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
         variables,
       });
