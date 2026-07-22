@@ -700,15 +700,12 @@ function TicketWorkspace() {
       )}
 
       {reasonOpen && (
-        <ReasonPicker
-          open={reasonOpen}
-          onClose={() => setReasonOpen(false)}
-          onConfirm={(payload) => {
+        <ReasonPickerDialog
+          onCancel={() => setReasonOpen(false)}
+          onSend={(v) => {
             setReasonOpen(false);
-            doCloseReply.mutate({ reason: payload.reason, note: payload.note });
+            doCloseReply.mutate(v);
           }}
-          title="Close with Reply (TB02)"
-          description="A reason-templated email will be sent to the customer and a 24-hour auto-close timer will start."
         />
       )}
     </div>
