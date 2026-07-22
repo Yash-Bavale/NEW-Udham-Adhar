@@ -189,6 +189,7 @@ import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/a
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
+import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 
 const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
   id: '/www-udyamregistration',
@@ -1134,6 +1135,12 @@ const ApiPublicAdminRegenerateInvoicesRoute =
     path: '/api/public/admin/regenerate-invoices',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminSupportTicketsTicketIdRoute =
+  AdminSupportTicketsTicketIdRouteImport.update({
+    id: '/$ticketId',
+    path: '/$ticketId',
+    getParentRoute: () => AdminSupportTicketsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1298,6 +1305,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1476,6 +1484,7 @@ export interface FileRoutesByTo {
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/tickets': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
+  '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1659,6 +1668,7 @@ export interface FileRoutesById {
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1843,6 +1853,7 @@ export interface FileRouteTypes {
     | '/admin/orders/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
+    | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -2021,6 +2032,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/tickets'
     | '/onboarding/$leadCode'
+    | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -2203,6 +2215,7 @@ export interface FileRouteTypes {
     | '/admin/orders/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
+    | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -3617,6 +3630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRegenerateInvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/support/tickets/$ticketId': {
+      id: '/admin/support/tickets/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/admin/support/tickets/$ticketId'
+      preLoaderRoute: typeof AdminSupportTicketsTicketIdRouteImport
+      parentRoute: typeof AdminSupportTicketsRoute
+    }
   }
 }
 
@@ -3721,10 +3741,12 @@ const AdminSubmissionsRouteWithChildren =
   AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
 
 interface AdminSupportTicketsRouteChildren {
+  AdminSupportTicketsTicketIdRoute: typeof AdminSupportTicketsTicketIdRoute
   AdminSupportTicketsIndexRoute: typeof AdminSupportTicketsIndexRoute
 }
 
 const AdminSupportTicketsRouteChildren: AdminSupportTicketsRouteChildren = {
+  AdminSupportTicketsTicketIdRoute: AdminSupportTicketsTicketIdRoute,
   AdminSupportTicketsIndexRoute: AdminSupportTicketsIndexRoute,
 }
 
