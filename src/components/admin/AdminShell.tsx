@@ -111,6 +111,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, module: "employees", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/permissions", label: "Permissions", icon: ShieldCheck, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/emails", label: "Email System", icon: Mail, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/email-templates", label: "Email Templates", icon: Mail, module: "email_templates", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/whatsapp-templates", label: "WhatsApp Templates", icon: MessageCircle, requireAnyRole: ADMIN_ROLES },
