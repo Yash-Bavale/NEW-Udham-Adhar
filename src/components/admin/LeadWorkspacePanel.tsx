@@ -168,7 +168,9 @@ function waNumber(mobile?: string | null) {
 
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const number = waNumber(lead.mobile);
-  const waUrl = number ? `https://wa.me/${number}` : null;
+  const waMessage = `Hello ${lead.name?.split(" ")[0] ?? "there"}, this is Business Help Services regarding your ${lead.service ?? "Udyam"} application${lead.lead_code ? ` (${lead.lead_code})` : ""}. How may we assist you?`;
+  const waUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(waMessage)}` : null;
+
   const total = lead.total_amount != null ? Number(lead.total_amount) : null;
   const sourceRaw = lead.lead_source ?? "";
   const sourceLabel = sourceRaw.startsWith("website:")
