@@ -134,6 +134,7 @@ import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
+import { Route as AdminMyPerformanceRouteImport } from './routes/admin.my-performance'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminInboxManagementRouteImport } from './routes/admin.inbox-management'
@@ -842,6 +843,11 @@ const AdminMyWorkRoute = AdminMyWorkRouteImport.update({
   path: '/my-work',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMyPerformanceRoute = AdminMyPerformanceRouteImport.update({
+  id: '/my-performance',
+  path: '/my-performance',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -1288,6 +1294,7 @@ export interface FileRoutesByFullPath {
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
@@ -1474,6 +1481,7 @@ export interface FileRoutesByTo {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
+  '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
@@ -1660,6 +1668,7 @@ export interface FileRoutesById {
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
@@ -1850,6 +1859,7 @@ export interface FileRouteTypes {
     | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
+    | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
@@ -2036,6 +2046,7 @@ export interface FileRouteTypes {
     | '/admin/gateways'
     | '/admin/inbox-management'
     | '/admin/invoices'
+    | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/payments'
@@ -2221,6 +2232,7 @@ export interface FileRouteTypes {
     | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
+    | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
@@ -3304,6 +3316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMyWorkRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/my-performance': {
+      id: '/admin/my-performance'
+      path: '/my-performance'
+      fullPath: '/admin/my-performance'
+      preLoaderRoute: typeof AdminMyPerformanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/leads': {
       id: '/admin/leads'
       path: '/leads'
@@ -3869,6 +3888,7 @@ interface AdminRouteChildren {
   AdminInboxManagementRoute: typeof AdminInboxManagementRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
+  AdminMyPerformanceRoute: typeof AdminMyPerformanceRoute
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
@@ -3914,6 +3934,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminInboxManagementRoute: AdminInboxManagementRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
+  AdminMyPerformanceRoute: AdminMyPerformanceRoute,
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
