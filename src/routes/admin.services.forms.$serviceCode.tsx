@@ -100,7 +100,9 @@ function FormBuilderPage() {
       setTitle(active.title || "");
       setDescription(active.description || "");
       setDocuments(Array.isArray(active.documents) ? (active.documents as Doc[]) : []);
-      const schemaAny = active.schema as { sections?: Section[]; fields?: Field[] } | null;
+      const schemaAny = active.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
+      setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
+      setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
       if (schemaAny?.sections?.length) setSections(schemaAny.sections);
       else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
       else setSections([{ key: "default", label: "Details", fields: [] }]);
@@ -108,6 +110,8 @@ function FormBuilderPage() {
       const fb = getFallbackSchema(serviceCode);
       setTitle(fb.title);
       setDescription(fb.description);
+      setSampleFormUrl(fb.sample_form_url ?? "");
+      setSampleFormLabel(fb.sample_form_label ?? "");
       setDocuments(fb.documents.map((d) => ({ key: d.key, label: d.label, required: d.required, help: d.help })));
       setSections(flatFieldsToSections(fb.fields as unknown as Field[]));
     }
