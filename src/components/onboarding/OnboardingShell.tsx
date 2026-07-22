@@ -66,6 +66,17 @@ export function OnboardingShell({
         </p>
         <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground mt-1">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto">{subtitle}</p>}
+        {sampleFormUrl && (
+          <a
+            href={sampleFormUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand-navy/30 bg-brand-navy/5 px-3 py-1.5 text-xs font-semibold text-brand-navy hover:bg-brand-navy/10 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {sampleFormLabel || "Download sample form"}
+          </a>
+        )}
       </div>
 
       {/* Animated progress bar */}
