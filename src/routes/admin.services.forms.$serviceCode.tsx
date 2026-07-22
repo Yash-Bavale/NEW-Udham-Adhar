@@ -285,6 +285,9 @@ function FormBuilderPage() {
             <span className="inline-flex items-center gap-1"><Type className="size-3.5" /> {totalFields} fields</span>
             <span className="inline-flex items-center gap-1"><FileText className="size-3.5" /> {documents.length} docs</span>
           </div>
+          <button onClick={() => setShowCopy(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
+            <Copy className="size-4" /> Copy from service
+          </button>
           <button onClick={() => setShowHistory(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
             <History className="size-4" /> History
             <span className="ml-1 rounded bg-slate-100 px-1.5 text-[11px] text-slate-600">{data?.versions.length ?? 0}</span>
