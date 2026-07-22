@@ -86,40 +86,36 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
           <input id={`${baseId}-name`} name="name" required className={inputCls} placeholder="Enter Applicant Name" />
         </Field>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <Field id={`${baseId}-email`} label="Email / ईमेल">
-            <input id={`${baseId}-email`} name="email" type="email" required className={inputCls} placeholder="Enter your email" />
-          </Field>
+        <Field id={`${baseId}-email`} label="Email / ईमेल">
+          <input id={`${baseId}-email`} name="email" type="email" required className={inputCls} placeholder="Enter your email" />
+        </Field>
 
-          <Field id={`${baseId}-mobile`} label="Mobile No / मोबाइल नंबर">
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm text-foreground/80 font-medium">
-                +91
-              </span>
-              <input
-                id={`${baseId}-mobile`}
-                name="mobile" required inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10}
-                className={`${inputCls} pl-14`} placeholder="Enter 10-digit mobile number"
-              />
-            </div>
-          </Field>
-        </div>
+        <Field id={`${baseId}-mobile`} label="Mobile No / मोबाइल नंबर">
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm text-foreground/80 font-medium">
+              +91
+            </span>
+            <input
+              id={`${baseId}-mobile`}
+              name="mobile" required inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10}
+              className={`${inputCls} pl-14`} placeholder="Enter 10-digit mobile number"
+            />
+          </div>
+        </Field>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <Field id={`${baseId}-state`} label="State / राज्य">
-            <select id={`${baseId}-state`} name="state" required defaultValue="" className={inputCls}>
-              <option value="" disabled>Select Your State</option>
-              {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
+        <Field id={`${baseId}-state`} label="State / राज्य">
+          <select id={`${baseId}-state`} name="state" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select Your State</option>
+            {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
 
-          <Field id={`${baseId}-language`} label="Language of Assistance / सहायता की भाषा">
-            <select id={`${baseId}-language`} name="language" required defaultValue="" className={inputCls}>
-              <option value="" disabled>Select Language</option>
-              {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </Field>
-        </div>
+        <Field id={`${baseId}-language`} label="Language of Assistance / सहायता की भाषा">
+          <select id={`${baseId}-language`} name="language" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Select Language</option>
+            {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </Field>
 
         <Field id={`${baseId}-service`} label="Reason for Help (Assistance) / सहायता का कारण">
           <select id={`${baseId}-service`} name="service" required defaultValue="" className={inputCls}>
@@ -127,6 +123,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
             {visibleServices.map((s) => <option key={s.slug} value={s.label}>{s.label}</option>)}
           </select>
         </Field>
+
 
         <label htmlFor={`${baseId}-consent`} className="flex gap-3 items-start text-xs text-foreground/80 leading-relaxed">
           <input id={`${baseId}-consent`} type="checkbox" name="consent" required className="mt-1 h-5 w-5 shrink-0 accent-brand-navy-deep border-2 border-brand-navy-deep rounded-sm cursor-pointer" style={{ accentColor: '#0a1f44' }} />
