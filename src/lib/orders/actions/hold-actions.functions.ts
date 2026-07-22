@@ -206,6 +206,9 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         awaiting_govt_started_at: null,
         active_reason_id: null,
         active_reason_text: null,
+        workflow_status: "in_processing",
+        workflow_delay_reason: null,
+        workflow_expected_review_at: null,
         // Delay resolved → revert to S04 Form Submitted (happy-flow hub)
         fulfillment_status: "form_submitted",
       } as never)
