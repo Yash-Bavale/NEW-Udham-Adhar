@@ -56,6 +56,7 @@ export function ContactPage() {
     <section className="mx-auto max-w-7xl px-4 py-8 md:py-12 grid gap-8 lg:grid-cols-2 items-start">
       {/* Left: intro + contact details */}
       <div className="space-y-5 text-foreground/90 text-[15px] leading-relaxed">
+        <h1 className="text-2xl md:text-3xl font-bold font-display text-foreground">Contact Business Help Services</h1>
         <p>Thank you for visiting Business Help Services.</p>
         <p>
           We are committed to providing professional consultancy, documentation
