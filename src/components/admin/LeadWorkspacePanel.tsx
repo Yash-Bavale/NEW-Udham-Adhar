@@ -178,6 +178,20 @@ function waNumber(mobile?: string | null) {
   return digits.length === 10 ? "91" + digits : digits;
 }
 
+function whatsappUrl(number: string, message: string) {
+  return `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(message)}`;
+}
+
+function openWhatsApp(url: string, preparedWindow?: Window | null) {
+  if (preparedWindow && !preparedWindow.closed) {
+    preparedWindow.location.replace(url);
+    return;
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.assign(url);
+}
+
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const number = waNumber(lead.mobile);
   const waMessage = `Hello ${lead.name?.split(" ")[0] ?? "there"}, this is Business Help Services regarding your ${lead.service ?? "Udyam"} application${lead.lead_code ? ` (${lead.lead_code})` : ""}. How may we assist you?`;
@@ -343,7 +357,7 @@ function QuickActionsCard({
 
   const number = waNumber(lead.mobile);
   const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
-  const introWaUrl = number ? `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}` : null;
+  const introWaUrl = number ? whatsappUrl(number, introMsg) : null;
 
 
 
@@ -359,9 +373,7 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
-      if (waWin && next === "contacted") {
-        waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(introMsg)}`;
-      }
+      if (next === "contacted" && introWaUrl) openWhatsApp(introWaUrl, waWin);
     } catch (e: any) {
       if (waWin) waWin.close();
       toast.error(e?.message ?? "Failed");
@@ -396,11 +408,17 @@ function QuickActionsCard({
 
   const sendPaymentLinkWhatsApp = async () => {
     if (!number) { toast.error("Add a mobile number first"); return; }
+    if (paymentUrl) {
+      const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl);
+      openWhatsApp(whatsappUrl(number, msg));
+      return;
+    }
+
     const waWin = window.open("about:blank", "_blank");
     const url = paymentUrl ?? await ensurePaymentUrl();
     if (!url) { waWin?.close(); return; }
     const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
-    if (waWin) waWin.location.href = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+    openWhatsApp(whatsappUrl(number, msg), waWin);
   };
 
   const sendPaymentLinkEmail = async () => {
