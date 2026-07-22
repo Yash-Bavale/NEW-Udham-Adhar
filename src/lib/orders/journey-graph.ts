@@ -481,7 +481,7 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
 
   // 2b. Form Submitted (S03): highlight ALL possible-next paths as active-blue
   // so the operator sees every branch they can take next.
-  if (i.phase === "form_submitted" && !i.terminal) {
+  if ((i.phase === "form_submitted" || i.phase === "post_b03_resume") && !i.terminal) {
     const POSSIBLE_NEXT_FROM_FORM_SUB = new Set([
       "e_fs_b02",                     // Into Technical Delay
       "e_top_gv",                     // Main happy path → Govt Portal
