@@ -709,6 +709,118 @@ function FormBuilderPage() {
           </div>
         </div>
       )}
+
+      {showCopy && (
+        <CopyFromServiceDialog
+          serviceCode={serviceCode}
+          onClose={() => setShowCopy(false)}
+          onApply={applyCopy}
+        />
+      )}
+    </div>
+  );
+}
+
+function CopyFromServiceDialog({
+  serviceCode,
+  onClose,
+  onApply,
+}: {
+  serviceCode: string;
+  onClose: () => void;
+  onApply: (sections: Section[], docs: Doc[], mode: "append" | "replace") => void;
+}) {
+  const listFn = useServerFn(listCopyableForms);
+  const { data, isLoading } = useQuery({
+    queryKey: ["copyable-forms", serviceCode],
+    queryFn: () => listFn({ data: { exclude_service_code: serviceCode } }),
+  });
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const [mode, setMode] = useState<"append" | "replace">("append");
+  const [includeDocs, setIncludeDocs] = useState(true);
+
+  const picked = data?.rows.find((r) => r.service_code === pickedCode) ?? null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">Copy from another service</div>
+            <div className="font-semibold text-slate-900">Reuse sections & documents</div>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><X className="size-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 grid md:grid-cols-[240px_1fr] gap-4">
+          <div className="rounded-lg border bg-slate-50/50 overflow-y-auto max-h-[55vh]">
+            {isLoading && <div className="p-4 text-sm text-slate-500">Loading…</div>}
+            {!isLoading && (data?.rows.length ?? 0) === 0 && (
+              <div className="p-4 text-sm text-slate-500">No other services have a published form yet.</div>
+            )}
+            {(data?.rows ?? []).map((r) => (
+              <button
+                key={r.service_code}
+                onClick={() => setPickedCode(r.service_code)}
+                className={`w-full text-left px-3 py-2 border-b text-sm ${pickedCode === r.service_code ? "bg-indigo-50 text-indigo-900" : "hover:bg-white"}`}
+              >
+                <div className="font-medium truncate">{r.title}</div>
+                <div className="text-[11px] text-slate-500 font-mono">{r.service_code}</div>
+              </button>
+            ))}
+          </div>
+          <div className="min-w-0 space-y-3">
+            {!picked && <div className="text-sm text-slate-500">Pick a service on the left to preview its sections.</div>}
+            {picked && (
+              <>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Sections ({picked.sections.length})</div>
+                  <ul className="rounded-lg border divide-y bg-white">
+                    {picked.sections.map((s) => (
+                      <li key={s.key} className="px-3 py-2 text-sm flex items-center justify-between gap-3">
+                        <span className="truncate">{s.label}</span>
+                        <span className="text-[11px] text-slate-500 shrink-0">{s.fieldCount} fields</span>
+                      </li>
+                    ))}
+                    {picked.sections.length === 0 && <li className="px-3 py-3 text-sm text-slate-500">No sections</li>}
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Documents ({picked.documents.length})</div>
+                  <label className="inline-flex items-center gap-1.5 text-xs">
+                    <input type="checkbox" checked={includeDocs} onChange={(e) => setIncludeDocs(e.target.checked)} />
+                    Include documents
+                  </label>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Mode</div>
+                  <div className="flex gap-2 text-sm">
+                    <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer ${mode === "append" ? "border-indigo-500 bg-indigo-50" : "hover:bg-slate-50"}`}>
+                      <input type="radio" className="hidden" checked={mode === "append"} onChange={() => setMode("append")} />
+                      <div className="font-medium">Append</div>
+                      <div className="text-[11px] text-slate-500">Add these sections after existing ones.</div>
+                    </label>
+                    <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer ${mode === "replace" ? "border-rose-500 bg-rose-50" : "hover:bg-slate-50"}`}>
+                      <input type="radio" className="hidden" checked={mode === "replace"} onChange={() => setMode("replace")} />
+                      <div className="font-medium">Replace</div>
+                      <div className="text-[11px] text-slate-500">Wipe current form and use these instead.</div>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="border-t px-5 py-3 flex items-center justify-end gap-2 bg-slate-50">
+          <button onClick={onClose} className="rounded-md border bg-white px-3 py-1.5 text-sm hover:bg-slate-100">Cancel</button>
+          <button
+            disabled={!picked}
+            onClick={() => picked && onApply(picked.rawSections as unknown as Section[], (includeDocs ? picked.documents : []) as unknown as Doc[], mode)}
+            className="rounded-md bg-slate-900 text-white px-4 py-1.5 text-sm font-medium disabled:opacity-40 hover:bg-slate-800"
+          >
+            {mode === "replace" ? "Replace form" : "Append to form"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
