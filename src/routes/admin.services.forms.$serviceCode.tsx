@@ -211,7 +211,17 @@ function FormBuilderPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveFn({ data: { service_code: serviceCode, title, description, sections, documents } });
+      await saveFn({
+        data: {
+          service_code: serviceCode,
+          title,
+          description,
+          sections,
+          documents,
+          sample_form_url: sampleFormUrl || undefined,
+          sample_form_label: sampleFormLabel || undefined,
+        },
+      });
       await refetch();
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2200);
@@ -229,11 +239,30 @@ function FormBuilderPage() {
     setTitle(row.title || "");
     setDescription(row.description || "");
     setDocuments(Array.isArray(row.documents) ? (row.documents as Doc[]) : []);
-    const schemaAny = row.schema as { sections?: Section[]; fields?: Field[] } | null;
+    const schemaAny = row.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
+    setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
+    setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
     if (schemaAny?.sections?.length) setSections(schemaAny.sections);
     else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
     setShowHistory(false);
     setActiveSection(0);
+  }
+
+  function applyCopy(rawSections: Section[], newDocs: Doc[], mode: "append" | "replace") {
+    if (mode === "replace") {
+      setSections(rawSections.length ? rawSections : [{ key: "default", label: "Details", fields: [] }]);
+      setDocuments(newDocs);
+      setActiveSection(0);
+    } else {
+      setSections((prev) => [...prev, ...rawSections]);
+      setDocuments((prev) => {
+        const keys = new Set(prev.map((d) => d.key));
+        const filtered = newDocs.filter((d) => !keys.has(d.key));
+        return [...prev, ...filtered];
+      });
+    }
+    setSelected(null);
+    setShowCopy(false);
   }
 
   if (isLoading) return <div className="p-8 text-slate-500">Loading form builder…</div>;
