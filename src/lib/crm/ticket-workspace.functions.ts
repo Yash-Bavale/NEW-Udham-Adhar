@@ -183,6 +183,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       },
       replies,
       inboundEmails: emailOnly,
+      outboundEmails: (emailsRes.data ?? []).filter((e: any) => e.direction === "outbound"),
       events: (eventsRes.data ?? []).map((r: any) => ({
         ...r,
         actor_name: r.created_by ? nameMap.get(r.created_by) ?? r.staff_name ?? "System" : r.staff_name ?? "System",
