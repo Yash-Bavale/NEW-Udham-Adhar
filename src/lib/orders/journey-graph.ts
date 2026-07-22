@@ -420,12 +420,14 @@ export function currentMainEdgesFor(
       s.add("e_fs_b02");
       s.add("e_b02_b03");
     } else if (phase === "post_b03_resume") {
-      s.add("e_b03_gv");
+      // Tech delay resolved — back at Form Submitted hub, no single "current" edge;
+      // possible-next paths are highlighted as active-blue via edgeState below.
     } else {
       // Normal flow: bypassing B02/B03
       s.add("e_top_gv");
     }
   }
+
   if (currentIdx === 4) s.add("e_gv_cs");
   return s;
 }
