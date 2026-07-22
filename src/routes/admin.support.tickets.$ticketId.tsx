@@ -1188,3 +1188,46 @@ function ConsultDialog({ value, onChange, onCancel, onSend }: {
     </div>
   );
 }
+
+function ReasonPickerDialog({
+  onCancel, onSend,
+}: {
+  onCancel: () => void;
+  onSend: (v: { reasonId: string | null; reasonLabel: string; replyBody: string }) => void;
+}) {
+  const [reasonId, setReasonId] = useState<string | null>(null);
+  const [reasonLabel, setReasonLabel] = useState<string>("");
+  const [reply, setReply] = useState<string>("");
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold text-slate-900">Close with Reply (TB02)</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Pick a reason. The T002 email will be sent to the customer with the reply below and a
+          24-hour auto-close timer will start.
+        </p>
+        <div className="mt-4">
+          <ReasonPicker
+            value={reasonId}
+            onChange={(id, reason) => {
+              setReasonId(id);
+              setReasonLabel(reason?.reason_text ?? reason?.reason_code ?? "");
+            }}
+            reply={reply}
+            onReplyChange={setReply}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="px-3 py-1.5 rounded-md text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
+          <button
+            onClick={() => onSend({ reasonId, reasonLabel, replyBody: reply })}
+            disabled={!reasonId || !reply.trim()}
+            className="px-3 py-1.5 rounded-md text-sm text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send & Arm 24h Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
