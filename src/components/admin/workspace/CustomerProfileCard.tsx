@@ -12,9 +12,9 @@ interface Props {
  * Shows every contact/lead field we have so staff can read everything in one place.
  */
 export function CustomerProfileCard({ customer, lead }: Props) {
-  const name = customer?.name ?? lead?.name ?? "—";
-  const mobile = customer?.primary_mobile ?? lead?.mobile ?? null;
-  const email = customer?.primary_email ?? lead?.email ?? null;
+  const name = lead?.name ?? customer?.name ?? "—";
+  const mobile = lead?.mobile ?? customer?.primary_mobile ?? null;
+  const email = lead?.email ?? customer?.primary_email ?? null;
   const waPhone = mobile ? String(mobile).replace(/\D/g, "") : "";
   const waUrl = waPhone ? `https://wa.me/${waPhone.length === 10 ? "91" + waPhone : waPhone}` : null;
 
