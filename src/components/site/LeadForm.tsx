@@ -128,7 +128,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         <Field id={`${baseId}-service`} label="Reason for Help (Assistance) / सहायता का कारण">
           <select id={`${baseId}-service`} name="service" required defaultValue="" className={inputCls}>
             <option value="" disabled>Select Reason</option>
-            {visibleServices.map((s) => <option key={s.slug} value={s.label}>{s.label}</option>)}
+            {visibleServices.map((s) => <option key={s.slug} value={s.slug}>{s.label}</option>)}
           </select>
         </Field>
 
