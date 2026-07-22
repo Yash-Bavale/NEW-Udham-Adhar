@@ -15,20 +15,25 @@ export const listServices = createServerFn({ method: "GET" })
     return { rows: data ?? [] };
   });
 
-// Public: active service codes for the website lead form.
+// Public: active services (code + display name) for the website lead form.
 export const listActiveServiceCodes = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("services")
-    .select("service_code")
-    .eq("is_active", true);
+    .select("service_code, service_name, sort_order")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
-  return { codes: (data ?? []).map((r) => r.service_code as string) };
+  const rows = data ?? [];
+  return {
+    codes: rows.map((r) => r.service_code as string),
+    services: rows.map((r) => ({ code: r.service_code as string, name: r.service_name as string })),
+  };
 });
 
 const ServiceInput = z.object({
   id: z.string().uuid().optional(),
-  service_code: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/),
+  service_code: z.string().trim().min(2).max(80).regex(/^[a-zA-Z0-9_-]+$/, "letters, numbers, hyphen or underscore only"),
   service_name: z.string().trim().min(2).max(160),
   description: z.string().max(2000).nullable().optional(),
   base_amount: z.number().min(0).max(1_000_000),

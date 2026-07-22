@@ -101,9 +101,13 @@ function ServicesPage() {
           <div className="flex gap-2">
             <button
               onClick={async () => {
-                await upsertFn({ data: form as never });
-                await qc.invalidateQueries({ queryKey: ["admin.services"] });
-                setForm(null);
+                try {
+                  await upsertFn({ data: form as never });
+                  await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                  setForm(null);
+                } catch (e) {
+                  alert("Save failed: " + (e as Error).message);
+                }
               }}
               className="rounded bg-slate-900 text-white px-4 py-2 text-sm"
             >Save</button>

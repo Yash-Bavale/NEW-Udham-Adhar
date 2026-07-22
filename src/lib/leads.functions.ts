@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { SERVICES, SERVICE_LABELS, INDIAN_STATES, LANGUAGES } from "./constants";
+import { SERVICES, INDIAN_STATES, LANGUAGES } from "./constants";
 
 const LeadInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -8,7 +8,7 @@ const LeadInput = z.object({
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
   state: z.enum(INDIAN_STATES as [string, ...string[]]),
   language: z.enum(LANGUAGES as [string, ...string[]]),
-  service: z.enum(SERVICE_LABELS as unknown as [string, ...string[]]),
+  service: z.string().trim().min(1).max(200),
   consent: z.literal(true, { message: "You must accept the terms to proceed" }),
   source_page: z.string().trim().max(300).optional(),
 });
@@ -27,21 +27,22 @@ export const createLead = createServerFn({ method: "POST" })
     const { getDefaultWebsiteId } = await import("./websites/default-website.server");
     const websiteId = await getDefaultWebsiteId();
     // 1. Map form label -> internal slug -> DB service row
-    const slug = SERVICES.find((s) => s.label === data.service)?.slug;
-    if (!slug) {
-      throw new Error("Selected service is not available. Please try again.");
-    }
-
+    // 1. Resolve service by code (slug) OR by legacy label — supports admin-renamed services.
+    const raw = data.service;
+    const slugFromStatic = SERVICES.find((s) => s.label === raw)?.slug;
+    const candidate = slugFromStatic ?? raw;
     const { data: service, error: svcErr } = await supabaseAdmin
       .from("services")
-      .select("id, service_name, base_amount, gst_amount, total_amount, is_active")
-      .eq("service_code", slug)
+      .select("id, service_code, service_name, base_amount, gst_amount, total_amount, is_active")
+      .or(`service_code.eq.${candidate},service_name.eq.${raw}`)
       .maybeSingle();
 
     if (svcErr) throw new Error(svcErr.message);
     if (!service || !service.is_active) {
       throw new Error("Selected service is not currently available.");
     }
+    // Store the current display name so renamed services propagate.
+    data.service = service.service_name as string;
 
     const baseAmount = Number(service.base_amount);
     const gstAmount = Number(service.gst_amount);

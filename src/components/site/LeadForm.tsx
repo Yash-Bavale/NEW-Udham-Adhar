@@ -12,14 +12,22 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   const fetchActiveCodes = useServerFn(listActiveServiceCodes);
   const baseId = useId();
 
-  const [activeCodes, setActiveCodes] = useState<string[] | null>(null);
+  const [activeServices, setActiveServices] = useState<Array<{ code: string; name: string }> | null>(null);
   useEffect(() => {
-    fetchActiveCodes().then((r) => setActiveCodes(r.codes)).catch(() => setActiveCodes(null));
+    fetchActiveCodes()
+      .then((r) => setActiveServices(r.services ?? r.codes.map((c: string) => ({ code: c, name: c }))))
+      .catch(() => setActiveServices(null));
   }, [fetchActiveCodes]);
-  const visibleServices = useMemo(
-    () => (activeCodes ? SERVICES.filter((s) => activeCodes.includes(s.slug)) : SERVICES),
-    [activeCodes],
-  );
+  const visibleServices = useMemo(() => {
+    if (activeServices && activeServices.length > 0) {
+      // Prefer live DB names; fall back to static label if a code matches SERVICES.
+      return activeServices.map((s) => {
+        const staticMatch = SERVICES.find((x) => x.slug === s.code);
+        return { slug: s.code, label: s.name || staticMatch?.label || s.code };
+      });
+    }
+    return SERVICES.map((s) => ({ slug: s.slug, label: s.label }));
+  }, [activeServices]);
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -120,7 +128,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
         <Field id={`${baseId}-service`} label="Reason for Help (Assistance) / सहायता का कारण">
           <select id={`${baseId}-service`} name="service" required defaultValue="" className={inputCls}>
             <option value="" disabled>Select Reason</option>
-            {visibleServices.map((s) => <option key={s.slug} value={s.label}>{s.label}</option>)}
+            {visibleServices.map((s) => <option key={s.slug} value={s.slug}>{s.label}</option>)}
           </select>
         </Field>
 
