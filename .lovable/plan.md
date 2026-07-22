@@ -1,19 +1,59 @@
-## Fix Form Submitted (S03) "possible next" edge highlights
+## Goal
 
-In `src/lib/orders/journey-graph.ts`, update the `POSSIBLE_NEXT_FROM_FORM_SUB` set inside `edgeState` so the blue "possible next" glow at S03 shows only the edges the operator can actually trigger from Form Submitted:
+Split the single "Pause order — mark delay" dialog into two dedicated dialogs with the right controls for each delay type.
 
-**Remove from set:**
-- `e_b02_b03` — Technical Delay → Issue Resolved (only lights up once B02 is clicked)
-- `e_b04_cl` — Customer Side Delay → Order Closed (only lights up once B04 is clicked)
-- `e_gv_cs` — Application Submitted → Application Accepted/Closed (not a direct next step from S03)
+## Current state (verified)
 
-**Add to set:**
-- `e_top_cs` — top loop edge from Form Submitted up-and-over to Application Accepted/Closed (this is the missing route the user wants highlighted)
+- `src/components/admin/ExternalDelayDialog.tsx` handles both delays with a top toggle (Customer-side / Our-side).
+- Both variants currently show the same Expected Review Date + Priority controls, even though customer delay doesn't need an internal reminder.
+- Dialog is opened from `WorkspaceShell.tsx` and `CustomerJourneyMap.tsx` using `{ kind: "customer_delay" | "technical_delay" }`.
 
-**Keep as-is:**
-- `e_fs_b02` (into Technical Delay)
-- `e_top_gv` (to Application Submitted Govt Portal)
-- `e_bot_b04` (into Customer Side Delay)
-- `e_gv_b05`, `e_gv_b06`, `e_cs_b07`, `e_cs_b08` (sub-card drops)
+## Plan
 
-No other files, no logic changes elsewhere — pure edge-list adjustment for the S03 preview highlight.
+### 1. New `CustomerDelayDialog.tsx`
+
+Purpose: pause the order and email the customer (E003). No self-reminder.
+
+- Header: "Customer-side delay — notify customer"
+- Reason picker (customer reasons only, unchanged from current customer tab)
+- Internal note (team-only)
+- Customer-visible note (optional, appended to email)
+- Info panel: "Customer receives E003 now. Order auto-closes after {app_settings.customer_delay_autoclose_minutes} if no reply. Resume anytime."
+- No Expected Review Date, no Priority.
+- Primary button: "Save & notify customer".
+
+### 2. New `TechnicalDelayDialog.tsx`
+
+Purpose: pause the order internally and set our own follow-up reminder. customer email also sent & then internal reminder.
+
+- Header: "Our-side (technical) delay — internal follow-up"
+- Reason picker (internal reasons only)
+- Follow-up reminder — replaces Expected Review Date:
+  - Preset chips: `1h`, `2h`, `3h`, `6h`, `1d`, `3d`, `7d` (single-select, default `2h`)
+  - "Custom…" chip → reveals a small HH:MM / minutes input (min 15 min, max 30 days) reusing the same validation as `armTimer`.
+  - Shown value drives `reminderMinutes` passed to `startTechnicalHold` (already supports this).
+- Priority (Low / Normal / High / Urgent) — kept, used for the internal reminder.
+- Internal note (team-only). No customer-visible note field.
+- Info panel: "Email is sent to customer regarding technical delay & Assignee gets a reminder in {selected duration}, repeating until you Resume."
+- Primary button: "Save & notify assignee".
+
+### 3. Wire the new dialogs
+
+- `WorkspaceShell.tsx` (lines ~706–715) and `CustomerJourneyMap.tsx` (lines ~544–553): replace the two `<ExternalDelayDialog>` instances with `<CustomerDelayDialog>` and `<TechnicalDelayDialog>`, keeping the existing `{ kind: … }` state and success handlers (invalidations, toast) exactly as they are.
+- Keep `ExternalDelayDialog.tsx` file for now but stop importing it (safe to delete in a follow-up; not doing it here to avoid touching unrelated call sites).
+
+### 4. Server functions
+
+No changes. `startTechnicalHold` already accepts `reminderMinutes` + `remarks` + `reasonId`, and `customerSideDelay` already handles the customer flow with the app-settings timer.
+
+## Out of scope
+
+- Reason library edits, email template edits, journey highlight rules — untouched.
+- No DB migrations.
+
+## Files touched
+
+- `src/components/admin/workspace/CustomerDelayDialog.tsx` (new)
+- `src/components/admin/workspace/TechnicalDelayDialog.tsx` (new)
+- `src/components/admin/workspace/WorkspaceShell.tsx` (swap imports/usages)
+- `src/components/admin/workspace/CustomerJourneyMap.tsx` (swap imports/usages)
