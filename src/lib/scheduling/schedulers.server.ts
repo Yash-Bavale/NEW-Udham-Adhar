@@ -264,6 +264,9 @@ export async function resolveCustomerDelay(
   }
 
   return { cancelled: (cancelled ?? []).length, reverted };
+}
+
+
 
 // ─────────────────────────── Fire due schedulers ───────────────────────────
 
