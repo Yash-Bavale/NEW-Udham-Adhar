@@ -428,7 +428,7 @@ function TicketWorkspace() {
           <AssigneePicker
             currentId={ticket.assigned_to}
             currentName={ticket.assigned_name}
-            staff={(staff as any) ?? []}
+            staff={((staff as any)?.staff ?? []) as any}
             onPick={(id) => changeAssignee.mutate(id)}
           />
 
