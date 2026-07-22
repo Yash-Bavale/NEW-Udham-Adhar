@@ -1,81 +1,93 @@
-## Part 3 — Granular Role-Based Access Control
+## Goals
 
-Layer per-employee permissions on top of the existing `user_roles` system without breaking `admin`/`super_admin` bypass or existing RLS.
+1. Wire the new RBAC (`<Can>` + `scopeIds()`) into pages so unauthorized users don't see actions/rows.
+2. Build the Employee Performance dashboard (Part 1 of the earlier 3-part CRM enhancement) — contact tracking, conversion attribution, unique/repeat detection, and reporting UI.
 
-### Data model (single migration)
+---
 
-`**permission_modules**` (seed table, read-only for staff)
+## Part A — Wire RBAC into the app
 
-- `key` (PK text): e.g. `leads`, `orders`, `tickets`, `services`, `websites`, `customers`, `payments`, `reports`, `settings`, `form_builder`, `assignments`
-- `label`, `description`, `sort_order`
-- Seeded with all current admin modules.
+### A1. UI gating with `<Can>` (client-side hide)
+Wrap destructive/admin actions in the existing `<Can module="…" action="…">` component across:
 
-`**user_permissions**` (per-employee grants)
+- **Leads** (`admin.leads.index.tsx`, `admin.leads.$leadId.tsx`, `LeadWorkspacePanel.tsx`): bulk delete, "Assign to…", edit customer, delete lead.
+- **Orders** (`admin.orders.index.tsx`, `admin.orders.$orderId.tsx`, `OrderWorkflowPanel.tsx`): close order, refund, change service, admin override, delete docs.
+- **Customers, Applications, Tickets, Invoices, Payments, Services, Websites, Employees, Permissions, Email Templates, SEO, Automations** index + detail pages: hide Create / Edit / Delete buttons per module key.
+- **Sidebar** (`AdminShell.tsx`): hide nav entries when the user has zero `view` permission on that module (admins always pass).
 
-- `user_id` (FK auth.users)
-- `module_key` (FK permission_modules)
-- `can_view`, `can_create`, `can_edit`, `can_delete` (bool, default false)
-- `scope_all` (bool, default true) — if false, restrict to scoped rows
-- PK (`user_id`, `module_key`)
+Module keys align with rows already in `permission_modules`.
 
-`**user_permission_scopes**` (row-level scope)
+### A2. List scoping with `scopeIds()`
+When `scopeAll === false`, pass the resolved website/category/service ID lists into list queries. Two-tier approach:
 
-- `user_id`, `module_key`
-- `website_id` (nullable), `category_id` (nullable), `service_id` (nullable)
-- One row = one allowed slice; module read is union of scopes.
+- **Client filter (fast win)**: in list routes (leads, orders, applications, tickets, services) call `scopeIds(module)` and, when not `all`, filter the returned rows by matching `service_id` / `website_id` / `category_id` before rendering.
+- **Server filter (defence-in-depth)**: add an optional `scopeFilter` arg to the corresponding list server functions (`listLeads`, `listOrders`, `listApplications`, `listTickets`, `listServices`). When provided, apply `.in('service_id', ids)` etc. Admins skip the filter.
 
-**Helper functions (SECURITY DEFINER):**
+RLS policies stay unchanged for this pass (as previously agreed) — enforcement is UI + server-fn scoped queries. Add a TODO comment linking the follow-up RLS migration.
 
-- `has_permission(_uid, _module, _action text)` — admin/super_admin auto-true; otherwise checks `user_permissions`.
-- `permitted_service_ids(_uid, _module)` — returns array of service UUIDs the user may access (or NULL meaning "all").
-- `permitted_website_ids(_uid, _module)` — same for websites.
+### A3. Verification
+- Sign in as admin: everything visible (unchanged).
+- Sign in as a scoped employee: hidden buttons, filtered lists, sidebar reflects modules.
+- Typecheck + smoke click through Leads, Orders, Services.
 
-GRANTs + RLS: `authenticated` reads own permissions; only admins write.
+---
 
-### RLS updates
+## Part B — Employee Performance Tracking
 
-Extend existing lead/application/ticket policies to also allow rows where `service_id`/`website_id` is in `permitted_*_ids(auth.uid(), '<module>')`. Admin/super_admin unchanged (already bypass).
+### B1. Data model (one migration)
+Reuse existing tables; only two additions:
 
-### Server functions
+- `public.lead_contact_events` — one row per outbound contact attempt.
+  - fields: `lead_id`, `user_id`, `channel` (`whatsapp | email | call | note`), `outcome` (`connected | no_answer | wrong_number | not_interested | callback | converted_intent`), `notes`, `created_at`.
+  - RLS: staff insert their own; admins read all; employees read own.
+  - GRANTs for authenticated + service_role.
+- `public.lead_attribution` — one row per lead capturing conversion source.
+  - fields: `lead_id UNIQUE`, `first_contact_user_id`, `first_contact_at`, `converted_user_id` (nullable), `converted_at`, `conversion_kind` (`system_paid | employee_handled | organic`), `is_unique_lead` (bool, false when same email/mobile already exists), `repeat_of_lead_id` (nullable).
+  - Trigger on `leads INSERT`: set `is_unique_lead` + `repeat_of_lead_id` by matching normalized email/mobile.
+  - Trigger on `lead_contact_events INSERT`: populate `first_contact_user_id/at` if null.
+  - Trigger on `applications UPDATE` when `fulfillment_status` transitions to a paid/completed state: set `converted_user_id` = current `assigned_to` (or first contact user if system-paid before any contact) and `conversion_kind` accordingly.
 
-`src/lib/crm/permissions-admin.functions.ts`:
+### B2. Server functions (`src/lib/crm/performance.functions.ts`)
+All `requireSupabaseAuth`, admin-only via `assertRole`:
 
-- `listPermissionModules()`
-- `listUserPermissions(userId)` — returns modules + scopes
-- `upsertUserPermission({ userId, moduleKey, canView, canCreate, canEdit, canDelete, scopeAll })`
-- `setUserPermissionScopes({ userId, moduleKey, scopes: [{websiteId?, categoryId?, serviceId?}] })`
-- `listStaffUsers()` — id, email, display_name, role
+- `logLeadContact({ leadId, channel, outcome, notes })` — inserts a `lead_contact_events` row; also mirrors an `activity_logs` row for the existing timeline.
+- `getPerformanceOverview({ from, to, userId? })` — returns per-employee KPI rows: leads assigned, contacted, avg time-to-first-contact, conversions (employee-handled vs system-paid), conversion rate, repeat vs unique split, revenue attributed (join `payments`/`invoices` on converted leads).
+- `getEmployeeDetail({ userId, from, to })` — contact log, funnel counts by service, daily trend.
+- `getMyPerformance({ from, to })` — same shape but scoped to `auth.uid()` for self-view.
 
-`src/lib/crm/permissions.functions.ts` (self):
+### B3. UI wiring
 
-- `getMyPermissions()` — used by client to gate UI. Returns `{ [moduleKey]: {view,create,edit,delete, scopes} }`.
+- **Log contact (staff surface)**: in `LeadWorkspacePanel.tsx`, replace/augment the existing "Mark as Contacted" quick action with a small dialog that calls `logLeadContact` (channel + outcome dropdowns + optional note). Existing WhatsApp/Email quick actions also call `logLeadContact` automatically on click.
+- **Employee self view**: new route `/admin/my-performance` — KPI cards + funnel chart from `getMyPerformance`. Linked from the sidebar under "My Work".
+- **Admin performance dashboard**: new route `/admin/performance` — leaderboard table (sortable columns), per-employee drilldown drawer, date-range picker reusing `DateRangePicker`, filters for service/website (respects `scopeIds`). Sidebar entry gated with `<Can module="performance">`; add a `performance` row to `permission_modules` in the same migration.
 
-### Client integration
+### B4. Verification
 
-- `src/hooks/usePermissions.ts` — TanStack Query wrapper around `getMyPermissions`, caches per session.
-- `<Can module="leads" action="edit">` component + `useCan(module, action)` hook.
-- `AdminShell.tsx`: filter sidebar links by `view` permission (admin sees all).
-- Guard action buttons (assign, delete, edit) in Leads/Orders/Tickets/Services pages via `useCan`.
+- Insert a lead, log contacts, mark paid — attribution row reflects `employee_handled`.
+- Insert a webhook-paid lead with no contact — shows `system_paid`.
+- Duplicate email → `is_unique_lead=false`, `repeat_of_lead_id` set.
+- Admin sees leaderboard; employee sees only their own metrics.
+- Typecheck clean.
 
-### Admin UI
+---
 
-New route `src/routes/admin.permissions.tsx`:
+## Deliverables (files touched)
 
-1. Left column: staff user list (search).
-2. Right column for selected user: matrix — rows = modules, columns = View / Create / Edit / Delete + "Scope: All / Custom".
-3. Expand a "Custom" module → picker to add scope rows (Website → Category → Service selects; leaving deeper levels blank means "all under").
-4. Save persists via server fns; live toast + query invalidation.
+```text
+supabase/migrations/*.sql              # tables, triggers, GRANTs, permission_modules row
+src/lib/crm/performance.functions.ts   # new
+src/routes/admin.performance.tsx       # admin dashboard
+src/routes/admin.my-performance.tsx    # self view
+src/components/admin/AdminShell.tsx    # sidebar gating + new links
+src/components/admin/LeadWorkspacePanel.tsx  # log-contact dialog
+src/routes/admin.leads.index.tsx, admin.orders.index.tsx,
+src/routes/admin.applications.tsx, admin.tickets.index.tsx,
+src/routes/admin.services.index.tsx, admin.websites.tsx,
+src/routes/admin.customers.tsx, admin.invoices.tsx,
+src/routes/admin.payments.tsx, admin.employees.tsx,
+src/routes/admin.email-templates.tsx, admin.seo.tsx      # <Can> wrapping + scopeIds filtering
+src/lib/crm/leads-admin.functions.ts, orders-v2.functions.ts,
+src/lib/crm/services-admin.functions.ts, tickets.functions.ts   # optional scopeFilter arg
+```
 
-Sidebar link "Permissions" (admin-only) with Shield icon.
-
-### Out of scope (call out to user)
-
-- Not rewriting every existing RLS policy — only the high-value ones (leads, applications, support_tickets). Others still fall back to role checks.
-- No bulk-copy-permissions-from-user helper this round.
-- No audit log of permission changes beyond existing activity_logs.
-
-### Rollout
-
-Default state: every existing non-admin user gets NO explicit permissions → they lose access until an admin grants. To avoid disruption, migration seeds all current staff with full `view/create/edit` on all modules, `scope_all=true`. Admins then tighten as needed. make sure after migrating shift to default state 
-
-&nbsp;
+Once approved, I'll ship it in that order: migration first, then server functions, then UI (RBAC wiring and performance screens in parallel).

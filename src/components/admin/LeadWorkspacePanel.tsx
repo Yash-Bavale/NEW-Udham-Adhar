@@ -46,6 +46,7 @@ import {
 } from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
+import { LogContactDialog } from "./LogContactDialog";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 
@@ -357,6 +358,7 @@ function QuickActionsCard({
 
   const [contactBusy, setContactBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
 
   const { data: linkStatus } = useQuery({
     queryKey: ["lead.paymentLink", lead.id],
@@ -462,6 +464,11 @@ function QuickActionsCard({
             {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
+        <Button size="sm" variant="outline" onClick={() => setLogOpen(true)} className="justify-start text-xs">
+          <Phone className="size-3.5 mr-1.5" />
+          Log Contact Attempt
+        </Button>
+        <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
 
 
         {!hideMoney && (
