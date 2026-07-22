@@ -34,7 +34,8 @@ import {
 } from "@/lib/orders/journey-graph";
 import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
-import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
+import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
+import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 import { CountdownChip } from "./CountdownChip";
@@ -541,15 +542,13 @@ export function CustomerJourneyMap(p: Props) {
       </section>
 
       {/* Dialogs */}
-      <ExternalDelayDialog
+      <CustomerDelayDialog
         applicationId={p.applicationId}
-        initialSide="customer"
         open={dialog?.kind === "customer_delay"}
         onClose={() => { setDialog(null); invalidate(); }}
       />
-      <ExternalDelayDialog
+      <TechnicalDelayDialog
         applicationId={p.applicationId}
-        initialSide="internal"
         open={dialog?.kind === "technical_delay"}
         onClose={() => { setDialog(null); invalidate(); }}
       />

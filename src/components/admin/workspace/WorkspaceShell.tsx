@@ -16,7 +16,8 @@ import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { ChangeServiceButton } from "./ChangeServiceDialog";
 import { TabStatusHeader } from "./TabStatusHeader";
 
-import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
+import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
+import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 
@@ -703,15 +704,13 @@ export function WorkspaceShell(p: Props) {
 
 
         {/* Dialog Overlays */}
-        <ExternalDelayDialog
+        <CustomerDelayDialog
           applicationId={application.id}
-          initialSide="customer"
           open={dialog?.kind === "customer_delay"}
           onClose={() => { setDialog(null); invalidate(); }}
         />
-        <ExternalDelayDialog
+        <TechnicalDelayDialog
           applicationId={application.id}
-          initialSide="internal"
           open={dialog?.kind === "technical_delay"}
           onClose={() => { setDialog(null); invalidate(); }}
         />
