@@ -358,6 +358,7 @@ function QuickActionsCard({
 
   const [contactBusy, setContactBusy] = useState(false);
   const [linkBusy, setLinkBusy] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
 
   const { data: linkStatus } = useQuery({
     queryKey: ["lead.paymentLink", lead.id],
