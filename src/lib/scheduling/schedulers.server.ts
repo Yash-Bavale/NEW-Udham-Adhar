@@ -61,7 +61,7 @@ export async function readCustomerDelayAutocloseSeconds(): Promise<number> {
       .eq("id", 1)
       .maybeSingle();
     const mins = (data as { customer_delay_autoclose_minutes?: number } | null)?.customer_delay_autoclose_minutes;
-    if (typeof mins === "number" && mins >= 15) return mins * 60;
+    if (typeof mins === "number" && mins >= 1) return mins * 60;
   } catch {
     /* fall through to default */
   }
@@ -213,6 +213,60 @@ export async function cancelAllForOrder(applicationId: string, reason = "order_s
     .in("status", ["active", "paused"]);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Resolve a Customer-Side Delay for an order:
+ *   - Cancel any active/paused customer_closure_24h scheduler.
+ *   - If fulfillment_status is customer_delay, revert to form_submitted and
+ *     clear customer_hold_started_at + active_reason_id.
+ * Called when the customer replies (a ticket opens) or when the order is
+ * restarted from either the workspace or a support ticket.
+ */
+export async function resolveCustomerDelay(
+  applicationId: string,
+  reason = "customer_replied",
+): Promise<{ cancelled: number; reverted: boolean }> {
+  const now = new Date().toISOString();
+
+  const { data: cancelled } = await supabaseAdmin
+    .from("order_schedulers")
+    .update({
+      status: "cancelled",
+      stopped_at: now,
+      stop_reason: reason,
+      stop_triggered_by: "system",
+      updated_at: now,
+    } as never)
+    .eq("application_id", applicationId)
+    .in("status", ["active", "paused"])
+    .eq("scheduler_type", SCHEDULER_CUSTOMER_CLOSURE)
+    .select("id");
+
+  const { data: app } = await supabaseAdmin
+    .from("applications")
+    .select("fulfillment_status")
+    .eq("id", applicationId)
+    .maybeSingle();
+  const fs = (app as { fulfillment_status?: string | null } | null)?.fulfillment_status ?? null;
+
+  let reverted = false;
+  if (fs === "customer_delay") {
+    await supabaseAdmin
+      .from("applications")
+      .update({
+        fulfillment_status: "form_submitted",
+        customer_hold_started_at: null,
+        active_reason_id: null,
+        updated_at: now,
+      } as never)
+      .eq("id", applicationId);
+    reverted = true;
+  }
+
+  return { cancelled: (cancelled ?? []).length, reverted };
+}
+
+
 
 // ─────────────────────────── Fire due schedulers ───────────────────────────
 

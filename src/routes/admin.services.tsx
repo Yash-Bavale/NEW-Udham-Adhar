@@ -120,7 +120,21 @@ function ServicesPage() {
                 <td className="px-3 py-2 text-right">₹{Number(s.base_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right">₹{Number(s.gst_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right font-semibold">₹{Number(s.total_amount).toFixed(2)}</td>
-                <td className="px-3 py-2 text-center">{s.is_active ? "✓" : "—"}</td>
+                <td className="px-3 py-2 text-center">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await upsertFn({ data: { ...(s as ServiceForm), is_active: !s.is_active } as never });
+                        await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                      } catch (e) { alert((e as Error).message); }
+                    }}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border ${s.is_active ? "bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"}`}
+                    title={s.is_active ? "Click to deactivate" : "Click to activate"}
+                  >
+                    <span className={`size-1.5 rounded-full ${s.is_active ? "bg-emerald-600" : "bg-slate-400"}`} />
+                    {s.is_active ? "Active" : "Inactive"}
+                  </button>
+                </td>
                 <td className="px-3 py-2 text-right">
                   <Link
                     to="/admin/services/$serviceCode"

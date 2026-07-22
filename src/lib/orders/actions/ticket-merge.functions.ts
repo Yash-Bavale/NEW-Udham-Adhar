@@ -32,7 +32,9 @@ export const findOrReopenTicket = createServerFn({ method: "POST" })
     const ticketId = row?.ticket_id as string | undefined;
     if (!ticketId) throw new Error("ticket_reopen_or_create returned no ticket_id");
 
-    // Every open/reopen dispatches TicketOpened to pause the workflow.
+    // Every open/reopen dispatches TicketOpened to pause the workflow, and
+    // resolves any active Customer-Side Delay for the order (the customer
+    // replying is what the delay was waiting for).
     try {
       const { dispatchEvent } = await import("@/lib/workflow/engine.server");
       await dispatchEvent({
@@ -42,6 +44,12 @@ export const findOrReopenTicket = createServerFn({ method: "POST" })
       });
     } catch (e) {
       console.warn("[findOrReopenTicket] TicketOpened dispatch failed:", e);
+    }
+    try {
+      const { resolveCustomerDelay } = await import("@/lib/scheduling/schedulers.server");
+      await resolveCustomerDelay(data.applicationId, "customer_replied_via_ticket");
+    } catch (e) {
+      console.warn("[findOrReopenTicket] resolveCustomerDelay failed:", e);
     }
 
     return {

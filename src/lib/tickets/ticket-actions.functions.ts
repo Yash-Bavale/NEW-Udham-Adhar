@@ -697,7 +697,14 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
     if (oldStatus !== "FORM_RECEIVED") {
       const { error: orderErr } = await admin
         .from("applications")
-        .update({ order_status: "FORM_RECEIVED", form_submitted_at: new Date().toISOString(), updated_at: new Date().toISOString() } as never)
+        .update({
+          order_status: "FORM_RECEIVED",
+          fulfillment_status: "form_submitted",
+          form_submitted_at: new Date().toISOString(),
+          customer_hold_started_at: null,
+          active_reason_id: null,
+          updated_at: new Date().toISOString(),
+        } as never)
         .eq("id", ticket.application_id);
       if (orderErr) throw new Error(orderErr.message);
       await admin.from("application_events").insert({

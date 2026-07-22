@@ -18,7 +18,7 @@ function hhmmToMinutes(v: string): number | null {
   const m = /^(\d{1,3}):([0-5]?\d)$/.exec(v.trim());
   if (!m) return null;
   const mins = Number(m[1]) * 60 + Number(m[2]);
-  if (mins < 15 || mins > 10080) return null;
+  if (mins < 1 || mins > 10080) return null;
   return mins;
 }
 
@@ -46,7 +46,7 @@ export function AppSettingsCard() {
   async function onSave() {
     const mins = hhmmToMinutes(value);
     if (mins === null) {
-      toast.error("Enter time as HH:MM (min 00:15, max 168:00)");
+      toast.error("Enter time as HH:MM (min 00:01, max 168:00)");
       return;
     }
     setSaving(true);
@@ -85,7 +85,7 @@ export function AppSettingsCard() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Applies to newly-triggered Customer Delays. Existing timers continue on their original schedule. Range 00:15 – 168:00.
+            Applies to newly-triggered Customer Delays. Existing timers continue on their original schedule. Also auto-resolves when the customer replies (opens a ticket) or the order is restarted. Range 00:01 – 168:00.
           </p>
         </div>
       </CardContent>
