@@ -30,7 +30,17 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   const submitLead = useServerFn(createLead);
   const fetchSiteKey = useServerFn(getCaptchaSiteKey);
   const verifyToken = useServerFn(verifyCaptcha);
+  const fetchActiveCodes = useServerFn(listActiveServiceCodes);
   const baseId = useId();
+
+  const [activeCodes, setActiveCodes] = useState<string[] | null>(null);
+  useEffect(() => {
+    fetchActiveCodes().then((r) => setActiveCodes(r.codes)).catch(() => setActiveCodes(null));
+  }, [fetchActiveCodes]);
+  const visibleServices = useMemo(
+    () => (activeCodes ? SERVICES.filter((s) => activeCodes.includes(s.slug)) : SERVICES),
+    [activeCodes],
+  );
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
