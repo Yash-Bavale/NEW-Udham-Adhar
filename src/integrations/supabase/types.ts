@@ -2851,6 +2851,7 @@ export type Database = {
           service_code: string
           title: string
           updated_at: string
+          updated_by: string | null
           version: number
         }
         Insert: {
@@ -2863,6 +2864,7 @@ export type Database = {
           service_code: string
           title: string
           updated_at?: string
+          updated_by?: string | null
           version?: number
         }
         Update: {
@@ -2875,6 +2877,7 @@ export type Database = {
           service_code?: string
           title?: string
           updated_at?: string
+          updated_by?: string | null
           version?: number
         }
         Relationships: []
@@ -3994,6 +3997,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_service_form_schema: {
+        Args: {
+          _description: string
+          _documents: Json
+          _schema: Json
+          _service_code: string
+          _title: string
+        }
+        Returns: Json
       }
     }
     Enums: {
