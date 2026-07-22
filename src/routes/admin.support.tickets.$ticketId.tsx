@@ -18,7 +18,7 @@ import {
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
-import type { OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
+
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { parseEmailReply } from "@/lib/support/emailParser";
 import { useRole } from "@/hooks/useRole";
