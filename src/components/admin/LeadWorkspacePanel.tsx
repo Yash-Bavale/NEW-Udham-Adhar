@@ -46,6 +46,7 @@ import {
 } from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
+import { LogContactDialog } from "./LogContactDialog";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 
