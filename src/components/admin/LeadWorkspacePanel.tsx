@@ -138,11 +138,16 @@ function relativeTime(iso?: string | null) {
 function buildIntroMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
-    `Hi ${customerName}\n\n` +
-    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
-    `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n\n` +
-    `I'm here to assist you with any questions regarding your service.\n\n` +
-    `Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Hi ${customerName}\n` +
+    `\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n` +
+    `\n` +
+    `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n` +
+    `\n` +
+    `I'm here to assist you with any questions regarding your service.\n` +
+    `\n` +
+    ` Office Hours: 10:00 AM – 6:00 PM\n` +
+    `\n` +
     `Simply reply to this message or contact us anytime during office hours.`
   );
 }
@@ -150,15 +155,22 @@ function buildIntroMessage(customerName: string, employeeName: string | null, le
 function buildPaymentLinkMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null, paymentUrl: string) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
-    `Hi ${customerName}\n\n` +
-    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Hi ${customerName}\n` +
+    `\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n` +
+    `\n` +
     `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n` +
-    `Payment Link: ${paymentUrl}\n\n` +
-    `I'm here to assist you with any questions regarding your service.\n\n` +
-    `Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `\n` +
+    `Payment Link: ${paymentUrl}\n` +
+    `\n` +
+    `I'm here to assist you with any questions regarding your service.\n` +
+    `\n` +
+    ` Office Hours: 10:00 AM – 6:00 PM\n` +
+    `\n` +
     `Simply reply to this message or contact us anytime during office hours.`
   );
 }
+
 
 function waNumber(mobile?: string | null) {
   const digits = (mobile ?? "").replace(/\D/g, "");
