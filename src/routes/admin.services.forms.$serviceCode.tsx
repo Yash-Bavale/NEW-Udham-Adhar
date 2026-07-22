@@ -642,6 +642,7 @@ function FormBuilderPage() {
                       <Tf label="Activity source key" mono value={activeField.activityFrom ?? ""} onChange={(v) => updateField({ activityFrom: v || undefined })} />
                     </>
                   )}
+                  <Tf label="Default value" value={activeField.default ?? ""} onChange={(v) => updateField({ default: v || undefined })} />
                   <Tf label="Help text" value={activeField.help ?? ""} onChange={(v) => updateField({ help: v || undefined })} />
                 </div>
               )}
