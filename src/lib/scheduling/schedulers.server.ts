@@ -6,9 +6,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   DEFAULT_BUSINESS_HOURS,
   addBusinessSeconds,
-  businessSecondsBetween,
   type BusinessHoursConfig,
 } from "@/lib/scheduling/business-hours";
+
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 
