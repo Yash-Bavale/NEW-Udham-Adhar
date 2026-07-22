@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/public/cron/daily-digest")({
     handlers: {
       POST: async ({ request }) => {
         const apiKey = request.headers.get("apikey");
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const expected = process.env.CRON_SECRET;
         if (!apiKey || !expected || apiKey !== expected) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
