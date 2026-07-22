@@ -405,7 +405,14 @@ export function currentMainEdgesFor(
 ): Set<string> {
   const s = new Set<string>();
   if (terminal) return s;
-  if (phase === "form_not_submitted" || phase === "customer_delay") return s;
+  if (phase === "customer_delay") return s;
+  if (phase === "form_not_submitted") {
+    // Trace: order_rec → form_not is done; the closure path (form_not→B01→closed)
+    // is highlighted separately via the form-nag active branch.
+    s.add("e_or_fn");
+    return s;
+  }
+
   if (currentIdx <= 2) s.add("e_or_fn");
   if (currentIdx === 3) {
     if (phase === "technical_delay") {
