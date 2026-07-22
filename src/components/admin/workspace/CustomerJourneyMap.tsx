@@ -541,15 +541,13 @@ export function CustomerJourneyMap(p: Props) {
       </section>
 
       {/* Dialogs */}
-      <ExternalDelayDialog
+      <CustomerDelayDialog
         applicationId={p.applicationId}
-        initialSide="customer"
         open={dialog?.kind === "customer_delay"}
         onClose={() => { setDialog(null); invalidate(); }}
       />
-      <ExternalDelayDialog
+      <TechnicalDelayDialog
         applicationId={p.applicationId}
-        initialSide="internal"
         open={dialog?.kind === "technical_delay"}
         onClose={() => { setDialog(null); invalidate(); }}
       />

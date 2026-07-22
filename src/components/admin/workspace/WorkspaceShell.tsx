@@ -703,15 +703,13 @@ export function WorkspaceShell(p: Props) {
 
 
         {/* Dialog Overlays */}
-        <ExternalDelayDialog
+        <CustomerDelayDialog
           applicationId={application.id}
-          initialSide="customer"
           open={dialog?.kind === "customer_delay"}
           onClose={() => { setDialog(null); invalidate(); }}
         />
-        <ExternalDelayDialog
+        <TechnicalDelayDialog
           applicationId={application.id}
-          initialSide="internal"
           open={dialog?.kind === "technical_delay"}
           onClose={() => { setDialog(null); invalidate(); }}
         />
