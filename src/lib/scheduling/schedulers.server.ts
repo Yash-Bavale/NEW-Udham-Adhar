@@ -121,9 +121,8 @@ export async function startCustomerClosureScheduler(input: {
   return data;
 }
 
-/** Pause a scheduler (e.g. incoming ticket). Preserves remaining business-seconds. */
+/** Pause a scheduler (e.g. incoming ticket). Preserves remaining wall-clock seconds. */
 export async function pauseScheduler(schedulerId: string, ticketId?: string | null) {
-  const cfg = await readBusinessHoursConfig();
   const { data: row, error } = await supabaseAdmin
     .from("order_schedulers")
     .select("id, status, fires_at, business_seconds_remaining")
@@ -133,8 +132,9 @@ export async function pauseScheduler(schedulerId: string, ticketId?: string | nu
   if (!row || row.status !== "active") return { ok: false, reason: "not_active" };
 
   const now = new Date();
-  const remaining =
-    row.fires_at ? businessSecondsBetween(now, new Date(row.fires_at as string), cfg) : (row.business_seconds_remaining as number);
+  const remaining = row.fires_at
+    ? Math.max(0, Math.floor((new Date(row.fires_at as string).getTime() - now.getTime()) / 1000))
+    : (row.business_seconds_remaining as number);
 
   const { error: uErr } = await supabaseAdmin
     .from("order_schedulers")
@@ -151,9 +151,8 @@ export async function pauseScheduler(schedulerId: string, ticketId?: string | nu
   return { ok: true, remaining };
 }
 
-/** Resume a paused scheduler; recomputes fires_at from remaining business-seconds. */
+/** Resume a paused scheduler; recomputes fires_at from remaining wall-clock seconds. */
 export async function resumeScheduler(schedulerId: string) {
-  const cfg = await readBusinessHoursConfig();
   const { data: row, error } = await supabaseAdmin
     .from("order_schedulers")
     .select("id, status, business_seconds_remaining")
@@ -164,7 +163,7 @@ export async function resumeScheduler(schedulerId: string) {
 
   const now = new Date();
   const remaining = Math.max(60, (row.business_seconds_remaining as number) ?? DEFAULT_CLOSURE_SECONDS);
-  const firesAt = addBusinessSeconds(now, remaining, cfg);
+  const firesAt = new Date(now.getTime() + remaining * 1000);
 
   const { error: uErr } = await supabaseAdmin
     .from("order_schedulers")
@@ -179,6 +178,7 @@ export async function resumeScheduler(schedulerId: string) {
   if (uErr) throw new Error(uErr.message);
   return { ok: true, firesAt };
 }
+
 
 /** Cancel a scheduler outright. */
 export async function cancelScheduler(schedulerId: string, reason: string, triggeredBy = "user") {
