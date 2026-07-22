@@ -402,6 +402,26 @@ function FormBuilderPage() {
               placeholder="Short description shown to customers…"
               className="w-full rounded-lg border px-3 py-2 text-sm resize-none"
             />
+            <div className="grid md:grid-cols-[1fr_220px] gap-2 pt-2 border-t">
+              <label className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">Sample form URL (PDF/link) — shown to customer as a download button</div>
+                <input
+                  value={sampleFormUrl}
+                  onChange={(e) => setSampleFormUrl(e.target.value)}
+                  placeholder="https://…/sample-form.pdf"
+                  className="w-full rounded-md border px-2.5 py-1.5 text-sm font-mono"
+                />
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">Button label (optional)</div>
+                <input
+                  value={sampleFormLabel}
+                  onChange={(e) => setSampleFormLabel(e.target.value)}
+                  placeholder="Download sample form"
+                  className="w-full rounded-md border px-2.5 py-1.5 text-sm"
+                />
+              </label>
+            </div>
           </div>
 
           {/* Tabs */}
