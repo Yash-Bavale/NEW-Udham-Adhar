@@ -29,7 +29,7 @@ async function probe(dc: "in" | "com" | "eu") {
     const parsed = JSON.parse(tokBody) as { access_token?: string; scope?: string };
     accessToken = parsed.access_token ?? null;
     (out.refresh as Record<string, unknown>).scope = parsed.scope;
-    (out.refresh as Record<string, unknown>).token_prefix = accessToken?.slice(0, 8) ?? null;
+    // token_prefix intentionally omitted — do not leak any portion of the access token.
   } catch {
     /* ignore */
   }
