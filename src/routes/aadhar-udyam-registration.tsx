@@ -6,9 +6,9 @@ export const Route = createFileRoute("/aadhar-udyam-registration")({
   head: () => ({
     meta: [
       { title: "Aadhar Udyam Registration - Access MSME Certificate" },
-      { name: "description", content: "Aadhar Udyam registration is the process of linking your Aadhaar number with your MSME registration on the Udyam portal. This process ensures secure,..." },
+      { name: "description", content: "Link Aadhaar with MSME on the Udyam portal for a secure, paperless registration and a digitally signed certificate unlocking government schemes." },
       { property: "og:title", content: "Aadhar Udyam Registration - Access MSME Certificate" },
-      { property: "og:description", content: "Aadhar Udyam registration is the process of linking your Aadhaar number with your MSME registration on the Udyam portal. This process ensures secure,..." },
+      { property: "og:description", content: "Link Aadhaar with MSME on the Udyam portal for a secure, paperless registration and a digitally signed certificate unlocking government schemes." },
     ],
     links: [
       { rel: "canonical", href: "https://udyamadhar.in/aadhar-udyam-registration" },
