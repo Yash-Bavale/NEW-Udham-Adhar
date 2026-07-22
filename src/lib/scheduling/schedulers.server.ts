@@ -606,10 +606,11 @@ export async function startTicketAutocloseScheduler(input: {
   createdBy?: string | null;
   note?: string | null;
 }) {
-  const cfg = await readBusinessHoursConfig();
   const total = input.totalSeconds ?? DEFAULT_TICKET_AUTOCLOSE_SECONDS;
   const now = new Date();
-  const firesAt = addBusinessSeconds(now, total, cfg);
+  // Wall-clock — ticket auto-close does NOT use business hours.
+  const firesAt = new Date(now.getTime() + total * 1000);
+
 
   // Cancel any prior autoclose for this exact ticket.
   await supabaseAdmin
