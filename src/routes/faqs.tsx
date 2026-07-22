@@ -39,7 +39,7 @@ const ICONS: Record<string, typeof UserPlus> = {
 const PAGE_TITLE =
   "Udyam & MSME FAQs — 115 Answers to Common Questions";
 const PAGE_DESC =
-  "Detailed Udyam Registration, MSME Certificate and Udyog Aadhaar FAQs — registration, documents, download, print, updates, migration, fees and benefits. Updated answers for 2026.";
+  "Udyam Registration, MSME certificate and Udyog Aadhaar FAQs: documents, download, print, updates, migration, fees and benefits. Updated for 2026.";
 const CANONICAL = "https://udyamadhar.in/faqs";
 
 export const Route = createFileRoute("/faqs")({
