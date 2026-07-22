@@ -49,6 +49,8 @@ export const Route = createFileRoute("/api/public/complaint")({
 
         // De-dup: same email + complaint_form within last 60s
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { resolveWebsiteIdFromRequest } = await import("@/lib/websites/default-website.server");
+        const websiteId = await resolveWebsiteIdFromRequest(request);
         const since = new Date(Date.now() - 60_000).toISOString();
         const { data: recent } = await supabaseAdmin
           .from("leads")
