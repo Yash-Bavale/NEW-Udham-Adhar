@@ -166,20 +166,9 @@ function TicketWorkspace() {
     qc.invalidateQueries({ queryKey: ["support-workspace", ticketId] });
 
   // Realtime — refresh on new inbound emails / replies
-  useRealtimeTable({
-    channel: `support-ticket-${ticketId}`,
-    table: "ticket_replies",
-    filter: `ticket_id=eq.${ticketId}`,
-    onChange: invalidate,
-  } as any);
+  useRealtimeTable("ticket_replies", invalidate, { filter: `ticket_id=eq.${ticketId}` });
   const appId = data?.ticket?.application_id ?? null;
-  useRealtimeTable({
-    channel: `support-ticket-emails-${ticketId}`,
-    table: "email_logs",
-    filter: appId ? `application_id=eq.${appId}` : undefined,
-    onChange: invalidate,
-    enabled: !!appId,
-  } as any);
+  useRealtimeTable("email_logs", invalidate, appId ? { filter: `application_id=eq.${appId}` } : undefined);
 
   const messages: Msg[] = useMemo(() => {
     if (!data) return [];
