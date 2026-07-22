@@ -15,6 +15,17 @@ export const listServices = createServerFn({ method: "GET" })
     return { rows: data ?? [] };
   });
 
+// Public: active service codes for the website lead form.
+export const listActiveServiceCodes = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("services")
+    .select("service_code")
+    .eq("is_active", true);
+  if (error) throw new Error(error.message);
+  return { codes: (data ?? []).map((r) => r.service_code as string) };
+});
+
 const ServiceInput = z.object({
   id: z.string().uuid().optional(),
   service_code: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/),
