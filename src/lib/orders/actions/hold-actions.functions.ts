@@ -173,10 +173,16 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     // of a technical hold (external) and therefore needs the E011 resume email.
     const { data: preRow } = await supabaseAdmin
       .from("applications")
-      .select("technical_hold_kind, lead_id, application_code, customers(primary_email, name)")
+      .select("technical_hold_kind, workflow_status, lead_id, application_code, customers(primary_email, name)")
       .eq("id", data.orderId)
       .maybeSingle();
-    const wasExternalTechHold = (preRow as any)?.technical_hold_kind === "external";
+    // Send E011 whenever we're resuming from a technical/our-side hold. The new
+    // TechnicalDelayDialog routes through setExternalDelay which sets
+    // workflow_status='government_portal_pending' (not technical_hold_kind),
+    // so check both to cover legacy and current flows.
+    const wasExternalTechHold =
+      (preRow as any)?.technical_hold_kind === "external" ||
+      (preRow as any)?.workflow_status === "government_portal_pending";
 
     const { data: updated, error } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
