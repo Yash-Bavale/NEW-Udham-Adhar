@@ -150,6 +150,7 @@ import { Route as AdminApplicationsRouteImport } from './routes/admin.applicatio
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as OnboardingLeadCodeIndexRouteImport } from './routes/onboarding.$leadCode.index'
 import { Route as AdminTicketsIndexRouteImport } from './routes/admin.tickets.index'
+import { Route as AdminServicesIndexRouteImport } from './routes/admin.services.index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin.orders.index'
 import { Route as AdminLeadsIndexRouteImport } from './routes/admin.leads.index'
 import { Route as OnboardingLeadCodeDoneRouteImport } from './routes/onboarding.$leadCode.done'
@@ -918,6 +919,11 @@ const AdminTicketsIndexRoute = AdminTicketsIndexRouteImport.update({
   path: '/tickets/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminServicesIndexRoute = AdminServicesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminServicesRoute,
+} as any)
 const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -1310,6 +1316,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/services/': typeof AdminServicesIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
@@ -1455,7 +1462,6 @@ export interface FileRoutesByTo {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
-  '/admin/services': typeof AdminServicesRouteWithChildren
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
@@ -1490,6 +1496,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads': typeof AdminLeadsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
+  '/admin/services': typeof AdminServicesIndexRoute
   '/admin/tickets': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
@@ -1675,6 +1682,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/done': typeof OnboardingLeadCodeDoneRoute
   '/admin/leads/': typeof AdminLeadsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/services/': typeof AdminServicesIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
@@ -1861,6 +1869,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
     | '/admin/orders/'
+    | '/admin/services/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/admin/services/forms/$serviceCode'
@@ -2006,7 +2015,6 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
-    | '/admin/services'
     | '/admin/settings'
     | '/admin/submissions'
     | '/admin/super'
@@ -2041,6 +2049,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads'
     | '/admin/orders'
+    | '/admin/services'
     | '/admin/tickets'
     | '/onboarding/$leadCode'
     | '/admin/services/forms/$serviceCode'
@@ -2225,6 +2234,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/done'
     | '/admin/leads/'
     | '/admin/orders/'
+    | '/admin/services/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
     | '/admin/services/forms/$serviceCode'
@@ -3370,6 +3380,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTicketsIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/services/': {
+      id: '/admin/services/'
+      path: '/'
+      fullPath: '/admin/services/'
+      preLoaderRoute: typeof AdminServicesIndexRouteImport
+      parentRoute: typeof AdminServicesRoute
+    }
     '/admin/orders/': {
       id: '/admin/orders/'
       path: '/'
@@ -3739,11 +3756,13 @@ const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(
 
 interface AdminServicesRouteChildren {
   AdminServicesServiceCodeRoute: typeof AdminServicesServiceCodeRoute
+  AdminServicesIndexRoute: typeof AdminServicesIndexRoute
   AdminServicesFormsServiceCodeRoute: typeof AdminServicesFormsServiceCodeRoute
 }
 
 const AdminServicesRouteChildren: AdminServicesRouteChildren = {
   AdminServicesServiceCodeRoute: AdminServicesServiceCodeRoute,
+  AdminServicesIndexRoute: AdminServicesIndexRoute,
   AdminServicesFormsServiceCodeRoute: AdminServicesFormsServiceCodeRoute,
 }
 
