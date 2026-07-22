@@ -138,11 +138,16 @@ function relativeTime(iso?: string | null) {
 function buildIntroMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
-    `Hi ${customerName}\n\n` +
-    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
-    `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n\n` +
-    `I'm here to assist you with any questions regarding your service.\n\n` +
-    `Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `Hi ${customerName}\n` +
+    `\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n` +
+    `\n` +
+    `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n` +
+    `\n` +
+    `I'm here to assist you with any questions regarding your service.\n` +
+    `\n` +
+    ` Office Hours: 10:00 AM – 6:00 PM\n` +
+    `\n` +
     `Simply reply to this message or contact us anytime during office hours.`
   );
 }
@@ -150,15 +155,22 @@ function buildIntroMessage(customerName: string, employeeName: string | null, le
 function buildPaymentLinkMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null, paymentUrl: string) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
-    `Hi ${customerName}\n\n` +
-    `I'm ${emp} from Udyam Aadhar Advisory.\n\n` +
+    `Hi ${customerName}\n` +
+    `\n` +
+    `I'm ${emp} from Udyam Aadhar Advisory.\n` +
+    `\n` +
     `Lead ID: ${leadCode}   Service: ${service ?? "your service"}\n` +
-    `Payment Link: ${paymentUrl}\n\n` +
-    `I'm here to assist you with any questions regarding your service.\n\n` +
-    `Office Hours: 10:00 AM – 6:00 PM\n\n` +
+    `\n` +
+    `Payment Link: ${paymentUrl}\n` +
+    `\n` +
+    `I'm here to assist you with any questions regarding your service.\n` +
+    `\n` +
+    ` Office Hours: 10:00 AM – 6:00 PM\n` +
+    `\n` +
     `Simply reply to this message or contact us anytime during office hours.`
   );
 }
+
 
 function waNumber(mobile?: string | null) {
   const digits = (mobile ?? "").replace(/\D/g, "");
@@ -372,8 +384,15 @@ function QuickActionsCard({
 
   const generateLink = async () => {
     const url = await ensurePaymentUrl();
-    if (url) toast.success("Payment link generated");
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Payment link copied");
+    } catch {
+      toast.success("Payment link generated");
+    }
   };
+
 
   const sendPaymentLinkWhatsApp = async () => {
     if (!number) { toast.error("Add a mobile number first"); return; }
@@ -432,7 +451,7 @@ function QuickActionsCard({
             ) : (
               <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
                 <Link2 className="size-3.5 mr-1.5" />
-                {linkBusy ? "Generating…" : "Generate Payment Link"}
+                {linkBusy ? "Preparing…" : "Copy Payment Link"}
               </Button>
             )}
 
