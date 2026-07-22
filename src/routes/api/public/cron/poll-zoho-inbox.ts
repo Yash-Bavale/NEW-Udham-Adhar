@@ -11,18 +11,8 @@ export const Route = createFileRoute("/api/public/cron/poll-zoho-inbox")({
         const apikey =
           request.headers.get("apikey") ||
           request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-        // Accept any of the keys the various cron jobs may present. Env
-        // rotation (anon → publishable, or a manual CRON_SECRET) previously
-        // caused a 401 loop that stopped inbound emails from being ingested
-        // and, as a result, no support ticket was ever created for replies.
-        const allowed = new Set(
-          [
-            process.env.SUPABASE_ANON_KEY,
-            process.env.SUPABASE_PUBLISHABLE_KEY,
-            process.env.CRON_SECRET,
-          ].filter((v): v is string => Boolean(v))
-        );
-        if (!apikey || allowed.size === 0 || !allowed.has(apikey)) {
+        const expected = process.env.CRON_SECRET;
+        if (!apikey || !expected || apikey !== expected) {
           return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
