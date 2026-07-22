@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { renderTemplate } from "./smtp.server";
+import { renderTemplate, renderTemplateHtml } from "./smtp.server";
 import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 
 /**
@@ -428,7 +428,7 @@ export async function enqueueFromTemplateInternal(
     toEmail,
     toName: opts?.toName ?? null,
     subject,
-    bodyHtml: renderTemplate(tpl.body_html, variables),
+    bodyHtml: renderTemplateHtml(tpl.body_html, variables),
     bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
     variables: finalVars,
     leadId: opts?.leadId ?? null,

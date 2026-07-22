@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/cron/schedulers-tick")({
     handlers: {
       POST: async ({ request }) => {
         const apikey = request.headers.get("apikey") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-        const expected = process.env.SUPABASE_ANON_KEY;
+        const expected = process.env.CRON_SECRET;
         if (!apikey || !expected || apikey !== expected) {
           return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
             status: 401,

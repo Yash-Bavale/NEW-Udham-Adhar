@@ -29,7 +29,7 @@ async function probe(dc: "in" | "com" | "eu") {
     const parsed = JSON.parse(tokBody) as { access_token?: string; scope?: string };
     accessToken = parsed.access_token ?? null;
     (out.refresh as Record<string, unknown>).scope = parsed.scope;
-    (out.refresh as Record<string, unknown>).token_prefix = accessToken?.slice(0, 8) ?? null;
+    // token_prefix intentionally omitted — do not leak any portion of the access token.
   } catch {
     /* ignore */
   }
@@ -67,14 +67,8 @@ export const Route = createFileRoute("/api/public/cron/zoho-diagnose")({
         const apikey =
           request.headers.get("apikey") ||
           request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-        const allowed = new Set(
-          [
-            process.env.SUPABASE_ANON_KEY,
-            process.env.SUPABASE_PUBLISHABLE_KEY,
-            process.env.CRON_SECRET,
-          ].filter((v): v is string => Boolean(v))
-        );
-        if (!apikey || allowed.size === 0 || !allowed.has(apikey)) {
+        const expected = process.env.CRON_SECRET;
+        if (!apikey || !expected || apikey !== expected) {
           return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
