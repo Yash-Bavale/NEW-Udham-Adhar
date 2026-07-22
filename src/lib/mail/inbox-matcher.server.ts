@@ -2,7 +2,8 @@
 // For each fetched message: dedupe by zoho_mail_uid, match to an application
 // via In-Reply-To/References → email_logs.message_id, then X-BHS-Order header,
 // then latest active order by from_email. Persists to email_logs, opens or
-// appends to a support_ticket, and pauses any active Scheduler 2 for the order.
+// appends to a support_ticket. Customer-delay closure keeps running unless a
+// staff member explicitly restarts the order.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -15,9 +16,7 @@ import {
   type ZohoMessageListItem,
 } from "@/lib/mail/zoho-inbox.server";
 import {
-  pauseScheduler,
   cancelTicketAutocloseForOrder,
-  SCHEDULER_CUSTOMER_CLOSURE,
 } from "@/lib/scheduling/schedulers.server";
 
 export type PollResult = {
