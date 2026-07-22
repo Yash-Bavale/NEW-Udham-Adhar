@@ -15,6 +15,27 @@ Deno.serve(async (req) => {
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
+  // Auth: this function performs an irreversible destructive operation using the
+  // service role key. Only trusted server-side callers (server functions invoking
+  // via admin.functions.invoke, which forwards the service role bearer, or a
+  // pg_cron/internal call presenting CRON_SECRET) may run it. Reject everyone else.
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+  const authHeader = req.headers.get("authorization") ?? "";
+  const bearer = authHeader.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+  const apikey = req.headers.get("apikey") ?? "";
+  const authorized =
+    (!!serviceKey && (bearer === serviceKey || apikey === serviceKey)) ||
+    (!!cronSecret && (bearer === cronSecret || apikey === cronSecret));
+  if (!authorized) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
   let payload: { application_id?: string; reason?: string; keep_document_id?: string } = {};
   try {
     payload = await req.json();
