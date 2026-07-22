@@ -125,6 +125,7 @@ function ServicesPage() {
               <th className="px-3 py-2 text-right">Base</th>
               <th className="px-3 py-2 text-right">GST</th>
               <th className="px-3 py-2 text-right">Total</th>
+              <th className="px-3 py-2 text-center">Sort</th>
               <th className="px-3 py-2">Active</th>
               <th className="px-3 py-2"></th>
             </tr>
