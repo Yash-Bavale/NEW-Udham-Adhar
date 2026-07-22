@@ -103,6 +103,7 @@ export const createLead = createServerFn({ method: "POST" })
           is_duplicate: isDuplicate,
           duplicate_of: duplicateOf,
           customer_id: customerId,
+          website_id: websiteId,
         })
         .select("id, lead_code")
         .single();
