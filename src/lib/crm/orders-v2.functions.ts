@@ -580,8 +580,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           : Promise.resolve({ data: null as null | { service_name: string | null; service_code: string | null } }),
       ]);
 
-      const recipientEmail = customer?.primary_email || lead?.email || null;
-      const recipientName = customer?.name || lead?.name || "Customer";
+      const recipientEmail = lead?.email || customer?.primary_email || null;
+      const recipientName = lead?.name || customer?.name || "Customer";
       const serviceName = service?.service_name || lead?.service || "Service";
 
       let certificateUrl: string | null = null;
