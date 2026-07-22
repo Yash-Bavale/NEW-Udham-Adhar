@@ -446,7 +446,7 @@ export function currentStageNodeFor(
   if (phase === "technical_delay") return "b02_tech";
   if (phase === "customer_delay") return "b04_cust";
   if (phase === "application_rejected") return "b08_reject";
-  if (phase === "form_not_submitted") return "form_not";
+  if (phase === "form_not_submitted" || phase === "form_link_sent") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
   if (currentIdx === 3) return "form_sub";
