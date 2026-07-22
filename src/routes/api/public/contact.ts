@@ -44,6 +44,8 @@ export const Route = createFileRoute("/api/public/contact")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { resolveWebsiteIdFromRequest } = await import("@/lib/websites/default-website.server");
+        const websiteId = await resolveWebsiteIdFromRequest(request);
 
         // De-dup guard: same email + contact_form within last 60s
         const since = new Date(Date.now() - 60_000).toISOString();
