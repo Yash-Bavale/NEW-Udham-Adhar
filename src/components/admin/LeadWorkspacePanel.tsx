@@ -192,6 +192,16 @@ function openWhatsApp(url: string, preparedWindow?: Window | null) {
   if (!opened) window.location.assign(url);
 }
 
+function readPaymentUrl(value: any): string | null {
+  return value?.payment_url
+    ?? value?.url
+    ?? value?.short_url
+    ?? value?.link?.payment_url
+    ?? value?.link?.url
+    ?? value?.link?.short_url
+    ?? null;
+}
+
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const number = waNumber(lead.mobile);
   const waMessage = `Hello ${lead.name?.split(" ")[0] ?? "there"}, this is Business Help Services regarding your ${lead.service ?? "Udyam"} application${lead.lead_code ? ` (${lead.lead_code})` : ""}. How may we assist you?`;
@@ -353,7 +363,7 @@ function QuickActionsCard({
     queryFn: () => linkStatusFn({ data: { leadId: lead.id } }),
     staleTime: 30_000,
   });
-  const paymentUrl: string | null = (linkStatus as any)?.url ?? (linkStatus as any)?.short_url ?? null;
+  const paymentUrl = readPaymentUrl(linkStatus);
 
   const number = waNumber(lead.mobile);
   const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
@@ -385,7 +395,7 @@ function QuickActionsCard({
     setLinkBusy(true);
     try {
       const res: any = await createLinkFn({ data: { leadId: lead.id } });
-      const url = res?.url ?? res?.short_url ?? null;
+      const url = readPaymentUrl(res);
       await qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
       return url;
     } catch (e: any) {
