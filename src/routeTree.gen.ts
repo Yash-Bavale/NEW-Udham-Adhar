@@ -160,6 +160,7 @@ import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/t
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
 import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin.tickets.$ticketId'
+import { Route as AdminSupportTicketsRouteImport } from './routes/admin.support.tickets'
 import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
 import { Route as AdminServicesServiceCodeRouteImport } from './routes/admin.services.$serviceCode'
 import { Route as AdminOrdersOrderIdRouteImport } from './routes/admin.orders.$orderId'
@@ -170,6 +171,7 @@ import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
 import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
 import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
+import { Route as AdminSupportTicketsIndexRouteImport } from './routes/admin.support.tickets.index'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -965,6 +967,11 @@ const AdminTicketsTicketIdRoute = AdminTicketsTicketIdRouteImport.update({
   path: '/tickets/$ticketId',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSupportTicketsRoute = AdminSupportTicketsRouteImport.update({
+  id: '/support/tickets',
+  path: '/support/tickets',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSubmissionsSubmissionIdRoute =
   AdminSubmissionsSubmissionIdRouteImport.update({
     id: '/$submissionId',
@@ -1019,6 +1026,12 @@ const AdminApplicationsApplicationIdRoute =
     id: '/$applicationId',
     path: '/$applicationId',
     getParentRoute: () => AdminApplicationsRoute,
+  } as any)
+const AdminSupportTicketsIndexRoute =
+  AdminSupportTicketsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminSupportTicketsRoute,
   } as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
@@ -1272,6 +1285,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
+  '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
@@ -1301,6 +1315,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
+  '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1478,6 +1493,7 @@ export interface FileRoutesByTo {
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
+  '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1630,6 +1646,7 @@ export interface FileRoutesById {
   '/admin/orders/$orderId': typeof AdminOrdersOrderIdRoute
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
+  '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
@@ -1659,6 +1676,7 @@ export interface FileRoutesById {
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
+  '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1812,6 +1830,7 @@ export interface FileRouteTypes {
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
+    | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/api/public/complaint'
     | '/api/public/contact'
@@ -1841,6 +1860,7 @@ export interface FileRouteTypes {
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
+    | '/admin/support/tickets/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -2018,6 +2038,7 @@ export interface FileRouteTypes {
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
+    | '/admin/support/tickets'
   id:
     | '__root__'
     | '/'
@@ -2169,6 +2190,7 @@ export interface FileRouteTypes {
     | '/admin/orders/$orderId'
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
+    | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/api/public/complaint'
     | '/api/public/contact'
@@ -2198,6 +2220,7 @@ export interface FileRouteTypes {
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
+    | '/admin/support/tickets/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -3391,6 +3414,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTicketsTicketIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/support/tickets': {
+      id: '/admin/support/tickets'
+      path: '/support/tickets'
+      fullPath: '/admin/support/tickets'
+      preLoaderRoute: typeof AdminSupportTicketsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/submissions/$submissionId': {
       id: '/admin/submissions/$submissionId'
       path: '/$submissionId'
@@ -3460,6 +3490,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/applications/$applicationId'
       preLoaderRoute: typeof AdminApplicationsApplicationIdRouteImport
       parentRoute: typeof AdminApplicationsRoute
+    }
+    '/admin/support/tickets/': {
+      id: '/admin/support/tickets/'
+      path: '/'
+      fullPath: '/admin/support/tickets/'
+      preLoaderRoute: typeof AdminSupportTicketsIndexRouteImport
+      parentRoute: typeof AdminSupportTicketsRoute
     }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
@@ -3683,6 +3720,17 @@ const AdminSubmissionsRouteChildren: AdminSubmissionsRouteChildren = {
 const AdminSubmissionsRouteWithChildren =
   AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
 
+interface AdminSupportTicketsRouteChildren {
+  AdminSupportTicketsIndexRoute: typeof AdminSupportTicketsIndexRoute
+}
+
+const AdminSupportTicketsRouteChildren: AdminSupportTicketsRouteChildren = {
+  AdminSupportTicketsIndexRoute: AdminSupportTicketsIndexRoute,
+}
+
+const AdminSupportTicketsRouteWithChildren =
+  AdminSupportTicketsRoute._addFileChildren(AdminSupportTicketsRouteChildren)
+
 interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
@@ -3720,6 +3768,7 @@ interface AdminRouteChildren {
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
+  AdminSupportTicketsRoute: typeof AdminSupportTicketsRouteWithChildren
   AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
   AdminTicketsIndexRoute: typeof AdminTicketsIndexRoute
 }
@@ -3761,6 +3810,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
+  AdminSupportTicketsRoute: AdminSupportTicketsRouteWithChildren,
   AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
   AdminTicketsIndexRoute: AdminTicketsIndexRoute,
 }
