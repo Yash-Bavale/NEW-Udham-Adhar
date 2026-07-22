@@ -451,7 +451,7 @@ function QuickActionsCard({
             ) : (
               <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
                 <Link2 className="size-3.5 mr-1.5" />
-                {linkBusy ? "Generating…" : "Generate Payment Link"}
+                {linkBusy ? "Preparing…" : "Copy Payment Link"}
               </Button>
             )}
 
