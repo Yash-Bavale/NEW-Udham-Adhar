@@ -787,8 +787,8 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       ? (await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()).data
       : null;
 
-    const recipientEmail = customer?.primary_email || lead?.email || null;
-    const recipientName = customer?.name || lead?.name || "Customer";
+    const recipientEmail = lead?.email || customer?.primary_email || null;
+    const recipientName = lead?.name || customer?.name || "Customer";
     const serviceName = serviceRow?.service_name || lead?.service || "Service";
 
     if (!recipientEmail) {
