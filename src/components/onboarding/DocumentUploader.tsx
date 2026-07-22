@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle2, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
+import { CheckCircle2, Download, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
 import { requestDocumentUpload, confirmDocumentUpload } from "@/lib/onboarding/onboarding.functions";
 import { ALLOWED_DOC_MIME, MAX_DOC_SIZE_BYTES, type DocDef } from "@/lib/onboarding/schemas";
 
