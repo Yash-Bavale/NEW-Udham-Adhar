@@ -129,6 +129,7 @@ import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
 import { Route as AdminQuarantineRouteImport } from './routes/admin.quarantine'
 import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminPermissionsRouteImport } from './routes/admin.permissions'
+import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
@@ -816,6 +817,11 @@ const AdminPermissionsRoute = AdminPermissionsRouteImport.update({
   path: '/permissions',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPerformanceRoute = AdminPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -1286,6 +1292,7 @@ export interface FileRoutesByFullPath {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/quarantine': typeof AdminQuarantineRoute
@@ -1470,6 +1477,7 @@ export interface FileRoutesByTo {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/quarantine': typeof AdminQuarantineRoute
@@ -1656,6 +1664,7 @@ export interface FileRoutesById {
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
   '/admin/pipeline': typeof AdminPipelineRoute
   '/admin/quarantine': typeof AdminQuarantineRoute
@@ -1845,6 +1854,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/orders'
     | '/admin/payments'
+    | '/admin/performance'
     | '/admin/permissions'
     | '/admin/pipeline'
     | '/admin/quarantine'
@@ -2029,6 +2039,7 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/payments'
+    | '/admin/performance'
     | '/admin/permissions'
     | '/admin/pipeline'
     | '/admin/quarantine'
@@ -2214,6 +2225,7 @@ export interface FileRouteTypes {
     | '/admin/notifications'
     | '/admin/orders'
     | '/admin/payments'
+    | '/admin/performance'
     | '/admin/permissions'
     | '/admin/pipeline'
     | '/admin/quarantine'
@@ -3257,6 +3269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPermissionsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/performance': {
+      id: '/admin/performance'
+      path: '/performance'
+      fullPath: '/admin/performance'
+      preLoaderRoute: typeof AdminPerformanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/payments': {
       id: '/admin/payments'
       path: '/payments'
@@ -3854,6 +3873,7 @@ interface AdminRouteChildren {
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
   AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdminPermissionsRoute: typeof AdminPermissionsRoute
   AdminPipelineRoute: typeof AdminPipelineRoute
   AdminQuarantineRoute: typeof AdminQuarantineRoute
@@ -3898,6 +3918,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminPerformanceRoute: AdminPerformanceRoute,
   AdminPermissionsRoute: AdminPermissionsRoute,
   AdminPipelineRoute: AdminPipelineRoute,
   AdminQuarantineRoute: AdminQuarantineRoute,
