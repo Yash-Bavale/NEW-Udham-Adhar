@@ -405,7 +405,14 @@ export function currentMainEdgesFor(
 ): Set<string> {
   const s = new Set<string>();
   if (terminal) return s;
-  if (phase === "form_not_submitted" || phase === "customer_delay") return s;
+  if (phase === "customer_delay") return s;
+  if (phase === "form_not_submitted") {
+    // Trace: order_rec → form_not is done; the closure path (form_not→B01→closed)
+    // is highlighted separately via the form-nag active branch.
+    s.add("e_or_fn");
+    return s;
+  }
+
   if (currentIdx <= 2) s.add("e_or_fn");
   if (currentIdx === 3) {
     if (phase === "technical_delay") {
@@ -504,10 +511,14 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
         (e.branch === "accept" || e.branch === "consult" || e.branch === "submit")) {
       return "done";
     }
+    // Form-nag closure path (form_not → B01 → order_closed): always render as
+    // active-blue so operators see the pending closure route while B01 sits armed.
+    if (e.branch === "form-nag" && !i.terminal) return "active";
     // Pending-closure paths flow amber (warning) until they actually terminate.
     if (isClosurePath && !i.terminal) return "warning";
     return "active";
   }
+
   // 4. Technical loop edges go green once order is past form_submitted into govt flow
   if (RESOLVED_TECH_EDGES.has(e.id) &&
       i.phase !== "technical_delay" &&

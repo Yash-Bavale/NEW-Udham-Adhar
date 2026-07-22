@@ -6,9 +6,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   DEFAULT_BUSINESS_HOURS,
   addBusinessSeconds,
-  businessSecondsBetween,
   type BusinessHoursConfig,
 } from "@/lib/scheduling/business-hours";
+
 import { enqueueFromTemplateInternal } from "@/lib/emails/emails.server";
 import { BHS_EMAILS } from "@/lib/emails/bhs-templates";
 
@@ -79,10 +79,11 @@ export async function startCustomerClosureScheduler(input: {
   createdBy?: string | null;
   totalSeconds?: number;
 }) {
-  const cfg = await readBusinessHoursConfig();
   const total = input.totalSeconds ?? (await readCustomerDelayAutocloseSeconds());
   const now = new Date();
-  const firesAt = addBusinessSeconds(now, total, cfg);
+  // Wall-clock hours — closure/delay flows do NOT use business hours.
+  const firesAt = new Date(now.getTime() + total * 1000);
+
 
 
 
@@ -120,9 +121,8 @@ export async function startCustomerClosureScheduler(input: {
   return data;
 }
 
-/** Pause a scheduler (e.g. incoming ticket). Preserves remaining business-seconds. */
+/** Pause a scheduler (e.g. incoming ticket). Preserves remaining wall-clock seconds. */
 export async function pauseScheduler(schedulerId: string, ticketId?: string | null) {
-  const cfg = await readBusinessHoursConfig();
   const { data: row, error } = await supabaseAdmin
     .from("order_schedulers")
     .select("id, status, fires_at, business_seconds_remaining")
@@ -132,8 +132,9 @@ export async function pauseScheduler(schedulerId: string, ticketId?: string | nu
   if (!row || row.status !== "active") return { ok: false, reason: "not_active" };
 
   const now = new Date();
-  const remaining =
-    row.fires_at ? businessSecondsBetween(now, new Date(row.fires_at as string), cfg) : (row.business_seconds_remaining as number);
+  const remaining = row.fires_at
+    ? Math.max(0, Math.floor((new Date(row.fires_at as string).getTime() - now.getTime()) / 1000))
+    : (row.business_seconds_remaining as number);
 
   const { error: uErr } = await supabaseAdmin
     .from("order_schedulers")
@@ -150,9 +151,8 @@ export async function pauseScheduler(schedulerId: string, ticketId?: string | nu
   return { ok: true, remaining };
 }
 
-/** Resume a paused scheduler; recomputes fires_at from remaining business-seconds. */
+/** Resume a paused scheduler; recomputes fires_at from remaining wall-clock seconds. */
 export async function resumeScheduler(schedulerId: string) {
-  const cfg = await readBusinessHoursConfig();
   const { data: row, error } = await supabaseAdmin
     .from("order_schedulers")
     .select("id, status, business_seconds_remaining")
@@ -163,7 +163,7 @@ export async function resumeScheduler(schedulerId: string) {
 
   const now = new Date();
   const remaining = Math.max(60, (row.business_seconds_remaining as number) ?? DEFAULT_CLOSURE_SECONDS);
-  const firesAt = addBusinessSeconds(now, remaining, cfg);
+  const firesAt = new Date(now.getTime() + remaining * 1000);
 
   const { error: uErr } = await supabaseAdmin
     .from("order_schedulers")
@@ -178,6 +178,7 @@ export async function resumeScheduler(schedulerId: string) {
   if (uErr) throw new Error(uErr.message);
   return { ok: true, firesAt };
 }
+
 
 /** Cancel a scheduler outright. */
 export async function cancelScheduler(schedulerId: string, reason: string, triggeredBy = "user") {
@@ -549,7 +550,7 @@ async function fireCustomerClosure(s: {
     event_type: "order_status_change",
     old_value: order.order_status as string,
     new_value: "CLOSED",
-    notes: "Scheduler 2 auto-close (8h business time)",
+    notes: "Scheduler 2 auto-close (configured wall-clock timer)",
     staff_name: "System",
     staff_role: "system",
   } as never);
@@ -605,10 +606,11 @@ export async function startTicketAutocloseScheduler(input: {
   createdBy?: string | null;
   note?: string | null;
 }) {
-  const cfg = await readBusinessHoursConfig();
   const total = input.totalSeconds ?? DEFAULT_TICKET_AUTOCLOSE_SECONDS;
   const now = new Date();
-  const firesAt = addBusinessSeconds(now, total, cfg);
+  // Wall-clock — ticket auto-close does NOT use business hours.
+  const firesAt = new Date(now.getTime() + total * 1000);
+
 
   // Cancel any prior autoclose for this exact ticket.
   await supabaseAdmin
