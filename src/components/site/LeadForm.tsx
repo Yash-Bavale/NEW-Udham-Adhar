@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { createLead } from "@/lib/leads.functions";
 import { getCaptchaSiteKey, verifyCaptcha } from "@/lib/captcha.functions";
+import { listActiveServiceCodes } from "@/lib/crm/services-admin.functions";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { trackEvent } from "@/lib/analytics/track";
@@ -29,7 +30,17 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
   const submitLead = useServerFn(createLead);
   const fetchSiteKey = useServerFn(getCaptchaSiteKey);
   const verifyToken = useServerFn(verifyCaptcha);
+  const fetchActiveCodes = useServerFn(listActiveServiceCodes);
   const baseId = useId();
+
+  const [activeCodes, setActiveCodes] = useState<string[] | null>(null);
+  useEffect(() => {
+    fetchActiveCodes().then((r) => setActiveCodes(r.codes)).catch(() => setActiveCodes(null));
+  }, [fetchActiveCodes]);
+  const visibleServices = useMemo(
+    () => (activeCodes ? SERVICES.filter((s) => activeCodes.includes(s.slug)) : SERVICES),
+    [activeCodes],
+  );
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -182,7 +193,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
           <Field id={`${baseId}-service`} label="Reason for Help (Assistance) / सहायता का कारण">
             <select id={`${baseId}-service`} name="service" required defaultValue="" className={inputCls}>
               <option value="" disabled>Select Reason</option>
-              {SERVICES.map((s) => <option key={s.slug} value={s.label}>{s.label}</option>)}
+              {visibleServices.map((s) => <option key={s.slug} value={s.label}>{s.label}</option>)}
             </select>
           </Field>
 
