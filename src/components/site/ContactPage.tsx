@@ -271,10 +271,10 @@ function InfoBlock({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-foreground mb-1.5">
+      <label htmlFor={htmlFor} className="block text-sm font-semibold text-foreground mb-1.5">
         {label}
       </label>
       {children}
