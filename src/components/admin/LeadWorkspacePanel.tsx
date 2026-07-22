@@ -396,7 +396,7 @@ function QuickActionsCard({
 
   const sendPaymentLinkWhatsApp = async () => {
     if (!number) { toast.error("Add a mobile number first"); return; }
-    const waWin = window.open("", "_blank", "noopener,noreferrer");
+    const waWin = window.open("about:blank", "_blank");
     const url = paymentUrl ?? await ensurePaymentUrl();
     if (!url) { waWin?.close(); return; }
     const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
