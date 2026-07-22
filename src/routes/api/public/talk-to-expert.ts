@@ -47,6 +47,8 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
 
         // Always create a fresh lead — treat every submission as a new application.
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { resolveWebsiteIdFromRequest } = await import("@/lib/websites/default-website.server");
+        const websiteId = await resolveWebsiteIdFromRequest(request);
         let leadId: string;
         let leadCode: string | null;
         {
