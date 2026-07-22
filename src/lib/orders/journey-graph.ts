@@ -330,6 +330,7 @@ export function activeBranchesFor(
   const s = new Set<BranchKey>();
   switch (phase) {
     case "form_not_submitted": s.add("form-nag"); break;
+    case "form_link_sent":     s.add("form-nag"); break;
     case "form_submitted":     break;
     case "technical_delay":    s.add("technical"); break;
     case "customer_delay":
