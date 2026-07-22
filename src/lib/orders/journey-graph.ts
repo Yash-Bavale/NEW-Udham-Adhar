@@ -481,10 +481,10 @@ export function edgeState(e: EdgeDef, i: EdgeStateInput): EdgeState {
   // so the operator sees every branch they can take next.
   if (i.phase === "form_submitted" && !i.terminal) {
     const POSSIBLE_NEXT_FROM_FORM_SUB = new Set([
-      "e_fs_b02", "e_b02_b03",       // Technical delay loop
+      "e_fs_b02",                     // Into Technical Delay
       "e_top_gv",                     // Main happy path → Govt Portal
-      "e_gv_cs",                      // Govt Portal → Consult stage
-      "e_bot_b04", "e_b04_cl",        // Customer delay → Close
+      "e_top_cs",                     // Top loop → Application Accepted/Closed
+      "e_bot_b04",                    // Into Customer Side Delay
       "e_gv_b05", "e_gv_b06",         // Govt sub-drops (B05 / B06)
       "e_cs_b07", "e_cs_b08",         // Consult stage sub-drops (B07 / B08)
     ]);
