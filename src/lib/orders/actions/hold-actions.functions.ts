@@ -173,18 +173,36 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     // of a technical hold (external) and therefore needs the E011 resume email.
     // Pull the lead email too — leads are the source of truth for the specific
     // order's recipient (customers.primary_email can be stale across orders).
-    const { data: preRow } = await supabaseAdmin
+    const { data: preRow, error: preRowError } = await supabaseAdmin
       .from("applications")
-      .select("technical_hold_kind, workflow_status, lead_id, application_code, leads(email, name), customers(primary_email, name)")
+      .select("technical_hold_kind, workflow_status, fulfillment_status, lead_id, customer_id, application_code")
       .eq("id", data.orderId)
       .maybeSingle();
+    if (preRowError) throw new Error(`Unable to read the technical-delay state: ${preRowError.message}`);
+    if (!preRow) throw new Error("Order not found.");
+
+    const [{ data: lead, error: leadError }, { data: customer, error: customerError }] = await Promise.all([
+      preRow.lead_id
+        ? supabaseAdmin.from("leads").select("email, name").eq("id", preRow.lead_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      preRow.customer_id
+        ? supabaseAdmin.from("customers").select("primary_email, name").eq("id", preRow.customer_id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (leadError) throw new Error(`Unable to read the order recipient: ${leadError.message}`);
+    if (customerError) throw new Error(`Unable to read the customer recipient: ${customerError.message}`);
     // Send E011 whenever we're resuming from a technical/our-side hold. The new
     // TechnicalDelayDialog routes through setExternalDelay which sets
     // workflow_status='government_portal_pending' (not technical_hold_kind),
     // so check both to cover legacy and current flows.
     const wasExternalTechHold =
-      (preRow as any)?.technical_hold_kind === "external" ||
-      (preRow as any)?.workflow_status === "government_portal_pending";
+      preRow.technical_hold_kind === "external" ||
+      preRow.workflow_status === "government_portal_pending" ||
+      preRow.fulfillment_status === "technical_delay";
+
+    if (!wasExternalTechHold) {
+      throw new Error("This order is not currently in Technical Delay, so E011 was not sent.");
+    }
 
     const { data: updated, error } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
@@ -217,51 +235,42 @@ export const resumeFromHold = createServerFn({ method: "POST" })
       .eq("id", data.orderId);
 
     // E011 — Technical Delay Resolved: notify the customer that we've resumed.
-    if (wasExternalTechHold) {
-      // Prefer the lead's email (per-order source of truth) and fall back to
-      // customers.primary_email only when the lead has none. Same rule as the
-      // other order emails so E011 always lands in the right inbox.
-      const leadEmail = (preRow as any)?.leads?.email as string | undefined;
-      const custEmail = (preRow as any)?.customers?.primary_email as string | undefined;
-      const email = leadEmail || custEmail;
-      const recipientName =
-        ((preRow as any)?.leads?.name as string) ||
-        ((preRow as any)?.customers?.name as string) ||
-        "Customer";
-      if (email) {
-        try {
-          const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
-            import("@/lib/emails/emails.server"),
-            import("@/lib/emails/bhs-templates"),
-          ]);
-          const resolvedAt = new Date().toLocaleString("en-IN", {
-            timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit", hour12: true,
-          });
-          await enqueueFromTemplateInternal(
-            BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
-            email,
-            {
-              customerName: recipientName,
-              orderNumber: ((preRow as any)?.application_code as string) || data.orderId.slice(0, 8),
-              resolved_at: resolvedAt,
-              resolvedAt,
-              fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
-            },
-            {
-              applicationId: data.orderId,
-              leadId: ((preRow as any)?.lead_id as string) ?? undefined,
-              requireImmediateSuccess: true,
-            },
-          );
-        } catch (e) {
-          console.error("[resumeFromHold] E011 enqueue failed", e);
-          throw e instanceof Error ? e : new Error(String(e));
-        }
-      } else {
-        console.warn("[resumeFromHold] no recipient email — E011 skipped", { orderId: data.orderId });
-      }
+    // Prefer the lead's email because it belongs to this specific order.
+    const email = lead?.email || customer?.primary_email;
+    const recipientName = lead?.name || customer?.name || "Customer";
+    if (!email) throw new Error("This order has no recipient email, so E011 could not be sent.");
+
+    try {
+      const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
+        import("@/lib/emails/emails.server"),
+        import("@/lib/emails/bhs-templates"),
+      ]);
+      const resolvedAt = new Date().toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+      const sendResult = await enqueueFromTemplateInternal(
+        BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
+        email,
+        {
+          customerName: recipientName,
+          orderNumber: preRow.application_code || data.orderId.slice(0, 8),
+          resolved_at: resolvedAt,
+          resolvedAt,
+          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+        },
+        {
+          applicationId: data.orderId,
+          leadId: preRow.lead_id ?? undefined,
+          trigger: "manual",
+          requireImmediateSuccess: true,
+        },
+      );
+      if (!sendResult?.sent) throw new Error("E011 was not accepted by the email service.");
+    } catch (e) {
+      console.error("[resumeFromHold] E011 enqueue failed", e);
+      throw e instanceof Error ? e : new Error(String(e));
     }
 
-    return { ok: true, order: updated };
+    return { ok: true, order: updated, emailSent: true };
   });
