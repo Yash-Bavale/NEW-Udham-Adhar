@@ -328,8 +328,8 @@ function TicketWorkspace() {
     onError: (e: Error) => toast.error(e.message),
   });
   const doCloseReply = useMutation({
-    mutationFn: (v: { reason: OrderCloseReason; note?: string }) =>
-      closeReply({ data: { ticketId, reason: v.reason, note: v.note } }),
+    mutationFn: (v: { reasonId: string | null; reasonLabel: string; replyBody: string }) =>
+      closeReply({ data: { ticketId, reasonId: v.reasonId, reasonLabel: v.reasonLabel, replyBody: v.replyBody } }),
     onSuccess: () => { toast.success("T002 sent — 24h auto-close armed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
