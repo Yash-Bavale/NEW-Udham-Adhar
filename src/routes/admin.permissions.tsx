@@ -20,7 +20,7 @@ import {
 } from "@/lib/crm/permissions-admin.functions";
 import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 
-export const Route = createFileRoute("/_authenticated/admin/permissions")({
+export const Route = createFileRoute("/admin/permissions")({
   head: () => ({
     meta: [
       { title: "Permissions — Udyam Ops OS" },
