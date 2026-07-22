@@ -218,7 +218,16 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     // E011 — Technical Delay Resolved: notify the customer that we've resumed.
     if (wasExternalTechHold) {
-      const email = (preRow as any)?.customers?.primary_email as string | undefined;
+      // Prefer the lead's email (per-order source of truth) and fall back to
+      // customers.primary_email only when the lead has none. Same rule as the
+      // other order emails so E011 always lands in the right inbox.
+      const leadEmail = (preRow as any)?.leads?.email as string | undefined;
+      const custEmail = (preRow as any)?.customers?.primary_email as string | undefined;
+      const email = leadEmail || custEmail;
+      const recipientName =
+        ((preRow as any)?.leads?.name as string) ||
+        ((preRow as any)?.customers?.name as string) ||
+        "Customer";
       if (email) {
         try {
           const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
@@ -233,17 +242,24 @@ export const resumeFromHold = createServerFn({ method: "POST" })
             BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
             email,
             {
-              customerName: ((preRow as any)?.customers?.name as string) || "Customer",
+              customerName: recipientName,
               orderNumber: ((preRow as any)?.application_code as string) || data.orderId.slice(0, 8),
               resolved_at: resolvedAt,
               resolvedAt,
               fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
             },
-            { applicationId: data.orderId, leadId: ((preRow as any)?.lead_id as string) ?? undefined },
+            {
+              applicationId: data.orderId,
+              leadId: ((preRow as any)?.lead_id as string) ?? undefined,
+              requireImmediateSuccess: true,
+            },
           );
         } catch (e) {
           console.error("[resumeFromHold] E011 enqueue failed", e);
+          throw e instanceof Error ? e : new Error(String(e));
         }
+      } else {
+        console.warn("[resumeFromHold] no recipient email — E011 skipped", { orderId: data.orderId });
       }
     }
 
