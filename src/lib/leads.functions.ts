@@ -135,6 +135,7 @@ export const createLead = createServerFn({ method: "POST" })
       .insert({
         lead_id: leadId,
         service_id: service.id,
+        website_id: websiteId,
         application_status: "awaiting_payment",
       });
     if (appErr) {
