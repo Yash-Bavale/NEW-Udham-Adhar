@@ -49,7 +49,7 @@ export function CustomerDelayDialog({ applicationId, open, onClose }: Props) {
     enabled: open,
   });
 
-  const autocloseMinutes: number = (settings as any)?.customer_delay_autoclose_minutes ?? 480;
+  const autocloseMinutes: number = (settings as any)?.customerDelayAutocloseMinutes ?? 480;
 
   const [reasonCode, setReasonCode] = useState("");
   const [internalNote, setInternalNote] = useState("");
