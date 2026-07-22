@@ -140,18 +140,17 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     await cancelByTicket(ticketMatch.ticketId, "customer_replied").catch(() => {});
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
-      await pauseActiveCustomerScheduler(ticketMatch.applicationId, null).catch(() => {});
-      // Workflow engine: pause timers/automations on customer reply.
+      // A customer reply opens/updates support, but the customer-delay closure
+      // clock keeps running until staff explicitly clicks Restart Order.
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
         await dispatchEvent({
-          type: "CustomerEmailReceived",
+          type: "TicketOpened",
           applicationId: ticketMatch.applicationId,
           ticketId: ticketMatch.ticketId,
-          messageId: messageId ?? msg.messageId,
         });
       } catch (e) {
-        console.error("[workflow] dispatch CustomerEmailReceived failed", e);
+        console.error("[workflow] dispatch TicketOpened failed", e);
       }
     }
     result.matched += 1;
@@ -197,7 +196,6 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
 
   if (matched?.applicationId || matched?.customerId) {
     if (matched.applicationId) {
-      await pauseActiveCustomerScheduler(matched.applicationId, logRow?.id ?? null);
       await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     }
     const openedTicketId = await openOrAppendTicket({
@@ -214,13 +212,12 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
         await dispatchEvent({
-          type: "CustomerEmailReceived",
+          type: "TicketOpened",
           applicationId: matched.applicationId,
           ticketId: openedTicketId,
-          messageId: messageId ?? msg.messageId,
         });
       } catch (e) {
-        console.error("[workflow] dispatch CustomerEmailReceived failed", e);
+        console.error("[workflow] dispatch TicketOpened failed", e);
       }
     }
   } else if (fromEmail) {
@@ -526,20 +523,6 @@ async function matchOrder(input: {
 }
 
 // ─────────────────────────── Side effects ───────────────────────────
-
-async function pauseActiveCustomerScheduler(applicationId: string, ticketOrLogId: string | null) {
-  const { data: active } = await supabaseAdmin
-    .from("order_schedulers")
-    .select("id")
-    .eq("application_id", applicationId)
-    .eq("scheduler_type", SCHEDULER_CUSTOMER_CLOSURE)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
-  const row = active as { id: string } | null;
-  if (!row) return;
-  await pauseScheduler(row.id, ticketOrLogId);
-}
 
 async function openOrAppendTicket(input: {
   applicationId: string | null;
