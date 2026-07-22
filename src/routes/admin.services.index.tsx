@@ -131,7 +131,7 @@ function ServicesPage() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+            {isLoading && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
             {data?.rows.map((s) => (
               <tr key={s.id} className="border-t">
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
