@@ -78,6 +78,8 @@ function FormBuilderPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [sampleFormUrl, setSampleFormUrl] = useState("");
+  const [sampleFormLabel, setSampleFormLabel] = useState("");
   const [sections, setSections] = useState<Section[]>([]);
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [activeSection, setActiveSection] = useState(0);
@@ -87,6 +89,7 @@ function FormBuilderPage() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCopy, setShowCopy] = useState(false);
   const [tab, setTab] = useState<"fields" | "documents">("fields");
   const [paletteQuery, setPaletteQuery] = useState("");
 
