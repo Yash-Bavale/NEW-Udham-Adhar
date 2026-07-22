@@ -33,7 +33,7 @@ export const listActiveServiceCodes = createServerFn({ method: "GET" }).handler(
 
 const ServiceInput = z.object({
   id: z.string().uuid().optional(),
-  service_code: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/),
+  service_code: z.string().trim().min(2).max(80).regex(/^[a-zA-Z0-9_-]+$/, "letters, numbers, hyphen or underscore only"),
   service_name: z.string().trim().min(2).max(160),
   description: z.string().max(2000).nullable().optional(),
   base_amount: z.number().min(0).max(1_000_000),
