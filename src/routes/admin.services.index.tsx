@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
+import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 import { fromBase, fromTotal } from "@/lib/pricing/gst";
 
 export const Route = createFileRoute("/admin/services/")({ component: ServicesPage });
@@ -19,10 +20,12 @@ type ServiceForm = {
   is_active: boolean;
   sort_order: number;
   govt_portal_url?: string | null;
+  website_id?: string;
+  category_id?: string | null;
 };
 
 function emptyForm(): ServiceForm {
-  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "" };
+  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null };
 }
 
 function ServicesPage() {
