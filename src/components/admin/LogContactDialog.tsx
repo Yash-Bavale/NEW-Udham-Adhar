@@ -1,0 +1,103 @@
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { logLeadContact } from "@/lib/crm/performance.functions";
+
+const CHANNELS = ["call", "whatsapp", "email", "sms", "note"] as const;
+const OUTCOMES = [
+  { value: "connected", label: "Connected" },
+  { value: "no_answer", label: "No answer" },
+  { value: "wrong_number", label: "Wrong number" },
+  { value: "not_interested", label: "Not interested" },
+  { value: "callback", label: "Callback scheduled" },
+  { value: "converted_intent", label: "Ready to pay" },
+  { value: "sent", label: "Message sent" },
+] as const;
+
+export function LogContactDialog({
+  leadId,
+  open,
+  onOpenChange,
+}: {
+  leadId: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("call");
+  const [outcome, setOutcome] = useState<(typeof OUTCOMES)[number]["value"]>("connected");
+  const [notes, setNotes] = useState("");
+  const qc = useQueryClient();
+  const fn = useServerFn(logLeadContact);
+  const m = useMutation({
+    mutationFn: () => fn({ data: { leadId, channel, outcome, notes: notes.trim() || undefined } }),
+    onSuccess: () => {
+      toast.success("Contact logged");
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] });
+      qc.invalidateQueries({ queryKey: ["perf.me"] });
+      setNotes("");
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Log contact attempt</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs">Channel</Label>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {CHANNELS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setChannel(c)}
+                  className={`px-2.5 py-1 rounded-md border text-xs capitalize ${
+                    channel === c ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Outcome</Label>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {OUTCOMES.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setOutcome(o.value)}
+                  className={`px-2.5 py-1 rounded-md border text-xs ${
+                    outcome === o.value ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Notes (optional)</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="What did the customer say?" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
