@@ -115,6 +115,7 @@ import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-fail
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
+import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminSuperRouteImport } from './routes/admin.super'
@@ -744,6 +745,11 @@ const AdminWhatsappTemplatesRoute = AdminWhatsappTemplatesRouteImport.update({
   path: '/whatsapp-templates',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminWebsitesRoute = AdminWebsitesRouteImport.update({
+  id: '/websites',
+  path: '/websites',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -1286,6 +1292,7 @@ export interface FileRoutesByFullPath {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1467,6 +1474,7 @@ export interface FileRoutesByTo {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1652,6 +1660,7 @@ export interface FileRoutesById {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1839,6 +1848,7 @@ export interface FileRouteTypes {
     | '/admin/super'
     | '/admin/tasks'
     | '/admin/users'
+    | '/admin/websites'
     | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2020,6 +2030,7 @@ export interface FileRouteTypes {
     | '/admin/super'
     | '/admin/tasks'
     | '/admin/users'
+    | '/admin/websites'
     | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -2204,6 +2215,7 @@ export interface FileRouteTypes {
     | '/admin/super'
     | '/admin/tasks'
     | '/admin/users'
+    | '/admin/websites'
     | '/admin/whatsapp-templates'
     | '/app/$token'
     | '/email/unsubscribe'
@@ -3135,6 +3147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWhatsappTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/websites': {
+      id: '/admin/websites'
+      path: '/websites'
+      fullPath: '/admin/websites'
+      preLoaderRoute: typeof AdminWebsitesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -3828,6 +3847,7 @@ interface AdminRouteChildren {
   AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminWebsitesRoute: typeof AdminWebsitesRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
@@ -3870,6 +3890,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminWebsitesRoute: AdminWebsitesRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,

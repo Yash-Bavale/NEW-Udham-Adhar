@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
+import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 import { fromBase, fromTotal } from "@/lib/pricing/gst";
 
 export const Route = createFileRoute("/admin/services/")({ component: ServicesPage });
@@ -19,26 +20,39 @@ type ServiceForm = {
   is_active: boolean;
   sort_order: number;
   govt_portal_url?: string | null;
+  website_id?: string;
+  category_id?: string | null;
 };
 
 function emptyForm(): ServiceForm {
-  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "" };
+  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null };
 }
 
 function ServicesPage() {
   const listFn = useServerFn(listServices);
+  const treeFn = useServerFn(listWebsiteTree);
   const upsertFn = useServerFn(upsertService);
   const delFn = useServerFn(deleteService);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin.services"], queryFn: () => listFn() });
+  const { data: tree } = useQuery({ queryKey: ["admin.websites.tree"], queryFn: () => treeFn() });
 
   const [form, setForm] = useState<ServiceForm | null>(null);
+
+  const websites = tree?.websites ?? [];
+  const categories = tree?.categories ?? [];
+  const websiteById = useMemo(() => Object.fromEntries(websites.map((w) => [w.id, w])), [websites]);
+  const categoryById = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories]);
+  const categoriesForForm = useMemo(
+    () => categories.filter((c) => c.website_id === form?.website_id),
+    [categories, form?.website_id],
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Services</h1>
-        <button onClick={() => setForm(emptyForm())} className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">+ New Service</button>
+        <button onClick={() => setForm({ ...emptyForm(), website_id: websites[0]?.id })} className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">+ New Service</button>
       </div>
 
       {form && (
@@ -46,6 +60,18 @@ function ServicesPage() {
           <div className="grid md:grid-cols-2 gap-3">
             <Input label="Service code" value={form.service_code} onChange={(v) => setForm({ ...form, service_code: v })} />
             <Input label="Service name" value={form.service_name} onChange={(v) => setForm({ ...form, service_name: v })} />
+            <Select
+              label="Website"
+              value={form.website_id ?? ""}
+              onChange={(v) => setForm({ ...form, website_id: v || undefined, category_id: null })}
+              options={[{ value: "", label: "— select —" }, ...websites.map((w) => ({ value: w.id, label: `${w.name} (${w.domain})` }))]}
+            />
+            <Select
+              label="Category (optional)"
+              value={form.category_id ?? ""}
+              onChange={(v) => setForm({ ...form, category_id: v || null })}
+              options={[{ value: "", label: "— none —" }, ...categoriesForForm.map((c) => ({ value: c.id, label: c.name }))]}
+            />
             <Input
               label="Total (₹ inclusive of 18% GST)"
               type="number"
@@ -106,6 +132,18 @@ function ServicesPage() {
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
                 <td className="px-3 py-2">
                   <div className="font-medium">{s.service_name}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                    {s.website_id && websiteById[s.website_id] && (
+                      <span className="inline-flex items-center gap-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5">
+                        {websiteById[s.website_id].domain}
+                      </span>
+                    )}
+                    {s.category_id && categoryById[s.category_id] && (
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5">
+                        {categoryById[s.category_id].name}
+                      </span>
+                    )}
+                  </div>
                   {s.govt_portal_url && (
                     <a
                       href={s.govt_portal_url}
@@ -170,6 +208,29 @@ function Input({ label, value, onChange, type = "text" }: { label: string; value
     <label className="block text-sm">
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded border px-3 py-2" />
+    </label>
+  );
+}
+
+function Select({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="block text-sm">
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded border px-3 py-2 bg-white">
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
     </label>
   );
 }
