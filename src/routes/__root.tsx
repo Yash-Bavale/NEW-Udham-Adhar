@@ -156,7 +156,7 @@ function RootShell({ children }: { children: ReactNode }) {
             }
           `
         }} />
-        <script src="https://www.google.com/recaptcha/api.js" async defer />
+        
         <HeadContent />
       </head>
       <body>
