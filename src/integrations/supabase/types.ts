@@ -3888,6 +3888,10 @@ export type Database = {
           read_ct: number
         }[]
       }
+      restart_order: {
+        Args: { _note?: string; _order_id: string }
+        Returns: Json
+      }
       restart_order_from_ticket: { Args: { _ticket_id: string }; Returns: Json }
       search_nic_codes: {
         Args: { activity?: string; limit_n?: number; q?: string }
