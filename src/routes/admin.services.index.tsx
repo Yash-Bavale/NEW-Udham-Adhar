@@ -125,12 +125,13 @@ function ServicesPage() {
               <th className="px-3 py-2 text-right">Base</th>
               <th className="px-3 py-2 text-right">GST</th>
               <th className="px-3 py-2 text-right">Total</th>
+              <th className="px-3 py-2 text-center">Sort</th>
               <th className="px-3 py-2">Active</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={7} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+            {isLoading && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
             {data?.rows.map((s) => (
               <tr key={s.id} className="border-t">
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
@@ -162,6 +163,21 @@ function ServicesPage() {
                 <td className="px-3 py-2 text-right">₹{Number(s.base_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right">₹{Number(s.gst_amount).toFixed(2)}</td>
                 <td className="px-3 py-2 text-right font-semibold">₹{Number(s.total_amount).toFixed(2)}</td>
+                <td className="px-3 py-2 text-center">
+                  <input
+                    type="number"
+                    defaultValue={s.sort_order ?? 0}
+                    onBlur={async (e) => {
+                      const next = Number(e.target.value);
+                      if (next === (s.sort_order ?? 0)) return;
+                      try {
+                        await upsertFn({ data: { ...(s as ServiceForm), sort_order: next } as never });
+                        await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                      } catch (err) { alert((err as Error).message); }
+                    }}
+                    className="w-16 rounded border px-2 py-1 text-sm text-center"
+                  />
+                </td>
                 <td className="px-3 py-2 text-center">
                   <button
                     onClick={async () => {
