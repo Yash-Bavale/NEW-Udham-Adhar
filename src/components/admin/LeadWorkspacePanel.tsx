@@ -464,6 +464,11 @@ function QuickActionsCard({
             {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
+        <Button size="sm" variant="outline" onClick={() => setLogOpen(true)} className="justify-start text-xs">
+          <Phone className="size-3.5 mr-1.5" />
+          Log Contact Attempt
+        </Button>
+        <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
 
 
         {!hideMoney && (
