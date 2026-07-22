@@ -16,7 +16,8 @@ import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { ChangeServiceButton } from "./ChangeServiceDialog";
 import { TabStatusHeader } from "./TabStatusHeader";
 
-import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
+import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
+import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 

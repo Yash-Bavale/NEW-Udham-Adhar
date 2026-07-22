@@ -34,7 +34,8 @@ import {
 } from "@/lib/orders/journey-graph";
 import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 
-import { ExternalDelayDialog } from "@/components/admin/ExternalDelayDialog";
+import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
+import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 import { CountdownChip } from "./CountdownChip";
