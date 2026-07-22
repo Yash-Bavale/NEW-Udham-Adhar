@@ -518,24 +518,46 @@ function FormBuilderPage() {
               </div>
               <div className="p-3 space-y-2">
                 {documents.map((d, i) => (
-                  <div key={i} className="rounded-lg border bg-white px-3 py-2.5 grid grid-cols-12 gap-2 items-center">
+                  <div key={i} className="rounded-lg border bg-white px-3 py-2.5 space-y-2">
+                    <div className="grid grid-cols-12 gap-2 items-center">
+                      <input
+                        value={d.label}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                        placeholder="Document label"
+                        className="col-span-12 md:col-span-5 rounded-md border px-2 py-1.5 text-sm"
+                      />
+                      <input
+                        value={d.key}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, key: slugify(e.target.value) } : x))}
+                        placeholder="key"
+                        className="col-span-6 md:col-span-3 rounded-md border px-2 py-1.5 text-sm font-mono"
+                      />
+                      <label className="col-span-4 md:col-span-2 text-xs flex items-center gap-1.5">
+                        <input type="checkbox" checked={!!d.required} onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))} />
+                        Required
+                      </label>
+                      <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-2">
+                      <input
+                        value={d.sample_url ?? ""}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: e.target.value || undefined } : x))}
+                        placeholder="Template / sample URL (optional)"
+                        className="rounded-md border px-2 py-1.5 text-xs font-mono"
+                      />
+                      <input
+                        value={d.sample_label ?? ""}
+                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
+                        placeholder="Template button label"
+                        className="rounded-md border px-2 py-1.5 text-xs"
+                      />
+                    </div>
                     <input
-                      value={d.label}
-                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
-                      placeholder="Document label"
-                      className="col-span-12 md:col-span-5 rounded-md border px-2 py-1.5 text-sm"
+                      value={d.help ?? ""}
+                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, help: e.target.value || undefined } : x))}
+                      placeholder="Help text shown under the document (optional)"
+                      className="w-full rounded-md border px-2 py-1.5 text-xs"
                     />
-                    <input
-                      value={d.key}
-                      onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, key: slugify(e.target.value) } : x))}
-                      placeholder="key"
-                      className="col-span-6 md:col-span-3 rounded-md border px-2 py-1.5 text-sm font-mono"
-                    />
-                    <label className="col-span-4 md:col-span-2 text-xs flex items-center gap-1.5">
-                      <input type="checkbox" checked={!!d.required} onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))} />
-                      Required
-                    </label>
-                    <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
                   </div>
                 ))}
                 {documents.length === 0 && (
