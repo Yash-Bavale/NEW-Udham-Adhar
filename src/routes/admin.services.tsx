@@ -141,6 +141,11 @@ function ServicesPage() {
                     params={{ serviceCode: s.service_code }}
                     className="text-emerald-700 text-xs hover:underline mr-3"
                   >Configure</Link>
+                  <Link
+                    to="/admin/services/forms/$serviceCode"
+                    params={{ serviceCode: s.service_code }}
+                    className="text-indigo-700 text-xs hover:underline mr-3"
+                  >Edit Form</Link>
                   <button onClick={() => setForm(s as ServiceForm)} className="text-blue-700 text-xs hover:underline mr-3">Edit</button>
                   <button
                     onClick={async () => {

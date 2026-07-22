@@ -190,6 +190,7 @@ import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/publi
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
+import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admin.services.forms.$serviceCode'
 
 const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
   id: '/www-udyamregistration',
@@ -1141,6 +1142,12 @@ const AdminSupportTicketsTicketIdRoute =
     path: '/$ticketId',
     getParentRoute: () => AdminSupportTicketsRoute,
   } as any)
+const AdminServicesFormsServiceCodeRoute =
+  AdminServicesFormsServiceCodeRouteImport.update({
+    id: '/forms/$serviceCode',
+    path: '/forms/$serviceCode',
+    getParentRoute: () => AdminServicesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1305,6 +1312,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -1484,6 +1492,7 @@ export interface FileRoutesByTo {
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/tickets': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
+  '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -1668,6 +1677,7 @@ export interface FileRoutesById {
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/tickets/': typeof AdminTicketsIndexRoute
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
+  '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
@@ -1853,6 +1863,7 @@ export interface FileRouteTypes {
     | '/admin/orders/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
+    | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
@@ -2032,6 +2043,7 @@ export interface FileRouteTypes {
     | '/admin/orders'
     | '/admin/tickets'
     | '/onboarding/$leadCode'
+    | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
@@ -2215,6 +2227,7 @@ export interface FileRouteTypes {
     | '/admin/orders/'
     | '/admin/tickets/'
     | '/onboarding/$leadCode/'
+    | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
@@ -3637,6 +3650,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSupportTicketsTicketIdRouteImport
       parentRoute: typeof AdminSupportTicketsRoute
     }
+    '/admin/services/forms/$serviceCode': {
+      id: '/admin/services/forms/$serviceCode'
+      path: '/forms/$serviceCode'
+      fullPath: '/admin/services/forms/$serviceCode'
+      preLoaderRoute: typeof AdminServicesFormsServiceCodeRouteImport
+      parentRoute: typeof AdminServicesRoute
+    }
   }
 }
 
@@ -3719,10 +3739,12 @@ const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(
 
 interface AdminServicesRouteChildren {
   AdminServicesServiceCodeRoute: typeof AdminServicesServiceCodeRoute
+  AdminServicesFormsServiceCodeRoute: typeof AdminServicesFormsServiceCodeRoute
 }
 
 const AdminServicesRouteChildren: AdminServicesRouteChildren = {
   AdminServicesServiceCodeRoute: AdminServicesServiceCodeRoute,
+  AdminServicesFormsServiceCodeRoute: AdminServicesFormsServiceCodeRoute,
 }
 
 const AdminServicesRouteWithChildren = AdminServicesRoute._addFileChildren(

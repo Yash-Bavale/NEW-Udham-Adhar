@@ -218,13 +218,21 @@ const UDYAM_DOWNLOAD: OnboardingSchema = {
 };
 
 const MIGRATE: OnboardingSchema = {
-  title: "Migrate — Incomplete Information",
-  description: "Share your Udyog Aadhaar number so our experts can verify migration requirements.",
+  title: "Migrate Udyog Aadhaar to Udyam — Full Details",
+  description:
+    "Share your existing Udyog Aadhaar details, PAN information and enterprise details so our team can prepare your migration to Udyam.",
   fields: [
+    { key: "section_existing_uam", label: "Existing Udyog Aadhaar Details", type: "section" },
     { key: "applicant_name", label: "Applicant Name", type: "text", required: true, maxLength: 120 },
     { key: "uam_number", label: "Udyog Aadhaar Number", type: "text", required: true, pattern: "^[A-Z]{2}\\d{2}[A-Z]\\d{7}$", placeholder: "DL05A0000001", maxLength: 12, help: "Format: first 2 alphabets, then 2 digits, then 1 alphabet, then 7 digits." },
     { key: "registered_mobile", label: "Registered Mobile Number", type: "tel", required: false, pattern: "^[6-9]\\d{9}$" },
     { key: "registered_email", label: "Registered Email ID", type: "email", required: false },
+    { key: "section_pan_details", label: "PAN Details", type: "section" },
+    { key: "pan_number", label: "Customer PAN Number", type: "text", required: true, pattern: "^[A-Z]{5}\\d{4}[A-Z]$", placeholder: "ABCDE1234F", maxLength: 10 },
+    { key: "pan_holder_name", label: "Name As Per PAN Card", type: "text", required: true, maxLength: 120 },
+    { key: "pan_dob", label: "Date of Birth as per PAN Card", type: "date", required: true },
+    { key: "section_new_udyam", label: "Enterprise, Bank & Activity Details", type: "section" },
+    ...NEW_UDYAM.fields.filter((f) => f.key !== "pan_number" && f.key !== "pan_holder_name" && f.key !== "pan_dob"),
   ],
   documents: [],
 };
