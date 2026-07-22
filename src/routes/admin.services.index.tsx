@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
 import { fromBase, fromTotal } from "@/lib/pricing/gst";
 
-export const Route = createFileRoute("/admin/services")({ component: ServicesPage });
+export const Route = createFileRoute("/admin/services/")({ component: ServicesPage });
 
 type ServiceForm = {
   id?: string;
