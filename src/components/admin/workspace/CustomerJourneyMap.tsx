@@ -319,7 +319,7 @@ export function CustomerJourneyMap(p: Props) {
                   closed ? "bg-rose-100 text-rose-700"
                     : phase === "consultation_done" ? "bg-emerald-100 text-emerald-800"
                       : phase === "technical_delay" ? "bg-sky-100 text-sky-800"
-                        : phase === "customer_delay" || phase === "form_not_submitted" ? "bg-amber-100 text-amber-800"
+                        : phase === "customer_delay" || phase === "form_not_submitted" || phase === "form_link_sent" ? "bg-amber-100 text-amber-800"
                           : phase === "govt_processing" ? "bg-violet-100 text-violet-800"
                             : completed ? "bg-emerald-100 text-emerald-800"
                               : p.adminOverride ? "bg-orange-100 text-orange-800"

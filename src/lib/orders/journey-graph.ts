@@ -330,6 +330,7 @@ export function activeBranchesFor(
   const s = new Set<BranchKey>();
   switch (phase) {
     case "form_not_submitted": s.add("form-nag"); break;
+    case "form_link_sent":     s.add("form-nag"); break;
     case "form_submitted":     break;
     case "technical_delay":    s.add("technical"); break;
     case "customer_delay":
@@ -374,8 +375,8 @@ export function mainDoneEdgesFor(
   techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
-  const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
-  const idx = holding && phase === "form_not_submitted" ? 2
+  const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted" || phase === "form_link_sent";
+  const idx = holding && (phase === "form_not_submitted" || phase === "form_link_sent") ? 2
             : holding ? 3
             : phase === "consultation_done" ? 4
             : currentIdx;
@@ -406,7 +407,7 @@ export function currentMainEdgesFor(
   const s = new Set<string>();
   if (terminal) return s;
   if (phase === "customer_delay") return s;
-  if (phase === "form_not_submitted") {
+  if (phase === "form_not_submitted" || phase === "form_link_sent") {
     // Trace: order_rec → form_not is done; the closure path (form_not→B01→closed)
     // is highlighted separately via the form-nag active branch.
     s.add("e_or_fn");
@@ -445,7 +446,7 @@ export function currentStageNodeFor(
   if (phase === "technical_delay") return "b02_tech";
   if (phase === "customer_delay") return "b04_cust";
   if (phase === "application_rejected") return "b08_reject";
-  if (phase === "form_not_submitted") return "form_not";
+  if (phase === "form_not_submitted" || phase === "form_link_sent") return "form_not";
   if (currentIdx <= 1) return "order_rec";
   if (currentIdx === 2) return "form_not";
   if (currentIdx === 3) return "form_sub";
