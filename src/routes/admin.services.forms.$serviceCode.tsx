@@ -436,7 +436,8 @@ function FormBuilderPage() {
             </div>
             <OnboardingForm
               schema={previewSchema}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              initial={{}}
+              busy={false}
               onSubmit={async () => alert("Preview only — not saved")}
             />
           </div>
