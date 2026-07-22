@@ -212,6 +212,17 @@ function DocRow({
         </p>
       )}
       {def.help && <p className="text-xs text-muted-foreground">{def.help}</p>}
+      {def.sample_url && (
+        <a
+          href={def.sample_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline w-fit"
+        >
+          <Download className="w-3.5 h-3.5" />
+          {def.sample_label || "Download template"}
+        </a>
+      )}
 
       <AnimatePresence>
         {busy && (
