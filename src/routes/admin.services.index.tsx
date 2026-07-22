@@ -132,6 +132,18 @@ function ServicesPage() {
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
                 <td className="px-3 py-2">
                   <div className="font-medium">{s.service_name}</div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                    {s.website_id && websiteById[s.website_id] && (
+                      <span className="inline-flex items-center gap-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5">
+                        {websiteById[s.website_id].domain}
+                      </span>
+                    )}
+                    {s.category_id && categoryById[s.category_id] && (
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5">
+                        {categoryById[s.category_id].name}
+                      </span>
+                    )}
+                  </div>
                   {s.govt_portal_url && (
                     <a
                       href={s.govt_portal_url}
