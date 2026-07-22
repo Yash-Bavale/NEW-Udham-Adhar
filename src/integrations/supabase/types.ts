@@ -1830,6 +1830,98 @@ export type Database = {
           },
         ]
       }
+      lead_attribution: {
+        Row: {
+          conversion_kind: string | null
+          converted_at: string | null
+          converted_user_id: string | null
+          created_at: string
+          first_contact_at: string | null
+          first_contact_user_id: string | null
+          is_unique_lead: boolean
+          lead_id: string
+          repeat_of_lead_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          conversion_kind?: string | null
+          converted_at?: string | null
+          converted_user_id?: string | null
+          created_at?: string
+          first_contact_at?: string | null
+          first_contact_user_id?: string | null
+          is_unique_lead?: boolean
+          lead_id: string
+          repeat_of_lead_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conversion_kind?: string | null
+          converted_at?: string | null
+          converted_user_id?: string | null
+          created_at?: string
+          first_contact_at?: string | null
+          first_contact_user_id?: string | null
+          is_unique_lead?: boolean
+          lead_id?: string
+          repeat_of_lead_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_attribution_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_attribution_repeat_of_lead_id_fkey"
+            columns: ["repeat_of_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_contact_events: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          outcome: string
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          outcome: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          outcome?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_contact_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_notes: {
         Row: {
           created_at: string
