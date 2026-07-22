@@ -432,7 +432,7 @@ function TicketHeader({ data, ticketId, composerMode, setComposerMode, focusRepl
   });
   const t001RestartMut = useMutation({
     mutationFn: () => t001RestartFn({ data: { ticketId } }),
-    onSuccess: () => { setRestartOpen(false); toast.success("Order moved to form completed — ticket closed"); invalidate(); },
+    onSuccess: () => { setRestartOpen(false); toast.success("Order restarted at Form Submitted — ticket closed"); invalidate(); },
     onError: (e: any) => toast.error(e?.message ?? "Restart failed"),
   });
   const t001ConsultMut = useMutation({

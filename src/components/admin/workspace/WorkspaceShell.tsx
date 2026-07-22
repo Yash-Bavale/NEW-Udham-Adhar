@@ -629,7 +629,7 @@ export function WorkspaceShell(p: Props) {
                 },
                 B09: {
                   label: "B09 — Reopen/Restart Order",
-                  sub: "Restart a closed order",
+                  sub: "Return to Form Submitted",
                   badgeBottom: "E09",
                   onClick: () => mutReopen.mutate(),
                   pending: mutReopen.isPending,
