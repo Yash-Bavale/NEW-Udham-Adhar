@@ -10,9 +10,8 @@ export const Route = createFileRoute("/api/public/cron/workflow-tick")({
         const secret = process.env.CRON_SECRET;
         const auth = request.headers.get("authorization") ?? "";
         const apikey = request.headers.get("apikey") ?? "";
-        if (secret && auth !== `Bearer ${secret}` && apikey !== secret) {
-          // still allow supabase anon key so pg_cron using apikey header works
-          if (!apikey) return new Response("Unauthorized", { status: 401 });
+        if (!secret || (auth !== `Bearer ${secret}` && apikey !== secret)) {
+          return new Response("Unauthorized", { status: 401 });
         }
 
         const { tickDueTimers } = await import("@/lib/workflow/engine.server");
