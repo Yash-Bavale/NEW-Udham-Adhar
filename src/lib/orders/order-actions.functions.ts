@@ -646,11 +646,12 @@ export const reopenOrder = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), remarks: z.string().max(2000).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const updated = await transition(context.supabase, data.orderId, "REOPENED", {
-      remarks: data.remarks ?? null,
-      force: true,
+    const { data: result, error } = await context.supabase.rpc("restart_order", {
+      _order_id: data.orderId,
+      _note: data.remarks ?? undefined,
     });
-    return { ok: true, order: updated };
+    if (error) throw new Error(error.message);
+    return { ok: true, order: result };
   });
 
 // ─────────────────────── Close Order (manual) ───────────────────────

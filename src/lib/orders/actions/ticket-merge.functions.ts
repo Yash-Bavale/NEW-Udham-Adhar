@@ -1,7 +1,7 @@
 // Phase 2 — Ticket merge: single ticket per order lifetime.
 // Wraps the ticket_reopen_or_create RPC and dispatches TicketOpened so the
-// workflow engine pauses (per spec v2: one ticket per order, reopen instead
-// of creating a new one when the same customer emails again).
+// workflow engine records the open ticket (per spec v2: one ticket per order,
+// reopen instead of creating a new one when the same customer emails again).
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -32,9 +32,9 @@ export const findOrReopenTicket = createServerFn({ method: "POST" })
     const ticketId = row?.ticket_id as string | undefined;
     if (!ticketId) throw new Error("ticket_reopen_or_create returned no ticket_id");
 
-    // Every open/reopen dispatches TicketOpened to pause the workflow, and
-    // resolves any active Customer-Side Delay for the order (the customer
-    // replying is what the delay was waiting for).
+    // Record the open/reopened ticket. Customer-delay closure continues until
+    // staff explicitly chooses Restart Order; ticket creation alone must not
+    // cancel, pause, or resolve that timer.
     try {
       const { dispatchEvent } = await import("@/lib/workflow/engine.server");
       await dispatchEvent({
@@ -45,13 +45,6 @@ export const findOrReopenTicket = createServerFn({ method: "POST" })
     } catch (e) {
       console.warn("[findOrReopenTicket] TicketOpened dispatch failed:", e);
     }
-    try {
-      const { resolveCustomerDelay } = await import("@/lib/scheduling/schedulers.server");
-      await resolveCustomerDelay(data.applicationId, "customer_replied_via_ticket");
-    } catch (e) {
-      console.warn("[findOrReopenTicket] resolveCustomerDelay failed:", e);
-    }
-
     return {
       ticketId,
       wasReopened: Boolean(row?.was_reopened),

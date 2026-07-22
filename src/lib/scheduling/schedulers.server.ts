@@ -219,8 +219,8 @@ export async function cancelAllForOrder(applicationId: string, reason = "order_s
  *   - Cancel any active/paused customer_closure_24h scheduler.
  *   - If fulfillment_status is customer_delay, revert to form_submitted and
  *     clear customer_hold_started_at + active_reason_id.
- * Called when the customer replies (a ticket opens) or when the order is
- * restarted from either the workspace or a support ticket.
+ * Called only when staff explicitly restarts an order. Opening a ticket or
+ * receiving a customer reply must leave the closure timer running.
  */
 export async function resolveCustomerDelay(
   applicationId: string,

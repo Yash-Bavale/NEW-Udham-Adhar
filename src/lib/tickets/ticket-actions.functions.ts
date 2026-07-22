@@ -677,55 +677,21 @@ export const closeTicketNormalT001 = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Restart Order — move linked order to form completed and close, no customer email.
+// Restart Order — the database atomically cancels the customer-delay timer,
+// returns the linked order to Form Submitted, and closes the ticket.
 export const closeTicketRestartT001 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({
     ticketId: z.string().uuid(),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    const admin = await getAdmin();
     const ticket = await loadTicket(data.ticketId);
     if (!ticket.application_id) throw new Error("This ticket is not linked to an order.");
-
-    const { data: app } = await admin
-      .from("applications")
-      .select("order_status, customer_id, lead_id")
-      .eq("id", ticket.application_id)
-      .maybeSingle();
-    const oldStatus = (app as { order_status?: string | null } | null)?.order_status ?? null;
-    if (oldStatus !== "FORM_RECEIVED") {
-      const { error: orderErr } = await admin
-        .from("applications")
-        .update({
-          order_status: "FORM_RECEIVED",
-          fulfillment_status: "form_submitted",
-          form_submitted_at: new Date().toISOString(),
-          customer_hold_started_at: null,
-          active_reason_id: null,
-          updated_at: new Date().toISOString(),
-        } as never)
-        .eq("id", ticket.application_id);
-      if (orderErr) throw new Error(orderErr.message);
-      await admin.from("application_events").insert({
-        application_id: ticket.application_id,
-        lead_id: (app as { lead_id?: string | null } | null)?.lead_id ?? null,
-        customer_id: ticket.customer_id ?? (app as { customer_id?: string | null } | null)?.customer_id ?? null,
-        event_type: "order_status_change",
-        old_value: oldStatus,
-        new_value: "FORM_RECEIVED",
-        note: `Restarted from ticket ${ticket.ticket_number ?? ticket.id.slice(0, 8)} — moved to form completed`,
-        created_by: context.userId,
-      } as never);
-    }
-
-    try {
-      const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
-      await cancelAllForOrder(ticket.application_id, "order_restarted_from_ticket");
-    } catch { /* non-fatal */ }
-    await markTicketClosed(ticket.id, context.userId, "Closed: Restarted order to form completed.", "closed_restart_order");
-    await dispatchTicketClosedCooperating(ticket, context.userId);
-    return { ok: true };
+    const { data: result, error } = await context.supabase.rpc("restart_order_from_ticket", {
+      _ticket_id: ticket.id,
+    });
+    if (error) throw new Error(error.message);
+    return result as { ok: true; applicationId: string; cancelledCustomerDelayTimers: number };
   });
 
 // T001 — Consultation / Support Completed
