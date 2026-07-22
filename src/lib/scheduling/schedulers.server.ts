@@ -79,10 +79,11 @@ export async function startCustomerClosureScheduler(input: {
   createdBy?: string | null;
   totalSeconds?: number;
 }) {
-  const cfg = await readBusinessHoursConfig();
   const total = input.totalSeconds ?? (await readCustomerDelayAutocloseSeconds());
   const now = new Date();
-  const firesAt = addBusinessSeconds(now, total, cfg);
+  // Wall-clock hours — closure/delay flows do NOT use business hours.
+  const firesAt = new Date(now.getTime() + total * 1000);
+
 
 
 
