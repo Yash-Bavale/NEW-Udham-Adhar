@@ -199,3 +199,26 @@ function Input({ label, value, onChange, type = "text" }: { label: string; value
     </label>
   );
 }
+
+function Select({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <label className="block text-sm">
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded border px-3 py-2 bg-white">
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
