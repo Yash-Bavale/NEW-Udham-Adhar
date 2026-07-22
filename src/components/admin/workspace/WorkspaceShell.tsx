@@ -257,9 +257,11 @@ export function WorkspaceShell(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const cName = customer?.name ?? lead?.name ?? "—";
-  const cMobile = customer?.primary_mobile ?? lead?.mobile ?? null;
-  const cEmail = customer?.primary_email ?? lead?.email ?? null;
+  // Prefer lead values — that's what THIS order was created with and where
+  // its emails actually go. Customer row may be a shared/older dedup record.
+  const cName = lead?.name ?? customer?.name ?? "—";
+  const cMobile = lead?.mobile ?? customer?.primary_mobile ?? null;
+  const cEmail = lead?.email ?? customer?.primary_email ?? null;
   const cLanguage = lead?.language ?? "—";
   const cState = lead?.state ?? "—";
   const cSource = lead?.lead_source ?? "—";

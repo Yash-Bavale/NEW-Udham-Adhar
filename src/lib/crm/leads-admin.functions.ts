@@ -457,6 +457,21 @@ export const addLead = createServerFn({ method: "POST" })
     });
     if (rpcErr) throw new Error(rpcErr.message);
 
+    // Refresh the deduped customer record with the latest details from this
+    // lead so the order card / customer view doesn't show a stale email
+    // when the same person (matched by mobile) returns with a new email.
+    if (customerId) {
+      await (admin.from("customers") as any)
+        .update({
+          name: data.name,
+          primary_email: data.email.toLowerCase(),
+          primary_mobile: data.mobile,
+          state: data.state,
+          language: data.language,
+        })
+        .eq("id", customerId as string);
+    }
+
     const { notes, district, ...rest } = data;
     const composedNotes = [notes, district ? `District: ${district}` : null].filter(Boolean).join("\n") || null;
 

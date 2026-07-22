@@ -180,9 +180,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         lead_id: a.lead_id,
         lead_code: lead?.lead_code ?? null,
         customer_id: a.customer_id,
-        customer_name: cust?.name ?? lead?.name ?? "—",
-        customer_mobile: cust?.primary_mobile ?? lead?.mobile ?? null,
-        customer_email: cust?.primary_email ?? lead?.email ?? null,
+        customer_name: lead?.name ?? cust?.name ?? "—",
+        customer_mobile: lead?.mobile ?? cust?.primary_mobile ?? null,
+        customer_email: lead?.email ?? cust?.primary_email ?? null,
         service_id: a.service_id,
         service_name: svc?.service_name ?? null,
         total_amount: total,
@@ -580,8 +580,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           : Promise.resolve({ data: null as null | { service_name: string | null; service_code: string | null } }),
       ]);
 
-      const recipientEmail = customer?.primary_email || lead?.email || null;
-      const recipientName = customer?.name || lead?.name || "Customer";
+      const recipientEmail = lead?.email || customer?.primary_email || null;
+      const recipientName = lead?.name || customer?.name || "Customer";
       const serviceName = service?.service_name || lead?.service || "Service";
 
       let certificateUrl: string | null = null;
@@ -787,8 +787,8 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       ? (await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()).data
       : null;
 
-    const recipientEmail = customer?.primary_email || lead?.email || null;
-    const recipientName = customer?.name || lead?.name || "Customer";
+    const recipientEmail = lead?.email || customer?.primary_email || null;
+    const recipientName = lead?.name || customer?.name || "Customer";
     const serviceName = serviceRow?.service_name || lead?.service || "Service";
 
     if (!recipientEmail) {
