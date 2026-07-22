@@ -375,8 +375,8 @@ export function mainDoneEdgesFor(
   techDelayResolved?: boolean,
 ): Set<string> {
   const s = new Set<string>();
-  const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted";
-  const idx = holding && phase === "form_not_submitted" ? 2
+  const holding = phase === "technical_delay" || phase === "customer_delay" || phase === "form_not_submitted" || phase === "form_link_sent";
+  const idx = holding && (phase === "form_not_submitted" || phase === "form_link_sent") ? 2
             : holding ? 3
             : phase === "consultation_done" ? 4
             : currentIdx;
