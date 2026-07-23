@@ -896,7 +896,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     queryFn: () => listFn({ data: { leadId } }),
   });
 
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [date, setDate] = useState<Date | undefined>(() => new Date());
   const [time, setTime] = useState<string>("10:00");
   const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
   const [assignedTo, setAssignedTo] = useState<string>("");
