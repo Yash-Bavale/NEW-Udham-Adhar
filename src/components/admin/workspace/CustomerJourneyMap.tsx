@@ -194,13 +194,8 @@ export function CustomerJourneyMap(p: Props) {
   });
   const hasOpenTicket = !!openTicket;
 
-  const currentStageLabel = useMemo(() => {
-    if (p.stage === "consultation_completed") return "Consultation Completed";
-    if (live.terminal === "closed") return "Order Closed";
-    if (live.terminal === "completed") return "Order Completed";
-    const s = JOURNEY_STAGES[Math.min(Math.max(currentIdx, 0), JOURNEY_STAGES.length - 1)];
-    return s?.label ?? "Order Received";
-  }, [currentIdx, live.terminal, p.stage]);
+  // Single source of truth for the "Current" label — derived stage from computeOrderStage.
+  const currentStageLabel = useMemo(() => STAGE_META[p.stage].label, [p.stage]);
 
 
   const [dialog, setDialog] = useState<
