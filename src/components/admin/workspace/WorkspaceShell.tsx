@@ -558,7 +558,7 @@ export function WorkspaceShell(p: Props) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
             {(() => {
               const isB09Enabled = closed || completed;
               const isB10Enabled = !closed;
@@ -571,7 +571,7 @@ export function WorkspaceShell(p: Props) {
 
               const buttonHandlers: Record<string, { label: string; sub: string; badgeBottom: string; onClick: () => void; pending?: boolean; variant: string }> = {
                 B01: {
-                  label: "B01 — Form Not Submitted",
+                  label: "Form Not Submitted",
                   sub: "Send Form Link / Incomplete mail",
                   badgeBottom: "E002",
                   onClick: () => mutFormLink.mutate(),
@@ -579,14 +579,14 @@ export function WorkspaceShell(p: Props) {
                   variant: "amber",
                 },
                 B02: {
-                  label: "B02 — Technical Delay",
+                  label: "Technical Delay",
                   sub: "Select Reason",
                   badgeBottom: "E003",
                   onClick: () => setDialog({ kind: "technical_delay" }),
                   variant: "sky",
                 },
                 B03: {
-                  label: "B03 — Technical Delay Resolved",
+                  label: "Technical Delay Resolved",
                   sub: "Issue Resolved & Resume",
                   badgeBottom: "E011",
                   onClick: () => mutResume.mutate(),
@@ -594,14 +594,14 @@ export function WorkspaceShell(p: Props) {
                   variant: "emerald",
                 },
                 B04: {
-                  label: "B04 — Customer Side Delay",
+                  label: "Customer Side Delay",
                   sub: "Select Reason",
                   badgeBottom: "E004",
                   onClick: () => setDialog({ kind: "customer_delay" }),
                   variant: "amber",
                 },
                 B05: {
-                  label: "B05 — Application Submitted",
+                  label: "Application Submitted",
                   sub: "Waiting for Govt. Approval",
                   badgeBottom: "E006",
                   onClick: () => mutSubmit.mutate(),
@@ -609,7 +609,7 @@ export function WorkspaceShell(p: Props) {
                   variant: "violet",
                 },
                 B06: {
-                  label: "B06 — Consultation Completed",
+                  label: "Consultation Completed",
                   sub: "Fulfillment completed",
                   badgeBottom: "E005",
                   onClick: () => mutConsultation.mutate(),
@@ -617,21 +617,21 @@ export function WorkspaceShell(p: Props) {
                   variant: "violet",
                 },
                 B07: {
-                  label: "B07 — Application Accepted",
+                  label: "Application Accepted",
                   sub: "Upload PDF & Complete",
                   badgeBottom: "E007",
                   onClick: () => setDialog({ kind: "complete_with_cert" }),
                   variant: "emerald",
                 },
                 B08: {
-                  label: "B08 — Application Rejected",
+                  label: "Application Rejected",
                   sub: "Select Reason & Close",
                   badgeBottom: "E008",
                   onClick: () => setDialog({ kind: "govt_rejected" }),
                   variant: "rose",
                 },
                 B09: {
-                  label: "B09 — Reopen/Restart Order",
+                  label: "Reopen/Restart Order",
                   sub: "Return to Form Submitted",
                   badgeBottom: "E09",
                   onClick: () => mutReopen.mutate(),
@@ -639,7 +639,7 @@ export function WorkspaceShell(p: Props) {
                   variant: "indigo",
                 },
                 B10: {
-                  label: "B10 — Order Force Closed",
+                  label: "Order Force Closed",
                   sub: "Force Close order (Cat A)",
                   badgeBottom: "E010",
                   onClick: () => setDialog({ kind: "force_close" }),
@@ -648,12 +648,12 @@ export function WorkspaceShell(p: Props) {
               };
 
               const TINT_STYLES: Record<string, { active: string }> = {
-                amber: { active: "border-amber-200 bg-amber-50 hover:bg-amber-100/80 text-amber-800 hover:border-amber-300 shadow-amber-100/50" },
-                sky: { active: "border-sky-200 bg-sky-50 hover:bg-sky-100/80 text-sky-800 hover:border-sky-300 shadow-sky-100/50" },
-                emerald: { active: "border-emerald-200 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 hover:border-emerald-300 shadow-emerald-100/50" },
-                rose: { active: "border-rose-200 bg-rose-50 hover:bg-rose-100/80 text-rose-800 hover:border-rose-300 shadow-rose-100/50" },
-                violet: { active: "border-violet-200 bg-violet-50 hover:bg-violet-100/80 text-violet-800 hover:border-violet-300 shadow-violet-100/50" },
-                indigo: { active: "border-indigo-200 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-800 hover:border-indigo-300 shadow-indigo-100/50" },
+                amber: { active: "border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-900 hover:border-amber-300" },
+                sky: { active: "border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-sky-900 hover:border-sky-300" },
+                emerald: { active: "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 hover:border-emerald-300" },
+                rose: { active: "border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-900 hover:border-rose-300" },
+                violet: { active: "border-violet-200 bg-violet-50/70 hover:bg-violet-100 text-violet-900 hover:border-violet-300" },
+                indigo: { active: "border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 hover:border-indigo-300" },
               };
 
               return Object.entries(buttonHandlers).map(([code, btn]) => {
@@ -666,30 +666,30 @@ export function WorkspaceShell(p: Props) {
                     onClick={btn.onClick}
                     disabled={!enabled || btn.pending}
                     className={cn(
-                      "relative flex flex-col justify-between items-center text-center p-3 rounded-xl border transition shadow-xs disabled:cursor-not-allowed select-none group min-h-[96px]",
+                      "relative flex flex-col justify-center items-center text-center rounded-lg border transition disabled:cursor-not-allowed select-none group min-h-[58px] py-2 px-2",
                       enabled
                         ? style.active
                         : "border-slate-200 bg-slate-50 text-slate-400 opacity-60"
                     )}
                   >
-                    {/* Yellow Badge Top */}
-                    <span className="absolute -top-2 left-3 rounded-md bg-yellow-300 border border-yellow-400 px-1.5 py-px text-[9px] font-black text-slate-900 shadow-2xs font-mono">
+                    {/* Yellow B Badge Top-Left */}
+                    <span className="absolute top-1.5 left-1.5 rounded bg-yellow-300 border border-yellow-400 px-1 py-px text-[8px] font-black text-slate-900 shadow-sm font-mono leading-none">
                       {code}
                     </span>
 
-                    {/* Blue Badge Bottom */}
-                    <span className="absolute -bottom-2 right-3 rounded-md bg-blue-600 border border-blue-700 px-1.5 py-px text-[9px] font-black text-white shadow-2xs font-mono">
+                    {/* Blue E Badge Bottom-Right */}
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-blue-600 border border-blue-700 px-1 py-px text-[8px] font-black text-white shadow-sm font-mono leading-none">
                       {btn.badgeBottom}
                     </span>
 
-                    <div className="text-[11px] font-extrabold tracking-tight mt-1 leading-snug">
-                      {btn.label.split(" — ")[1] || btn.label}
+                    <div className="text-[10px] font-bold leading-tight tracking-tight">
+                      {btn.label}
                     </div>
-                    <div className="text-[9px] font-medium opacity-85 leading-normal mt-0.5 max-w-[90%] break-words">
+                    <div className="text-[8px] font-medium opacity-85 leading-normal mt-0.5 max-w-[92%] break-words">
                       {btn.sub}
                     </div>
                     {btn.pending && (
-                      <span className="absolute inset-0 bg-white/60 flex items-center justify-center text-xs font-bold text-slate-800 rounded-xl">
+                      <span className="absolute inset-0 bg-white/70 flex items-center justify-center text-[10px] font-bold text-slate-800 rounded-lg">
                         Processing…
                       </span>
                     )}
