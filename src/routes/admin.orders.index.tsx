@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 
@@ -129,6 +129,9 @@ function OrdersListPage() {
   });
 
   const allRows = (data?.rows ?? []) as any[];
+
+  const isAdmin = role.hasAny(["admin", "super_admin"]);
+  const colCount = 6 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
 
   // Compute pending-age threshold in days from filter selection.
   const minDays: number | null = useMemo(() => {
@@ -348,30 +351,27 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
                 <th className="text-left font-medium px-2 py-2.5">Status</th>
-                <th className="text-left font-medium px-2 py-2.5">Assigned</th>
+                {isAdmin && <th className="text-left font-medium px-2 py-2.5">Assigned</th>}
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
-                <th className="px-2 py-2.5" />
-
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={colCount} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
-                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />)}
+                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />)}
                 </>
               ))}
-
             </tbody>
           </table>
         </ScrollableTable>
@@ -393,7 +393,6 @@ function formatOrderAge(ms: number): string {
 }
 
 function formatDayHeader(day: string): string {
-
   const d = new Date(day);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yest = new Date(today); yest.setDate(today.getDate() - 1);
@@ -404,7 +403,7 @@ function formatDayHeader(day: string): string {
   return base;
 }
 
-function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean; onOpen: (id: string) => void }) {
+function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney: boolean; isAdmin: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   
@@ -429,7 +428,6 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
         onOpen(order.id);
       }}
     >
-
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div className="flex items-center gap-1.5">
@@ -492,23 +490,15 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
           );
         })()}
       </td>
-      <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
+      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
         </td>
       )}
-
-      <td className="px-2 py-2.5 whitespace-nowrap text-right">
-        <Link
-          to="/admin/orders/$orderId"
-          params={{ orderId: order.id }}
-          className="inline-flex items-center gap-1 text-xs font-medium text-sky-700 hover:text-sky-800"
-        >
-          <Eye className="size-3.5" /> View
-        </Link>
-      </td>
     </tr>
+  );
+}
   );
 }
 
