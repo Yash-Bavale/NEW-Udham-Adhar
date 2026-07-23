@@ -398,6 +398,22 @@ function LeadsPage() {
                           {l.lead_code}
                         </span>
                       </td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <div>{formatIST(l.created_at, { dateOnly: true })}</div>
+                            <div className="text-[10px] text-slate-400">{formatIST(l.created_at, { timeOnly: true })} IST</div>
+                          </div>
+                          {(l.status === "new" || !l.status) && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                              title="Time since lead created — clears once contacted"
+                            >
+                              {formatAge(ageMs)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 font-medium">
                         <div className="flex items-center gap-1.5">
                           <span>{l.name}</span>
@@ -420,16 +436,11 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
                       {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
-                      
-                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
-                        <div>{formatIST(l.created_at, { dateOnly: true })}</div>
-                        <div className="text-[10px] text-slate-400">{formatIST(l.created_at, { timeOnly: true })} IST</div>
-                      </td>
+
                       <td className="px-4 py-2.5 text-right">
                         <Link
                           to="/admin/leads/$leadId"
