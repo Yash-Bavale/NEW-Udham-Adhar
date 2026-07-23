@@ -61,7 +61,14 @@ const HIGH_PRIORITY = new Set<string>([
 function isExcluded(p: string): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (p.includes("$") || p.includes("*")) return true;
-  if (p === "/home") return true;
+  // Retired / non-indexable paths that should never appear in sitemap.
+  if (
+    p === "/home" ||
+    p === "/index.html" ||
+    p === "/unauthorized" ||
+    p === "/not-found" ||
+    p === "/404"
+  ) return true;
   // Keyword-variant pages stay live but are dropped from the sitemap;
   // their canonical points at the cluster primary (see canonical-clusters.ts).
   const slug = p.replace(/^\/+/, "");
