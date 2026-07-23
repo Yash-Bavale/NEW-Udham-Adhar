@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Eye, Calendar, Users as UsersIcon } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon } from "lucide-react";
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
@@ -356,9 +356,8 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
                   {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Action</th>
+                  {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Assignee</th>}
+                  <th className="px-4 py-2.5 text-left font-medium">Current Stage</th>
                 </tr>
 
               </thead>
@@ -451,21 +450,10 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
                       {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
+                      {role.hasAny(["super_admin", "admin"]) && (
+                        <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
+                      )}
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
-
-                      <td className="px-4 py-2.5 text-right">
-                        <Link
-                          to="/admin/leads/$leadId"
-                          params={{ leadId: l.id }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--admin-surface)] border"
-                          style={{ borderColor: "var(--admin-border)", color: "var(--admin-accent)" }}
-                          title="Open full lead page"
-                        >
-                          <Eye className="size-3.5" /> View
-                        </Link>
-                      </td>
                     </tr>
                     </Fragment>
                   );
