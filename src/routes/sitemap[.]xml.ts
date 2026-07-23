@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
 import { BASE_URL } from "@/lib/brand";
+import { VARIANT_SLUGS } from "@/lib/seo/canonical-clusters";
 
 // Path prefixes that must never appear in the sitemap.
 // Intentional exclusions (not bugs — scanner may flag these as "missing"):
