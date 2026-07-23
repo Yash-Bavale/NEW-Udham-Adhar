@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
   Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin,
+  Upload, Loader2,
 } from "lucide-react";
 import {
   getBuilderSchema,
@@ -16,6 +17,9 @@ import {
 } from "@/lib/crm/form-builder.functions";
 import { getSchema as getFallbackSchema } from "@/lib/onboarding/schemas";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/admin/services/forms/$serviceCode")({
   head: () => ({ meta: [{ title: "Form Builder — Admin" }] }),
