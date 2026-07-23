@@ -609,7 +609,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     });
     if (!isAdmin) throw new Error("Forbidden: admin required");
 
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
       remarks: `Refund of ₹${data.amount} processed. Ref: ${data.paymentReference}`,
     });
@@ -626,12 +626,12 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .eq("status", "approved");
 
     let emailQueued = false;
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "refund_processed_confirmation",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           refundAmount: `₹${data.amount.toFixed(2)}`,
           paymentReference: data.paymentReference,
