@@ -108,13 +108,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" },
       { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+      // Preconnect to third-party origins used site-wide so DNS/TLS handshake
+      // for async gtag + CDN assets happens in parallel with HTML parse.
+      { rel: "preconnect", href: "https://www.googletagmanager.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://www.google-analytics.com", crossOrigin: "anonymous" },
+      { rel: "dns-prefetch", href: "https://www.googletagmanager.com" },
+      { rel: "dns-prefetch", href: "https://www.google-analytics.com" },
     ],
 
     scripts: [
-      // GA is loaded lazily on idle from RootComponent to keep the critical
-      // path light (PageSpeed/Core Web Vitals).
+      // GA/Ads gtag is injected from RootComponent after first paint (idle
+      // callback) to keep the critical path light for Core Web Vitals.
     ],
 
   }),
