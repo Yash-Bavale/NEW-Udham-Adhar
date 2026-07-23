@@ -419,7 +419,7 @@ function LeadsPage() {
                           {(l.status === "new_lead" || l.status === "lead_created" || !l.status) && (
                             <span
                               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-                              title="Time since lead created — clears once contacted"
+                              title="Time since lead created"
                             >
                               {formatAge(ageMs)}
                             </span>
