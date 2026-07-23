@@ -48,7 +48,13 @@ const DocSchema = z.object({
   label: z.string().trim().min(1).max(200),
   required: z.boolean().optional(),
   help: z.string().max(500).optional(),
-  sample_url: z.string().trim().max(2000).url().optional().or(z.literal("").transform(() => undefined)),
+  sample_url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((s) => s === "" || s.startsWith("/") || /^https?:\/\//i.test(s), "Invalid URL")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   sample_label: z.string().max(200).optional(),
 });
 
