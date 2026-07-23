@@ -95,7 +95,7 @@ function MyWorkPage() {
                   className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
                   style={{ background: "#F97316", color: "white" }}
                 >
-                  Act now
+                  Start now
                 </span>
               )}
               <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
