@@ -41,6 +41,7 @@ export type MyWorkSummary = {
     orderReceived: number;
     pendingDocs: number;
     assignedLeads: number;
+    totalLeads: number;
     unreadNotifications: number;
     slaRisk: number;
   };
