@@ -338,17 +338,16 @@ function LeadsPage() {
                     />
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Lead ID</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Email</th>
                   {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  
-                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-right font-medium">Action</th>
                 </tr>
+
               </thead>
               <tbody>
                 {rows.map((l: any, idx: number) => {
