@@ -413,7 +413,7 @@ export const closeTicketWithReply = createServerFn({ method: "POST" })
             replyMessage: data.message,
             fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
           },
-          { applicationId: ticket.application_id ?? undefined },
+          { applicationId: ticket.application_id ?? undefined, trigger: "manual" },
         );
       } catch (e) {
         console.error("[tickets] E008 enqueue failed", e);
