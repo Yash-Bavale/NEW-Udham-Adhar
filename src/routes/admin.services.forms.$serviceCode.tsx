@@ -126,8 +126,15 @@ function FormBuilderPage() {
 
   const previewSchema = useMemo(() => {
     const fields = sections.flatMap((s) => s.fields);
-    return { title, description, fields: fields as unknown as ReturnType<typeof getFallbackSchema>["fields"], documents: documents as unknown as ReturnType<typeof getFallbackSchema>["documents"] };
-  }, [sections, documents, title, description]);
+    return {
+      title,
+      description,
+      fields: fields as unknown as ReturnType<typeof getFallbackSchema>["fields"],
+      documents: documents as unknown as ReturnType<typeof getFallbackSchema>["documents"],
+      sample_form_url: sampleFormUrl || undefined,
+      sample_form_label: sampleFormLabel || undefined,
+    };
+  }, [sections, documents, title, description, sampleFormUrl, sampleFormLabel]);
 
   const totalFields = useMemo(() => sections.reduce((n, s) => n + s.fields.length, 0), [sections]);
   const currentSection = sections[activeSection];
