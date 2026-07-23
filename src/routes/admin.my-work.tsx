@@ -61,8 +61,8 @@ function MyWorkPage() {
   const OrdersSection = canOrders ? (
     <Section
       key="orders"
-      title="Next-best actions"
-      subtitle="Fresh orders with no action yet — shown first"
+      title="Paid orders — process now"
+      subtitle="Payment received. Start the fulfillment workflow."
       empty="No assigned orders — you're clear."
       href="/admin/orders"
     >
