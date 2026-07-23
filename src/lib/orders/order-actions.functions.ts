@@ -431,19 +431,19 @@ export const completeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => z.object({ orderId: z.string().uuid() }).parse(raw))
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "COMPLETED");
     const { cancelAllForOrder, startFeedbackFollowupScheduler } = await import(
       "@/lib/scheduling/schedulers.server"
     );
     await cancelAllForOrder(data.orderId, "completed");
     let emailQueued = false;
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "order_completed",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
         },
