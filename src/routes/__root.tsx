@@ -133,35 +133,30 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Google tag (gtag.js) — GA4 + Google Ads share one dataLayer */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM" />
+        {/* gtag (GA4 + Google Ads) is loaded from RootComponent after first
+            paint via requestIdleCallback — see effect below. */}
         <script dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
+            function gtag(){window.dataLayer.push(arguments);}
+            window.gtag = gtag;
             gtag('js', new Date());
             gtag('config', 'G-62JC7PRPMM');
             gtag('config', 'AW-18336340451');
-          `
-        }} />
-
-        <script dangerouslySetInnerHTML={{
-          __html: `
             function gtag_report_conversion(url) {
               var callback = function () {
-                if (typeof(url) != 'undefined') {
-                  window.location = url;
-                }
+                if (typeof(url) != 'undefined') { window.location = url; }
               };
               gtag('event', 'conversion', {
-                  'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
-                  'event_callback': callback
+                'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
+                'event_callback': callback
               });
               return false;
             }
+            window.gtag_report_conversion = gtag_report_conversion;
           `
         }} />
-        
+
         <HeadContent />
       </head>
       <body>
