@@ -471,45 +471,44 @@ function QuickActionsCard({
         <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
 
 
-        {!hideMoney && (
-          <>
-            <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
-              Payment Link
+        <>
+          <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+            Payment Link
+          </div>
+
+          {paymentUrl ? (
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
+              <Link2 className="size-3 shrink-0" />
+              <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
+              <CopyButton value={paymentUrl} label="" />
             </div>
+          ) : (
+            <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
+              <Link2 className="size-3.5 mr-1.5" />
+              {linkBusy ? "Preparing…" : "Copy Payment Link"}
+            </Button>
+          )}
 
-            {paymentUrl ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
-                <Link2 className="size-3 shrink-0" />
-                <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
-                <CopyButton value={paymentUrl} label="" />
-              </div>
-            ) : (
-              <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
-                <Link2 className="size-3.5 mr-1.5" />
-                {linkBusy ? "Preparing…" : "Copy Payment Link"}
-              </Button>
-            )}
+          <button
+            type="button"
+            disabled={!number || linkBusy}
+            onClick={sendPaymentLinkWhatsApp}
+            className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <MessageCircle className="size-3.5" />
+            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via WhatsApp"}
+          </button>
+          <button
+            type="button"
+            disabled={!lead.email || linkBusy}
+            onClick={sendPaymentLinkEmail}
+            className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <Mail className="size-3.5" />
+            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
+          </button>
+        </>
 
-            <button
-              type="button"
-              disabled={!number || linkBusy}
-              onClick={sendPaymentLinkWhatsApp}
-              className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <MessageCircle className="size-3.5" />
-              {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via WhatsApp"}
-            </button>
-            <button
-              type="button"
-              disabled={!lead.email || linkBusy}
-              onClick={sendPaymentLinkEmail}
-              className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <Mail className="size-3.5" />
-              {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
-            </button>
-          </>
-        )}
       </div>
 
       {!lead.email && (
