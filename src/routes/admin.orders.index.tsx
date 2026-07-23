@@ -347,7 +347,7 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                
+                <th className="text-left font-medium px-2 py-2.5">Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Assigned</th>
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
                 <th className="px-2 py-2.5" />
@@ -356,15 +356,15 @@ function OrdersListPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
@@ -475,6 +475,22 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
             );
           })()}
         </div>
+      </td>
+      <td className="px-2 py-2.5 whitespace-nowrap">
+        {(() => {
+          const b = bucketOfRow(order);
+          const label = b === "closed" ? "Closed" : b === "completed" ? "Completed" : b === "exception" ? "Exception" : "Pending";
+          const tone =
+            b === "closed" ? "bg-rose-50 text-rose-700 border-rose-200"
+            : b === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+            : b === "exception" ? "bg-amber-50 text-amber-800 border-amber-200"
+            : "bg-slate-100 text-slate-700 border-slate-200";
+          return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${tone}`}>
+              {label}
+            </span>
+          );
+        })()}
       </td>
       <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
       {!hideMoney && (

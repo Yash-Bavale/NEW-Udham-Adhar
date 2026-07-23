@@ -283,14 +283,14 @@ async function backfillCommonVariables(
   if (!leadId && !applicationId) return out;
   try {
     type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
-    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null };
+    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null; updated_at?: string | null; closure_reason_id?: string | null; closure_remarks?: string | null; fulfillment_status?: string | null };
     let lead: LeadRow | null = null;
     let app: AppRow | null = null;
 
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, assigned_to, created_at")
+        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
@@ -360,6 +360,34 @@ async function backfillCommonVariables(
         inv = (data as InvRow | null) ?? null;
       }
       if (inv?.invoice_number) out.invoice_number = inv.invoice_number;
+    }
+
+    // Closure fields for E010-family templates. Only backfill when the order
+    // is in a closed/rejected fulfillment state so we don't leak stale values
+    // into unrelated templates.
+    const closedFs = new Set(["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
+    if (app && closedFs.has(String(app.fulfillment_status ?? ""))) {
+      if (missing("closure_date") && app.updated_at) {
+        out.closure_date = new Date(app.updated_at).toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        });
+      }
+      if (missing("employee_remarks")) {
+        out.employee_remarks = (app.closure_remarks && String(app.closure_remarks).trim()) || "—";
+      }
+      if (missing("closure_reason")) {
+        let label: string | null = null;
+        if (app.closure_reason_id) {
+          const { data: r } = await supabaseAdmin
+            .from("order_close_reasons")
+            .select("label")
+            .eq("id", app.closure_reason_id)
+            .maybeSingle();
+          label = ((r as { label?: string } | null)?.label) ?? null;
+        }
+        out.closure_reason = label || (app.closure_remarks ? String(app.closure_remarks) : "Order closed");
+      }
     }
 
   } catch (e) {
