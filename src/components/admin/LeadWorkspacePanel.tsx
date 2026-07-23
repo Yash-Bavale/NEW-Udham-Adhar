@@ -1208,6 +1208,9 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
             className="text-xs h-8"
             maxLength={500}
           />
+        </div>
+
+
 
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
