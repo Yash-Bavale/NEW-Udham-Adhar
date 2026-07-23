@@ -18,6 +18,7 @@ const FIELD_TYPES = [
   "section",
   "state",
   "district",
+  "note",
 ] as const;
 
 const FieldSchema = z.object({

@@ -12,6 +12,7 @@ import {
   Loader2,
   FileText,
   AlertTriangle,
+  StickyNote,
 } from "lucide-react";
 import {
   getFormSubmissionForApplication,
@@ -59,20 +60,57 @@ function mask(field: string, value: unknown): string {
 }
 
 
-type SectionGroup = { label: string; fields: { key: string; label: string }[] };
+type FieldItem = {
+  key: string;
+  label: string;
+  type?: string;
+  help?: string;
+  default?: string;
+  placeholder?: string;
+};
+type SectionGroup = { label: string; fields: FieldItem[] };
 
-function groupFieldsBySection(serviceCode: string | null): SectionGroup[] {
-  if (!serviceCode) return [];
-  const schema = getSchema(serviceCode);
-  if (!schema) return [];
+function groupFieldsBySection(serviceCode: string | null, activeSchema?: any): SectionGroup[] {
+  let fields: any[] = [];
+  let sectionsFromSchema: any[] = [];
+
+  if (activeSchema?.sections?.length) {
+    sectionsFromSchema = activeSchema.sections;
+  } else {
+    const fallback = serviceCode ? getSchema(serviceCode) : null;
+    if (fallback?.fields) fields = fallback.fields;
+  }
+
+  if (sectionsFromSchema.length) {
+    return sectionsFromSchema.map((sec: any) => ({
+      label: sec.label || "Details",
+      fields: (sec.fields || []).map((f: any) => ({
+        key: f.key,
+        label: f.label,
+        type: f.type,
+        help: f.help,
+        default: f.default,
+        placeholder: f.placeholder,
+      })),
+    }));
+  }
+
+  if (!fields.length) return [];
   const groups: SectionGroup[] = [];
   let current: SectionGroup = { label: "Details", fields: [] };
-  for (const f of schema.fields) {
+  for (const f of fields) {
     if (f.type === "section") {
       if (current.fields.length) groups.push(current);
       current = { label: f.label, fields: [] };
     } else {
-      current.fields.push({ key: f.key, label: f.label });
+      current.fields.push({
+        key: f.key,
+        label: f.label,
+        type: f.type,
+        help: f.help,
+        default: f.default,
+        placeholder: f.placeholder,
+      });
     }
   }
   if (current.fields.length) groups.push(current);
@@ -155,7 +193,7 @@ export function FormSubmissionPanel({
   }
   if (!data) return null;
 
-  const { submission, documents, requiredDocs, serviceCode, lead, service } = data as any;
+  const { submission, documents, requiredDocs, serviceCode, lead, service, activeSchema } = data as any;
   const serviceLabel: string =
     (service?.service_name as string) || (lead?.service as string) || serviceCode || "Service";
 
@@ -191,7 +229,7 @@ export function FormSubmissionPanel({
     </span>
   );
 
-  const sections = groupFieldsBySection(serviceCode);
+  const sections = groupFieldsBySection(serviceCode, activeSchema);
   const formData: Record<string, any> = submission?.form_data ?? {};
   const renderedKeys = new Set(sections.flatMap((s) => s.fields.map((f) => f.key)));
   const extras = Object.keys(formData).filter((k) => {
@@ -362,6 +400,43 @@ export function FormSubmissionPanel({
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                     {section.fields.map((f) => {
+                      if (f.type === "note") {
+                        const noteText = (f.help || f.default || f.placeholder || f.label || "").trim();
+                        return (
+                          <div
+                            key={f.key}
+                            className="col-span-1 sm:col-span-2 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/90 via-amber-50/50 to-orange-50/30 p-4 space-y-2.5 shadow-sm my-1"
+                          >
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 font-semibold text-xs text-amber-900 uppercase tracking-wide">
+                                <StickyNote className="size-4 text-amber-600 shrink-0" />
+                                <span>{f.label || "Internal Staff Note"}</span>
+                                <span className="text-[10px] text-amber-800 font-semibold border border-amber-300 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                                  Staff Note
+                                </span>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs border-amber-300 bg-white hover:bg-amber-100 text-amber-900 font-medium shadow-none"
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(noteText);
+                                    toast.success("Note copied to clipboard");
+                                  } catch {
+                                    toast.error("Failed to copy note");
+                                  }
+                                }}
+                              >
+                                <Copy className="size-3 mr-1.5" /> Copy Note
+                              </Button>
+                            </div>
+                            <p className="text-xs md:text-sm text-slate-800 font-normal whitespace-pre-line leading-relaxed bg-white/90 p-3 rounded-lg border border-amber-200/80 font-mono">
+                              {noteText || "No note content provided."}
+                            </p>
+                          </div>
+                        );
+                      }
                       const v = formData[f.key];
                       const required = requiredKeys.has(f.key);
                       const blank = isBlank(v);

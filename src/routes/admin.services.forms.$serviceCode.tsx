@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
-  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin,
+  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin, StickyNote,
 } from "lucide-react";
 import {
   getBuilderSchema,
@@ -39,6 +39,7 @@ const FIELD_META: Record<Field["type"], { label: string; icon: typeof Type; hint
   section:  { label: "Section",      icon: FileText,  hint: "Group a set of fields" },
   state:    { label: "State",        icon: MapPin,    hint: "Indian state dropdown" },
   district: { label: "District",     icon: MapPin,    hint: "District dropdown linked to state" },
+  note:     { label: "Note",         icon: StickyNote, hint: "Staff internal note (hidden from customer)" },
 };
 
 const FIELD_TYPES = Object.keys(FIELD_META) as Field["type"][];
@@ -56,6 +57,7 @@ const NEW_FIELD: Record<Field["type"], () => Field> = {
   section:  () => ({ key: newKey("section"), label: "Section header", type: "section" }),
   state:    () => ({ key: "state",           label: "State",          type: "state" }),
   district: () => ({ key: "district",        label: "District",       type: "district" }),
+  note:     () => ({ key: newKey("note"),    label: "Staff Note",     type: "note", help: "Internal note text for staff" }),
 };
 
 function newKey(prefix: string): string {
@@ -601,10 +603,22 @@ function FormBuilderPage() {
                       {FIELD_TYPES.map((t) => <option key={t} value={t}>{FIELD_META[t].label}</option>)}
                     </select>
                   </label>
-                  {activeField.type !== "section" && activeField.type !== "plants" && (
+                  {activeField.type !== "section" && activeField.type !== "plants" && activeField.type !== "note" && (
                     <label className="flex items-center gap-2 text-sm rounded-md border bg-slate-50 px-2.5 py-2">
                       <input type="checkbox" checked={!!activeField.required} onChange={(e) => updateField({ required: e.target.checked })} />
                       <span className="font-medium text-slate-700">Required</span>
+                    </label>
+                  )}
+                  {activeField.type === "note" && (
+                    <label className="block text-sm">
+                      <div className="text-xs font-medium text-slate-600 mb-1">Note Content (shown to staff only)</div>
+                      <textarea
+                        rows={4}
+                        value={activeField.help ?? activeField.default ?? ""}
+                        onChange={(e) => updateField({ help: e.target.value || undefined, default: e.target.value || undefined })}
+                        placeholder="Type internal note text for employees here..."
+                        className="w-full rounded-md border px-2.5 py-1.5 text-sm"
+                      />
                     </label>
                   )}
                   {["text", "email", "tel", "number", "textarea"].includes(activeField.type) && (
@@ -642,8 +656,12 @@ function FormBuilderPage() {
                       <Tf label="Activity source key" mono value={activeField.activityFrom ?? ""} onChange={(v) => updateField({ activityFrom: v || undefined })} />
                     </>
                   )}
-                  <Tf label="Default value" value={activeField.default ?? ""} onChange={(v) => updateField({ default: v || undefined })} />
-                  <Tf label="Help text" value={activeField.help ?? ""} onChange={(v) => updateField({ help: v || undefined })} />
+                  {activeField.type !== "note" && (
+                    <>
+                      <Tf label="Default value" value={activeField.default ?? ""} onChange={(v) => updateField({ default: v || undefined })} />
+                      <Tf label="Help text" value={activeField.help ?? ""} onChange={(v) => updateField({ help: v || undefined })} />
+                    </>
+                  )}
                 </div>
               )}
             </div>

@@ -13,7 +13,8 @@ export type FieldType =
   | "plants"
   | "section"
   | "state"
-  | "district";
+  | "district"
+  | "note";
 
 
 export type FieldDef = {

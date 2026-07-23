@@ -263,15 +263,17 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
     const serviceCode = sub?.service_code ?? (service as any)?.service_code ?? null;
 
     let requiredDocs: Array<{ key: string; label: string; required: boolean }> = [];
+    let activeSchema: any = null;
     if (serviceCode) {
       const { data: schema } = await supabase
         .from("service_form_schemas")
-        .select("documents")
+        .select("schema, documents")
         .eq("service_code", serviceCode)
         .eq("is_active", true)
         .order("version", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (schema?.schema) activeSchema = schema.schema;
       const docList = (schema?.documents as any[]) ?? [];
       requiredDocs = docList.map((d) => ({
         key: String(d.key ?? d.type ?? ""),
@@ -288,6 +290,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
       documents: docs ?? [],
       requiredDocs,
       serviceCode,
+      activeSchema,
     };
   });
 

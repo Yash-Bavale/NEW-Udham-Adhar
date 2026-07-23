@@ -185,6 +185,7 @@ export function OnboardingForm({
     <form onSubmit={handle} className="space-y-5">
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => {
+          if (f.type === "note") return null;
           if (f.type === "section") {
             return (
               <div key={f.key} className="md:col-span-2 pt-4 mt-2 border-t border-border">
