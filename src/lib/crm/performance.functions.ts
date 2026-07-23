@@ -45,6 +45,26 @@ export const logLeadContact = createServerFn({ method: "POST" })
       activity_description: `${data.channel} • ${data.outcome}${data.notes ? ` — ${data.notes}` : ""}`,
     });
 
+    // Mirror into application_events so the Internal Notes & Activity feed shows it.
+    try {
+      const [{ data: profile }, { data: roleRow }, { data: lead }] = await Promise.all([
+        supabase.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+        supabase.from("leads").select("customer_id").eq("id", data.leadId).maybeSingle(),
+      ]);
+      await supabase.from("application_events").insert({
+        lead_id: data.leadId,
+        customer_id: lead?.customer_id ?? null,
+        event_type: "contact_logged",
+        old_value: data.channel,
+        new_value: data.outcome,
+        note: data.notes ?? null,
+        created_by: userId,
+        staff_name: profile?.display_name || profile?.email || "Staff",
+        staff_role: (roleRow?.role as string | undefined) ?? "staff",
+      } as never);
+    } catch { /* non-fatal */ }
+
     return { ok: true };
   });
 

@@ -376,8 +376,6 @@ function QuickActionsCard({
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
-    // Pre-open a blank tab synchronously to avoid popup blockers when moving to contacted
-    const waWin = next === "contacted" && number ? window.open("about:blank", "_blank") : null;
     setContactBusy(true);
     try {
       await transitionFn({ data: { leadId: lead.id, toStatus: next } });
@@ -385,11 +383,15 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
-      if (next === "contacted" && introWaUrl) openWhatsApp(introWaUrl, waWin);
     } catch (e: any) {
-      if (waWin) waWin.close();
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
+  };
+
+  const contactOnWhatsApp = () => {
+    if (!number) { toast.error("Add a mobile number first"); return; }
+    if (!introWaUrl) return;
+    openWhatsApp(introWaUrl);
   };
 
   const ensurePaymentUrl = async (): Promise<string | null> => {
@@ -464,6 +466,15 @@ function QuickActionsCard({
             {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
+        <button
+          type="button"
+          disabled={!number}
+          onClick={contactOnWhatsApp}
+          className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <MessageCircle className="size-3.5" />
+          Contact on WhatsApp
+        </button>
         <Button size="sm" variant="outline" onClick={() => setLogOpen(true)} className="justify-start text-xs">
           <Phone className="size-3.5 mr-1.5" />
           Log Contact Attempt
@@ -885,7 +896,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     queryFn: () => listFn({ data: { leadId } }),
   });
 
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [date, setDate] = useState<Date | undefined>(() => new Date());
   const [time, setTime] = useState<string>("10:00");
   const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
   const [assignedTo, setAssignedTo] = useState<string>("");
@@ -915,7 +926,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     setBusy(true);
     try {
       await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
-      setDate(undefined); setTime("10:00"); setReason("call_back"); setAssignedTo("");
+      setDate(new Date()); setTime("10:00"); setReason("call_back"); setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
       toast.success("Follow-up scheduled");
