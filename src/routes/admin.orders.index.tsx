@@ -354,14 +354,15 @@ function OrdersListPage() {
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
                 <th className="text-left font-medium px-2 py-2.5">Order #</th>
+                <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
                 <th className="text-left font-medium px-2 py-2.5">Fulfillment</th>
                 <th className="text-left font-medium px-2 py-2.5">Assigned</th>
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
-                <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="px-2 py-2.5" />
+
               </tr>
             </thead>
             <tbody>
@@ -390,7 +391,20 @@ function OrdersListPage() {
   );
 }
 
+function formatOrderAge(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
 function formatDayHeader(day: string): string {
+
   const d = new Date(day);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const yest = new Date(today); yest.setDate(today.getDate() - 1);
@@ -430,6 +444,22 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
     >
 
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
+        <div className="flex items-center gap-1.5">
+          <div>
+            <div>{formatIST(order.created_at, { dateOnly: true })}</div>
+            <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
+          </div>
+          {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+              title="Time since order created — clears once first action is taken"
+            >
+              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
@@ -470,10 +500,7 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
           {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
         </td>
       )}
-      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
-        <div>{formatIST(order.created_at, { dateOnly: true })}</div>
-        <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
-      </td>
+
       <td className="px-2 py-2.5 whitespace-nowrap text-right">
         <Link
           to="/admin/orders/$orderId"

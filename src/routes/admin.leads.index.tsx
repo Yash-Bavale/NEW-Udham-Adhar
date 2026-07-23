@@ -29,6 +29,19 @@ import { INDIAN_STATES } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 
+function formatAge(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+
 export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
 function LeadsPage() {
@@ -338,17 +351,16 @@ function LeadsPage() {
                     />
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Lead ID</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-left font-medium">Name</th>
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Email</th>
                   {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
                   <th className="px-4 py-2.5 text-left font-medium">Assignee</th>
                   <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                  
-                  <th className="px-4 py-2.5 text-left font-medium">Date</th>
                   <th className="px-4 py-2.5 text-right font-medium">Action</th>
                 </tr>
+
               </thead>
               <tbody>
                 {rows.map((l: any, idx: number) => {
@@ -399,6 +411,22 @@ function LeadsPage() {
                           {l.lead_code}
                         </span>
                       </td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <div>{formatIST(l.created_at, { dateOnly: true })}</div>
+                            <div className="text-[10px] text-slate-400">{formatIST(l.created_at, { timeOnly: true })} IST</div>
+                          </div>
+                          {(l.status === "new" || !l.status) && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                              title="Time since lead created — clears once contacted"
+                            >
+                              {formatAge(ageMs)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 font-medium">
                         <div className="flex items-center gap-1.5">
                           <span>{l.name}</span>
@@ -421,16 +449,11 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      <td className="px-4 py-2.5 text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.email || "—"}</td>
                       {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
-                      
-                      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
-                        <div>{formatIST(l.created_at, { dateOnly: true })}</div>
-                        <div className="text-[10px] text-slate-400">{formatIST(l.created_at, { timeOnly: true })} IST</div>
-                      </td>
+
                       <td className="px-4 py-2.5 text-right">
                         <Link
                           to="/admin/leads/$leadId"
