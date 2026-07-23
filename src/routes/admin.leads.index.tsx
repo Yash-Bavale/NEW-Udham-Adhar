@@ -356,8 +356,8 @@ function LeadsPage() {
                   <th className="px-4 py-2.5 text-left font-medium">Mobile</th>
                   {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Source</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Service</th>
-                  {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Assignee</th>}
                   <th className="px-4 py-2.5 text-left font-medium">Current Stage</th>
+                  {role.hasAny(["super_admin", "admin"]) && <th className="px-4 py-2.5 text-left font-medium">Assignee</th>}
                 </tr>
 
               </thead>
