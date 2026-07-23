@@ -123,7 +123,17 @@ export const Route = createFileRoute("/$")({
   },
   head: ({ loaderData }) => {
     const a = (loaderData as any)?.article;
-    if (!a) return {};
+    if (!a) {
+      if ((loaderData as any)?.gone) {
+        return {
+          meta: [
+            { title: "Gone — Udyam Adhar" },
+            { name: "robots", content: "noindex" },
+          ],
+        };
+      }
+      return {};
+    }
     const slugPath = a.slug.startsWith("/") ? a.slug : `/${a.slug}`;
     const title = a.meta_title ?? a.h1 ?? a.label;
     const description = a.meta_description ?? "";
