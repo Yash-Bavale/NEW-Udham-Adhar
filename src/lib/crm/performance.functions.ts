@@ -68,6 +68,30 @@ export const logLeadContact = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const listContactEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ leadId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: rows, error } = await supabase
+      .from("lead_contact_events")
+      .select("id, channel, outcome, notes, created_at, user_id")
+      .eq("lead_id", data.leadId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id).filter(Boolean))) as string[];
+    let nameMap = new Map<string, string>();
+    if (userIds.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name, email")
+        .in("id", userIds);
+      for (const p of profs ?? []) nameMap.set(p.id, p.display_name || p.email || "Staff");
+    }
+    return { rows: (rows ?? []).map((r) => ({ ...r, staff_name: nameMap.get(r.user_id) || "Staff" })) };
+  });
+
 const RangeInput = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
