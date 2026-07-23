@@ -257,7 +257,7 @@ export const changeLeadService = createServerFn({ method: "POST" })
     // 6. Generate fresh new payment link according to new service
     const txnid = `LNK-${lead.lead_code}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
     const appOrigin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
-    const paymentUrl = `${appOrigin}/payment/${encodeURIComponent(lead.lead_code)}`;
+    const paymentUrl = `${appOrigin}/payment/${encodeURIComponent(lead.lead_code ?? "")}`;
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: newPaymentLink } = await admin
