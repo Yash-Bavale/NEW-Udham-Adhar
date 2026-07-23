@@ -48,7 +48,13 @@ const DocSchema = z.object({
   label: z.string().trim().min(1).max(200),
   required: z.boolean().optional(),
   help: z.string().max(500).optional(),
-  sample_url: z.string().trim().max(2000).url().optional().or(z.literal("").transform(() => undefined)),
+  sample_url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((s) => s === "" || s.startsWith("/") || /^https?:\/\//i.test(s), "Invalid URL")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   sample_label: z.string().max(200).optional(),
 });
 
@@ -58,7 +64,13 @@ const SaveInput = z.object({
   description: z.string().max(2000).optional().nullable(),
   sections: z.array(SectionSchema).min(1).max(30),
   documents: z.array(DocSchema).max(40).default([]),
-  sample_form_url: z.string().trim().max(2000).optional().or(z.literal("").transform(() => undefined)),
+  sample_form_url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((s) => s === "" || s.startsWith("/") || /^https?:\/\//i.test(s), "Invalid URL")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   sample_form_label: z.string().max(200).optional(),
 });
 
