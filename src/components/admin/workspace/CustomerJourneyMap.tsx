@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { OrderStage } from "@/lib/crm/computeOrderStage";
+import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { relativeIST } from "@/lib/datetime";
