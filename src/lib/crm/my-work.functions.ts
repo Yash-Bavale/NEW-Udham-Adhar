@@ -80,7 +80,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .from("payments")
         .select("application_id, status")
         .in("application_id", assignedAppIds)
-        .in("status", ["paid", "success", "successful"]);
+        .in("status", ["paid"]);
       if (paidErr) throw new Error(paidErr.message);
       paidAppIdSet = new Set((paidRows ?? []).map((p: any) => p.application_id).filter(Boolean));
     }
