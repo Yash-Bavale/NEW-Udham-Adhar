@@ -98,7 +98,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://udyamadhar.in/" },
-      { property: "og:site_name", content: "Udyam Registration — Business Help Consultancy" },
+      { property: "og:site_name", content: "Udyam Aadhar" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Udyam Aadhar | MSME Certificate Download" },
       { name: "twitter:description", content: "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance." },
