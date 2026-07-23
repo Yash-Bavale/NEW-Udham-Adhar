@@ -69,7 +69,12 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                 .eq("id", app.lead_id!)
                 .maybeSingle();
 
-              if (r.template_code && lead?.email) {
+              // Auto-close overrides the queued template to E010 so the
+              // customer receives the correct closure notice.
+              const isAutoClose = r.kind === "pending_closure_followup";
+              const effectiveTemplate = isAutoClose ? "bhs_e010_ticket_closed_final" : r.template_code;
+
+              if (effectiveTemplate && lead?.email) {
                 const payload: any = r.payload ?? {};
                 const allowedTemplates = new Set([
                   "order_confirmation", "welcome_and_form_link", "bhs_e003_customer_delay",
@@ -78,83 +83,109 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   "support_ticket_closed_final", "refund_processed_confirmation", "bhs_e012_submitted_to_govt",
                   "bhs_e010_ticket_closed_final",
                 ]);
-                if (!allowedTemplates.has(String(r.template_code))) continue;
-                await enqueueFromTemplateInternal(
-                  r.template_code,
-                  lead.email,
-                  {
-                    customer_name: lead.name ?? "Customer",
-                    customer_email: lead.email ?? "",
-                    order_id: app.application_code ?? "",
-                    order_number: app.application_code ?? "",
-                    service_name: lead.service ?? "",
-                    reason: payload.reason ?? "Processing update",
-                    reason_block: payload.reason_block ?? payload.reason ?? "Processing update",
-                    closure_reason: payload.closure_reason ?? payload.reason ?? "Processing update",
-                    employee_remarks: payload.employee_remarks ?? payload.customer_note ?? payload.internal_note ?? "—",
-                    closure_date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }),
-                    date: new Date().toLocaleDateString("en-IN"),
-                    company_name: COMPANY_NAME,
-                    support_email: SUPPORT_EMAIL,
-                  },
-                  { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id },
-                );
-                sent++;
+                if (allowedTemplates.has(String(effectiveTemplate))) {
+                  await enqueueFromTemplateInternal(
+                    effectiveTemplate,
+                    lead.email,
+                    {
+                      customer_name: lead.name ?? "Customer",
+                      customerName: lead.name ?? "Customer",
+                      customer_email: lead.email ?? "",
+                      order_id: app.application_code ?? "",
+                      order_number: app.application_code ?? "",
+                      orderNumber: app.application_code ?? "",
+                      service_name: lead.service ?? "",
+                      reason: payload.reason ?? "Customer delay unresolved within the 8-hour window",
+                      reason_block: payload.reason_block ?? payload.reason ?? "Customer delay unresolved within the 8-hour window",
+                      closure_reason: payload.closure_reason ?? payload.reason ?? "Customer delay unresolved within the 8-hour window",
+                      employee_remarks: payload.employee_remarks ?? payload.customer_note ?? payload.internal_note ?? "—",
+                      closure_date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }),
+                      date: new Date().toLocaleDateString("en-IN"),
+                      company_name: COMPANY_NAME,
+                      support_email: SUPPORT_EMAIL,
+                      fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+                    },
+                    { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id },
+                  );
+                  sent++;
 
-                await supabaseAdmin.from("workflow_events").insert({
-                  application_id: app.id,
-                  lead_id: app.lead_id,
-                  event_type: "followup_email_sent",
-                  title: `Automated follow-up sent (${r.kind})`,
-                  description: null,
-                  customer_visible: false,
-                  actor_name: "System",
-                  is_system: true,
-                  metadata: { reminder_id: r.id, template: r.template_code },
-                } as never);
+                  await supabaseAdmin.from("workflow_events").insert({
+                    application_id: app.id,
+                    lead_id: app.lead_id,
+                    event_type: "followup_email_sent",
+                    title: `Automated follow-up sent (${r.kind})`,
+                    description: null,
+                    customer_visible: false,
+                    actor_name: "System",
+                    is_system: true,
+                    metadata: { reminder_id: r.id, template: effectiveTemplate },
+                  } as never);
+                }
               }
 
               // Auto-close the order when the 8h pending-closure window elapses.
-              if (r.kind === "pending_closure_followup") {
-                // Pick a default close reason (first active).
+              // Direct admin updates — the security-definer RPC requires auth.uid()
+              // which is NULL from cron/service-role and silently rejects.
+              if (isAutoClose) {
                 const { data: reason } = await supabaseAdmin
                   .from("order_close_reasons")
-                  .select("id")
+                  .select("id, label")
                   .eq("is_active", true)
                   .order("number")
                   .limit(1)
                   .maybeSingle();
                 const reasonId = (reason as any)?.id ?? null;
+                const remarks = "Auto-close: customer delay unresolved within 8 hours";
 
-                const { error: rpcErr } = await supabaseAdmin.rpc("transition_order_status" as any, {
-                  _order_id: app.id,
-                  _new_status: "CLOSED",
-                  _reason_id: reasonId,
-                  _remarks: "Auto-close: customer delay unresolved within 8 business hours",
-                  _force: true,
-                } as any);
-                if (rpcErr) {
-                  console.error("[workflow-cron] auto-close RPC failed", app.id, rpcErr.message);
+                const { error: uErr } = await supabaseAdmin
+                  .from("applications")
+                  .update({
+                    order_status: "CLOSED",
+                    fulfillment_status: "order_closed",
+                    application_status: "closed",
+                    closure_reason_id: reasonId,
+                    closure_remarks: remarks,
+                    customer_hold_started_at: null,
+                    active_reason_id: null,
+                    active_reason_text: null,
+                    updated_at: new Date().toISOString(),
+                  } as never)
+                  .eq("id", app.id);
+
+                if (uErr) {
+                  console.error("[workflow-cron] auto-close update failed", app.id, uErr.message);
                 } else {
-                  const { error: ffErr } = await supabaseAdmin
-                    .from("applications")
-                    .update({ fulfillment_status: "order_closed" } as never)
-                    .eq("id", app.id);
-                  if (ffErr) console.error("[workflow-cron] fulfillment update failed", app.id, ffErr.message);
-                }
+                  // Cancel any still-armed schedulers for this order.
+                  try {
+                    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+                    await cancelAllForOrder(app.id, "auto_close_customer_delay");
+                  } catch (e) { console.error("[workflow-cron] cancelAll failed", e); }
 
-                await supabaseAdmin.from("workflow_events").insert({
-                  application_id: app.id,
-                  lead_id: app.lead_id,
-                  event_type: "order_auto_closed",
-                  title: "Order auto-closed after 8h customer-delay window",
-                  description: "No response received within the 8-business-hour customer-delay window.",
-                  customer_visible: false,
-                  actor_name: "System",
-                  is_system: true,
-                  metadata: { reminder_id: r.id, reason: (r.payload as any)?.reason ?? null },
-                } as never);
+                  await supabaseAdmin.from("application_events").insert({
+                    application_id: app.id,
+                    lead_id: app.lead_id,
+                    event_type: "order_status_change",
+                    old_value: app.order_status,
+                    new_value: "CLOSED",
+                    note: remarks,
+                    staff_name: "System",
+                    staff_role: "system",
+                  } as never);
+
+                  await supabaseAdmin.from("workflow_events").insert({
+                    application_id: app.id,
+                    lead_id: app.lead_id,
+                    event_type: "order_auto_closed",
+                    title: "Order auto-closed after 8h customer-delay window",
+                    description: "No response received within the 8-hour customer-delay window.",
+                    customer_visible: false,
+                    actor_name: "System",
+                    is_system: true,
+                    metadata: { reminder_id: r.id, reason: (reason as any)?.label ?? null },
+                  } as never);
+                }
               }
+
 
               // Internal-side delay review: notify assignee, do not email customer.
               if ((r.kind as string) === "internal_review") {
