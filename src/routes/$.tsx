@@ -82,7 +82,8 @@ export const Route = createFileRoute("/$")({
     // 410 Gone for retired legacy paths — check BEFORE multi-segment handoff
     // so /wp-content/*, /feed/*, /category/* return 410 instead of redirecting.
     if (isGone(lower) || isGone(firstSeg)) {
-      throw new Response("Gone", { status: 410 });
+      setResponseStatus(410);
+      return { gone: true as const };
     }
 
     // Canonicalise multi-segment paths: strip trailing slash + lowercase → 301.
