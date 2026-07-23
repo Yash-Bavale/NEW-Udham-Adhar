@@ -1,52 +1,65 @@
+## SEO Consolidation & Accessibility Fixes
 
-## Goal
-Make the admin form builder more powerful and remove hardcoding, so admins can fully configure each service's onboarding form and helper resources without dev work.
+Approach approved: **#2 — keep all pages, fix canonicals, trim sitemap.** No content deletion.
 
-## 1. Copy sections from another service
-- Add "Copy from service…" button in the builder toolbar (`src/routes/admin.services.forms.$serviceCode.tsx`).
-- Dialog: pick source service → load its active schema → checkboxes for each section + documents → radio "Append" or "Replace entire form".
-- New server fn `copyFromService` in `src/lib/crm/form-builder.functions.ts` returns the source schema for preview; actual merge happens client-side, then existing `saveBuilderSchema` persists as a new version.
-- Auto-dedupe field keys on Append (suffix `_2`, `_3`) and warn the admin.
+### 1. AdsBot accessibility (`public/robots.txt`)
 
-## 2. State & District field types
-- Add two new field types `state` and `district` to `FIELD_TYPES` in `form-builder.functions.ts` and to the palette.
-- Renderer (`OnboardingForm.tsx`) uses the existing `src/lib/onboarding/india-districts.ts` data:
-  - `state`: select of all Indian states/UTs.
-  - `district`: independent select of all districts (flat list) — not linked to state, per your choice.
-- Both support required/placeholder/help like other selects.
+Add explicit allow blocks so Google Ads landing-page checks never get ambiguously matched:
 
-## 3. Sample form download (one PDF per service)
-- New column `services.sample_form_url text` (migration + GRANTs unchanged, RLS already permissive).
-- In service edit page, add "Sample form PDF" uploader → uploads to a new **public** storage bucket `service-samples` via `supabase--storage_create_bucket` + `storage.objects` RLS (admins write, anyone read).
-- On `/onboarding/$leadCode`, when `sample_form_url` exists, show a prominent "Download sample form" button in `OnboardingShell` header.
+```
+User-agent: AdsBot-Google
+Allow: /
 
-## 4. Admin-uploaded resources beside document fields
-- Extend `DocSchema` in `form-builder.functions.ts` with optional `sample_url: string` and `sample_label: string`.
-- Builder Documents tab: per-document row, add "Upload sample/template" (uploads to same `service-samples` bucket under `{service_code}/docs/{doc_key}/…`).
-- `DocumentUploader.tsx` renders a "Download template" link next to the upload input when `sample_url` is set.
+User-agent: AdsBot-Google-Mobile
+Allow: /
+```
 
-## 5. Additional improvements found during analysis
-- **Default value** per field: add optional `default` string to `FieldSchema`; renderer prefills when submission is empty.
-- **Field-level visibility rule** (simple): optional `showIf: { key, equals }` so e.g. "Other business type" only appears when `business_type == "Other"`.
-- **Section description**: optional `description` on `SectionSchema`, rendered under the section title.
-- **Reorder** sections/fields via up/down buttons in the canvas (drag-free, keyboard accessible).
-- **Duplicate field/section** buttons in the canvas.
-- **Publish vs Draft**: existing save creates a new active version; add "Save as draft" that inserts with `is_active=false` so admins can iterate without exposing to customers. History drawer already lists versions — add "Activate" button per row.
-- **Field key auto-generation** from label (slugify) with manual override, to prevent the "invalid key" foot-gun.
-- **Live preview** already exists; ensure new field types (state/district, showIf, default) render there too.
+Keep existing `User-agent: *` rules intact.
 
-## 6. Schema/data changes
-- Migration:
-  - `alter table public.services add column sample_form_url text;`
-  - Create bucket `service-samples` (public) via tool; add `storage.objects` policies: admins insert/update/delete, anyone select.
-- No changes to `service_form_schemas` table — new field/doc keys live inside existing `schema` / `documents` JSON.
+### 2. Kill the `/home` duplicate
 
-## Technical touch points
-- Server fns: `src/lib/crm/form-builder.functions.ts`, `src/lib/crm/services-admin.functions.ts`.
-- Loader: `src/lib/forms/schema-loader.server.ts` — pass through new doc `sample_url` and field `default`/`showIf`.
-- UI: `src/routes/admin.services.forms.$serviceCode.tsx`, `src/routes/admin.services.$serviceCode.tsx` (sample PDF upload), `src/components/onboarding/OnboardingForm.tsx`, `src/components/onboarding/OnboardingShell.tsx`, `src/components/onboarding/DocumentUploader.tsx`.
+- Delete `src/routes/home.tsx`.
+- Add `/home` (and any `/home/*`) to the 410 Gone matcher in `src/routes/$.tsx` so the URL stops existing instead of redirecting. Single homepage = `https://udyamadhar.in/`.
 
-## Out of scope
-- Multi-file sample uploads (chose single PDF).
-- Linked state→district cascade (chose independent dropdowns).
-- Per-field sample attachments on non-document fields.
+### 3. Canonical + trailing-slash normalization
+
+Extend the normalizer in `src/routes/$.tsx` to:
+
+- Lowercase multi-segment paths (not just top-level).
+- Strip trailing slashes on all depths except `/`.
+- 301 to the normalized form.
+
+### 4. Cluster canonicals (approach #2)
+
+Audit `src/content/seo-batch1/*.json` + `src/content/wp/*.html` + the sitemap generator. Group near-duplicates into clusters, pick one canonical per cluster. For every variant page:
+
+- Its route's `head()` emits `<link rel="canonical">` and `og:url` pointing at the **cluster primary**, not itself.
+- Remove the variant from `sitemap.xml` output (primary stays).
+- Page stays live, content untouched, direct links keep working.
+
+Proposed initial clusters (final list produced during implementation from the actual file audit):
+
+- **udyam-registration** ← udyam-registration-online, udyam-registration-process, msme-registration, udyam-registration-free
+- **udyam-certificate** ← udyam-registration-certificate, download-udyam-certificate, print-udyam-certificate
+- **udyam-registration-number** ← udyam-registration-number-verify, verify-udyam-certificate, forgot-udyam-registration-number
+- **udyog-aadhaar-govin** ← udyog-aadhaar-government-in, udyog-aadhaar-register, udyog-aadhar-card, www-udyamregistration
+- **udyog-aadhaar-to-udyam-migration** (standalone primary)
+- Standalone primaries kept as-is: udyam-login, udyam-reprint, udyam-registration-status, udyam-registration-update, udyam-registration-fee, udyam-registration-documents-required, udyam-registration-eligibility, udyam-registration-benefits, msme-certificate-benefits
+
+Target sitemap size: ~205 → ~60–80 URLs, all with self-referencing canonicals.
+
+### 5. Legacy 410 sweep
+
+Verify every dead government-scheme URL flagged in the audit resolves to 410 via `src/routes/$.tsx` matcher. Add any missing patterns.
+
+### 6. Verification
+
+- Curl `/robots.txt`, `/home`, a variant page (check canonical header/tag), and `/sitemap.xml` (count URLs).
+- Confirm build passes.
+- Tell you to hit Rescan in the SEO tab.
+
+### Technical notes
+
+- Canonical goes in the leaf route's `head()` `links` array (never in `__root.tsx` — router concatenates `links` and would emit both). `og:url` in `meta` is fine to update alongside.
+- Sitemap lives in `src/routes/sitemap[.]xml.ts` (or the static generator — I'll match whichever mechanism is currently in use, no migration without asking).
+- The final cluster → primary mapping will be produced from the actual file audit before I flip canonicals; if any cluster grouping looks wrong to you, tell me during implementation and I'll adjust before touching the sitemap.
