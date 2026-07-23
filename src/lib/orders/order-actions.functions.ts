@@ -266,6 +266,9 @@ async function queueTemplateEmail(
     await enqueueFromTemplateInternal(templateCode, to, vars, {
       applicationId: refs.applicationId,
       leadId: refs.leadId ?? undefined,
+      // Button-initiated sends are always manual triggers — bypasses the
+      // dispatch_mode='manual' gate that silently drops "auto" attempts.
+      trigger: "manual",
     });
     return true;
   } catch (e) {
