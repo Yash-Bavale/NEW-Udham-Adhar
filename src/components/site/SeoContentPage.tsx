@@ -445,7 +445,7 @@ export function buildSeoJsonLd(data: SeoPageData): string {
     "@type": "Article",
     headline: data.h1,
     description: data.seo.metaDescription,
-    author: { "@type": "Organization", name: "Udyamadhar Editorial Team" },
+    author: { "@type": "Organization", name: "Udyam Aadhar Editorial Team" },
     publisher: { "@id": "https://udyamadhar.in/#organization" },
     mainEntityOfPage: url,
   });
