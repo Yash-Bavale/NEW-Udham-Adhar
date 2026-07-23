@@ -62,7 +62,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     // "Act now" = fresh orders with no employee action yet (S01/S02 or legacy order_received/null)
     const ACT_NOW_STATUSES = ["order_received", "S01", "S02", "awaiting_customer_form"];
 
-    const [appsRes, assignedAppsCountRes, docsRes, leadsRes, notifRes] = await Promise.all([
+    const [appsRes, assignedAppsCountRes, docsRes, leadsRes, totalLeadsRes, notifRes] = await Promise.all([
       supabase
         .from("applications")
         .select(
@@ -91,6 +91,10 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .in("status", ["lead_created", "new_lead"])
         .order("created_at", { ascending: true })
         .limit(50),
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", userId),
       supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
