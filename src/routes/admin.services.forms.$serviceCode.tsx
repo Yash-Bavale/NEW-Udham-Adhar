@@ -407,15 +407,16 @@ function FormBuilderPage() {
               className="w-full rounded-lg border px-3 py-2 text-sm resize-none"
             />
             <div className="grid md:grid-cols-[1fr_220px] gap-2 pt-2 border-t">
-              <label className="block">
-                <div className="text-[11px] font-medium text-slate-600 mb-1">Sample form URL (PDF/link) — shown to customer as a download button</div>
-                <input
+              <div className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">
+                  Sample form file — shown to customer as a download button
+                </div>
+                <SampleFormPicker
+                  serviceCode={serviceCode}
                   value={sampleFormUrl}
-                  onChange={(e) => setSampleFormUrl(e.target.value)}
-                  placeholder="https://…/sample-form.pdf"
-                  className="w-full rounded-md border px-2.5 py-1.5 text-sm font-mono"
+                  onChange={setSampleFormUrl}
                 />
-              </label>
+              </div>
               <label className="block">
                 <div className="text-[11px] font-medium text-slate-600 mb-1">Button label (optional)</div>
                 <input
@@ -427,6 +428,7 @@ function FormBuilderPage() {
               </label>
             </div>
           </div>
+
 
           {/* Tabs */}
           <div className="flex items-center gap-1 border-b">
