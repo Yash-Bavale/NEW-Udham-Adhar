@@ -47,7 +47,7 @@ import { RefundRequestDialog } from "@/components/admin/RefundRequestDialog";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
-import { FULFILLMENT_LABEL, FULFILLMENT_CODE, labelForFulfillment } from "@/lib/crm/fulfillment-transitions";
+// Fulfillment mapping utilities still used by tab-scoped panels (not for the header pills).
 
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
