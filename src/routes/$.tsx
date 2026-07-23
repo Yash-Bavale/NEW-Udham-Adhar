@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
+import { setResponseStatus } from "@tanstack/react-start/server";
 import { getArticleBySlug } from "@/lib/seo-articles.functions";
 import {
   ArticlePageLayout,
@@ -8,6 +9,7 @@ import {
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
 import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
+
 
 // Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
 // them quickly instead of re-crawling forever (faster than a soft 404).
