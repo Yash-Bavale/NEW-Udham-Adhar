@@ -534,6 +534,7 @@ function QuickActionsCard({
           Add Customer Feedback
         </Button>
         <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
+        <FeedbackList leadId={lead.id} />
 
         <>
           <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
