@@ -312,13 +312,18 @@ export const sendFormLink = createServerFn({ method: "POST" })
     });
     const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
     let emailQueued = false;
-    if (customer?.primary_email) {
+    const { recipientEmail, recipientName } = { recipientEmail: (customer?.primary_email || (order as any).lead?.email || null) as string | null, recipientName: (customer?.name || "Customer") as string };
+    // Use combined recipient (customer profile → lead fallback) built by loadOrderContext.
+    const _ctx = await loadOrderContext(context.supabase, data.orderId);
+    const to = _ctx.recipientEmail;
+    const name = _ctx.recipientName;
+    if (to) {
       const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
       emailQueued = await queueTemplateEmail(
         "welcome_and_form_link",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           formLink: link,
           fromName,
@@ -347,8 +352,11 @@ export const sendFormLink = createServerFn({ method: "POST" })
         order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
         kind: "form_link_sent",
         title: `Form link sent for ${order.application_code || order.id.slice(0, 8)}`,
-        body: `Delivered to ${customer?.primary_email}.`,
+        body: `Delivered to ${to}.`,
       });
+    }
+    if (!to) {
+      throw new Error("No email on file for this customer or lead — cannot send form link.");
     }
     return { ok: true, order: updated, emailQueued };
   });
