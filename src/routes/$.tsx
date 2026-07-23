@@ -25,6 +25,7 @@ const GONE_EXACT = new Set<string>([
   "udyam-register-how-to-register-your-business-as-msme",
   "kviconline-all-services-united-in-one-place",
   "online-kvic-the-new-face-of-digital-khadi",
+  "home",
   "home-3",
   "home-2",
   "shop-act",
