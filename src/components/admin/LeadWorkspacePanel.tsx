@@ -54,6 +54,7 @@ import { createPaymentLink, getPaymentLinkStatusForLead } from "@/lib/payments/p
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { LogContactDialog } from "./LogContactDialog";
+import { listContactEvents } from "@/lib/crm/performance.functions";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
