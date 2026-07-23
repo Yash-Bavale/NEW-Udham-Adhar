@@ -412,10 +412,12 @@ export function WorkspaceShell(p: Props) {
               </span>
             </HeaderMeta>
             <HeaderMeta label="Order Status">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
-                {meta.label}
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
+                <span className="font-mono text-[10px] opacity-70">{FULFILLMENT_CODE[current] ?? ""}</span>
+                {labelForFulfillment(current) || FULFILLMENT_LABEL[current] || meta.label}
               </span>
             </HeaderMeta>
+
             <HeaderMeta label="Order Created">
               <div className="text-sm text-slate-800">
                 {formatIST(application.created_at)}
