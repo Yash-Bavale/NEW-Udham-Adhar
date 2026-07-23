@@ -702,13 +702,13 @@ export const sendManualReminder = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), note: z.string().max(1000).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
-    if (!customer?.primary_email) return { ok: false, reason: "no_email" };
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
+    if (!to) return { ok: false, reason: "no_email" };
     const emailQueued = await queueTemplateEmail(
       "bhs_e005_manual_reminder",
-      customer.primary_email,
+      to,
       {
-        customerName: customer.name || "Customer",
+        customerName: name,
         orderNumber: order.application_code || order.id.slice(0, 8),
         message: data.note || "",
         fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
