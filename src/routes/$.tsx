@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
+import { setResponseStatus } from "@tanstack/react-start/server";
 import { getArticleBySlug } from "@/lib/seo-articles.functions";
 import {
   ArticlePageLayout,
@@ -8,6 +9,7 @@ import {
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
 import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
+
 
 // Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
 // them quickly instead of re-crawling forever (faster than a soft 404).
@@ -80,7 +82,8 @@ export const Route = createFileRoute("/$")({
     // 410 Gone for retired legacy paths — check BEFORE multi-segment handoff
     // so /wp-content/*, /feed/*, /category/* return 410 instead of redirecting.
     if (isGone(lower) || isGone(firstSeg)) {
-      throw new Response("Gone", { status: 410 });
+      setResponseStatus(410);
+      return { gone: true as const };
     }
 
     // Canonicalise multi-segment paths: strip trailing slash + lowercase → 301.
@@ -120,7 +123,17 @@ export const Route = createFileRoute("/$")({
   },
   head: ({ loaderData }) => {
     const a = (loaderData as any)?.article;
-    if (!a) return {};
+    if (!a) {
+      if ((loaderData as any)?.gone) {
+        return {
+          meta: [
+            { title: "Gone — Udyam Adhar" },
+            { name: "robots", content: "noindex" },
+          ],
+        };
+      }
+      return {};
+    }
     const slugPath = a.slug.startsWith("/") ? a.slug : `/${a.slug}`;
     const title = a.meta_title ?? a.h1 ?? a.label;
     const description = a.meta_description ?? "";
@@ -181,7 +194,21 @@ export const Route = createFileRoute("/$")({
 });
 
 function ArticleRoute() {
-  const { article, related } = Route.useLoaderData();
+  const data = Route.useLoaderData() as any;
+  if (data?.gone) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">410 — Gone</h1>
+        <p className="mt-4 text-muted-foreground">
+          This page has been permanently removed.
+        </p>
+        <a href="/" className="mt-6 inline-block text-primary underline">
+          Return to homepage
+        </a>
+      </div>
+    );
+  }
+  const { article, related } = data;
   const sections = (Array.isArray(article.sections) ? article.sections : []) as ArticleSection[];
   const faq = (Array.isArray(article.faq) ? article.faq : []) as ArticleFaq[];
   return (
