@@ -431,6 +431,22 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
     >
 
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
+        <div className="flex items-center gap-1.5">
+          <div>
+            <div>{formatIST(order.created_at, { dateOnly: true })}</div>
+            <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
+          </div>
+          {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+              title="Time since order created — clears once first action is taken"
+            >
+              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
@@ -471,10 +487,7 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
           {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
         </td>
       )}
-      <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
-        <div>{formatIST(order.created_at, { dateOnly: true })}</div>
-        <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
-      </td>
+
       <td className="px-2 py-2.5 whitespace-nowrap text-right">
         <Link
           to="/admin/orders/$orderId"
