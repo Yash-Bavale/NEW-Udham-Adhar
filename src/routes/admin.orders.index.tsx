@@ -356,15 +356,15 @@ function OrdersListPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
@@ -407,7 +407,7 @@ function formatDayHeader(day: string): string {
 function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
-  const payTone = PAYMENT_TONE[order.payment_status] ?? "bg-slate-100 text-slate-700";
+  
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
     amber:   "bg-amber-50 text-amber-700",
