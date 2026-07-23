@@ -126,8 +126,15 @@ function FormBuilderPage() {
 
   const previewSchema = useMemo(() => {
     const fields = sections.flatMap((s) => s.fields);
-    return { title, description, fields: fields as unknown as ReturnType<typeof getFallbackSchema>["fields"], documents: documents as unknown as ReturnType<typeof getFallbackSchema>["documents"] };
-  }, [sections, documents, title, description]);
+    return {
+      title,
+      description,
+      fields: fields as unknown as ReturnType<typeof getFallbackSchema>["fields"],
+      documents: documents as unknown as ReturnType<typeof getFallbackSchema>["documents"],
+      sample_form_url: sampleFormUrl || undefined,
+      sample_form_label: sampleFormLabel || undefined,
+    };
+  }, [sections, documents, title, description, sampleFormUrl, sampleFormLabel]);
 
   const totalFields = useMemo(() => sections.reduce((n, s) => n + s.fields.length, 0), [sections]);
   const currentSection = sections[activeSection];
@@ -547,18 +554,25 @@ function FormBuilderPage() {
                       <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-2">
-                      <input
-                        value={d.sample_url ?? ""}
-                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: e.target.value || undefined } : x))}
-                        placeholder="Template / sample URL (optional)"
-                        className="rounded-md border px-2 py-1.5 text-xs font-mono"
-                      />
-                      <input
-                        value={d.sample_label ?? ""}
-                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
-                        placeholder="Template button label"
-                        className="rounded-md border px-2 py-1.5 text-xs"
-                      />
+                      <div>
+                        <div className="text-[11px] font-medium text-slate-600 mb-1">
+                          Fillable sample — customer downloads, fills & re-uploads
+                        </div>
+                        <SampleFormPicker
+                          serviceCode={`${serviceCode}/docs`}
+                          value={d.sample_url ?? ""}
+                          onChange={(v) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: v || undefined } : x))}
+                        />
+                      </div>
+                      <label className="block">
+                        <div className="text-[11px] font-medium text-slate-600 mb-1">Download button label</div>
+                        <input
+                          value={d.sample_label ?? ""}
+                          onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
+                          placeholder="Download template"
+                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                        />
+                      </label>
                     </div>
                     <input
                       value={d.help ?? ""}
@@ -675,27 +689,109 @@ function FormBuilderPage() {
         </aside>
       </div>
 
-      {/* Preview slide-over */}
+      {/* Preview slide-over — full customer-side view (read-only) */}
       {showPreview && (
         <div className="fixed inset-0 z-50 flex" onClick={() => setShowPreview(false)}>
           <div className="flex-1 bg-black/40" />
-          <div className="w-full max-w-2xl bg-white h-full overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-4xl bg-slate-50 h-full overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b bg-white px-5 py-3 flex items-center justify-between">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">Live preview</div>
+                <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Customer-side preview · read-only</div>
                 <div className="font-semibold text-slate-900">{title || "Untitled form"}</div>
               </div>
               <button onClick={() => setShowPreview(false)} className="p-2 rounded-md hover:bg-slate-100 text-slate-500">
                 <X className="size-4" />
               </button>
             </div>
-            <div className="p-5">
-              <OnboardingForm
-                schema={previewSchema}
-                initial={{}}
-                busy={false}
-                onSubmit={async () => alert("Preview only — not saved")}
-              />
+            <div className="mx-auto max-w-3xl px-5 py-6 space-y-5">
+              {/* Sample form download banner */}
+              {sampleFormUrl && (
+                <a
+                  href={sampleFormUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 hover:bg-indigo-100 transition"
+                >
+                  <div className="size-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <FileText className="size-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-indigo-900">
+                      {sampleFormLabel || "Download sample form"}
+                    </div>
+                    <div className="text-xs text-indigo-700/80 truncate">
+                      Reference copy of the entire application form.
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-indigo-700">Download →</span>
+                </a>
+              )}
+
+              {/* Form fields */}
+              <div className="rounded-xl border bg-white shadow-sm p-5">
+                <div className="mb-4">
+                  <div className="text-lg font-semibold text-slate-900">{title || "Untitled form"}</div>
+                  {description && <div className="text-sm text-slate-600 mt-1">{description}</div>}
+                </div>
+                <div className="pointer-events-none opacity-95 select-none" aria-hidden="false">
+                  <OnboardingForm
+                    schema={previewSchema}
+                    initial={{}}
+                    busy={false}
+                    onSubmit={async () => { /* preview only */ }}
+                  />
+                </div>
+              </div>
+
+              {/* Documents step preview (read-only) */}
+              {documents.length > 0 && (
+                <div className="rounded-xl border bg-white shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Upload documents</div>
+                      <div className="text-xs text-slate-500">Customer sees this on the next step.</div>
+                    </div>
+                    <span className="text-[11px] uppercase font-semibold text-slate-400">Step 2</span>
+                  </div>
+                  <div className="space-y-2">
+                    {documents.map((d) => (
+                      <div key={d.key} className="rounded-lg border bg-slate-50/50 px-3 py-3">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="size-9 rounded-lg bg-white border flex items-center justify-center shrink-0">
+                              <FileText className="size-4 text-slate-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-900 truncate">
+                                {d.label}
+                                {d.required && <span className="text-rose-600"> *</span>}
+                              </div>
+                              {d.help && <div className="text-xs text-slate-500 truncate">{d.help}</div>}
+                            </div>
+                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full border bg-white px-3 py-1 text-slate-500">
+                            <Upload className="size-3.5" /> Upload
+                          </span>
+                        </div>
+                        {d.sample_url && (
+                          <a
+                            href={d.sample_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:underline"
+                          >
+                            <FileText className="size-3.5" />
+                            {d.sample_label || "Download template"}
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px] text-slate-400">
+                    Customers download the template above, fill & sign it, then re-upload here as PDF / JPG / PNG (max 5 MB).
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
