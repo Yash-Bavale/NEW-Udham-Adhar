@@ -192,10 +192,25 @@ function RootComponent() {
   }, [router, queryClient]);
 
 
-  // GA4 is loaded eagerly via the standard gtag snippet in RootShell so that
-  // page_view fires on first paint. No lazy loader here — the old idle loader
-  // pushed `args` (array) instead of `arguments`, so GA4 never registered the
-  // config command and Realtime stayed empty even though the tag "verified".
+  // Load gtag.js after first paint via requestIdleCallback so it never
+  // competes with LCP. dataLayer + config commands are already queued in
+  // RootShell, so once the script hydrates it replays them in order.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (document.querySelector('script[data-gtag="1"]')) return;
+    const load = () => {
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = "https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM";
+      s.setAttribute("data-gtag", "1");
+      document.head.appendChild(s);
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    if (typeof ric === "function") ric(load, { timeout: 4000 });
+    else setTimeout(load, 2500);
+  }, []);
+
+
 
 
 
