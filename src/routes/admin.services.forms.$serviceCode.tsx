@@ -554,18 +554,25 @@ function FormBuilderPage() {
                       <button onClick={() => setDocuments((docs) => docs.filter((_, j) => j !== i))} className="col-span-2 text-rose-600 text-xs hover:underline text-right">Remove</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-2">
-                      <input
-                        value={d.sample_url ?? ""}
-                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: e.target.value || undefined } : x))}
-                        placeholder="Template / sample URL (optional)"
-                        className="rounded-md border px-2 py-1.5 text-xs font-mono"
-                      />
-                      <input
-                        value={d.sample_label ?? ""}
-                        onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
-                        placeholder="Template button label"
-                        className="rounded-md border px-2 py-1.5 text-xs"
-                      />
+                      <div>
+                        <div className="text-[11px] font-medium text-slate-600 mb-1">
+                          Fillable sample — customer downloads, fills & re-uploads
+                        </div>
+                        <SampleFormPicker
+                          serviceCode={`${serviceCode}/docs`}
+                          value={d.sample_url ?? ""}
+                          onChange={(v) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_url: v || undefined } : x))}
+                        />
+                      </div>
+                      <label className="block">
+                        <div className="text-[11px] font-medium text-slate-600 mb-1">Download button label</div>
+                        <input
+                          value={d.sample_label ?? ""}
+                          onChange={(e) => setDocuments((docs) => docs.map((x, j) => j === i ? { ...x, sample_label: e.target.value || undefined } : x))}
+                          placeholder="Download template"
+                          className="w-full rounded-md border px-2 py-1.5 text-xs"
+                        />
+                      </label>
                     </div>
                     <input
                       value={d.help ?? ""}
