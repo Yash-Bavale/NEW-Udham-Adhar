@@ -517,15 +517,22 @@ async function fireCustomerClosure(s: {
   // 1. Transition order → CLOSED
   const { data: order, error: oErr } = await supabaseAdmin
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code")
+    .select("id, lead_id, customer_id, order_status, fulfillment_status, application_code")
     .eq("id", s.application_id)
     .maybeSingle();
   if (oErr) throw new Error(oErr.message);
   if (!order) return;
 
-  // Only close if still in a "waiting" state; otherwise leave alone.
-  const active = ["CUSTOMER_HOLD", "WAITING_CUSTOMER_INFO", "NEW_ORDER"];
-  if (!active.includes(order.order_status as string)) {
+
+  // Only close if the order is still in a waiting/hold state (order_status OR
+  // fulfillment_status). Modern flow uses fulfillment_status = 'customer_delay'
+  // without changing order_status, so the legacy list alone was too strict.
+  const activeOrderStatus = ["CUSTOMER_HOLD", "WAITING_CUSTOMER_INFO", "NEW_ORDER"];
+  const activeFulfillment = ["customer_delay", "waiting_for_customer_submission", "awaiting_customer_form"];
+  const stillWaiting =
+    activeOrderStatus.includes((order as any).order_status as string) ||
+    activeFulfillment.includes((order as any).fulfillment_status as string);
+  if (!stillWaiting) {
     await supabaseAdmin
       .from("order_schedulers")
       .update({ status: "stopped", stopped_at: new Date().toISOString(), stop_reason: "order_moved_on" } as never)
@@ -537,11 +544,17 @@ async function fireCustomerClosure(s: {
     .from("applications")
     .update({
       order_status: "CLOSED",
+      fulfillment_status: "order_closed",
+      application_status: "closed",
       closure_reason_id: s.reason_id,
       closure_remarks: s.remarks ?? "Auto-closed after 8 hours of no reply",
+      customer_hold_started_at: null,
+      active_reason_id: null,
+      active_reason_text: null,
       updated_at: new Date().toISOString(),
     } as never)
     .eq("id", s.application_id);
+
 
   await supabaseAdmin.from("application_events").insert({
     application_id: s.application_id,
