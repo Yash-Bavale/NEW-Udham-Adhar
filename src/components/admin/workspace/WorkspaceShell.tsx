@@ -907,7 +907,7 @@ export function WorkspaceShell(p: Props) {
                     }
                   />
                   <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
-                  <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{FULFILLMENT_CODE[current] ?? ""} · {labelForFulfillment(current)}</span>} />
+                  <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
                 </dl>
               </div>
             </aside>
