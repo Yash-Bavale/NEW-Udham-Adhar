@@ -1109,10 +1109,11 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     }
     setBusy(true);
     try {
-      await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
+      await createFn({ data: { leadId, scheduledAt, reason, reasonNote: reasonNote.trim() || undefined, assignedTo: assignedTo || null } });
       setDate(new Date());
       setTime("10:00");
       setReason("call_back");
+      setReasonNote("");
       setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
