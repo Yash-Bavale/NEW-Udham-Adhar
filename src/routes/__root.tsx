@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
+
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteShell } from "../components/site/SiteShell";
 import { supabase } from "@/integrations/supabase/client";
