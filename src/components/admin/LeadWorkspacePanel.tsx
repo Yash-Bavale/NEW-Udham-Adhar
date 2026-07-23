@@ -4,16 +4,33 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
-  AlertTriangle, CheckCircle2, XCircle, Loader2,
-  Calendar as CalendarIcon, FileText, Receipt, Trash2,
-  Phone, FileWarning, Sparkles, Clock,
-  Copy, Mail, MessageCircle, Link2,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Calendar as CalendarIcon,
+  FileText,
+  Receipt,
+  Trash2,
+  Phone,
+  FileWarning,
+  Sparkles,
+  Clock,
+  Copy,
+  Mail,
+  MessageCircle,
+  Link2,
 } from "lucide-react";
 import { CopyButton } from "@/components/admin/primitives/CopyButton";
 import { formatIST } from "@/lib/datetime";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,25 +47,14 @@ import {
   getAllowedLeadTransitions,
   type LeadStatusV2,
 } from "@/lib/crm/lead-transitions";
-import {
-  transitionLeadStatus,
-  addManualNote,
-  listLeadEvents,
-} from "@/lib/crm/lead-status.functions";
-import {
-  approveRefund, markRefundProcessed, rejectRefund,
-} from "@/lib/crm/refunds.functions";
-import {
-  createFollowUp, listFollowUpsForLead,
-} from "@/lib/crm/follow-ups.functions";
-import {
-  createPaymentLink, getPaymentLinkStatusForLead,
-} from "@/lib/payments/payment-links.functions";
+import { transitionLeadStatus, addManualNote, listLeadEvents } from "@/lib/crm/lead-status.functions";
+import { approveRefund, markRefundProcessed, rejectRefund } from "@/lib/crm/refunds.functions";
+import { createFollowUp, listFollowUpsForLead } from "@/lib/crm/follow-ups.functions";
+import { createPaymentLink, getPaymentLinkStatusForLead } from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { LogContactDialog } from "./LogContactDialog";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
-
 
 type Staff = { id: string; display_name: string | null; email: string | null };
 
@@ -72,7 +78,9 @@ type LeadShape = {
 };
 
 export function LeadWorkspacePanel({
-  lead, applications, staff,
+  lead,
+  applications,
+  staff,
 }: {
   lead: LeadShape;
   applications: any[];
@@ -82,7 +90,9 @@ export function LeadWorkspacePanel({
   const role = useRole();
   const hideMoney = role.hideMoney();
   const hasPaidOrder = (applications ?? []).some(
-    (a) => a?.application_status && !["awaiting_payment", "payment_pending", "payment_failed", "cancelled"].includes(a.application_status),
+    (a) =>
+      a?.application_status &&
+      !["awaiting_payment", "payment_pending", "payment_failed", "cancelled"].includes(a.application_status),
   );
   return (
     <div className="space-y-5">
@@ -120,7 +130,6 @@ export function LeadWorkspacePanel({
   );
 }
 
-
 /* ------------------- Customer Quick Card ------------------- */
 
 function relativeTime(iso?: string | null) {
@@ -136,7 +145,12 @@ function relativeTime(iso?: string | null) {
   return `${d}d ago`;
 }
 
-function buildIntroMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null) {
+function buildIntroMessage(
+  customerName: string,
+  employeeName: string | null,
+  leadCode: string,
+  service: string | null,
+) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
     `Hi ${customerName}\n` +
@@ -153,7 +167,13 @@ function buildIntroMessage(customerName: string, employeeName: string | null, le
   );
 }
 
-function buildPaymentLinkMessage(customerName: string, employeeName: string | null, leadCode: string, service: string | null, paymentUrl: string) {
+function buildPaymentLinkMessage(
+  customerName: string,
+  employeeName: string | null,
+  leadCode: string,
+  service: string | null,
+  paymentUrl: string,
+) {
   const emp = employeeName || "the Udyam Aadhar Advisory team";
   return (
     `Hi ${customerName}\n` +
@@ -171,7 +191,6 @@ function buildPaymentLinkMessage(customerName: string, employeeName: string | nu
     `Simply reply to this message or contact us anytime during office hours.`
   );
 }
-
 
 function waNumber(mobile?: string | null) {
   const digits = (mobile ?? "").replace(/\D/g, "");
@@ -194,13 +213,15 @@ function openWhatsApp(url: string, preparedWindow?: Window | null) {
 }
 
 function readPaymentUrl(value: any): string | null {
-  return value?.payment_url
-    ?? value?.url
-    ?? value?.short_url
-    ?? value?.link?.payment_url
-    ?? value?.link?.url
-    ?? value?.link?.short_url
-    ?? null;
+  return (
+    value?.payment_url ??
+    value?.url ??
+    value?.short_url ??
+    value?.link?.payment_url ??
+    value?.link?.url ??
+    value?.link?.short_url ??
+    null
+  );
 }
 
 function CustomerQuickCard({ lead }: { lead: LeadShape }) {
@@ -234,7 +255,10 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   );
 
   return (
-    <div className="rounded-2xl border bg-white overflow-hidden shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
+    <div
+      className="rounded-2xl border bg-white overflow-hidden shadow-sm"
+      style={{ borderColor: "var(--admin-border)" }}
+    >
       {/* Hero: Name + Mobile — highlighted, always full-width so nothing is split on mobile */}
       <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-500 to-sky-500 text-white px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex items-start gap-3">
@@ -257,7 +281,11 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
             )}
           </div>
           {lead.mobile && (
-            <CopyButton value={lead.mobile} label="" className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border-white/25" />
+            <CopyButton
+              value={lead.mobile}
+              label=""
+              className="text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border-white/25"
+            />
           )}
         </div>
       </div>
@@ -271,7 +299,9 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           >
             <Phone className="size-4" /> Call
           </a>
-        ) : <span className="border-r border-slate-100" />}
+        ) : (
+          <span className="border-r border-slate-100" />
+        )}
         {waUrl ? (
           <a
             href={waUrl}
@@ -281,7 +311,9 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           >
             <MessageCircle className="size-4" /> WhatsApp
           </a>
-        ) : <span className="border-r border-slate-100" />}
+        ) : (
+          <span className="border-r border-slate-100" />
+        )}
         {lead.email ? (
           <a
             href={`mailto:${lead.email}`}
@@ -289,7 +321,9 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           >
             <Mail className="size-4" /> Email
           </a>
-        ) : <span />}
+        ) : (
+          <span />
+        )}
       </div>
 
       {/* Details — single column on mobile so labels & values stay aligned, two cols on ≥sm */}
@@ -302,7 +336,9 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           "Email",
           lead.email ? (
             <span className="flex items-center gap-1.5 min-w-0">
-              <span className="truncate" title={lead.email}>{lead.email}</span>
+              <span className="truncate" title={lead.email}>
+                {lead.email}
+              </span>
               <CopyButton value={lead.email} label="" />
             </span>
           ) : null,
@@ -319,7 +355,10 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
       </div>
 
       {sourceLabel && (
-        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate" title={sourceLabel}>
+        <div
+          className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500 font-mono truncate"
+          title={sourceLabel}
+        >
           Source: {sourceLabel}
         </div>
       )}
@@ -335,8 +374,6 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
     </div>
   );
 }
-
-
 
 /* ------------------- Quick Actions Card ------------------- */
 
@@ -371,9 +408,6 @@ function QuickActionsCard({
   const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
   const introWaUrl = number ? whatsappUrl(number, introMsg) : null;
 
-
-
-
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
     setContactBusy(true);
@@ -385,11 +419,16 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
-    } finally { setContactBusy(false); }
+    } finally {
+      setContactBusy(false);
+    }
   };
 
   const contactOnWhatsApp = () => {
-    if (!number) { toast.error("Add a mobile number first"); return; }
+    if (!number) {
+      toast.error("Add a mobile number first");
+      return;
+    }
     if (!introWaUrl) return;
     openWhatsApp(introWaUrl);
   };
@@ -405,7 +444,9 @@ function QuickActionsCard({
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to generate link");
       return null;
-    } finally { setLinkBusy(false); }
+    } finally {
+      setLinkBusy(false);
+    }
   };
 
   const generateLink = async () => {
@@ -419,9 +460,11 @@ function QuickActionsCard({
     }
   };
 
-
   const sendPaymentLinkWhatsApp = async () => {
-    if (!number) { toast.error("Add a mobile number first"); return; }
+    if (!number) {
+      toast.error("Add a mobile number first");
+      return;
+    }
     if (paymentUrl) {
       const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl);
       openWhatsApp(whatsappUrl(number, msg));
@@ -429,15 +472,21 @@ function QuickActionsCard({
     }
 
     const waWin = window.open("about:blank", "_blank");
-    const url = paymentUrl ?? await ensurePaymentUrl();
-    if (!url) { waWin?.close(); return; }
+    const url = paymentUrl ?? (await ensurePaymentUrl());
+    if (!url) {
+      waWin?.close();
+      return;
+    }
     const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
     openWhatsApp(whatsappUrl(number, msg), waWin);
   };
 
   const sendPaymentLinkEmail = async () => {
-    if (!lead.email) { toast.error("Add a customer email first"); return; }
-    const url = paymentUrl ?? await ensurePaymentUrl();
+    if (!lead.email) {
+      toast.error("Add a customer email first");
+      return;
+    }
+    const url = paymentUrl ?? (await ensurePaymentUrl());
     if (!url) return;
     const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
     const subject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
@@ -446,10 +495,14 @@ function QuickActionsCard({
 
   const isContacted = currentStatus === "contacted";
   const showContactToggle = currentStatus === "new_lead" || currentStatus === "contacted";
-  const btnBase = "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium justify-start transition-colors";
+  const btnBase =
+    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium justify-start transition-colors";
 
   return (
-    <div className="rounded-xl border bg-white p-4 space-y-3 h-full shadow-sm" style={{ borderColor: "var(--admin-border)" }}>
+    <div
+      className="rounded-xl border bg-white p-4 space-y-3 h-full shadow-sm"
+      style={{ borderColor: "var(--admin-border)" }}
+    >
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Quick Actions</h3>
@@ -473,14 +526,13 @@ function QuickActionsCard({
           className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <MessageCircle className="size-3.5" />
-          Contact on WhatsApp
+          Send Message on WhatsApp
         </button>
         <Button size="sm" variant="outline" onClick={() => setLogOpen(true)} className="justify-start text-xs">
           <Phone className="size-3.5 mr-1.5" />
-          Log Contact Attempt
+          Add Customer Feedback
         </Button>
         <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
-
 
         <>
           <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
@@ -490,11 +542,19 @@ function QuickActionsCard({
           {paymentUrl ? (
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
               <Link2 className="size-3 shrink-0" />
-              <span className="truncate flex-1" title={paymentUrl}>{paymentUrl}</span>
+              <span className="truncate flex-1" title={paymentUrl}>
+                {paymentUrl}
+              </span>
               <CopyButton value={paymentUrl} label="" />
             </div>
           ) : (
-            <Button size="sm" variant="outline" disabled={linkBusy} onClick={generateLink} className="justify-start text-xs">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={linkBusy}
+              onClick={generateLink}
+              className="justify-start text-xs"
+            >
               <Link2 className="size-3.5 mr-1.5" />
               {linkBusy ? "Preparing…" : "Copy Payment Link"}
             </Button>
@@ -519,7 +579,6 @@ function QuickActionsCard({
             {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
           </button>
         </>
-
       </div>
 
       {!lead.email && (
@@ -536,12 +595,9 @@ function QuickActionsCard({
   );
 }
 
-
 /* ------------------- Status Control Panel ------------------- */
 
-function StatusControlPanel({
-  lead, currentStatus,
-}: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+function StatusControlPanel({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
   const transitionFn = useServerFn(transitionLeadStatus);
   const allowed = getAllowedLeadTransitions(currentStatus);
@@ -568,7 +624,9 @@ function StatusControlPanel({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Current Status</div>
-          <span className={`inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-semibold ${LEAD_STATUS_BADGE[currentStatus]}`}>
+          <span
+            className={`inline-flex items-center px-3 py-1.5 rounded-md border text-sm font-semibold ${LEAD_STATUS_BADGE[currentStatus]}`}
+          >
             {LEAD_STATUS_LABEL[currentStatus]}
           </span>
         </div>
@@ -595,15 +653,20 @@ function StatusControlPanel({
                 }}
                 className="text-xs"
               >
-                {busy && <Loader2 className="size-3 animate-spin mr-1" />}
-                → {LEAD_STATUS_LABEL[s]}
+                {busy && <Loader2 className="size-3 animate-spin mr-1" />}→ {LEAD_STATUS_LABEL[s]}
               </Button>
             ))}
           </div>
         </div>
       )}
 
-      <Dialog open={uninterestedOpen} onOpenChange={(o) => { setUninterestedOpen(o); if (!o) setReason(""); }}>
+      <Dialog
+        open={uninterestedOpen}
+        onOpenChange={(o) => {
+          setUninterestedOpen(o);
+          if (!o) setReason("");
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -615,7 +678,9 @@ function StatusControlPanel({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label className="text-xs">Why is the customer uninterested? <span className="text-red-500">*</span></Label>
+            <Label className="text-xs">
+              Why is the customer uninterested? <span className="text-red-500">*</span>
+            </Label>
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -624,7 +689,9 @@ function StatusControlPanel({
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUninterestedOpen(false)} disabled={busy}>Cancel</Button>
+            <Button variant="outline" onClick={() => setUninterestedOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
             <Button
               disabled={busy || reason.trim().length < 3}
               onClick={async () => {
@@ -644,9 +711,7 @@ function StatusControlPanel({
 
 /* ------------------- Refund Decision Panel ------------------- */
 
-function RefundDecisionPanel({
-  lead, currentStatus,
-}: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
+function RefundDecisionPanel({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
   const role = useRole();
   const approveFn = useServerFn(approveRefund);
@@ -673,32 +738,47 @@ function RefundDecisionPanel({
       await approveFn({ data: { leadId: lead.id, policyNote: policyNote || undefined } });
       toast.success("Refund approved");
       refresh();
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onProcessed = async () => {
-    if (!gatewayRef.trim()) { toast.error("Gateway reference required"); return; }
+    if (!gatewayRef.trim()) {
+      toast.error("Gateway reference required");
+      return;
+    }
     if (!confirm("Confirm refund has been processed at the payment gateway?")) return;
     setBusy(true);
     try {
       await processedFn({ data: { leadId: lead.id, gatewayRef: gatewayRef.trim() } });
       toast.success("Refund processed. Documents will be deleted.");
       refresh();
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onReject = async () => {
-    if (rejectReason.trim().length < 3) { toast.error("Reason required"); return; }
+    if (rejectReason.trim().length < 3) {
+      toast.error("Reason required");
+      return;
+    }
     setBusy(true);
     try {
       await rejectFn({ data: { leadId: lead.id, reason: rejectReason.trim() } });
       toast.success("Refund rejected");
       setRejectOpen(false);
       refresh();
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -720,7 +800,12 @@ function RefundDecisionPanel({
       </div>
 
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={eligible} onChange={(e) => setEligible(e.target.checked)} disabled={currentStatus === "refund_approved"} />
+        <input
+          type="checkbox"
+          checked={eligible}
+          onChange={(e) => setEligible(e.target.checked)}
+          disabled={currentStatus === "refund_approved"}
+        />
         Customer is refund-eligible per policy
       </label>
 
@@ -757,7 +842,8 @@ function RefundDecisionPanel({
               </Button>
             </div>
             <div className="text-[11px] rounded-md border border-rose-200 bg-rose-50 text-rose-800 px-2 py-1.5 font-medium">
-              ⚠ Marking processed will PERMANENTLY DELETE all customer documents from storage (certificates excluded). This cannot be undone.
+              ⚠ Marking processed will PERMANENTLY DELETE all customer documents from storage (certificates excluded).
+              This cannot be undone.
             </div>
           </div>
         )}
@@ -765,14 +851,22 @@ function RefundDecisionPanel({
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Reject Refund</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Reject Refund</DialogTitle>
+          </DialogHeader>
           <div className="space-y-2">
-            <Label className="text-xs">Reason for rejection <span className="text-red-500">*</span></Label>
+            <Label className="text-xs">
+              Reason for rejection <span className="text-red-500">*</span>
+            </Label>
             <Textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={busy}>Cancel</Button>
-            <Button variant="destructive" onClick={onReject} disabled={busy}>Reject</Button>
+            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={onReject} disabled={busy}>
+              Reject
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -784,15 +878,15 @@ function RefundDecisionPanel({
 
 const eventBorder: Record<string, string> = {
   lead_status_change: "border-l-blue-400",
-  payment_received:   "border-l-emerald-400",
-  refund_approved:    "border-l-rose-400",
-  refund_processed:   "border-l-rose-400",
-  refund_rejected:    "border-l-rose-400",
-  document_uploaded:  "border-l-orange-400",
-  documents_deleted:  "border-l-orange-400",
-  note_added:         "border-l-slate-300",
-  assignment_change:  "border-l-violet-400",
-  lead_created:       "border-l-blue-300",
+  payment_received: "border-l-emerald-400",
+  refund_approved: "border-l-rose-400",
+  refund_processed: "border-l-rose-400",
+  refund_rejected: "border-l-rose-400",
+  document_uploaded: "border-l-orange-400",
+  documents_deleted: "border-l-orange-400",
+  note_added: "border-l-slate-300",
+  assignment_change: "border-l-violet-400",
+  lead_created: "border-l-blue-300",
 };
 
 function EventsTimeline({ leadId }: { leadId: string }) {
@@ -817,7 +911,9 @@ function EventsTimeline({ leadId }: { leadId: string }) {
       toast.success("Note added");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const fmt = (iso: string) => formatIST(iso);
@@ -843,17 +939,19 @@ function EventsTimeline({ leadId }: { leadId: string }) {
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <div>
                   <span className="font-semibold text-slate-700">{e.staff_name}</span>
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] uppercase">{e.staff_role}</span>
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] uppercase">
+                    {e.staff_role}
+                  </span>
                 </div>
                 <div>{fmt(e.created_at)}</div>
               </div>
               <div className="text-sm text-slate-800 mt-1">
                 {e.event_type === "lead_status_change" && (
-                  <>Status: <b>{e.old_value ?? "—"}</b> → <b>{e.new_value}</b></>
+                  <>
+                    Status: <b>{e.old_value ?? "—"}</b> → <b>{e.new_value}</b>
+                  </>
                 )}
-                {e.event_type === "assignment_change" && (
-                  <>Assignee changed</>
-                )}
+                {e.event_type === "assignment_change" && <>Assignee changed</>}
                 {e.event_type === "note_added" && <i>Internal note</i>}
                 {!["lead_status_change", "assignment_change", "note_added"].includes(e.event_type) && (
                   <span className="capitalize">{e.event_type.replace(/_/g, " ")}</span>
@@ -922,16 +1020,25 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
   }, []);
 
   const submit = async () => {
-    if (!scheduledAt) { toast.error("Pick a date & time"); return; }
+    if (!scheduledAt) {
+      toast.error("Pick a date & time");
+      return;
+    }
     setBusy(true);
     try {
       await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
-      setDate(new Date()); setTime("10:00"); setReason("call_back"); setAssignedTo("");
+      setDate(new Date());
+      setTime("10:00");
+      setReason("call_back");
+      setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
       toast.success("Follow-up scheduled");
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const upcoming = (data?.rows ?? []).filter((r: any) => !r.is_completed);
@@ -948,8 +1055,11 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
           <Label className="text-[11px] text-slate-500">Date</Label>
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm"
-                className={cn("w-full justify-start text-left font-normal text-xs", !date && "text-muted-foreground")}>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn("w-full justify-start text-left font-normal text-xs", !date && "text-muted-foreground")}
+              >
                 <CalendarIcon className="mr-1.5 size-3.5" />
                 {date ? format(date, "dd/MM/yyyy") : "Pick a date"}
               </Button>
@@ -958,8 +1068,11 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
               <Calendar
                 mode="single"
                 selected={date}
-                onSelect={(d) => { setDate(d); setDateOpen(false); }}
-                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                onSelect={(d) => {
+                  setDate(d);
+                  setDateOpen(false);
+                }}
+                disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
                 initialFocus
                 className="p-3 pointer-events-auto"
               />
@@ -971,17 +1084,27 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
           <Label className="text-[11px] text-slate-500">Time (IST)</Label>
           <div className="relative">
             <Clock className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-            <select value={time} onChange={(e) => setTime(e.target.value)}
-              className="w-full rounded-md border px-7 py-1.5 text-xs bg-white h-8 tabular-nums">
-              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+            <select
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="w-full rounded-md border px-7 py-1.5 text-xs bg-white h-8 tabular-nums"
+            >
+              {timeOptions.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">Reason</Label>
-          <select value={reason} onChange={(e) => setReason(e.target.value as any)}
-            className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value as any)}
+            className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8"
+          >
             <option value="call_back">Call Back</option>
             <option value="documents_pending">Documents Pending</option>
             <option value="refund_followup">Refund Follow-up</option>
@@ -992,10 +1115,17 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
           {canAssign ? (
-            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8">
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full rounded-md border px-2 py-1.5 text-xs bg-white h-8"
+            >
               <option value="">Myself</option>
-              {staff.map((s) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.display_name || s.email}
+                </option>
+              ))}
             </select>
           ) : (
             <Button size="sm" className="w-full h-8" disabled={busy || !date} onClick={submit}>
@@ -1033,7 +1163,6 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
   );
 }
 
-
 /* ------------------- Linked Order Panel ------------------- */
 
 function LinkedOrderPanel({ applications, hideMoney = false }: { applications: any[]; hideMoney?: boolean }) {
@@ -1054,7 +1183,14 @@ function LinkedOrderPanel({ applications, hideMoney = false }: { applications: a
       </div>
       <div className="text-xs space-y-1.5">
         <Row k="Order #" v={<span className="font-mono">{app.application_code}</span>} />
-        <Row k="Fulfillment" v={<Badge variant="secondary" className="text-[10px]">{(app.fulfillment_status ?? app.application_status ?? "—").replace(/_/g, " ")}</Badge>} />
+        <Row
+          k="Fulfillment"
+          v={
+            <Badge variant="secondary" className="text-[10px]">
+              {(app.fulfillment_status ?? app.application_status ?? "—").replace(/_/g, " ")}
+            </Badge>
+          }
+        />
         {!hideMoney && <Row k="Total" v={`₹${Number(app.total_amount ?? 0).toLocaleString("en-IN")}`} />}
         <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline pt-1">
           Open order →
@@ -1088,9 +1224,14 @@ function DocumentsPanel({ applications }: { applications: any[] }) {
         <div className="text-xs text-slate-500 italic">No order yet.</div>
       ) : deleted ? (
         <div className="rounded-md bg-rose-50 border border-rose-200 p-2 text-xs text-rose-800">
-          Documents deleted on{" "}
-          <b>{formatIST(deleted)}</b>
-          {app.documents_deleted_reason ? <> — reason: <b>{app.documents_deleted_reason}</b></> : null}.
+          Documents deleted on <b>{formatIST(deleted)}</b>
+          {app.documents_deleted_reason ? (
+            <>
+              {" "}
+              — reason: <b>{app.documents_deleted_reason}</b>
+            </>
+          ) : null}
+          .
         </div>
       ) : (
         <a href={`/admin/applications/${app.id}`} className="block text-xs text-blue-600 hover:underline">
