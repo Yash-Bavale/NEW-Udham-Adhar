@@ -149,20 +149,6 @@ function LeadsPage() {
 
   const counts = countsData?.counts ?? {};
 
-  const handleExport = async () => {
-    setBusy(true);
-    try {
-      const res = await exportFn({ data: filter });
-      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "");
-      a.href = url; a.download = `leads_${stamp}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally { setBusy(false); }
-  };
-
   const handleBulkStatus = async (s: string) => {
     setBusy(true);
     try {
@@ -192,39 +178,11 @@ function LeadsPage() {
 
   return (
     <div className="space-y-5 pb-24">
-      <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-          <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-            {data?.total ?? 0} total records
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-            style={{ background: "var(--admin-primary)" }}
-          >
-            <Plus className="size-4" /> Add Lead
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm hover:bg-[var(--admin-surface-2)] disabled:opacity-50"
-            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-          >
-            <Download className="size-4" /> Export CSV
-          </button>
-          <SavedFiltersMenu
-            currentFilter={filter}
-            onApply={(f) => {
-              setSearchInput(f.search ?? "");
-              setSearch(f.search ?? "");
-              setStatus(f.status ?? "");
-              setPage(1);
-            }}
-          />
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+          {data?.total ?? 0} total records
+        </p>
       </div>
 
       {/* Status pills with counts */}
@@ -315,6 +273,13 @@ function LeadsPage() {
             style={{ color: "var(--admin-fg)" }}
           />
         </div>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          style={{ background: "var(--admin-primary)" }}
+        >
+          <Plus className="size-4" /> Add Lead
+        </button>
         {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {
