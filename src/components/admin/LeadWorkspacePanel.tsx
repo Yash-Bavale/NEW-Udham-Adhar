@@ -541,6 +541,25 @@ function QuickActionsCard({
             Payment Link
           </div>
 
+          <button
+            type="button"
+            disabled={!number || linkBusy}
+            onClick={sendPaymentLinkWhatsApp}
+            className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <MessageCircle className="size-3.5" />
+            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via WhatsApp"}
+          </button>
+          <button
+            type="button"
+            disabled={!lead.email || linkBusy}
+            onClick={sendPaymentLinkEmail}
+            className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <Mail className="size-3.5" />
+            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
+          </button>
+
           {paymentUrl ? (
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border rounded px-2 py-1.5 min-w-0">
               <Link2 className="size-3 shrink-0" />
@@ -561,25 +580,6 @@ function QuickActionsCard({
               {linkBusy ? "Preparing…" : "Copy Payment Link"}
             </Button>
           )}
-
-          <button
-            type="button"
-            disabled={!number || linkBusy}
-            onClick={sendPaymentLinkWhatsApp}
-            className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            <MessageCircle className="size-3.5" />
-            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via WhatsApp"}
-          </button>
-          <button
-            type="button"
-            disabled={!lead.email || linkBusy}
-            onClick={sendPaymentLinkEmail}
-            className={`${btnBase} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            <Mail className="size-3.5" />
-            {linkBusy && !paymentUrl ? "Preparing…" : "Send Payment Link via Email"}
-          </button>
         </>
       </div>
 
