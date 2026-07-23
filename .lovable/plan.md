@@ -1,65 +1,39 @@
-## SEO Consolidation & Accessibility Fixes
+## What was actually done (no pages were deleted or redirected)
 
-Approach approved: **#2 — keep all pages, fix canonicals, trim sitemap.** No content deletion.
+I re-audited the code and the live site. The earlier "205 → 87" summary was misleading in two ways: nothing was deleted, and the reduction is not yet visible on production.
 
-### 1. AdsBot accessibility (`public/robots.txt`)
+### 1. Pages: still live, still rendering
+- **127 variant slugs** are listed in `src/lib/seo/canonical-clusters.ts` (mapped to **11 cluster primaries**).
+- Every one of those routes still exists under `src/routes/` and returns HTML. No route file was removed, no 301/302 was added, no `410 Gone` was set for these variants. `/home` is the only URL that was retired and set to 410 (that was a separate earlier change).
 
-Add explicit allow blocks so Google Ads landing-page checks never get ambiguously matched:
+### 2. Canonicals: rewritten to consolidate SEO signal
+- The build rewrites each variant's `<link rel="canonical">` and `<meta property="og:url">` to point at its cluster primary (e.g. `/msme-certificate` → canonical `/udyam-certificate`).
+- This is a *soft* consolidation: users, ads, and existing backlinks still land on the variant page; Google is told to index the primary. No redirect, no content change.
 
-```
-User-agent: AdsBot-Google
-Allow: /
+### 3. Sitemap: intended reduction, not yet live
+- `src/routes/sitemap[.]xml.ts` filters out `VARIANT_SLUGS`. In theory that yields ~87 URLs (≈104 indexable static routes + `seo_pages` rows − 127 variants + primaries).
+- **Live check just now**: `https://udyamadhar.in/sitemap.xml` returns **205 `<loc>` entries** with `lastmod=2026-07-11`. It still lists all the variants (`aadhar-udyam-download`, `msme-certificate`, `udyog-aadhar-registration`, …), plus junk that shouldn't be there at all: `/home`, `/index.html`, `/unauthorized`.
+- Conclusion: the sitemap change and the `/home` removal are in the codebase but the deployed sitemap is stale. The "87" number was the *expected* output of the current generator, not what Google is actually seeing.
 
-User-agent: AdsBot-Google-Mobile
-Allow: /
-```
+### 4. Extra issues surfaced by the audit
+- `/home` is still in the live sitemap even though it's marked 410 in code — stale deploy.
+- `/index.html` and `/unauthorized` are in the live sitemap; the generator doesn't exclude them.
+- Cache-Control on `/sitemap.xml` is `max-age=3600`, so even after republish Google can see the old file for up to an hour.
 
-Keep existing `User-agent: *` rules intact.
+## Plan to reconcile
 
-### 2. Kill the `/home` duplicate
+1. **Republish the site** so the new sitemap route is served. This alone drops the variants and `/home` from `/sitemap.xml`.
+2. **Tighten the sitemap excluder** in `src/routes/sitemap[.]xml.ts`:
+   - Add `/index.html`, `/unauthorized`, `/not-found`, `/404` to the excluded set.
+   - Add a sanity assertion so any path listed in `VARIANT_SLUGS` that slips through logs a warning at build time.
+3. **Verify on production after republish**:
+   - `curl https://udyamadhar.in/sitemap.xml | grep -c '<loc>'` should be ~87.
+   - Spot-check 3 variants (`/msme-certificate`, `/udyog-aadhar-registration`, `/download-msme-certificate`) and confirm `<link rel="canonical">` points at the cluster primary.
+   - Confirm `/home` returns 410 with `x-robots-tag: noindex`.
+4. **In Search Console**: resubmit the sitemap and mark the retired variants under "URL removals" only if we want faster de-indexing. Otherwise the canonical tags will do it over 2–6 weeks.
 
-- Delete `src/routes/home.tsx`.
-- Add `/home` (and any `/home/*`) to the 410 Gone matcher in `src/routes/$.tsx` so the URL stops existing instead of redirecting. Single homepage = `https://udyamadhar.in/`.
+## Technical notes
 
-### 3. Canonical + trailing-slash normalization
-
-Extend the normalizer in `src/routes/$.tsx` to:
-
-- Lowercase multi-segment paths (not just top-level).
-- Strip trailing slashes on all depths except `/`.
-- 301 to the normalized form.
-
-### 4. Cluster canonicals (approach #2)
-
-Audit `src/content/seo-batch1/*.json` + `src/content/wp/*.html` + the sitemap generator. Group near-duplicates into clusters, pick one canonical per cluster. For every variant page:
-
-- Its route's `head()` emits `<link rel="canonical">` and `og:url` pointing at the **cluster primary**, not itself.
-- Remove the variant from `sitemap.xml` output (primary stays).
-- Page stays live, content untouched, direct links keep working.
-
-Proposed initial clusters (final list produced during implementation from the actual file audit):
-
-- **udyam-registration** ← udyam-registration-online, udyam-registration-process, msme-registration, udyam-registration-free
-- **udyam-certificate** ← udyam-registration-certificate, download-udyam-certificate, print-udyam-certificate
-- **udyam-registration-number** ← udyam-registration-number-verify, verify-udyam-certificate, forgot-udyam-registration-number
-- **udyog-aadhaar-govin** ← udyog-aadhaar-government-in, udyog-aadhaar-register, udyog-aadhar-card, www-udyamregistration
-- **udyog-aadhaar-to-udyam-migration** (standalone primary)
-- Standalone primaries kept as-is: udyam-login, udyam-reprint, udyam-registration-status, udyam-registration-update, udyam-registration-fee, udyam-registration-documents-required, udyam-registration-eligibility, udyam-registration-benefits, msme-certificate-benefits
-
-Target sitemap size: ~205 → ~60–80 URLs, all with self-referencing canonicals.
-
-### 5. Legacy 410 sweep
-
-Verify every dead government-scheme URL flagged in the audit resolves to 410 via `src/routes/$.tsx` matcher. Add any missing patterns.
-
-### 6. Verification
-
-- Curl `/robots.txt`, `/home`, a variant page (check canonical header/tag), and `/sitemap.xml` (count URLs).
-- Confirm build passes.
-- Tell you to hit Rescan in the SEO tab.
-
-### Technical notes
-
-- Canonical goes in the leaf route's `head()` `links` array (never in `__root.tsx` — router concatenates `links` and would emit both). `og:url` in `meta` is fine to update alongside.
-- Sitemap lives in `src/routes/sitemap[.]xml.ts` (or the static generator — I'll match whichever mechanism is currently in use, no migration without asking).
-- The final cluster → primary mapping will be produced from the actual file audit before I flip canonicals; if any cluster grouping looks wrong to you, tell me during implementation and I'll adjust before touching the sitemap.
+- Files involved: `src/lib/seo/canonical-clusters.ts`, `src/routes/sitemap[.]xml.ts`, `src/routes/$.tsx` (410 handler).
+- No DB migration.
+- No content or route deletions in this plan — same soft-consolidation strategy.
