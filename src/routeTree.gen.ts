@@ -82,7 +82,6 @@ import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
-import { Route as HomeRouteImport } from './routes/home'
 import { Route as GrievanceRedressalPolicyRouteImport } from './routes/grievance-redressal-policy'
 import { Route as ForgotUdyamRegistrationNumberRouteImport } from './routes/forgot-udyam-registration-number'
 import { Route as FaqsRouteImport } from './routes/faqs'
@@ -577,11 +576,6 @@ const IndexDothtmlRoute = IndexDothtmlRouteImport.update({
 const ImportantNoticeRoute = ImportantNoticeRouteImport.update({
   id: '/important-notice',
   path: '/important-notice',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GrievanceRedressalPolicyRoute =
@@ -1203,7 +1197,6 @@ export interface FileRoutesByFullPath {
   '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
-  '/home': typeof HomeRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
@@ -1391,7 +1384,6 @@ export interface FileRoutesByTo {
   '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
-  '/home': typeof HomeRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
@@ -1577,7 +1569,6 @@ export interface FileRoutesById {
   '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
-  '/home': typeof HomeRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
@@ -1768,7 +1759,6 @@ export interface FileRouteTypes {
     | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
-    | '/home'
     | '/important-notice'
     | '/index.html'
     | '/llms-full.txt'
@@ -1956,7 +1946,6 @@ export interface FileRouteTypes {
     | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
-    | '/home'
     | '/important-notice'
     | '/index.html'
     | '/llms-full.txt'
@@ -2141,7 +2130,6 @@ export interface FileRouteTypes {
     | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
-    | '/home'
     | '/important-notice'
     | '/index.html'
     | '/llms-full.txt'
@@ -2331,7 +2319,6 @@ export interface RootRouteChildren {
   FaqsRoute: typeof FaqsRoute
   ForgotUdyamRegistrationNumberRoute: typeof ForgotUdyamRegistrationNumberRoute
   GrievanceRedressalPolicyRoute: typeof GrievanceRedressalPolicyRoute
-  HomeRoute: typeof HomeRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
   IndexDothtmlRoute: typeof IndexDothtmlRoute
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
@@ -2950,13 +2937,6 @@ declare module '@tanstack/react-router' {
       path: '/important-notice'
       fullPath: '/important-notice'
       preLoaderRoute: typeof ImportantNoticeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/grievance-redressal-policy': {
@@ -3988,7 +3968,6 @@ const rootRouteChildren: RootRouteChildren = {
   FaqsRoute: FaqsRoute,
   ForgotUdyamRegistrationNumberRoute: ForgotUdyamRegistrationNumberRoute,
   GrievanceRedressalPolicyRoute: GrievanceRedressalPolicyRoute,
-  HomeRoute: HomeRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
   IndexDothtmlRoute: IndexDothtmlRoute,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,

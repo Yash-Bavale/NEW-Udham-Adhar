@@ -11,7 +11,7 @@ export const Route = createFileRoute("/print-msme-certificate")({
       { property: "og:description", content: "Printing your MSME Certificate online is a crucial step for registered businesses to validate their micro, small, or medium enterprise status. Through the..." },
     ],
     links: [
-      { rel: "canonical", href: "https://udyamadhar.in/print-msme-certificate" },
+      { rel: "canonical", href: "https://udyamadhar.in/download-udyam-certificate" },
     ],
   }),
   component: () => <SeoLandingPage title="Print MSME Certificate" linkTitle="Print MSME Certificate | Download Your Udyam Registration Certificate" content={`Printing your MSME Certificate online is a crucial step for registered businesses to validate their micro, small, or medium enterprise status. Through the official Udyam portal, entrepreneurs can enter their registration number, verify via OTP, and download the certificate in PDF format. This certificate is essential for applying for loans, subsidies, government tenders, and other schemes. The online process is secure, fast, and completely paperless, allowing businesses to maintain compliance and credibility. Even if the Udyam Number is forgotten, the portal provides recovery options to print the certificate. Having a printed MSME certificate ensures uninterrupted access to government benefits and formal recognition of the business, supporting operational growth and financial planning.`} html={html} />,

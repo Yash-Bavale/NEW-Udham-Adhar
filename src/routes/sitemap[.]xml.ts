@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
 import { BASE_URL } from "@/lib/brand";
+import { VARIANT_SLUGS } from "@/lib/seo/canonical-clusters";
 
 // Path prefixes that must never appear in the sitemap.
 // Intentional exclusions (not bugs — scanner may flag these as "missing"):
@@ -60,6 +61,11 @@ const HIGH_PRIORITY = new Set<string>([
 function isExcluded(p: string): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (p.includes("$") || p.includes("*")) return true;
+  if (p === "/home") return true;
+  // Keyword-variant pages stay live but are dropped from the sitemap;
+  // their canonical points at the cluster primary (see canonical-clusters.ts).
+  const slug = p.replace(/^\/+/, "");
+  if (VARIANT_SLUGS.has(slug)) return true;
   return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
 }
 

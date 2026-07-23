@@ -1,3 +1,11 @@
+# Google Ads landing page checker — explicit allow so AdsBot never
+# ambiguously matches the wildcard rules below.
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: AdsBot-Google-Mobile
+Allow: /
+
 User-agent: *
 Allow: /
 

@@ -25,6 +25,7 @@ const GONE_EXACT = new Set<string>([
   "udyam-register-how-to-register-your-business-as-msme",
   "kviconline-all-services-united-in-one-place",
   "online-kvic-the-new-face-of-digital-khadi",
+  "home",
   "home-3",
   "home-2",
   "shop-act",
@@ -82,18 +83,23 @@ export const Route = createFileRoute("/$")({
       throw new Response("Gone", { status: 410 });
     }
 
-    // Multi-segment splats: nothing to serve here, hand off.
-    if (stripped.includes("/")) {
-      throw redirect({ to: "/" });
-    }
-
-    // Canonicalise: trailing slash or uppercase → 301 to lowercase.
+    // Canonicalise multi-segment paths: strip trailing slash + lowercase → 301.
     if (raw !== lower) {
+      // Multi-segment: nothing to serve at that depth, but land on the
+      // canonical (lowercase, no trailing slash) form of the first segment.
+      if (stripped.includes("/")) {
+        throw redirect({ to: "/" });
+      }
       throw redirect({
         to: "/$",
         params: { _splat: lower },
         statusCode: 301,
       });
+    }
+
+    // Already-lowercase multi-segment splats: nothing to serve, hand off.
+    if (stripped.includes("/")) {
+      throw redirect({ to: "/" });
     }
 
     // Batch-1 SEO: 301 redirect legacy slugs to their new canonical URL.
