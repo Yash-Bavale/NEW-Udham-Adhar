@@ -47,6 +47,8 @@ import { RefundRequestDialog } from "@/components/admin/RefundRequestDialog";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
+import { FULFILLMENT_LABEL, FULFILLMENT_CODE, labelForFulfillment } from "@/lib/crm/fulfillment-transitions";
+
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
   QUICK_ACTIONS,
