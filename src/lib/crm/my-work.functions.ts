@@ -41,6 +41,7 @@ export type MyWorkSummary = {
     orderReceived: number;
     pendingDocs: number;
     assignedLeads: number;
+    totalLeads: number;
     unreadNotifications: number;
     slaRisk: number;
   };
@@ -61,7 +62,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     // "Act now" = fresh orders with no employee action yet (S01/S02 or legacy order_received/null)
     const ACT_NOW_STATUSES = ["order_received", "S01", "S02", "awaiting_customer_form"];
 
-    const [appsRes, assignedAppsCountRes, docsRes, leadsRes, notifRes] = await Promise.all([
+    const [appsRes, assignedAppsCountRes, docsRes, leadsRes, totalLeadsRes, notifRes] = await Promise.all([
       supabase
         .from("applications")
         .select(
@@ -91,6 +92,10 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         .order("created_at", { ascending: true })
         .limit(50),
       supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", userId),
+      supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
@@ -117,6 +122,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         orderReceived: apps.filter((a) => ACT_NOW_STATUSES.includes(a.fulfillment_status ?? "order_received")).length,
         pendingDocs: docs.length,
         assignedLeads: leads.length,
+        totalLeads: totalLeadsRes.count ?? 0,
         unreadNotifications: notifRes.count ?? 0,
         slaRisk,
       },

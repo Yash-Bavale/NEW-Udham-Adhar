@@ -2,9 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useEffect, useState } from "react";
-import { Inbox, FileCheck2, Sparkles, Bell, AlertTriangle, ArrowRight, PackageOpen } from "lucide-react";
+import { Inbox, FileCheck2, Sparkles, Bell, ArrowRight, PackageOpen } from "lucide-react";
 import { getMyWorkSummary, type MyWorkSummary } from "@/lib/crm/my-work.functions";
 import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,6 +18,7 @@ function MyWorkPage() {
   const fetchSummary = useServerFn(getMyWorkSummary);
   const [hasSession, setHasSession] = useState(false);
   const role = useRole();
+  const { can } = usePermissions();
   useEffect(() => {
     let active = true;
     supabase.auth.getSession().then(({ data }) => { if (active) setHasSession(!!data.session); });
@@ -34,24 +36,135 @@ function MyWorkPage() {
   useRealtimeTable("documents", () => refetch());
 
   const counters = data?.counters;
+  const isAdmin = role.hasAny(["super_admin", "admin"]);
+  const canOrders = isAdmin || can("orders");
+  const canLeads = isAdmin || can("leads");
 
   const cards = useMemo(
     () => {
-      const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string> }> = [
-        { label: "Assigned applications", value: counters?.assignedApps ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/orders", search: { assignee: "me" } },
-        { label: "Act now · no action yet", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" } },
-        { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" } },
-        { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications" },
-        { label: "SLA risk (>48h idle)", value: counters?.slaRisk ?? 0, icon: AlertTriangle, accent: "var(--admin-danger)", to: "/admin/orders", search: { assignee: "me", sla: "risk" } },
+      const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string>; show: boolean }> = [
+        { label: "Orders Received", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
+        { label: "Total Leads", value: counters?.totalLeads ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/leads", search: { assignee: "me" }, show: canLeads },
+        { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" }, show: canLeads },
+        { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications", show: true },
       ];
-      if (role.hasAny(["super_admin", "admin"])) {
-        base.splice(2, 0, { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)", to: "/admin/review" });
+      if (isAdmin) {
+        base.splice(3, 0, { label: "Documents to review", value: counters?.pendingDocs ?? 0, icon: FileCheck2, accent: "var(--admin-warn)", to: "/admin/review", show: true });
       }
-      return base;
+      return base.filter((c) => c.show);
     },
-    [counters, role],
+    [counters, isAdmin, canOrders, canLeads],
   );
 
+  const hasAssignedOrders = (data?.assignedApplications?.length ?? 0) > 0;
+
+  const OrdersSection = canOrders ? (
+    <Section
+      key="orders"
+      title="Next-best actions"
+      subtitle="Fresh orders with no action yet — shown first"
+      empty="No assigned orders — you're clear."
+      href="/admin/orders"
+    >
+      {[...(data?.assignedApplications ?? [])]
+        .sort((a, b) => {
+          const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+          const aFresh = actNow.includes(a.fulfillment_status ?? "order_received") ? 0 : 1;
+          const bFresh = actNow.includes(b.fulfillment_status ?? "order_received") ? 0 : 1;
+          if (aFresh !== bFresh) return aFresh - bFresh;
+          return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+        })
+        .slice(0, 12)
+        .map((a) => {
+          const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
+          const fresh = actNow.includes(a.fulfillment_status ?? "order_received");
+          return (
+            <Link
+              key={a.id}
+              to="/admin/applications/$applicationId"
+              params={{ applicationId: a.id }}
+              className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm border"
+              style={
+                fresh
+                  ? { background: "rgba(249, 115, 22, 0.10)", borderColor: "rgba(249, 115, 22, 0.45)" }
+                  : { borderColor: "transparent" }
+              }
+            >
+              {fresh && (
+                <span
+                  className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: "#F97316", color: "white" }}
+                >
+                  Act now
+                </span>
+              )}
+              <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
+                {a.application_code ?? a.id.slice(0, 8)}
+              </code>
+              <span className="font-medium truncate flex-1" style={{ color: fresh ? "#F97316" : "var(--admin-fg)" }}>
+                {a.lead?.name ?? "Unknown"}
+              </span>
+              <StatusPill status={a.fulfillment_status ?? a.application_status} fresh={fresh} />
+              <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                {formatRelative(a.updated_at)}
+              </span>
+              <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
+            </Link>
+          );
+        })}
+    </Section>
+  ) : null;
+
+  const LeadsSection = canLeads ? (
+    <Section
+      key="leads"
+      title="Active leads — contact now"
+      subtitle="Not-contacted leads, oldest first. Red = >3h, amber = >1h"
+      empty="No uncontacted leads assigned."
+      href="/admin/leads"
+    >
+      {(data?.assignedLeads ?? []).slice(0, 12).map((l) => {
+        const ageMs = Date.now() - new Date(l.created_at).getTime();
+        const overdue3h = ageMs > 3 * 3600 * 1000;
+        const overdue1h = !overdue3h && ageMs > 1 * 3600 * 1000;
+        const tone = overdue3h
+          ? { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", fg: "#EF4444", label: "3h+" }
+          : overdue1h
+          ? { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.45)", fg: "#F59E0B", label: "1h+" }
+          : null;
+        return (
+          <Link
+            key={l.id}
+            to="/admin/leads/$leadId"
+            params={{ leadId: l.id }}
+            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm border"
+            style={tone ? { background: tone.bg, borderColor: tone.border } : { borderColor: "transparent" }}
+          >
+            {tone && (
+              <span
+                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                style={{ background: tone.fg, color: "white" }}
+              >
+                {tone.label}
+              </span>
+            )}
+            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
+              {l.lead_code ?? l.id.slice(0, 8)}
+            </code>
+            <span className="font-medium truncate flex-1" style={{ color: tone ? tone.fg : "var(--admin-fg)" }}>{l.name}</span>
+            <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
+            <StatusPill status={l.status} />
+            <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{formatRelative(l.created_at)}</span>
+          </Link>
+        );
+      })}
+    </Section>
+  ) : null;
+
+  // If orders exist → Orders on top, Leads below. If no orders → Leads on top, empty Orders below.
+  const orderedSections = hasAssignedOrders
+    ? [OrdersSection, LeadsSection]
+    : [LeadsSection, OrdersSection];
 
   return (
     <div className="space-y-6">
@@ -59,12 +172,12 @@ function MyWorkPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--admin-fg)" }}>My Work</h1>
           <p className="text-sm mt-1" style={{ color: "var(--admin-fg-muted)" }}>
-            Your personal queue — assignments, document reviews, leads, and live alerts.
+            Your personal queue — assignments, leads, and live alerts.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {cards.map((c) => (
           <Link
             key={c.label}
@@ -86,62 +199,9 @@ function MyWorkPage() {
         ))}
       </div>
 
-      <Section
-        title="Next-best actions"
-        subtitle="Fresh orders with no action yet — shown first"
-        empty="No assigned applications — you're clear."
-        href="/admin/applications"
-      >
-        {[...(data?.assignedApplications ?? [])]
-          .sort((a, b) => {
-            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
-            const aFresh = actNow.includes(a.fulfillment_status ?? "order_received") ? 0 : 1;
-            const bFresh = actNow.includes(b.fulfillment_status ?? "order_received") ? 0 : 1;
-            if (aFresh !== bFresh) return aFresh - bFresh;
-            return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
-          })
-          .slice(0, 12)
-          .map((a) => {
-            const actNow = ["order_received", "S01", "S02", "awaiting_customer_form"];
-            const fresh = actNow.includes(a.fulfillment_status ?? "order_received");
-            return (
-              <Link
-                key={a.id}
-                to="/admin/applications/$applicationId"
-                params={{ applicationId: a.id }}
-                className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm border"
-                style={
-                  fresh
-                    ? { background: "rgba(249, 115, 22, 0.10)", borderColor: "rgba(249, 115, 22, 0.45)" }
-                    : { borderColor: "transparent" }
-                }
-              >
-                {fresh && (
-                  <span
-                    className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
-                    style={{ background: "#F97316", color: "white" }}
-                  >
-                    Act now
-                  </span>
-                )}
-                <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
-                  {a.application_code ?? a.id.slice(0, 8)}
-                </code>
-                <span className="font-medium truncate flex-1" style={{ color: fresh ? "#F97316" : "var(--admin-fg)" }}>
-                  {a.lead?.name ?? "Unknown"}
-                </span>
-                <StatusPill status={a.fulfillment_status ?? a.application_status} fresh={fresh} />
-                <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-                  {formatRelative(a.updated_at)}
-                </span>
-                <ArrowRight className="size-3.5" style={{ color: "var(--admin-fg-subtle)" }} />
-              </Link>
-            );
-          })}
-      </Section>
+      {orderedSections}
 
-
-      {role.hasAny(["super_admin", "admin"]) && (
+      {isAdmin && (
         <Section
           title="Documents pending review"
           subtitle="Oldest uploads first"
@@ -168,49 +228,6 @@ function MyWorkPage() {
           ))}
         </Section>
       )}
-
-      <Section
-        title="Active leads — contact now"
-        subtitle="Not-contacted leads, oldest first. Red = >3h, amber = >1h"
-        empty="No uncontacted leads assigned."
-        href="/admin/leads"
-      >
-        {(data?.assignedLeads ?? []).slice(0, 12).map((l) => {
-          const ageMs = Date.now() - new Date(l.created_at).getTime();
-          const overdue3h = ageMs > 3 * 3600 * 1000;
-          const overdue1h = !overdue3h && ageMs > 1 * 3600 * 1000;
-          const tone = overdue3h
-            ? { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", fg: "#EF4444", label: "3h+" }
-            : overdue1h
-            ? { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.45)", fg: "#F59E0B", label: "1h+" }
-            : null;
-          return (
-            <Link
-              key={l.id}
-              to="/admin/leads/$leadId"
-              params={{ leadId: l.id }}
-              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm border"
-              style={tone ? { background: tone.bg, borderColor: tone.border } : { borderColor: "transparent" }}
-            >
-              {tone && (
-                <span
-                  className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
-                  style={{ background: tone.fg, color: "white" }}
-                >
-                  {tone.label}
-                </span>
-              )}
-              <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
-                {l.lead_code ?? l.id.slice(0, 8)}
-              </code>
-              <span className="font-medium truncate flex-1" style={{ color: tone ? tone.fg : "var(--admin-fg)" }}>{l.name}</span>
-              <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
-              <StatusPill status={l.status} />
-              <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{formatRelative(l.created_at)}</span>
-            </Link>
-          );
-        })}
-      </Section>
     </div>
   );
 }
