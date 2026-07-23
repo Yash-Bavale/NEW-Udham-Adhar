@@ -29,6 +29,19 @@ import { INDIAN_STATES } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 
+function formatAge(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+
 export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
 function LeadsPage() {
