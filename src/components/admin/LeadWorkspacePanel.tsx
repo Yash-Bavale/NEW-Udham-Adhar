@@ -466,6 +466,15 @@ function QuickActionsCard({
             {contactBusy ? "Updating…" : isContacted ? "Contacted ✓ (undo)" : "Mark as Contacted"}
           </Button>
         )}
+        <button
+          type="button"
+          disabled={!number}
+          onClick={contactOnWhatsApp}
+          className={`${btnBase} border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <MessageCircle className="size-3.5" />
+          Contact on WhatsApp
+        </button>
         <Button size="sm" variant="outline" onClick={() => setLogOpen(true)} className="justify-start text-xs">
           <Phone className="size-3.5 mr-1.5" />
           Log Contact Attempt
