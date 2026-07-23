@@ -354,14 +354,15 @@ function OrdersListPage() {
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
                 <th className="text-left font-medium px-2 py-2.5">Order #</th>
+                <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
                 <th className="text-left font-medium px-2 py-2.5">Fulfillment</th>
                 <th className="text-left font-medium px-2 py-2.5">Assigned</th>
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
-                <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="px-2 py-2.5" />
+
               </tr>
             </thead>
             <tbody>
