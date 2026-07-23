@@ -499,8 +499,7 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
     </tr>
   );
 }
-  );
-}
+
 
 function ScrollableTable({ children }: { children: React.ReactNode }) {
   const topRef = useRef<HTMLDivElement>(null);
