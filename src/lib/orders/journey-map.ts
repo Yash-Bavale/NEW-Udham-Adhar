@@ -337,7 +337,7 @@ export function deriveJourneyLiveState(input: {
 }): JourneyLiveState {
   const idx = stageToJourneyIndex(input.stage);
   const closureStageValue = (input.closureStage ?? "").toLowerCase();
-  const isClosed = /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
+  const isClosed = input.stage === "closed" || /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
   const isConsultationCompleted = input.stage === "consultation_completed";
   const isCompleted = input.stage === "completed" || isConsultationCompleted;
   const ws = (input.workflowStatus ?? "").toLowerCase();
