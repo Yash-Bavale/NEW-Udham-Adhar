@@ -11,7 +11,7 @@ import { relativeIST } from "@/lib/datetime";
 import { NEXT_STEP_HINT } from "@/lib/orders/order-actions-map";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
-  FULFILLMENT_CODE, FULFILLMENT_BADGE, labelForFulfillment,
+  FULFILLMENT_CODE, labelForFulfillment,
   type FulfillmentStatus,
 } from "@/lib/crm/fulfillment-transitions";
 
@@ -47,33 +47,31 @@ export function TabStatusHeader({
             ? "bg-amber-50 text-amber-800 ring-amber-200"
             : "bg-sky-50 text-sky-700 ring-sky-200";
 
+  // Single source of truth: display ONE stage pill only. When a fulfillment
+  // stage is available (S01–S12), prefer its label because it's more granular
+  // than the OrderStage bucket. Otherwise fall back to STAGE_META.
   const fs = fulfillmentStatus as FulfillmentStatus | undefined;
   const sCode = fs ? FULFILLMENT_CODE[fs] : null;
   const sLabel = fs ? labelForFulfillment(fs) : null;
-  const sBadge = fs ? (FULFILLMENT_BADGE[fs] ?? "bg-slate-50 text-slate-700 border-slate-200") : null;
   const isTerminal = fs ? TERMINAL_FS.has(fs) : false;
+  const displayLabel = sLabel || meta.label;
+  const displayPillCls = isTerminal
+    ? "bg-rose-50 text-rose-700 ring-rose-200"
+    : pillCls;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm flex flex-wrap items-center gap-x-4 gap-y-1.5">
-      {sCode && sLabel && (
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${sBadge}`}
-          title={isTerminal ? "Terminal stage" : "Current fulfillment stage"}
-        >
-          <span className="font-mono opacity-70">{sCode}</span>
-          <span>·</span>
-          <span>{sLabel}</span>
-          {isTerminal && (
-            <span className="ml-1 rounded-sm bg-black/10 px-1 text-[9px] font-bold uppercase tracking-wider">Terminal</span>
-          )}
-        </span>
-      )}
-
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${pillCls}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${displayPillCls}`}
+        title={isTerminal ? "Terminal stage" : "Current stage"}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-        {meta.label}
+        {sCode && <span className="font-mono opacity-70">{sCode}</span>}
+        {sCode && <span className="opacity-50">·</span>}
+        <span>{displayLabel}</span>
+        {isTerminal && (
+          <span className="ml-1 rounded-sm bg-black/10 px-1 text-[9px] font-bold uppercase tracking-wider">Terminal</span>
+        )}
       </span>
 
       <span className="font-mono text-xs font-bold text-slate-700">{applicationCode}</span>

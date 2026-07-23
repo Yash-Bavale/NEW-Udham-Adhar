@@ -9,9 +9,6 @@ import { formatIST } from "@/lib/datetime";
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
-import {
-  FULFILLMENT_LABEL, type FulfillmentStatus,
-} from "@/lib/crm/fulfillment-transitions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Input } from "@/components/ui/input";
@@ -27,21 +24,31 @@ export const Route = createFileRoute("/admin/orders/")({
 
 type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
 
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
-const COMPLETED_STAGES: OrderStage[] = ["completed"];
-const CLOSED_STAGES: OrderStage[] = ["closed"];
+// Bucket mapping uses fulfillment_status (S01–S12) directly, per user spec:
+//   Pending   = S01, S02, S03, S04, S05, S06, S07, S09
+//   Completed = S08 (consultation_completed) + S11 (order_completed)
+//   Closed    = S10 (application_rejected) + S12 (order_closed)
+const CLOSED_FS = new Set<string>([
+  "application_rejected", "certificate_rejected", "order_closed", "cancelled",
+]);
+const COMPLETED_FS = new Set<string>([
+  "consultation_completed", "order_completed", "completed",
+]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-// Pending = anything not completed, not closed, and not a terminal exception.
-function isPending(stage: OrderStage): boolean {
-  return !COMPLETED_STAGES.includes(stage) && !CLOSED_STAGES.includes(stage) && !EXCEPTION_STAGES.includes(stage);
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
+
+function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
+  const fs = row.fulfillment_status ?? "";
+  if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
+  if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
+  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
+  if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
+  return "pending";
 }
 
-function bucketOf(stage: OrderStage): Exclude<Bucket, "all"> {
-  if (COMPLETED_STAGES.includes(stage)) return "completed";
-  if (CLOSED_STAGES.includes(stage)) return "closed";
-  if (EXCEPTION_STAGES.includes(stage)) return "exception";
-  if (NEEDS_ACTION_STAGES.includes(stage)) return "needs_action";
-  return "pending";
+function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage }): boolean {
+  const b = bucketOfRow(row);
+  return b === "pending" || b === "needs_action";
 }
 
 const BUCKETS: { id: Bucket; label: string }[] = [
@@ -79,15 +86,6 @@ const PAYMENT_TONE: Record<string, string> = {
   Failed:           "bg-rose-50 text-rose-700",
 };
 
-const FULFILL_TONE: Record<string, string> = {
-  order_received:        "bg-slate-100 text-slate-700",
-  documents_received:    "bg-slate-100 text-slate-700",
-  verification_pending:  "bg-amber-50 text-amber-700",
-  application_submitted: "bg-sky-50 text-sky-700",
-  under_processing:      "bg-indigo-50 text-indigo-700",
-  completed:             "bg-emerald-50 text-emerald-700",
-  cancelled:             "bg-rose-50 text-rose-700",
-};
 
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
@@ -146,14 +144,14 @@ function OrdersListPage() {
   const ageFiltered = useMemo(() => {
     if (minDays == null) return allRows;
     return allRows.filter((r) => {
-      if (!isPending(r.stage as OrderStage)) return true; // don't hide completed/exception here
+      if (!isPendingRow(r)) return true; // don't hide completed/exception here
       return daysSince(r.created_at) >= minDays;
     });
   }, [allRows, minDays]);
 
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0 };
-    for (const r of ageFiltered) c[bucketOf(r.stage as OrderStage)]++;
+    for (const r of ageFiltered) c[bucketOfRow(r)]++;
 
     return c;
   }, [ageFiltered]);
@@ -162,7 +160,7 @@ function OrdersListPage() {
   const ageBuckets = useMemo(() => {
     const b = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
     for (const r of ageFiltered) {
-      if (!isPending(r.stage as OrderStage)) continue;
+      if (!isPendingRow(r)) continue;
       const d = daysSince(r.created_at);
       if (d >= 7) b.older++;
       else if (d >= 3) b.d7++;
@@ -173,7 +171,7 @@ function OrdersListPage() {
     return b;
   }, [ageFiltered]);
 
-  const rows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOf(r.stage as OrderStage) === bucket);
+  const rows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOfRow(r) === bucket);
   const total = data?.total ?? 0;
 
   // Group by day
@@ -210,15 +208,6 @@ function OrdersListPage() {
             className="pl-8 h-9 text-sm bg-white"
           />
         </div>
-        <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
-          <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All fulfillment" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All fulfillment</SelectItem>
-            {Object.entries(FULFILLMENT_LABEL).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={serviceId} onValueChange={setServiceId}>
           <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All services" /></SelectTrigger>
           <SelectContent>
@@ -358,7 +347,7 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                <th className="text-left font-medium px-2 py-2.5">Fulfillment</th>
+                
                 <th className="text-left font-medium px-2 py-2.5">Assigned</th>
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
                 <th className="px-2 py-2.5" />
@@ -367,15 +356,15 @@ function OrdersListPage() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
                 <>
                   <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={9} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                    <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
@@ -418,9 +407,7 @@ function formatDayHeader(day: string): string {
 function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
-  const fs = (order.fulfillment_status ?? "order_received") as FulfillmentStatus;
-  const payTone = PAYMENT_TONE[order.payment_status] ?? "bg-slate-100 text-slate-700";
-  const fulTone = FULFILL_TONE[fs] ?? "bg-slate-100 text-slate-700";
+  
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
     amber:   "bg-amber-50 text-amber-700",
@@ -472,7 +459,7 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
             {meta?.label ?? stage}
           </span>
-          {isPending(stage) && (() => {
+          {isPendingRow(order) && (() => {
             const d = daysSince(order.created_at);
             if (d < 1) return null;
             const tone = d >= 7 ? "bg-rose-50 text-rose-700 border-rose-200"
@@ -488,11 +475,6 @@ function OrderRow({ order, hideMoney, onOpen }: { order: any; hideMoney: boolean
             );
           })()}
         </div>
-      </td>
-      <td className="px-2 py-2.5 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${fulTone}`}>
-          {FULFILLMENT_LABEL[fs]}
-        </span>
       </td>
       <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>
       {!hideMoney && (
