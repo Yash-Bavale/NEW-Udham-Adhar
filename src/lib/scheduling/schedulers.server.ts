@@ -517,11 +517,12 @@ async function fireCustomerClosure(s: {
   // 1. Transition order → CLOSED
   const { data: order, error: oErr } = await supabaseAdmin
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code")
+    .select("id, lead_id, customer_id, order_status, fulfillment_status, application_code")
     .eq("id", s.application_id)
     .maybeSingle();
   if (oErr) throw new Error(oErr.message);
   if (!order) return;
+
 
   // Only close if the order is still in a waiting/hold state (order_status OR
   // fulfillment_status). Modern flow uses fulfillment_status = 'customer_delay'
