@@ -66,7 +66,7 @@ export const listFollowUpsForLead = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const { data: rows, error } = await admin
       .from("follow_ups")
-      .select("id, scheduled_at, reason, assigned_to, is_completed, completed_at, completion_note, created_at")
+      .select("id, scheduled_at, reason, reason_note, assigned_to, is_completed, completed_at, completion_note, created_at")
       .eq("lead_id", data.leadId)
       .order("scheduled_at", { ascending: true });
     if (error) throw new Error(error.message);
