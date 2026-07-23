@@ -283,14 +283,14 @@ async function backfillCommonVariables(
   if (!leadId && !applicationId) return out;
   try {
     type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
-    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null };
+    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null; updated_at?: string | null; closure_reason_id?: string | null; closure_remarks?: string | null; fulfillment_status?: string | null };
     let lead: LeadRow | null = null;
     let app: AppRow | null = null;
 
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, assigned_to, created_at")
+        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
