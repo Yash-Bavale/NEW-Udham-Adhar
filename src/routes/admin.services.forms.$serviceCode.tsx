@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
   Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin, StickyNote,
+  Upload, Loader2,
 } from "lucide-react";
 import {
   getBuilderSchema,
@@ -16,6 +17,9 @@ import {
 } from "@/lib/crm/form-builder.functions";
 import { getSchema as getFallbackSchema } from "@/lib/onboarding/schemas";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/admin/services/forms/$serviceCode")({
   head: () => ({ meta: [{ title: "Form Builder — Admin" }] }),
@@ -405,15 +409,16 @@ function FormBuilderPage() {
               className="w-full rounded-lg border px-3 py-2 text-sm resize-none"
             />
             <div className="grid md:grid-cols-[1fr_220px] gap-2 pt-2 border-t">
-              <label className="block">
-                <div className="text-[11px] font-medium text-slate-600 mb-1">Sample form URL (PDF/link) — shown to customer as a download button</div>
-                <input
+              <div className="block">
+                <div className="text-[11px] font-medium text-slate-600 mb-1">
+                  Sample form file — shown to customer as a download button
+                </div>
+                <SampleFormPicker
+                  serviceCode={serviceCode}
                   value={sampleFormUrl}
-                  onChange={(e) => setSampleFormUrl(e.target.value)}
-                  placeholder="https://…/sample-form.pdf"
-                  className="w-full rounded-md border px-2.5 py-1.5 text-sm font-mono"
+                  onChange={setSampleFormUrl}
                 />
-              </label>
+              </div>
               <label className="block">
                 <div className="text-[11px] font-medium text-slate-600 mb-1">Button label (optional)</div>
                 <input
@@ -425,6 +430,7 @@ function FormBuilderPage() {
               </label>
             </div>
           </div>
+
 
           {/* Tabs */}
           <div className="flex items-center gap-1 border-b">
@@ -905,3 +911,91 @@ function Tf({ label, value, onChange, mono }: { label: string; value: string; on
     </label>
   );
 }
+
+function SampleFormPicker({
+  serviceCode,
+  value,
+  onChange,
+}: {
+  serviceCode: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isUploaded = value.startsWith("/api/public/form-asset/");
+  const fileName = isUploaded ? decodeURIComponent(value.split("/").pop() || "") : "";
+
+  async function handleFile(file: File) {
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("File too large (max 15 MB).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+      const path = `${serviceCode}/${Date.now()}-${safe}`;
+      const { error } = await supabase.storage
+        .from("form-assets")
+        .upload(path, file, { upsert: false, contentType: file.type || undefined });
+      if (error) throw error;
+      onChange(`/api/public/form-asset/${path}`);
+      toast.success("Sample form uploaded.");
+    } catch (e) {
+      toast.error((e as Error).message || "Upload failed.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleFile(f);
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {value ? "Replace file" : "Upload file"}
+        </button>
+        {value && (
+          <>
+            <a
+              href={value}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-indigo-600 hover:underline truncate max-w-[220px]"
+              title={value}
+            >
+              {isUploaded ? fileName : "View current"}
+            </a>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-xs text-slate-500 hover:text-rose-600"
+            >
+              Remove
+            </button>
+          </>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Upload PDF, DOC, or image (max 15 MB). Customers see a download button on the form.
+      </p>
+    </div>
+  );
+}
+
