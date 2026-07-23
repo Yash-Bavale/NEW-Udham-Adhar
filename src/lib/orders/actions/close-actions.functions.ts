@@ -58,10 +58,13 @@ export const closeOrderSystem = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ctx } = await supabaseAdmin
       .from("applications")
-      .select("application_code, lead_id, customers(primary_email, name)")
+      .select("application_code, lead_id, closure_reason_id, closure_remarks, customers(primary_email, name), order_close_reasons:closure_reason_id(label, standard_reply)")
       .eq("id", data.orderId)
       .maybeSingle();
     const email = (ctx as any)?.customers?.primary_email as string | undefined;
+    const reasonLabel = ((ctx as any)?.order_close_reasons?.label as string) || null;
+    let e010Ok = false;
+    let e010Err: string | null = null;
     if (email) {
       try {
         const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
@@ -74,17 +77,36 @@ export const closeOrderSystem = createServerFn({ method: "POST" })
           {
             customerName: ((ctx as any)?.customers?.name as string) || "Customer",
             orderNumber: ((ctx as any)?.application_code as string) || data.orderId.slice(0, 8),
-            reason: data.remarks || "System closure",
+            reason: reasonLabel || data.remarks || "System closure",
             fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
           },
           { applicationId: data.orderId, leadId: ((ctx as any)?.lead_id as string) ?? undefined },
         );
-      } catch (e) {
+        e010Ok = true;
+      } catch (e: any) {
+        e010Err = e?.message ?? String(e);
         console.error("[closeOrderSystem] E010 enqueue failed", e);
       }
+    } else {
+      e010Err = "no_customer_email";
     }
 
-    return { ok: true, order: updated, source: data.source };
+    // Audit trail so a single query answers "was the close+E010 fully processed?"
+    try {
+      await supabaseAdmin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: ((ctx as any)?.lead_id as string) ?? null,
+        event_type: "system_close",
+        new_value: "CLOSED",
+        note: `source=${data.source}; e010=${e010Ok ? "queued" : `failed:${e010Err}`}`,
+        staff_name: "System",
+        staff_role: "system",
+      } as never);
+    } catch (e) {
+      console.error("[closeOrderSystem] audit insert failed", e);
+    }
+
+    return { ok: true, order: updated, source: data.source, e010Queued: e010Ok, e010Error: e010Err };
   });
 
 /**
