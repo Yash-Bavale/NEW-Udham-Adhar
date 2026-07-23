@@ -926,7 +926,7 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     setBusy(true);
     try {
       await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
-      setDate(undefined); setTime("10:00"); setReason("call_back"); setAssignedTo("");
+      setDate(new Date()); setTime("10:00"); setReason("call_back"); setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
       toast.success("Follow-up scheduled");
