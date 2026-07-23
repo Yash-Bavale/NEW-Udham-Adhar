@@ -450,10 +450,10 @@ function LeadsPage() {
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
                       {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       {role.hasAny(["super_admin", "admin"]) && (
                         <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>
                       )}
-                      <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                     </tr>
                     </Fragment>
                   );
