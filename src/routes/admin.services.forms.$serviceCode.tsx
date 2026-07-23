@@ -893,3 +893,91 @@ function Tf({ label, value, onChange, mono }: { label: string; value: string; on
     </label>
   );
 }
+
+function SampleFormPicker({
+  serviceCode,
+  value,
+  onChange,
+}: {
+  serviceCode: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isUploaded = value.startsWith("/api/public/form-asset/");
+  const fileName = isUploaded ? decodeURIComponent(value.split("/").pop() || "") : "";
+
+  async function handleFile(file: File) {
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("File too large (max 15 MB).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
+      const path = `${serviceCode}/${Date.now()}-${safe}`;
+      const { error } = await supabase.storage
+        .from("form-assets")
+        .upload(path, file, { upsert: false, contentType: file.type || undefined });
+      if (error) throw error;
+      onChange(`/api/public/form-asset/${path}`);
+      toast.success("Sample form uploaded.");
+    } catch (e) {
+      toast.error((e as Error).message || "Upload failed.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleFile(f);
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {value ? "Replace file" : "Upload file"}
+        </button>
+        {value && (
+          <>
+            <a
+              href={value}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-indigo-600 hover:underline truncate max-w-[220px]"
+              title={value}
+            >
+              {isUploaded ? fileName : "View current"}
+            </a>
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-xs text-slate-500 hover:text-rose-600"
+            >
+              Remove
+            </button>
+          </>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Upload PDF, DOC, or image (max 15 MB). Customers see a download button on the form.
+      </p>
+    </div>
+  );
+}
+
