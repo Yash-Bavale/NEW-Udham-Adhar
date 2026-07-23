@@ -183,6 +183,141 @@ export const updateLead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const changeLeadService = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      leadId: z.string().uuid(),
+      serviceId: z.string().uuid().optional(),
+      serviceCode: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    await assertRole(supabase, LEAD_WRITE_ROLES);
+    const admin = await getAdmin();
+
+    // 1. Fetch current lead
+    const { data: lead, error: leadErr } = await admin
+      .from("leads")
+      .select("id, lead_code, name, service, service_id, customer_id, base_amount, gst_amount, total_amount")
+      .eq("id", data.leadId)
+      .single();
+
+    if (leadErr || !lead) throw new Error("Lead not found");
+
+    // 2. Fetch target service from services table
+    let svcQuery = admin.from("services").select("id, service_code, service_name, base_amount, gst_amount, total_amount");
+    if (data.serviceId) {
+      svcQuery = svcQuery.eq("id", data.serviceId);
+    } else if (data.serviceCode) {
+      svcQuery = svcQuery.eq("service_code", data.serviceCode);
+    } else {
+      throw new Error("Must provide serviceId or serviceCode");
+    }
+
+    const { data: targetSvc, error: svcErr } = await svcQuery.maybeSingle();
+    if (svcErr || !targetSvc) throw new Error("Target service not found");
+
+    const oldService = lead.service;
+    const newService = targetSvc.service_name;
+    const baseAmount = Number(targetSvc.base_amount);
+    const gstAmount = Number(targetSvc.gst_amount);
+    const totalAmount = Number(targetSvc.total_amount);
+
+    // 3. Update lead DB record instantly
+    const { error: updLeadErr } = await admin
+      .from("leads")
+      .update({
+        service: newService,
+        service_id: targetSvc.id,
+        base_amount: baseAmount,
+        gst_amount: gstAmount,
+        total_amount: totalAmount,
+      })
+      .eq("id", data.leadId);
+
+    if (updLeadErr) throw new Error(updLeadErr.message);
+
+    // 4. Update linked applications record instantly
+    await admin
+      .from("applications")
+      .update({
+        service_id: targetSvc.id,
+      })
+      .eq("lead_id", data.leadId);
+
+    // 5. Expire existing pending payment links for this lead
+    await admin
+      .from("payment_links" as any)
+      .update({ status: "expired" })
+      .eq("lead_id", data.leadId)
+      .eq("status", "pending");
+
+    // 6. Generate fresh new payment link according to new service
+    const txnid = `LNK-${lead.lead_code}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+    const appOrigin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
+    const paymentUrl = `${appOrigin}/payment/${encodeURIComponent(lead.lead_code)}`;
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: newPaymentLink } = await admin
+      .from("payment_links" as any)
+      .insert({
+        lead_id: data.leadId,
+        txnid,
+        payment_url: paymentUrl,
+        amount: totalAmount,
+        status: "pending",
+        expires_at: expiresAt,
+        created_by: context.userId,
+      } as any)
+      .select("id, txnid, payment_url, amount, status")
+      .maybeSingle();
+
+    // 7. Log timeline activity events
+    const [{ data: profile }, { data: roleRows }] = await Promise.all([
+      admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),
+      admin.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    const staff_name = profile?.display_name || profile?.email || "Staff";
+    const staff_role = roleRows?.[0]?.role ?? "staff";
+
+    await admin.from("application_events").insert({
+      lead_id: data.leadId,
+      customer_id: lead.customer_id ?? null,
+      event_type: "service_changed",
+      old_value: oldService ?? "Unknown",
+      new_value: `${newService} (₹${totalAmount})`,
+      created_by: context.userId,
+      staff_name,
+      staff_role,
+    } as never);
+
+    await admin.from("activity_logs").insert({
+      lead_id: data.leadId,
+      user_id: context.userId,
+      activity_type: "service_changed",
+      activity_description: `Service changed from ${oldService ?? "Unknown"} to ${newService} (₹${totalAmount})`,
+    });
+
+    await writeAudit({
+      supabase,
+      entityType: "lead",
+      entityId: data.leadId,
+      action: "change_service",
+      oldValue: lead,
+      newValue: { ...lead, service: newService, service_id: targetSvc.id, total_amount: totalAmount },
+      actorId: context.userId,
+    });
+
+    return {
+      ok: true,
+      serviceName: newService,
+      totalAmount,
+      paymentLink: newPaymentLink,
+    };
+  });
+
 
 export const listLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

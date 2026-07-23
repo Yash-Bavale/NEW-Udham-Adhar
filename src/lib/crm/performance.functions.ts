@@ -21,28 +21,37 @@ export const logLeadContact = createServerFn({ method: "POST" })
       .object({
         leadId: z.string().uuid(),
         channel: ChannelEnum,
-        outcome: OutcomeEnum,
+        outcome: OutcomeEnum.optional(),
+        outcomes: z.array(OutcomeEnum).optional(),
         notes: z.string().max(2000).optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase.from("lead_contact_events").insert({
-      lead_id: data.leadId,
-      user_id: userId,
-      channel: data.channel,
-      outcome: data.outcome,
-      notes: data.notes ?? null,
-    });
-    if (error) throw new Error(error.message);
+    const outcomeList = (data.outcomes && data.outcomes.length > 0)
+      ? data.outcomes
+      : (data.outcome ? [data.outcome] : ["connected"]);
+
+    for (const out of outcomeList) {
+      const { error } = await supabase.from("lead_contact_events").insert({
+        lead_id: data.leadId,
+        user_id: userId,
+        channel: data.channel,
+        outcome: out,
+        notes: data.notes ?? null,
+      });
+      if (error) throw new Error(error.message);
+    }
+
+    const outcomeText = outcomeList.join(", ");
 
     // Mirror into activity_logs so it shows in the lead timeline.
     await supabase.from("activity_logs").insert({
       lead_id: data.leadId,
       user_id: userId,
       activity_type: "contact_logged",
-      activity_description: `${data.channel} • ${data.outcome}${data.notes ? ` — ${data.notes}` : ""}`,
+      activity_description: `${data.channel} • ${outcomeText}${data.notes ? ` — ${data.notes}` : ""}`,
     });
 
     // Mirror into application_events so the Internal Notes & Activity feed shows it.
@@ -57,7 +66,7 @@ export const logLeadContact = createServerFn({ method: "POST" })
         customer_id: lead?.customer_id ?? null,
         event_type: "contact_logged",
         old_value: data.channel,
-        new_value: data.outcome,
+        new_value: outcomeText,
         note: data.notes ?? null,
         created_by: userId,
         staff_name: profile?.display_name || profile?.email || "Staff",
