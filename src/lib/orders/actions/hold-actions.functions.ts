@@ -103,21 +103,28 @@ export const startTechnicalHold = createServerFn({ method: "POST" })
       ]);
       const { data: cust } = await supabaseAdmin
         .from("applications")
-        .select("customers(primary_email, name), application_code, lead_id")
+        .select("customers(primary_email, name), leads:lead_id(email, name), application_code, lead_id")
         .eq("id", data.orderId)
         .maybeSingle();
-      const email = (cust as any)?.customers?.primary_email as string | undefined;
+      const custRow = cust as any;
+      const email =
+        (custRow?.customers?.primary_email as string | undefined) ||
+        (custRow?.leads?.email as string | undefined);
+      const custName =
+        (custRow?.customers?.name as string | undefined) ||
+        (custRow?.leads?.name as string | undefined) ||
+        "Customer";
       if (email) {
         try {
           await enqueueFromTemplateInternal(
             BHS_EMAILS.E005_OUR_SIDE_DELAY,
             email,
             {
-              customerName: ((cust as any)?.customers?.name as string) || "Customer",
-              orderNumber: ((cust as any)?.application_code as string) || data.orderId.slice(0, 8),
+              customerName: custName,
+              orderNumber: (custRow?.application_code as string) || data.orderId.slice(0, 8),
               fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
             },
-            { applicationId: data.orderId, leadId: ((cust as any)?.lead_id as string) ?? undefined },
+            { applicationId: data.orderId, leadId: (custRow?.lead_id as string) ?? undefined, trigger: "manual" },
           );
         } catch (e) {
           console.error("[startTechnicalHold] E005 enqueue failed", e);

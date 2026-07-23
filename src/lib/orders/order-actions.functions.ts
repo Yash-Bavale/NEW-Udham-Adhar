@@ -195,7 +195,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to")
+    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -209,7 +209,20 @@ async function loadOrderContext(supabase: any, orderId: string) {
       .maybeSingle();
     customer = c as any;
   }
-  return { order, customer };
+  // Fall back to the lead record when the customer profile has no email
+  // (leads are the source of truth for that specific order's recipient).
+  let lead: { email: string | null; name: string | null } | null = null;
+  if (order.lead_id && (!customer?.primary_email || !customer?.name)) {
+    const { data: l } = await supabase
+      .from("leads")
+      .select("email, name")
+      .eq("id", order.lead_id)
+      .maybeSingle();
+    lead = l as any;
+  }
+  const recipientEmail = customer?.primary_email || lead?.email || null;
+  const recipientName = customer?.name || lead?.name || "Customer";
+  return { order, customer, lead, recipientEmail, recipientName };
 }
 
 /** Fire-and-forget: notify assignee (+ optional extra roles) about an order event. Never throws. */
@@ -253,6 +266,9 @@ async function queueTemplateEmail(
     await enqueueFromTemplateInternal(templateCode, to, vars, {
       applicationId: refs.applicationId,
       leadId: refs.leadId ?? undefined,
+      // Button-initiated sends are always manual triggers — bypasses the
+      // dispatch_mode='manual' gate that silently drops "auto" attempts.
+      trigger: "manual",
     });
     return true;
   } catch (e) {
@@ -286,7 +302,7 @@ export const sendFormLink = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), transitionToWaiting: z.boolean().default(true) }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const { assertTransitionAllowed } = await import("@/lib/workflow/transition-guard.server");
     assertTransitionAllowed({
       stage: (order as any).order_status,
@@ -296,13 +312,13 @@ export const sendFormLink = createServerFn({ method: "POST" })
     });
     const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
     let emailQueued = false;
-    if (customer?.primary_email) {
+    if (to) {
       const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
       emailQueued = await queueTemplateEmail(
         "welcome_and_form_link",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           formLink: link,
           fromName,
@@ -331,8 +347,11 @@ export const sendFormLink = createServerFn({ method: "POST" })
         order: { id: order.id, application_code: order.application_code, assigned_to: (order as any).assigned_to ?? null },
         kind: "form_link_sent",
         title: `Form link sent for ${order.application_code || order.id.slice(0, 8)}`,
-        body: `Delivered to ${customer?.primary_email}.`,
+        body: `Delivered to ${to}.`,
       });
+    }
+    if (!to) {
+      throw new Error("No email on file for this customer or lead — cannot send form link.");
     }
     return { ok: true, order: updated, emailQueued };
   });
@@ -359,7 +378,7 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), referenceNumber: z.string().max(200).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "SUBMITTED_TO_GOVT", {
       remarks: data.referenceNumber ? `Ref: ${data.referenceNumber}` : null,
     });
@@ -374,12 +393,12 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[markSubmittedToGovt] stamp fulfillment_status failed", e);
     }
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "bhs_e012_submitted_to_govt",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           referenceNumber: data.referenceNumber || "",
           fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
@@ -412,19 +431,19 @@ export const completeOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => z.object({ orderId: z.string().uuid() }).parse(raw))
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "COMPLETED");
     const { cancelAllForOrder, startFeedbackFollowupScheduler } = await import(
       "@/lib/scheduling/schedulers.server"
     );
     await cancelAllForOrder(data.orderId, "completed");
     let emailQueued = false;
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "order_completed",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
         },
@@ -590,7 +609,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     });
     if (!isAdmin) throw new Error("Forbidden: admin required");
 
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
       remarks: `Refund of ₹${data.amount} processed. Ref: ${data.paymentReference}`,
     });
@@ -607,12 +626,12 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .eq("status", "approved");
 
     let emailQueued = false;
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "refund_processed_confirmation",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           refundAmount: `₹${data.amount.toFixed(2)}`,
           paymentReference: data.paymentReference,
@@ -683,13 +702,13 @@ export const sendManualReminder = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), note: z.string().max(1000).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
-    if (!customer?.primary_email) return { ok: false, reason: "no_email" };
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
+    if (!to) return { ok: false, reason: "no_email" };
     const emailQueued = await queueTemplateEmail(
       "bhs_e005_manual_reminder",
-      customer.primary_email,
+      to,
       {
-        customerName: customer.name || "Customer",
+        customerName: name,
         orderNumber: order.application_code || order.id.slice(0, 8),
         message: data.note || "",
         fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",

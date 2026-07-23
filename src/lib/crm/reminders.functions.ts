@@ -67,7 +67,7 @@ export const queueDocumentReminder = createServerFn({ method: "POST" })
           order_number: appCode,
           message: "Please upload the pending documents to continue.",
         },
-        { toName: lead.name ?? undefined, leadId: lead.id, applicationId: applicationId ?? undefined },
+        { toName: lead.name ?? undefined, leadId: lead.id, applicationId: applicationId ?? undefined, trigger: "manual" },
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
