@@ -14,7 +14,8 @@ export const createFollowUp = createServerFn({ method: "POST" })
       .object({
         leadId: z.string().uuid(),
         scheduledAt: z.string().min(1), // ISO string from <input type=datetime-local>
-        reason: z.enum(["call_back", "documents_pending", "refund_followup", "general"]),
+        reason: z.enum(["call_back", "documents_pending", "refund_followup", "general", "other"]),
+        reasonNote: z.string().trim().max(500).optional(),
         assignedTo: z.string().uuid().nullable().optional(),
       })
       .parse(i)
@@ -40,6 +41,7 @@ export const createFollowUp = createServerFn({ method: "POST" })
       application_id: app?.id ?? null,
       scheduled_at: new Date(data.scheduledAt).toISOString(),
       reason: data.reason,
+      reason_note: data.reasonNote?.trim() || null,
       assigned_to: data.assignedTo ?? null,
       created_by: context.userId,
     } as never);
@@ -50,7 +52,7 @@ export const createFollowUp = createServerFn({ method: "POST" })
       .from("leads")
       .update({
         next_followup_at: new Date(data.scheduledAt).toISOString(),
-        followup_note: data.reason,
+        followup_note: data.reasonNote?.trim() || data.reason,
       } as never)
       .eq("id", data.leadId);
 
