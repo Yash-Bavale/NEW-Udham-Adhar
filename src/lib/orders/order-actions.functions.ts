@@ -195,7 +195,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to")
+    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -209,7 +209,20 @@ async function loadOrderContext(supabase: any, orderId: string) {
       .maybeSingle();
     customer = c as any;
   }
-  return { order, customer };
+  // Fall back to the lead record when the customer profile has no email
+  // (leads are the source of truth for that specific order's recipient).
+  let lead: { email: string | null; name: string | null } | null = null;
+  if (order.lead_id && (!customer?.primary_email || !customer?.name)) {
+    const { data: l } = await supabase
+      .from("leads")
+      .select("email, name")
+      .eq("id", order.lead_id)
+      .maybeSingle();
+    lead = l as any;
+  }
+  const recipientEmail = customer?.primary_email || lead?.email || null;
+  const recipientName = customer?.name || lead?.name || "Customer";
+  return { order, customer, lead, recipientEmail, recipientName };
 }
 
 /** Fire-and-forget: notify assignee (+ optional extra roles) about an order event. Never throws. */
