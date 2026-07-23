@@ -347,7 +347,7 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                
+                <th className="text-left font-medium px-2 py-2.5">Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Assigned</th>
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
                 <th className="px-2 py-2.5" />
