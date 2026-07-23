@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, notFound } from "@tanstack/react-router";
-import { setResponseStatus } from "@tanstack/react-start/server";
+import { createIsomorphicFn } from "@tanstack/react-start";
 import { getArticleBySlug } from "@/lib/seo-articles.functions";
 import {
   ArticlePageLayout,
@@ -9,6 +9,16 @@ import {
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
 import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
+
+const setGoneStatus = createIsomorphicFn()
+  .client(() => {})
+  .server(() => {
+    // Lazy import so client bundle never sees the server-only module.
+    void import("@tanstack/react-start/server").then(({ setResponseStatus }) =>
+      setResponseStatus(410),
+    );
+  });
+
 
 
 // Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
@@ -82,7 +92,7 @@ export const Route = createFileRoute("/$")({
     // 410 Gone for retired legacy paths — check BEFORE multi-segment handoff
     // so /wp-content/*, /feed/*, /category/* return 410 instead of redirecting.
     if (isGone(lower) || isGone(firstSeg)) {
-      setResponseStatus(410);
+      setGoneStatus();
       return { gone: true as const };
     }
 
