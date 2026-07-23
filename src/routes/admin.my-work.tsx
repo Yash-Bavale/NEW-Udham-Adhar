@@ -43,7 +43,7 @@ function MyWorkPage() {
   const cards = useMemo(
     () => {
       const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string>; show: boolean }> = [
-        { label: "Orders Received", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
+        { label: "Paid Orders", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
         { label: "Total Leads", value: counters?.totalLeads ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/leads", search: { assignee: "me" }, show: canLeads },
         { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" }, show: canLeads },
         { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications", show: true },
@@ -61,8 +61,8 @@ function MyWorkPage() {
   const OrdersSection = canOrders ? (
     <Section
       key="orders"
-      title="Next-best actions"
-      subtitle="Fresh orders with no action yet — shown first"
+      title="Paid orders — process now"
+      subtitle="Payment received. Start the fulfillment workflow."
       empty="No assigned orders — you're clear."
       href="/admin/orders"
     >
@@ -95,7 +95,7 @@ function MyWorkPage() {
                   className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
                   style={{ background: "#F97316", color: "white" }}
                 >
-                  Act now
+                  Start now
                 </span>
               )}
               <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
