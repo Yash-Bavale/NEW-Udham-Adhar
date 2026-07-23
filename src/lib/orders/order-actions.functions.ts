@@ -302,7 +302,7 @@ export const sendFormLink = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), transitionToWaiting: z.boolean().default(true) }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const { assertTransitionAllowed } = await import("@/lib/workflow/transition-guard.server");
     assertTransitionAllowed({
       stage: (order as any).order_status,
@@ -312,11 +312,6 @@ export const sendFormLink = createServerFn({ method: "POST" })
     });
     const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
     let emailQueued = false;
-    const { recipientEmail, recipientName } = { recipientEmail: (customer?.primary_email || (order as any).lead?.email || null) as string | null, recipientName: (customer?.name || "Customer") as string };
-    // Use combined recipient (customer profile → lead fallback) built by loadOrderContext.
-    const _ctx = await loadOrderContext(context.supabase, data.orderId);
-    const to = _ctx.recipientEmail;
-    const name = _ctx.recipientName;
     if (to) {
       const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
       emailQueued = await queueTemplateEmail(
