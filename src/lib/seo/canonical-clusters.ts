@@ -52,7 +52,6 @@ export const CANONICAL_CLUSTERS: Record<string, string> = {
   "udyam-certificate-apply": "udyam-certificate",
   "udyam-certificate-apply-online": "udyam-certificate",
   "udyog-aadhar-certificate": "udyam-certificate",
-  "aadhar-udyam-certificate": "udyam-certificate",
 
   // ── Cluster: /download-udyam-certificate (download + print + reprint) ──
   "print-udyam-certificate": "download-udyam-certificate",
