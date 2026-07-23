@@ -1445,6 +1445,7 @@ export type Database = {
           is_completed: boolean | null
           lead_id: string | null
           reason: string
+          reason_note: string | null
           scheduled_at: string
         }
         Insert: {
@@ -1459,6 +1460,7 @@ export type Database = {
           is_completed?: boolean | null
           lead_id?: string | null
           reason: string
+          reason_note?: string | null
           scheduled_at: string
         }
         Update: {
@@ -1473,6 +1475,7 @@ export type Database = {
           is_completed?: boolean | null
           lead_id?: string | null
           reason?: string
+          reason_note?: string | null
           scheduled_at?: string
         }
         Relationships: [

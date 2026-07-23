@@ -36,8 +36,9 @@ export function LogContactDialog({
   const m = useMutation({
     mutationFn: () => fn({ data: { leadId, channel, outcome, notes: notes.trim() || undefined } }),
     onSuccess: () => {
-      toast.success("Contact logged");
+      toast.success("Feedback saved");
       qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-contact-events", leadId] });
       qc.invalidateQueries({ queryKey: ["perf.me"] });
       setNotes("");
       onOpenChange(false);

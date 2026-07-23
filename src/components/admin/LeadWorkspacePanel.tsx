@@ -54,6 +54,7 @@ import { createPaymentLink, getPaymentLinkStatusForLead } from "@/lib/payments/p
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { LogContactDialog } from "./LogContactDialog";
+import { listContactEvents } from "@/lib/crm/performance.functions";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
@@ -533,6 +534,7 @@ function QuickActionsCard({
           Add Customer Feedback
         </Button>
         <LogContactDialog leadId={lead.id} open={logOpen} onOpenChange={setLogOpen} />
+        <FeedbackList leadId={lead.id} />
 
         <>
           <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
@@ -595,7 +597,87 @@ function QuickActionsCard({
   );
 }
 
-/* ------------------- Status Control Panel ------------------- */
+/* ------------------- Feedback List (recent contact feedback) ------------------- */
+
+const OUTCOME_LABEL: Record<string, string> = {
+  connected: "Connected",
+  no_answer: "No answer",
+  wrong_number: "Wrong number",
+  not_interested: "Not interested",
+  callback: "Callback scheduled",
+  converted_intent: "Ready to pay",
+  sent: "Message sent",
+};
+
+const OUTCOME_TONE: Record<string, string> = {
+  connected: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  callback: "bg-amber-50 text-amber-700 border-amber-200",
+  converted_intent: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  sent: "bg-sky-50 text-sky-700 border-sky-200",
+  no_answer: "bg-slate-50 text-slate-700 border-slate-200",
+  wrong_number: "bg-rose-50 text-rose-700 border-rose-200",
+  not_interested: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+function FeedbackList({ leadId }: { leadId: string }) {
+  const fn = useServerFn(listContactEvents);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.lead-contact-events", leadId],
+    queryFn: () => fn({ data: { leadId } }),
+  });
+  const rows = data?.rows ?? [];
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? rows : rows.slice(0, 3);
+
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+          Recent Feedback {rows.length > 0 && <span className="text-slate-400">({rows.length})</span>}
+        </div>
+        {rows.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[11px] text-indigo-600 hover:text-indigo-700"
+          >
+            {expanded ? "Show less" : `Show all`}
+          </button>
+        )}
+      </div>
+      {isLoading ? (
+        <div className="text-[11px] text-slate-400">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="text-[11px] text-slate-400 italic">
+          No feedback logged yet. Use “Add Customer Feedback” to record a call or note.
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {visible.map((r: any) => (
+            <li key={r.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-2 text-[11px]">
+              <div className="flex items-center flex-wrap gap-1.5">
+                <span className="px-1.5 py-0.5 rounded border bg-white text-slate-700 capitalize text-[10px] font-medium">
+                  {r.channel}
+                </span>
+                <span
+                  className={`px-1.5 py-0.5 rounded border text-[10px] font-medium ${OUTCOME_TONE[r.outcome] ?? "bg-slate-50 text-slate-700 border-slate-200"}`}
+                >
+                  {OUTCOME_LABEL[r.outcome] ?? r.outcome}
+                </span>
+                <span className="ml-auto text-slate-500 tabular-nums">{formatIST(r.created_at)}</span>
+              </div>
+              {r.notes && (
+                <div className="mt-1 text-slate-700 whitespace-pre-wrap leading-snug">{r.notes}</div>
+              )}
+              <div className="mt-0.5 text-[10px] text-slate-400">by {r.staff_name}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 
 function StatusControlPanel({ lead, currentStatus }: { lead: LeadShape; currentStatus: LeadStatusV2 }) {
   const qc = useQueryClient();
@@ -996,7 +1078,8 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
 
   const [date, setDate] = useState<Date | undefined>(() => new Date());
   const [time, setTime] = useState<string>("10:00");
-  const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general">("call_back");
+  const [reason, setReason] = useState<"call_back" | "documents_pending" | "refund_followup" | "general" | "other">("call_back");
+  const [reasonNote, setReasonNote] = useState<string>("");
   const [assignedTo, setAssignedTo] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
@@ -1026,10 +1109,11 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
     }
     setBusy(true);
     try {
-      await createFn({ data: { leadId, scheduledAt, reason, assignedTo: assignedTo || null } });
+      await createFn({ data: { leadId, scheduledAt, reason, reasonNote: reasonNote.trim() || undefined, assignedTo: assignedTo || null } });
       setDate(new Date());
       setTime("10:00");
       setReason("call_back");
+      setReasonNote("");
       setAssignedTo("");
       qc.invalidateQueries({ queryKey: ["admin.followups", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
@@ -1109,8 +1193,24 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
             <option value="documents_pending">Documents Pending</option>
             <option value="refund_followup">Refund Follow-up</option>
             <option value="general">General</option>
+            <option value="other">Other</option>
           </select>
         </div>
+
+        <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+          <Label className="text-[11px] text-slate-500">
+            Additional note (optional)
+          </Label>
+          <Input
+            value={reasonNote}
+            onChange={(e) => setReasonNote(e.target.value)}
+            placeholder={reason === "other" ? "Describe the reason…" : "Any extra context for this follow-up"}
+            className="text-xs h-8"
+            maxLength={500}
+          />
+        </div>
+
+
 
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
