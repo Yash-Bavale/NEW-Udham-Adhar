@@ -194,7 +194,21 @@ export const Route = createFileRoute("/$")({
 });
 
 function ArticleRoute() {
-  const { article, related } = Route.useLoaderData();
+  const data = Route.useLoaderData() as any;
+  if (data?.gone) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">410 — Gone</h1>
+        <p className="mt-4 text-muted-foreground">
+          This page has been permanently removed.
+        </p>
+        <a href="/" className="mt-6 inline-block text-primary underline">
+          Return to homepage
+        </a>
+      </div>
+    );
+  }
+  const { article, related } = data;
   const sections = (Array.isArray(article.sections) ? article.sections : []) as ArticleSection[];
   const faq = (Array.isArray(article.faq) ? article.faq : []) as ArticleFaq[];
   return (
