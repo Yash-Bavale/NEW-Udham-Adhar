@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
+
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteShell } from "../components/site/SiteShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -108,13 +108,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "preload", as: "image", href: certImg.url, fetchpriority: "high" },
       { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+      // Preconnect to third-party origins used site-wide so DNS/TLS handshake
+      // for async gtag + CDN assets happens in parallel with HTML parse.
+      { rel: "preconnect", href: "https://www.googletagmanager.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://www.google-analytics.com", crossOrigin: "anonymous" },
+      { rel: "dns-prefetch", href: "https://www.googletagmanager.com" },
+      { rel: "dns-prefetch", href: "https://www.google-analytics.com" },
     ],
 
     scripts: [
-      // GA is loaded lazily on idle from RootComponent to keep the critical
-      // path light (PageSpeed/Core Web Vitals).
+      // GA/Ads gtag is injected from RootComponent after first paint (idle
+      // callback) to keep the critical path light for Core Web Vitals.
     ],
 
   }),
@@ -128,35 +133,30 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Google tag (gtag.js) — GA4 + Google Ads share one dataLayer */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM" />
+        {/* gtag (GA4 + Google Ads) is loaded from RootComponent after first
+            paint via requestIdleCallback — see effect below. */}
         <script dangerouslySetInnerHTML={{
           __html: `
             window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
+            function gtag(){window.dataLayer.push(arguments);}
+            window.gtag = gtag;
             gtag('js', new Date());
             gtag('config', 'G-62JC7PRPMM');
             gtag('config', 'AW-18336340451');
-          `
-        }} />
-
-        <script dangerouslySetInnerHTML={{
-          __html: `
             function gtag_report_conversion(url) {
               var callback = function () {
-                if (typeof(url) != 'undefined') {
-                  window.location = url;
-                }
+                if (typeof(url) != 'undefined') { window.location = url; }
               };
               gtag('event', 'conversion', {
-                  'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
-                  'event_callback': callback
+                'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
+                'event_callback': callback
               });
               return false;
             }
+            window.gtag_report_conversion = gtag_report_conversion;
           `
         }} />
-        
+
         <HeadContent />
       </head>
       <body>
@@ -192,10 +192,25 @@ function RootComponent() {
   }, [router, queryClient]);
 
 
-  // GA4 is loaded eagerly via the standard gtag snippet in RootShell so that
-  // page_view fires on first paint. No lazy loader here — the old idle loader
-  // pushed `args` (array) instead of `arguments`, so GA4 never registered the
-  // config command and Realtime stayed empty even though the tag "verified".
+  // Load gtag.js after first paint via requestIdleCallback so it never
+  // competes with LCP. dataLayer + config commands are already queued in
+  // RootShell, so once the script hydrates it replays them in order.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (document.querySelector('script[data-gtag="1"]')) return;
+    const load = () => {
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = "https://www.googletagmanager.com/gtag/js?id=G-62JC7PRPMM";
+      s.setAttribute("data-gtag", "1");
+      document.head.appendChild(s);
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    if (typeof ric === "function") ric(load, { timeout: 4000 });
+    else setTimeout(load, 2500);
+  }, []);
+
+
 
 
 
