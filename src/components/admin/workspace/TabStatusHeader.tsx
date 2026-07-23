@@ -10,22 +10,15 @@ import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { relativeIST } from "@/lib/datetime";
 import { NEXT_STEP_HINT } from "@/lib/orders/order-actions-map";
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
-import {
-  FULFILLMENT_CODE, labelForFulfillment,
-  type FulfillmentStatus,
-} from "@/lib/crm/fulfillment-transitions";
+import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
-const TERMINAL_FS = new Set<string>([
-  "order_completed", "completed", "order_closed", "cancelled",
-  "application_rejected", "certificate_rejected",
-]);
+const TERMINAL_STAGES = new Set<OrderStage>(["closed", "refunded", "completed"]);
 
 export function TabStatusHeader({
   applicationCode,
   orderStatus,
   stage,
   updatedAt,
-  fulfillmentStatus,
 }: {
   applicationCode: string;
   orderStatus: OrderStatus | null;
@@ -33,8 +26,11 @@ export function TabStatusHeader({
   updatedAt: string | null | undefined;
   fulfillmentStatus?: FulfillmentStatus | string | null;
 }) {
+  // Single source of truth for the current stage label: computeOrderStage → STAGE_META.
+  // Do NOT read fulfillment_status directly here — it drifts from the Orders table pill.
   const meta = STAGE_META[stage];
   const hint = orderStatus ? NEXT_STEP_HINT[orderStatus] : null;
+  const isTerminal = TERMINAL_STAGES.has(stage);
 
   const pillCls =
     meta.side === "exception"
@@ -47,28 +43,14 @@ export function TabStatusHeader({
             ? "bg-amber-50 text-amber-800 ring-amber-200"
             : "bg-sky-50 text-sky-700 ring-sky-200";
 
-  // Single source of truth: display ONE stage pill only. When a fulfillment
-  // stage is available (S01–S12), prefer its label because it's more granular
-  // than the OrderStage bucket. Otherwise fall back to STAGE_META.
-  const fs = fulfillmentStatus as FulfillmentStatus | undefined;
-  const sCode = fs ? FULFILLMENT_CODE[fs] : null;
-  const sLabel = fs ? labelForFulfillment(fs) : null;
-  const isTerminal = fs ? TERMINAL_FS.has(fs) : false;
-  const displayLabel = sLabel || meta.label;
-  const displayPillCls = isTerminal
-    ? "bg-rose-50 text-rose-700 ring-rose-200"
-    : pillCls;
-
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm flex flex-wrap items-center gap-x-4 gap-y-1.5">
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${displayPillCls}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${pillCls}`}
         title={isTerminal ? "Terminal stage" : "Current stage"}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-        {sCode && <span className="font-mono opacity-70">{sCode}</span>}
-        {sCode && <span className="opacity-50">·</span>}
-        <span>{displayLabel}</span>
+        <span>{meta.label}</span>
         {isTerminal && (
           <span className="ml-1 rounded-sm bg-black/10 px-1 text-[9px] font-bold uppercase tracking-wider">Terminal</span>
         )}
