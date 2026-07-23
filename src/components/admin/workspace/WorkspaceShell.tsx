@@ -411,7 +411,7 @@ export function WorkspaceShell(p: Props) {
                 {paymentStatus}
               </span>
             </HeaderMeta>
-            <HeaderMeta label="Order Status">
+            <HeaderMeta label="Current Stage">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
                 <span className="font-mono text-[10px] opacity-70">{FULFILLMENT_CODE[current] ?? ""}</span>
                 {labelForFulfillment(current) || FULFILLMENT_LABEL[current] || meta.label}
