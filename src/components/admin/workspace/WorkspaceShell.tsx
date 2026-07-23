@@ -47,7 +47,7 @@ import { RefundRequestDialog } from "@/components/admin/RefundRequestDialog";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
-import { FULFILLMENT_LABEL, FULFILLMENT_CODE, labelForFulfillment } from "@/lib/crm/fulfillment-transitions";
+// Fulfillment mapping utilities still used by tab-scoped panels (not for the header pills).
 
 import type { OrderStatus } from "@/lib/orders/order-status.functions";
 import {
@@ -412,9 +412,9 @@ export function WorkspaceShell(p: Props) {
               </span>
             </HeaderMeta>
             <HeaderMeta label="Current Stage">
+              {/* Single source of truth — computeOrderStage → STAGE_META */}
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
-                <span className="font-mono text-[10px] opacity-70">{FULFILLMENT_CODE[current] ?? ""}</span>
-                {labelForFulfillment(current) || FULFILLMENT_LABEL[current] || meta.label}
+                {meta.label}
               </span>
             </HeaderMeta>
 
@@ -907,7 +907,7 @@ export function WorkspaceShell(p: Props) {
                     }
                   />
                   <SummaryRow label="Last Updated" value={<span className="text-xs">{formatIST(application.updated_at ?? application.created_at)}</span>} />
-                  <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{FULFILLMENT_CODE[current] ?? ""} · {labelForFulfillment(current)}</span>} />
+                  <SummaryRow label="Current Stage" value={<span className={`text-xs font-semibold ${meta.side === "exception" ? "text-rose-600" : "text-indigo-600"}`}>{meta.label}</span>} />
                 </dl>
               </div>
             </aside>

@@ -1,5 +1,9 @@
-// Single source of truth for the unified Order Workspace stage.
-// Pure, client-safe. Derived from real DB columns — no new status field added.
+// SINGLE SOURCE OF TRUTH for the "current stage" label shown to users.
+// Every UI surface that displays an order's current stage (Orders table pill,
+// WorkspaceShell "Current Stage", Customer Journey "Current") MUST read from
+// computeOrderStage(lead, application) and render STAGE_META[stage].label.
+// Do NOT map fulfillment_status → label directly in components — that path
+// drifts and produces inconsistent stage names across surfaces.
 
 import { isUnconvertedConsultationLead } from "./consultation";
 
