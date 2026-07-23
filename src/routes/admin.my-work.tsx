@@ -43,9 +43,9 @@ function MyWorkPage() {
   const cards = useMemo(
     () => {
       const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string>; show: boolean }> = [
-        { label: "Paid Orders", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
         { label: "Total Leads", value: counters?.totalLeads ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/leads", search: { assignee: "me" }, show: canLeads },
-        { label: "Active leads · not contacted", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" }, show: canLeads },
+        { label: "Orders", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
+        { label: "Active Leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" }, show: canLeads },
         { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications", show: true },
       ];
       if (isAdmin) {
@@ -128,22 +128,21 @@ function MyWorkPage() {
         const overdue3h = ageMs > 3 * 3600 * 1000;
         const overdue1h = !overdue3h && ageMs > 1 * 3600 * 1000;
         const tone = overdue3h
-          ? { bg: "rgba(239,68,68,0.10)", border: "rgba(239,68,68,0.45)", fg: "#EF4444", label: "3h+" }
+          ? { fg: "#EF4444", label: "3h+" }
           : overdue1h
-          ? { bg: "rgba(245,158,11,0.10)", border: "rgba(245,158,11,0.45)", fg: "#F59E0B", label: "1h+" }
+          ? { fg: "#F59E0B", label: "1h+" }
           : null;
         return (
           <Link
             key={l.id}
             to="/admin/leads/$leadId"
             params={{ leadId: l.id }}
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm border"
-            style={tone ? { background: tone.bg, borderColor: tone.border } : { borderColor: "transparent" }}
+            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[var(--admin-surface-2)] transition-colors text-sm border border-transparent"
           >
             {tone && (
               <span
-                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
-                style={{ background: tone.fg, color: "white" }}
+                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded text-white"
+                style={{ background: tone.fg }}
               >
                 {tone.label}
               </span>
@@ -151,7 +150,7 @@ function MyWorkPage() {
             <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}>
               {l.lead_code ?? l.id.slice(0, 8)}
             </code>
-            <span className="font-medium truncate flex-1" style={{ color: tone ? tone.fg : "var(--admin-fg)" }}>{l.name}</span>
+            <span className="font-medium truncate flex-1" style={{ color: "var(--admin-fg)" }}>{l.name}</span>
             <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--admin-fg-muted)" }}>{l.service}</span>
             <StatusPill status={l.status} />
             <span className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>{formatRelative(l.created_at)}</span>
