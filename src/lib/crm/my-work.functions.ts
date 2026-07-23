@@ -122,6 +122,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
         orderReceived: apps.filter((a) => ACT_NOW_STATUSES.includes(a.fulfillment_status ?? "order_received")).length,
         pendingDocs: docs.length,
         assignedLeads: leads.length,
+        totalLeads: totalLeadsRes.count ?? 0,
         unreadNotifications: notifRes.count ?? 0,
         slaRisk,
       },
