@@ -378,7 +378,7 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), referenceNumber: z.string().max(200).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { order, customer } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "SUBMITTED_TO_GOVT", {
       remarks: data.referenceNumber ? `Ref: ${data.referenceNumber}` : null,
     });
@@ -393,12 +393,12 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[markSubmittedToGovt] stamp fulfillment_status failed", e);
     }
-    if (customer?.primary_email) {
+    if (to) {
       emailQueued = await queueTemplateEmail(
         "bhs_e012_submitted_to_govt",
-        customer.primary_email,
+        to,
         {
-          customerName: customer.name || "Customer",
+          customerName: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
           referenceNumber: data.referenceNumber || "",
           fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
