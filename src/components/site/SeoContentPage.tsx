@@ -391,11 +391,12 @@ export function buildSeoJsonLd(data: SeoPageData): string {
   graph.push({
     "@type": "Organization",
     "@id": "https://udyamadhar.in/#organization",
-    name: "Udyamadhar",
+    name: "Udyam Aadhar",
+    alternateName: "Udyamadhar",
     url: "https://udyamadhar.in/",
     logo: "https://udyamadhar.in/favicon.ico",
     description:
-      "Udyamadhar is a private MSME and Udyam Registration consultancy assisting Indian small businesses.",
+      "Udyam Aadhar is a private MSME and Udyam Registration consultancy assisting Indian small businesses.",
   });
 
   graph.push({
