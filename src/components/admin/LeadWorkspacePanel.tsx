@@ -1193,8 +1193,21 @@ function FollowUpScheduler({ leadId, staff }: { leadId: string; staff: Staff[] }
             <option value="documents_pending">Documents Pending</option>
             <option value="refund_followup">Refund Follow-up</option>
             <option value="general">General</option>
+            <option value="other">Other</option>
           </select>
         </div>
+
+        <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+          <Label className="text-[11px] text-slate-500">
+            Additional note (optional)
+          </Label>
+          <Input
+            value={reasonNote}
+            onChange={(e) => setReasonNote(e.target.value)}
+            placeholder={reason === "other" ? "Describe the reason…" : "Any extra context for this follow-up"}
+            className="text-xs h-8"
+            maxLength={500}
+          />
 
         <div className="space-y-1">
           <Label className="text-[11px] text-slate-500">{canAssign ? "Assign to" : "Action"}</Label>
