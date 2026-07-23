@@ -376,8 +376,6 @@ function QuickActionsCard({
 
   const toggleContacted = async () => {
     const next = currentStatus === "contacted" ? "new_lead" : "contacted";
-    // Pre-open a blank tab synchronously to avoid popup blockers when moving to contacted
-    const waWin = next === "contacted" && number ? window.open("about:blank", "_blank") : null;
     setContactBusy(true);
     try {
       await transitionFn({ data: { leadId: lead.id, toStatus: next } });
@@ -385,11 +383,15 @@ function QuickActionsCard({
       qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
-      if (next === "contacted" && introWaUrl) openWhatsApp(introWaUrl, waWin);
     } catch (e: any) {
-      if (waWin) waWin.close();
       toast.error(e?.message ?? "Failed");
     } finally { setContactBusy(false); }
+  };
+
+  const contactOnWhatsApp = () => {
+    if (!number) { toast.error("Add a mobile number first"); return; }
+    if (!introWaUrl) return;
+    openWhatsApp(introWaUrl);
   };
 
   const ensurePaymentUrl = async (): Promise<string | null> => {
