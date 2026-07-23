@@ -412,9 +412,9 @@ export function WorkspaceShell(p: Props) {
               </span>
             </HeaderMeta>
             <HeaderMeta label="Current Stage">
+              {/* Single source of truth — computeOrderStage → STAGE_META */}
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
-                <span className="font-mono text-[10px] opacity-70">{FULFILLMENT_CODE[current] ?? ""}</span>
-                {labelForFulfillment(current) || FULFILLMENT_LABEL[current] || meta.label}
+                {meta.label}
               </span>
             </HeaderMeta>
 
