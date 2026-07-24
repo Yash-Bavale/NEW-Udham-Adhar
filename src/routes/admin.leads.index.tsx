@@ -85,8 +85,9 @@ function LeadsPage() {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data.user?.id ?? "";
       setCurrentUserId(uid);
-      // If user is not an admin, default assignee to current user ID
-      if (uid && !defaultApplied && !role.hasAny(["super_admin", "admin"])) {
+      if (role.hasAny(["super_admin", "admin"])) {
+        setAssignee("");
+      } else if (uid && !defaultApplied) {
         setAssignee(uid);
       }
     });

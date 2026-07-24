@@ -44,9 +44,9 @@ function MyWorkPage() {
   const cards = useMemo(
     () => {
       const base: Array<{ label: string; value: number; icon: any; accent: string; to: string; search?: Record<string, string>; show: boolean }> = [
-        { label: "Total Leads", value: counters?.totalLeads ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/leads", search: { assignee: "me" }, show: canLeads },
-        { label: "Orders", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: { assignee: "me", fulfillment: "order_received" }, show: canOrders },
-        { label: "Active Leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: { assignee: "me", status: "new_lead" }, show: canLeads },
+        { label: "Total Leads", value: counters?.totalLeads ?? 0, icon: Inbox, accent: "var(--admin-accent)", to: "/admin/leads", search: isAdmin ? undefined : { assignee: "me" }, show: canLeads },
+        { label: "Orders", value: counters?.orderReceived ?? 0, icon: PackageOpen, accent: "#F97316", to: "/admin/orders", search: isAdmin ? { fulfillment: "order_received" } : { assignee: "me", fulfillment: "order_received" }, show: canOrders },
+        { label: "Active Leads", value: counters?.assignedLeads ?? 0, icon: Sparkles, accent: "var(--admin-success)", to: "/admin/leads", search: isAdmin ? { status: "new_lead" } : { assignee: "me", status: "new_lead" }, show: canLeads },
         { label: "Unread notifications", value: counters?.unreadNotifications ?? 0, icon: Bell, accent: "var(--admin-accent)", to: "/admin/notifications", show: true },
       ];
       if (isAdmin) {
