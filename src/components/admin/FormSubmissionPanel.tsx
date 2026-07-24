@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   StickyNote,
   MessageCircle,
+  ExternalLink,
 } from "lucide-react";
 import {
   getFormSubmissionForApplication,
@@ -302,44 +303,23 @@ export function FormSubmissionPanel({
           {statusPill}
         </div>
         <div className="flex items-center gap-2">
-          {submission && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs"
-              onClick={async () => {
-                // "Copy All Details" — flat text dump of all submitted fields
-                // grouped by section, easy to paste into WhatsApp/email.
-                const lines: string[] = [];
-                lines.push(`Lead: ${lead?.name ?? "—"} (${lead?.lead_code ?? "—"})`);
-                if (lead?.mobile) lines.push(`Mobile: ${lead.mobile}`);
-                if (lead?.email)  lines.push(`Email: ${lead.email}`);
-                lines.push("");
-                for (const section of sections) {
-                  const visible = section.fields.filter((f) => {
-                    const v = formData[f.key];
-                    return v !== undefined && v !== null && String(v).trim() !== "";
-                  });
-                  if (!visible.length) continue;
-                  lines.push(`— ${section.label} —`);
-                  for (const f of visible) lines.push(`${f.label}: ${mask(f.key, formData[f.key])}`);
-                  lines.push("");
-                }
-                if (extras.length) {
-                  lines.push("— Other —");
-                  for (const k of extras) lines.push(`${k.replace(/_/g, " ")}: ${mask(k, formData[k])}`);
-                }
-                try {
-                  await navigator.clipboard.writeText(lines.join("\n").trim());
-                  toast.success("All details copied to clipboard");
-                } catch {
-                  toast.error("Clipboard blocked by browser");
-                }
-              }}
-            >
-              <Copy className="size-3.5 mr-1.5" /> Copy All Details
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!service?.govt_portal_url}
+            className="h-8 text-xs border-indigo-100 text-indigo-700 hover:bg-indigo-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title={service?.govt_portal_url ? "Open the government portal for this service" : "No government portal URL configured"}
+            onClick={() => {
+              if (service?.govt_portal_url) {
+                window.open(service.govt_portal_url, "_blank", "noopener,noreferrer");
+              } else {
+                toast.error("No government portal URL set for this service");
+              }
+            }}
+          >
+            <ExternalLink className="size-3.5 mr-1.5" /> Govt. Portal
+          </Button>
+
           {formLink && (
             <Button size="sm" variant="outline" onClick={handleCopy} disabled={isLocked} className="h-8 text-xs">
               <Copy className="size-3.5 mr-1.5" /> Copy link
@@ -366,7 +346,7 @@ export function FormSubmissionPanel({
               }}
             >
               <MessageCircle className="size-3.5 mr-1.5 text-emerald-600" />
-              Send on WhatsApp
+              Send form link on whatsapp
             </Button>
           )}
           {lead?.id && (
@@ -383,7 +363,7 @@ export function FormSubmissionPanel({
               ) : (
                 <Mail className="size-3.5 mr-1.5" />
               )}
-              Resend form link
+              Send form link on Email
             </Button>
           )}
         </div>
