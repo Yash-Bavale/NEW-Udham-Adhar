@@ -183,6 +183,13 @@ function DeltaPill({ d }: { d: { pct: number; up: boolean } | null }) {
   );
 }
 
+function parseHref(href: string): { path: string; search: Record<string, string> } {
+  const [path, qs] = href.split("?");
+  const search: Record<string, string> = {};
+  if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
+  return { path, search };
+}
+
 function StatChip({
   label, value, tone, href,
 }: {
@@ -191,6 +198,7 @@ function StatChip({
   tone: "emerald" | "rose" | "amber" | "sky" | "slate" | "indigo" | "violet" | "teal";
   href?: string;
 }) {
+  const navigate = useNavigate();
   const cls: Record<string, string> = {
     emerald: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
     rose: "text-rose-700 bg-rose-50 hover:bg-rose-100",
@@ -209,14 +217,15 @@ function StatChip({
   );
   const base = `inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`;
   if (href) {
+    const { path, search } = parseHref(href);
     return (
-      <a
-        href={href}
-        onClick={(e) => e.stopPropagation()}
-        className={`${base} transition-colors`}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate({ to: path as never, search: search as never }); }}
+        className={`${base} transition-colors cursor-pointer`}
       >
         {body}
-      </a>
+      </button>
     );
   }
   return <span className={base}>{body}</span>;
