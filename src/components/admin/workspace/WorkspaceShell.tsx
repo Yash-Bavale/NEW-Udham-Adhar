@@ -819,7 +819,7 @@ export function WorkspaceShell(p: Props) {
                           </Tooltip>
                         );
                       })}
-                    })()}
+                    })}
                   </div>
                 </div>
 
