@@ -250,8 +250,11 @@ function ModernKpi({
     </div>
   );
   if (href) {
+    const [path, qs] = href.split("?");
+    const search: Record<string, string> = {};
+    if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
     return (
-      <Link to={href} className="block h-full">{inner}</Link>
+      <Link to={path as never} search={search as never} className="block h-full">{inner}</Link>
     );
   }
   return inner;
