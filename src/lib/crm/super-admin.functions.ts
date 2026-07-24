@@ -116,12 +116,51 @@ export type SuperAdminOverview = {
     emailQueueDepth: number;
     totalCustomers: number;
     activeStaff: number;
-    conversionRate: number; // paid leads / total leads inside the range
+    conversionRate: number;
     repeatedLeads: number;
     avgOrderValue: number;
   };
+  /** v2 executive metrics — used by the modern KPI grid. */
+  metrics: {
+    uniqueLeads: number;
+    uniqueLeadsPrev: number;
+    leadsNotContacted: number;
+    leadsConvertedAfterContact: number;
+    paidOrders: number;
+    paidOrdersPrev: number;
+    paidOrdersPending: number;
+    paidOrdersClosed: number;
+    technicalDelay: number;
+    customerDelay: number;
+    formNotSubmitted: number;
+    ordersDelayed3d: number;
+    ordersDelayed7d: number;
+    ticketsRaised: number;
+    ticketsRaisedPrev: number;
+    ticketsClosed: number;
+    ticketsPending3d: number;
+    refundAccepted: number;
+    refundRejected: number;
+    emailSent: number;
+    emailQueued: number;
+    emailFailed: number;
+    staffTotal: number;
+    staffActiveToday: number;
+    staffInactive: number;
+    ordersNotContacted3h: number;
+    ordersNotContacted5h: number;
+    revenueInclTax: number;
+    revenueExclTax: number;
+    taxCollected: number;
+    revenueInclTaxPrev: number;
+    conversionRate: number;
+    conversionRatePrev: number;
+    webhookErrors24h: number;
+    payuLive: boolean;
+    payuRevenue: number;
+  };
   trend: {
-    days: string[]; // IST YYYY-MM-DD oldest → newest
+    days: string[];
     leads: number[];
     revenueInr: number[];
   };
@@ -292,6 +331,137 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       repeatedLeads = count ?? 0;
     }
 
+    // ---------- v2 executive metrics ----------
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const threeHoursAgoIso = new Date(now.getTime() - 3 * 3600 * 1000).toISOString();
+    const fiveHoursAgoIso = new Date(now.getTime() - 5 * 3600 * 1000).toISOString();
+    const threeDaysAgoIso = new Date(now.getTime() - 3 * 86_400_000).toISOString();
+    const sevenDaysAgoIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+    const todayStartIso = istDayStartUtc(now).toISOString();
+
+    const [
+      uniqueLeadsRes, uniqueLeadsPrevRes,
+      leadAttrInRange,
+      paidPaymentsRes, paidPaymentsPrevRes,
+      technicalDelayRes, customerDelayRes, formNotSubmittedRes,
+      delayed3dRes, delayed7dRes,
+      ticketsRaisedRes, ticketsRaisedPrevRes, ticketsClosedRes, ticketsPending3dRes,
+      refundAcceptedRes, refundRejectedRes,
+      emailLogRes,
+      staffAuthRes,
+      notContactedAppsRes,
+      payuRevRes,
+      contactedLeadIdsRes,
+    ] = await Promise.all([
+      admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
+      admin.from("lead_attribution").select("lead_id, first_contact_at, converted_at, leads!inner(created_at)").gte("leads.created_at", startIso).lt("leads.created_at", endIso).limit(5000),
+      admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications!inner(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
+      admin.from("payments").select("application_id", { count: "exact", head: true }).eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("technical_hold_started_at", "is", null),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("customer_hold_started_at", "is", null),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("order_status", ["NEW_ORDER", "FORM_PENDING", "WAITING_CUSTOMER_INFO"]).not("form_link_sent_at", "is", null).is("form_submitted_at", null),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeDaysAgoIso),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", sevenDaysAgoIso),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso),
+      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("email_send_log").select("message_id, status, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
+      admin.schema("auth" as never).from("users" as never).select("id, last_sign_in_at").limit(5000),
+      admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).eq("fulfillment_status", "order_received").lt("created_at", threeHoursAgoIso).limit(5000),
+      admin.from("payments").select("amount").eq("status", "paid").eq("gateway_name", "payu").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
+      admin.from("lead_contact_events").select("lead_id").gte("created_at", startIso).lt("created_at", nowIso).limit(20000),
+    ]);
+
+    // Unique leads
+    const uniqueLeads = uniqueLeadsRes.count ?? 0;
+    const uniqueLeadsPrev = uniqueLeadsPrevRes.count ?? 0;
+
+    // Leads: not contacted vs converted after contact
+    const attrRows = (leadAttrInRange.data ?? []) as Array<{ lead_id: string; first_contact_at: string | null; converted_at: string | null }>;
+    let leadsConvertedAfterContact = 0;
+    let leadsWithContact = 0;
+    for (const r of attrRows) {
+      if (r.first_contact_at) leadsWithContact += 1;
+      if (r.first_contact_at && r.converted_at) leadsConvertedAfterContact += 1;
+    }
+    const leadsNotContacted = Math.max(0, uniqueLeads - leadsWithContact);
+
+    // Paid orders
+    const paidRows = (paidPaymentsRes.data ?? []) as Array<{ application_id: string | null; amount: number; base_amount: number | null; gst_amount: number | null; gateway_name: string | null; applications: any }>;
+    const paidAppIds = new Set<string>();
+    let paidOrdersPending = 0;
+    let paidOrdersClosed = 0;
+    let revenueInclTax = 0;
+    let revenueExclTax = 0;
+    let taxCollected = 0;
+    for (const p of paidRows) {
+      if (p.application_id && !paidAppIds.has(p.application_id)) {
+        paidAppIds.add(p.application_id);
+        const app = Array.isArray(p.applications) ? p.applications[0] : p.applications;
+        const os = String(app?.order_status ?? "");
+        const fs = String(app?.fulfillment_status ?? "");
+        if (["COMPLETED", "CLOSED", "REFUND_PROCESSED"].includes(os) || ["completed", "order_completed", "order_closed", "cancelled"].includes(fs)) {
+          paidOrdersClosed += 1;
+        } else {
+          paidOrdersPending += 1;
+        }
+      }
+      const amt = Number(p.amount ?? 0);
+      revenueInclTax += amt;
+      if (p.base_amount != null && p.gst_amount != null) {
+        revenueExclTax += Number(p.base_amount);
+        taxCollected += Number(p.gst_amount);
+      } else {
+        // Assume 18% GST inclusive
+        const excl = amt / 1.18;
+        revenueExclTax += excl;
+        taxCollected += amt - excl;
+      }
+    }
+    const paidOrders = paidAppIds.size;
+    const paidOrdersPrev = paidPaymentsPrevRes.count ?? 0;
+
+    // Email delivery (dedupe by message_id → latest status)
+    const latestByMsg = new Map<string, string>();
+    for (const r of (emailLogRes.data ?? []) as Array<{ message_id: string | null; status: string; created_at: string }>) {
+      if (!r.message_id) continue;
+      latestByMsg.set(r.message_id, r.status);
+    }
+    let emailSent = 0, emailQueued = 0, emailFailed = 0;
+    for (const s of latestByMsg.values()) {
+      if (s === "sent") emailSent += 1;
+      else if (s === "queued" || s === "pending" || s === "processing") emailQueued += 1;
+      else if (s === "failed" || s === "dlq" || s === "bounced") emailFailed += 1;
+    }
+
+    // Staff activity
+    const staffTotal = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
+    const authRows = (staffAuthRes.data ?? []) as Array<{ id: string; last_sign_in_at: string | null }>;
+    const staffRoleIds = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+    const staffActiveToday = authRows.filter((u) => staffRoleIds.has(u.id) && u.last_sign_in_at && u.last_sign_in_at >= todayStartIso).length;
+    const staffInactive = Math.max(0, staffTotal - staffActiveToday);
+
+    // Orders not contacted (customer not called after order created)
+    const contactedLeadIds = new Set(((contactedLeadIdsRes.data ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id));
+    const uncontactedApps = ((notContactedAppsRes.data ?? []) as Array<{ id: string; created_at: string; lead_id: string | null }>)
+      .filter((a) => !a.lead_id || !contactedLeadIds.has(a.lead_id));
+    const ordersNotContacted3h = uncontactedApps.length;
+    const ordersNotContacted5h = uncontactedApps.filter((a) => a.created_at < fiveHoursAgoIso).length;
+
+    // PayU
+    const payuRevenue = ((payuRevRes.data ?? []) as Array<{ amount: number }>).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+    const payuLive = payuRevenue > 0 || paidRows.some((p) => p.gateway_name === "payu");
+
+    // Conversion rate v2 (paid orders / unique leads)
+    const conversionRateV2 = uniqueLeads > 0 ? Math.round((paidOrders / uniqueLeads) * 1000) / 10 : 0;
+    const conversionRatePrev = uniqueLeadsPrev > 0 ? Math.round(((paidOrdersPrev) / uniqueLeadsPrev) * 1000) / 10 : 0;
+
+
     return {
       range: { preset, startIso, endIso, label: presetLabel(preset) },
       kpis: {
@@ -309,6 +479,44 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
         conversionRate,
         repeatedLeads,
         avgOrderValue,
+      },
+      metrics: {
+        uniqueLeads,
+        uniqueLeadsPrev,
+        leadsNotContacted,
+        leadsConvertedAfterContact,
+        paidOrders,
+        paidOrdersPrev,
+        paidOrdersPending,
+        paidOrdersClosed,
+        technicalDelay: technicalDelayRes.count ?? 0,
+        customerDelay: customerDelayRes.count ?? 0,
+        formNotSubmitted: formNotSubmittedRes.count ?? 0,
+        ordersDelayed3d: delayed3dRes.count ?? 0,
+        ordersDelayed7d: delayed7dRes.count ?? 0,
+        ticketsRaised: ticketsRaisedRes.count ?? 0,
+        ticketsRaisedPrev: ticketsRaisedPrevRes.count ?? 0,
+        ticketsClosed: ticketsClosedRes.count ?? 0,
+        ticketsPending3d: ticketsPending3dRes.count ?? 0,
+        refundAccepted: refundAcceptedRes.count ?? 0,
+        refundRejected: refundRejectedRes.count ?? 0,
+        emailSent,
+        emailQueued,
+        emailFailed,
+        staffTotal,
+        staffActiveToday,
+        staffInactive,
+        ordersNotContacted3h,
+        ordersNotContacted5h,
+        revenueInclTax,
+        revenueExclTax,
+        taxCollected,
+        revenueInclTaxPrev: revenuePrev,
+        conversionRate: conversionRateV2,
+        conversionRatePrev,
+        webhookErrors24h: webhookErrs.count ?? 0,
+        payuLive,
+        payuRevenue,
       },
       trend: {
         days,

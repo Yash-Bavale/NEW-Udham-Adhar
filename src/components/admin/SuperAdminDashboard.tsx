@@ -156,99 +156,187 @@ export function SuperAdminDashboard({
   );
 }
 
-/* ---------------- KPI ---------------- */
+/* ---------------- KPI (modern light) ---------------- */
 
-function KpiCard({
-  icon, label, value, sub, tone = "default",
+type Tone = "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "slate" | "teal";
+
+const TONE_STYLES: Record<Tone, { chip: string; ring: string; value: string; barA: string; barB: string }> = {
+  indigo:  { chip: "bg-indigo-50 text-indigo-600",   ring: "ring-indigo-100",  value: "text-slate-900", barA: "bg-indigo-500",  barB: "bg-indigo-200"  },
+  emerald: { chip: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-100", value: "text-slate-900", barA: "bg-emerald-500", barB: "bg-emerald-200" },
+  amber:   { chip: "bg-amber-50 text-amber-600",     ring: "ring-amber-100",   value: "text-slate-900", barA: "bg-amber-500",   barB: "bg-amber-200"   },
+  rose:    { chip: "bg-rose-50 text-rose-600",       ring: "ring-rose-100",    value: "text-slate-900", barA: "bg-rose-500",    barB: "bg-rose-200"    },
+  sky:     { chip: "bg-sky-50 text-sky-600",         ring: "ring-sky-100",     value: "text-slate-900", barA: "bg-sky-500",     barB: "bg-sky-200"     },
+  violet:  { chip: "bg-violet-50 text-violet-600",   ring: "ring-violet-100",  value: "text-slate-900", barA: "bg-violet-500",  barB: "bg-violet-200"  },
+  slate:   { chip: "bg-slate-100 text-slate-600",    ring: "ring-slate-200",   value: "text-slate-900", barA: "bg-slate-500",   barB: "bg-slate-200"   },
+  teal:    { chip: "bg-teal-50 text-teal-600",       ring: "ring-teal-100",    value: "text-slate-900", barA: "bg-teal-500",    barB: "bg-teal-200"    },
+};
+
+function DeltaPill({ d }: { d: { pct: number; up: boolean } | null }) {
+  if (!d) return null;
+  const Icon = d.up ? TrendingUp : TrendingDown;
+  const cls = d.up ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50";
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>
+      <Icon className="size-2.5" /> {d.pct}%
+    </span>
+  );
+}
+
+function StatChip({ label, value, tone }: { label: string; value: string | number; tone: "emerald" | "rose" | "amber" | "sky" | "slate" | "indigo" | "violet" | "teal" }) {
+  const cls: Record<string, string> = {
+    emerald: "text-emerald-700 bg-emerald-50",
+    rose: "text-rose-700 bg-rose-50",
+    amber: "text-amber-700 bg-amber-50",
+    sky: "text-sky-700 bg-sky-50",
+    slate: "text-slate-600 bg-slate-100",
+    indigo: "text-indigo-700 bg-indigo-50",
+    violet: "text-violet-700 bg-violet-50",
+    teal: "text-teal-700 bg-teal-50",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`}>
+      <span className="opacity-70">{label}</span>
+      <span className="font-semibold tabular-nums">{typeof value === "number" ? fmtN(value) : value}</span>
+    </span>
+  );
+}
+
+function ModernKpi({
+  icon, label, value, tone, delta, subs, footer,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub?: React.ReactNode;
-  tone?: "default" | "good" | "warn" | "bad";
+  tone: Tone;
+  delta?: { pct: number; up: boolean } | null;
+  subs?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
-  const toneClasses = {
-    default: "border-border",
-    good: "border-emerald-200 dark:border-emerald-900/40",
-    warn: "border-amber-200 dark:border-amber-900/40",
-    bad: "border-rose-200 dark:border-rose-900/40",
-  }[tone];
-  const iconBg = {
-    default: "bg-muted text-foreground",
-    good: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-    warn: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-    bad: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  }[tone];
+  const t = TONE_STYLES[tone];
   return (
-    <Card className={`overflow-hidden ${toneClasses}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-            <div className="mt-1 truncate text-2xl font-bold tabular-nums">{value}</div>
-            {sub && <div className="mt-1 text-[11px] text-muted-foreground">{sub}</div>}
-          </div>
-          <div className={`rounded-lg p-2 ${iconBg}`}>{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DeltaPill({ d }: { d: { pct: number; up: boolean } | null }) {
-  if (!d) return <span className="text-muted-foreground">—</span>;
-  const Icon = d.up ? TrendingUp : TrendingDown;
-  return (
-    <span
-      className={`inline-flex items-center gap-0.5 font-semibold ${
-        d.up ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-      }`}
-    >
-      <Icon className="size-3" /> {d.pct}%
-    </span>
+    <div className={`group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md hover:border-slate-300 ring-1 ${t.ring}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className={`grid size-9 place-items-center rounded-xl ${t.chip}`}>{icon}</div>
+        {delta !== undefined && <DeltaPill d={delta ?? null} />}
+      </div>
+      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 text-2xl font-bold leading-tight tabular-nums ${t.value}`}>{value}</div>
+      {subs && <div className="mt-2 flex flex-wrap gap-1">{subs}</div>}
+      {footer && <div className="mt-2 text-[11px] text-slate-500">{footer}</div>}
+    </div>
   );
 }
 
 function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
   if (loading || !data) {
     return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-[100px] rounded-xl" />)}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {Array.from({ length: 13 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
       </div>
     );
   }
-  const k = data.kpis;
-  const leadsD = pctDelta(k.leadsCurrent, k.leadsPrev);
-  const revD = pctDelta(k.revenueCurrent, k.revenuePrev);
+  const m = data.metrics;
+  const leadsDelta = pctDelta(m.uniqueLeads, m.uniqueLeadsPrev);
+  const paidDelta = pctDelta(m.paidOrders, m.paidOrdersPrev);
+  const ticketsDelta = pctDelta(m.ticketsRaised, m.ticketsRaisedPrev);
+  const revDelta = pctDelta(m.revenueInclTax, m.revenueInclTaxPrev);
+  const convDelta = pctDelta(m.conversionRate, m.conversionRatePrev);
+
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      <KpiCard icon={<Users className="size-4" />} label="Leads" value={fmtN(k.leadsCurrent)}
-        sub={<>vs prev period <DeltaPill d={leadsD} /></>} />
-      <KpiCard icon={<Wallet className="size-4" />} label="Revenue" value={fmtShortINR(k.revenueCurrent)}
-        sub={<>vs prev <DeltaPill d={revD} /></>} tone="good" />
-      <KpiCard icon={<ShoppingBag className="size-4" />} label="Paid Orders" value={fmtN(k.paidPayments)}
-        sub={<>AOV {fmtShortINR(k.avgOrderValue)}</>} />
-      <KpiCard icon={<Target className="size-4" />} label="Conversion" value={`${k.conversionRate.toFixed(1)}%`}
-        sub="paid leads / total" />
-      <KpiCard icon={<ShoppingBag className="size-4" />} label="Open Orders" value={fmtN(k.openApplications)}
-        sub="in fulfillment" />
-      <KpiCard icon={<FileText className="size-4" />} label="Docs Pending" value={fmtN(k.documentsPending)}
-        sub="awaiting upload" tone={k.documentsPending > 0 ? "warn" : "default"} />
-      <KpiCard icon={<Award className="size-4" />} label="Certificates" value={fmtN(k.certificatesInRange)}
-        sub="in range" tone="good" />
-      <KpiCard icon={<Mail className="size-4" />} label="Email Queue" value={fmtN(k.emailQueueDepth)}
-        sub="queued + failed" tone={k.emailQueueDepth > 0 ? "warn" : "default"} />
-      <KpiCard icon={<UserCheck className="size-4" />} label="Customers" value={fmtN(k.totalCustomers)}
-        sub="lifetime" />
-      <KpiCard icon={<Users className="size-4" />} label="Duplicate Leads" value={fmtN(k.repeatedLeads)}
-        sub="same mobile or email" tone={k.repeatedLeads > 0 ? "warn" : "default"} />
-      <KpiCard icon={<Briefcase className="size-4" />} label="Active Staff" value={fmtN(k.activeStaff)}
-        sub="with role" />
-      <KpiCard icon={<AlertTriangle className="size-4" />} label="Webhook Errors (24h)" value={fmtN(data.webhookFailures24h)}
-        tone={data.webhookFailures24h > 0 ? "bad" : "good"} />
-      <KpiCard icon={<Globe className="size-4" />} label="PayU" value={data.payu.mode.toUpperCase()}
-        sub={data.payu.isProduction ? "live payments" : "test mode"}
-        tone={data.payu.isProduction ? "good" : "bad"} />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <ModernKpi
+        icon={<Users className="size-4" />} label="Unique Leads" value={fmtN(m.uniqueLeads)} tone="indigo" delta={leadsDelta}
+        subs={<>
+          <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" />
+          <StatChip label="Converted" value={m.leadsConvertedAfterContact} tone="emerald" />
+        </>}
+      />
+      <ModernKpi
+        icon={<ShoppingBag className="size-4" />} label="Paid Orders" value={fmtN(m.paidOrders)} tone="emerald" delta={paidDelta}
+        subs={<>
+          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" />
+          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" />
+        </>}
+      />
+      <ModernKpi
+        icon={<AlertTriangle className="size-4" />} label="Technical Delay" value={fmtN(m.technicalDelay)}
+        tone={m.technicalDelay > 0 ? "amber" : "slate"}
+        subs={<>
+          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" />
+          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" />
+        </>}
+      />
+      <ModernKpi
+        icon={<Bell className="size-4" />} label="Order Alerts" value={fmtN(m.ordersDelayed3d)}
+        tone={m.ordersDelayed7d > 0 ? "rose" : m.ordersDelayed3d > 0 ? "amber" : "slate"}
+        subs={<>
+          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" />
+          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" />
+        </>}
+      />
+      <ModernKpi
+        icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsRaised)} tone="sky" delta={ticketsDelta}
+        subs={<>
+          <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" />
+          <StatChip label="Pending 3+d" value={m.ticketsPending3d} tone="rose" />
+        </>}
+      />
+      <ModernKpi
+        icon={<RefreshCw className="size-4" />} label="Refund Requests" value={fmtN(m.refundAccepted + m.refundRejected)} tone="violet"
+        subs={<>
+          <StatChip label="Accepted" value={m.refundAccepted} tone="emerald" />
+          <StatChip label="Rejected" value={m.refundRejected} tone="rose" />
+        </>}
+      />
+      <ModernKpi
+        icon={<Mail className="size-4" />} label="Email Delivery" value={fmtN(m.emailSent + m.emailQueued + m.emailFailed)}
+        tone={m.emailFailed > 0 ? "rose" : "teal"}
+        subs={<>
+          <StatChip label="Sent" value={m.emailSent} tone="emerald" />
+          <StatChip label="Queued" value={m.emailQueued} tone="amber" />
+          <StatChip label="Failed" value={m.emailFailed} tone="rose" />
+        </>}
+      />
+      <ModernKpi
+        icon={<Briefcase className="size-4" />} label="Active Staff" value={fmtN(m.staffActiveToday)} tone="indigo"
+        subs={<>
+          <StatChip label="Total" value={m.staffTotal} tone="slate" />
+          <StatChip label="Inactive" value={m.staffInactive} tone="rose" />
+        </>}
+        footer="Signed in today (IST)"
+      />
+      <ModernKpi
+        icon={<UserCheck className="size-4" />} label="Orders Not Contacted" value={fmtN(m.ordersNotContacted3h)}
+        tone={m.ordersNotContacted5h > 0 ? "rose" : m.ordersNotContacted3h > 0 ? "amber" : "slate"}
+        subs={<>
+          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" />
+          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" />
+        </>}
+      />
+      <ModernKpi
+        icon={<Wallet className="size-4" />} label="Revenue (excl. Tax)" value={fmtShortINR(m.revenueExclTax)} tone="emerald" delta={revDelta}
+        subs={<>
+          <StatChip label="Incl. Tax" value={fmtShortINR(m.revenueInclTax)} tone="emerald" />
+          <StatChip label="Tax" value={fmtShortINR(m.taxCollected)} tone="slate" />
+        </>}
+      />
+      <ModernKpi
+        icon={<Target className="size-4" />} label="Conversion %" value={`${m.conversionRate.toFixed(1)}%`} tone="teal" delta={convDelta}
+        footer={`Paid ÷ Unique Leads (${fmtN(m.paidOrders)} / ${fmtN(m.uniqueLeads)})`}
+      />
+      <ModernKpi
+        icon={<Activity className="size-4" />} label="Webhook Errors (24h)" value={fmtN(m.webhookErrors24h)}
+        tone={m.webhookErrors24h > 0 ? "rose" : "emerald"}
+        footer={m.webhookErrors24h > 0 ? "Investigate failures" : "All webhooks healthy"}
+      />
+      <ModernKpi
+        icon={<Globe className="size-4" />} label="Gateway Status" value="PayU"
+        tone={m.payuLive && data.payu.isProduction ? "emerald" : "amber"}
+        subs={<>
+          <StatChip label={data.payu.isProduction ? "LIVE" : data.payu.mode.toUpperCase()} value={m.payuLive ? "●" : "○"} tone={data.payu.isProduction ? "emerald" : "amber"} />
+          <StatChip label="Collected" value={fmtShortINR(m.payuRevenue)} tone="slate" />
+        </>}
+      />
     </div>
   );
 }
