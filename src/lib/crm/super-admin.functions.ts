@@ -368,7 +368,7 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso),
-      admin.from("refund_requests").select("id", { count: "exact", head: true }).in("status", ["approved", "accepted", "processed"]).gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso),
       admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso),
       admin.from("email_send_log").select("message_id, status, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
       admin.schema("auth" as never).from("users" as never).select("id, last_sign_in_at").limit(5000),
