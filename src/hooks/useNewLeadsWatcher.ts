@@ -78,7 +78,7 @@ export function useNewLeadsWatcher() {
           (payload: { new?: { id?: string; name?: string | null; full_name?: string | null; phone?: string | null; service_slug?: string | null; assigned_to?: string | null } }) => {
             const lead = payload.new ?? {};
             if (!isAdmin && lead.assigned_to !== uid) return;
-            
+
             const dedupeKey = lead.id ? `lead-${lead.id}` : `lead-${lead.name}-${lead.phone}`;
             const title = "🔔 New lead received!";
             const body = [lead.name || lead.full_name, lead.service_slug, lead.phone].filter(Boolean).join(" · ") || "Open the leads queue";
@@ -93,7 +93,7 @@ export function useNewLeadsWatcher() {
           (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; name?: string | null; full_name?: string | null; lead_code?: string | null; assigned_to?: string | null } }) => {
             const newLead = payload.new ?? {};
             const oldLead = payload.old ?? {};
-            
+
             invalidateLeadsData();
 
             if (newLead.assigned_to === uid && oldLead.assigned_to !== uid) {
