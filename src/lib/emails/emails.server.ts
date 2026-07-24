@@ -13,6 +13,7 @@ import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
   // Order lifecycle
   order_confirmation: "E001",
+  service_changed: "E012",
   welcome_and_form_link: "E002",
   "client-info-request": "E002",
   docs_required_reminder: "E002",
@@ -60,7 +61,7 @@ const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
 function resolveTemplateCode(code: string | null | undefined): { code: string | null; drop: boolean } {
   if (!code) return { code: null, drop: false };
   const trimmed = code.trim();
-  if (/^(E0(0[1-9]|1[01])|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
+  if (/^(E0(0[1-9]|1[0-2])|T00[1-3]|R001)$/.test(trimmed)) return { code: trimmed, drop: false };
   if (Object.prototype.hasOwnProperty.call(LEGACY_TEMPLATE_ALIAS, trimmed)) {
     const mapped = LEGACY_TEMPLATE_ALIAS[trimmed];
     return { code: mapped, drop: mapped === null };
