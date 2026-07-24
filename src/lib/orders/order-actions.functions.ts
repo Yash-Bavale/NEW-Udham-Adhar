@@ -310,22 +310,24 @@ export const sendFormLink = createServerFn({ method: "POST" })
       closureStage: (order as any).closure_stage ?? null,
       action: "send_form_link",
     });
-    const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
-    let emailQueued = false;
-    if (to) {
-      const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
-      emailQueued = await queueTemplateEmail(
-        "welcome_and_form_link",
-        to,
-        {
-          customerName: name,
-          orderNumber: order.application_code || order.id.slice(0, 8),
-          formLink: link,
-          fromName,
-        },
-        { applicationId: order.id, leadId: order.lead_id },
-      );
+    // Fail fast BEFORE any state mutation so the operator can add an email
+    // and retry from the same button without a manual status fix.
+    if (!to) {
+      throw new Error("No email on file for this customer or lead — cannot send form link.");
     }
+    const fromName = process.env.ZOHO_FROM_NAME || "Udyam Support";
+    const link = `${process.env.APP_BASE_URL || ""}/resume/${order.id}`;
+    const emailQueued = await queueTemplateEmail(
+      "welcome_and_form_link",
+      to,
+      {
+        customerName: name,
+        orderNumber: order.application_code || order.id.slice(0, 8),
+        formLink: link,
+        fromName,
+      },
+      { applicationId: order.id, leadId: order.lead_id },
+    );
     let updated = order;
     if (data.transitionToWaiting && order.order_status === "NEW_ORDER") {
       updated = await transition(context.supabase, order.id, "WAITING_CUSTOMER_INFO");
@@ -350,10 +352,8 @@ export const sendFormLink = createServerFn({ method: "POST" })
         body: `Delivered to ${to}.`,
       });
     }
-    if (!to) {
-      throw new Error("No email on file for this customer or lead — cannot send form link.");
-    }
     return { ok: true, order: updated, emailQueued };
+
   });
 
 
