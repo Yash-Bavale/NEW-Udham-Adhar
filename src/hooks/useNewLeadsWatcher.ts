@@ -108,27 +108,32 @@ export function useNewLeadsWatcher() {
         )
         .on(
           "postgres_changes" as never,
+          { event: "*", schema: "public", table: "onboarding_submissions" },
+          () => {
+            invalidateLeadsData();
+          }
+        )
+        .on(
+          "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` },
           (payload: { new?: { id?: string; title?: string | null; body?: string | null; href?: string | null; kind?: string | null } }) => {
             const notif = payload.new ?? {};
             qc.invalidateQueries({ queryKey: ["notifications"] });
-            if (notif.kind === "order_assigned") {
-              setUnseen((n) => n + 1);
-              invalidateLeadsData();
-              qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-              playLeadRingSound();
+            setUnseen((n) => n + 1);
+            invalidateLeadsData();
+            qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+            playLeadRingSound();
 
-              const title = notif.title || "📋 New Task Assigned";
-              const body = notif.body || "A new lead/order has been assigned to you.";
-              const url = notif.href || "/admin/leads";
-              
-              notify({ title, body, url, tag: `notif-${notif.id ?? Date.now()}` });
-              toast.info(title, {
-                description: body,
-                duration: 7000,
-                action: { label: "View Task", onClick: () => { window.location.href = url; } },
-              });
-            }
+            const title = notif.title || "🔔 New CRM Notification";
+            const body = notif.body || "A new update or task has arrived in your queue.";
+            const url = notif.href || "/admin/leads";
+            
+            notify({ title, body, url, tag: `notif-${notif.id ?? Date.now()}` });
+            toast.info(title, {
+              description: body,
+              duration: 7000,
+              action: { label: "View Details", onClick: () => { window.location.href = url; } },
+            });
           },
         )
         .subscribe();

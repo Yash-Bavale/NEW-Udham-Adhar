@@ -236,6 +236,40 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         leadId: lead.id,
         applicationId: app?.id ?? undefined,
       }).catch((e: unknown) => console.error("admin onboarding notification failed:", e));
+
+      // Emit internal CRM notification to assigned employee and admins
+      try {
+        const { emitToRole, emitNotification } = await import("@/lib/notifications/emit.server");
+        if (lead.assigned_to) {
+          await emitNotification({
+            userId: lead.assigned_to,
+            kind: "form_submitted",
+            title: "Form Details Submitted",
+            body: `${lead.name ?? "Customer"} submitted details for ${lead.service ?? ""}`,
+            href: `/admin/leads/${lead.id}`,
+            entityKind: "lead",
+            entityId: lead.id,
+          });
+        }
+        await emitToRole("admin", {
+          kind: "form_submitted",
+          title: "Form Details Submitted",
+          body: `${lead.name ?? "Customer"} submitted details for ${lead.service ?? ""}`,
+          href: `/admin/leads/${lead.id}`,
+          entityKind: "lead",
+          entityId: lead.id,
+        });
+        await emitToRole("super_admin", {
+          kind: "form_submitted",
+          title: "Form Details Submitted",
+          body: `${lead.name ?? "Customer"} submitted details for ${lead.service ?? ""}`,
+          href: `/admin/leads/${lead.id}`,
+          entityKind: "lead",
+          entityId: lead.id,
+        });
+      } catch (e: unknown) {
+        console.error("Internal notification emitting failed:", e);
+      }
     }
 
     return { ok: true };
