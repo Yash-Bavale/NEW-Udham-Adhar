@@ -73,8 +73,8 @@ interface Props {
 }
 
 const TAB_DEFS = [
-  { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
   { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
+  { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
   { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
   { id: "invoices" as const, label: "Invoices", icon: BadgeDollarSign, tooltip: "View, download, resend, or replace invoices for this order", moneyOnly: true },
   { id: "activity" as const, label: "Timeline / Activity Log", icon: Activity, tooltip: "Full chronological activity log for this order" },
@@ -87,7 +87,7 @@ export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
-  const [tab, setTab] = useState<TabId>("workflow");
+  const [tab, setTab] = useState<TabId>("form");
   const [refundOpen, setRefundOpen] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
   const [dialog, setDialog] = useState<
@@ -189,9 +189,9 @@ export function WorkspaceShell(p: Props) {
     return enabledCodes.includes(code) && !closed && !completed;
   };
 
-  // If the active tab becomes unavailable (status changed), fall back to Workflow.
+  // If the active tab becomes unavailable (status changed), fall back to Forms & Docs.
   useEffect(() => {
-    if (!availability[tab].enabled) setTab("workflow");
+    if (!availability[tab].enabled) setTab("form");
   }, [availability, tab]);
 
   const invalidate = useCallback(() => {
@@ -519,191 +519,7 @@ export function WorkspaceShell(p: Props) {
           />
         </section>
 
-        {/* ── Journey Action Panel (B01 - B10) — admin only ─────────── */}
-        {isAdmin && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-indigo-600">
-                Journey Action Panel (B01 – B10)
-              </div>
-              <div className="mt-0.5 text-xs text-slate-500">
-                Trigger actions directly based on the current customer journey state.
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium">Admin Override:</span>
-              {!adminOverride ? (
-                <button
-                  type="button"
-                  onClick={() => setAdminOverride(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 shadow-sm hover:bg-orange-100 transition"
-                >
-                  <ShieldAlert className="size-3.5" />
-                  Enable Override
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setAdminOverride(false)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-sm hover:bg-emerald-100 transition"
-                >
-                  <ShieldOff className="size-3.5" />
-                  Disable Override
-                </button>
-              )}
-            </div>
-          </div>
 
-          {adminOverride && (
-            <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-2 text-[11px] text-orange-800">
-              <ShieldAlert className="mr-1 inline size-3" />
-              <strong>Warning:</strong> Admin override is active. Journey actions (B01 – B08) are fully unlocked.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-            {(() => {
-              const isB09Enabled = closed || completed;
-              const isB10Enabled = !closed;
-
-              const gateWithOverride = (code: ButtonCode | "B09" | "B10") => {
-                if (code === "B09") return isB09Enabled;
-                if (code === "B10") return isB10Enabled;
-                return gate(code as ButtonCode);
-              };
-
-              const buttonHandlers: Record<string, { label: string; sub: string; badgeBottom: string; onClick: () => void; pending?: boolean; variant: string }> = {
-                B01: {
-                  label: "Form Not Submitted",
-                  sub: "Send Form Link / Incomplete mail",
-                  badgeBottom: "E002",
-                  onClick: () => mutFormLink.mutate(),
-                  pending: mutFormLink.isPending,
-                  variant: "amber",
-                },
-                B02: {
-                  label: "Technical Delay",
-                  sub: "Select Reason",
-                  badgeBottom: "E003",
-                  onClick: () => setDialog({ kind: "technical_delay" }),
-                  variant: "sky",
-                },
-                B03: {
-                  label: "Technical Delay Resolved",
-                  sub: "Issue Resolved & Resume",
-                  badgeBottom: "E011",
-                  onClick: () => mutResume.mutate(),
-                  pending: mutResume.isPending,
-                  variant: "emerald",
-                },
-                B04: {
-                  label: "Customer Side Delay",
-                  sub: "Select Reason",
-                  badgeBottom: "E004",
-                  onClick: () => setDialog({ kind: "customer_delay" }),
-                  variant: "amber",
-                },
-                B05: {
-                  label: "Application Submitted",
-                  sub: "Waiting for Govt. Approval",
-                  badgeBottom: "E006",
-                  onClick: () => mutSubmit.mutate(),
-                  pending: mutSubmit.isPending,
-                  variant: "violet",
-                },
-                B06: {
-                  label: "Consultation Completed",
-                  sub: "Fulfillment completed",
-                  badgeBottom: "E005",
-                  onClick: () => mutConsultation.mutate(),
-                  pending: mutConsultation.isPending,
-                  variant: "violet",
-                },
-                B07: {
-                  label: "Application Accepted",
-                  sub: "Upload PDF & Complete",
-                  badgeBottom: "E007",
-                  onClick: () => setDialog({ kind: "complete_with_cert" }),
-                  variant: "emerald",
-                },
-                B08: {
-                  label: "Application Rejected",
-                  sub: "Select Reason & Close",
-                  badgeBottom: "E008",
-                  onClick: () => setDialog({ kind: "govt_rejected" }),
-                  variant: "rose",
-                },
-                B09: {
-                  label: "Reopen/Restart Order",
-                  sub: "Return to Form Submitted",
-                  badgeBottom: "E09",
-                  onClick: () => mutReopen.mutate(),
-                  pending: mutReopen.isPending,
-                  variant: "indigo",
-                },
-                B10: {
-                  label: "Order Force Closed",
-                  sub: "Force Close order (Cat A)",
-                  badgeBottom: "E010",
-                  onClick: () => setDialog({ kind: "force_close" }),
-                  variant: "rose",
-                },
-              };
-
-              const TINT_STYLES: Record<string, { active: string }> = {
-                amber: { active: "border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-900 hover:border-amber-300" },
-                sky: { active: "border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-sky-900 hover:border-sky-300" },
-                emerald: { active: "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 hover:border-emerald-300" },
-                rose: { active: "border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-900 hover:border-rose-300" },
-                violet: { active: "border-violet-200 bg-violet-50/70 hover:bg-violet-100 text-violet-900 hover:border-violet-300" },
-                indigo: { active: "border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 hover:border-indigo-300" },
-              };
-
-              return Object.entries(buttonHandlers).map(([code, btn]) => {
-                const enabled = gateWithOverride(code as ButtonCode);
-                const style = TINT_STYLES[btn.variant] || TINT_STYLES.indigo;
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    onClick={btn.onClick}
-                    disabled={!enabled || btn.pending}
-                    className={cn(
-                      "relative flex flex-col justify-center items-center text-center rounded-lg border transition disabled:cursor-not-allowed select-none group min-h-[58px] py-2 px-2",
-                      enabled
-                        ? style.active
-                        : "border-slate-200 bg-slate-50 text-slate-400 opacity-60"
-                    )}
-                  >
-                    {/* Yellow B Badge Top-Left */}
-                    <span className="absolute top-1.5 left-1.5 rounded bg-yellow-300 border border-yellow-400 px-1 py-px text-[8px] font-black text-slate-900 shadow-sm font-mono leading-none">
-                      {code}
-                    </span>
-
-                    {/* Blue E Badge Bottom-Right */}
-                    <span className="absolute bottom-1.5 right-1.5 rounded bg-blue-600 border border-blue-700 px-1 py-px text-[8px] font-black text-white shadow-sm font-mono leading-none">
-                      {btn.badgeBottom}
-                    </span>
-
-                    <div className="text-[10px] font-bold leading-tight tracking-tight">
-                      {btn.label}
-                    </div>
-                    <div className="text-[8px] font-medium opacity-85 leading-normal mt-0.5 max-w-[92%] break-words">
-                      {btn.sub}
-                    </div>
-                    {btn.pending && (
-                      <span className="absolute inset-0 bg-white/70 flex items-center justify-center text-[10px] font-bold text-slate-800 rounded-lg">
-                        Processing…
-                      </span>
-                    )}
-                  </button>
-                );
-              });
-            })()}
-          </div>
-        </section>
-        )}
 
 
 
@@ -797,6 +613,216 @@ export function WorkspaceShell(p: Props) {
                 fulfillmentStatus={current}
               />
               <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
+                {/* ── B1 to B10 Task Actions Bar ── */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="size-4 text-indigo-600" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        Task Actions (B1 – B10)
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal hidden sm:inline">
+                        Stage & journey triggers
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500 font-medium">Admin Override:</span>
+                        <button
+                          type="button"
+                          onClick={() => setAdminOverride(!adminOverride)}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[11px] font-bold border transition",
+                            adminOverride
+                              ? "bg-orange-100 border-orange-300 text-orange-800"
+                              : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+                          )}
+                        >
+                          {adminOverride ? "ON" : "OFF"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {adminOverride && (
+                    <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-1.5 text-[11px] text-orange-800 flex items-center gap-1.5">
+                      <ShieldAlert className="size-3.5 shrink-0" />
+                      <span><strong>Admin override active:</strong> Actions B01 – B08 unlocked regardless of current stage.</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                    {(() => {
+                      const isB09Enabled = closed || completed;
+                      const isB10Enabled = !closed;
+
+                      const gateWithOverride = (code: ButtonCode | "B09" | "B10") => {
+                        if (code === "B09") return isB09Enabled;
+                        if (code === "B10") return isB10Enabled;
+                        return gate(code as ButtonCode);
+                      };
+
+                      const buttonHandlers: Record<
+                        string,
+                        {
+                          code: ButtonCode | "B09" | "B10";
+                          label: string;
+                          emailCode: string;
+                          onClick: () => void;
+                          pending?: boolean;
+                          variant: "amber" | "sky" | "emerald" | "violet" | "rose" | "indigo";
+                          tooltip: string;
+                        }
+                      > = {
+                        B1: {
+                          code: "B01",
+                          label: "Form Not Submitted",
+                          emailCode: "E002",
+                          onClick: () => mutFormLink.mutate(),
+                          pending: mutFormLink.isPending,
+                          variant: "amber",
+                          tooltip: "Send Form Link / Reminder email (E002)",
+                        },
+                        B2: {
+                          code: "B02",
+                          label: "Technical Delay",
+                          emailCode: "E003",
+                          onClick: () => setDialog({ kind: "technical_delay" }),
+                          variant: "sky",
+                          tooltip: "Mark technical delay and select reason (E003)",
+                        },
+                        B3: {
+                          code: "B03",
+                          label: "Issue Resolved",
+                          emailCode: "E011",
+                          onClick: () => mutResume.mutate(),
+                          pending: mutResume.isPending,
+                          variant: "emerald",
+                          tooltip: "Resolve technical delay & resume order (E011)",
+                        },
+                        B4: {
+                          code: "B04",
+                          label: "Customer Delay",
+                          emailCode: "E004",
+                          onClick: () => setDialog({ kind: "customer_delay" }),
+                          variant: "amber",
+                          tooltip: "Mark customer side delay and select reason (E004)",
+                        },
+                        B5: {
+                          code: "B05",
+                          label: "Submitted to Govt",
+                          emailCode: "E006",
+                          onClick: () => mutSubmit.mutate(),
+                          pending: mutSubmit.isPending,
+                          variant: "violet",
+                          tooltip: "Mark application as submitted to govt portal (E006)",
+                        },
+                        B6: {
+                          code: "B06",
+                          label: "Consultation Done",
+                          emailCode: "E005",
+                          onClick: () => mutConsultation.mutate(),
+                          pending: mutConsultation.isPending,
+                          variant: "violet",
+                          tooltip: "Mark consultation fulfilled (E005)",
+                        },
+                        B7: {
+                          code: "B07",
+                          label: "App Accepted",
+                          emailCode: "E007",
+                          onClick: () => setDialog({ kind: "complete_with_cert" }),
+                          variant: "emerald",
+                          tooltip: "Upload final certificate & complete order (E007)",
+                        },
+                        B8: {
+                          code: "B08",
+                          label: "App Rejected",
+                          emailCode: "E008",
+                          onClick: () => setDialog({ kind: "govt_rejected" }),
+                          variant: "rose",
+                          tooltip: "Mark govt rejection & select reason (E008)",
+                        },
+                        B9: {
+                          code: "B09",
+                          label: "Reopen Order",
+                          emailCode: "E09",
+                          onClick: () => mutReopen.mutate(),
+                          pending: mutReopen.isPending,
+                          variant: "indigo",
+                          tooltip: "Reopen order back to Form Submitted (E09)",
+                        },
+                        B10: {
+                          code: "B10",
+                          label: "Force Close",
+                          emailCode: "E010",
+                          onClick: () => setDialog({ kind: "force_close" }),
+                          variant: "rose",
+                          tooltip: "Force close order with reason (E010)",
+                        },
+                      };
+
+                      const TINT_STYLES: Record<string, { active: string; badge: string }> = {
+                        amber: {
+                          active: "bg-amber-50/90 border-amber-300 text-amber-900 hover:bg-amber-100 hover:border-amber-400",
+                          badge: "bg-amber-600 text-white",
+                        },
+                        sky: {
+                          active: "bg-sky-50/90 border-sky-300 text-sky-900 hover:bg-sky-100 hover:border-sky-400",
+                          badge: "bg-sky-600 text-white",
+                        },
+                        emerald: {
+                          active: "bg-emerald-50/90 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-400",
+                          badge: "bg-emerald-600 text-white",
+                        },
+                        violet: {
+                          active: "bg-purple-50/90 border-purple-300 text-purple-900 hover:bg-purple-100 hover:border-purple-400",
+                          badge: "bg-purple-600 text-white",
+                        },
+                        rose: {
+                          active: "bg-rose-50/90 border-rose-300 text-rose-900 hover:bg-rose-100 hover:border-rose-400",
+                          badge: "bg-rose-600 text-white",
+                        },
+                        indigo: {
+                          active: "bg-indigo-50/90 border-indigo-300 text-indigo-900 hover:bg-indigo-100 hover:border-indigo-400",
+                          badge: "bg-indigo-600 text-white",
+                        },
+                      };
+
+                      return Object.entries(buttonHandlers).map(([bKey, btn]) => {
+                        const enabled = gateWithOverride(btn.code);
+                        const style = TINT_STYLES[btn.variant] || TINT_STYLES.indigo;
+
+                        return (
+                          <Tooltip key={bKey}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={btn.onClick}
+                                disabled={!enabled || btn.pending}
+                                className={cn(
+                                  "h-9 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-1.5 transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed select-none",
+                                  enabled ? style.active : "bg-slate-50 border-slate-200 text-slate-400"
+                                )}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={cn("px-1 py-0.5 rounded text-[10px] font-extrabold font-mono leading-none shrink-0", enabled ? style.badge : "bg-slate-300 text-slate-700")}>
+                                    {bKey}
+                                  </span>
+                                  <span className="truncate text-left text-[11px] font-semibold">{btn.label}</span>
+                                </div>
+                                <span className="text-[9px] font-mono opacity-60 shrink-0 font-medium">
+                                  {btn.emailCode}
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{btn.tooltip}{!enabled ? " (Disabled for current stage)" : ""}</TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    })()}
+                  </div>
+                </div>
+
                 {p.showConsultationPanel ? (
                   <ConvertConsultationPanel
                     leadId={lead.id} leadCode={lead.lead_code}
