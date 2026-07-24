@@ -523,14 +523,22 @@ export const requestRefund = createServerFn({ method: "POST" })
     });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const app = updated as Record<string, unknown>;
-    await supabaseAdmin.from("refund_requests").insert({
+    const { data: inserted } = await supabaseAdmin.from("refund_requests").insert({
       application_id: data.orderId,
       lead_id: (app.lead_id as string | null) ?? null,
       reason: data.reason,
       status: "pending",
       refund_amount: data.amount ?? null,
+      refund_mode: data.mode ?? "full",
+      customer_notes: data.customerNotes ?? null,
       created_by: context.userId,
-    } as never);
+    } as never).select("id").single();
+    if (inserted?.id) {
+      await writeRefundEvent(data.orderId, "raised", context.userId, {
+        note: data.reason,
+        meta: { amount: data.amount ?? null, mode: data.mode ?? "full" },
+      });
+    }
     await notifyOrderEvent({
       order: {
         id: data.orderId,
