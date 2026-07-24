@@ -66,7 +66,7 @@ export function isLeadTransitionAllowed(from: LeadStatusV2, to: LeadStatusV2): b
 
 // Spec colour map → Tailwind classes (admin theme uses semantic tokens; these are explicit per spec).
 export const LEAD_STATUS_BADGE: Record<LeadStatusV2, string> = {
-  new_lead:           "bg-blue-100 text-blue-800 border-blue-200",
+  new_lead:           "bg-rose-100 text-rose-800 border-rose-300 font-bold",
   contacted:          "bg-indigo-100 text-indigo-800 border-indigo-200",
   follow_up_required: "bg-indigo-100 text-indigo-800 border-indigo-200",
   payment_pending:    "bg-amber-100 text-amber-900 border-amber-200",

@@ -20,7 +20,8 @@ export const logLeadContact = createServerFn({ method: "POST" })
     z
       .object({
         leadId: z.string().uuid(),
-        channel: ChannelEnum,
+        channel: ChannelEnum.optional(),
+        channels: z.array(ChannelEnum).optional(),
         outcome: OutcomeEnum.optional(),
         outcomes: z.array(OutcomeEnum).optional(),
         notes: z.string().max(2000).optional(),
@@ -29,21 +30,27 @@ export const logLeadContact = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const channelList = (data.channels && data.channels.length > 0)
+      ? data.channels
+      : (data.channel ? [data.channel] : ["call"]);
     const outcomeList = (data.outcomes && data.outcomes.length > 0)
       ? data.outcomes
       : (data.outcome ? [data.outcome] : ["connected"]);
 
-    for (const out of outcomeList) {
-      const { error } = await supabase.from("lead_contact_events").insert({
-        lead_id: data.leadId,
-        user_id: userId,
-        channel: data.channel,
-        outcome: out,
-        notes: data.notes ?? null,
-      });
-      if (error) throw new Error(error.message);
+    for (const ch of channelList) {
+      for (const out of outcomeList) {
+        const { error } = await supabase.from("lead_contact_events").insert({
+          lead_id: data.leadId,
+          user_id: userId,
+          channel: ch,
+          outcome: out,
+          notes: data.notes ?? null,
+        });
+        if (error) throw new Error(error.message);
+      }
     }
 
+    const channelText = channelList.join(", ");
     const outcomeText = outcomeList.join(", ");
 
     // Mirror into activity_logs so it shows in the lead timeline.
@@ -51,7 +58,7 @@ export const logLeadContact = createServerFn({ method: "POST" })
       lead_id: data.leadId,
       user_id: userId,
       activity_type: "contact_logged",
-      activity_description: `${data.channel} • ${outcomeText}${data.notes ? ` — ${data.notes}` : ""}`,
+      activity_description: `${channelText} • ${outcomeText}${data.notes ? ` — ${data.notes}` : ""}`,
     });
 
     // Mirror into application_events so the Internal Notes & Activity feed shows it.

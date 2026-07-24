@@ -123,6 +123,13 @@ function LeadsPage() {
     status: status || undefined,
   }), [search, status]);
 
+  // Live ticker to update relative age timing ("lead arrived since") every 15s
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
   const { data, isLoading } = useQuery({
     queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
     queryFn: () => listFn({ data: {
@@ -135,6 +142,7 @@ function LeadsPage() {
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     } }),
+    refetchInterval: 60_000,
   });
 
   // All filtering happens server-side now (C3).

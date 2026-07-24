@@ -101,7 +101,9 @@ export function TableSkeleton({ rows = 6, cols = 6 }: { rows?: number; cols?: nu
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  new: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+  new: "bg-rose-100 text-rose-800 border border-rose-300 font-semibold dark:bg-rose-950 dark:text-rose-200",
+  new_lead: "bg-rose-100 text-rose-800 border border-rose-300 font-semibold dark:bg-rose-950 dark:text-rose-200",
+  lead_created: "bg-rose-100 text-rose-800 border border-rose-300 font-semibold dark:bg-rose-950 dark:text-rose-200",
   contacted: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
   in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   payment_pending: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300",

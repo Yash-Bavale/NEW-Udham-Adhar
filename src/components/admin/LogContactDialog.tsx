@@ -28,13 +28,13 @@ export function LogContactDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("call");
+  const [channels, setChannels] = useState<Array<(typeof CHANNELS)[number]>>(["call"]);
   const [outcomes, setOutcomes] = useState<Array<(typeof OUTCOMES)[number]["value"]>>(["connected"]);
   const [notes, setNotes] = useState("");
   const qc = useQueryClient();
   const fn = useServerFn(logLeadContact);
   const m = useMutation({
-    mutationFn: () => fn({ data: { leadId, channel, outcomes, notes: notes.trim() || undefined } }),
+    mutationFn: () => fn({ data: { leadId, channel: channels[0], channels, outcomes, notes: notes.trim() || undefined } }),
     onSuccess: () => {
       toast.success("Feedback saved");
       qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] });
@@ -45,6 +45,16 @@ export function LogContactDialog({
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
+
+  const toggleChannel = (value: (typeof CHANNELS)[number]) => {
+    setChannels((prev) => {
+      if (prev.includes(value)) {
+        if (prev.length <= 1) return prev; // keep at least 1 channel selected
+        return prev.filter((c) => c !== value);
+      }
+      return [...prev, value];
+    });
+  };
 
   const toggleOutcome = (value: (typeof OUTCOMES)[number]["value"]) => {
     setOutcomes((prev) => {
@@ -64,20 +74,28 @@ export function LogContactDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Channel</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Channel (select multiple)</Label>
+              <span className="text-[10px] text-slate-400">Click to select multiple</span>
+            </div>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {CHANNELS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setChannel(c)}
-                  className={`px-2.5 py-1 rounded-md border text-xs capitalize ${
-                    channel === c ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+              {CHANNELS.map((c) => {
+                const isSelected = channels.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleChannel(c)}
+                    className={`px-2.5 py-1 rounded-md border text-xs capitalize transition-colors ${
+                      isSelected
+                        ? "bg-slate-900 text-white border-slate-900 font-medium"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {c} {isSelected && "✓"}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>

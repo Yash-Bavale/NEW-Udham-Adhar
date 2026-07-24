@@ -1,7 +1,7 @@
 // Subscribes to lead INSERTs, lead assignment UPDATEs for the current user,
 // and backend notifications. Fires desktop notifications and popup toasts.
 // (Final_CRM Part E & employee lead assignment popups.)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,9 @@ export function useNewLeadsWatcher() {
   const role = useRole();
   const isAdmin = role.hasAny(["admin", "super_admin"]);
 
+  // Deduplication cache: key -> timestamp (ms) to avoid duplicate toasts & sounds for same event
+  const notifiedKeysRef = useRef<Map<string, number>>(new Map());
+
   // Reset counter when user enters the leads section.
   useEffect(() => {
     if (path.startsWith("/admin/leads")) setUnseen(0);
@@ -30,6 +33,29 @@ export function useNewLeadsWatcher() {
       qc.invalidateQueries({ queryKey: ["admin.leads"] });
       qc.invalidateQueries({ queryKey: ["admin.leadCounts"] });
       qc.invalidateQueries({ queryKey: ["my-work"] });
+    };
+
+    const triggerNotification = (dedupeKey: string, title: string, body: string, url: string) => {
+      const now = Date.now();
+      const lastTime = notifiedKeysRef.current.get(dedupeKey) ?? 0;
+      if (now - lastTime < 10000) return; // Skip if notified within last 10s
+      notifiedKeysRef.current.set(dedupeKey, now);
+
+      // Clean up old keys
+      for (const [k, t] of notifiedKeysRef.current.entries()) {
+        if (now - t > 60000) notifiedKeysRef.current.delete(k);
+      }
+
+      setUnseen((n) => n + 1);
+      invalidateLeadsData();
+      playLeadRingSound();
+
+      notify({ title, body, url, tag: dedupeKey });
+      toast.info(title, {
+        description: body,
+        duration: 6000,
+        action: { label: "View Details", onClick: () => { window.location.href = url; } },
+      });
     };
 
     (async () => {
@@ -53,25 +79,12 @@ export function useNewLeadsWatcher() {
             const lead = payload.new ?? {};
             if (!isAdmin && lead.assigned_to !== uid) return;
             
-            setUnseen((n) => n + 1);
-            invalidateLeadsData();
-            playLeadRingSound();
-
+            const dedupeKey = lead.id ? `lead-${lead.id}` : `lead-${lead.name}-${lead.phone}`;
             const title = "🔔 New lead received!";
             const body = [lead.name || lead.full_name, lead.service_slug, lead.phone].filter(Boolean).join(" · ") || "Open the leads queue";
             const url = lead.id ? `/admin/leads/${lead.id}` : "/admin/leads";
-            
-            notify({
-              title,
-              body,
-              url,
-              tag: `lead-${lead.id ?? Date.now()}`,
-            });
-            toast.info(title, {
-              description: body,
-              duration: 6000,
-              action: { label: "View Lead", onClick: () => { window.location.href = url; } },
-            });
+
+            triggerNotification(dedupeKey, title, body, url);
           },
         )
         .on(
@@ -84,25 +97,14 @@ export function useNewLeadsWatcher() {
             invalidateLeadsData();
 
             if (newLead.assigned_to === uid && oldLead.assigned_to !== uid) {
-              setUnseen((n) => n + 1);
               qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-              playLeadRingSound();
 
+              const dedupeKey = newLead.id ? `lead-assigned-${newLead.id}` : `lead-assigned-${Date.now()}`;
               const title = "🎯 Lead Assigned to You";
               const body = `Lead ${newLead.name || newLead.full_name || newLead.lead_code || ""} is now assigned to your queue.`;
               const url = newLead.id ? `/admin/leads/${newLead.id}` : "/admin/leads";
-              
-              notify({
-                title,
-                body,
-                url,
-                tag: `lead-assigned-${newLead.id ?? Date.now()}`,
-              });
-              toast.info(title, {
-                description: body,
-                duration: 7000,
-                action: { label: "Open Lead", onClick: () => { window.location.href = url; } },
-              });
+
+              triggerNotification(dedupeKey, title, body, url);
             }
           },
         )
@@ -116,24 +118,17 @@ export function useNewLeadsWatcher() {
         .on(
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` },
-          (payload: { new?: { id?: string; title?: string | null; body?: string | null; href?: string | null; kind?: string | null } }) => {
+          (payload: { new?: { id?: string; title?: string | null; body?: string | null; href?: string | null; kind?: string | null; entity_id?: string | null } }) => {
             const notif = payload.new ?? {};
             qc.invalidateQueries({ queryKey: ["notifications"] });
-            setUnseen((n) => n + 1);
-            invalidateLeadsData();
             qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-            playLeadRingSound();
 
+            const dedupeKey = notif.entity_id ? `lead-${notif.entity_id}` : `notif-${notif.id}`;
             const title = notif.title || "🔔 New CRM Notification";
             const body = notif.body || "A new update or task has arrived in your queue.";
             const url = notif.href || "/admin/leads";
-            
-            notify({ title, body, url, tag: `notif-${notif.id ?? Date.now()}` });
-            toast.info(title, {
-              description: body,
-              duration: 7000,
-              action: { label: "View Details", onClick: () => { window.location.href = url; } },
-            });
+
+            triggerNotification(dedupeKey, title, body, url);
           },
         )
         .subscribe();

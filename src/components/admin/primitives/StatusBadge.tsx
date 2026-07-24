@@ -4,8 +4,10 @@ import { cn } from "@/lib/utils";
 
 const MAP: Record<string, string> = {
   // Lead statuses
-  new:               "bg-blue-50 text-blue-700 border-blue-200",
-  lead_received:     "bg-blue-50 text-blue-700 border-blue-200",
+  new:               "bg-rose-100 text-rose-800 border-rose-300 font-bold",
+  new_lead:          "bg-rose-100 text-rose-800 border-rose-300 font-bold",
+  lead_created:      "bg-rose-100 text-rose-800 border-rose-300 font-bold",
+  lead_received:     "bg-rose-100 text-rose-800 border-rose-300 font-bold",
   contacted:         "bg-sky-50 text-sky-700 border-sky-200",
   qualified:         "bg-indigo-50 text-indigo-700 border-indigo-200",
   proposal_sent:     "bg-violet-50 text-violet-700 border-violet-200",
