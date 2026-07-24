@@ -457,7 +457,7 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     );
 
     // Order alerts (payment-successful only, older than 3d/7d, not terminal).
-    const NON_TERMINAL_OS = ["NEW_ORDER", "FORM_PENDING", "WAITING_CUSTOMER_INFO", "FORM_SUBMITTED", "UNDER_REVIEW", "UNDER_PROCESS", "PAYMENT_RECEIVED"];
+    const NON_TERMINAL_OS = ["NEW_ORDER", "FORM_PENDING", "WAITING_CUSTOMER_INFO", "FORM_SUBMITTED", "UNDER_REVIEW", "UNDER_PROCESS", "PAYMENT_RECEIVED"] as const;
     async function countAgingPaid(cutoffIso: string): Promise<number> {
       if (allPaidAppIds.size === 0) return 0;
       const ids = Array.from(allPaidAppIds);
