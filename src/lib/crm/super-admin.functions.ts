@@ -116,12 +116,51 @@ export type SuperAdminOverview = {
     emailQueueDepth: number;
     totalCustomers: number;
     activeStaff: number;
-    conversionRate: number; // paid leads / total leads inside the range
+    conversionRate: number;
     repeatedLeads: number;
     avgOrderValue: number;
   };
+  /** v2 executive metrics — used by the modern KPI grid. */
+  metrics: {
+    uniqueLeads: number;
+    uniqueLeadsPrev: number;
+    leadsNotContacted: number;
+    leadsConvertedAfterContact: number;
+    paidOrders: number;
+    paidOrdersPrev: number;
+    paidOrdersPending: number;
+    paidOrdersClosed: number;
+    technicalDelay: number;
+    customerDelay: number;
+    formNotSubmitted: number;
+    ordersDelayed3d: number;
+    ordersDelayed7d: number;
+    ticketsRaised: number;
+    ticketsRaisedPrev: number;
+    ticketsClosed: number;
+    ticketsPending3d: number;
+    refundAccepted: number;
+    refundRejected: number;
+    emailSent: number;
+    emailQueued: number;
+    emailFailed: number;
+    staffTotal: number;
+    staffActiveToday: number;
+    staffInactive: number;
+    ordersNotContacted3h: number;
+    ordersNotContacted5h: number;
+    revenueInclTax: number;
+    revenueExclTax: number;
+    taxCollected: number;
+    revenueInclTaxPrev: number;
+    conversionRate: number;
+    conversionRatePrev: number;
+    webhookErrors24h: number;
+    payuLive: boolean;
+    payuRevenue: number;
+  };
   trend: {
-    days: string[]; // IST YYYY-MM-DD oldest → newest
+    days: string[];
     leads: number[];
     revenueInr: number[];
   };
