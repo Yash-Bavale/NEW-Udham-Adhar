@@ -24,15 +24,10 @@ import { STAGE_LABEL, TIMER_LABEL, AUTO_LABEL } from "@/lib/workflow/engine-view
 import { formatIST, relativeIST } from "@/lib/datetime";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
-export function OrderWorkflowPanel({
-  applicationId,
-  payments,
-  hideAmount,
-}: {
+export function OrderWorkflowPanel(_props: {
   applicationId: string;
   payments?: any[];
   hideAmount?: boolean;
-  // Legacy props kept for backwards compatibility (rail owns primary actions).
   current?: FulfillmentStatus;
   workflowStatus?: string | null;
   closureStage?: string | null;
@@ -41,35 +36,7 @@ export function OrderWorkflowPanel({
   reasonCode?: string | null;
   reasonText?: string | null;
 }) {
-  const qc = useQueryClient();
-  const [historyOpen, setHistoryOpen] = useState(true);
-
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
-    qc.invalidateQueries({ queryKey: ["admin.order.notes", applicationId] });
-    qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
-    qc.invalidateQueries({ queryKey: ["order-exception-state", applicationId] });
-    qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
-    qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
-    qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
-  };
-
-  return (
-    <div className="space-y-4">
-      <EngineControls applicationId={applicationId} payments={payments ?? []} hideAmount={!!hideAmount} onRefresh={refresh} />
-
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <button type="button" onClick={() => setHistoryOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-slate-50">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-slate-600">
-            <History className="size-3.5" /> Timeline & reminders
-          </div>
-          {historyOpen ? <ChevronDown className="size-4 text-slate-500" /> : <ChevronRight className="size-4 text-slate-500" />}
-        </button>
-        {historyOpen && <HistorySection applicationId={applicationId} onRefresh={refresh} />}
-      </div>
-    </div>
-  );
+  return null;
 }
 
 // ── Engine controls ─────────────────────────────────────────────────────────

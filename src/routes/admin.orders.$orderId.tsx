@@ -95,8 +95,6 @@ function OrderDetailPage() {
       notesNode={
         <div className="space-y-4">
           <ExceptionBanner orderId={orderId} />
-          <TicketPanel orderId={orderId} />
-          <InternalNotes orderId={orderId} />
         </div>
       }
     />
