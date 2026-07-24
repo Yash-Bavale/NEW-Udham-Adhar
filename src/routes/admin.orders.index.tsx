@@ -109,6 +109,27 @@ function OrdersListPage() {
   const [page, setPage] = useState(1);
   const pageSize = 100;
 
+  // Hydrate filters from URL query params (deep-links from dashboard KPIs).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const flt = sp.get("filter");
+    if (!flt) return;
+    switch (flt) {
+      case "pending": setBucket("pending"); break;
+      case "closed": setBucket("closed"); break;
+      case "completed": setBucket("completed"); break;
+      case "delayed_3d": setBucket("pending"); setPendingAge("3"); break;
+      case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
+      case "not_contacted": setBucket("needs_action"); break;
+      case "not_contacted_5h": setBucket("needs_action"); break;
+      case "technical_delay": setFulfillmentStatus("technical_delay"); break;
+      case "customer_delay": setFulfillmentStatus("customer_delay"); break;
+      case "form_not_submitted": setFulfillmentStatus("form_pending"); break;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
 
