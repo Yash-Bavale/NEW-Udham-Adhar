@@ -56,9 +56,9 @@ const NAV: NavGroup[] = [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
 
-      { to: "/admin/activity", label: "Activity", icon: Activity },
+      { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
-      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3 },
+      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -67,7 +67,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: OPS_ROLES },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: OPS_ROLES },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers" },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: OPS_ROLES },
       { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },

@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 function formatAge(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "just now";
@@ -142,6 +143,9 @@ function LeadsPage() {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });
     qc.invalidateQueries({ queryKey: ["admin.leadCounts"] });
   };
+
+  // Realtime: auto-refresh the leads list whenever any lead row changes.
+  useRealtimeTable("leads", refresh);
   const clearSel = () => setSelected(new Set());
 
   const allOnPage = rows.map((l: any) => l.id);

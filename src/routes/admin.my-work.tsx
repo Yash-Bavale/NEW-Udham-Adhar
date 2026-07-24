@@ -34,6 +34,7 @@ function MyWorkPage() {
   useRealtimeTable("notifications", () => refetch());
   useRealtimeTable("applications", () => refetch());
   useRealtimeTable("documents", () => refetch());
+  useRealtimeTable("leads", () => refetch());
 
   const counters = data?.counters;
   const isAdmin = role.hasAny(["super_admin", "admin"]);
