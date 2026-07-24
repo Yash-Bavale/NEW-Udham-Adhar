@@ -1,5 +1,6 @@
 // Shared executive / super-admin dashboard. Clean shadcn UI, IST date-range aware.
 // Mounted by both /admin/dashboard and /admin/super (super-mode adds quick actions).
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -182,27 +183,56 @@ function DeltaPill({ d }: { d: { pct: number; up: boolean } | null }) {
   );
 }
 
-function StatChip({ label, value, tone }: { label: string; value: string | number; tone: "emerald" | "rose" | "amber" | "sky" | "slate" | "indigo" | "violet" | "teal" }) {
+function parseHref(href: string): { path: string; search: Record<string, string> } {
+  const [path, qs] = href.split("?");
+  const search: Record<string, string> = {};
+  if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
+  return { path, search };
+}
+
+function StatChip({
+  label, value, tone, href,
+}: {
+  label: string;
+  value: string | number;
+  tone: "emerald" | "rose" | "amber" | "sky" | "slate" | "indigo" | "violet" | "teal";
+  href?: string;
+}) {
+  const navigate = useNavigate();
   const cls: Record<string, string> = {
-    emerald: "text-emerald-700 bg-emerald-50",
-    rose: "text-rose-700 bg-rose-50",
-    amber: "text-amber-700 bg-amber-50",
-    sky: "text-sky-700 bg-sky-50",
-    slate: "text-slate-600 bg-slate-100",
-    indigo: "text-indigo-700 bg-indigo-50",
-    violet: "text-violet-700 bg-violet-50",
-    teal: "text-teal-700 bg-teal-50",
+    emerald: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
+    rose: "text-rose-700 bg-rose-50 hover:bg-rose-100",
+    amber: "text-amber-700 bg-amber-50 hover:bg-amber-100",
+    sky: "text-sky-700 bg-sky-50 hover:bg-sky-100",
+    slate: "text-slate-600 bg-slate-100 hover:bg-slate-200",
+    indigo: "text-indigo-700 bg-indigo-50 hover:bg-indigo-100",
+    violet: "text-violet-700 bg-violet-50 hover:bg-violet-100",
+    teal: "text-teal-700 bg-teal-50 hover:bg-teal-100",
   };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`}>
+  const body = (
+    <>
       <span className="opacity-70">{label}</span>
       <span className="font-semibold tabular-nums">{typeof value === "number" ? fmtN(value) : value}</span>
-    </span>
+    </>
   );
+  const base = `inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`;
+  if (href) {
+    const { path, search } = parseHref(href);
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate({ to: path as never, search: search as never }); }}
+        className={`${base} transition-colors cursor-pointer`}
+      >
+        {body}
+      </button>
+    );
+  }
+  return <span className={base}>{body}</span>;
 }
 
 function ModernKpi({
-  icon, label, value, tone, delta, subs, footer,
+  icon, label, value, tone, delta, subs, footer, href,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -211,27 +241,39 @@ function ModernKpi({
   delta?: { pct: number; up: boolean } | null;
   subs?: React.ReactNode;
   footer?: React.ReactNode;
+  href?: string;
 }) {
   const t = TONE_STYLES[tone];
-  return (
-    <div className={`group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md hover:border-slate-300 ring-1 ${t.ring}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className={`grid size-9 place-items-center rounded-xl ${t.chip}`}>{icon}</div>
+  const inner = (
+    <div className={`group relative flex h-full flex-col rounded-xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ring-1 ${t.ring} ${href ? "hover:shadow-md hover:border-slate-300 cursor-pointer" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
         {delta !== undefined && <DeltaPill d={delta ?? null} />}
       </div>
-      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-bold leading-tight tabular-nums ${t.value}`}>{value}</div>
+      <div className="mt-1.5 flex items-center gap-2">
+        <div className={`grid size-8 shrink-0 place-items-center rounded-lg ${t.chip}`}>{icon}</div>
+        <div className={`text-2xl font-bold leading-tight tabular-nums ${t.value}`}>{value}</div>
+      </div>
       {subs && <div className="mt-2 flex flex-wrap gap-1">{subs}</div>}
-      {footer && <div className="mt-2 text-[11px] text-slate-500">{footer}</div>}
+      {footer && <div className="mt-auto pt-2 text-[10px] text-slate-500">{footer}</div>}
     </div>
   );
+  if (href) {
+    const [path, qs] = href.split("?");
+    const search: Record<string, string> = {};
+    if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
+    return (
+      <Link to={path as never} search={search as never} className="block h-full">{inner}</Link>
+    );
+  }
+  return inner;
 }
 
 function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
   if (loading || !data) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {Array.from({ length: 13 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
+        {Array.from({ length: 13 }).map((_, i) => <Skeleton key={i} className="h-[112px] rounded-xl" />)}
       </div>
     );
   }
@@ -243,54 +285,62 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
   const convDelta = pctDelta(m.conversionRate, m.conversionRatePrev);
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
       <ModernKpi
         icon={<Users className="size-4" />} label="Unique Leads" value={fmtN(m.uniqueLeads)} tone="indigo" delta={leadsDelta}
+        href="/admin/leads"
         subs={<>
-          <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" />
-          <StatChip label="Converted" value={m.leadsConvertedAfterContact} tone="emerald" />
+          <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" href="/admin/leads?filter=not_contacted" />
+          <StatChip label="Contacted" value={m.leadsContacted} tone="sky" href="/admin/leads?status=contacted" />
+          <StatChip label="Converted" value={m.leadsConverted} tone="emerald" href="/admin/leads?filter=converted" />
         </>}
       />
       <ModernKpi
-        icon={<ShoppingBag className="size-4" />} label="Paid Orders" value={fmtN(m.paidOrders)} tone="emerald" delta={paidDelta}
+        icon={<ShoppingBag className="size-4" />} label="Orders" value={fmtN(m.paidOrders)} tone="emerald" delta={paidDelta}
+        href="/admin/orders"
         subs={<>
-          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" />
-          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" />
+          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" href="/admin/orders?filter=pending" />
+          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" href="/admin/orders?filter=closed" />
         </>}
       />
       <ModernKpi
         icon={<AlertTriangle className="size-4" />} label="Technical Delay" value={fmtN(m.technicalDelay)}
         tone={m.technicalDelay > 0 ? "amber" : "slate"}
+        href="/admin/orders?filter=technical_delay"
         subs={<>
-          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" />
-          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" />
+          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href="/admin/orders?filter=customer_delay" />
+          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href="/admin/orders?filter=form_not_submitted" />
         </>}
       />
       <ModernKpi
         icon={<Bell className="size-4" />} label="Order Alerts" value={fmtN(m.ordersDelayed3d)}
         tone={m.ordersDelayed7d > 0 ? "rose" : m.ordersDelayed3d > 0 ? "amber" : "slate"}
+        href="/admin/orders?filter=delayed_3d"
         subs={<>
-          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" />
-          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" />
+          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" href="/admin/orders?filter=delayed_3d" />
+          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" href="/admin/orders?filter=delayed_7d" />
         </>}
       />
       <ModernKpi
-        icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsRaised)} tone="sky" delta={ticketsDelta}
+        icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsActive)} tone={m.ticketsActive > 0 ? "sky" : "slate"} delta={ticketsDelta}
+        href="/admin/support/tickets"
         subs={<>
-          <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" />
-          <StatChip label="Pending 3+d" value={m.ticketsPending3d} tone="rose" />
+          <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" href="/admin/support/tickets?status=closed" />
+          <StatChip label="Pending 3+d" value={m.ticketsPending3d} tone="rose" href="/admin/support/tickets?status=open" />
         </>}
       />
       <ModernKpi
         icon={<RefreshCw className="size-4" />} label="Refund Requests" value={fmtN(m.refundAccepted + m.refundRejected)} tone="violet"
+        href="/admin/refunds"
         subs={<>
-          <StatChip label="Accepted" value={m.refundAccepted} tone="emerald" />
-          <StatChip label="Rejected" value={m.refundRejected} tone="rose" />
+          <StatChip label="Accepted" value={m.refundAccepted} tone="emerald" href="/admin/refunds?status=approved" />
+          <StatChip label="Rejected" value={m.refundRejected} tone="rose" href="/admin/refunds?status=rejected" />
         </>}
       />
       <ModernKpi
         icon={<Mail className="size-4" />} label="Email Delivery" value={fmtN(m.emailSent + m.emailQueued + m.emailFailed)}
         tone={m.emailFailed > 0 ? "rose" : "teal"}
+        href="/admin/help/email-matrix"
         subs={<>
           <StatChip label="Sent" value={m.emailSent} tone="emerald" />
           <StatChip label="Queued" value={m.emailQueued} tone="amber" />
@@ -299,6 +349,7 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
       />
       <ModernKpi
         icon={<Briefcase className="size-4" />} label="Active Staff" value={fmtN(m.staffActiveToday)} tone="indigo"
+        href="/admin/performance"
         subs={<>
           <StatChip label="Total" value={m.staffTotal} tone="slate" />
           <StatChip label="Inactive" value={m.staffInactive} tone="rose" />
@@ -308,9 +359,10 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
       <ModernKpi
         icon={<UserCheck className="size-4" />} label="Orders Not Contacted" value={fmtN(m.ordersNotContacted3h)}
         tone={m.ordersNotContacted5h > 0 ? "rose" : m.ordersNotContacted3h > 0 ? "amber" : "slate"}
+        href="/admin/orders?filter=not_contacted"
         subs={<>
-          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" />
-          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" />
+          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" href="/admin/orders?filter=not_contacted" />
+          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" href="/admin/orders?filter=not_contacted_5h" />
         </>}
       />
       <ModernKpi
@@ -322,6 +374,7 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
       />
       <ModernKpi
         icon={<Target className="size-4" />} label="Conversion %" value={`${m.conversionRate.toFixed(1)}%`} tone="teal" delta={convDelta}
+        href="/admin/leads?filter=converted"
         footer={`Paid ÷ Unique Leads (${fmtN(m.paidOrders)} / ${fmtN(m.uniqueLeads)})`}
       />
       <ModernKpi

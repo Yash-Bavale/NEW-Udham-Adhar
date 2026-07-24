@@ -125,6 +125,8 @@ export type SuperAdminOverview = {
     uniqueLeads: number;
     uniqueLeadsPrev: number;
     leadsNotContacted: number;
+    leadsContacted: number;
+    leadsConverted: number;
     leadsConvertedAfterContact: number;
     paidOrders: number;
     paidOrdersPrev: number;
@@ -137,6 +139,7 @@ export type SuperAdminOverview = {
     ordersDelayed7d: number;
     ticketsRaised: number;
     ticketsRaisedPrev: number;
+    ticketsActive: number;
     ticketsClosed: number;
     ticketsPending3d: number;
     refundAccepted: number;
@@ -342,37 +345,37 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
 
     const [
       uniqueLeadsRes, uniqueLeadsPrevRes,
+      leadStatusRowsRes,
       leadAttrInRange,
       paidPaymentsRes, paidPaymentsPrevRes,
       technicalDelayRes, customerDelayRes, formNotSubmittedRes,
-      delayed3dRes, delayed7dRes,
-      ticketsRaisedRes, ticketsRaisedPrevRes, ticketsClosedRes, ticketsPending3dRes,
+      ticketsRaisedRes, ticketsRaisedPrevRes, ticketsActiveRes, ticketsClosedRes, ticketsPending3dRes,
       refundAcceptedRes, refundRejectedRes,
       emailLogRes,
       staffAuthRes,
-      notContactedAppsRes,
+      allPaidAppIdsRes,
       payuRevRes,
       contactedLeadIdsRes,
     ] = await Promise.all([
       admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso),
       admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
+      admin.from("leads").select("status").eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso).limit(10000),
       admin.from("lead_attribution").select("lead_id, first_contact_at, converted_at, leads!inner(created_at)").gte("leads.created_at", startIso).lt("leads.created_at", endIso).limit(5000),
       admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications!inner(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
       admin.from("payments").select("application_id", { count: "exact", head: true }).eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("technical_hold_started_at", "is", null),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("customer_hold_started_at", "is", null),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("order_status", ["NEW_ORDER", "FORM_PENDING", "WAITING_CUSTOMER_INFO"]).not("form_link_sent_at", "is", null).is("form_submitted_at", null),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeDaysAgoIso),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", sevenDaysAgoIso),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "technical_delay"),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "customer_delay"),
+      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("fulfillment_status", ["awaiting_customer_form", "waiting_for_customer_submission"]),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)"),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso),
       admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso),
       admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso),
       admin.from("email_send_log").select("message_id, status, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
       admin.schema("auth" as never).from("users" as never).select("id, last_sign_in_at").limit(5000),
-      admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).eq("fulfillment_status", "order_received").lt("created_at", threeHoursAgoIso).limit(5000),
+      admin.from("payments").select("application_id").eq("status", "paid").not("application_id", "is", null).limit(20000),
       admin.from("payments").select("amount").eq("status", "paid").eq("gateway_name", "payu").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
       admin.from("lead_contact_events").select("lead_id").gte("created_at", startIso).lt("created_at", nowIso).limit(20000),
     ]);
@@ -381,15 +384,34 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     const uniqueLeads = uniqueLeadsRes.count ?? 0;
     const uniqueLeadsPrev = uniqueLeadsPrevRes.count ?? 0;
 
-    // Leads: not contacted vs converted after contact
+    // Leads breakdown by current status (not by lead_attribution — status is
+    // what employees actually change and what the CRM shows).
+    const NOT_CONTACTED_STATUSES = new Set(["new_lead", "lead_created"]);
+    const CONTACTED_STATUSES = new Set(["contacted", "payment_pending"]);
+    const CONVERTED_STATUSES = new Set([
+      "payment_successful",
+      "details_pending",
+      "documents_pending",
+      "under_review",
+      "under_process",
+      "completed",
+    ]);
+    let leadsNotContacted = 0;
+    let leadsContacted = 0;
+    let leadsConverted = 0;
+    for (const r of (leadStatusRowsRes.data ?? []) as Array<{ status: string | null }>) {
+      const s = String(r.status ?? "");
+      if (NOT_CONTACTED_STATUSES.has(s)) leadsNotContacted += 1;
+      else if (CONTACTED_STATUSES.has(s)) leadsContacted += 1;
+      else if (CONVERTED_STATUSES.has(s)) leadsConverted += 1;
+    }
+    // Preserve the older "converted after first contact" attribution metric
+    // for compatibility with the conversion-rate KPI.
     const attrRows = (leadAttrInRange.data ?? []) as Array<{ lead_id: string; first_contact_at: string | null; converted_at: string | null }>;
     let leadsConvertedAfterContact = 0;
-    let leadsWithContact = 0;
     for (const r of attrRows) {
-      if (r.first_contact_at) leadsWithContact += 1;
       if (r.first_contact_at && r.converted_at) leadsConvertedAfterContact += 1;
     }
-    const leadsNotContacted = Math.max(0, uniqueLeads - leadsWithContact);
 
     // Paid orders
     const paidRows = (paidPaymentsRes.data ?? []) as Array<{ application_id: string | null; amount: number; base_amount: number | null; gst_amount: number | null; gateway_name: string | null; applications: any }>;
@@ -426,6 +448,38 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     const paidOrders = paidAppIds.size;
     const paidOrdersPrev = paidPaymentsPrevRes.count ?? 0;
 
+    // Universe of all paid application ids (across all time) — used to scope
+    // "order" alerts and "orders not contacted" to real payment-successful orders.
+    const allPaidAppIds = new Set<string>(
+      ((allPaidAppIdsRes.data ?? []) as Array<{ application_id: string | null }>)
+        .map((r) => r.application_id)
+        .filter((id): id is string => !!id),
+    );
+
+    // Order alerts (payment-successful only, older than 3d/7d, not terminal).
+    async function countAgingPaid(cutoffIso: string): Promise<number> {
+      if (allPaidAppIds.size === 0) return 0;
+      const ids = Array.from(allPaidAppIds);
+      // Supabase caps `.in()` size; chunk into batches of 500.
+      let total = 0;
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const { count } = await admin
+          .from("applications")
+          .select("id", { count: "exact", head: true })
+          .eq("is_deleted", false)
+          .in("id", chunk)
+          .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
+          .lt("created_at", cutoffIso);
+        total += count ?? 0;
+      }
+      return total;
+    }
+    const [ordersDelayed3d, ordersDelayed7d] = await Promise.all([
+      countAgingPaid(threeDaysAgoIso),
+      countAgingPaid(sevenDaysAgoIso),
+    ]);
+
     // Email delivery (dedupe by message_id → latest status)
     const latestByMsg = new Map<string, string>();
     for (const r of (emailLogRes.data ?? []) as Array<{ message_id: string | null; status: string; created_at: string }>) {
@@ -439,17 +493,49 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       else if (s === "failed" || s === "dlq" || s === "bounced") emailFailed += 1;
     }
 
-    // Staff activity
+    // Staff activity — first try auth schema, fall back to auth admin API
+    // (Lovable Cloud service_role often doesn't expose auth.users via schema()).
     const staffTotal = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
-    const authRows = (staffAuthRes.data ?? []) as Array<{ id: string; last_sign_in_at: string | null }>;
     const staffRoleIds = new Set(((staffRoles.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+    let authRows = (staffAuthRes.data ?? []) as Array<{ id: string; last_sign_in_at: string | null }>;
+    if (!authRows.length) {
+      try {
+        const collected: Array<{ id: string; last_sign_in_at: string | null }> = [];
+        for (let page = 1; page <= 20; page += 1) {
+          const { data, error } = await (admin as any).auth.admin.listUsers({ page, perPage: 200 });
+          if (error) break;
+          const users = (data?.users ?? []) as Array<{ id: string; last_sign_in_at: string | null }>;
+          collected.push(...users.map((u) => ({ id: u.id, last_sign_in_at: u.last_sign_in_at ?? null })));
+          if (users.length < 200) break;
+        }
+        authRows = collected;
+      } catch {
+        // ignore
+      }
+    }
     const staffActiveToday = authRows.filter((u) => staffRoleIds.has(u.id) && u.last_sign_in_at && u.last_sign_in_at >= todayStartIso).length;
     const staffInactive = Math.max(0, staffTotal - staffActiveToday);
 
-    // Orders not contacted (customer not called after order created)
-    const contactedLeadIds = new Set(((contactedLeadIdsRes.data ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id));
-    const uncontactedApps = ((notContactedAppsRes.data ?? []) as Array<{ id: string; created_at: string; lead_id: string | null }>)
-      .filter((a) => !a.lead_id || !contactedLeadIds.has(a.lead_id));
+    // Orders not contacted — payment-successful applications older than 3h
+    // whose linked lead has never had a contact event.
+    let uncontactedApps: Array<{ id: string; created_at: string; lead_id: string | null }> = [];
+    if (allPaidAppIds.size > 0) {
+      const ids = Array.from(allPaidAppIds);
+      const acc: typeof uncontactedApps = [];
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const { data } = await admin
+          .from("applications")
+          .select("id, created_at, lead_id")
+          .eq("is_deleted", false)
+          .in("id", chunk)
+          .lt("created_at", threeHoursAgoIso)
+          .limit(5000);
+        acc.push(...((data ?? []) as typeof uncontactedApps));
+      }
+      const contactedLeadIds = new Set(((contactedLeadIdsRes.data ?? []) as Array<{ lead_id: string }>).map((r) => r.lead_id));
+      uncontactedApps = acc.filter((a) => !a.lead_id || !contactedLeadIds.has(a.lead_id));
+    }
     const ordersNotContacted3h = uncontactedApps.length;
     const ordersNotContacted5h = uncontactedApps.filter((a) => a.created_at < fiveHoursAgoIso).length;
 
@@ -484,6 +570,8 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
         uniqueLeads,
         uniqueLeadsPrev,
         leadsNotContacted,
+        leadsContacted,
+        leadsConverted,
         leadsConvertedAfterContact,
         paidOrders,
         paidOrdersPrev,
@@ -492,10 +580,11 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
         technicalDelay: technicalDelayRes.count ?? 0,
         customerDelay: customerDelayRes.count ?? 0,
         formNotSubmitted: formNotSubmittedRes.count ?? 0,
-        ordersDelayed3d: delayed3dRes.count ?? 0,
-        ordersDelayed7d: delayed7dRes.count ?? 0,
+        ordersDelayed3d,
+        ordersDelayed7d,
         ticketsRaised: ticketsRaisedRes.count ?? 0,
         ticketsRaisedPrev: ticketsRaisedPrevRes.count ?? 0,
+        ticketsActive: ticketsActiveRes.count ?? 0,
         ticketsClosed: ticketsClosedRes.count ?? 0,
         ticketsPending3d: ticketsPending3dRes.count ?? 0,
         refundAccepted: refundAcceptedRes.count ?? 0,

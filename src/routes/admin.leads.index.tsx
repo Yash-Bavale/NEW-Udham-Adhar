@@ -75,6 +75,19 @@ function LeadsPage() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const role = useRole();
 
+  // Hydrate filters from URL query params (deep-links from dashboard KPIs).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const st = sp.get("status");
+    const flt = sp.get("filter");
+    if (st && LEAD_STATUSES.includes(st as never)) { setStatus(st); setDefaultApplied(true); return; }
+    if (flt === "not_contacted") { setStatus("new_lead"); setDefaultApplied(true); }
+    else if (flt === "converted") { setStatus("payment_successful"); setDefaultApplied(true); }
+    else if (flt === "contacted") { setStatus("contacted"); setDefaultApplied(true); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Debounce the search input → committed `search` (300ms).
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
