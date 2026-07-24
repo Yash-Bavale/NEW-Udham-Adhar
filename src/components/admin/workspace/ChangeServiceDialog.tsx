@@ -76,13 +76,21 @@ function ChangeServiceDialog({
     setBusy(true);
     try {
       const r = await changeFn({ data: { orderId, newServiceId: newId } });
-      const msg = r.delta > 0.01
-        ? `Service changed. Top-up of ₹${r.delta.toFixed(2)} required — supplementary link created.`
+      const priceMsg = r.delta > 0.01
+        ? `Top-up of ₹${r.delta.toFixed(2)} required — supplementary link created.`
         : r.delta < -0.01
-          ? `Service changed. Customer overpaid by ₹${Math.abs(r.delta).toFixed(2)} (no refund per policy).`
-          : `Service changed. Amount unchanged.`;
-      toast.success(msg);
+          ? `Customer overpaid by ₹${Math.abs(r.delta).toFixed(2)} (no refund per policy).`
+          : `Amount unchanged.`;
+      const emailMsg = r.emailSent
+        ? " Updated invoice emailed to customer."
+        : r.invoiceRegenerated
+          ? " Invoice updated (email could not be sent)."
+          : " No paid invoice found to regenerate.";
+      toast.success(`Service changed. ${priceMsg}${emailMsg}`);
       qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-emails"] });
+      qc.invalidateQueries({ queryKey: ["admin.invoices"] });
+      qc.invalidateQueries({ queryKey: ["payment-link-status", orderId] });
       onClose();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to change service");
