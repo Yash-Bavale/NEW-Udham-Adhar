@@ -92,11 +92,7 @@ function OrderDetailPage() {
       showConsultationPanel={showConsultationPanel}
       consultationMode={consultationMode}
       canComplete={!role.has("support")}
-      notesNode={
-        <div className="space-y-4">
-          <ExceptionBanner orderId={orderId} />
-        </div>
-      }
+      notesNode={null}
     />
   );
 }
