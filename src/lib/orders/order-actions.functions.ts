@@ -470,6 +470,41 @@ export const completeOrder = createServerFn({ method: "POST" })
 
 // ─────────────────────── Refund Lifecycle (E011) ───────────────────────
 
+/** Write an entry into refund_request_events for the given application's active request. */
+async function writeRefundEvent(
+  applicationId: string,
+  action: string,
+  userId: string,
+  extras: { note?: string | null; meta?: Record<string, unknown> } = {},
+) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: req } = await supabaseAdmin
+      .from("refund_requests")
+      .select("id")
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!req) return;
+    const [{ data: profile }, { data: roleRow }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).limit(1).maybeSingle(),
+    ]);
+    await supabaseAdmin.from("refund_request_events").insert({
+      request_id: req.id,
+      actor_id: userId,
+      actor_name: profile?.display_name || profile?.email || "Staff",
+      actor_role: (roleRow as { role?: string } | null)?.role ?? "staff",
+      action,
+      note: extras.note ?? null,
+      meta: extras.meta ?? {},
+    } as never);
+  } catch (e) {
+    console.warn("[writeRefundEvent] failed", e);
+  }
+}
+
 /** Customer / staff files a refund request → REFUND_REQUESTED + refund_requests row. */
 export const requestRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -478,6 +513,8 @@ export const requestRefund = createServerFn({ method: "POST" })
       orderId: z.string().uuid(),
       reason: z.string().min(3).max(2000),
       amount: z.number().positive().optional(),
+      mode: z.enum(["full", "partial"]).optional(),
+      customerNotes: z.string().max(2000).optional(),
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
@@ -486,14 +523,22 @@ export const requestRefund = createServerFn({ method: "POST" })
     });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const app = updated as Record<string, unknown>;
-    await supabaseAdmin.from("refund_requests").insert({
+    const { data: inserted } = await supabaseAdmin.from("refund_requests").insert({
       application_id: data.orderId,
       lead_id: (app.lead_id as string | null) ?? null,
       reason: data.reason,
       status: "pending",
       refund_amount: data.amount ?? null,
+      refund_mode: data.mode ?? "full",
+      customer_notes: data.customerNotes ?? null,
       created_by: context.userId,
-    } as never);
+    } as never).select("id").single();
+    if (inserted?.id) {
+      await writeRefundEvent(data.orderId, "raised", context.userId, {
+        note: data.reason,
+        meta: { amount: data.amount ?? null, mode: data.mode ?? "full" },
+      });
+    }
     await notifyOrderEvent({
       order: {
         id: data.orderId,
@@ -508,7 +553,15 @@ export const requestRefund = createServerFn({ method: "POST" })
     return { ok: true, order: updated };
   });
 
-/** Admin approves refund → REFUND_APPROVED. Requires admin role. */
+async function assertFinanceOrAdmin(supabase: any, userId: string) {
+  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const ok = (data ?? []).some((r: { role: string }) =>
+    ["admin", "super_admin", "finance"].includes(r.role),
+  );
+  if (!ok) throw new Error("Forbidden: admin or finance required");
+}
+
+/** Admin approves refund → REFUND_APPROVED. Requires admin or finance role. */
 export const approveRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
@@ -516,14 +569,13 @@ export const approveRefund = createServerFn({ method: "POST" })
       orderId: z.string().uuid(),
       amount: z.number().positive(),
       adminNotes: z.string().max(2000).optional(),
+      mode: z.enum(["full", "partial"]).optional(),
+      deductionAmount: z.number().min(0).optional(),
+      deductionReason: z.string().max(500).optional(),
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Forbidden: admin required");
+    await assertFinanceOrAdmin(context.supabase, context.userId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_APPROVED", {
       remarks: data.adminNotes ?? null,
     });
@@ -533,12 +585,24 @@ export const approveRefund = createServerFn({ method: "POST" })
       .update({
         status: "approved",
         refund_amount: data.amount,
+        refund_mode: data.mode ?? "full",
+        deduction_amount: data.deductionAmount ?? null,
+        deduction_reason: data.deductionReason ?? null,
         admin_notes: data.adminNotes ?? null,
         reviewer_id: context.userId,
         decided_at: new Date().toISOString(),
       } as never)
       .eq("application_id", data.orderId)
       .eq("status", "pending");
+    await writeRefundEvent(data.orderId, "approved", context.userId, {
+      note: data.adminNotes ?? null,
+      meta: {
+        amount: data.amount,
+        mode: data.mode ?? "full",
+        deduction_amount: data.deductionAmount ?? 0,
+        deduction_reason: data.deductionReason ?? null,
+      },
+    });
     const app2 = updated as Record<string, unknown> | null;
     await notifyOrderEvent({
       order: {
@@ -554,7 +618,7 @@ export const approveRefund = createServerFn({ method: "POST" })
     return { ok: true, order: updated };
   });
 
-/** Admin rejects refund → back to previous status (kept as REFUND_REQUESTED, note only). */
+/** Admin rejects refund. */
 export const rejectRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
@@ -564,11 +628,7 @@ export const rejectRefund = createServerFn({ method: "POST" })
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Forbidden: admin required");
+    await assertFinanceOrAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("refund_requests")
@@ -580,12 +640,91 @@ export const rejectRefund = createServerFn({ method: "POST" })
       } as never)
       .eq("application_id", data.orderId)
       .eq("status", "pending");
+    await writeRefundEvent(data.orderId, "rejected", context.userId, { note: data.reason });
     // Move order back to IN_PROCESSING (force — REFUND_REQUESTED can't reach it normally).
     const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING", {
       remarks: `Refund rejected: ${data.reason}`,
       force: true,
     });
     return { ok: true, order: updated };
+  });
+
+/** Ask customer for more info on a pending refund (sets status = info_needed). */
+export const requestRefundInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      note: z.string().min(3).max(2000),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinanceOrAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        status: "info_needed",
+        info_needed_note: data.note,
+      } as never)
+      .eq("application_id", data.orderId)
+      .in("status", ["pending", "info_needed"]);
+    await writeRefundEvent(data.orderId, "info_needed", context.userId, { note: data.note });
+    return { ok: true };
+  });
+
+/** Escalate a refund to super_admin review. */
+export const escalateRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      note: z.string().min(3).max(2000),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinanceOrAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("refund_requests")
+      .update({
+        status: "escalated",
+        escalation_note: data.note,
+      } as never)
+      .eq("application_id", data.orderId)
+      .in("status", ["pending", "info_needed", "escalated"]);
+    await writeRefundEvent(data.orderId, "escalated", context.userId, { note: data.note });
+    await (async () => {
+      try {
+        const { emitToRole } = await import("@/lib/notifications/emit.server");
+        await emitToRole("super_admin", {
+          kind: "refund_escalated",
+          title: "Refund escalated",
+          body: data.note.slice(0, 200),
+          href: `/admin/refunds`,
+          entityKind: "order",
+          entityId: data.orderId,
+        });
+      } catch (e) {
+        console.warn("[escalateRefund] notify failed", e);
+      }
+    })();
+    return { ok: true };
+  });
+
+/** Append a free-form audit note to a refund request. */
+export const addRefundNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      orderId: z.string().uuid(),
+      note: z.string().min(1).max(2000),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinanceOrAdmin(context.supabase, context.userId);
+    await writeRefundEvent(data.orderId, "note", context.userId, { note: data.note });
+    return { ok: true };
   });
 
 /**
@@ -599,15 +738,12 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       orderId: z.string().uuid(),
       amount: z.number().positive(),
       paymentReference: z.string().min(1).max(200),
+      gatewayName: z.string().max(60).optional(),
       processedOn: z.string().datetime().optional(),
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Forbidden: admin required");
+    await assertFinanceOrAdmin(context.supabase, context.userId);
 
     const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
@@ -621,9 +757,18 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .update({
         admin_notes: `PROCESSED @ ${processedAt} | Ref: ${data.paymentReference} | Amount: ₹${data.amount}`,
         refund_amount: data.amount,
+        gateway_ref: data.paymentReference,
+        gateway_name: data.gatewayName ?? null,
+        processed_at: processedAt,
+        processed_by: context.userId,
       } as never)
       .eq("application_id", data.orderId)
       .eq("status", "approved");
+
+    await writeRefundEvent(data.orderId, "processed", context.userId, {
+      note: `Ref ${data.paymentReference}`,
+      meta: { amount: data.amount, gateway_ref: data.paymentReference, gateway_name: data.gatewayName ?? null },
+    });
 
     let emailQueued = false;
     if (to) {
@@ -652,6 +797,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[markRefundProcessed] auto-close failed", e);
     }
+
 
     return { ok: true, order: updated, emailQueued };
   });

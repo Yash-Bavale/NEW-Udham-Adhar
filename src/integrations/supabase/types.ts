@@ -2806,6 +2806,50 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_request_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          created_at: string
+          id: string
+          meta: Json
+          note: string | null
+          request_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          meta?: Json
+          note?: string | null
+          request_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          meta?: Json
+          note?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "refund_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       refund_requests: {
         Row: {
           admin_notes: string | null
@@ -2814,12 +2858,21 @@ export type Database = {
           created_by: string | null
           customer_notes: string | null
           decided_at: string | null
+          deduction_amount: number | null
+          deduction_reason: string | null
+          escalation_note: string | null
+          gateway_name: string | null
+          gateway_ref: string | null
           id: string
+          info_needed_note: string | null
           lead_id: string | null
           payment_id: string | null
+          processed_at: string | null
+          processed_by: string | null
           reason: string | null
           reason_code: string | null
           refund_amount: number | null
+          refund_mode: string
           reviewer_id: string | null
           status: Database["public"]["Enums"]["refund_request_status"]
           updated_at: string
@@ -2831,12 +2884,21 @@ export type Database = {
           created_by?: string | null
           customer_notes?: string | null
           decided_at?: string | null
+          deduction_amount?: number | null
+          deduction_reason?: string | null
+          escalation_note?: string | null
+          gateway_name?: string | null
+          gateway_ref?: string | null
           id?: string
+          info_needed_note?: string | null
           lead_id?: string | null
           payment_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
           reason?: string | null
           reason_code?: string | null
           refund_amount?: number | null
+          refund_mode?: string
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["refund_request_status"]
           updated_at?: string
@@ -2848,12 +2910,21 @@ export type Database = {
           created_by?: string | null
           customer_notes?: string | null
           decided_at?: string | null
+          deduction_amount?: number | null
+          deduction_reason?: string | null
+          escalation_note?: string | null
+          gateway_name?: string | null
+          gateway_ref?: string | null
           id?: string
+          info_needed_note?: string | null
           lead_id?: string | null
           payment_id?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
           reason?: string | null
           reason_code?: string | null
           refund_amount?: number | null
+          refund_mode?: string
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["refund_request_status"]
           updated_at?: string
