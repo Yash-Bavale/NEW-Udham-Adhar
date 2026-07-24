@@ -266,19 +266,18 @@ export function FormSubmissionPanel({
 
   return (
     <>
-      {/* Summary Box with Customer Name & Mobile Number details */}
-      <div className="mb-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm md:text-base">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-medium">Customer:</span>
-          <span className="text-slate-800 font-bold">{lead?.name ?? "—"}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-medium">Mobile:</span>
-          <span className="text-slate-800 font-semibold font-mono">{lead?.mobile ?? "—"}</span>
-        </div>
-      </div>
-
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
+        {/* Unified header: customer identity + form title in one card */}
+        <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 font-medium">Customer:</span>
+            <span className="text-slate-800 font-bold">{lead?.name ?? "—"}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 font-medium">Mobile:</span>
+            <span className="text-slate-800 font-semibold font-mono">{lead?.mobile ?? "—"}</span>
+          </div>
+        </div>
         {/* Header */}
         <div className="px-5 py-3 border-b bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
@@ -302,6 +301,7 @@ export function FormSubmissionPanel({
           </div>
           {statusPill}
         </div>
+
         <div className="flex items-center gap-2">
           {formLink && (
             <Button size="sm" variant="outline" onClick={handleCopy} disabled={isLocked} className="h-8 text-xs">

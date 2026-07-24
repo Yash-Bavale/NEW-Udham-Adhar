@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { ChangeServiceButton } from "./ChangeServiceDialog";
-import { TabStatusHeader } from "./TabStatusHeader";
+
 
 import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
 import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
@@ -614,15 +614,7 @@ export function WorkspaceShell(p: Props) {
           </TabsList>
 
           <div className="w-full mt-5 space-y-5">
-            {/* Sticky "where are we + what's next" strip for every tab. Display-only —
-                the single action surface lives inside the Employee Workflow tab. */}
-            <TabStatusHeader
-              applicationCode={application.application_code}
-              orderStatus={orderStatus}
-              stage={p.stage}
-              updatedAt={application.updated_at ?? application.created_at}
-              fulfillmentStatus={current}
-            />
+
             <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
               {/* ── B1 to B10 Task Actions Bar ── */}
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
