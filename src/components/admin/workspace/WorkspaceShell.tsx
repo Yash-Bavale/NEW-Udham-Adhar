@@ -913,10 +913,9 @@ export function WorkspaceShell(p: Props) {
               </TabsContent>
             )}
           </div>
+        </Tabs>
       </div>
-    </Tabs>
-      </div >
-    </TooltipProvider >
+    </TooltipProvider>
   );
 }
 
