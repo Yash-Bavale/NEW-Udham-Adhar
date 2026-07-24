@@ -13,6 +13,7 @@ import {
   FileText,
   AlertTriangle,
   StickyNote,
+  MessageCircle,
 } from "lucide-react";
 import {
   getFormSubmissionForApplication,
@@ -22,6 +23,7 @@ import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
@@ -136,6 +138,18 @@ export function FormSubmissionPanel({
   const { data, isLoading } = useQuery({
     queryKey: ["admin.formSubmission", applicationId],
     queryFn: () => getFn({ data: { applicationId } }),
+  });
+
+  // Live-refresh whenever the customer's auto-save writes to the draft, or
+  // uploads/removes a document for this application. Keeps the panel in sync
+  // without a manual refresh.
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["admin.formSubmission", applicationId] });
+  useRealtimeTable("onboarding_submissions", invalidate, {
+    filter: `application_id=eq.${applicationId}`,
+  });
+  useRealtimeTable("documents", invalidate, {
+    filter: `application_id=eq.${applicationId}`,
   });
 
   const formLink = data?.lead?.lead_code
@@ -346,6 +360,30 @@ export function FormSubmissionPanel({
                 <Mail className="size-3.5 mr-1.5" />
               )}
               Resend form link
+            </Button>
+          )}
+          {formLink && lead?.mobile && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isLocked}
+              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              title={isLocked ? "Order is completed — form link is disabled" : "Send form link on WhatsApp"}
+              onClick={() => {
+                if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
+                // Normalize mobile to digits and prepend country code if missing.
+                const digits = String(lead.mobile).replace(/\D/g, "");
+                const wa = digits.length === 10 ? `91${digits}` : digits;
+                const svc = (service?.service_name as string) || (lead?.service as string) || "your service";
+                const name = (lead?.name as string) || "there";
+                const text =
+                  `Hi ${name},\n\nPlease fill the details for *${svc}* using the secure link below to help us process your order.\n\n${formLink}\n\nIf you've already submitted, please ignore this message.\n— Team BHS`;
+                const url = `https://wa.me/${wa}?text=${encodeURIComponent(text)}`;
+                window.open(url, "_blank", "noopener");
+              }}
+            >
+              <MessageCircle className="size-3.5 mr-1.5" />
+              Send on WhatsApp
             </Button>
           )}
         </div>
