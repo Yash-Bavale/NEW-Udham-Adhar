@@ -142,6 +142,7 @@ export const createRefundRequest = createServerFn({ method: "POST" })
       reasonCode: z.string().max(64).optional(),
       customerNotes: z.string().max(2000).optional(),
       refundAmount: z.number().nonnegative().optional(),
+      refundMode: z.enum(["full", "partial"]).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -166,6 +167,7 @@ export const createRefundRequest = createServerFn({ method: "POST" })
         reason_code: data.reasonCode ?? null,
         customer_notes: data.customerNotes ?? null,
         refund_amount: data.refundAmount ?? null,
+        refund_mode: data.refundMode ?? "full",
         status: "pending",
         created_by: context.userId,
       } as never)
