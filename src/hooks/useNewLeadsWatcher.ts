@@ -123,6 +123,11 @@ export function useNewLeadsWatcher() {
             qc.invalidateQueries({ queryKey: ["notifications"] });
             qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
 
+            // Only ring loudly for lead-assignment notifications; other CRM
+            // notifications (form_submitted, delay flags, status changes) go
+            // to the notifications tray silently to avoid alert fatigue.
+            if (notif.kind !== "order_assigned") return;
+
             const dedupeKey = notif.entity_id ? `lead-${notif.entity_id}` : `notif-${notif.id}`;
             const title = notif.title || "🔔 New CRM Notification";
             const body = notif.body || "A new update or task has arrived in your queue.";
@@ -131,6 +136,7 @@ export function useNewLeadsWatcher() {
             triggerNotification(dedupeKey, title, body, url);
           },
         )
+
         .subscribe();
     })();
 
