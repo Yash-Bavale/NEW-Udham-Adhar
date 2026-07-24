@@ -1,70 +1,115 @@
-## Goal
+# Refund Module — Plan
 
-When staff changes the service on an order (pre form-submission), send a dedicated **Service Changed** email instead of reusing the E001 order confirmation, and handle three pricing scenarios with clear UI + payment-adjustment logic.
+Goal: end-to-end refund workflow with a payment-gateway-style UI (like the PayU screenshots) — employees raise requests, admins/finance review, approve, process, and track everything with full audit trail.
 
-## The three scenarios
+Existing state (reuse, don't rebuild):
 
-Let `paidSum` = total successful payments so far, `newTotal` = new service price, `delta = newTotal − paidSum`.
+- `refund_requests` table (status enum: pending/approved/rejected/info_needed/escalated).
+- Server fns: `createRefundRequest`, `listRefundRequests`, `approveRefund`, `rejectRefund`, `markRefundProcessed`.
+- Pages/dialogs: `RefundRequestDialog.tsx`, `admin.refunds.tsx` (basic list + modal).
+- Email E011 (refund processed) already wired.
 
+## Scope
 
-| Case                           | Condition      | Money action                                                               | Email content                                                                                                             | Form link                                  |
-| ------------------------------ | -------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **A. Same price**              | `|delta| ≤ ₹1` | None                                                                       | "Your service was updated as {service name}"                                                                              | New service form link                      |
-| **B. Downgrade** (new cheaper) | `delta < −₹1`  | No refund (per existing policy). Mark order as fully paid for new service. | "Your service was updated as {service name}"                                                                              | New service form link                      |
-| **C. Upgrade** (new costlier)  | `delta > ₹1`   | Create a **top-up payment link** for exactly `delta`.                      | Adjustment table: Previous service + amount paid, New service + new total, Balance due = delta, CTA button → top-up link. | Form link shown only after top-up is paid. |
+### 1. Data model additions (one migration)
 
+Add to `refund_requests`:
 
-## Deliverables
+- `refund_mode` (`full` | `partial`), `deduction_amount`, `deduction_reason`
+- `gateway_ref`, `gateway_name`, `processed_at`, `processed_by`
+- `attachments jsonb` (customer proof uploads)
+- `info_needed_note`, `escalation_note`
+- New table `refund_request_events` (id, request_id, actor_id, actor_role, action, note, meta jsonb, created_at) for audit timeline
+- GRANTs + RLS: staff read/insert/update on both; customer can insert into `refund_requests` only for own lead (via server fn).
 
-### 1. New email template `service-changed.tsx` (code `E011`)
+### 2. Server functions (`src/lib/crm/refunds.functions.ts`)
 
-Location: `src/lib/email-templates/service-changed.tsx`, registered in `registry.ts` and also seeded into `email_templates` DB table as `service_changed` so `enqueueFromTemplateInternal` can resolve it.
+- `createRefundRequestV2` — employee raise: validates lead ownership, computes max refundable = paid − deductions, records event.
+- `updateRefundRequest` — edit amount/notes while pending.
+- `requestMoreInfo` — status → info_needed, logs event, emails customer (new template E013).
+- `escalateRefund` — status → escalated (visible only to super_admin/finance_lead).
+- `approveRefund` (extend) — supports partial + deduction fields, writes event.
+- `rejectRefund` (extend) — required reason, writes event + emails customer.
+- `markRefundProcessed` (extend) — gateway/ref/mode, writes event, inserts negative payment row, sends E011.
+- `getRefundRequest(id)` — full detail with lead, application, payment, events, attachments.
+- `listRefundRequests` (extend) — filters: status, date range, gateway, assignee, search (order code / customer / UTR); pagination.
+- `refundStats` — KPI counts (pending, approved-unprocessed, processed today, refunded amount MTD).
 
-Matches existing template theme (same header, container, brand button, footer used by client-info-request / order_confirmation). Variants driven by a single `mode: "same" | "downgrade" | "upgrade"` prop:
+Role gating via `useRole`:
 
-- Common header: "Your service has been updated"
-- Summary block: Previous service → New service, Order #
-- Adjustment table (only for upgrade):
-  - Amount already paid
-  - New service total
-  - Balance due (upgrade)
-- CTA:
-  - Upgrade → "Pay balance ₹X" 
-  - Same/Downgrade → "Continue to form" → onboarding link
-- Support line + signature identical to other templates.
+- Employee: create, edit-while-pending, view own-lead requests.
+- Finance/Admin: approve/reject/info/escalate/process, view all.
+- Super admin: full + delete.
 
-### 2. Update `changeOrderService` in `src/lib/crm/orders-v2.functions.ts`
+### 3. Employee UI
 
-- Compute `mode` from delta.
-- **Upgrade**: keep current top-up `payment_links` creation; pass `top_up_url` (points to `/payment/<leadCode>` which already handles balance) + `balance_due` into vars. Do NOT regenerate invoice yet (invoice regenerates after top-up payment webhook fires).
-- **Same price**: skip invoice regeneration (nothing changed financially).
-- **Downgrade**: skip invoice regeneration (nothing changed financially).
-- Replace `enqueueFromTemplateInternal("order_confirmation", ...)` call with `"service_changed"`, passing `mode` and appropriate vars. Drop invoice attachment for upgrade case (final invoice comes after balance paid).
-- Return shape gains `mode` and `topUpUrl` for the dialog.
+- **Trigger**: replace `RefundRequestDialog` with new `RaiseRefundDrawer` on lead & order workspaces (Actions menu → "Request Refund").
+- Fields: refund mode (full/partial), amount (auto-cap to paid), reason (dropdown + free text), customer notes, optional attachments.
+- Live summary card: paid amount, previous refunds, max refundable, net payable to customer.
+- After submit → toast + inline status chip on the lead/order.
+- **My Refunds** section on `/admin/my-work`: small card + list of employee's own requests with status.
 
-### 3. Update `ChangeServiceDialog.tsx`
+### 4. Admin UI — `/admin/refunds` rebuild
 
-Before submit, show a **preview panel** once a new service is picked:
+Two-pane, PayU-inspired layout:
 
-```
-Current paid:   ₹1,180
-New total:      ₹1,770
-─────────────────────
-Balance due:    ₹590   [Upgrade badge]
-```
+**Top KPI strip** (chips like the screenshots):
+Pending · Awaiting Processing · Processed Today · Refunded (MTD) · Avg TAT.
 
-Three colored states (emerald=same, amber=upgrade, slate=downgrade) with plain-English explanation of what will happen (email + payment link / no action / no refund). Submit button label adapts: "Change & send balance link" / "Change service" / "Change (no refund)".
+**Left: filter + list**
 
-Success toast summarises mode + whether the top-up link + email were sent; existing cache invalidations kept.
+- Segmented status tabs, gateway filter, date range, search box.
+- Rows: order code, customer, amount, mode badge (Full/Partial), gateway, requested-ago, status pill.
+- Row click → opens detail drawer (right pane on desktop, full-screen on mobile).
 
-## Technical notes
+**Right: detail drawer** — modeled on the attached PayU screens:
 
-- Top-up link already reuses `/payment/<leadCode>`; the payment page reads the current lead `total_amount` (now the new service price) and the payments table dedupes against `paidSum`, so the customer pays exactly the delta — no changes needed there.
-- `email_templates` seed row for `service_changed` added via a small migration so DB-driven template resolution works alongside the React component in `TEMPLATES`.
-- No changes to `payments`, `invoices`, or webhook code. Existing invoice regeneration flow post-payment already fires E001 with the new amount for upgrades.
-- No schema changes beyond the one `email_templates` insert.
+- Header: amount, status pill, download invoice, copy IDs.
+- Tabs: **Activity** | **Details** | **Customer** | **Attachments**.
+  - Activity: vertical timeline (requested → info-needed → approved → refund initiated → raised to bank → processed) sourced from `refund_request_events`. Right column shows payment breakup (paid, deduction, refundable).
+  - Details: payment method, gateway, bank ref, txn id, UTR, error desc (if any), original payment card, actions taken table (capture / refund rows).
+  - Customer: name, email, mobile, address, device info.
+  - Attachments: proof uploads with preview.
+- Action bar (role-aware):
+  - Pending → Approve (opens amount + deduction form) · Reject (reason required) · Request More Info · Escalate.
+  - Approved → Mark Processed (gateway + UTR + mode) · Revoke.
+  - Processed/Rejected → read-only, download receipt.
 
-## Out of scope
+### 5. Notifications & emails
 
-- Actual refund automation for downgrades (policy remains "no refund").
-- Changing service after form is submitted (still blocked by existing guard).
+- E011 (existing) — refund processed.
+- New E013 — "Additional info needed for your refund" (variables: order_code, note).
+- New E014 — "Refund request rejected" (reason).
+- Realtime: `notifications` insert on status change; toast for finance role on new pending refund.
+
+### 6. Order/Lead workspace integration
+
+- Show a compact **Refund Status Card** on `WorkspaceShell` finance tab when a request exists (status pill + latest event + link to detail).
+- Journey Map: highlight refund path when request is active (reuse existing refund_approved / refunded stages).
+
+### 7. Tracking / reports
+
+- `/admin/reports` add "Refunds" section: totals by gateway, by reason_code, by staff (requester & approver), avg TAT.
+- CSV export from list view (respects filters).
+
+## Deliverables checklist
+
+1. Migration: schema + grants + RLS + events table.
+2. `refunds.functions.ts` — new/extended server fns + Zod validators.
+3. `RaiseRefundDrawer.tsx` (employee) — replaces old dialog.
+4. `admin.refunds.tsx` — new two-pane layout with drawer + tabs.
+5. `RefundStatusCard.tsx` on lead + order workspaces.
+6. Email templates E013, E014 registered + wired.
+7. Realtime + notification hooks (`useRefundNotifications`).
+8. Reports section + CSV export.
+9. Role gating verified via `useRole` (employee/finance/admin/super_admin).
+10. Manual QA pass: happy path (raise → approve → process → E011), partial refund with deduction, reject flow, info-needed loop, escalation visibility.
+
+## Open questions before build
+
+1. **Deductions/adjustments**: should employees be allowed to propose a deduction, or only finance during approval? (I'll default to *finance-only* unless you say otherwise.)
+2. **Attachments**: allow customer proof uploads on the request (e.g. screenshots)? Storage bucket `refund-attachments` :no
+3. **Auto-refund via gateway API** (PayU, ccavenue refund API) or keep it manual UTR entry as today? automated
+4. **Who can escalate/see escalated queue** — super_admin  also finance
+
+Please confirm answers to Q1–Q4 (or say "your defaults") and I'll implement.
