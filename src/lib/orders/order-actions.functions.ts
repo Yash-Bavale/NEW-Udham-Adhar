@@ -513,6 +513,8 @@ export const requestRefund = createServerFn({ method: "POST" })
       orderId: z.string().uuid(),
       reason: z.string().min(3).max(2000),
       amount: z.number().positive().optional(),
+      mode: z.enum(["full", "partial"]).optional(),
+      customerNotes: z.string().max(2000).optional(),
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
