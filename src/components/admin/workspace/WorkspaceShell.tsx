@@ -818,7 +818,7 @@ export function WorkspaceShell(p: Props) {
                             <TooltipContent>{btn.tooltip}{!enabled ? " (Disabled for current stage)" : ""}</TooltipContent>
                           </Tooltip>
                         );
-                      })}
+                      })
                     })()}
                   </div>
                 </div>
