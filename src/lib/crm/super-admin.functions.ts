@@ -125,6 +125,8 @@ export type SuperAdminOverview = {
     uniqueLeads: number;
     uniqueLeadsPrev: number;
     leadsNotContacted: number;
+    leadsContacted: number;
+    leadsConverted: number;
     leadsConvertedAfterContact: number;
     paidOrders: number;
     paidOrdersPrev: number;
@@ -137,6 +139,7 @@ export type SuperAdminOverview = {
     ordersDelayed7d: number;
     ticketsRaised: number;
     ticketsRaisedPrev: number;
+    ticketsActive: number;
     ticketsClosed: number;
     ticketsPending3d: number;
     refundAccepted: number;
