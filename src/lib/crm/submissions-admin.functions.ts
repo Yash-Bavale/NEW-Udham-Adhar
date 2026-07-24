@@ -240,7 +240,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
         app.service_id
           ? supabase
               .from("services")
-              .select("id, service_code, service_name")
+              .select("id, service_code, service_name, govt_portal_url")
               .eq("id", app.service_id)
               .maybeSingle()
           : Promise.resolve({ data: null }),
