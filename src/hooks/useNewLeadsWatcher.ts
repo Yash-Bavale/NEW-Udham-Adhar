@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, playLeadRingSound } from "@/hooks/useNotifications";
 import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 
@@ -26,6 +26,12 @@ export function useNewLeadsWatcher() {
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
+    const invalidateLeadsData = () => {
+      qc.invalidateQueries({ queryKey: ["admin.leads"] });
+      qc.invalidateQueries({ queryKey: ["admin.leadCounts"] });
+      qc.invalidateQueries({ queryKey: ["my-work"] });
+    };
+
     (async () => {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
@@ -35,15 +41,26 @@ export function useNewLeadsWatcher() {
         .channel(topic)
         .on(
           "postgres_changes" as never,
+          { event: "*", schema: "public", table: "leads" },
+          () => {
+            invalidateLeadsData();
+          }
+        )
+        .on(
+          "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "leads" },
           (payload: { new?: { id?: string; name?: string | null; full_name?: string | null; phone?: string | null; service_slug?: string | null; assigned_to?: string | null } }) => {
             const lead = payload.new ?? {};
             if (!isAdmin && lead.assigned_to !== uid) return;
+            
             setUnseen((n) => n + 1);
-            qc.invalidateQueries({ queryKey: ["leads"] });
-            const title = "New lead received";
+            invalidateLeadsData();
+            playLeadRingSound();
+
+            const title = "🔔 New lead received!";
             const body = [lead.name || lead.full_name, lead.service_slug, lead.phone].filter(Boolean).join(" · ") || "Open the leads queue";
             const url = lead.id ? `/admin/leads/${lead.id}` : "/admin/leads";
+            
             notify({
               title,
               body,
@@ -52,8 +69,8 @@ export function useNewLeadsWatcher() {
             });
             toast.info(title, {
               description: body,
-              duration: 5000,
-              action: { label: "View", onClick: () => { window.location.href = url; } },
+              duration: 6000,
+              action: { label: "View Lead", onClick: () => { window.location.href = url; } },
             });
           },
         )
@@ -63,13 +80,18 @@ export function useNewLeadsWatcher() {
           (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; name?: string | null; full_name?: string | null; lead_code?: string | null; assigned_to?: string | null } }) => {
             const newLead = payload.new ?? {};
             const oldLead = payload.old ?? {};
+            
+            invalidateLeadsData();
+
             if (newLead.assigned_to === uid && oldLead.assigned_to !== uid) {
               setUnseen((n) => n + 1);
-              qc.invalidateQueries({ queryKey: ["leads"] });
               qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-              const title = "Lead Assigned to You";
+              playLeadRingSound();
+
+              const title = "🎯 Lead Assigned to You";
               const body = `Lead ${newLead.name || newLead.full_name || newLead.lead_code || ""} is now assigned to your queue.`;
               const url = newLead.id ? `/admin/leads/${newLead.id}` : "/admin/leads";
+              
               notify({
                 title,
                 body,
@@ -78,8 +100,8 @@ export function useNewLeadsWatcher() {
               });
               toast.info(title, {
                 description: body,
-                duration: 6000,
-                action: { label: "Open", onClick: () => { window.location.href = url; } },
+                duration: 7000,
+                action: { label: "Open Lead", onClick: () => { window.location.href = url; } },
               });
             }
           },
@@ -92,16 +114,19 @@ export function useNewLeadsWatcher() {
             qc.invalidateQueries({ queryKey: ["notifications"] });
             if (notif.kind === "order_assigned") {
               setUnseen((n) => n + 1);
-              qc.invalidateQueries({ queryKey: ["leads"] });
+              invalidateLeadsData();
               qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-              const title = notif.title || "New Task Assigned";
+              playLeadRingSound();
+
+              const title = notif.title || "📋 New Task Assigned";
               const body = notif.body || "A new lead/order has been assigned to you.";
               const url = notif.href || "/admin/leads";
+              
               notify({ title, body, url, tag: `notif-${notif.id ?? Date.now()}` });
               toast.info(title, {
                 description: body,
-                duration: 6000,
-                action: { label: "View", onClick: () => { window.location.href = url; } },
+                duration: 7000,
+                action: { label: "View Task", onClick: () => { window.location.href = url; } },
               });
             }
           },
@@ -117,3 +142,5 @@ export function useNewLeadsWatcher() {
 
   return { unseen };
 }
+
+
