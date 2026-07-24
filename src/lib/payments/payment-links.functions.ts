@@ -105,7 +105,7 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
 
     const { data: link } = await supabaseAdmin
       .from("payment_links" as any)
-      .select("id, txnid, payment_url, amount, status, created_at, expires_at, opened_at, paid_at")
+      .select("id, txnid, payment_url, amount, status, created_at, expires_at, opened_at, paid_at, payment_id")
       .eq("lead_id", data.leadId)
       .order("created_at", { ascending: false })
       .limit(1)
