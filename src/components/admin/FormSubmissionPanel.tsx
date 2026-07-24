@@ -345,29 +345,12 @@ export function FormSubmissionPanel({
               <Copy className="size-3.5 mr-1.5" /> Copy link
             </Button>
           )}
-          {lead?.id && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleResend}
-              disabled={resending || isLocked}
-              className="h-8 text-xs"
-              title={isLocked ? "Order is completed — form link is disabled" : undefined}
-            >
-              {resending ? (
-                <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Mail className="size-3.5 mr-1.5" />
-              )}
-              Resend form link
-            </Button>
-          )}
           {formLink && lead?.mobile && (
             <Button
               size="sm"
               variant="outline"
               disabled={isLocked}
-              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium"
               title={isLocked ? "Order is completed — form link is disabled" : "Send form link on WhatsApp"}
               onClick={() => {
                 if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
@@ -382,8 +365,25 @@ export function FormSubmissionPanel({
                 window.open(url, "_blank", "noopener");
               }}
             >
-              <MessageCircle className="size-3.5 mr-1.5" />
+              <MessageCircle className="size-3.5 mr-1.5 text-emerald-600" />
               Send on WhatsApp
+            </Button>
+          )}
+          {lead?.id && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleResend}
+              disabled={resending || isLocked}
+              className="h-8 text-xs font-medium"
+              title={isLocked ? "Order is completed — form link is disabled" : undefined}
+            >
+              {resending ? (
+                <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Mail className="size-3.5 mr-1.5" />
+              )}
+              Resend form link
             </Button>
           )}
         </div>
