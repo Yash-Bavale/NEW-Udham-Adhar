@@ -123,7 +123,7 @@ export const getRefundDetail = createServerFn({ method: "POST" })
     const { data: req, error } = await admin
       .from("refund_requests")
       .select(
-        "*, application:applications(id, application_code, order_status, fulfillment_status, service_id, total_amount, paid_amount, customer_id), lead:leads(id, name, email, mobile, service, state, lead_code)",
+        "*, application:applications(id, application_code, order_status, fulfillment_status, service_id, customer_id), lead:leads(id, name, email, mobile, service, state, lead_code, base_amount, gst_amount, total_amount)",
       )
       .eq("id", data.id)
       .maybeSingle();
