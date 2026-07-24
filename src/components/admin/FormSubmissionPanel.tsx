@@ -140,6 +140,18 @@ export function FormSubmissionPanel({
     queryFn: () => getFn({ data: { applicationId } }),
   });
 
+  // Live-refresh whenever the customer's auto-save writes to the draft, or
+  // uploads/removes a document for this application. Keeps the panel in sync
+  // without a manual refresh.
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["admin.formSubmission", applicationId] });
+  useRealtimeTable("onboarding_submissions", invalidate, {
+    filter: `application_id=eq.${applicationId}`,
+  });
+  useRealtimeTable("documents", invalidate, {
+    filter: `application_id=eq.${applicationId}`,
+  });
+
   const formLink = data?.lead?.lead_code
     ? `${(typeof window !== "undefined" && window.location?.origin) || "https://udyamadhar.in"}/onboarding/${data.lead.lead_code}`
     : "";
