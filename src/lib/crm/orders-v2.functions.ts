@@ -1199,6 +1199,104 @@ export const changeOrderService = createServerFn({ method: "POST" })
       staff_role: (roleRows?.[0] as any)?.role ?? "staff",
     } as never);
 
+    // Regenerate invoice(s) for the latest successful payment on this order so
+    // the PDF shows the new service name, then email the customer a revised
+    // order-confirmation (E001) with the updated invoice attached.
+    let invoiceRegenerated = false;
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const { data: paidPayments } = await admin
+        .from("payments")
+        .select("id, created_at")
+        .eq("lead_id", app.lead_id)
+        .eq("status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const latestPayment = paidPayments?.[0];
+
+      if (latestPayment?.id) {
+        const { generateAndStore, loadInvoiceAttachmentByPayment } = await import("@/lib/crm/invoices.functions");
+        const actorLabel = profile?.display_name || profile?.email || "staff";
+        await generateAndStore(latestPayment.id, { id: context.userId, label: actorLabel });
+        invoiceRegenerated = true;
+
+        const attachment = await loadInvoiceAttachmentByPayment(latestPayment.id);
+
+        const { data: leadRow } = await admin
+          .from("leads")
+          .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, state")
+          .eq("id", app.lead_id)
+          .maybeSingle();
+
+        const { data: appRow } = await admin
+          .from("applications")
+          .select("application_code")
+          .eq("id", app.id)
+          .maybeSingle();
+
+        const { data: invRow } = await admin
+          .from("invoices")
+          .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
+          .eq("payment_id", latestPayment.id)
+          .maybeSingle();
+
+        if (leadRow?.email && leadRow.lead_code) {
+          const origin = process.env.APP_BASE_URL || "https://udyamadhar.in";
+          const onboardingUrl = `${origin}/onboarding/${encodeURIComponent(leadRow.lead_code)}`;
+          const invoiceUrl = `${origin}/api/public/invoice/${encodeURIComponent(leadRow.lead_code)}`;
+          const total = Number(invRow?.total_amount ?? newSvc.total_amount ?? 0);
+          const issued = invRow?.issued_at ? new Date(invRow.issued_at) : new Date();
+          const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
+          const vars: Record<string, unknown> = {
+            name: leadRow.name ?? "",
+            customer_name: leadRow.name ?? "",
+            customer_email: leadRow.email,
+            customer_mobile: leadRow.mobile ?? "",
+            lead_code: leadRow.lead_code,
+            leadCode: leadRow.lead_code,
+            order_number: appRow?.application_code ?? leadRow.lead_code,
+            service: newSvc.service_name,
+            service_name: newSvc.service_name,
+            previous_service: (oldSvc as any)?.service_name ?? "",
+            base_amount: Number(invRow?.base_amount ?? newSvc.base_amount ?? 0).toFixed(2),
+            gst_amount: Number(invRow?.gst_amount ?? newSvc.gst_amount ?? 0).toFixed(2),
+            total_amount: total.toFixed(2),
+            amount: total.toFixed(2),
+            amount_in_words: amountInWordsINR(total),
+            invoice_number: invRow?.invoice_number ?? "",
+            invoice_date: issued.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            sac_code: invRow?.sac_code ?? "998311",
+            place_of_supply: invRow?.place_of_supply ?? leadRow.state ?? "Maharashtra",
+            cgst_amount: Number(invRow?.cgst_amount ?? 0).toFixed(2),
+            sgst_amount: Number(invRow?.sgst_amount ?? 0).toFixed(2),
+            igst_amount: Number(invRow?.igst_amount ?? 0).toFixed(2),
+            form_link: onboardingUrl,
+            onboarding_url: onboardingUrl,
+            invoice_url: invoiceUrl,
+            invoice_download_url: invoiceUrl,
+            service_fee: Number(invRow?.base_amount ?? newSvc.base_amount ?? 0).toFixed(2),
+            top_up_amount: delta > 0.01 ? delta.toFixed(2) : "0.00",
+            support_email: "help@businesshelpservices.com",
+          };
+
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          await enqueueFromTemplateInternal("order_confirmation", leadRow.email, vars, {
+            toName: leadRow.name ?? undefined,
+            leadId: app.lead_id,
+            applicationId: app.id,
+            attachments: attachment ? [attachment] : undefined,
+            trigger: "manual",
+            requireImmediateSuccess: false,
+          });
+          emailSent = true;
+        }
+      }
+    } catch (e) {
+      emailError = e instanceof Error ? e.message : String(e);
+      console.error("[changeOrderService] invoice/email regen failed", e);
+    }
+
     return {
       ok: true,
       newService: newSvc,
@@ -1206,5 +1304,8 @@ export const changeOrderService = createServerFn({ method: "POST" })
       newTotal,
       delta,
       topUpLinkId,
+      invoiceRegenerated,
+      emailSent,
+      emailError,
     };
   });
