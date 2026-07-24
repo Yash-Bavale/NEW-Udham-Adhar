@@ -31,7 +31,7 @@ const EMAILS: EmailRow[] = [
   { code: "E009", name: "Ticket Resolved", trigger: "auto/manual", when: "On ticket resolve", audience: "Customer" },
   { code: "E010", name: "Ticket Closed", trigger: "auto/manual", when: "On ticket close", audience: "Customer" },
   { code: "E011", name: "Refund Approved", trigger: "auto", when: "Transition → REFUND_APPROVED", audience: "Customer + finance" },
-  { code: "E012", name: "Application Submitted (to Govt)", trigger: "auto", when: "Transition → SUBMITTED_TO_GOVT", audience: "Customer" },
+  { code: "E012", name: "Service Changed", trigger: "auto", when: "Change Service in order workspace (same / downgrade / upgrade)", audience: "Customer" },
 ];
 
 const STATUSES: { code: string; description: string; nextAllowed: string }[] = [
