@@ -1,6 +1,6 @@
 // Shared executive / super-admin dashboard. Clean shadcn UI, IST date-range aware.
 // Mounted by both /admin/dashboard and /admin/super (super-mode adds quick actions).
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
