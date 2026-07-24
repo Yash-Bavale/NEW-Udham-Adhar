@@ -105,7 +105,7 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
 
     const { data: link } = await supabaseAdmin
       .from("payment_links" as any)
-      .select("id, txnid, payment_url, amount, status, created_at, expires_at, opened_at, paid_at")
+      .select("id, txnid, payment_url, amount, status, created_at, expires_at, opened_at, paid_at, payment_id")
       .eq("lead_id", data.leadId)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -113,25 +113,31 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
 
     if (!link) return { link: null, paid: false };
 
-    // Cross-check actual payment status, but only count payments that arrived
-    // AFTER this link was minted. Otherwise, for a Talk-to-Expert converted
-    // lead the original ₹99 consultation payment would falsely mark the new
-    // link as paid and hide the share UI.
-    const { data: paidRow } = await supabaseAdmin
-      .from("payments")
-      .select("id, status, payment_date, amount, created_at")
-      .eq("lead_id", data.leadId)
-      .eq("status", "paid")
-      .gte("created_at", (link as any).created_at)
-      .order("payment_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Source of truth is the link row itself. The PayU finalize pipeline flips
+    // payment_links.status to 'paid' + stamps paid_at + payment_id when the
+    // matching payment settles. Inferring "paid" from unrelated payments (e.g.
+    // an earlier ₹99 consultation charge, or a top-up sibling) caused false
+    // "Payment Received" banners on Talk-to-Expert / service-change flows.
+    const linkRow: any = link;
+    const isPaid = linkRow.status === "paid";
+
+    let paidAmount: number | null = null;
+    if (isPaid && linkRow.payment_id) {
+      const { data: p } = await supabaseAdmin
+        .from("payments")
+        .select("amount")
+        .eq("id", linkRow.payment_id)
+        .maybeSingle();
+      paidAmount = p?.amount != null ? Number(p.amount) : Number(linkRow.amount);
+    } else if (isPaid) {
+      paidAmount = Number(linkRow.amount);
+    }
 
     return {
-      link: { ...(link as any), amount: Number((link as any).amount) },
-      paid: !!paidRow,
-      paidAt: paidRow?.payment_date ?? null,
-      paidAmount: paidRow?.amount ? Number(paidRow.amount) : null,
+      link: { ...linkRow, amount: Number(linkRow.amount) },
+      paid: isPaid,
+      paidAt: linkRow.paid_at ?? null,
+      paidAmount,
     };
   });
 
