@@ -470,6 +470,41 @@ export const completeOrder = createServerFn({ method: "POST" })
 
 // ─────────────────────── Refund Lifecycle (E011) ───────────────────────
 
+/** Write an entry into refund_request_events for the given application's active request. */
+async function writeRefundEvent(
+  applicationId: string,
+  action: string,
+  userId: string,
+  extras: { note?: string | null; meta?: Record<string, unknown> } = {},
+) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: req } = await supabaseAdmin
+      .from("refund_requests")
+      .select("id")
+      .eq("application_id", applicationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!req) return;
+    const [{ data: profile }, { data: roleRow }] = await Promise.all([
+      supabaseAdmin.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
+      supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).limit(1).maybeSingle(),
+    ]);
+    await supabaseAdmin.from("refund_request_events").insert({
+      request_id: req.id,
+      actor_id: userId,
+      actor_name: profile?.display_name || profile?.email || "Staff",
+      actor_role: (roleRow as { role?: string } | null)?.role ?? "staff",
+      action,
+      note: extras.note ?? null,
+      meta: extras.meta ?? {},
+    } as never);
+  } catch (e) {
+    console.warn("[writeRefundEvent] failed", e);
+  }
+}
+
 /** Customer / staff files a refund request → REFUND_REQUESTED + refund_requests row. */
 export const requestRefund = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
