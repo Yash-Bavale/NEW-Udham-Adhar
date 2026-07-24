@@ -13,6 +13,7 @@ import {
   FileText,
   AlertTriangle,
   StickyNote,
+  MessageCircle,
 } from "lucide-react";
 import {
   getFormSubmissionForApplication,
@@ -22,6 +23,7 @@ import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
