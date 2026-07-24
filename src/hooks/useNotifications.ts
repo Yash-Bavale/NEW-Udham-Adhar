@@ -15,48 +15,48 @@ export interface NotifyPayload {
   tag?: string;
 }
 
+function playSingleRing(ctx: AudioContext, startOffset: number) {
+  const now = ctx.currentTime + startOffset;
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = "sine";
+  osc1.frequency.setValueAtTime(587.33, now);
+  osc1.frequency.setValueAtTime(880, now + 0.12);
+  gain1.gain.setValueAtTime(0.001, now);
+  gain1.gain.linearRampToValueAtTime(0.9, now + 0.03);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(now);
+  osc1.stop(now + 0.46);
+
+  const now2 = now + 0.5;
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = "sine";
+  osc2.frequency.setValueAtTime(659.25, now2);
+  osc2.frequency.setValueAtTime(987.77, now2 + 0.12);
+  gain2.gain.setValueAtTime(0.001, now2);
+  gain2.gain.linearRampToValueAtTime(1.0, now2 + 0.03);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.5);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(now2);
+  osc2.stop(now2 + 0.51);
+}
+
 export function playLeadRingSound() {
   try {
     if (typeof window === "undefined") return;
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-
-    const now = ctx.currentTime;
-    // Tone 1 (Ding)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(587.33, now); // D5
-    osc1.frequency.setValueAtTime(880, now + 0.12); // A5
-
-    gain1.gain.setValueAtTime(0.001, now);
-    gain1.gain.linearRampToValueAtTime(0.35, now + 0.03);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.41);
-
-    // Tone 2 (Dong - second ring after 450ms)
-    const now2 = now + 0.45;
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(659.25, now2); // E5
-    osc2.frequency.setValueAtTime(987.77, now2 + 0.12); // B5
-
-    gain2.gain.setValueAtTime(0.001, now2);
-    gain2.gain.linearRampToValueAtTime(0.4, now2 + 0.03);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.45);
-
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now2);
-    osc2.stop(now2 + 0.46);
-
-    osc2.onended = () => ctx.close().catch(() => {});
+    // Loud ring, repeats 3x (~1.45s per ring).
+    const CYCLE = 1.45;
+    playSingleRing(ctx, 0);
+    playSingleRing(ctx, CYCLE);
+    playSingleRing(ctx, CYCLE * 2);
+    setTimeout(() => { ctx.close().catch(() => {}); }, CYCLE * 3 * 1000 + 200);
   } catch {
     // Ignore audio autoplay restrictions if user hasn't interacted yet
   }
