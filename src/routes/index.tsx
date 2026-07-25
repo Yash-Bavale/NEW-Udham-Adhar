@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -12,6 +12,7 @@ import {
   faqSchema,
   jsonLdScript,
 } from "@/lib/seo/jsonld";
+import { getContentfulLandingPage, type ContentfulLandingPage } from "@/lib/contentful/client.functions";
 
 const HOMEPAGE_TITLE =
   "Udyam Registration & MSME Certificate Help";
