@@ -189,7 +189,7 @@ function EmployeesPage() {
             <tbody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-3 rounded animate-pulse" style={{ background: "var(--admin-surface-2)" }} />
                     </td>
@@ -197,7 +197,7 @@ function EmployeesPage() {
                 </tr>
               ))}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center">
+                <tr><td colSpan={8} className="px-4 py-10 text-center">
                   <UserCog className="size-8 mx-auto mb-2" style={{ color: "var(--admin-fg-subtle)" }} />
                   <div className="text-sm">No employees match.</div>
                   <Button size="sm" className="mt-3 gap-1.5" onClick={() => setAddOpen(true)}>
@@ -207,7 +207,11 @@ function EmployeesPage() {
               )}
               {!isLoading && filtered.map((u, i) => (
                 <tr key={u.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: i % 2 ? "var(--admin-surface-2)" : "transparent" }}>
+                  <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                    {u.employee_code ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}
+                  </td>
                   <td className="px-4 py-2.5">{u.full_name ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
+
                   <td className="px-4 py-2.5">{u.email}</td>
                   <td className="px-4 py-2.5">{u.mobile ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
                   <td className="px-4 py-2.5">
