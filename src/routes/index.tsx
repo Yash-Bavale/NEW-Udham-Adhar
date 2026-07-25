@@ -227,7 +227,7 @@ function HomePage() {
             Here is what happens after you submit the form:
           </p>
           <ol className="mt-4 list-decimal pl-6 space-y-2 text-sm md:text-base text-foreground/85">
-            {HOW_IT_WORKS.map((s, i) => (
+            {howItWorks.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ol>
@@ -249,7 +249,7 @@ function HomePage() {
           </p>
           <p>Beyond document checking, here is what our clients consistently tell us they value:</p>
           <ul className="list-disc pl-6 space-y-1">
-            {WHY_BULLETS.map((b, i) => (
+            {whyUs.map((b, i) => (
               <li key={i}>{b}</li>
             ))}
           </ul>
@@ -266,7 +266,7 @@ function HomePage() {
         </p>
 
         <dl className="mt-8 md:mt-10 space-y-4">
-          {FAQS.map((f, i) => (
+          {faqList.map((f, i) => (
             <div
               key={i}
               className="rounded-lg border border-border bg-card p-4 md:p-5"
