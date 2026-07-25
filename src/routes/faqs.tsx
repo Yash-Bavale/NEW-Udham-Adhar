@@ -23,8 +23,11 @@ import {
 import {
   FAQS,
   FAQ_CATEGORIES,
+  type Faq,
   type FaqCategoryKey,
 } from "@/lib/faqs-data";
+import { getContentfulFaqs } from "@/lib/contentful/client.functions";
+
 
 const ICONS: Record<string, typeof UserPlus> = {
   UserPlus,
