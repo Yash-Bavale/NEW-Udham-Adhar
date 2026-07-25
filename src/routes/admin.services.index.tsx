@@ -22,11 +22,14 @@ type ServiceForm = {
   govt_portal_url?: string | null;
   website_id?: string;
   category_id?: string | null;
+  expected_processing_days?: number | null;
+  journey_key?: string | null;
 };
 
 function emptyForm(): ServiceForm {
-  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null };
+  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null, expected_processing_days: null, journey_key: "default" };
 }
+
 
 function ServicesPage() {
   const listFn = useServerFn(listServices);
