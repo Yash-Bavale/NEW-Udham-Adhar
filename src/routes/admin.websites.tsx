@@ -207,7 +207,7 @@ function WebsitesPage() {
                   <FolderPlus className="size-3.5" /> Category
                 </button>
                 <button
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, is_active: w.is_active, sort_order: w.sort_order })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, sort_order: w.sort_order })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >
