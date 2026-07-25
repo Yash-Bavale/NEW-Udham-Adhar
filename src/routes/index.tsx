@@ -88,42 +88,50 @@ const FACTS: [string, string][] = [
 ];
 
 export const Route = createFileRoute("/")({
-
-  head: () => ({
-    meta: [
-      { title: HOMEPAGE_TITLE },
-      { name: "description", content: HOMEPAGE_DESC },
-      { property: "og:title", content: HOMEPAGE_TITLE },
-      { property: "og:description", content: HOMEPAGE_DESC },
-      { property: "og:url", content: "https://udyamadhar.in/" },
-    ],
-    links: [
-      { rel: "canonical", href: "https://udyamadhar.in/" },
-      // Preload the LCP image so the browser fetches it before React mounts.
-      {
-        rel: "preload",
-        as: "image",
-        href: certImg.url,
-        fetchpriority: "high",
-      },
-    ],
-    scripts: [
-      jsonLdScript(orgSchema()),
-      jsonLdScript(faqSchema(FAQS)),
-      jsonLdScript({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "@id": "https://udyamadhar.in/#website",
-        url: "https://udyamadhar.in/",
-        name: "Udyam Registration Consultancy & Assistance Services",
-        potentialAction: {
-          "@type": "SearchAction",
-          target: "https://udyamadhar.in/faqs?q={search_term_string}",
-          "query-input": "required name=search_term_string",
+  loader: async () => ({ cms: await getContentfulLandingPage({ data: { slug: "home" } }) }),
+  head: ({ loaderData }) => {
+    const cms = (loaderData as { cms: ContentfulLandingPage | null } | undefined)?.cms;
+    const title = cms?.metaTitle || HOMEPAGE_TITLE;
+    const desc = cms?.metaDescription || HOMEPAGE_DESC;
+    const faqList = cms?.faqs?.length
+      ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
+      : FAQS;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: desc },
+        { property: "og:title", content: title },
+        { property: "og:description", content: desc },
+        { property: "og:url", content: "https://udyamadhar.in/" },
+      ],
+      links: [
+        { rel: "canonical", href: "https://udyamadhar.in/" },
+        // Preload the LCP image so the browser fetches it before React mounts.
+        {
+          rel: "preload",
+          as: "image",
+          href: certImg.url,
+          fetchpriority: "high",
         },
-      }),
-    ],
-  }),
+      ],
+      scripts: [
+        jsonLdScript(orgSchema()),
+        jsonLdScript(faqSchema(faqList)),
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "@id": "https://udyamadhar.in/#website",
+          url: "https://udyamadhar.in/",
+          name: "Udyam Registration Consultancy & Assistance Services",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: "https://udyamadhar.in/faqs?q={search_term_string}",
+            "query-input": "required name=search_term_string",
+          },
+        }),
+      ],
+    };
+  },
   component: HomePage,
 });
 
