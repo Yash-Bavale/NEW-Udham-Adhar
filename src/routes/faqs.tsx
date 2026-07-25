@@ -46,11 +46,27 @@ const PAGE_DESC =
 const CANONICAL = "https://udyamadhar.in/faqs";
 
 export const Route = createFileRoute("/faqs")({
-  head: () => {
+  loader: async () => {
+    const cf = await getContentfulFaqs();
+    const validKeys = new Set<FaqCategoryKey>(
+      FAQ_CATEGORIES.map((c) => c.key),
+    );
+    const remote: Faq[] = cf
+      .filter((f) => validKeys.has(f.category as FaqCategoryKey))
+      .map((f, i) => ({
+        id: 10000 + i,
+        category: f.category as FaqCategoryKey,
+        q: f.question,
+        a: f.answer,
+      }));
+    return { faqs: remote.length > 0 ? remote : FAQS };
+  },
+  head: ({ loaderData }) => {
+    const faqs = loaderData?.faqs ?? FAQS;
     const faqSchema = {
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: FAQS.map((f) => ({
+      mainEntity: faqs.map((f) => ({
         "@type": "Question",
         name: f.q,
         acceptedAnswer: { "@type": "Answer", text: f.a },
@@ -86,20 +102,21 @@ export const Route = createFileRoute("/faqs")({
 });
 
 function FaqsPage() {
+  const { faqs: FAQ_LIST } = Route.useLoaderData();
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<FaqCategoryKey | "all">("all");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return FAQS.filter((f) => {
+    return FAQ_LIST.filter((f) => {
       if (activeCat !== "all" && f.category !== activeCat) return false;
       if (!q) return true;
       return f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q);
     });
-  }, [query, activeCat]);
+  }, [query, activeCat, FAQ_LIST]);
 
   const grouped = useMemo(() => {
-    const map = new Map<FaqCategoryKey, typeof FAQS>();
+    const map = new Map<FaqCategoryKey, Faq[]>();
     for (const f of filtered) {
       const arr = map.get(f.category) ?? [];
       arr.push(f);
@@ -109,12 +126,13 @@ function FaqsPage() {
   }, [filtered]);
 
   const counts = useMemo(() => {
-    const m: Record<string, number> = { all: FAQS.length };
+    const m: Record<string, number> = { all: FAQ_LIST.length };
     for (const c of FAQ_CATEGORIES) {
-      m[c.key] = FAQS.filter((f) => f.category === c.key).length;
+      m[c.key] = FAQ_LIST.filter((f) => f.category === c.key).length;
     }
     return m;
-  }, []);
+  }, [FAQ_LIST]);
+
 
   return (
     <>
