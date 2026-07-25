@@ -24,12 +24,13 @@ import {
 
 export const Route = createFileRoute("/admin/websites")({ component: WebsitesPage });
 
-type WebsiteForm = { id?: string; name: string; domain: string; is_active: boolean; sort_order: number };
+type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; sort_order: number };
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
 function emptyWebsite(): WebsiteForm {
-  return { name: "", domain: "", is_active: true, sort_order: 0 };
+  return { name: "", domain: "", description: "", is_active: true, sort_order: 0 };
 }
+
 function emptyCategory(website_id: string): CategoryForm {
   return { website_id, name: "", is_active: true, sort_order: 0 };
 }
