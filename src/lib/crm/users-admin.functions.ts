@@ -73,13 +73,17 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       list.push(r.role as string);
       roleMap.set(r.user_id, list);
     });
-    const profMap = new Map<string, { full_name: string | null; mobile: string | null; is_active: boolean | null; display_name: string | null }>();
+    const profMap = new Map<string, { full_name: string | null; mobile: string | null; is_active: boolean | null; display_name: string | null; employee_code: string | null; department: string | null; joining_date: string | null }>();
     (profiles ?? []).forEach((p) => profMap.set(p.id, {
       full_name: p.full_name ?? null,
       mobile: p.mobile ?? null,
       is_active: p.is_active ?? true,
       display_name: p.display_name ?? null,
+      employee_code: (p as any).employee_code ?? null,
+      department: (p as any).department ?? null,
+      joining_date: (p as any).joining_date ?? null,
     }));
+
 
     // Performance aggregates keyed by user_id
     type Perf = {
