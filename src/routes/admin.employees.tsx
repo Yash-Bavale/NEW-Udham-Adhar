@@ -664,3 +664,144 @@ function ResetPasswordDialog({ row, onClose }: { row: Row | null; onClose: () =>
     </Dialog>
   );
 }
+
+const WORK_MODULES = [
+  { key: "work.leads", label: "Leads" },
+  { key: "work.orders", label: "Orders" },
+  { key: "work.support", label: "Support" },
+  { key: "work.finance", label: "Finance" },
+] as const;
+
+function WorkAccessDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const getFn = useServerFn(getEmployeeWorkAccess);
+  const saveFn = useServerFn(setEmployeeWorkAccess);
+  const qc = useQueryClient();
+  const enabled = !!row;
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.employee.workAccess", row?.id],
+    queryFn: () => getFn({ data: { user_id: row!.id } }),
+    enabled,
+  });
+
+  const [work, setWork] = useState<Record<string, boolean>>({});
+  const [websites, setWebsites] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setWork({ ...(data.permissions as Record<string, boolean>) });
+    // Union of website scopes across enabled modules → shown as one set (Phase 4 simple model)
+    const w = new Set<string>();
+    const s = new Set<string>();
+    for (const m of WORK_MODULES) {
+      for (const id of (data.websiteScopes as Record<string, string[]>)[m.key] ?? []) w.add(id);
+      for (const id of (data.serviceScopes as Record<string, string[]>)[m.key] ?? []) s.add(id);
+    }
+    setWebsites(Array.from(w));
+    setServices(Array.from(s));
+  }, [data]);
+
+  if (!row) return null;
+
+  const websitesList: Array<{ id: string; name: string; domain: string; is_active: boolean }> =
+    (data?.websites as never) ?? [];
+  const servicesList: Array<{ id: string; service_code: string; service_name: string; website_id: string; is_active: boolean }> =
+    (data?.services as never) ?? [];
+  const filteredServices = websites.length
+    ? servicesList.filter((s) => websites.includes(s.website_id))
+    : servicesList;
+
+  function toggle(list: string[], id: string): string[] {
+    return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      await saveFn({ data: {
+        user_id: row!.id,
+        work: {
+          "work.leads":   !!work["work.leads"],
+          "work.orders":  !!work["work.orders"],
+          "work.support": !!work["work.support"],
+          "work.finance": !!work["work.finance"],
+        },
+        websites, services,
+      } });
+      toast.success("Work access updated.");
+      qc.invalidateQueries({ queryKey: ["admin.employee.workAccess", row!.id] });
+      onClose();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Work Access — {row.full_name ?? row.email}</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="py-6 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>Loading…</div>
+        ) : (
+          <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+            <section>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "var(--admin-fg-muted)" }}>Work types they can receive</div>
+              <div className="grid grid-cols-2 gap-2">
+                {WORK_MODULES.map((m) => (
+                  <label key={m.key} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={!!work[m.key]} onChange={() => setWork({ ...work, [m.key]: !work[m.key] })} />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Websites</div>
+                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all websites</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {websitesList.map((w) => (
+                  <label key={w.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={websites.includes(w.id)} onChange={() => setWebsites(toggle(websites, w.id))} />
+                    <span className="truncate">{w.name} <span className="text-xs text-slate-400">{w.domain}</span></span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Services</div>
+                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all services in selected websites</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                {filteredServices.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={services.includes(s.id)} onChange={() => setServices(toggle(services, s.id))} />
+                    <span className="truncate">{s.service_name} <span className="text-[11px] font-mono text-slate-400">{s.service_code}</span></span>
+                  </label>
+                ))}
+                {filteredServices.length === 0 && (
+                  <div className="col-span-full text-xs italic" style={{ color: "var(--admin-fg-subtle)" }}>No services in selected websites.</div>
+                )}
+              </div>
+            </section>
+
+            <p className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+              Auto-assignment will only route new items to this employee when the item's website and service match their scopes.
+              Employees with no work types enabled will keep receiving assignments the same way they do today.
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={busy || isLoading}>{busy ? "Saving…" : "Save Access"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
