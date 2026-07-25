@@ -256,6 +256,8 @@ const UpdateInput = z.object({
   full_name: z.string().trim().min(1).max(120).optional(),
   mobile: z.string().trim().max(20).optional().nullable(),
   role: z.enum(ROLE_VALUES).optional(),
+  department: z.string().trim().max(120).optional().nullable(),
+  joining_date: z.string().trim().max(20).optional().nullable(), // ISO date
 });
 
 export const updateEmployee = createServerFn({ method: "POST" })
@@ -264,18 +266,19 @@ export const updateEmployee = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const admin = await getAdmin();
-    const patch: { full_name?: string; display_name?: string; mobile?: string | null } = {};
+    const patch: Record<string, unknown> = {};
     if (data.full_name !== undefined) {
       patch.full_name = data.full_name;
       patch.display_name = data.full_name;
     }
     if (data.mobile !== undefined) patch.mobile = data.mobile;
+    if (data.department !== undefined) patch.department = data.department;
+    if (data.joining_date !== undefined) patch.joining_date = data.joining_date || null;
     if (Object.keys(patch).length) {
       const { error } = await admin.from("profiles").update(patch).eq("id", data.user_id);
       if (error) throw new Error(error.message);
     }
     if (data.role) {
-      // Replace existing roles with the single chosen role (employee form keeps one role)
       const { error: dErr } = await admin.from("user_roles").delete().eq("user_id", data.user_id);
       if (dErr) throw new Error(dErr.message);
       const { error: iErr } = await admin.from("user_roles").insert({ user_id: data.user_id, role: data.role as Role });
@@ -283,6 +286,97 @@ export const updateEmployee = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+// ---------- Work Access (Phase 4) ----------
+
+const WORK_MODULES = ["work.leads", "work.orders", "work.support", "work.finance"] as const;
+type WorkModule = (typeof WORK_MODULES)[number];
+
+export const getEmployeeWorkAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const admin = await getAdmin();
+    const [perms, scopes, ws, svcs] = await Promise.all([
+      admin.from("user_permissions").select("module_key, can_view").eq("user_id", data.user_id).in("module_key", WORK_MODULES as unknown as string[]),
+      admin.from("user_permission_scopes").select("module_key, website_id, service_id").eq("user_id", data.user_id).in("module_key", WORK_MODULES as unknown as string[]),
+      admin.from("websites").select("id, name, domain, is_active").order("sort_order", { ascending: true }),
+      admin.from("services").select("id, service_code, service_name, website_id, is_active").order("sort_order", { ascending: true }),
+    ]);
+    const permMap: Record<string, boolean> = {};
+    for (const m of WORK_MODULES) permMap[m] = false;
+    (perms.data ?? []).forEach((p: any) => { permMap[p.module_key] = !!p.can_view; });
+    const websiteScopes: Record<string, string[]> = {};
+    const serviceScopes: Record<string, string[]> = {};
+    for (const m of WORK_MODULES) { websiteScopes[m] = []; serviceScopes[m] = []; }
+    (scopes.data ?? []).forEach((s: any) => {
+      if (s.website_id) websiteScopes[s.module_key]?.push(s.website_id);
+      if (s.service_id) serviceScopes[s.module_key]?.push(s.service_id);
+    });
+    return {
+      permissions: permMap,
+      websiteScopes,
+      serviceScopes,
+      websites: ws.data ?? [],
+      services: svcs.data ?? [],
+    };
+  });
+
+const WorkAccessInput = z.object({
+  user_id: z.string().uuid(),
+  work: z.object({
+    "work.leads": z.boolean().default(false),
+    "work.orders": z.boolean().default(false),
+    "work.support": z.boolean().default(false),
+    "work.finance": z.boolean().default(false),
+  }),
+  websites: z.array(z.string().uuid()).default([]),
+  services: z.array(z.string().uuid()).default([]),
+});
+
+/** Writes user_permissions + user_permission_scopes for the four work modules.
+ *  Website + service scopes apply to whichever work modules the user has enabled.
+ *  Passing an empty websites/services list means "unrestricted" for that dimension. */
+export const setEmployeeWorkAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => WorkAccessInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const admin = await getAdmin();
+    // Upsert permissions per work module
+    for (const m of WORK_MODULES) {
+      const can = !!data.work[m];
+      const { error } = await admin.from("user_permissions").upsert({
+        user_id: data.user_id,
+        module_key: m,
+        can_view: can,
+        can_create: false,
+        can_edit: false,
+        can_delete: false,
+        scope_all: data.websites.length === 0 && data.services.length === 0,
+      }, { onConflict: "user_id,module_key" });
+      if (error) throw new Error(error.message);
+    }
+    // Reset scopes for these modules, then rewrite
+    const { error: dErr } = await admin.from("user_permission_scopes")
+      .delete()
+      .eq("user_id", data.user_id)
+      .in("module_key", WORK_MODULES as unknown as string[]);
+    if (dErr) throw new Error(dErr.message);
+    const rows: Array<{ user_id: string; module_key: string; website_id?: string; service_id?: string }> = [];
+    for (const m of WORK_MODULES) {
+      if (!data.work[m]) continue; // only scope enabled modules
+      for (const w of data.websites) rows.push({ user_id: data.user_id, module_key: m, website_id: w });
+      for (const s of data.services) rows.push({ user_id: data.user_id, module_key: m, service_id: s });
+    }
+    if (rows.length) {
+      const { error: iErr } = await admin.from("user_permission_scopes").insert(rows as never);
+      if (iErr) throw new Error(iErr.message);
+    }
+    return { ok: true };
+  });
+
 
 const ActiveInput = z.object({
   user_id: z.string().uuid(),
