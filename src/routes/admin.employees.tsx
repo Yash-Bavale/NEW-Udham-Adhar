@@ -231,6 +231,14 @@ function EmployeesPage() {
                           <Pencil className="size-3.5" /> Edit
                         </Button>
                       )}
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: "#7c3aed" }}
+                          onClick={() => setAccessRow(u)}>
+                          <ShieldCheck className="size-3.5" /> Work Access
+                        </Button>
+                      )}
+
                       {isSuper && (
                         <Button size="sm" variant="ghost" className="h-7 gap-1"
                           style={{ color: "#1d4ed8" }}
