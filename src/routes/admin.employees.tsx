@@ -175,6 +175,7 @@ function EmployeesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                <th className="px-4 py-2">Emp ID</th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Email</th>
                 <th className="px-4 py-2">Mobile</th>
@@ -183,6 +184,7 @@ function EmployeesPage() {
                 <th className="px-4 py-2">Last Login</th>
                 <th className="px-4 py-2 text-right">Actions</th>
               </tr>
+
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
