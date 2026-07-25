@@ -47,7 +47,7 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       { data: appsCompletedAll, error: caErr },
     ] = await Promise.all([
       admin.from("user_roles").select("user_id, role"),
-      admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email"),
+      admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email, employee_code, department, joining_date"),
       admin.from("leads").select("assigned_to, status, created_at, updated_at"),
       admin.from("applications").select("assigned_to, application_status"),
       admin
