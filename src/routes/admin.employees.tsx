@@ -118,6 +118,8 @@ function EmployeesPage() {
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
   const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
+  const [accessRow, setAccessRow] = useState<Row | null>(null);
+
 
   const canManage = role.access("employees") === "full";
   const canSee = role.access("employees") !== "none";
