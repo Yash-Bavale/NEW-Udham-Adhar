@@ -154,13 +154,10 @@ function HomePage() {
     <>
       {/* SEO H1 — kept in DOM for crawlers, visually hidden */}
       <section className="sr-only">
-        <h1>Udyam Registration &amp; MSME Certificate Services</h1>
-        <p>
-          Private consultancy &amp; assistance for new Udyam (MSME) registration,
-          certificate updates, downloads and Udyog Aadhaar to Udyam migration —
-          pan-India support in English &amp; Hindi.
-        </p>
+        <h1>{heroHeading}</h1>
+        <p>{heroSub}</p>
       </section>
+
 
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
