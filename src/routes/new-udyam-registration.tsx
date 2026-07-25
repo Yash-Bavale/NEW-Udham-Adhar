@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -87,12 +88,15 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/new-udyam-registration")({
-  head: () => ({
+  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "new-udyam-registration" } }) }),
+  head: ({ loaderData }) => {
+    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
+    return ({
     meta: [
-      { title: TITLE },
-      { name: "description", content: DESC },
-      { property: "og:title", content: TITLE },
-      { property: "og:description", content: DESC },
+      { title: cms?.metaTitle || TITLE },
+      { name: "description", content: cms?.metaDescription || DESC },
+      { property: "og:title", content: cms?.metaTitle || TITLE },
+      { property: "og:description", content: cms?.metaDescription || DESC },
       { property: "og:url", content: URL },
     ],
     links: [{ rel: "canonical", href: URL }],
@@ -119,7 +123,8 @@ export const Route = createFileRoute("/new-udyam-registration")({
         ]),
       ),
     ],
-  }),
+  });
+  },
   component: () => (
     <RichServicePage
       serviceTitle="Udyam New Registration"
