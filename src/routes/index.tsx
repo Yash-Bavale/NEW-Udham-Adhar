@@ -57,7 +57,7 @@ const FAQS: Array<{ q: string; a: string }> = [
 const HOW_IT_WORKS = [
   "You fill the form and select your service — registration, update, download, migration, or a custom issue.",
   "You make the consultancy payment online through our secure payment gateway.",
-  "Our team reviews your request and calls or emails you within 2 business hours (Monday to Saturday, 10 AM to 5 PM IST).",
+  "Our team reviews your request and calls or emails you (Monday to Saturday, 10 AM to 5 PM IST).",
   "We collect the necessary information and documents from you securely.",
   "Our expert handles the process, verifies all details and submits on your behalf.",
   "You receive your Udyam certificate or confirmation via email, typically within 1 to 3 business days depending on the service.",
