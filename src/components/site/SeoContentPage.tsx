@@ -157,7 +157,65 @@ function FaqAccordion({ faq }: { faq: SeoPageFaq[] }) {
   );
 }
 
-export function SeoContentPage({ data }: { data: SeoPageData }) {
+export interface SeoContentOverrides {
+  h1?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  aiOverview?: { short?: string; medium?: string; long?: string } | null;
+  quickFacts?: { label: string; value: string }[];
+  body?: SeoPageSection[];
+  eeat?: Partial<SeoPageData["eeat"]> | null;
+  faq?: SeoPageFaq[];
+  internalLinks?: SeoPageLink[];
+  howto?: { name: string; text: string }[];
+  cta?: Partial<SeoPageData["cta"]> | null;
+}
+
+function mergeSeoData(local: SeoPageData, o?: SeoContentOverrides | null): SeoPageData {
+  if (!o) return local;
+  const nonEmpty = <T,>(v: T[] | undefined, fallback: T[]): T[] =>
+    Array.isArray(v) && v.length ? v : fallback;
+  return {
+    ...local,
+    h1: o.h1?.trim() || local.h1,
+    seo: {
+      ...local.seo,
+      metaTitle: o.metaTitle?.trim() || local.seo.metaTitle,
+      metaDescription: o.metaDescription?.trim() || local.seo.metaDescription,
+    },
+    aiOverview: o.aiOverview ? { ...local.aiOverview, ...stripUndef(o.aiOverview) } : local.aiOverview,
+    quickFacts: nonEmpty(o.quickFacts, local.quickFacts),
+    body: nonEmpty(o.body, local.body),
+    eeat: o.eeat ? { ...local.eeat, ...stripUndef(o.eeat) } : local.eeat,
+    faq: nonEmpty(o.faq, local.faq),
+    internalLinks: nonEmpty(o.internalLinks, local.internalLinks),
+    howto: nonEmpty(o.howto, local.howto),
+    cta: o.cta ? { ...local.cta, ...stripUndef(o.cta) } : local.cta,
+  };
+}
+
+function stripUndef<T extends Record<string, unknown>>(o: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k in o) {
+    const v = o[k];
+    if (v !== undefined && v !== null && v !== "") out[k] = v;
+  }
+  return out;
+}
+
+
+export function SeoContentPage({
+  data,
+  overrides,
+}: {
+  data: SeoPageData;
+  overrides?: SeoContentOverrides | null;
+}) {
+  const merged = mergeSeoData(data, overrides);
+  return <SeoContentPageInner data={merged} />;
+}
+
+function SeoContentPageInner({ data }: { data: SeoPageData }) {
   const formTitle = data.seo.metaTitle || data.h1;
   // Build a link pool keyed by anchor text for natural insertion
   const linkPool = new Map<string, SeoPageLink>();

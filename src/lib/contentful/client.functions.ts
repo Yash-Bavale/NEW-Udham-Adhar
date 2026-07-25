@@ -158,6 +158,33 @@ export type ContentfulSeoArticle = {
   body: string;
   canonicalUrl: string;
   publishedAt: string;
+  // Structured body overrides (all optional — fall back to local JSON if absent)
+  aiOverview: { short?: string; medium?: string; long?: string } | null;
+  quickFacts: Array<{ label: string; value: string }>;
+  bodySections: Array<{
+    heading: string;
+    level: number;
+    paragraphs: string[];
+    subsections?: Array<{ heading: string; level: number; paragraphs: string[] }>;
+  }>;
+  eeat: {
+    experience?: string;
+    expertise?: string;
+    trust?: string;
+    transparency?: string;
+    disclaimer?: string;
+  } | null;
+  faqs: Array<{ question: string; answer: string }>;
+  internalLinks: Array<{ href: string; anchor: string; reason?: string }>;
+  howto: Array<{ name: string; text: string }>;
+  ctas: {
+    hero?: string;
+    middle?: string;
+    bottom?: string;
+    trust?: string;
+    benefits?: string;
+    why?: string;
+  } | null;
 };
 
 type SeoArticleFields = {
@@ -168,6 +195,14 @@ type SeoArticleFields = {
   body?: unknown;
   canonicalUrl?: string;
   publishedAt?: string;
+  aiOverview?: ContentfulSeoArticle["aiOverview"];
+  quickFacts?: ContentfulSeoArticle["quickFacts"];
+  bodySections?: ContentfulSeoArticle["bodySections"];
+  eeat?: ContentfulSeoArticle["eeat"];
+  faqs?: ContentfulSeoArticle["faqs"];
+  internalLinks?: ContentfulSeoArticle["internalLinks"];
+  howto?: ContentfulSeoArticle["howto"];
+  ctas?: ContentfulSeoArticle["ctas"];
 };
 
 export const getContentfulSeoArticle = createServerFn({ method: "GET" })
@@ -190,9 +225,79 @@ export const getContentfulSeoArticle = createServerFn({ method: "GET" })
         body: richTextToPlain(f.body).trim(),
         canonicalUrl: (f.canonicalUrl ?? "").trim(),
         publishedAt: (f.publishedAt ?? "").trim(),
+        aiOverview: f.aiOverview ?? null,
+        quickFacts: Array.isArray(f.quickFacts) ? f.quickFacts : [],
+        bodySections: Array.isArray(f.bodySections) ? f.bodySections : [],
+        eeat: f.eeat ?? null,
+        faqs: Array.isArray(f.faqs) ? f.faqs : [],
+        internalLinks: Array.isArray(f.internalLinks) ? f.internalLinks : [],
+        howto: Array.isArray(f.howto) ? f.howto : [],
+        ctas: f.ctas ?? null,
       };
     } catch (err) {
       console.error("[contentful] getContentfulSeoArticle failed:", err);
+      return null;
+    }
+  });
+
+/* -------------------------------------------------------------------------- */
+/*  Landing Page (homepage)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type ContentfulLandingPage = {
+  id: string;
+  slug: string;
+  title: string;
+  metaTitle: string;
+  metaDescription: string;
+  hero: {
+    heading?: string;
+    subheading?: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
+  } | null;
+  howItWorks: string[];
+  whyUs: string[];
+  faqs: Array<{ question: string; answer: string }>;
+  ctas: Record<string, string> | null;
+};
+
+type LandingPageFields = {
+  slug?: string;
+  title?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  hero?: ContentfulLandingPage["hero"];
+  howItWorks?: string[];
+  whyUs?: string[];
+  faqs?: ContentfulLandingPage["faqs"];
+  ctas?: ContentfulLandingPage["ctas"];
+};
+
+export const getContentfulLandingPage = createServerFn({ method: "GET" })
+  .inputValidator((data: { slug: string }) => data)
+  .handler(async ({ data }): Promise<ContentfulLandingPage | null> => {
+    try {
+      const page = await cfFetch<LandingPageFields>(
+        `/entries?content_type=landingPage&fields.slug=${encodeURIComponent(data.slug)}&limit=1`,
+      );
+      const e = page.items[0];
+      if (!e) return null;
+      const f = e.fields;
+      return {
+        id: e.sys.id,
+        slug: (f.slug ?? "").trim(),
+        title: (f.title ?? "").trim(),
+        metaTitle: (f.metaTitle ?? "").trim(),
+        metaDescription: (f.metaDescription ?? "").trim(),
+        hero: f.hero ?? null,
+        howItWorks: Array.isArray(f.howItWorks) ? f.howItWorks : [],
+        whyUs: Array.isArray(f.whyUs) ? f.whyUs : [],
+        faqs: Array.isArray(f.faqs) ? f.faqs : [],
+        ctas: f.ctas ?? null,
+      };
+    } catch (err) {
+      console.error("[contentful] getContentfulLandingPage failed:", err);
       return null;
     }
   });

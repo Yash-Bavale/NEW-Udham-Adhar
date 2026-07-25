@@ -43,10 +43,18 @@ function RouteView() {
   const { cms } = useLoaderData({ from: "/msme-certificate-benefits" }) as {
     cms: ContentfulSeoArticle | null;
   };
-  // If Contentful has a published article with a non-trivial body, prefer its H1;
-  // body content still renders from the local JSON for now (rich formatting).
-  const merged: SeoPageData = cms?.title
-    ? { ...page, h1: cms.title }
-    : page;
-  return <SeoContentPage data={merged} />;
+  const overrides = cms ? {
+    h1: cms.title,
+    metaTitle: cms.metaTitle,
+    metaDescription: cms.metaDescription,
+    aiOverview: cms.aiOverview,
+    quickFacts: cms.quickFacts,
+    body: cms.bodySections,
+    eeat: cms.eeat,
+    faq: cms.faqs,
+    internalLinks: cms.internalLinks,
+    howto: cms.howto,
+    cta: cms.ctas,
+  } : null;
+  return <SeoContentPage data={page} overrides={overrides} />;
 }

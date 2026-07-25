@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -12,6 +12,7 @@ import {
   faqSchema,
   jsonLdScript,
 } from "@/lib/seo/jsonld";
+import { getContentfulLandingPage, type ContentfulLandingPage } from "@/lib/contentful/client.functions";
 
 const HOMEPAGE_TITLE =
   "Udyam Registration & MSME Certificate Help";
@@ -87,47 +88,65 @@ const FACTS: [string, string][] = [
 ];
 
 export const Route = createFileRoute("/")({
-
-  head: () => ({
-    meta: [
-      { title: HOMEPAGE_TITLE },
-      { name: "description", content: HOMEPAGE_DESC },
-      { property: "og:title", content: HOMEPAGE_TITLE },
-      { property: "og:description", content: HOMEPAGE_DESC },
-      { property: "og:url", content: "https://udyamadhar.in/" },
-    ],
-    links: [
-      { rel: "canonical", href: "https://udyamadhar.in/" },
-      // Preload the LCP image so the browser fetches it before React mounts.
-      {
-        rel: "preload",
-        as: "image",
-        href: certImg.url,
-        fetchpriority: "high",
-      },
-    ],
-    scripts: [
-      jsonLdScript(orgSchema()),
-      jsonLdScript(faqSchema(FAQS)),
-      jsonLdScript({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "@id": "https://udyamadhar.in/#website",
-        url: "https://udyamadhar.in/",
-        name: "Udyam Registration Consultancy & Assistance Services",
-        potentialAction: {
-          "@type": "SearchAction",
-          target: "https://udyamadhar.in/faqs?q={search_term_string}",
-          "query-input": "required name=search_term_string",
+  loader: async () => ({ cms: await getContentfulLandingPage({ data: { slug: "home" } }) }),
+  head: ({ loaderData }) => {
+    const cms = (loaderData as { cms: ContentfulLandingPage | null } | undefined)?.cms;
+    const title = cms?.metaTitle || HOMEPAGE_TITLE;
+    const desc = cms?.metaDescription || HOMEPAGE_DESC;
+    const faqList = cms?.faqs?.length
+      ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
+      : FAQS;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: desc },
+        { property: "og:title", content: title },
+        { property: "og:description", content: desc },
+        { property: "og:url", content: "https://udyamadhar.in/" },
+      ],
+      links: [
+        { rel: "canonical", href: "https://udyamadhar.in/" },
+        // Preload the LCP image so the browser fetches it before React mounts.
+        {
+          rel: "preload",
+          as: "image",
+          href: certImg.url,
+          fetchpriority: "high",
         },
-      }),
-    ],
-  }),
+      ],
+      scripts: [
+        jsonLdScript(orgSchema()),
+        jsonLdScript(faqSchema(faqList)),
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "@id": "https://udyamadhar.in/#website",
+          url: "https://udyamadhar.in/",
+          name: "Udyam Registration Consultancy & Assistance Services",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: "https://udyamadhar.in/faqs?q={search_term_string}",
+            "query-input": "required name=search_term_string",
+          },
+        }),
+      ],
+    };
+  },
   component: HomePage,
 });
 
 
 function HomePage() {
+  const { cms } = useLoaderData({ from: "/" }) as { cms: ContentfulLandingPage | null };
+  const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
+  const heroSub = cms?.hero?.subheading ||
+    "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
+  const howItWorks = cms?.howItWorks?.length ? cms.howItWorks : HOW_IT_WORKS;
+  const whyUs = cms?.whyUs?.length ? cms.whyUs : WHY_BULLETS;
+  const faqList = cms?.faqs?.length
+    ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
+    : FAQS;
+
   useEffect(() => {
     trackEvent("page_view_landing", { path: "/" });
   }, []);
@@ -135,13 +154,10 @@ function HomePage() {
     <>
       {/* SEO H1 — kept in DOM for crawlers, visually hidden */}
       <section className="sr-only">
-        <h1>Udyam Registration &amp; MSME Certificate Services</h1>
-        <p>
-          Private consultancy &amp; assistance for new Udyam (MSME) registration,
-          certificate updates, downloads and Udyog Aadhaar to Udyam migration —
-          pan-India support in English &amp; Hindi.
-        </p>
+        <h1>{heroHeading}</h1>
+        <p>{heroSub}</p>
       </section>
+
 
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
@@ -211,7 +227,7 @@ function HomePage() {
             Here is what happens after you submit the form:
           </p>
           <ol className="mt-4 list-decimal pl-6 space-y-2 text-sm md:text-base text-foreground/85">
-            {HOW_IT_WORKS.map((s, i) => (
+            {howItWorks.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ol>
@@ -233,7 +249,7 @@ function HomePage() {
           </p>
           <p>Beyond document checking, here is what our clients consistently tell us they value:</p>
           <ul className="list-disc pl-6 space-y-1">
-            {WHY_BULLETS.map((b, i) => (
+            {whyUs.map((b, i) => (
               <li key={i}>{b}</li>
             ))}
           </ul>
@@ -250,7 +266,7 @@ function HomePage() {
         </p>
 
         <dl className="mt-8 md:mt-10 space-y-4">
-          {FAQS.map((f, i) => (
+          {faqList.map((f, i) => (
             <div
               key={i}
               className="rounded-lg border border-border bg-card p-4 md:p-5"
