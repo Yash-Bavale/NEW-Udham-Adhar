@@ -87,3 +87,112 @@ export const getContentfulFaqs = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+/* -------------------------------------------------------------------------- */
+/*  Service Pages                                                             */
+/* -------------------------------------------------------------------------- */
+
+export type ContentfulServicePage = {
+  id: string;
+  serviceCode: string;
+  slug: string;
+  name: string;
+  shortDescription: string;
+  longDescription: string;
+  priceInclusive: number | null;
+  processingDays: number | null;
+  metaTitle: string;
+  metaDescription: string;
+};
+
+type ServicePageFields = {
+  serviceCode?: string;
+  slug?: string;
+  name?: string;
+  shortDescription?: string;
+  longDescription?: unknown;
+  priceInclusive?: number;
+  processingDays?: number;
+  metaTitle?: string;
+  metaDescription?: string;
+};
+
+export const getContentfulServicePage = createServerFn({ method: "GET" })
+  .inputValidator((data: { slug: string }) => data)
+  .handler(async ({ data }): Promise<ContentfulServicePage | null> => {
+    try {
+      const page = await cfFetch<ServicePageFields>(
+        `/entries?content_type=servicePage&fields.slug=${encodeURIComponent(data.slug)}&limit=1`,
+      );
+      const e = page.items[0];
+      if (!e) return null;
+      const f = e.fields;
+      return {
+        id: e.sys.id,
+        serviceCode: (f.serviceCode ?? "").trim(),
+        slug: (f.slug ?? "").trim(),
+        name: (f.name ?? "").trim(),
+        shortDescription: (f.shortDescription ?? "").trim(),
+        longDescription: richTextToPlain(f.longDescription).trim(),
+        priceInclusive: typeof f.priceInclusive === "number" ? f.priceInclusive : null,
+        processingDays: typeof f.processingDays === "number" ? f.processingDays : null,
+        metaTitle: (f.metaTitle ?? "").trim(),
+        metaDescription: (f.metaDescription ?? "").trim(),
+      };
+    } catch (err) {
+      console.error("[contentful] getContentfulServicePage failed:", err);
+      return null;
+    }
+  });
+
+/* -------------------------------------------------------------------------- */
+/*  SEO Articles                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type ContentfulSeoArticle = {
+  id: string;
+  slug: string;
+  title: string;
+  metaTitle: string;
+  metaDescription: string;
+  body: string;
+  canonicalUrl: string;
+  publishedAt: string;
+};
+
+type SeoArticleFields = {
+  slug?: string;
+  title?: string | string[];
+  metaTitle?: string;
+  metaDescription?: string;
+  body?: unknown;
+  canonicalUrl?: string;
+  publishedAt?: string;
+};
+
+export const getContentfulSeoArticle = createServerFn({ method: "GET" })
+  .inputValidator((data: { slug: string }) => data)
+  .handler(async ({ data }): Promise<ContentfulSeoArticle | null> => {
+    try {
+      const page = await cfFetch<SeoArticleFields>(
+        `/entries?content_type=seoArticle&fields.slug=${encodeURIComponent(data.slug)}&limit=1`,
+      );
+      const e = page.items[0];
+      if (!e) return null;
+      const f = e.fields;
+      const title = Array.isArray(f.title) ? (f.title[0] ?? "") : (f.title ?? "");
+      return {
+        id: e.sys.id,
+        slug: (f.slug ?? "").trim(),
+        title: String(title).trim(),
+        metaTitle: (f.metaTitle ?? "").trim(),
+        metaDescription: (f.metaDescription ?? "").trim(),
+        body: richTextToPlain(f.body).trim(),
+        canonicalUrl: (f.canonicalUrl ?? "").trim(),
+        publishedAt: (f.publishedAt ?? "").trim(),
+      };
+    } catch (err) {
+      console.error("[contentful] getContentfulSeoArticle failed:", err);
+      return null;
+    }
+  });
