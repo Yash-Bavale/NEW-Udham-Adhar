@@ -183,16 +183,24 @@ function mergeSeoData(local: SeoPageData, o?: SeoContentOverrides | null): SeoPa
       metaTitle: o.metaTitle?.trim() || local.seo.metaTitle,
       metaDescription: o.metaDescription?.trim() || local.seo.metaDescription,
     },
-    aiOverview: o.aiOverview ? { ...local.aiOverview, ...o.aiOverview } : local.aiOverview,
+    aiOverview: o.aiOverview ? { ...local.aiOverview, ...stripUndef(o.aiOverview) } : local.aiOverview,
     quickFacts: nonEmpty(o.quickFacts, local.quickFacts),
     body: nonEmpty(o.body, local.body),
-    eeat: o.eeat ? { ...local.eeat, ...o.eeat } : local.eeat,
+    eeat: o.eeat ? { ...local.eeat, ...stripUndef(o.eeat) } : local.eeat,
     faq: nonEmpty(o.faq, local.faq),
     internalLinks: nonEmpty(o.internalLinks, local.internalLinks),
     howto: nonEmpty(o.howto, local.howto),
-    cta: o.cta ? { ...local.cta, ...o.cta } : local.cta,
+    cta: o.cta ? { ...local.cta, ...stripUndef(o.cta) } : local.cta,
   };
 }
+
+function stripUndef<T extends Record<string, unknown>>(o: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k in o) {
+    const v = o[k];
+    if (v !== undefined && v !== null && v !== "") out[k] = v;
+  }
+  return out;
 
 export function SeoContentPage({
   data,
