@@ -2,11 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff } from "lucide-react";
+import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
+  getEmployeeWorkAccess, setEmployeeWorkAccess,
 } from "@/lib/crm/users-admin.functions";
+
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 import { useRole } from "@/hooks/useRole";
 import { SectionCard } from "@/components/admin/ui";
