@@ -201,6 +201,8 @@ function stripUndef<T extends Record<string, unknown>>(o: T): Partial<T> {
     if (v !== undefined && v !== null && v !== "") out[k] = v;
   }
   return out;
+}
+
 
 export function SeoContentPage({
   data,
