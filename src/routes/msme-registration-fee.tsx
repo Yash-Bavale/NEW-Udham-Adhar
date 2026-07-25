@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
+import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
 import {
   jsonLdScript,
   faqSchema,
