@@ -104,7 +104,18 @@ function WebsitesPage() {
               <input type="checkbox" checked={webForm.is_active} onChange={(e) => setWebForm({ ...webForm, is_active: e.target.checked })} />
               Active
             </label>
+            <label className="block text-sm md:col-span-2">
+              <div className="text-xs text-slate-500 mb-1">Description (optional)</div>
+              <textarea
+                value={webForm.description ?? ""}
+                onChange={(e) => setWebForm({ ...webForm, description: e.target.value })}
+                rows={2}
+                placeholder="Short internal note about this website"
+                className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </label>
           </div>
+
           <div className="flex gap-2 pt-2">
             <button
               onClick={async () => {
