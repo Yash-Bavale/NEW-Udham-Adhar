@@ -30,5 +30,21 @@ export const Route = createFileRoute("/udyam-login")({
     ],
   });
   },
-  component: () => <SeoContentPage data={page} />,
+  component: function SeoRoute() {
+    const { cms } = Route.useLoaderData() as { cms: ContentfulSeoArticle | null };
+    const overrides = cms ? {
+      h1: cms.title,
+      metaTitle: cms.metaTitle,
+      metaDescription: cms.metaDescription,
+      aiOverview: cms.aiOverview,
+      quickFacts: cms.quickFacts,
+      body: cms.bodySections,
+      eeat: cms.eeat,
+      faq: cms.faqs,
+      internalLinks: cms.internalLinks,
+      howto: cms.howto,
+      cta: cms.ctas,
+    } : null;
+    return <SeoContentPage data={page} overrides={overrides} />;
+  },
 });
