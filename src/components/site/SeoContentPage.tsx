@@ -164,7 +164,7 @@ export interface SeoContentOverrides {
   aiOverview?: { short?: string; medium?: string; long?: string } | null;
   quickFacts?: { label: string; value: string }[];
   body?: SeoPageSection[];
-  eeat?: SeoPageData["eeat"] | null;
+  eeat?: Partial<SeoPageData["eeat"]> | null;
   faq?: SeoPageFaq[];
   internalLinks?: SeoPageLink[];
   howto?: { name: string; text: string }[];
