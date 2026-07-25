@@ -137,6 +137,16 @@ export const Route = createFileRoute("/")({
 
 
 function HomePage() {
+  const { cms } = useLoaderData({ from: "/" }) as { cms: ContentfulLandingPage | null };
+  const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
+  const heroSub = cms?.hero?.subheading ||
+    "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
+  const howItWorks = cms?.howItWorks?.length ? cms.howItWorks : HOW_IT_WORKS;
+  const whyUs = cms?.whyUs?.length ? cms.whyUs : WHY_BULLETS;
+  const faqList = cms?.faqs?.length
+    ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
+    : FAQS;
+
   useEffect(() => {
     trackEvent("page_view_landing", { path: "/" });
   }, []);
