@@ -275,6 +275,9 @@ function EmployeesPage() {
             onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
           <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
+
+          <WorkAccessDialog row={accessRow} onClose={() => setAccessRow(null)} />
+
         </TabsContent>
 
         <TabsContent value="performance" className="mt-4">
