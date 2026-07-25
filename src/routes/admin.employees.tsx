@@ -2,11 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff } from "lucide-react";
+import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
+  getEmployeeWorkAccess, setEmployeeWorkAccess,
 } from "@/lib/crm/users-admin.functions";
+
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
 import { useRole } from "@/hooks/useRole";
 import { SectionCard } from "@/components/admin/ui";
@@ -87,8 +89,10 @@ type Perf = {
 type Row = {
   id: string; email: string; full_name: string | null; mobile: string | null;
   is_active: boolean; created_at: string; last_sign_in_at: string | null | undefined; roles: string[];
+  employee_code?: string | null; department?: string | null; joining_date?: string | null;
   perf?: Perf;
 };
+
 
 function EmployeesPage() {
   const role = useRole();
@@ -114,6 +118,8 @@ function EmployeesPage() {
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
   const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
+  const [accessRow, setAccessRow] = useState<Row | null>(null);
+
 
   const canManage = role.access("employees") === "full";
   const canSee = role.access("employees") !== "none";
@@ -169,6 +175,7 @@ function EmployeesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
+                <th className="px-4 py-2">Emp ID</th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Email</th>
                 <th className="px-4 py-2">Mobile</th>
@@ -177,11 +184,12 @@ function EmployeesPage() {
                 <th className="px-4 py-2">Last Login</th>
                 <th className="px-4 py-2 text-right">Actions</th>
               </tr>
+
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-3 rounded animate-pulse" style={{ background: "var(--admin-surface-2)" }} />
                     </td>
@@ -189,7 +197,7 @@ function EmployeesPage() {
                 </tr>
               ))}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center">
+                <tr><td colSpan={8} className="px-4 py-10 text-center">
                   <UserCog className="size-8 mx-auto mb-2" style={{ color: "var(--admin-fg-subtle)" }} />
                   <div className="text-sm">No employees match.</div>
                   <Button size="sm" className="mt-3 gap-1.5" onClick={() => setAddOpen(true)}>
@@ -199,7 +207,11 @@ function EmployeesPage() {
               )}
               {!isLoading && filtered.map((u, i) => (
                 <tr key={u.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: i % 2 ? "var(--admin-surface-2)" : "transparent" }}>
+                  <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                    {u.employee_code ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}
+                  </td>
                   <td className="px-4 py-2.5">{u.full_name ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
+
                   <td className="px-4 py-2.5">{u.email}</td>
                   <td className="px-4 py-2.5">{u.mobile ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
                   <td className="px-4 py-2.5">
@@ -219,6 +231,14 @@ function EmployeesPage() {
                           <Pencil className="size-3.5" /> Edit
                         </Button>
                       )}
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1"
+                          style={{ color: "#7c3aed" }}
+                          onClick={() => setAccessRow(u)}>
+                          <ShieldCheck className="size-3.5" /> Work Access
+                        </Button>
+                      )}
+
                       {isSuper && (
                         <Button size="sm" variant="ghost" className="h-7 gap-1"
                           style={{ color: "#1d4ed8" }}
@@ -255,6 +275,9 @@ function EmployeesPage() {
             onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
 
           <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
+
+          <WorkAccessDialog row={accessRow} onClose={() => setAccessRow(null)} />
+
         </TabsContent>
 
         <TabsContent value="performance" className="mt-4">
@@ -453,6 +476,8 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
   const [full_name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [role, setRoleVal] = useState<Role>("executive");
+  const [department, setDepartment] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Reset when row changes
@@ -460,6 +485,8 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
     setName(r.full_name ?? "");
     setMobile(r.mobile ?? "");
     setRoleVal((r.roles[0] as Role) ?? "executive");
+    setDepartment(r.department ?? "");
+    setJoiningDate(r.joining_date ?? "");
   });
 
   if (!row) return null;
@@ -468,7 +495,11 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
     if (!row) return;
     setBusy(true);
     try {
-      await updateFn({ data: { user_id: row.id, full_name, mobile: mobile || null, role } });
+      await updateFn({ data: {
+        user_id: row.id, full_name, mobile: mobile || null, role,
+        department: department || null,
+        joining_date: joiningDate || null,
+      } });
       toast.success("Employee updated.");
       onSaved();
       onClose();
@@ -481,25 +512,41 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
       <DialogContent>
         <DialogHeader><DialogTitle>Edit Employee</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <Field label="Email"><Input value={row.email} disabled /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Employee ID">
+              <Input value={row.employee_code ?? "—"} disabled />
+            </Field>
+            <Field label="Email"><Input value={row.email} disabled /></Field>
+          </div>
           <Field label="Full Name">
             <Input value={full_name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Mobile">
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-          </Field>
-          <Field label="Role">
-            <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Mobile">
+              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            </Field>
+            <Field label="Department">
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Operations, Sales…" />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Joining Date">
+              <Input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} />
+            </Field>
+            <Field label="Role">
+              <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </div>
         <DialogFooter>
+
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
@@ -636,6 +683,147 @@ function ResetPasswordDialog({ row, onClose }: { row: Row | null; onClose: () =>
         <DialogFooter>
           <Button variant="outline" onClick={() => { reset(); onClose(); }} disabled={busy}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Resetting…" : "Set Password"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const WORK_MODULES = [
+  { key: "work.leads", label: "Leads" },
+  { key: "work.orders", label: "Orders" },
+  { key: "work.support", label: "Support" },
+  { key: "work.finance", label: "Finance" },
+] as const;
+
+function WorkAccessDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const getFn = useServerFn(getEmployeeWorkAccess);
+  const saveFn = useServerFn(setEmployeeWorkAccess);
+  const qc = useQueryClient();
+  const enabled = !!row;
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.employee.workAccess", row?.id],
+    queryFn: () => getFn({ data: { user_id: row!.id } }),
+    enabled,
+  });
+
+  const [work, setWork] = useState<Record<string, boolean>>({});
+  const [websites, setWebsites] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setWork({ ...(data.permissions as Record<string, boolean>) });
+    // Union of website scopes across enabled modules → shown as one set (Phase 4 simple model)
+    const w = new Set<string>();
+    const s = new Set<string>();
+    for (const m of WORK_MODULES) {
+      for (const id of (data.websiteScopes as Record<string, string[]>)[m.key] ?? []) w.add(id);
+      for (const id of (data.serviceScopes as Record<string, string[]>)[m.key] ?? []) s.add(id);
+    }
+    setWebsites(Array.from(w));
+    setServices(Array.from(s));
+  }, [data]);
+
+  if (!row) return null;
+
+  const websitesList: Array<{ id: string; name: string; domain: string; is_active: boolean }> =
+    (data?.websites as never) ?? [];
+  const servicesList: Array<{ id: string; service_code: string; service_name: string; website_id: string; is_active: boolean }> =
+    (data?.services as never) ?? [];
+  const filteredServices = websites.length
+    ? servicesList.filter((s) => websites.includes(s.website_id))
+    : servicesList;
+
+  function toggle(list: string[], id: string): string[] {
+    return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+  }
+
+  async function save() {
+    setBusy(true);
+    try {
+      await saveFn({ data: {
+        user_id: row!.id,
+        work: {
+          "work.leads":   !!work["work.leads"],
+          "work.orders":  !!work["work.orders"],
+          "work.support": !!work["work.support"],
+          "work.finance": !!work["work.finance"],
+        },
+        websites, services,
+      } });
+      toast.success("Work access updated.");
+      qc.invalidateQueries({ queryKey: ["admin.employee.workAccess", row!.id] });
+      onClose();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Work Access — {row.full_name ?? row.email}</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="py-6 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>Loading…</div>
+        ) : (
+          <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+            <section>
+              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "var(--admin-fg-muted)" }}>Work types they can receive</div>
+              <div className="grid grid-cols-2 gap-2">
+                {WORK_MODULES.map((m) => (
+                  <label key={m.key} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={!!work[m.key]} onChange={() => setWork({ ...work, [m.key]: !work[m.key] })} />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Websites</div>
+                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all websites</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {websitesList.map((w) => (
+                  <label key={w.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={websites.includes(w.id)} onChange={() => setWebsites(toggle(websites, w.id))} />
+                    <span className="truncate">{w.name} <span className="text-xs text-slate-400">{w.domain}</span></span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Services</div>
+                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all services in selected websites</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                {filteredServices.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={services.includes(s.id)} onChange={() => setServices(toggle(services, s.id))} />
+                    <span className="truncate">{s.service_name} <span className="text-[11px] font-mono text-slate-400">{s.service_code}</span></span>
+                  </label>
+                ))}
+                {filteredServices.length === 0 && (
+                  <div className="col-span-full text-xs italic" style={{ color: "var(--admin-fg-subtle)" }}>No services in selected websites.</div>
+                )}
+              </div>
+            </section>
+
+            <p className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+              Auto-assignment will only route new items to this employee when the item's website and service match their scopes.
+              Employees with no work types enabled will keep receiving assignments the same way they do today.
+            </p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={busy || isLoading}>{busy ? "Saving…" : "Save Access"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -44,7 +44,10 @@ const ServiceInput = z.object({
   govt_portal_url: z.string().trim().max(1000).nullable().optional(),
   website_id: z.string().uuid().optional(),
   category_id: z.string().uuid().nullable().optional(),
+  expected_processing_days: z.number().int().min(0).max(3650).nullable().optional(),
+  journey_key: z.string().trim().max(80).nullable().optional(),
 });
+
 
 export const upsertService = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

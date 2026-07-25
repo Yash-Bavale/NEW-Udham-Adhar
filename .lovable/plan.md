@@ -1,86 +1,118 @@
+## Scope
 
-## Goal
+Phases 1–4 only. No changes to journeys, payments, emails, lead/order flows, or bundles this iteration.
 
-Fix Executive Dashboard: correct KPI logic (Unique Leads, Orders, Order Alerts, Support Tickets, Active Staff, Orders Not Contacted), tighten card layout (icon inline with value + inline delta), and make every KPI clickable — both the whole card and each sub-chip — deep-linking to the right list with the right filter.
+## What already exists (reuse)
 
-## 1. Correct the metric logic (`src/lib/crm/super-admin.functions.ts`)
+- `public.websites` — CRUD via `websites-admin.functions.ts` (`listWebsiteTree`, `upsertWebsite`, `deleteWebsite`). Currently no `description` column, no dedicated "Websites" management route surfaced in sidebar.
+- `public.service_categories`, `public.services` — CRUD via same module + `services-admin.functions.ts`. Each service already carries `website_id`, `category_id`, pricing, `sort_order`, `is_active`.
+- `public.profiles` — has `display_name`, `email`, `mobile`, `full_name`, `is_active`. No `employee_code`, no `department`, no `joining_date`.
+- `public.user_roles` (+ `has_role`, `has_any_staff_role`) — canonical role storage. Keep.
+- `public.user_permissions` (module + can_view/create/edit/delete) and `public.user_permission_scopes` (website / category / service per module) — already the shape needed for per-website / per-service access.
+- `public.assignment_pool` (user_id, service_id nullable, is_active, round-robin counters) — powers `auto_assign_lead` / `auto_assign_application`.
 
-- **Unique Leads → Not Contacted / Contacted / Converted (from `leads.status`, not `lead_attribution`)**
-  Current code counts "not contacted" as `uniqueLeads − leadsWithFirstContact`, so it stays at 23 even after employees change the lead status. Switch to counting directly from `leads.status` within the range (`is_duplicate = false`):
-  - `notContacted`: `status in ('new_lead','lead_created')`
-  - `contacted`: `status = 'contacted'`
-  - `converted`: `status in ('payment_successful','under_process','completed','details_pending','documents_pending','under_review')`
-  Show all three as sub-chips on the card.
+## What's missing / to change
 
-- **Rename "Paid Orders" → "Orders"**
-  Keep the same underlying paid-payments count (an order = payment successful). Only the label and internal key rename.
+### Phase 1 — Websites
+- Add `websites.description text`.
+- Add `Management → Websites` route with list + create/edit dialog. Reuse `upsertWebsite`; extend Zod for `description`.
 
-- **Order Alerts (payment-successful only)**
-  Current query counts any application older than 3d/7d that isn't completed/closed — includes unpaid leads, producing the 7,322 figure. Restrict to applications tied to a successful payment. Use `applications` filtered by `id in (select application_id from payments where status='paid')` and same age buckets. Result should be small realistic numbers.
+### Phase 2 — Services
+- Add `services.expected_processing_days int`, `services.journey_key text` (nullable; defaults to current Udyam journey when null — actual journey routing lands in Phase 7, column added now so admin UI can capture it).
+- Extend `Management → Services` page: filter by website, show category, price, expected days, active toggle, and an "Assigned Employees" count sourced from `assignment_pool ⋈ user_permission_scopes`.
+- Do NOT change service_code semantics used by existing form-schema/onboarding code.
 
-- **Support Tickets Raised — show live active count**
-  Add `ticketsActive` = tickets whose `status not in ('closed','resolved')` (not date-bounded), display that as the headline value. Keep `Closed` and `Pending 3+d` as sub-chips. `ticketsRaised` in range stays as delta baseline.
+### Phase 3 — Employees + EMP-#### IDs
+- Add `profiles.employee_code text UNIQUE`, `profiles.department text`, `profiles.joining_date date`.
+- Create sequence `employee_code_seq` starting at 1.
+- Trigger `set_employee_code` on `profiles` BEFORE INSERT: if null, `EMP-` + `lpad(nextval, 4, '0')`. Never reused, never mutated (trigger only fires on INSERT and only when null).
+- One-off backfill in the same migration: assign EMP-#### to existing profiles ordered by `created_at ASC`, then `setval` sequence to `max + 1`.
+- Update `handle_new_user()` so new signups get an EMP-#### automatically (trigger handles it — no code change needed beyond sequence existing).
+- Surface `employee_code` everywhere staff is shown: employees list, lead/order assignee chips, activity log staff labels. This iteration wires it into the employees admin table + assignee dropdowns; broader surfaces get updated as they're touched later.
 
-- **Active Staff (signed in today IST)**
-  Fix `auth.users.last_sign_in_at` access — the `admin.schema("auth")` call needs verification; if it returns 0 rows, fall back to querying `auth.users` via `supabaseAdmin.auth.admin.listUsers()` and filter `last_sign_in_at >= todayStartIso` intersected with staff role ids. Also expose `staffSignedInToday` explicitly.
+### Phase 4 — Employee → Website + Service + Work Permission
+- Introduce four "work permission" module keys in `permission_modules` (idempotent insert): `work.leads`, `work.orders`, `work.support`, `work.finance`. These are separate from view permissions and represent "can be auto-assigned this kind of work".
+- Employee editor UI (extend existing employee/permissions page):
+  1. Role checkboxes (unchanged).
+  2. Website access — writes `user_permission_scopes` rows with `module_key='work.leads'|'work.orders'|...` and `website_id` set.
+  3. Service access — same table, `service_id` set (nullable website_id means "all sites").
+  4. Work permission toggles — writes `user_permissions` rows for the `work.*` module keys.
+- Extend `auto_assign_lead()` and `auto_assign_application()` to require:
+  - user has `user_permissions.can_view` on `work.leads` (or `work.orders`) AND
+  - a matching `user_permission_scopes` row for that module covering `NEW.website_id` (or scope is "all sites") AND
+  - service scope match if the user has any service scopes on that module (empty = all services).
+  - Falls back to today's `assignment_pool` behaviour when a user has no `work.*` scopes configured, so existing assignments keep working during rollout.
+- Manual reassignment (admin/manager) unchanged.
 
-- **Orders Not Contacted (payment successful only)**
-  Current query uses `fulfillment_status='order_received'` — matches unpaid orders too, hence 999+. Restrict to applications where a paid payment exists AND no `lead_contact_events` after payment. Buckets: 3+ hrs, 5+ hrs.
+## Technical details
 
-## 2. Compact card layout (`src/components/admin/SuperAdminDashboard.tsx` → `ModernKpi`)
+Migration (single file):
 
-Current: icon top-left, delta top-right, then label, then a large value, then chips → tall card, uneven heights.
+```sql
+ALTER TABLE public.websites ADD COLUMN IF NOT EXISTS description text;
+ALTER TABLE public.services
+  ADD COLUMN IF NOT EXISTS expected_processing_days int,
+  ADD COLUMN IF NOT EXISTS journey_key text;
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS employee_code text,
+  ADD COLUMN IF NOT EXISTS department text,
+  ADD COLUMN IF NOT EXISTS joining_date date;
 
-New layout inside each card:
+CREATE SEQUENCE IF NOT EXISTS public.employee_code_seq START 1;
+
+CREATE OR REPLACE FUNCTION public.set_employee_code() RETURNS trigger
+LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF NEW.employee_code IS NULL THEN
+    NEW.employee_code := 'EMP-' || lpad(nextval('public.employee_code_seq')::text, 4, '0');
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_profiles_employee_code ON public.profiles;
+CREATE TRIGGER trg_profiles_employee_code BEFORE INSERT ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.set_employee_code();
+
+-- Backfill in creation order, then advance sequence.
+WITH ordered AS (
+  SELECT id, row_number() OVER (ORDER BY created_at ASC, id ASC) AS n
+  FROM public.profiles WHERE employee_code IS NULL
+)
+UPDATE public.profiles p SET employee_code = 'EMP-' || lpad(o.n::text, 4, '0')
+FROM ordered o WHERE p.id = o.id;
+SELECT setval('public.employee_code_seq',
+  GREATEST(1, (SELECT COALESCE(MAX(substring(employee_code from 5)::int), 0) FROM public.profiles)));
+
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_employee_code_key UNIQUE (employee_code);
+
+INSERT INTO public.permission_modules(key, label, sort_order) VALUES
+  ('work.leads','Work: Leads',900),
+  ('work.orders','Work: Orders',901),
+  ('work.support','Work: Support',902),
+  ('work.finance','Work: Finance',903)
+ON CONFLICT (key) DO NOTHING;
 ```
-[icon]  LABEL                        [▲/▼ delta]
-[icon]  VALUE (2xl, inline with icon on same row)
-[chip] [chip] [chip]
-```
-- Move icon inline with the value (icon size 5, chip background) so the value row is icon + number.
-- Keep the tiny delta pill anchored top-right on the same row as the label.
-- Reduce padding `p-4 → p-3`, `rounded-2xl → rounded-xl`, `size-9 → size-8` for icon chip.
-- Force uniform height with `min-h-[112px]` and `grid-auto-rows`; drop the third-line footer to a subtle 10-px muted line only when present.
 
-## 3. Make KPIs click-through
+`auto_assign_lead` / `auto_assign_application` updated in the same migration to filter pool candidates by the `work.*` permission + website/service scopes, with the "no scopes configured → treat as unrestricted" fallback for safety.
 
-Wrap `ModernKpi` in a `<Link>` (or `useNavigate`) driven by two new props: `href` for the whole card and `subs` items that carry their own `href`. `StatChip` accepts an optional `href` and renders as a link when set. Clicking a chip stops propagation so it doesn't fire the card link.
+Server functions changed (thin edits, no new files unless noted):
+- `src/lib/crm/websites-admin.functions.ts` — accept `description`.
+- `src/lib/crm/services-admin.functions.ts` — accept `expected_processing_days`, `journey_key`.
+- `src/lib/crm/users-admin.functions.ts` — return `employee_code`, `department`, `joining_date`; accept them in upserts; new `setEmployeeWorkAccess({ userId, websites[], services[], work: {leads,orders,support,finance} })` writing `user_permissions` + `user_permission_scopes`.
 
-Targets:
-| KPI | Card click | Sub-chip clicks |
-|---|---|---|
-| Unique Leads | `/admin/leads` | Not Contacted → `?filter=not_contacted`; Contacted → `?status=contacted`; Converted → `?filter=converted` |
-| Orders | `/admin/orders` | Pending → `?filter=pending`; Closed → `?filter=closed` |
-| Technical Delay | `/admin/orders?filter=technical_delay` | Customer Delay → `?filter=customer_delay`; Form Not Submitted → `?filter=form_not_submitted` |
-| Order Alerts | `/admin/orders?filter=delayed_3d` | 3+ Days / 7+ Days |
-| Support Tickets Raised | `/admin/support/tickets` | Closed / Pending 3+d → same list with status filter |
-| Refund Requests | `/admin/refunds` | Accepted / Rejected → status tab |
-| Email Delivery | `/admin/help/email-matrix` | Sent / Queued / Failed |
-| Active Staff | `/admin/performance` | Total / Inactive |
-| Orders Not Contacted | `/admin/orders?filter=not_contacted` | 3+ hrs / 5+ hrs |
-| Revenue | `/admin/finance` (or existing revenue page) | — |
-| Conversion % | `/admin/leads?filter=converted` | — |
-| Webhook Errors | `/admin/help/webhooks` (existing) | — |
-| Gateway Status | `/admin/settings/payments` | — |
+UI:
+- New route `src/routes/admin.management.websites.tsx` (list + dialog). Sidebar entry under Management.
+- Extend existing services management route with expected-days + journey-key inputs, plus a small "Assigned employees" popover.
+- Extend existing employees admin page with three collapsible sections: Websites, Services, Work Permissions. Employee row shows `EMP-####` prominently.
 
-## 4. Wire the filters at the destinations
+## Verification (in this iteration)
 
-- `src/routes/admin.leads.index.tsx`: add `validateSearch` with `status` and `filter` (`not_contacted | contacted | converted`); on mount, hydrate the existing local `status`/`search` state from URL so the pre-filter shows immediately.
-- `src/routes/admin.orders.index.tsx`: add `validateSearch` for `filter` (`pending | closed | technical_delay | customer_delay | form_not_submitted | delayed_3d | delayed_7d | not_contacted`) and translate each into the existing filter/where clauses on the page.
-- Support tickets / refunds routes already accept status tabs — pass through via search param.
+1. Apply migration; confirm all existing profiles have unique EMP-####.
+2. Create a new employee via admin → EMP-#### auto-assigned; sequence not reused.
+3. Grant a test employee `work.leads` + website Udyam + service "New Udyam" only; create a Udyam lead → auto-assigned to them; create a GST lead → NOT assigned to them.
+4. Existing employees with no `work.*` scopes still receive assignments (fallback path).
+5. `admin.leads.index` and employee dropdowns render `EMP-####` beside names.
 
-## 5. Types
+## Out of scope (later phases)
 
-Update `SuperAdminOverview.metrics` to add `leadsContacted`, `leadsConverted` (from `leads.status`), rename `paidOrders*` remains internally but UI label changes, add `ticketsActive`, `staffSignedInToday` (alias). Adjust `KpiGrid` reads accordingly.
-
-## Out of scope
-
-- No changes to charts, alerts, activity, top-services cards.
-- No design-token rewrite — keep existing tone palette.
-- No new backend tables.
-
-## Technical notes
-
-- Leads status enum values come from `src/lib/crm/types.ts` (`LEAD_STATUSES`); use those exact strings in filters.
-- For the "Orders" (paid-only) subqueries, add a pre-fetched `Set<paidAppIds>` once per handler and reuse — avoid N round-trips.
-- `admin.auth.admin.listUsers()` supports pagination; page through until `< perPage` returned, then filter by role ids. Cache result inside the single request.
+Phase 5–7 lead/order flow rewrites, Phase 8 bundles, Phase 9 Customer 360 (already largely present), Phase 10–14. Journey per service uses the added `services.journey_key` column but the router lands in Phase 7.

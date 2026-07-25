@@ -22,11 +22,14 @@ type ServiceForm = {
   govt_portal_url?: string | null;
   website_id?: string;
   category_id?: string | null;
+  expected_processing_days?: number | null;
+  journey_key?: string | null;
 };
 
 function emptyForm(): ServiceForm {
-  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null };
+  return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null, expected_processing_days: null, journey_key: "default" };
 }
+
 
 function ServicesPage() {
   const listFn = useServerFn(listServices);
@@ -93,11 +96,23 @@ function ServicesPage() {
             <Input label="GST 18% (₹) — auto" type="number" value={String(form.gst_amount)} onChange={() => {}} />
             <Input label="Govt Portal URL" value={form.govt_portal_url ?? ""} onChange={(v) => setForm({ ...form, govt_portal_url: v })} />
             <Input label="Sort order" type="number" value={String(form.sort_order)} onChange={(v) => setForm({ ...form, sort_order: Number(v) })} />
+            <Input
+              label="Expected processing days"
+              type="number"
+              value={form.expected_processing_days == null ? "" : String(form.expected_processing_days)}
+              onChange={(v) => setForm({ ...form, expected_processing_days: v === "" ? null : Number(v) })}
+            />
+            <Input
+              label="Journey key"
+              value={form.journey_key ?? "default"}
+              onChange={(v) => setForm({ ...form, journey_key: v || "default" })}
+            />
             <label className="flex items-center gap-2 text-sm md:col-span-2">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
               Active
             </label>
           </div>
+
           <div className="flex gap-2">
             <button
               onClick={async () => {

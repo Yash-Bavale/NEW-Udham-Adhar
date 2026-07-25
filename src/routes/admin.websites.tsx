@@ -24,12 +24,13 @@ import {
 
 export const Route = createFileRoute("/admin/websites")({ component: WebsitesPage });
 
-type WebsiteForm = { id?: string; name: string; domain: string; is_active: boolean; sort_order: number };
+type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; sort_order: number };
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
 function emptyWebsite(): WebsiteForm {
-  return { name: "", domain: "", is_active: true, sort_order: 0 };
+  return { name: "", domain: "", description: "", is_active: true, sort_order: 0 };
 }
+
 function emptyCategory(website_id: string): CategoryForm {
   return { website_id, name: "", is_active: true, sort_order: 0 };
 }
@@ -103,7 +104,18 @@ function WebsitesPage() {
               <input type="checkbox" checked={webForm.is_active} onChange={(e) => setWebForm({ ...webForm, is_active: e.target.checked })} />
               Active
             </label>
+            <label className="block text-sm md:col-span-2">
+              <div className="text-xs text-slate-500 mb-1">Description (optional)</div>
+              <textarea
+                value={webForm.description ?? ""}
+                onChange={(e) => setWebForm({ ...webForm, description: e.target.value })}
+                rows={2}
+                placeholder="Short internal note about this website"
+                className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              />
+            </label>
           </div>
+
           <div className="flex gap-2 pt-2">
             <button
               onClick={async () => {
@@ -195,7 +207,7 @@ function WebsitesPage() {
                   <FolderPlus className="size-3.5" /> Category
                 </button>
                 <button
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, is_active: w.is_active, sort_order: w.sort_order })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, sort_order: w.sort_order })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >

@@ -35,9 +35,11 @@ const WebsiteInput = z.object({
     .min(3)
     .max(255)
     .regex(/^[a-z0-9.-]+$/i, "Domain must contain only letters, digits, dots and hyphens"),
+  description: z.string().trim().max(2000).nullable().optional(),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
 });
+
 
 export const upsertWebsite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

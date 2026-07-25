@@ -2776,31 +2776,40 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          department: string | null
           display_name: string | null
           email: string | null
+          employee_code: string | null
           full_name: string | null
           id: string
           is_active: boolean
+          joining_date: string | null
           mobile: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          department?: string | null
           display_name?: string | null
           email?: string | null
+          employee_code?: string | null
           full_name?: string | null
           id: string
           is_active?: boolean
+          joining_date?: string | null
           mobile?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          department?: string | null
           display_name?: string | null
           email?: string | null
+          employee_code?: string | null
           full_name?: string | null
           id?: string
           is_active?: boolean
+          joining_date?: string | null
           mobile?: string | null
           updated_at?: string
         }
@@ -3169,10 +3178,12 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string | null
+          expected_processing_days: number | null
           govt_portal_url: string | null
           gst_amount: number
           id: string
           is_active: boolean
+          journey_key: string | null
           sac_code: string
           service_code: string
           service_name: string
@@ -3186,10 +3197,12 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          expected_processing_days?: number | null
           govt_portal_url?: string | null
           gst_amount?: number
           id?: string
           is_active?: boolean
+          journey_key?: string | null
           sac_code?: string
           service_code: string
           service_name: string
@@ -3203,10 +3216,12 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          expected_processing_days?: number | null
           govt_portal_url?: string | null
           gst_amount?: number
           id?: string
           is_active?: boolean
+          journey_key?: string | null
           sac_code?: string
           service_code?: string
           service_name?: string
@@ -3692,6 +3707,7 @@ export type Database = {
       websites: {
         Row: {
           created_at: string
+          description: string | null
           domain: string
           id: string
           is_active: boolean
@@ -3701,6 +3717,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           domain: string
           id?: string
           is_active?: boolean
@@ -3710,6 +3727,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           domain?: string
           id?: string
           is_active?: boolean
