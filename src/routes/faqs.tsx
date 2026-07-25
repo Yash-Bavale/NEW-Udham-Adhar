@@ -102,7 +102,8 @@ export const Route = createFileRoute("/faqs")({
 });
 
 function FaqsPage() {
-  const { faqs: FAQ_LIST } = Route.useLoaderData();
+  const { faqs: FAQ_LIST } = Route.useLoaderData() as { faqs: Faq[] };
+
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<FaqCategoryKey | "all">("all");
 
