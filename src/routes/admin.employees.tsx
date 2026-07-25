@@ -476,6 +476,8 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
   const [full_name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [role, setRoleVal] = useState<Role>("executive");
+  const [department, setDepartment] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Reset when row changes
@@ -483,6 +485,8 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
     setName(r.full_name ?? "");
     setMobile(r.mobile ?? "");
     setRoleVal((r.roles[0] as Role) ?? "executive");
+    setDepartment(r.department ?? "");
+    setJoiningDate(r.joining_date ?? "");
   });
 
   if (!row) return null;
@@ -491,7 +495,11 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
     if (!row) return;
     setBusy(true);
     try {
-      await updateFn({ data: { user_id: row.id, full_name, mobile: mobile || null, role } });
+      await updateFn({ data: {
+        user_id: row.id, full_name, mobile: mobile || null, role,
+        department: department || null,
+        joining_date: joiningDate || null,
+      } });
       toast.success("Employee updated.");
       onSaved();
       onClose();
@@ -504,25 +512,41 @@ function EditEmployeeDialog({ row, onClose, onSaved }:
       <DialogContent>
         <DialogHeader><DialogTitle>Edit Employee</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <Field label="Email"><Input value={row.email} disabled /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Employee ID">
+              <Input value={row.employee_code ?? "—"} disabled />
+            </Field>
+            <Field label="Email"><Input value={row.email} disabled /></Field>
+          </div>
           <Field label="Full Name">
             <Input value={full_name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Mobile">
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-          </Field>
-          <Field label="Role">
-            <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Mobile">
+              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            </Field>
+            <Field label="Department">
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Operations, Sales…" />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Joining Date">
+              <Input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} />
+            </Field>
+            <Field label="Role">
+              <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </div>
         <DialogFooter>
+
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save Changes"}</Button>
         </DialogFooter>
