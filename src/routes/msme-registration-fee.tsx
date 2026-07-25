@@ -79,30 +79,45 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/msme-registration-fee")({
-  head: () => ({
-    meta: [
-      { title: TITLE },
-      { name: "description", content: DESC },
-      { property: "og:title", content: TITLE },
-      { property: "og:description", content: DESC },
-      { property: "og:url", content: URL },
-    ],
-    links: [{ rel: "canonical", href: URL }],
-    scripts: [
-      jsonLdScript(faqSchema(FAQS)),
-      jsonLdScript(
-        breadcrumbSchema([
-          { name: "Home", url: "https://udyamadhar.in/" },
-          { name: "MSME Registration Fee", url: URL },
-        ]),
-      ),
-    ],
-  }),
-  component: () => (
-    <RichServicePage
-      h1="MSME Registration Fee — What's Free, What's Paid"
-      intro="Udyam (MSME) registration on the official government portal is free. There is no government fee for new registration, updates, downloads, or Udyog Aadhar migration. This page explains what is genuinely free and what private consultancies — including Business Help Services — charge for."
-      blocks={BLOCKS}
-    />
-  ),
+  loader: async () => {
+    const cms = await getContentfulServicePage({ data: { slug: "msme-registration-fee" } });
+    return { cms };
+  },
+  head: ({ loaderData }) => {
+    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
+    const title = cms?.metaTitle || TITLE;
+    const desc = cms?.metaDescription || DESC;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: desc },
+        { property: "og:title", content: title },
+        { property: "og:description", content: desc },
+        { property: "og:url", content: URL },
+      ],
+      links: [{ rel: "canonical", href: URL }],
+      scripts: [
+        jsonLdScript(faqSchema(FAQS)),
+        jsonLdScript(
+          breadcrumbSchema([
+            { name: "Home", url: "https://udyamadhar.in/" },
+            { name: "MSME Registration Fee", url: URL },
+          ]),
+        ),
+      ],
+    };
+  },
+  component: RouteView,
 });
+
+function RouteView() {
+  const { cms } = useLoaderData({ from: "/msme-registration-fee" }) as {
+    cms: ContentfulServicePage | null;
+  };
+  const intro =
+    cms?.longDescription ||
+    cms?.shortDescription ||
+    "Udyam (MSME) registration on the official government portal is free. There is no government fee for new registration, updates, downloads, or Udyog Aadhar migration. This page explains what is genuinely free and what private consultancies — including Business Help Services — charge for.";
+  const h1 = cms?.name || "MSME Registration Fee — What's Free, What's Paid";
+  return <RichServicePage h1={h1} intro={intro} blocks={BLOCKS} />;
+}
