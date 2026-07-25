@@ -154,8 +154,12 @@ export const listStaffUsers = createServerFn({ method: "GET" })
           created_at: u.created_at,
           last_sign_in_at: u.last_sign_in_at,
           roles: roleMap.get(u.id) ?? [],
+          employee_code: p?.employee_code ?? null,
+          department: p?.department ?? null,
+          joining_date: p?.joining_date ?? null,
           perf: stats,
         };
+
       }),
     };
   });
