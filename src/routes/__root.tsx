@@ -85,32 +85,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: ({ loaderData }) => {
     const brand = (loaderData as { brand?: Awaited<ReturnType<typeof getCurrentBrand>> } | undefined)?.brand;
     const verify = brand?.googleSiteVerification || "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY";
+    const siteName = brand?.siteName || "Udyam Aadhar";
+    const baseUrl = brand?.baseUrl || "https://udyamadhar.in";
+    const title = `${siteName} | MSME Certificate Download`;
+    const description = `Consultancy for ${siteName} / MSME registration, certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.`;
     return {
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "google-site-verification", content: verify },
-      { title: "Udyam Aadhar | MSME Certificate Download" },
-      {
-        name: "description",
-        content:
-          "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
-      },
-      { property: "og:title", content: "Udyam Aadhar | MSME Certificate Download" },
-      {
-        property: "og:description",
-        content:
-          "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance.",
-      },
+      { title },
+      { name: "description", content: description },
+      { property: "og:title", content: title },
+      { property: "og:description", content: description },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://udyamadhar.in/" },
-      { property: "og:site_name", content: "Udyam Aadhar" },
+      { property: "og:url", content: `${baseUrl}/` },
+      { property: "og:site_name", content: siteName },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Udyam Aadhar | MSME Certificate Download" },
-      { name: "twitter:description", content: "Consultancy for Udyam Registration, MSME certificate updates, downloads, Udyog Aadhaar migration and related registration assistance." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/6f8b6b1e-da32-4a33-8101-27b29a8f150e" },
-
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
