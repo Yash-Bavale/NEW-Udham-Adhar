@@ -3706,34 +3706,85 @@ export type Database = {
       }
       websites: {
         Row: {
+          brand_name: string | null
+          business_hours: string | null
+          company_name: string | null
+          contentful_delivery_token_secret: string | null
+          contentful_space_id: string | null
           created_at: string
           description: string | null
           domain: string
+          favicon_asset_url: string | null
+          google_site_verification: string | null
+          gtag_id: string | null
           id: string
           is_active: boolean
+          is_primary: boolean
+          legal_entity: string | null
+          legal_footer_line: string | null
+          logo_asset_url: string | null
           name: string
+          primary_color: string | null
+          sample_certificate_asset_url: string | null
           sort_order: number
+          support_email: string | null
+          support_phone: string | null
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
+          brand_name?: string | null
+          business_hours?: string | null
+          company_name?: string | null
+          contentful_delivery_token_secret?: string | null
+          contentful_space_id?: string | null
           created_at?: string
           description?: string | null
           domain: string
+          favicon_asset_url?: string | null
+          google_site_verification?: string | null
+          gtag_id?: string | null
           id?: string
           is_active?: boolean
+          is_primary?: boolean
+          legal_entity?: string | null
+          legal_footer_line?: string | null
+          logo_asset_url?: string | null
           name: string
+          primary_color?: string | null
+          sample_certificate_asset_url?: string | null
           sort_order?: number
+          support_email?: string | null
+          support_phone?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
+          brand_name?: string | null
+          business_hours?: string | null
+          company_name?: string | null
+          contentful_delivery_token_secret?: string | null
+          contentful_space_id?: string | null
           created_at?: string
           description?: string | null
           domain?: string
+          favicon_asset_url?: string | null
+          google_site_verification?: string | null
+          gtag_id?: string | null
           id?: string
           is_active?: boolean
+          is_primary?: boolean
+          legal_entity?: string | null
+          legal_footer_line?: string | null
+          logo_asset_url?: string | null
           name?: string
+          primary_color?: string | null
+          sample_certificate_asset_url?: string | null
           sort_order?: number
+          support_email?: string | null
+          support_phone?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
