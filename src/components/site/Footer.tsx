@@ -11,6 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
+import { useBrand } from "@/lib/websites/brand-context";
 
 
 type SeoPageRow = { id: string; slug: string; label: string; page_type?: string };
