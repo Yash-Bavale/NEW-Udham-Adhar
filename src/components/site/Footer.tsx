@@ -11,6 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
+import { useBrand } from "@/lib/websites/brand-context";
 
 
 type SeoPageRow = { id: string; slug: string; label: string; page_type?: string };
@@ -76,10 +77,12 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function Footer() {
+  const brand = useBrand();
   const loadSeoPages = useServerFn(listPublicSeoPages);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const year = new Date().getFullYear();
 
   // Only fetch the (heavy) SEO page list once the gated SEO tree is unlocked.
   // Avoids one server-fn round-trip on every page load for every visitor.
@@ -103,7 +106,7 @@ export function Footer() {
         {/* Col 1: Brand + socials */}
         <div>
           <h3 className="text-2xl font-bold font-display leading-tight">
-            © Business Help Services
+            © {brand.companyName}
           </h3>
         </div>
 
@@ -139,27 +142,29 @@ export function Footer() {
           <ul className="mt-6 space-y-5 text-[15px] text-white/90">
             <li className="flex items-start gap-3">
               <Briefcase className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>Working Hours: 10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)</span>
+              <span>Working Hours: {brand.businessHours || "10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)"}</span>
             </li>
             <li className="flex items-start gap-3">
               <Mail className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
               <span>
                 Email:<br />
-                <a href="mailto:help@businesshelpservices.com" className="hover:underline break-all">
-                  help@businesshelpservices.com
+                <a href={`mailto:${brand.supportEmail}`} className="hover:underline break-all">
+                  {brand.supportEmail}
                 </a>
               </span>
             </li>
-            <li className="flex items-start gap-3">
-              <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>
-                Phone:{" "}
-                <a href="tel:+919767870331" className="hover:underline">+91-9767870331</a>
-              </span>
-            </li>
+            {brand.supportPhone && (
+              <li className="flex items-start gap-3">
+                <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+                <span>
+                  Phone:{" "}
+                  <a href={`tel:${brand.supportPhone.replace(/\s+/g, "")}`} className="hover:underline">{brand.supportPhone}</a>
+                </span>
+              </li>
+            )}
             <li className="flex items-start gap-3">
               <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>Address: Business Help Services Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India</span>
+              <span>Address: {brand.companyName} Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India</span>
             </li>
           </ul>
         </div>
@@ -168,7 +173,7 @@ export function Footer() {
       <div className="border-t border-white/10">
 
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
-          © 2026 Business Help Services. All Rights Reserved. Operated by Business Help Services.
+          © {year} {brand.companyName}. All Rights Reserved. Operated by {brand.legalEntity}.
         </div>
       </div>
     </footer>
