@@ -16,6 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteShell } from "../components/site/SiteShell";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { getCurrentBrand } from "@/lib/websites/current-brand.functions";
+import { BrandProvider } from "@/lib/websites/brand-context";
 
 
 function NotFoundComponent() {
