@@ -77,10 +77,12 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function Footer() {
+  const brand = useBrand();
   const loadSeoPages = useServerFn(listPublicSeoPages);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const year = new Date().getFullYear();
 
   // Only fetch the (heavy) SEO page list once the gated SEO tree is unlocked.
   // Avoids one server-fn round-trip on every page load for every visitor.
