@@ -173,6 +173,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { brand } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const bareLayout = path.startsWith("/admin") || path === "/admin-login";
