@@ -106,7 +106,7 @@ export function Footer() {
         {/* Col 1: Brand + socials */}
         <div>
           <h3 className="text-2xl font-bold font-display leading-tight">
-            © Business Help Services
+            © {brand.companyName}
           </h3>
         </div>
 
