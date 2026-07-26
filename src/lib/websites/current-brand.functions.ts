@@ -53,7 +53,7 @@ export const getCurrentBrand = createServerFn({ method: "GET" }).handler(
   async (): Promise<BrandInfo> => {
     try {
       const { resolveCurrentWebsite } = await import("./current-website.server");
-      const request = getWebRequest();
+      const request = getRequest();
       const row = await resolveCurrentWebsite(request);
       return {
         websiteId: row.id,
