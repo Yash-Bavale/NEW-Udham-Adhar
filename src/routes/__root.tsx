@@ -221,8 +221,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
-      <Toaster />
+      <BrandProvider value={brand}>
+        {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
+        <Toaster />
+      </BrandProvider>
     </QueryClientProvider>
   );
 }
