@@ -593,7 +593,7 @@ export const approveRefund = createServerFn({ method: "POST" })
         decided_at: new Date().toISOString(),
       } as never)
       .eq("application_id", data.orderId)
-      .eq("status", "pending");
+      .in("status", ["pending", "info_needed", "escalated"]);
     await writeRefundEvent(data.orderId, "approved", context.userId, {
       note: data.adminNotes ?? null,
       meta: {
