@@ -639,7 +639,7 @@ export const rejectRefund = createServerFn({ method: "POST" })
         decided_at: new Date().toISOString(),
       } as never)
       .eq("application_id", data.orderId)
-      .eq("status", "pending");
+      .in("status", ["pending", "info_needed", "escalated"]);
     await writeRefundEvent(data.orderId, "rejected", context.userId, { note: data.reason });
     // Move order back to IN_PROCESSING (force — REFUND_REQUESTED can't reach it normally).
     const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING", {
@@ -763,7 +763,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
         processed_by: context.userId,
       } as never)
       .eq("application_id", data.orderId)
-      .eq("status", "approved");
+      .in("status", ["approved", "info_needed", "escalated"]);
 
     await writeRefundEvent(data.orderId, "processed", context.userId, {
       note: `Ref ${data.paymentReference}`,
