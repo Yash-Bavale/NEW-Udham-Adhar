@@ -16,6 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteShell } from "../components/site/SiteShell";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { getCurrentBrand } from "@/lib/websites/current-brand.functions";
+import { BrandProvider } from "@/lib/websites/brand-context";
 
 
 function NotFoundComponent() {
@@ -79,11 +81,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
+  loader: async () => ({ brand: await getCurrentBrand() }),
+  head: ({ loaderData }) => {
+    const brand = (loaderData as { brand?: Awaited<ReturnType<typeof getCurrentBrand>> } | undefined)?.brand;
+    const verify = brand?.googleSiteVerification || "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY";
+    return {
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "google-site-verification", content: "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY" },
+      { name: "google-site-verification", content: verify },
       { title: "Udyam Aadhar | MSME Certificate Download" },
       {
         name: "description",
@@ -108,9 +114,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-      // Preconnect to third-party origins used site-wide so DNS/TLS handshake
-      // for async gtag + CDN assets happens in parallel with HTML parse.
+      { rel: "icon", type: "image/x-icon", href: brand?.faviconAssetUrl || "/favicon.ico" },
       { rel: "preconnect", href: "https://www.googletagmanager.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://www.google-analytics.com", crossOrigin: "anonymous" },
       { rel: "dns-prefetch", href: "https://www.googletagmanager.com" },
@@ -121,8 +125,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // GA/Ads gtag is injected from RootComponent after first paint (idle
       // callback) to keep the critical path light for Core Web Vitals.
     ],
-
-  }),
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -169,6 +173,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { brand } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const bareLayout = path.startsWith("/admin") || path === "/admin-login";
@@ -216,8 +221,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
-      <Toaster />
+      <BrandProvider value={brand}>
+        {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
+        <Toaster />
+      </BrandProvider>
     </QueryClientProvider>
   );
 }
