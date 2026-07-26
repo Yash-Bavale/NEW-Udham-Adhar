@@ -54,12 +54,18 @@ export const logLeadContact = createServerFn({ method: "POST" })
     const outcomeText = outcomeList.join(", ");
 
     // Mirror into activity_logs so it shows in the lead timeline.
-    await supabase.from("activity_logs").insert({
-      lead_id: data.leadId,
-      user_id: userId,
-      activity_type: "contact_logged",
-      activity_description: `${channelText} • ${outcomeText}${data.notes ? ` — ${data.notes}` : ""}`,
-    });
+    // Use admin client because RLS on activity_logs blocks user-scope inserts.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("activity_logs").insert({
+        lead_id: data.leadId,
+        user_id: userId,
+        activity_type: "contact_logged",
+        activity_description: `${channelText} • ${outcomeText}${data.notes ? ` — ${data.notes}` : ""}`,
+      } as never);
+    } catch (e) {
+      console.warn("[logLeadContact] activity_logs mirror failed", e);
+    }
 
     // Mirror into application_events so the Internal Notes & Activity feed shows it.
     try {
