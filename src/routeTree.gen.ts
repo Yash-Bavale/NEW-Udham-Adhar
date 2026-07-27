@@ -175,6 +175,7 @@ import { Route as AdminFinanceGstRouteImport } from './routes/admin.finance.gst'
 import { Route as AdminCustomersCustomerIdRouteImport } from './routes/admin.customers.$customerId'
 import { Route as AdminComplaintsComplaintIdRouteImport } from './routes/admin.complaints.$complaintId'
 import { Route as AdminApplicationsApplicationIdRouteImport } from './routes/admin.applications.$applicationId'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AdminSupportTicketsIndexRouteImport } from './routes/admin.support.tickets.index'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -1054,6 +1055,11 @@ const AdminApplicationsApplicationIdRoute =
     path: '/$applicationId',
     getParentRoute: () => AdminApplicationsRoute,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminSupportTicketsIndexRoute =
   AdminSupportTicketsIndexRouteImport.update({
     id: '/',
@@ -1322,6 +1328,7 @@ export interface FileRoutesByFullPath {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1507,6 +1514,7 @@ export interface FileRoutesByTo {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1696,6 +1704,7 @@ export interface FileRoutesById {
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/admin/applications/$applicationId': typeof AdminApplicationsApplicationIdRoute
   '/admin/complaints/$complaintId': typeof AdminComplaintsComplaintIdRoute
   '/admin/customers/$customerId': typeof AdminCustomersCustomerIdRoute
@@ -1887,6 +1896,7 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
+    | '/.lovable/oauth/consent'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2072,6 +2082,7 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin'
+    | '/.lovable/oauth/consent'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2260,6 +2271,7 @@ export interface FileRouteTypes {
     | '/processing/$leadCode'
     | '/success/$leadCode'
     | '/admin/'
+    | '/.lovable/oauth/consent'
     | '/admin/applications/$applicationId'
     | '/admin/complaints/$complaintId'
     | '/admin/customers/$customerId'
@@ -2411,6 +2423,7 @@ export interface RootRouteChildren {
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
@@ -3603,6 +3616,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApplicationsApplicationIdRouteImport
       parentRoute: typeof AdminApplicationsRoute
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/support/tickets/': {
       id: '/admin/support/tickets/'
       path: '/'
@@ -4072,6 +4092,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,
