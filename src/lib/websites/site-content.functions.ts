@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 export interface NavItem {
   id: string;
   label: string;
@@ -13,7 +21,7 @@ export interface SiteContent {
   headerNav: NavItem[];
   footerNav: NavItem[];
   /** block_key -> content JSON */
-  blocks: Record<string, unknown>;
+  blocks: Record<string, JsonValue>;
 }
 
 const EMPTY: SiteContent = {
@@ -56,8 +64,8 @@ export const getSiteContent = createServerFn({ method: "GET" }).handler(
         openInNew: !!r.open_in_new,
       });
 
-      const blocks: Record<string, unknown> = {};
-      for (const b of blockRes.data ?? []) blocks[b.block_key] = b.content;
+      const blocks: Record<string, JsonValue> = {};
+      for (const b of blockRes.data ?? []) blocks[b.block_key] = b.content as JsonValue;
 
       return {
         websiteId: site.id,
