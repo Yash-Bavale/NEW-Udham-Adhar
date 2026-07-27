@@ -199,6 +199,7 @@ import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/a
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
+import { Route as AdminWebsitesContentWebsiteIdRouteImport } from './routes/admin.websites.content.$websiteId'
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admin.services.forms.$serviceCode'
 
@@ -1199,6 +1200,12 @@ const ApiPublicAdminRegenerateInvoicesRoute =
     path: '/api/public/admin/regenerate-invoices',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AdminWebsitesContentWebsiteIdRoute =
+  AdminWebsitesContentWebsiteIdRouteImport.update({
+    id: '/content/$websiteId',
+    path: '/content/$websiteId',
+    getParentRoute: () => AdminWebsitesRoute,
+  } as any)
 const AdminSupportTicketsTicketIdRoute =
   AdminSupportTicketsTicketIdRouteImport.update({
     id: '/$ticketId',
@@ -1348,7 +1355,7 @@ export interface FileRoutesByFullPath {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
-  '/admin/websites': typeof AdminWebsitesRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1386,6 +1393,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
+  '/admin/websites/content/$websiteId': typeof AdminWebsitesContentWebsiteIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1538,7 +1546,7 @@ export interface FileRoutesByTo {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
-  '/admin/websites': typeof AdminWebsitesRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1575,6 +1583,7 @@ export interface FileRoutesByTo {
   '/onboarding/$leadCode': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
+  '/admin/websites/content/$websiteId': typeof AdminWebsitesContentWebsiteIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1732,7 +1741,7 @@ export interface FileRoutesById {
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
   '/admin/users': typeof AdminUsersRoute
-  '/admin/websites': typeof AdminWebsitesRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -1770,6 +1779,7 @@ export interface FileRoutesById {
   '/onboarding/$leadCode/': typeof OnboardingLeadCodeIndexRoute
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
+  '/admin/websites/content/$websiteId': typeof AdminWebsitesContentWebsiteIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
@@ -1966,6 +1976,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/'
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
+    | '/admin/websites/content/$websiteId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -2155,6 +2166,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode'
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
+    | '/admin/websites/content/$websiteId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -2349,6 +2361,7 @@ export interface FileRouteTypes {
     | '/onboarding/$leadCode/'
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
+    | '/admin/websites/content/$websiteId'
     | '/api/public/admin/regenerate-invoices'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
@@ -3839,6 +3852,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRegenerateInvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/websites/content/$websiteId': {
+      id: '/admin/websites/content/$websiteId'
+      path: '/content/$websiteId'
+      fullPath: '/admin/websites/content/$websiteId'
+      preLoaderRoute: typeof AdminWebsitesContentWebsiteIdRouteImport
+      parentRoute: typeof AdminWebsitesRoute
+    }
     '/admin/support/tickets/$ticketId': {
       id: '/admin/support/tickets/$ticketId'
       path: '/$ticketId'
@@ -3960,6 +3980,18 @@ const AdminSubmissionsRouteChildren: AdminSubmissionsRouteChildren = {
 const AdminSubmissionsRouteWithChildren =
   AdminSubmissionsRoute._addFileChildren(AdminSubmissionsRouteChildren)
 
+interface AdminWebsitesRouteChildren {
+  AdminWebsitesContentWebsiteIdRoute: typeof AdminWebsitesContentWebsiteIdRoute
+}
+
+const AdminWebsitesRouteChildren: AdminWebsitesRouteChildren = {
+  AdminWebsitesContentWebsiteIdRoute: AdminWebsitesContentWebsiteIdRoute,
+}
+
+const AdminWebsitesRouteWithChildren = AdminWebsitesRoute._addFileChildren(
+  AdminWebsitesRouteChildren,
+)
+
 interface AdminSupportTicketsRouteChildren {
   AdminSupportTicketsTicketIdRoute: typeof AdminSupportTicketsTicketIdRoute
   AdminSupportTicketsIndexRoute: typeof AdminSupportTicketsIndexRoute
@@ -4010,7 +4042,7 @@ interface AdminRouteChildren {
   AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
   AdminUsersRoute: typeof AdminUsersRoute
-  AdminWebsitesRoute: typeof AdminWebsitesRoute
+  AdminWebsitesRoute: typeof AdminWebsitesRouteWithChildren
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
@@ -4056,7 +4088,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
   AdminUsersRoute: AdminUsersRoute,
-  AdminWebsitesRoute: AdminWebsitesRoute,
+  AdminWebsitesRoute: AdminWebsitesRouteWithChildren,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
