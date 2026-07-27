@@ -12,6 +12,7 @@ import {
   faqSchema,
   jsonLdScript,
 } from "@/lib/seo/jsonld";
+import { useBrand } from "@/lib/websites/brand-context";
 import { getContentfulLandingPage, type ContentfulLandingPage } from "@/lib/contentful/client.functions";
 
 const HOMEPAGE_TITLE =
@@ -138,6 +139,8 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { cms } = useLoaderData({ from: "/" }) as { cms: ContentfulLandingPage | null };
+  const brand = useBrand();
+  const certUrl = brand.sampleCertificateAssetUrl || certImg.url;
   const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
   const heroSub = cms?.hero?.subheading ||
     "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
@@ -168,8 +171,8 @@ function HomePage() {
           </div>
           <div className="p-6">
             <img
-              src={certImg.url}
-              alt="Sample Udyam Certificate"
+              src={certUrl}
+              alt={`Sample ${brand.siteName} certificate`}
               width={1200}
               height={849}
               className="w-full h-auto rounded-md border border-border"
