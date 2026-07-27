@@ -173,7 +173,7 @@ export function Footer() {
       <div className="border-t border-white/10">
 
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
-          © {year} {brand.companyName}. All Rights Reserved. Operated by {brand.legalEntity}.
+          © {year} {brand.companyName}. All Rights Reserved. Operated by Business Help&nbsp;Services.
         </div>
       </div>
     </footer>
