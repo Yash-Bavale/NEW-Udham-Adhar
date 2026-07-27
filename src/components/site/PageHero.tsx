@@ -84,6 +84,7 @@ export function WpPage({
   html: string;
   legal?: boolean;
 }) {
+  const branded = useBrandedHtml(html);
   return (
     <section className="mx-auto max-w-5xl px-4 py-10">
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -91,7 +92,8 @@ export function WpPage({
           <h1 className="text-2xl md:text-3xl font-bold font-display">{title}</h1>
         </div>
         <div className={proseClasses}>
-          <div dangerouslySetInnerHTML={{ __html: html }} />
+          <div dangerouslySetInnerHTML={{ __html: branded }} />
+
           {legal ? <LegalFooter /> : null}
         </div>
       </div>
