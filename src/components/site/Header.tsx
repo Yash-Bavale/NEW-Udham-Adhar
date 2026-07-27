@@ -56,6 +56,11 @@ function applyLang(lang: string) {
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const navLinks = useNav(
+    "header",
+    NAV_LINKS.map((l) => ({ id: `${l.to}-${l.label}`, label: l.label, path: l.to, openInNew: false })),
+  );
+
   const [lang, setLang] = useState<string>("en");
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
