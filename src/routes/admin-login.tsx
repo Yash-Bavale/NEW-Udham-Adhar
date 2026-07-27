@@ -2,7 +2,15 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Only allow same-origin relative paths as a post-login redirect target. */
+function safeNext(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
 export const Route = createFileRoute("/admin-login")({
+  validateSearch: (s: Record<string, unknown>) => ({ next: safeNext(s.next) ?? undefined }),
   head: () => ({
     meta: [
       { title: "Admin Login" },
@@ -14,10 +22,20 @@ export const Route = createFileRoute("/admin-login")({
 
 function AdminLoginPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const goAfterAuth = () => {
+    const target = safeNext(next);
+    if (target) {
+      window.location.href = target;
+      return;
+    }
+    navigate({ to: "/admin/dashboard", replace: true });
+  };
 
   // Redirect away if already signed in. Use getUser() so we await session
   // hydration (getSession() can return null on first paint). Also listen
@@ -26,20 +44,19 @@ function AdminLoginPage() {
     let cancelled = false;
 
     supabase.auth.getUser().then(({ data, error }) => {
-      if (!cancelled && !error && data.user) {
-        navigate({ to: "/admin/dashboard", replace: true });
-      }
+      if (!cancelled && !error && data.user) goAfterAuth();
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) navigate({ to: "/admin/dashboard", replace: true });
+      if (session) goAfterAuth();
     });
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, next]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +65,7 @@ function AdminLoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      navigate({ to: "/admin/dashboard", replace: true });
+      goAfterAuth();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
