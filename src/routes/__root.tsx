@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { getCurrentBrand } from "@/lib/websites/current-brand.functions";
 import { BrandProvider } from "@/lib/websites/brand-context";
+import { getSiteContent } from "@/lib/websites/site-content.functions";
+import { SiteContentProvider } from "@/lib/websites/site-content-context";
 
 
 function NotFoundComponent() {
@@ -81,7 +83,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  loader: async () => ({ brand: await getCurrentBrand() }),
+  loader: async () => {
+    const [brand, siteContent] = await Promise.all([getCurrentBrand(), getSiteContent()]);
+    return { brand, siteContent };
+  },
   head: ({ loaderData }) => {
     const brand = (loaderData as { brand?: Awaited<ReturnType<typeof getCurrentBrand>> } | undefined)?.brand;
     const verify = brand?.googleSiteVerification || "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY";
@@ -166,7 +171,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { brand } = Route.useLoaderData();
+  const { brand, siteContent } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const bareLayout = path.startsWith("/admin") || path === "/admin-login";
@@ -215,8 +220,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrandProvider value={brand}>
-        {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
-        <Toaster />
+        <SiteContentProvider value={siteContent}>
+          {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
+          <Toaster />
+        </SiteContentProvider>
       </BrandProvider>
     </QueryClientProvider>
   );

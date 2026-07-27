@@ -166,6 +166,7 @@ import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCo
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
+import { Route as AdminWebsiteContentWebsiteIdRouteImport } from './routes/admin.website-content.$websiteId'
 import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin.tickets.$ticketId'
 import { Route as AdminSupportTicketsRouteImport } from './routes/admin.support.tickets'
 import { Route as AdminSubmissionsSubmissionIdRouteImport } from './routes/admin.submissions.$submissionId'
@@ -1011,6 +1012,12 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminWebsiteContentWebsiteIdRoute =
+  AdminWebsiteContentWebsiteIdRouteImport.update({
+    id: '/website-content/$websiteId',
+    path: '/website-content/$websiteId',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AdminTicketsTicketIdRoute = AdminTicketsTicketIdRouteImport.update({
   id: '/tickets/$ticketId',
   path: '/tickets/$ticketId',
@@ -1372,6 +1379,7 @@ export interface FileRoutesByFullPath {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
+  '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1561,6 +1569,7 @@ export interface FileRoutesByTo {
   '/admin/services/$serviceCode': typeof AdminServicesServiceCodeRoute
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
+  '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1756,6 +1765,7 @@ export interface FileRoutesById {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
+  '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1952,6 +1962,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
+    | '/admin/website-content/$websiteId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2141,6 +2152,7 @@ export interface FileRouteTypes {
     | '/admin/services/$serviceCode'
     | '/admin/submissions/$submissionId'
     | '/admin/tickets/$ticketId'
+    | '/admin/website-content/$websiteId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -2335,6 +2347,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
+    | '/admin/website-content/$websiteId'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -3608,6 +3621,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/website-content/$websiteId': {
+      id: '/admin/website-content/$websiteId'
+      path: '/website-content/$websiteId'
+      fullPath: '/admin/website-content/$websiteId'
+      preLoaderRoute: typeof AdminWebsiteContentWebsiteIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/tickets/$ticketId': {
       id: '/admin/tickets/$ticketId'
       path: '/tickets/$ticketId'
@@ -4016,6 +4036,7 @@ interface AdminRouteChildren {
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
   AdminSupportTicketsRoute: typeof AdminSupportTicketsRouteWithChildren
   AdminTicketsTicketIdRoute: typeof AdminTicketsTicketIdRoute
+  AdminWebsiteContentWebsiteIdRoute: typeof AdminWebsiteContentWebsiteIdRoute
   AdminTicketsIndexRoute: typeof AdminTicketsIndexRoute
 }
 
@@ -4062,6 +4083,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
   AdminSupportTicketsRoute: AdminSupportTicketsRouteWithChildren,
   AdminTicketsTicketIdRoute: AdminTicketsTicketIdRoute,
+  AdminWebsiteContentWebsiteIdRoute: AdminWebsiteContentWebsiteIdRoute,
   AdminTicketsIndexRoute: AdminTicketsIndexRoute,
 }
 

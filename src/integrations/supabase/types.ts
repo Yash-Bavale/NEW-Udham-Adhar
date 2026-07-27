@@ -3247,6 +3247,94 @@ export type Database = {
           },
         ]
       }
+      site_content_blocks: {
+        Row: {
+          block_key: string
+          content: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          sort_order: number
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          block_key: string
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          block_key?: string
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_content_blocks_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_nav_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          nav_group: string
+          open_in_new: boolean
+          path: string
+          sort_order: number
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          nav_group?: string
+          open_in_new?: boolean
+          path: string
+          sort_order?: number
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          nav_group?: string
+          open_in_new?: boolean
+          path?: string
+          sort_order?: number
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_nav_items_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       smtp_settings: {
         Row: {
           created_at: string
@@ -3715,6 +3803,7 @@ export type Database = {
           description: string | null
           domain: string
           favicon_asset_url: string | null
+          footer_unlock_code: string | null
           google_site_verification: string | null
           gtag_id: string | null
           id: string
@@ -3724,6 +3813,7 @@ export type Database = {
           legal_footer_line: string | null
           logo_asset_url: string | null
           name: string
+          postal_address: string | null
           primary_color: string | null
           sample_certificate_asset_url: string | null
           sort_order: number
@@ -3742,6 +3832,7 @@ export type Database = {
           description?: string | null
           domain: string
           favicon_asset_url?: string | null
+          footer_unlock_code?: string | null
           google_site_verification?: string | null
           gtag_id?: string | null
           id?: string
@@ -3751,6 +3842,7 @@ export type Database = {
           legal_footer_line?: string | null
           logo_asset_url?: string | null
           name: string
+          postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
           sort_order?: number
@@ -3769,6 +3861,7 @@ export type Database = {
           description?: string | null
           domain?: string
           favicon_asset_url?: string | null
+          footer_unlock_code?: string | null
           google_site_verification?: string | null
           gtag_id?: string | null
           id?: string
@@ -3778,6 +3871,7 @@ export type Database = {
           legal_footer_line?: string | null
           logo_asset_url?: string | null
           name?: string
+          postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
           sort_order?: number

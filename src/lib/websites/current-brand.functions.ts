@@ -19,6 +19,8 @@ export interface BrandInfo {
   faviconAssetUrl: string | null;
   sampleCertificateAssetUrl: string | null;
   legalFooterLine: string;
+  postalAddress: string | null;
+  footerUnlockCode: string | null;
   googleSiteVerification: string | null;
   gtagId: string | null;
   baseUrl: string;
@@ -41,6 +43,8 @@ const FALLBACK: BrandInfo = {
   logoAssetUrl: null,
   faviconAssetUrl: null,
   sampleCertificateAssetUrl: null,
+  postalAddress: null,
+  footerUnlockCode: null,
   legalFooterLine:
     "Udyam Aadhar is operated by Udyam Registration Consultancy & Assistance Services, a private consultancy. We are not affiliated with, authorised by, endorsed by, or associated with any government authority or department.",
   googleSiteVerification: null,
@@ -70,6 +74,8 @@ export const getCurrentBrand = createServerFn({ method: "GET" }).handler(
         faviconAssetUrl: row.favicon_asset_url,
         sampleCertificateAssetUrl: row.sample_certificate_asset_url,
         legalFooterLine: row.legal_footer_line || FALLBACK.legalFooterLine,
+        postalAddress: row.postal_address,
+        footerUnlockCode: row.footer_unlock_code,
         googleSiteVerification: row.google_site_verification,
         gtagId: row.gtag_id,
         baseUrl: `https://${row.domain}`,

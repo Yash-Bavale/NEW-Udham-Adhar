@@ -1,58 +1,82 @@
-## What you need to do first
+## Part 1 — Audit: what's hardcoded vs dynamic today
 
-### 1. Create your destination Supabase project
-1. Sign in to your own Supabase account.
-2. Create a new project and save its database password in your password manager.
-3. Do not create tables or import anything yet.
-4. Do not paste the service-role key, database password, or access token into chat.
+### Already dynamic (per website, from the `websites` table via `useBrand()`)
+Resolved server-side from the Host header (`current-website.server.ts` → `getCurrentBrand`), so a second domain already gets its own values:
+- Brand name, legal entity, company name
+- Support email, support phone, WhatsApp number, business hours
+- Primary colour, logo, favicon, sample certificate image
+- Legal footer disclaimer line, Google site verification, GA tag, base URL
 
-### 2. Request the supported source export
-In this Lovable project, open **Cloud → Overview → Advanced settings → Export data** and request an export. Download it when Lovable notifies you that it is ready.
+### Already dynamic (from the database / Contentful)
+- Services list shown in the lead form (`services` table, scoped per website)
+- SEO landing pages list (`seo_pages` table) — powers the hidden footer link tree
+- Article pages served by the catch-all `/$` route (DB-backed)
+- Homepage meta title/description + FAQs, service pages and SEO articles can be overridden by Contentful, with local JSON as fallback
 
-This is the supported way to extract the managed database. The source service-role key and database password are intentionally unavailable and are not needed for this migration.
+### Hardcoded in code (the actual problem list)
+| Item | Where | Why it hurts a second site |
+|---|---|---|
+| Top nav links (10 items) | `src/lib/constants.ts` → `NAV_LINKS` | Same menu forced on every domain |
+| Footer "Useful Links" (13 policy links) | `Footer.tsx` → `FOOTER_LINKS` | Can't reorder/hide per site |
+| Footer "Get in touch" postal address | `Footer.tsx` (Pune address string) | Wrong for a different entity |
+| Footer copyright line | `Footer.tsx` | Partly hardcoded ("Business Help Services") |
+| Footer SEO-tree categories + unlock password `113355` | `Footer.tsx` (`CATEGORIES`) | Slug groups + password baked in code |
+| Disclaimer bar text | `constants.ts` → `DISCLAIMER_TEXT` | Names one company |
+| Homepage FAQs, "How it works", "Why us", steps, India facts | `routes/index.tsx` | Only meta+FAQ have a Contentful override; the rest is fixed |
+| Homepage canonical / og:url | `routes/index.tsx` (`https://udyamadhar.in/`) | Second domain would emit the wrong canonical |
+| Service prices `₹99` + slugs | `constants.ts` → `SERVICES` | Duplicate of the `services` table |
+| 13 policy pages | one route file each + `content/wp/*.html` | Brand names baked into the HTML |
+| ~180 legacy WP SEO route files | `src/routes/*.tsx` | New site can't get them without copying files |
+| `src/lib/brand.ts` constants | still imported in places (e.g. `/$` route `BASE_URL`) | Bypasses per-site brand |
 
-### 3. Return with these two items
-- Upload the downloaded Cloud export to this chat.
-- Tell me that the destination project is created.
+### Structural verdict
+The **brand layer** is solid; the **content/navigation layer** is not. Everything in the table above needs to move to per-website records so a new domain is a data setup, not a code fork.
 
-I will then open the appropriate secure connection/secret flow for the destination credentials. You will enter private values there, not in chat or source code.
+---
 
-## What I will do after that
+## Part 2 — Target structure (hybrid, as chosen)
 
-### 4. Rebuild the destination backend
-- Recreate the confirmed **74 public tables**, **80 public functions**, enums, sequences, indexes, triggers, grants, and RLS policies from the project migrations and source inventory.
-- Recreate the private `documents`, `form-assets`, and `invoices` storage buckets and access policies.
-- Recreate realtime publication coverage for the required CRM tables.
-- Adapt queues, scheduled jobs, email processing, callbacks, and Cloud-specific infrastructure for the destination.
+- **CRM database** owns structure & config: navigation, footer link groups, contact block, homepage section content, disclaimer, per-site canonical.
+- **Contentful** stays the source for long-form SEO/article/landing copy, with DB/local fallback (unchanged).
+- **Policy pages keep their route files**, but the HTML is run through a brand-token renderer at request time so `{{company}}`, `{{site_name}}`, `{{support_email}}`, `{{address}}`, `{{legal_entity}}`, `{{base_url}}` resolve per website.
 
-### 5. Move the data
-- Import data in foreign-key-safe order while preserving lead IDs, order IDs, codes, timestamps, invoices, tickets, refunds, workflows, and audit history.
-- Reset database sequences so future generated codes cannot collide.
-- Compare source/destination row counts and run orphan and relationship checks.
+---
 
-### 6. Move authentication
-- Recreate user identities and preserve an old-to-new user-ID map.
-- Remap profiles, `user_roles`, assignments, ownership, audit actors, and other user-linked rows.
-- Existing password hashes cannot be transferred; users will receive invitations or use password reset in the destination.
-- Reconfigure email/password, Google sign-in, redirect URLs, and MCP OAuth.
+## Part 3 — Phase 1 build
 
-### 7. Move storage files
-- Create a complete manifest for documents, form assets, and invoices.
-- Download source objects through authenticated application access and upload them to matching destination paths.
-- Verify signed downloads, document previews, invoice access, and database file references.
+### 1. Schema (one migration)
+- `site_nav_items` — website_id, label, path, group (`header` | `footer`), parent_id, sort_order, is_active, open_in_new
+- `site_content_blocks` — website_id, block_key (e.g. `home.hero`, `home.how_it_works`, `home.why_us`, `home.faqs`, `home.facts`, `disclaimer.bar`, `footer.address`, `footer.copyright`), content JSONB, is_active, sort_order
+- Extend `websites` with: `postal_address`, `footer_unlock_code`, `canonical_base` (if not already covered by domain)
+- Public read via `anon` SELECT on active rows only; writes limited to admin/super-admin; `service_role` full. GRANTs included per table.
+- Seed both tables with the current live values for the existing website, so nothing on udyamadhar.in changes visually.
 
-### 8. Reconnect the app
-- Point the browser and server clients to the destination project.
-- Enter the destination service-role key only as a protected server secret.
-- Re-enter external runtime secrets that cannot be exported.
-- Update MCP issuer settings, scheduled callback URLs, webhooks, email queue dispatch, and any hardcoded backend references.
+### 2. Server layer
+- `src/lib/websites/site-content.functions.ts` — `getSiteContent()` server fn returning `{ nav, footerGroups, blocks }` for the resolved website, cached alongside the existing brand resolution.
+- Load it once in `__root.tsx` next to `getCurrentBrand` and expose through a `SiteContentProvider` (mirrors `BrandProvider`).
 
-### 9. Validate and cut over
-- Test login, roles, leads, orders, onboarding, payments, refunds, tickets, uploads, invoices, email, realtime alerts, dashboards, and MCP tools.
-- Use a short write freeze for the final delta transfer.
-- Switch production only after validation succeeds and retain the old backend temporarily for rollback.
+### 3. Component rewiring (presentation only)
+- `Nav.tsx` — read header nav from context, fall back to `NAV_LINKS` when empty.
+- `Footer.tsx` — Useful Links, address, copyright, unlock code from context; SEO tree logic untouched.
+- `DisclaimerBar.tsx` — text from `disclaimer.bar` block, fallback to constant.
+- `routes/index.tsx` — FAQs / how-it-works / why-us / facts read from blocks (Contentful override still wins for meta+FAQ); canonical & og:url built from `brand.baseUrl`.
+- Policy routes — `WpPage` gains brand-token substitution; no route files removed.
 
-## Important boundaries
-- I cannot retrieve or expose Lovable Cloud’s service-role key, database password, or hidden backend login because Lovable Cloud does not make them available.
-- I can perform the migration without that source key using the supported export, checked-in migrations, authenticated application access for files, and secure destination credentials.
-- Do not delete or disable Lovable Cloud until the destination is fully validated.
+### 4. Admin editor
+New `admin.websites.content.$websiteId` screen (linked from the existing websites admin):
+- Website picker + brand fields (address, unlock code, contact)
+- Navigation tab: drag-order, add/edit/remove header and footer links, active toggle
+- Content blocks tab: edit hero copy, how-it-works steps, why-us bullets, FAQs, facts as repeatable rows
+- Preview link opens the site on that domain
+
+### 5. Launching site #2 afterwards
+Insert one `websites` row, its services scope, then clone nav/footer/content blocks from the primary with one "Copy content from…" action in the admin — no code changes.
+
+### Out of scope for phase 1 (flagged for later)
+- Converting the ~180 legacy WP route files to database-driven pages
+- Removing `src/lib/brand.ts` fallbacks entirely
+- Per-website Contentful space/token wiring (columns exist, not yet used)
+
+### Technical notes
+- All reads are SSR-safe server functions on public routes (no auth middleware), so prerender won't 401.
+- Fallback constants stay in code, so a DB miss or new domain never renders an empty nav/footer.

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
 import { useBrand } from "@/lib/websites/brand-context";
+import { useNav, useBlock } from "@/lib/websites/site-content-context";
 
 
 type SeoPageRow = { id: string; slug: string; label: string; page_type?: string };
@@ -78,6 +79,21 @@ const FOOTER_LINKS = [
 
 export function Footer() {
   const brand = useBrand();
+  const footerLinks = useNav(
+    "footer",
+    FOOTER_LINKS.filter((l) => l.to !== "/contact" && l.to !== "/important-notice").map((l) => ({
+      id: l.to,
+      label: l.label,
+      path: l.to,
+      openInNew: false,
+    })),
+  );
+  const addressBlock = useBlock<{ text?: string } | null>("footer.address", null);
+  const copyrightBlock = useBlock<{ text?: string } | null>("footer.copyright", null);
+  const address =
+    addressBlock?.text ||
+    [brand.companyName, brand.postalAddress].filter(Boolean).join(" ") ||
+    "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
   const loadSeoPages = useServerFn(listPublicSeoPages);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -115,7 +131,7 @@ export function Footer() {
           <h4 className="text-2xl font-bold font-display leading-tight">
             MSME / Udyog Aadhaar
           </h4>
-          <SeoTree pages={pages} loading={loading} loadError={loadError} onUnlock={fetchPagesIfNeeded} />
+          <SeoTree pages={pages} loading={loading} loadError={loadError} onUnlock={fetchPagesIfNeeded} unlockCode={brand.footerUnlockCode || "113355"} />
         </div>
 
         {/* Col 3: Useful Links */}
@@ -124,9 +140,9 @@ export function Footer() {
             Useful Links
           </h4>
           <ul className="mt-6 space-y-2.5 text-[15px] text-white/90">
-            {FOOTER_LINKS.filter((l) => l.to !== "/contact" && l.to !== "/important-notice").map((l) => (
-              <li key={l.to}>
-                <Link to={l.to} className="hover:text-white hover:underline">
+            {footerLinks.map((l) => (
+              <li key={l.id}>
+                <Link to={l.path} target={l.openInNew ? "_blank" : undefined} className="hover:text-white hover:underline">
                   {l.label}
                 </Link>
               </li>
@@ -164,7 +180,7 @@ export function Footer() {
             )}
             <li className="flex items-start gap-3">
               <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
-              <span>Address: {brand.companyName} Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India</span>
+              <span>Address: {address}</span>
             </li>
           </ul>
         </div>
@@ -173,7 +189,9 @@ export function Footer() {
       <div className="border-t border-white/10">
 
         <div className="mx-auto max-w-7xl px-4 py-5 text-center text-sm font-semibold text-white/85">
-          © {year} {brand.companyName}. All Rights Reserved. Operated by Business Help&nbsp;Services.
+          {copyrightBlock?.text
+            ? copyrightBlock.text.replace("{{year}}", String(year))
+            : `© ${year} ${brand.companyName}. All Rights Reserved. Operated by ${brand.legalEntity}.`}
         </div>
       </div>
     </footer>
@@ -185,11 +203,13 @@ function SeoTree({
   loading,
   loadError,
   onUnlock,
+  unlockCode,
 }: {
   pages: SeoPageRow[] | null;
   loading: boolean;
   loadError: boolean;
   onUnlock: () => void;
+  unlockCode: string;
 }) {
 
   const expandedAll = () =>
@@ -280,7 +300,7 @@ function SeoTree({
 
   function submitPwd(e: React.FormEvent) {
     e.preventDefault();
-    if (pwd === "113355") {
+    if (pwd === unlockCode) {
       try {
         window.sessionStorage.setItem("udyam_footer_unlock", "1");
       } catch { /* ignore */ }
