@@ -15,15 +15,25 @@ export const listServices = createServerFn({ method: "GET" })
     return { rows: data ?? [] };
   });
 
-// Public: active services (code + display name) for the website lead form.
+// Public: active services (code + display name) for the current website's lead form.
 export const listActiveServiceCodes = createServerFn({ method: "GET" }).handler(async () => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin
+  const { getRequest } = await import("@tanstack/react-start/server");
+  const { resolveWebsiteIdFromRequest } = await import("@/lib/websites/default-website.server");
+  let websiteId: string | null = null;
+  try {
+    websiteId = await resolveWebsiteIdFromRequest(getRequest());
+  } catch {
+    websiteId = null;
+  }
+  let q = supabaseAdmin
     .from("services")
     .select("service_code, service_name, sort_order")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
+    .eq("is_active", true);
+  if (websiteId) q = q.eq("website_id", websiteId);
+  const { data, error } = await q.order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
+
   const rows = data ?? [];
   return {
     codes: rows.map((r) => r.service_code as string),
