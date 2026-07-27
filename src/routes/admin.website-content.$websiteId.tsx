@@ -11,7 +11,7 @@ import {
   updateWebsiteContact,
 } from "@/lib/crm/site-content-admin.functions";
 
-export const Route = createFileRoute("/admin/websites/content/$websiteId")({
+export const Route = createFileRoute("/admin/website-content/$websiteId")({
   component: WebsiteContentPage,
 });
 
