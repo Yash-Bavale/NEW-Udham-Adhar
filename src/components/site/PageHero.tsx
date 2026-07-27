@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
-import { LEGAL_FOOTER_LINE } from "@/lib/brand";
+import { LEGAL_FOOTER_LINE, SITE_NAME, LEGAL_ENTITY, COMPANY_NAME, SUPPORT_EMAIL, BASE_URL } from "@/lib/brand";
+import { useOptionalBrand } from "@/lib/websites/brand-context";
 
 const proseClasses =
   "p-6 md:p-10 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
@@ -11,13 +12,42 @@ const proseClasses =
   "[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-1 " +
   "[&_p]:my-3 [&_strong]:text-foreground [&_table]:w-full [&_th]:text-left [&_th,&_td]:border [&_th,&_td]:border-border [&_th,&_td]:px-2 [&_th,&_td]:py-1";
 
+function escapeRe(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Rewrites the legacy hardcoded brand strings inside ported HTML content so
+ * every site in the `websites` table renders its own name / entity / contact.
+ */
+function useBrandedHtml(html: string) {
+  const brand = useOptionalBrand();
+  if (!brand) return html;
+  const pairs: Array<[string, string]> = [
+    [LEGAL_ENTITY, brand.legalEntity],
+    [COMPANY_NAME, brand.companyName],
+    [SUPPORT_EMAIL, brand.supportEmail],
+    [BASE_URL, brand.baseUrl],
+    ["udyamadhar.in", brand.domain],
+    [SITE_NAME, brand.siteName],
+  ];
+  let out = html;
+  for (const [from, to] of pairs) {
+    if (!to || from === to) continue;
+    out = out.replace(new RegExp(escapeRe(from), "g"), to);
+  }
+  return out;
+}
+
 function LegalFooter() {
+  const brand = useOptionalBrand();
   return (
     <p className="mt-6 border-t border-border pt-4 text-xs italic text-muted-foreground">
-      {LEGAL_FOOTER_LINE}
+      {brand?.legalFooterLine || LEGAL_FOOTER_LINE}
     </p>
   );
 }
+
 
 /** Standard inner-page container with a title band matching the homepage cards. */
 export function PageHero({
