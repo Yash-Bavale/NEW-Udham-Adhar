@@ -13,6 +13,8 @@ import {
   jsonLdScript,
 } from "@/lib/seo/jsonld";
 import { useBrand } from "@/lib/websites/brand-context";
+import { getCurrentBrand } from "@/lib/websites/current-brand.functions";
+import { useBlockItems } from "@/lib/websites/site-content-context";
 import { getContentfulLandingPage, type ContentfulLandingPage } from "@/lib/contentful/client.functions";
 
 const HOMEPAGE_TITLE =
@@ -89,9 +91,20 @@ const FACTS: [string, string][] = [
 ];
 
 export const Route = createFileRoute("/")({
-  loader: async () => ({ cms: await getContentfulLandingPage({ data: { slug: "home" } }) }),
+  loader: async () => {
+    const [cms, brand] = await Promise.all([
+      getContentfulLandingPage({ data: { slug: "home" } }),
+      getCurrentBrand(),
+    ]);
+    return { cms, baseUrl: brand.baseUrl, siteName: brand.siteName, legalEntity: brand.legalEntity };
+  },
   head: ({ loaderData }) => {
-    const cms = (loaderData as { cms: ContentfulLandingPage | null } | undefined)?.cms;
+    const ld = loaderData as
+      | { cms: ContentfulLandingPage | null; baseUrl?: string; legalEntity?: string }
+      | undefined;
+    const cms = ld?.cms;
+    const baseUrl = ld?.baseUrl || "https://udyamadhar.in";
+    const orgName = ld?.legalEntity || "Udyam Registration Consultancy & Assistance Services";
     const title = cms?.metaTitle || HOMEPAGE_TITLE;
     const desc = cms?.metaDescription || HOMEPAGE_DESC;
     const faqList = cms?.faqs?.length
@@ -103,10 +116,10 @@ export const Route = createFileRoute("/")({
         { name: "description", content: desc },
         { property: "og:title", content: title },
         { property: "og:description", content: desc },
-        { property: "og:url", content: "https://udyamadhar.in/" },
+        { property: "og:url", content: `${baseUrl}/` },
       ],
       links: [
-        { rel: "canonical", href: "https://udyamadhar.in/" },
+        { rel: "canonical", href: `${baseUrl}/` },
         // Preload the LCP image so the browser fetches it before React mounts.
         {
           rel: "preload",
@@ -121,12 +134,12 @@ export const Route = createFileRoute("/")({
         jsonLdScript({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          "@id": "https://udyamadhar.in/#website",
-          url: "https://udyamadhar.in/",
-          name: "Udyam Registration Consultancy & Assistance Services",
+          "@id": `${baseUrl}/#website`,
+          url: `${baseUrl}/`,
+          name: orgName,
           potentialAction: {
             "@type": "SearchAction",
-            target: "https://udyamadhar.in/faqs?q={search_term_string}",
+            target: `${baseUrl}/faqs?q={search_term_string}`,
             "query-input": "required name=search_term_string",
           },
         }),
@@ -139,16 +152,23 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { cms } = useLoaderData({ from: "/" }) as { cms: ContentfulLandingPage | null };
+  const howItWorksBlock = useBlockItems<string>("home.how_it_works", HOW_IT_WORKS);
+  const whyUsBlock = useBlockItems<string>("home.why_us", WHY_BULLETS);
+  const faqsBlock = useBlockItems<{ q: string; a: string }>("home.faqs", FAQS);
+  const factsBlock = useBlockItems<{ label: string; value: string }>(
+    "home.facts",
+    FACTS.map(([label, value]) => ({ label, value })),
+  );
   const brand = useBrand();
   const certUrl = brand.sampleCertificateAssetUrl || certImg.url;
   const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
   const heroSub = cms?.hero?.subheading ||
     "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
-  const howItWorks = cms?.howItWorks?.length ? cms.howItWorks : HOW_IT_WORKS;
-  const whyUs = cms?.whyUs?.length ? cms.whyUs : WHY_BULLETS;
+  const howItWorks = cms?.howItWorks?.length ? cms.howItWorks : howItWorksBlock;
+  const whyUs = cms?.whyUs?.length ? cms.whyUs : whyUsBlock;
   const faqList = cms?.faqs?.length
     ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
-    : FAQS;
+    : faqsBlock;
 
   useEffect(() => {
     trackEvent("page_view_landing", { path: "/" });
@@ -357,7 +377,7 @@ function HomePage() {
           </div>
           <table className="w-full border-t border-border text-sm md:text-base">
             <tbody>
-              {FACTS.map(([k, v]) => (
+              {factsBlock.map(({ label: k, value: v }) => (
                 <tr key={k} className="border-b border-border last:border-b-0">
                   <th
                     scope="row"
