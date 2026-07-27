@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
+import { useNav } from "@/lib/websites/site-content-context";
 
 declare global {
   interface Window {
@@ -261,12 +262,13 @@ export function Header() {
             </div>
             <nav className="px-5 py-4">
               <ul className="space-y-1">
-                {NAV_LINKS.map((l) => (
-                  <li key={`${l.to}-${l.label}`}>
+                {navLinks.map((l) => (
+                  <li key={l.id}>
                     <Link
-                      to={l.to}
+                      to={l.path}
+                      target={l.openInNew ? "_blank" : undefined}
                       onClick={() => setOpen(false)}
-                      activeOptions={{ exact: l.to === "/" }}
+                      activeOptions={{ exact: l.path === "/" }}
                       activeProps={{ className: "bg-white/10 text-brand-gold" }}
                       className="block px-3 py-3 rounded-md text-base font-medium text-white hover:bg-white/10 hover:text-brand-gold transition-colors"
                     >
