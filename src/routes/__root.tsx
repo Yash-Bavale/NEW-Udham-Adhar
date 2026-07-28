@@ -232,7 +232,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <BrandProvider value={brand}>
         <SiteContentProvider value={siteContent}>
-          {adminBlocked ? (
+          {adminBlocked || contentBlocked ? (
             <NotFoundComponent />
           ) : bareLayout ? (
             <Outlet />
