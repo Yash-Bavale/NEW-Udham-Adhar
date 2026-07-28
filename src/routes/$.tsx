@@ -9,6 +9,59 @@ import {
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
 import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
+import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
+import {
+  SeoContentPage,
+  buildSeoJsonLd,
+  type SeoPageData,
+} from "@/components/site/SeoContentPage";
+
+/** Map a Contentful seoArticle entry onto the shared SEO page shape. */
+function cfToSeoPageData(cf: any): SeoPageData {
+  const slugPath = cf.slug.startsWith("/") ? cf.slug : `/${cf.slug}`;
+  const canonical = cf.canonicalUrl || `${BASE_URL}${slugPath}`;
+  const title = cf.metaTitle || cf.title;
+  return {
+    slug: cf.slug,
+    canonical,
+    h1: cf.title || title,
+    seo: {
+      metaTitle: title,
+      metaDescription: cf.metaDescription ?? "",
+      canonical,
+      ogTitle: title,
+      ogDescription: cf.metaDescription ?? "",
+      twitterTitle: title,
+      twitterDescription: cf.metaDescription ?? "",
+      breadcrumb: cf.title || title,
+    },
+    aiOverview: cf.aiOverview ?? { short: "", medium: "" },
+    quickFacts: cf.quickFacts ?? [],
+    body: cf.bodySections ?? [],
+    eeat: {
+      experience: cf.eeat?.experience ?? "",
+      expertise: cf.eeat?.expertise ?? "",
+      trust: cf.eeat?.trust ?? "",
+      transparency: cf.eeat?.transparency ?? "",
+      disclaimer: cf.eeat?.disclaimer ?? "",
+    },
+    faq: (cf.faqs ?? []).map((f: any) => ({ question: f.question, answer: f.answer })),
+    internalLinks: cf.internalLinks ?? [],
+    cta: {
+      hero: cf.ctas?.hero ?? "",
+      middle: cf.ctas?.middle ?? "",
+      bottom: cf.ctas?.bottom ?? "",
+      trust: cf.ctas?.trust ?? "",
+      benefits: cf.ctas?.benefits ?? "",
+      why: cf.ctas?.why ?? "",
+    },
+    howto: cf.howto ?? [],
+    breadcrumb: [
+      { name: "Home", href: "/" },
+      { name: cf.title || title, href: slugPath },
+    ],
+  };
+}
 
 const setGoneStatus = createIsomorphicFn()
   .client(() => {})
@@ -128,10 +181,36 @@ export const Route = createFileRoute("/$")({
       const result = await getArticleBySlug({ data: { slug: lower } });
       return result;
     } catch {
+      // Fallback: page authored directly in Contentful for THIS site.
+      // Publishing a `seoArticle` entry there makes the URL live instantly —
+      // no DB row or code change needed.
+      const cf = await getContentfulSeoArticle({ data: { slug: lower } }).catch(
+        () => null,
+      );
+      if (cf) return { cfArticle: cf };
       throw notFound();
     }
   },
   head: ({ loaderData }) => {
+    const cf = (loaderData as any)?.cfArticle;
+    if (cf) {
+      const d = cfToSeoPageData(cf);
+      return {
+        meta: [
+          { title: d.seo.metaTitle },
+          { name: "description", content: d.seo.metaDescription },
+          { property: "og:title", content: d.seo.ogTitle },
+          { property: "og:description", content: d.seo.ogDescription },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: d.canonical },
+          { name: "twitter:card", content: "summary_large_image" },
+        ],
+        links: [{ rel: "canonical", href: d.canonical }],
+        scripts: [
+          { type: "application/ld+json", children: buildSeoJsonLd(d) },
+        ],
+      };
+    }
     const a = (loaderData as any)?.article;
     if (!a) {
       if ((loaderData as any)?.gone) {
@@ -217,6 +296,9 @@ function ArticleRoute() {
         </a>
       </div>
     );
+  }
+  if (data?.cfArticle) {
+    return <SeoContentPage data={cfToSeoPageData(data.cfArticle)} />;
   }
   const { article, related } = data;
   const sections = (Array.isArray(article.sections) ? article.sections : []) as ArticleSection[];

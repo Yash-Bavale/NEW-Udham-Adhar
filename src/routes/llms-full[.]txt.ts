@@ -24,7 +24,7 @@ function stripHtml(s: string): string {
 export const Route = createFileRoute("/llms-full.txt")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         const out: string[] = [];
         out.push(`# ${SITE_NAME} — Full Content`);
         out.push("");
@@ -44,6 +44,7 @@ export const Route = createFileRoute("/llms-full.txt")({
             .select(
               "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq",
             )
+            .eq("website_id", (await (await import("@/lib/websites/current-website.server")).resolveCurrentWebsite(request)).id)
             .eq("enabled", true)
             .order("sort_order", { ascending: true });
 

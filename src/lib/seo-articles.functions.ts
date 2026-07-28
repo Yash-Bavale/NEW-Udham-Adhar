@@ -11,6 +11,11 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { resolveCurrentWebsite } = await import(
+      "@/lib/websites/current-website.server"
+    );
+    const site = await resolveCurrentWebsite(getRequest());
     const slugVariants = data.slug.startsWith("/")
       ? [data.slug, data.slug.slice(1)]
       : [data.slug, `/${data.slug}`];
@@ -21,6 +26,7 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
         "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq, cover_image_url, related_slugs, published_at, updated_at",
       )
       .in("slug", slugVariants)
+      .eq("website_id", site.id)
       .eq("enabled", true)
       .eq("page_type", "article")
       .maybeSingle();
@@ -37,6 +43,7 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
         .from("seo_pages")
         .select("slug, label")
         .in("slug", relatedSlugs)
+        .eq("website_id", site.id)
         .eq("enabled", true);
       related = (rel ?? []).map((r: any) => ({ slug: r.slug, label: r.label }));
     }

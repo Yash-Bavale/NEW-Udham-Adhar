@@ -176,14 +176,22 @@ function RootComponent() {
   const { brand, siteContent } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  // Route id of the deepest match — "/$" means no hardcoded route claims this
+  // path, so it's resolved dynamically (DB / Contentful) and must stay open
+  // on secondary sites so they can publish their own SEO pages.
+  const leafRouteId = useRouterState({
+    select: (s: any) => String(s.matches[s.matches.length - 1]?.routeId ?? ""),
+  }) as unknown as string;
   const isAdminPath = path.startsWith("/admin") || path === "/admin-login";
   const bareLayout = isAdminPath;
   // Secondary public-only domains (allow_admin = false) must not expose the
   // staff panel — serve the normal 404 there instead.
   const secondarySite = brand?.allowAdmin === false;
   const adminBlocked = isAdminPath && secondarySite;
-  // Secondary sites carry none of the primary site's SEO / legacy-WP pages.
-  const contentBlocked = secondarySite && isBlockedOnSecondarySite(path);
+  // Secondary sites carry none of the primary site's hardcoded SEO / legacy-WP
+  // pages, but dynamic (catch-all) slugs are per-site and stay allowed.
+  const contentBlocked =
+    secondarySite && leafRouteId !== "/$" && isBlockedOnSecondarySite(path);
   const seenInitial = useRef(false);
 
 

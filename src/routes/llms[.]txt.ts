@@ -8,13 +8,18 @@ import { BASE_URL, SITE_NAME, LEGAL_ENTITY, CONTACT_EMAIL } from "@/lib/brand";
 export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         let seoLinks: { slug: string; label: string; description?: string | null }[] = [];
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { resolveCurrentWebsite } = await import(
+            "@/lib/websites/current-website.server"
+          );
+          const site = await resolveCurrentWebsite(request);
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, label, meta_description")
+            .eq("website_id", site.id)
             .eq("enabled", true)
             .order("sort_order", { ascending: true });
           seoLinks = (data ?? []).map((r: any) => ({
