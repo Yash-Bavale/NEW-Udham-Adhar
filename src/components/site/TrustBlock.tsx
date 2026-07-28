@@ -1,55 +1,6 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import mapImg from "@/assets/india-map.svg.asset.json";
 
-const FAQS = [
-  {
-    q: "1. What is Business Help Services?",
-    a: "Business Help Services is an online registration process for Micro, Small, and Medium Enterprises (MSMEs) in India, subject to applicable eligibility criteria and regulations.",
-  },
-  {
-    q: "2. Who can apply for Business Help Services?",
-    a: "Eligible proprietors, startups, traders, service providers, manufacturers, partnerships, companies, and other business entities operating as MSMEs may apply subject to applicable rules and eligibility conditions.",
-  },
-  {
-    q: "3. What is the use of Business Help Services for businesses?",
-    a: "Business Help Services may help businesses maintain MSME registration records and may be used wherever applicable for business-related documentation, compliance, financial, operational, or institutional purposes subject to applicable policies and eligibility conditions.",
-  },
-  {
-    q: "4. Can I update or modify my Business Help Services details?",
-    a: "Subject to applicable rules and portal functionality, certain business details such as address, mobile number, email, business activity, or other information may be updated through the relevant process and verification requirements.",
-  },
-  {
-    q: "5. What should I do if my registered mobile number or email is no longer accessible?",
-    a: "Depending upon applicable procedures and verification requirements, users may request assistance for updating or recovering registered contact details wherever permitted.",
-  },
-  {
-    q: "6. Can I download my Udyam Certificate online?",
-    a: "Subject to applicable verification procedures and portal availability, Udyam-related certificates or acknowledgments may be downloaded or retrieved through the relevant process wherever available.",
-  },
-  {
-    q: "7. What documents or information may be required for Udyam-related services?",
-    a: "Depending upon the requested service, users may be required to provide details such as Aadhaar information, PAN information, business details, OTP verification, contact details, or other supporting information wherever applicable.",
-  },
-  {
-    q: "8. Is OTP verification required for certain Udyam-related processes?",
-    a: "Yes. Certain services or updates may require OTP verification, authentication confirmation, or consent-based validation depending upon the applicable process and system requirements.",
-  },
-  {
-    q: "9. Can businesses update business activity or classification details in Udyam records?",
-    a: "Subject to applicable procedures and verification requirements, certain business-related details including activity classification or related information may be updated wherever permitted.",
-  },
-  {
-    q: "10. What happens if incorrect information is submitted during registration or update?",
-    a: "Incorrect, incomplete, inconsistent, or unverifiable information may affect processing, verification, communication, eligibility assessment, or successful completion of the requested service.",
-  },
-];
 
 const STEPS = [
   { icon: UserSquare2, label: "Fill Form & Make Payment", color: "text-brand-navy" },
