@@ -79,7 +79,16 @@ function isExcluded(p: string): boolean {
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const { resolveCurrentWebsite } = await import(
+          "@/lib/websites/current-website.server"
+        );
+        const { isBlockedOnSecondarySite } = await import(
+          "@/lib/websites/secondary-site-routes"
+        );
+        const currentSite = await resolveCurrentWebsite(request).catch(() => null);
+        const publicOnly = currentSite ? !currentSite.allow_admin : false;
+        const siteBlocked = (p: string) => publicOnly && isBlockedOnSecondarySite(p);
         // 1. Discover static routes from the generated route tree.
         const mod = await import("@/routeTree.gen");
         const tree = (mod as unknown as {
