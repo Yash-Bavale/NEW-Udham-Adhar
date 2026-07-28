@@ -23,14 +23,20 @@ async function assertAdmin(userId: string) {
   if (!data) throw new Error("Forbidden: admin role required");
 }
 
-/** Public — used by footer triple-click to render the hidden link list. */
+/** Public — used by footer triple-click to render the hidden link list.
+ *  Scoped to the current host's website so a secondary site never lists the
+ *  primary site's SEO pages. */
 export const listPublicSeoPages = createServerFn({ method: "GET" }).handler(
   async (): Promise<SeoPage[]> => {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { resolveCurrentWebsite } = await import("@/lib/websites/current-website.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const site = await resolveCurrentWebsite(getRequest());
     const { data, error } = await supabaseAdmin
       .from("seo_pages")
       .select("id, slug, label, enabled, sort_order, page_type")
       .eq("enabled", true)
+      .eq("website_id", site.id)
       .order("sort_order", { ascending: true });
     if (error) throw new Error(error.message);
     return (data ?? []) as SeoPage[];
