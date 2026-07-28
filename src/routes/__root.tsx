@@ -184,6 +184,8 @@ function RootComponent() {
   const adminBlocked = isAdminPath && secondarySite;
   // Secondary sites carry none of the primary site's SEO / legacy-WP pages.
   const contentBlocked = secondarySite && isBlockedOnSecondarySite(path);
+  const seenInitial = useRef(false);
+
 
 
   useEffect(() => {
