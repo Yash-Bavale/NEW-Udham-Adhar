@@ -61,12 +61,25 @@ const ALLOWED_PREFIXES = [
 /**
  * True when the given pathname is SEO / legacy-WP content that must 404 on a
  * secondary public-only site.
+ *
+ * `extraAllowed` carries the site's own configured nav paths (site_nav_items),
+ * so service pages that the secondary site actually links to stay reachable.
  */
-export function isBlockedOnSecondarySite(pathname: string): boolean {
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+export function isBlockedOnSecondarySite(
+  pathname: string,
+  extraAllowed?: Iterable<string>,
+): boolean {
+  const norm = (p: string) =>
+    p.length > 1 ? p.replace(/\/+$/, "").toLowerCase() : p.toLowerCase();
+  const path = norm(pathname);
   if (ALLOWED_EXACT.has(path)) return false;
   if (ALLOWED_PREFIXES.some((p) => path.startsWith(p))) return false;
   // Admin paths have their own gate in __root.
   if (path.startsWith("/admin")) return false;
+  if (extraAllowed) {
+    for (const p of extraAllowed) {
+      if (p && p.startsWith("/") && norm(p) === path) return false;
+    }
+  }
   return true;
 }
