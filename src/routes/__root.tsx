@@ -21,6 +21,9 @@ import { BrandProvider } from "@/lib/websites/brand-context";
 import { getSiteContent } from "@/lib/websites/site-content.functions";
 import { SiteContentProvider } from "@/lib/websites/site-content-context";
 import { isBlockedOnSecondarySite } from "@/lib/websites/secondary-site-routes";
+import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
+import { SeoContentPage } from "@/components/site/SeoContentPage";
+import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
 
 
 
@@ -85,10 +88,28 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  loader: async () => {
+  loader: async ({ location }) => {
     const [brand, siteContent] = await Promise.all([getCurrentBrand(), getSiteContent()]);
-    return { brand, siteContent };
+    // On secondary public-only sites the hardcoded SEO/legacy pages are gated
+    // off. A slug published in that site's own Contentful space must still go
+    // live, so resolve it here before falling back to 404.
+    let cfArticle: any = null;
+    if (brand?.allowAdmin === false) {
+      const navPaths = [
+        ...(siteContent?.headerNav ?? []),
+        ...(siteContent?.footerNav ?? []),
+      ].map((n: { path: string }) => n.path);
+      const path = location.pathname;
+      if (isBlockedOnSecondarySite(path, navPaths)) {
+        const slug = path.replace(/^\/+/, "").replace(/\/+$/, "").toLowerCase();
+        if (slug && !slug.includes("/")) {
+          cfArticle = await getContentfulSeoArticle({ data: { slug } }).catch(() => null);
+        }
+      }
+    }
+    return { brand, siteContent, cfArticle };
   },
+
   head: ({ loaderData }) => {
     const brand = (loaderData as { brand?: Awaited<ReturnType<typeof getCurrentBrand>> } | undefined)?.brand;
     const verify = brand?.googleSiteVerification || "RtG2UFXWGV5kl4RjhU7eQd6T3tx_DraF1D0WCFYmDAY";
@@ -173,7 +194,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { brand, siteContent } = Route.useLoaderData();
+  const { brand, siteContent, cfArticle } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // Route id of the deepest match — "/$" means no hardcoded route claims this
@@ -251,9 +272,14 @@ function RootComponent() {
             <NotFoundComponent />
           ) : contentBlocked ? (
             <SiteShell>
-              <NotFoundComponent />
+              {cfArticle ? (
+                <SeoContentPage data={cfToSeoPageData(cfArticle)} />
+              ) : (
+                <NotFoundComponent />
+              )}
             </SiteShell>
           ) : bareLayout ? (
+
             <Outlet />
           ) : (
             <SiteShell>
