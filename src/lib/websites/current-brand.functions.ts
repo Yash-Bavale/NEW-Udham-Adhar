@@ -25,6 +25,8 @@ export interface BrandInfo {
   gtagId: string | null;
   baseUrl: string;
   isPrimary: boolean;
+  /** When false, /admin routes are hidden on this domain (public site only). */
+  allowAdmin: boolean;
 }
 
 // Fallback constants mirror src/lib/brand.ts for local dev / preview hosts
@@ -51,6 +53,7 @@ const FALLBACK: BrandInfo = {
   gtagId: null,
   baseUrl: "https://udyamadhar.in",
   isPrimary: true,
+  allowAdmin: true,
 };
 
 export const getCurrentBrand = createServerFn({ method: "GET" }).handler(
@@ -80,6 +83,7 @@ export const getCurrentBrand = createServerFn({ method: "GET" }).handler(
         gtagId: row.gtag_id,
         baseUrl: `https://${row.domain}`,
         isPrimary: !!row.is_primary,
+        allowAdmin: row.allow_admin !== false,
       };
     } catch (err) {
       console.warn("[getCurrentBrand] falling back to defaults", err);

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { baseServiceCode } from "@/lib/services/base-code";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -130,7 +131,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     // with the previously-saved Stage 1 draft and validate against both schemas.
     let mergedData: Record<string, any> = { ...data.data };
     let validationFields = schema.fields;
-    if (!data.draft && serviceCode === "correct-pan-aadhaar") {
+    if (!data.draft && baseServiceCode(serviceCode) === "correct-pan-aadhaar") {
       const { data: prev } = await supabaseAdmin
         .from("onboarding_submissions")
         .select("form_data")
