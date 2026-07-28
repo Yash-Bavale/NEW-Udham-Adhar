@@ -194,7 +194,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { brand, siteContent } = Route.useLoaderData();
+  const { brand, siteContent, cfArticle } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // Route id of the deepest match — "/$" means no hardcoded route claims this
