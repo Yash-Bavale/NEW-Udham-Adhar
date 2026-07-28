@@ -180,8 +180,8 @@ function RootComponent() {
   // path, so it's resolved dynamically (DB / Contentful) and must stay open
   // on secondary sites so they can publish their own SEO pages.
   const leafRouteId = useRouterState({
-    select: (s) => s.matches[s.matches.length - 1]?.routeId ?? "",
-  });
+    select: (s: any) => String(s.matches[s.matches.length - 1]?.routeId ?? ""),
+  }) as unknown as string;
   const isAdminPath = path.startsWith("/admin") || path === "/admin-login";
   const bareLayout = isAdminPath;
   // Secondary public-only domains (allow_admin = false) must not expose the
