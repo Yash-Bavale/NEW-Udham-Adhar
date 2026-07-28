@@ -99,7 +99,6 @@ const CategoryInput = z.object({
   website_id: z.string().uuid(),
   name: z.string().trim().min(2).max(160),
   is_active: z.boolean().default(true),
-  allow_admin: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
 });
 
