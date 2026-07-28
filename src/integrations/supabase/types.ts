@@ -3794,6 +3794,7 @@ export type Database = {
       }
       websites: {
         Row: {
+          allow_admin: boolean
           brand_name: string | null
           business_hours: string | null
           company_name: string | null
@@ -3823,6 +3824,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          allow_admin?: boolean
           brand_name?: string | null
           business_hours?: string | null
           company_name?: string | null
@@ -3852,6 +3854,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          allow_admin?: boolean
           brand_name?: string | null
           business_hours?: string | null
           company_name?: string | null
