@@ -1,82 +1,44 @@
-## Part 1 — Audit: what's hardcoded vs dynamic today
+## 1. Remove three homepage sections
 
-### Already dynamic (per website, from the `websites` table via `useBrand()`)
-Resolved server-side from the Host header (`current-website.server.ts` → `getCurrentBrand`), so a second domain already gets its own values:
-- Brand name, legal entity, company name
-- Support email, support phone, WhatsApp number, business hours
-- Primary colour, logo, favicon, sample certificate image
-- Legal footer disclaimer line, Google site verification, GA tag, base URL
+Delete entirely from `src/routes/index.tsx`:
+- "About Udyam Registration"
+- "How Business Help Services Works"
+- "Why Business Owners Trust Us"
 
-### Already dynamic (from the database / Contentful)
-- Services list shown in the lead form (`services` table, scoped per website)
-- SEO landing pages list (`seo_pages` table) — powers the hidden footer link tree
-- Article pages served by the catch-all `/$` route (DB-backed)
-- Homepage meta title/description + FAQs, service pages and SEO articles can be overridden by Contentful, with local JSON as fallback
+Also remove their data/plumbing so nothing hardcoded or dynamic remains:
+- Constants `HOW_IT_WORKS`, `WHY_BULLETS` and the About paragraphs
+- `useBlockItems("home.how_it_works")` and `useBlockItems("home.why_us")` hooks
+- The matching `home.how_it_works` / `home.why_us` rows in `site_content_blocks` (migration DELETE) and their editors in the Admin → Websites → Content page
+- `cms.howItWorks` / `cms.whyUs` usage on the homepage (the Contentful type keeps the fields, they're just unused)
 
-### Hardcoded in code (the actual problem list)
-| Item | Where | Why it hurts a second site |
-|---|---|---|
-| Top nav links (10 items) | `src/lib/constants.ts` → `NAV_LINKS` | Same menu forced on every domain |
-| Footer "Useful Links" (13 policy links) | `Footer.tsx` → `FOOTER_LINKS` | Can't reorder/hide per site |
-| Footer "Get in touch" postal address | `Footer.tsx` (Pune address string) | Wrong for a different entity |
-| Footer copyright line | `Footer.tsx` | Partly hardcoded ("Business Help Services") |
-| Footer SEO-tree categories + unlock password `113355` | `Footer.tsx` (`CATEGORIES`) | Slug groups + password baked in code |
-| Disclaimer bar text | `constants.ts` → `DISCLAIMER_TEXT` | Names one company |
-| Homepage FAQs, "How it works", "Why us", steps, India facts | `routes/index.tsx` | Only meta+FAQ have a Contentful override; the rest is fixed |
-| Homepage canonical / og:url | `routes/index.tsx` (`https://udyamadhar.in/`) | Second domain would emit the wrong canonical |
-| Service prices `₹99` + slugs | `constants.ts` → `SERVICES` | Duplicate of the `services` table |
-| 13 policy pages | one route file each + `content/wp/*.html` | Brand names baked into the HTML |
-| ~180 legacy WP SEO route files | `src/routes/*.tsx` | New site can't get them without copying files |
-| `src/lib/brand.ts` constants | still imported in places (e.g. `/$` route `BASE_URL`) | Bypasses per-site brand |
+Homepage order becomes: Hero/form + sample certificate → FAQ → Process steps → India coverage.
 
-### Structural verdict
-The **brand layer** is solid; the **content/navigation layer** is not. Everything in the table above needs to move to per-website records so a new domain is a data setup, not a code fork.
+## 2. New homepage FAQ section
 
----
+Layout follows the reference image: two columns on desktop — illustration on the left, FAQ list on the right; stacked on mobile, illustration first.
 
-## Part 2 — Target structure (hybrid, as chosen)
+- Illustration: the uploaded question-mark artwork registered as a Lovable asset and imported (no binary in repo).
+- Questions render as a collapsible accordion (all collapsed by default), 10 per page.
+- Below the list: **Read more** loads the next 10, **Previous** goes back; a small "Showing 11–20 of 118" counter. Pagination is client-side over the full list so every question stays in the server-rendered HTML for crawlers (hidden pages rendered but visually paginated, so Google still sees all 100+ Q&As).
+- Removes the "Read all Udyam registration FAQs" button that pointed at /faqs.
 
-- **CRM database** owns structure & config: navigation, footer link groups, contact block, homepage section content, disclaimer, per-site canonical.
-- **Contentful** stays the source for long-form SEO/article/landing copy, with DB/local fallback (unchanged).
-- **Policy pages keep their route files**, but the HTML is run through a brand-token renderer at request time so `{{company}}`, `{{site_name}}`, `{{support_email}}`, `{{address}}`, `{{legal_entity}}`, `{{base_url}}` resolve per website.
+## 3. Contentful sync
 
----
+FAQs come from the existing Contentful `faq` content type (already wired in `getContentfulFaqs`, paginates to 500 entries) rather than the landing-page `faqs` field — that scales to 100+ entries and lets you edit them directly in Contentful. The homepage loader fetches them; if Contentful returns nothing, it falls back to the local FAQ list already in `src/lib/faqs-data.ts` so the page never renders empty.
 
-## Part 3 — Phase 1 build
+## 4. Proper FAQ schema
 
-### 1. Schema (one migration)
-- `site_nav_items` — website_id, label, path, group (`header` | `footer`), parent_id, sort_order, is_active, open_in_new
-- `site_content_blocks` — website_id, block_key (e.g. `home.hero`, `home.how_it_works`, `home.why_us`, `home.faqs`, `home.facts`, `disclaimer.bar`, `footer.address`, `footer.copyright`), content JSONB, is_active, sort_order
-- Extend `websites` with: `postal_address`, `footer_unlock_code`, `canonical_base` (if not already covered by domain)
-- Public read via `anon` SELECT on active rows only; writes limited to admin/super-admin; `service_role` full. GRANTs included per table.
-- Seed both tables with the current live values for the existing website, so nothing on udyamadhar.in changes visually.
+The homepage emits a single `FAQPage` JSON-LD containing **every** FAQ (not just the visible page), with each answer as plain text. Question text is de-duplicated and answers stripped of markup so it validates in Google's Rich Results test.
 
-### 2. Server layer
-- `src/lib/websites/site-content.functions.ts` — `getSiteContent()` server fn returning `{ nav, footerGroups, blocks }` for the resolved website, cached alongside the existing brand resolution.
-- Load it once in `__root.tsx` next to `getCurrentBrand` and expose through a `SiteContentProvider` (mirrors `BrandProvider`).
+## 5. Delete the /faqs page
 
-### 3. Component rewiring (presentation only)
-- `Nav.tsx` — read header nav from context, fall back to `NAV_LINKS` when empty.
-- `Footer.tsx` — Useful Links, address, copyright, unlock code from context; SEO tree logic untouched.
-- `DisclaimerBar.tsx` — text from `disclaimer.bar` block, fallback to constant.
-- `routes/index.tsx` — FAQs / how-it-works / why-us / facts read from blocks (Contentful override still wins for meta+FAQ); canonical & og:url built from `brand.baseUrl`.
-- Policy routes — `WpPage` gains brand-token substitution; no route files removed.
+- Delete `src/routes/faqs.tsx`
+- Remove the /faqs link in `src/components/site/TrustBlock.tsx`
+- Remove /faqs from `src/routes/sitemap[.]xml.ts`
+- Add a permanent 301 redirect `/faqs → /#faqs` in the legacy-redirects map so existing backlinks and indexed URLs pass authority to the homepage instead of 404ing
+- Fix the `WebSite` JSON-LD `SearchAction` target, which currently points at `/faqs?q=`
 
-### 4. Admin editor
-New `admin.websites.content.$websiteId` screen (linked from the existing websites admin):
-- Website picker + brand fields (address, unlock code, contact)
-- Navigation tab: drag-order, add/edit/remove header and footer links, active toggle
-- Content blocks tab: edit hero copy, how-it-works steps, why-us bullets, FAQs, facts as repeatable rows
-- Preview link opens the site on that domain
-
-### 5. Launching site #2 afterwards
-Insert one `websites` row, its services scope, then clone nav/footer/content blocks from the primary with one "Copy content from…" action in the admin — no code changes.
-
-### Out of scope for phase 1 (flagged for later)
-- Converting the ~180 legacy WP route files to database-driven pages
-- Removing `src/lib/brand.ts` fallbacks entirely
-- Per-website Contentful space/token wiring (columns exist, not yet used)
-
-### Technical notes
-- All reads are SSR-safe server functions on public routes (no auth middleware), so prerender won't 401.
-- Fallback constants stay in code, so a DB miss or new domain never renders an empty nav/footer.
+## Technical notes
+- `src/lib/faqs-data.ts` stays as the fallback dataset; nothing else imports it after this.
+- The FAQ block becomes its own component (`src/components/site/HomeFaqSection.tsx`) to keep `index.tsx` readable.
+- One migration removes the two obsolete content blocks; no schema changes.
