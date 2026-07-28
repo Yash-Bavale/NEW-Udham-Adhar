@@ -180,8 +180,11 @@ function RootComponent() {
   const bareLayout = isAdminPath;
   // Secondary public-only domains (allow_admin = false) must not expose the
   // staff panel — serve the normal 404 there instead.
-  const adminBlocked = isAdminPath && brand?.allowAdmin === false;
-  const seenInitial = useRef(false);
+  const secondarySite = brand?.allowAdmin === false;
+  const adminBlocked = isAdminPath && secondarySite;
+  // Secondary sites carry none of the primary site's SEO / legacy-WP pages.
+  const contentBlocked = secondarySite && isBlockedOnSecondarySite(path);
+
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
