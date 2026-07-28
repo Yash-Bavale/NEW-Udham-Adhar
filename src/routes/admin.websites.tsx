@@ -24,11 +24,11 @@ import {
 
 export const Route = createFileRoute("/admin/websites")({ component: WebsitesPage });
 
-type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; sort_order: number };
+type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; allow_admin: boolean; sort_order: number };
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
 function emptyWebsite(): WebsiteForm {
-  return { name: "", domain: "", description: "", is_active: true, sort_order: 0 };
+  return { name: "", domain: "", description: "", is_active: true, allow_admin: true, sort_order: 0 };
 }
 
 function emptyCategory(website_id: string): CategoryForm {
@@ -103,6 +103,21 @@ function WebsitesPage() {
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={webForm.is_active} onChange={(e) => setWebForm({ ...webForm, is_active: e.target.checked })} />
               Active
+            </label>
+            <label className="flex items-start gap-2 text-sm md:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={webForm.allow_admin}
+                onChange={(e) => setWebForm({ ...webForm, allow_admin: e.target.checked })}
+              />
+              <span>
+                Allow staff panel on this domain
+                <span className="block text-xs text-slate-500">
+                  Off = /admin and /admin-login return 404 on this domain. Keep it off for
+                  public-facing brand sites.
+                </span>
+              </span>
             </label>
             <label className="block text-sm md:col-span-2">
               <div className="text-xs text-slate-500 mb-1">Description (optional)</div>
@@ -216,7 +231,7 @@ function WebsitesPage() {
                 </Link>
                 <button
 
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, sort_order: w.sort_order })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >

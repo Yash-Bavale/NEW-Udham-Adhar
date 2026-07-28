@@ -37,6 +37,7 @@ const WebsiteInput = z.object({
     .regex(/^[a-z0-9.-]+$/i, "Domain must contain only letters, digits, dots and hyphens"),
   description: z.string().trim().max(2000).nullable().optional(),
   is_active: z.boolean().default(true),
+  allow_admin: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
 });
 
@@ -98,6 +99,7 @@ const CategoryInput = z.object({
   website_id: z.string().uuid(),
   name: z.string().trim().min(2).max(160),
   is_active: z.boolean().default(true),
+  allow_admin: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
 });
 
