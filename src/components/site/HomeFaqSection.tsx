@@ -60,10 +60,7 @@ export function HomeFaqSection({ faqs }: { faqs: HomeFaq[] }) {
             </Accordion>
 
             {faqs.length > PAGE_SIZE && (
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Showing {start + 1}–{end} of {faqs.length}
-                </p>
+              <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"

@@ -75,34 +75,6 @@ export function TrustBlock() {
 
   return (
     <div>
-      {/* FAQ Section */}
-      <section className="mx-auto max-w-4xl px-4 py-8 md:py-12">
-        <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground leading-tight">
-          Frequently Asked Questions for MSME registration in India.
-        </h2>
-        <p className="mt-4 text-center text-xs md:text-sm tracking-widest uppercase text-muted-foreground">
-          MSME Business Help Services Online, SSI – Small Scale Industries Certificate – Update, Edit, and Download Acknowledgement
-        </p>
-
-        <Accordion type="single" collapsible className="mt-8 md:mt-10 space-y-3">
-          {FAQS.map((f, i) => (
-            <AccordionItem
-              key={i}
-              value={`faq-${i}`}
-              className="border border-border rounded-lg px-4 bg-card"
-            >
-              <AccordionTrigger className="text-left text-base md:text-lg font-semibold font-display hover:no-underline">
-                {f.q}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground leading-relaxed">
-                {f.a}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-
-      </section>
-
       {/* Process Steps */}
       <section className="bg-brand-navy/10">
         <div className="mx-auto max-w-6xl px-4 py-10 md:py-12">
