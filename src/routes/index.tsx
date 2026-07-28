@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
-import { Button } from "@/components/ui/button";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import { HomeFaqSection } from "@/components/site/HomeFaqSection";
 import { trackEvent } from "@/lib/analytics/track";

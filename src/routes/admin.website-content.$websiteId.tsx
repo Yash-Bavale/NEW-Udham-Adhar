@@ -27,9 +27,6 @@ type NavRow = {
 };
 
 const BLOCK_HINTS: Record<string, string> = {
-  "home.how_it_works": '{ "items": ["Step one", "Step two"] }',
-  "home.why_us": '{ "items": ["Reason one", "Reason two"] }',
-  "home.faqs": '{ "items": [{ "q": "Question?", "a": "Answer" }] }',
   "home.facts": '{ "items": [{ "label": "Label", "value": "Value" }] }',
   "disclaimer.bar": '{ "text": "Disclaimer marquee text" }',
   "footer.address": '{ "text": "Full postal address" }',
