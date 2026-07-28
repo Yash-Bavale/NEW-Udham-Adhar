@@ -47,7 +47,7 @@ const WebsiteInput = z.object({
     .nullable()
     .optional(),
   contentful_delivery_token_secret: z
-    .enum(["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_2"])
+    .enum(["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_1", "CONTENTFUL_API_KEY_2"])
     .nullable()
     .optional(),
 });
