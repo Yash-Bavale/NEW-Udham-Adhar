@@ -24,12 +24,32 @@ import {
 
 export const Route = createFileRoute("/admin/websites")({ component: WebsitesPage });
 
-type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; allow_admin: boolean; sort_order: number };
+type WebsiteForm = {
+  id?: string;
+  name: string;
+  domain: string;
+  description?: string | null;
+  is_active: boolean;
+  allow_admin: boolean;
+  sort_order: number;
+  contentful_space_id?: string | null;
+  contentful_delivery_token_secret?: "CONTENTFUL_API_KEY" | "CONTENTFUL_API_KEY_2" | null;
+};
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
 function emptyWebsite(): WebsiteForm {
-  return { name: "", domain: "", description: "", is_active: true, allow_admin: true, sort_order: 0 };
+  return {
+    name: "",
+    domain: "",
+    description: "",
+    is_active: true,
+    allow_admin: true,
+    sort_order: 0,
+    contentful_space_id: "",
+    contentful_delivery_token_secret: "CONTENTFUL_API_KEY",
+  };
 }
+
 
 function emptyCategory(website_id: string): CategoryForm {
   return { website_id, name: "", is_active: true, sort_order: 0 };
