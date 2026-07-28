@@ -20,6 +20,8 @@ import { getCurrentBrand } from "@/lib/websites/current-brand.functions";
 import { BrandProvider } from "@/lib/websites/brand-context";
 import { getSiteContent } from "@/lib/websites/site-content.functions";
 import { SiteContentProvider } from "@/lib/websites/site-content-context";
+import { isBlockedOnSecondarySite } from "@/lib/websites/secondary-site-routes";
+
 
 
 function NotFoundComponent() {
@@ -178,8 +180,13 @@ function RootComponent() {
   const bareLayout = isAdminPath;
   // Secondary public-only domains (allow_admin = false) must not expose the
   // staff panel — serve the normal 404 there instead.
-  const adminBlocked = isAdminPath && brand?.allowAdmin === false;
+  const secondarySite = brand?.allowAdmin === false;
+  const adminBlocked = isAdminPath && secondarySite;
+  // Secondary sites carry none of the primary site's SEO / legacy-WP pages.
+  const contentBlocked = secondarySite && isBlockedOnSecondarySite(path);
   const seenInitial = useRef(false);
+
+
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -227,6 +234,10 @@ function RootComponent() {
         <SiteContentProvider value={siteContent}>
           {adminBlocked ? (
             <NotFoundComponent />
+          ) : contentBlocked ? (
+            <SiteShell>
+              <NotFoundComponent />
+            </SiteShell>
           ) : bareLayout ? (
             <Outlet />
           ) : (
