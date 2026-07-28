@@ -108,7 +108,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           .filter((p): p is string => typeof p === "string")
           .map((p) => (p.length > 1 ? p.replace(/\/$/, "") : p))
           .map((p) => p.toLowerCase())
-          .filter((p) => !isExcluded(p));
+          .filter((p) => !isExcluded(p) && !siteBlocked(p));
 
         // Stable lastmod for static routes. Bump this string only when the
         // route list or page content materially changes — do NOT use
@@ -127,14 +127,14 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")
-            .eq("website_id", (await (await import("@/lib/websites/current-website.server")).resolveCurrentWebsite(request)).id)
+            .eq("website_id", currentSite?.id ?? "")
             .eq("enabled", true);
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim().toLowerCase();
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            if (isExcluded(path)) continue;
+            if (isExcluded(path) || siteBlocked(path)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
