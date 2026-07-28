@@ -149,7 +149,38 @@ function WebsitesPage() {
                 className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
             </label>
+
+            <div className="md:col-span-2 border-t pt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                Contentful (per-site CMS)
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <Input
+                  label="Contentful Space ID"
+                  value={webForm.contentful_space_id ?? ""}
+                  onChange={(v) => setWebForm({ ...webForm, contentful_space_id: v })}
+                  placeholder="Leave blank to use the project default"
+                />
+                <label className="block text-sm">
+                  <div className="text-xs text-slate-500 mb-1">Delivery token secret</div>
+                  <select
+                    value={webForm.contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY"}
+                    onChange={(e) =>
+                      setWebForm({
+                        ...webForm,
+                        contentful_delivery_token_secret: e.target.value as WebsiteForm["contentful_delivery_token_secret"],
+                      })
+                    }
+                    className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  >
+                    <option value="CONTENTFUL_API_KEY">CONTENTFUL_API_KEY (default connection)</option>
+                    <option value="CONTENTFUL_API_KEY_2">CONTENTFUL_API_KEY_2 (second connection)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
           </div>
+
 
           <div className="flex gap-2 pt-2">
             <button
