@@ -189,9 +189,16 @@ function RootComponent() {
   const secondarySite = brand?.allowAdmin === false;
   const adminBlocked = isAdminPath && secondarySite;
   // Secondary sites carry none of the primary site's hardcoded SEO / legacy-WP
-  // pages, but dynamic (catch-all) slugs are per-site and stay allowed.
+  // pages, but dynamic (catch-all) slugs and the site's own nav/service pages
+  // stay allowed.
+  const navPaths = [
+    ...(siteContent?.headerNav ?? []),
+    ...(siteContent?.footerNav ?? []),
+  ].map((n) => n.path);
   const contentBlocked =
-    secondarySite && leafRouteId !== "/$" && isBlockedOnSecondarySite(path);
+    secondarySite &&
+    leafRouteId !== "/$" &&
+    isBlockedOnSecondarySite(path, navPaths);
   const seenInitial = useRef(false);
 
 
