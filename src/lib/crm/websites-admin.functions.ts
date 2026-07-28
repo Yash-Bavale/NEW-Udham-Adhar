@@ -48,6 +48,20 @@ export const upsertWebsite = createServerFn({ method: "POST" })
     const { supabase } = context;
     await assertRole(supabase, ["super_admin", "admin"]);
     const payload = { ...data, domain: data.domain.toLowerCase().replace(/^www\./, "") };
+
+    // Friendly guard: the domain column is unique across websites.
+    const dupQuery = supabase.from("websites").select("id, name").eq("domain", payload.domain);
+    const { data: dup, error: dupErr } = await (payload.id
+      ? dupQuery.neq("id", payload.id)
+      : dupQuery
+    ).maybeSingle();
+    if (dupErr) throw new Error(dupErr.message);
+    if (dup) {
+      throw new Error(
+        `The domain "${payload.domain}" is already used by the website "${dup.name}". Use a different domain or edit that website instead.`,
+      );
+    }
+
     if (payload.id) {
       const { id, ...patch } = payload;
       const { error } = await supabase.from("websites").update(patch).eq("id", id);
