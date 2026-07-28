@@ -272,9 +272,14 @@ function RootComponent() {
             <NotFoundComponent />
           ) : contentBlocked ? (
             <SiteShell>
-              <NotFoundComponent />
+              {cfArticle ? (
+                <SeoContentPage data={cfToSeoPageData(cfArticle)} />
+              ) : (
+                <NotFoundComponent />
+              )}
             </SiteShell>
           ) : bareLayout ? (
+
             <Outlet />
           ) : (
             <SiteShell>
