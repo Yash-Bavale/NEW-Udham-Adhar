@@ -118,6 +118,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")
+            .eq("website_id", (await (await import("@/lib/websites/current-website.server")).resolveCurrentWebsite(request)).id)
             .eq("enabled", true);
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim().toLowerCase();
