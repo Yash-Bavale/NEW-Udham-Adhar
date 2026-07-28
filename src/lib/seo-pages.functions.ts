@@ -107,8 +107,7 @@ export const upsertSeoPage = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-    return { ok: true };
-  });
+
 
 export const deleteSeoPage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
