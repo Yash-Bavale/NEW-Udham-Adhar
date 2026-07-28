@@ -3018,6 +3018,7 @@ export type Database = {
           slug: string
           sort_order: number
           updated_at: string
+          website_id: string
         }
         Insert: {
           cover_image_url?: string | null
@@ -3037,6 +3038,7 @@ export type Database = {
           slug: string
           sort_order?: number
           updated_at?: string
+          website_id: string
         }
         Update: {
           cover_image_url?: string | null
@@ -3056,8 +3058,17 @@ export type Database = {
           slug?: string
           sort_order?: number
           updated_at?: string
+          website_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "seo_pages_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_categories: {
         Row: {

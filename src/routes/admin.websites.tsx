@@ -24,12 +24,32 @@ import {
 
 export const Route = createFileRoute("/admin/websites")({ component: WebsitesPage });
 
-type WebsiteForm = { id?: string; name: string; domain: string; description?: string | null; is_active: boolean; allow_admin: boolean; sort_order: number };
+type WebsiteForm = {
+  id?: string;
+  name: string;
+  domain: string;
+  description?: string | null;
+  is_active: boolean;
+  allow_admin: boolean;
+  sort_order: number;
+  contentful_space_id?: string | null;
+  contentful_delivery_token_secret?: "CONTENTFUL_API_KEY" | "CONTENTFUL_API_KEY_2" | null;
+};
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
 function emptyWebsite(): WebsiteForm {
-  return { name: "", domain: "", description: "", is_active: true, allow_admin: true, sort_order: 0 };
+  return {
+    name: "",
+    domain: "",
+    description: "",
+    is_active: true,
+    allow_admin: true,
+    sort_order: 0,
+    contentful_space_id: "",
+    contentful_delivery_token_secret: "CONTENTFUL_API_KEY",
+  };
 }
+
 
 function emptyCategory(website_id: string): CategoryForm {
   return { website_id, name: "", is_active: true, sort_order: 0 };
@@ -129,7 +149,38 @@ function WebsitesPage() {
                 className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
             </label>
+
+            <div className="md:col-span-2 border-t pt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                Contentful (per-site CMS)
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <Input
+                  label="Contentful Space ID"
+                  value={webForm.contentful_space_id ?? ""}
+                  onChange={(v) => setWebForm({ ...webForm, contentful_space_id: v })}
+                  placeholder="Leave blank to use the project default"
+                />
+                <label className="block text-sm">
+                  <div className="text-xs text-slate-500 mb-1">Delivery token secret</div>
+                  <select
+                    value={webForm.contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY"}
+                    onChange={(e) =>
+                      setWebForm({
+                        ...webForm,
+                        contentful_delivery_token_secret: e.target.value as WebsiteForm["contentful_delivery_token_secret"],
+                      })
+                    }
+                    className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  >
+                    <option value="CONTENTFUL_API_KEY">CONTENTFUL_API_KEY (default connection)</option>
+                    <option value="CONTENTFUL_API_KEY_2">CONTENTFUL_API_KEY_2 (second connection)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
           </div>
+
 
           <div className="flex gap-2 pt-2">
             <button
@@ -231,7 +282,7 @@ function WebsitesPage() {
                 </Link>
                 <button
 
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order, contentful_space_id: (w as any).contentful_space_id ?? "", contentful_delivery_token_secret: (w as any).contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY" })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >

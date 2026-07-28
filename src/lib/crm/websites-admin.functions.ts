@@ -39,7 +39,19 @@ const WebsiteInput = z.object({
   is_active: z.boolean().default(true),
   allow_admin: z.boolean().default(true),
   sort_order: z.number().int().min(0).max(10_000).default(0),
+  contentful_space_id: z
+    .string()
+    .trim()
+    .max(64)
+    .regex(/^[a-z0-9]*$/i, "Space ID must be letters and digits only")
+    .nullable()
+    .optional(),
+  contentful_delivery_token_secret: z
+    .enum(["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_2"])
+    .nullable()
+    .optional(),
 });
+
 
 
 export const upsertWebsite = createServerFn({ method: "POST" })
