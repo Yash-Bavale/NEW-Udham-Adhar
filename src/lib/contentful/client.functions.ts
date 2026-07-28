@@ -7,29 +7,38 @@ type CfEntry<F> = { sys: { id: string; updatedAt: string }; fields: F };
 type CfList<F> = { total: number; skip: number; limit: number; items: CfEntry<F>[] };
 
 /** Only these env var names may be selected per-website (allow-list). */
-const ALLOWED_TOKEN_SECRETS = ["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_2"] as const;
+const ALLOWED_TOKEN_SECRETS = [
+  "CONTENTFUL_API_KEY",
+  "CONTENTFUL_API_KEY_1",
+  "CONTENTFUL_API_KEY_2",
+] as const;
 
 /**
  * Resolve the Contentful space + connection key for the current host.
  * Falls back to the project-default env vars when the website row has no
- * per-site configuration.
+ * per-site configuration. When a site selects e.g. CONTENTFUL_API_KEY_1 and
+ * stores no explicit space id, the matching CONTENTFUL_SPACE_ID_1 is used.
  */
 async function resolveCfCreds(): Promise<{ spaceId: string; apiKey: string }> {
-  let spaceId = process.env.CONTENTFUL_SPACE_ID ?? "";
+  let explicitSpaceId = "";
   let secretName = "CONTENTFUL_API_KEY";
   try {
     const { resolveCurrentWebsite } = await import("@/lib/websites/current-website.server");
     const site = await resolveCurrentWebsite(getRequest());
-    if (site.contentful_space_id) spaceId = site.contentful_space_id;
+    explicitSpaceId = site.contentful_space_id ?? "";
     const chosen = site.contentful_delivery_token_secret ?? "";
     if ((ALLOWED_TOKEN_SECRETS as readonly string[]).includes(chosen)) secretName = chosen;
   } catch {
     // ignore — use project defaults
   }
+  const suffix = secretName.replace("CONTENTFUL_API_KEY", "");
+  const spaceId =
+    explicitSpaceId || process.env[`CONTENTFUL_SPACE_ID${suffix}`] || process.env.CONTENTFUL_SPACE_ID || "";
   const apiKey = process.env[secretName] ?? "";
   if (!spaceId || !apiKey) throw new Error("Contentful gateway env vars missing");
   return { spaceId, apiKey };
 }
+
 
 async function cfFetch<F>(path: string): Promise<CfList<F>> {
   const key = process.env.LOVABLE_API_KEY;

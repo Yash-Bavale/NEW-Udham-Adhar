@@ -33,7 +33,7 @@ type WebsiteForm = {
   allow_admin: boolean;
   sort_order: number;
   contentful_space_id?: string | null;
-  contentful_delivery_token_secret?: "CONTENTFUL_API_KEY" | "CONTENTFUL_API_KEY_2" | null;
+  contentful_delivery_token_secret?: "CONTENTFUL_API_KEY" | "CONTENTFUL_API_KEY_1" | "CONTENTFUL_API_KEY_2" | null;
 };
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
@@ -174,7 +174,8 @@ function WebsitesPage() {
                     className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                   >
                     <option value="CONTENTFUL_API_KEY">CONTENTFUL_API_KEY (default connection)</option>
-                    <option value="CONTENTFUL_API_KEY_2">CONTENTFUL_API_KEY_2 (second connection)</option>
+                    <option value="CONTENTFUL_API_KEY_1">CONTENTFUL_API_KEY_1 (second connection)</option>
+                    <option value="CONTENTFUL_API_KEY_2">CONTENTFUL_API_KEY_2 (third connection)</option>
                   </select>
                 </label>
               </div>
