@@ -85,7 +85,6 @@ import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as GrievanceRedressalPolicyRouteImport } from './routes/grievance-redressal-policy'
 import { Route as ForgotUdyamRegistrationNumberRouteImport } from './routes/forgot-udyam-registration-number'
-import { Route as FaqsRouteImport } from './routes/faqs'
 import { Route as DownloadUdyamCertificateRouteImport } from './routes/download-udyam-certificate'
 import { Route as DownloadMsmeCertificateRouteImport } from './routes/download-msme-certificate'
 import { Route as DisclaimerRouteImport } from './routes/disclaimer'
@@ -602,11 +601,6 @@ const ForgotUdyamRegistrationNumberRoute =
     path: '/forgot-udyam-registration-number',
     getParentRoute: () => rootRouteImport,
   } as any)
-const FaqsRoute = FaqsRouteImport.update({
-  id: '/faqs',
-  path: '/faqs',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DownloadUdyamCertificateRoute =
   DownloadUdyamCertificateRouteImport.update({
     id: '/download-udyam-certificate',
@@ -1240,7 +1234,6 @@ export interface FileRoutesByFullPath {
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1434,7 +1427,6 @@ export interface FileRoutesByTo {
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1626,7 +1618,6 @@ export interface FileRoutesById {
   '/disclaimer': typeof DisclaimerRoute
   '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
   '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/faqs': typeof FaqsRoute
   '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
@@ -1823,7 +1814,6 @@ export interface FileRouteTypes {
     | '/disclaimer'
     | '/download-msme-certificate'
     | '/download-udyam-certificate'
-    | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
@@ -2017,7 +2007,6 @@ export interface FileRouteTypes {
     | '/disclaimer'
     | '/download-msme-certificate'
     | '/download-udyam-certificate'
-    | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
@@ -2208,7 +2197,6 @@ export interface FileRouteTypes {
     | '/disclaimer'
     | '/download-msme-certificate'
     | '/download-udyam-certificate'
-    | '/faqs'
     | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
@@ -2404,7 +2392,6 @@ export interface RootRouteChildren {
   DisclaimerRoute: typeof DisclaimerRoute
   DownloadMsmeCertificateRoute: typeof DownloadMsmeCertificateRoute
   DownloadUdyamCertificateRoute: typeof DownloadUdyamCertificateRoute
-  FaqsRoute: typeof FaqsRoute
   ForgotUdyamRegistrationNumberRoute: typeof ForgotUdyamRegistrationNumberRoute
   GrievanceRedressalPolicyRoute: typeof GrievanceRedressalPolicyRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
@@ -3052,13 +3039,6 @@ declare module '@tanstack/react-router' {
       path: '/forgot-udyam-registration-number'
       fullPath: '/forgot-udyam-registration-number'
       preLoaderRoute: typeof ForgotUdyamRegistrationNumberRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/faqs': {
-      id: '/faqs'
-      path: '/faqs'
-      fullPath: '/faqs'
-      preLoaderRoute: typeof FaqsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download-udyam-certificate': {
@@ -4110,7 +4090,6 @@ const rootRouteChildren: RootRouteChildren = {
   DisclaimerRoute: DisclaimerRoute,
   DownloadMsmeCertificateRoute: DownloadMsmeCertificateRoute,
   DownloadUdyamCertificateRoute: DownloadUdyamCertificateRoute,
-  FaqsRoute: FaqsRoute,
   ForgotUdyamRegistrationNumberRoute: ForgotUdyamRegistrationNumberRoute,
   GrievanceRedressalPolicyRoute: GrievanceRedressalPolicyRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
