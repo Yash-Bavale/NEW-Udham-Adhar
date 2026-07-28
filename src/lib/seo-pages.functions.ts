@@ -53,6 +53,7 @@ export const listAllSeoPages = createServerFn({ method: "GET" })
 
 const UpsertInput = z.object({
   id: z.string().uuid().optional(),
+  website_id: z.string().uuid().optional(),
   slug: z
     .string()
     .trim()
@@ -78,11 +79,24 @@ export const upsertSeoPage = createServerFn({ method: "POST" })
           label: data.label,
           enabled: data.enabled,
           sort_order: data.sort_order,
+          ...(data.website_id ? { website_id: data.website_id } : {}),
         })
         .eq("id", data.id);
       if (error) throw new Error(error.message);
     } else {
+      let websiteId = data.website_id;
+      if (!websiteId) {
+        const { data: site, error: sErr } = await supabaseAdmin
+          .from("websites")
+          .select("id")
+          .eq("is_primary", true)
+          .maybeSingle();
+        if (sErr) throw new Error(sErr.message);
+        if (!site) throw new Error("No primary website configured");
+        websiteId = site.id;
+      }
       const { error } = await supabaseAdmin.from("seo_pages").insert({
+        website_id: websiteId,
         slug: data.slug,
         label: data.label,
         enabled: data.enabled,
@@ -90,6 +104,9 @@ export const upsertSeoPage = createServerFn({ method: "POST" })
       });
       if (error) throw new Error(error.message);
     }
+    return { ok: true };
+  });
+
     return { ok: true };
   });
 
