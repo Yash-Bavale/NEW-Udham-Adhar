@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isService } from "@/lib/services/base-code";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -44,7 +45,7 @@ function OnboardingDetailsPage() {
   // Talk-to-Expert is a paid consultation — no intake form after payment.
   // Send the user straight to the thank-you screen.
   const isTalkToExpert =
-    data.serviceCode === "talk-to-expert" ||
+    isService(data.serviceCode, "talk-to-expert") ||
     data.lead.service === "Expert Consultation" ||
     data.lead.service === "Talk to Expert – Suitable Service Selection";
   if (data.lead.paid && isTalkToExpert) {
@@ -68,7 +69,7 @@ function OnboardingDetailsPage() {
     );
   }
 
-  const isCorrectPan = data.serviceCode === "correct-pan-aadhaar";
+  const isCorrectPan = isService(data.serviceCode, "correct-pan-aadhaar");
   const activeSchema = isCorrectPan && stage === 2 ? CORRECT_PAN_AADHAAR_STAGE2 : data.schema;
 
   const initial: Record<string, string> = {};

@@ -174,7 +174,11 @@ function RootComponent() {
   const { brand, siteContent } = Route.useLoaderData();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const bareLayout = path.startsWith("/admin") || path === "/admin-login";
+  const isAdminPath = path.startsWith("/admin") || path === "/admin-login";
+  const bareLayout = isAdminPath;
+  // Secondary public-only domains (allow_admin = false) must not expose the
+  // staff panel — serve the normal 404 there instead.
+  const adminBlocked = isAdminPath && brand?.allowAdmin === false;
   const seenInitial = useRef(false);
 
   useEffect(() => {
@@ -221,7 +225,15 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <BrandProvider value={brand}>
         <SiteContentProvider value={siteContent}>
-          {bareLayout ? <Outlet /> : <SiteShell><Outlet /></SiteShell>}
+          {adminBlocked ? (
+            <NotFoundComponent />
+          ) : bareLayout ? (
+            <Outlet />
+          ) : (
+            <SiteShell>
+              <Outlet />
+            </SiteShell>
+          )}
           <Toaster />
         </SiteContentProvider>
       </BrandProvider>
