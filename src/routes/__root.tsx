@@ -232,8 +232,12 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <BrandProvider value={brand}>
         <SiteContentProvider value={siteContent}>
-          {adminBlocked || contentBlocked ? (
+          {adminBlocked ? (
             <NotFoundComponent />
+          ) : contentBlocked ? (
+            <SiteShell>
+              <NotFoundComponent />
+            </SiteShell>
           ) : bareLayout ? (
             <Outlet />
           ) : (
