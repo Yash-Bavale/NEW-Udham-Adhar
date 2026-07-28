@@ -1,17 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/contentful";
 
 type CfEntry<F> = { sys: { id: string; updatedAt: string }; fields: F };
 type CfList<F> = { total: number; skip: number; limit: number; items: CfEntry<F>[] };
 
+/** Only these env var names may be selected per-website (allow-list). */
+const ALLOWED_TOKEN_SECRETS = ["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_2"] as const;
+
+/**
+ * Resolve the Contentful space + connection key for the current host.
+ * Falls back to the project-default env vars when the website row has no
+ * per-site configuration.
+ */
+async function resolveCfCreds(): Promise<{ spaceId: string; apiKey: string }> {
+  let spaceId = process.env.CONTENTFUL_SPACE_ID ?? "";
+  let secretName = "CONTENTFUL_API_KEY";
+  try {
+    const { resolveCurrentWebsite } = await import("@/lib/websites/current-website.server");
+    const site = await resolveCurrentWebsite(getRequest());
+    if (site.contentful_space_id) spaceId = site.contentful_space_id;
+    const chosen = site.contentful_delivery_token_secret ?? "";
+    if ((ALLOWED_TOKEN_SECRETS as readonly string[]).includes(chosen)) secretName = chosen;
+  } catch {
+    // ignore — use project defaults
+  }
+  const apiKey = process.env[secretName] ?? "";
+  if (!spaceId || !apiKey) throw new Error("Contentful gateway env vars missing");
+  return { spaceId, apiKey };
+}
+
 async function cfFetch<F>(path: string): Promise<CfList<F>> {
   const key = process.env.LOVABLE_API_KEY;
-  const apiKey = process.env.CONTENTFUL_API_KEY;
-  const spaceId = process.env.CONTENTFUL_SPACE_ID;
-  if (!key || !apiKey || !spaceId) {
-    throw new Error("Contentful gateway env vars missing");
-  }
+  if (!key) throw new Error("Contentful gateway env vars missing");
+  const { spaceId, apiKey } = await resolveCfCreds();
   const url = `${GATEWAY}/spaces/${spaceId}${path}`;
   const res = await fetch(url, {
     headers: {
@@ -25,6 +48,7 @@ async function cfFetch<F>(path: string): Promise<CfList<F>> {
   }
   return (await res.json()) as CfList<F>;
 }
+
 
 /** Walk a Contentful rich-text document and collect its plain text. */
 function richTextToPlain(node: unknown): string {
