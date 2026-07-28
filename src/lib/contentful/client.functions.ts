@@ -68,13 +68,82 @@ function richTextToPlain(node: unknown): string {
     let out = "";
     for (let i = 0; i < n.content.length; i++) {
       out += richTextToPlain(n.content[i]);
-      // Paragraph breaks preserve readability
+      // Block breaks preserve readability and keep authored headings separate.
       const child = n.content[i] as { nodeType?: string } | undefined;
-      if (child?.nodeType === "paragraph" && i < n.content.length - 1) out += "\n\n";
+      if (
+        child?.nodeType &&
+        (child.nodeType === "paragraph" ||
+          child.nodeType.startsWith("heading-") ||
+          child.nodeType === "unordered-list" ||
+          child.nodeType === "ordered-list") &&
+        i < n.content.length - 1
+      ) {
+        out += "\n\n";
+      }
     }
     return out;
   }
   return "";
+}
+
+type SeoBodySection = ContentfulSeoArticle["bodySections"][number];
+
+/** Convert Contentful Rich Text blocks into the sections consumed by SeoContentPage. */
+function richTextToSections(document: unknown, articleTitle: string): SeoBodySection[] {
+  if (!document || typeof document !== "object") return [];
+  const blocks = (document as { content?: unknown[] }).content;
+  if (!Array.isArray(blocks)) return [];
+
+  const sections: SeoBodySection[] = [];
+  let current: SeoBodySection | null = null;
+  let currentSubsection: NonNullable<SeoBodySection["subsections"]>[number] | null = null;
+
+  const ensureSection = () => {
+    if (!current) {
+      current = { heading: "Overview", level: 2, paragraphs: [] };
+      sections.push(current);
+    }
+    return current;
+  };
+
+  for (const block of blocks) {
+    const nodeType =
+      block && typeof block === "object"
+        ? (block as { nodeType?: string }).nodeType ?? ""
+        : "";
+    const text = richTextToPlain(block).trim();
+    if (!text) continue;
+
+    if (nodeType === "heading-1" || nodeType === "heading-2") {
+      // Contentful authors commonly repeat the article title as the first H1.
+      // The page already owns the single SEO H1, so do not render it twice.
+      if (text.toLocaleLowerCase() === articleTitle.toLocaleLowerCase()) continue;
+      current = { heading: text, level: 2, paragraphs: [] };
+      currentSubsection = null;
+      sections.push(current);
+      continue;
+    }
+
+    if (nodeType === "heading-3" || nodeType === "heading-4") {
+      const section = ensureSection();
+      currentSubsection = { heading: text, level: 3, paragraphs: [] };
+      section.subsections = [...(section.subsections ?? []), currentSubsection];
+      continue;
+    }
+
+    const paragraphs = text
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (currentSubsection) currentSubsection.paragraphs.push(...paragraphs);
+    else ensureSection().paragraphs.push(...paragraphs);
+  }
+
+  return sections.filter(
+    (section) =>
+      section.paragraphs.length > 0 ||
+      (section.subsections?.some((subsection) => subsection.paragraphs.length > 0) ?? false),
+  );
 }
 
 export type ContentfulFaq = {
@@ -249,10 +318,12 @@ export const getContentfulSeoArticle = createServerFn({ method: "GET" })
       if (!e) return null;
       const f = e.fields;
       const title = Array.isArray(f.title) ? (f.title[0] ?? "") : (f.title ?? "");
+      const normalizedTitle = String(title).trim();
+      const authoredSections = Array.isArray(f.bodySections) ? f.bodySections : [];
       return {
         id: e.sys.id,
         slug: (f.slug ?? "").trim(),
-        title: String(title).trim(),
+        title: normalizedTitle,
         metaTitle: (f.metaTitle ?? "").trim(),
         metaDescription: (f.metaDescription ?? "").trim(),
         body: richTextToPlain(f.body).trim(),
@@ -260,7 +331,10 @@ export const getContentfulSeoArticle = createServerFn({ method: "GET" })
         publishedAt: (f.publishedAt ?? "").trim(),
         aiOverview: f.aiOverview ?? null,
         quickFacts: Array.isArray(f.quickFacts) ? f.quickFacts : [],
-        bodySections: Array.isArray(f.bodySections) ? f.bodySections : [],
+        bodySections:
+          authoredSections.length > 0
+            ? authoredSections
+            : richTextToSections(f.body, normalizedTitle),
         eeat: f.eeat ?? null,
         faqs: Array.isArray(f.faqs) ? f.faqs : [],
         internalLinks: Array.isArray(f.internalLinks) ? f.internalLinks : [],
