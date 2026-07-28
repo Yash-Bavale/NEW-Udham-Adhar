@@ -282,7 +282,7 @@ function WebsitesPage() {
                 </Link>
                 <button
 
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order, contentful_space_id: (w as any).contentful_space_id ?? "", contentful_delivery_token_secret: (w as any).contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY" })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >
