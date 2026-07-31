@@ -8,7 +8,6 @@ import {
   type ArticleSection,
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
-import { LEGACY_REDIRECTS } from "@/lib/legacy-redirects";
 import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
 import {
   SeoContentPage,
@@ -36,7 +35,6 @@ const GONE_EXACT = new Set<string>([
   "obc-mahamandal-loan-scheme",
   "pmfme-scheme",
   "download-udyam-certificate-2",
-  "udyam-registration-form",
   "annasaheb-patil-loan-scheme-documents",
   "annasaheb-patil-mahamandal-loan-scheme-details",
   "annasaheb-patil-customer-care",
@@ -124,28 +122,19 @@ export const Route = createFileRoute("/$")({
       throw redirect({ to: "/" });
     }
 
-    // Batch-1 SEO: 301 redirect legacy slugs to their new canonical URL.
-    const legacy = LEGACY_REDIRECTS[lower];
-    if (legacy) {
-      throw redirect({ to: legacy, statusCode: 301 });
-    }
-
-
-
+    // Contentful is the source of truth for SEO pages — check it first so a
+    // newly published (or edited) entry goes live with no code change.
+    const cf = await getContentfulSeoArticle({ data: { slug: lower } }).catch(
+      () => null,
+    );
+    if (cf) return { cfArticle: cf };
 
     try {
-      const result = await getArticleBySlug({ data: { slug: lower } });
-      return result;
+      return await getArticleBySlug({ data: { slug: lower } });
     } catch {
-      // Fallback: page authored directly in Contentful for THIS site.
-      // Publishing a `seoArticle` entry there makes the URL live instantly —
-      // no DB row or code change needed.
-      const cf = await getContentfulSeoArticle({ data: { slug: lower } }).catch(
-        () => null,
-      );
-      if (cf) return { cfArticle: cf };
       throw notFound();
     }
+
   },
   head: ({ loaderData }) => {
     const cf = (loaderData as any)?.cfArticle;
