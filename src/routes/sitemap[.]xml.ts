@@ -143,6 +143,32 @@ export const Route = createFileRoute("/sitemap.xml")({
           // If DB is unreachable, still emit the static route list.
         }
 
+        // 3. Contentful is the source of truth for SEO pages: every published
+        //    seoArticle for THIS site is added automatically. Entries whose
+        //    canonical points at a different page (keyword variants) are
+        //    skipped so the sitemap only lists canonical URLs.
+        try {
+          const { listContentfulSeoSlugs } = await import(
+            "@/lib/contentful/client.functions"
+          );
+          const cfSlugs = await listContentfulSeoSlugs();
+          for (const row of cfSlugs) {
+            const path = `/${row.slug.replace(/^\/+/, "")}`;
+            if (isExcluded(path) || siteBlocked(path)) continue;
+            if (row.canonicalUrl) {
+              const canonicalPath = row.canonicalUrl
+                .replace(/^https?:\/\/[^/]+/, "")
+                .replace(/\/$/, "")
+                .toLowerCase();
+              if (canonicalPath && canonicalPath !== path) continue;
+            }
+            entries.set(path, { path, lastmod: row.updatedAt || STATIC_LASTMOD });
+          }
+        } catch {
+          // CMS unreachable — keep the static + DB entries.
+        }
+
+
 
         const sorted = Array.from(entries.values()).sort((a, b) =>
           a.path.localeCompare(b.path),

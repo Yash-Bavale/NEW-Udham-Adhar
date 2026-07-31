@@ -9,48 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WwwUdyamregistrationRouteImport } from './routes/www-udyamregistration'
-import { Route as VerifyUdyamCertificateRouteImport } from './routes/verify-udyam-certificate'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
-import { Route as UdyogAadharRegistration2RouteImport } from './routes/udyog-aadhar-registration-2'
-import { Route as UdyogAadharRegistrationRouteImport } from './routes/udyog-aadhar-registration'
-import { Route as UdyogAadharFreeRegistrationRouteImport } from './routes/udyog-aadhar-free-registration'
-import { Route as UdyogAadharDownloadRouteImport } from './routes/udyog-aadhar-download'
-import { Route as UdyogAadharCertificateRouteImport } from './routes/udyog-aadhar-certificate'
-import { Route as UdyogAadharCardRouteImport } from './routes/udyog-aadhar-card'
-import { Route as UdyogAadharRouteImport } from './routes/udyog-aadhar'
-import { Route as UdyogAadhaarToUdyamMigrationRouteImport } from './routes/udyog-aadhaar-to-udyam-migration'
-import { Route as UdyogAadhaarRegisterRouteImport } from './routes/udyog-aadhaar-register'
-import { Route as UdyogAadhaarDownloadRouteImport } from './routes/udyog-aadhaar-download'
-import { Route as UdyogAadhaarRouteImport } from './routes/udyog-aadhaar'
-import { Route as UdyamReprintRouteImport } from './routes/udyam-reprint'
-import { Route as UdyamRegistrationUpdateRouteImport } from './routes/udyam-registration-update'
-import { Route as UdyamRegistrationStatusRouteImport } from './routes/udyam-registration-status'
-import { Route as UdyamRegistrationProcessRouteImport } from './routes/udyam-registration-process'
-import { Route as UdyamRegistrationPortalRouteImport } from './routes/udyam-registration-portal'
-import { Route as UdyamRegistrationOnlineRouteImport } from './routes/udyam-registration-online'
-import { Route as UdyamRegistrationNumberRouteImport } from './routes/udyam-registration-number'
-import { Route as UdyamRegistrationFreeRouteImport } from './routes/udyam-registration-free'
-import { Route as UdyamRegistrationFormRouteImport } from './routes/udyam-registration-form'
-import { Route as UdyamRegistrationFeeRouteImport } from './routes/udyam-registration-fee'
-import { Route as UdyamRegistrationEligibilityRouteImport } from './routes/udyam-registration-eligibility'
-import { Route as UdyamRegistrationDownloadRouteImport } from './routes/udyam-registration-download'
-import { Route as UdyamRegistrationDocumentsRequiredRouteImport } from './routes/udyam-registration-documents-required'
-import { Route as UdyamRegistrationCertificateDownloadRouteImport } from './routes/udyam-registration-certificate-download'
-import { Route as UdyamRegistrationCertificateRouteImport } from './routes/udyam-registration-certificate'
-import { Route as UdyamRegistrationBenefitsRouteImport } from './routes/udyam-registration-benefits'
-import { Route as UdyamRegistrationRouteImport } from './routes/udyam-registration'
-import { Route as UdyamRegisterCertificateDownloadRouteImport } from './routes/udyam-register-certificate-download'
-import { Route as UdyamNewRegistrationRouteImport } from './routes/udyam-new-registration'
-import { Route as UdyamLoginRouteImport } from './routes/udyam-login'
-import { Route as UdyamEditRouteImport } from './routes/udyam-edit'
-import { Route as UdyamCertificateRouteImport } from './routes/udyam-certificate'
-import { Route as UdyamAdhar2RouteImport } from './routes/udyam-adhar-2'
-import { Route as UdyamAadharRegistrationRouteImport } from './routes/udyam-aadhar-registration'
-import { Route as UdyamAadhaarVerifyRouteImport } from './routes/udyam-aadhaar-verify'
-import { Route as UdyamAadhaarRegistrationRouteImport } from './routes/udyam-aadhaar-registration'
-import { Route as UdharAadharRegistrationRouteImport } from './routes/udhar-aadhar-registration'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
 import { Route as TalkToExpertRouteImport } from './routes/talk-to-expert'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -58,25 +18,13 @@ import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-deli
 import { Route as SeoAdminRouteImport } from './routes/seo-admin'
 import { Route as RefundCancellationPolicyRouteImport } from './routes/refund-cancellation-policy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
-import { Route as PrintUdyamCertificateRouteImport } from './routes/print-udyam-certificate'
-import { Route as PrintMsmeUdyamCertificateRouteImport } from './routes/print-msme-udyam-certificate'
-import { Route as PrintMsmeCertificateRouteImport } from './routes/print-msme-certificate'
 import { Route as PricingTransparencyRouteImport } from './routes/pricing-transparency'
 import { Route as PaymentNoticeServiceAcknowledgmentRouteImport } from './routes/payment-notice-service-acknowledgment'
 import { Route as PaymentNoticeRouteImport } from './routes/payment-notice'
 import { Route as OtherProblemRouteImport } from './routes/other-problem'
 import { Route as NoticeRouteImport } from './routes/notice'
 import { Route as NewUdyamRegistrationRouteImport } from './routes/new-udyam-registration'
-import { Route as MsmeUdyogAadharRouteImport } from './routes/msme-udyog-aadhar'
-import { Route as MsmeUdyamRegistrationRouteImport } from './routes/msme-udyam-registration'
-import { Route as MsmeRegistrationLoginRouteImport } from './routes/msme-registration-login'
-import { Route as MsmeRegistrationFreeRouteImport } from './routes/msme-registration-free'
 import { Route as MsmeRegistrationFeeRouteImport } from './routes/msme-registration-fee'
-import { Route as MsmeRegistrationChargesRouteImport } from './routes/msme-registration-charges'
-import { Route as MsmeRegistrationCertificateDownloadRouteImport } from './routes/msme-registration-certificate-download'
-import { Route as MsmeRegistrationRouteImport } from './routes/msme-registration'
-import { Route as MsmeCertificateBenefitsRouteImport } from './routes/msme-certificate-benefits'
-import { Route as MsmeCertificateRouteImport } from './routes/msme-certificate'
 import { Route as MigrateUdyogAadhaarToUdyamRouteImport } from './routes/migrate-udyog-aadhaar-to-udyam'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
@@ -84,9 +32,6 @@ import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as GrievanceRedressalPolicyRouteImport } from './routes/grievance-redressal-policy'
-import { Route as ForgotUdyamRegistrationNumberRouteImport } from './routes/forgot-udyam-registration-number'
-import { Route as DownloadUdyamCertificateRouteImport } from './routes/download-udyam-certificate'
-import { Route as DownloadMsmeCertificateRouteImport } from './routes/download-msme-certificate'
 import { Route as DisclaimerRouteImport } from './routes/disclaimer'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as ContactUsRouteImport } from './routes/contact-us'
@@ -100,9 +45,6 @@ import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutUsRouteImport } from './routes/about-us'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as AadharUdyogRegistrationRouteImport } from './routes/aadhar-udyog-registration'
-import { Route as AadharUdyamRegistrationRouteImport } from './routes/aadhar-udyam-registration'
-import { Route as AadharUdyamDownloadRouteImport } from './routes/aadhar-udyam-download'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -202,16 +144,6 @@ import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/a
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admin.services.forms.$serviceCode'
 
-const WwwUdyamregistrationRoute = WwwUdyamregistrationRouteImport.update({
-  id: '/www-udyamregistration',
-  path: '/www-udyamregistration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyUdyamCertificateRoute = VerifyUdyamCertificateRouteImport.update({
-  id: '/verify-udyam-certificate',
-  path: '/verify-udyam-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
   id: '/update-udyam-certificate',
   path: '/update-udyam-certificate',
@@ -220,208 +152,6 @@ const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
   path: '/unauthorized',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadharRegistration2Route =
-  UdyogAadharRegistration2RouteImport.update({
-    id: '/udyog-aadhar-registration-2',
-    path: '/udyog-aadhar-registration-2',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyogAadharRegistrationRoute = UdyogAadharRegistrationRouteImport.update({
-  id: '/udyog-aadhar-registration',
-  path: '/udyog-aadhar-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadharFreeRegistrationRoute =
-  UdyogAadharFreeRegistrationRouteImport.update({
-    id: '/udyog-aadhar-free-registration',
-    path: '/udyog-aadhar-free-registration',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyogAadharDownloadRoute = UdyogAadharDownloadRouteImport.update({
-  id: '/udyog-aadhar-download',
-  path: '/udyog-aadhar-download',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadharCertificateRoute = UdyogAadharCertificateRouteImport.update({
-  id: '/udyog-aadhar-certificate',
-  path: '/udyog-aadhar-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadharCardRoute = UdyogAadharCardRouteImport.update({
-  id: '/udyog-aadhar-card',
-  path: '/udyog-aadhar-card',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadharRoute = UdyogAadharRouteImport.update({
-  id: '/udyog-aadhar',
-  path: '/udyog-aadhar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadhaarToUdyamMigrationRoute =
-  UdyogAadhaarToUdyamMigrationRouteImport.update({
-    id: '/udyog-aadhaar-to-udyam-migration',
-    path: '/udyog-aadhaar-to-udyam-migration',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyogAadhaarRegisterRoute = UdyogAadhaarRegisterRouteImport.update({
-  id: '/udyog-aadhaar-register',
-  path: '/udyog-aadhaar-register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadhaarDownloadRoute = UdyogAadhaarDownloadRouteImport.update({
-  id: '/udyog-aadhaar-download',
-  path: '/udyog-aadhaar-download',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyogAadhaarRoute = UdyogAadhaarRouteImport.update({
-  id: '/udyog-aadhaar',
-  path: '/udyog-aadhaar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamReprintRoute = UdyamReprintRouteImport.update({
-  id: '/udyam-reprint',
-  path: '/udyam-reprint',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationUpdateRoute = UdyamRegistrationUpdateRouteImport.update({
-  id: '/udyam-registration-update',
-  path: '/udyam-registration-update',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationStatusRoute = UdyamRegistrationStatusRouteImport.update({
-  id: '/udyam-registration-status',
-  path: '/udyam-registration-status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationProcessRoute =
-  UdyamRegistrationProcessRouteImport.update({
-    id: '/udyam-registration-process',
-    path: '/udyam-registration-process',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationPortalRoute = UdyamRegistrationPortalRouteImport.update({
-  id: '/udyam-registration-portal',
-  path: '/udyam-registration-portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationOnlineRoute = UdyamRegistrationOnlineRouteImport.update({
-  id: '/udyam-registration-online',
-  path: '/udyam-registration-online',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationNumberRoute = UdyamRegistrationNumberRouteImport.update({
-  id: '/udyam-registration-number',
-  path: '/udyam-registration-number',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationFreeRoute = UdyamRegistrationFreeRouteImport.update({
-  id: '/udyam-registration-free',
-  path: '/udyam-registration-free',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationFormRoute = UdyamRegistrationFormRouteImport.update({
-  id: '/udyam-registration-form',
-  path: '/udyam-registration-form',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationFeeRoute = UdyamRegistrationFeeRouteImport.update({
-  id: '/udyam-registration-fee',
-  path: '/udyam-registration-fee',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegistrationEligibilityRoute =
-  UdyamRegistrationEligibilityRouteImport.update({
-    id: '/udyam-registration-eligibility',
-    path: '/udyam-registration-eligibility',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationDownloadRoute =
-  UdyamRegistrationDownloadRouteImport.update({
-    id: '/udyam-registration-download',
-    path: '/udyam-registration-download',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationDocumentsRequiredRoute =
-  UdyamRegistrationDocumentsRequiredRouteImport.update({
-    id: '/udyam-registration-documents-required',
-    path: '/udyam-registration-documents-required',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationCertificateDownloadRoute =
-  UdyamRegistrationCertificateDownloadRouteImport.update({
-    id: '/udyam-registration-certificate-download',
-    path: '/udyam-registration-certificate-download',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationCertificateRoute =
-  UdyamRegistrationCertificateRouteImport.update({
-    id: '/udyam-registration-certificate',
-    path: '/udyam-registration-certificate',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationBenefitsRoute =
-  UdyamRegistrationBenefitsRouteImport.update({
-    id: '/udyam-registration-benefits',
-    path: '/udyam-registration-benefits',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamRegistrationRoute = UdyamRegistrationRouteImport.update({
-  id: '/udyam-registration',
-  path: '/udyam-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamRegisterCertificateDownloadRoute =
-  UdyamRegisterCertificateDownloadRouteImport.update({
-    id: '/udyam-register-certificate-download',
-    path: '/udyam-register-certificate-download',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdyamNewRegistrationRoute = UdyamNewRegistrationRouteImport.update({
-  id: '/udyam-new-registration',
-  path: '/udyam-new-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamLoginRoute = UdyamLoginRouteImport.update({
-  id: '/udyam-login',
-  path: '/udyam-login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamEditRoute = UdyamEditRouteImport.update({
-  id: '/udyam-edit',
-  path: '/udyam-edit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamCertificateRoute = UdyamCertificateRouteImport.update({
-  id: '/udyam-certificate',
-  path: '/udyam-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamAdhar2Route = UdyamAdhar2RouteImport.update({
-  id: '/udyam-adhar-2',
-  path: '/udyam-adhar-2',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamAadharRegistrationRoute = UdyamAadharRegistrationRouteImport.update({
-  id: '/udyam-aadhar-registration',
-  path: '/udyam-aadhar-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamAadhaarVerifyRoute = UdyamAadhaarVerifyRouteImport.update({
-  id: '/udyam-aadhaar-verify',
-  path: '/udyam-aadhaar-verify',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UdyamAadhaarRegistrationRoute =
-  UdyamAadhaarRegistrationRouteImport.update({
-    id: '/udyam-aadhaar-registration',
-    path: '/udyam-aadhaar-registration',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const UdharAadharRegistrationRoute = UdharAadharRegistrationRouteImport.update({
-  id: '/udhar-aadhar-registration',
-  path: '/udhar-aadhar-registration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsConditionsRoute = TermsConditionsRouteImport.update({
@@ -460,22 +190,6 @@ const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   path: '/privacy-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrintUdyamCertificateRoute = PrintUdyamCertificateRouteImport.update({
-  id: '/print-udyam-certificate',
-  path: '/print-udyam-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrintMsmeUdyamCertificateRoute =
-  PrintMsmeUdyamCertificateRouteImport.update({
-    id: '/print-msme-udyam-certificate',
-    path: '/print-msme-udyam-certificate',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const PrintMsmeCertificateRoute = PrintMsmeCertificateRouteImport.update({
-  id: '/print-msme-certificate',
-  path: '/print-msme-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PricingTransparencyRoute = PricingTransparencyRouteImport.update({
   id: '/pricing-transparency',
   path: '/pricing-transparency',
@@ -507,55 +221,9 @@ const NewUdyamRegistrationRoute = NewUdyamRegistrationRouteImport.update({
   path: '/new-udyam-registration',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MsmeUdyogAadharRoute = MsmeUdyogAadharRouteImport.update({
-  id: '/msme-udyog-aadhar',
-  path: '/msme-udyog-aadhar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeUdyamRegistrationRoute = MsmeUdyamRegistrationRouteImport.update({
-  id: '/msme-udyam-registration',
-  path: '/msme-udyam-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeRegistrationLoginRoute = MsmeRegistrationLoginRouteImport.update({
-  id: '/msme-registration-login',
-  path: '/msme-registration-login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeRegistrationFreeRoute = MsmeRegistrationFreeRouteImport.update({
-  id: '/msme-registration-free',
-  path: '/msme-registration-free',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MsmeRegistrationFeeRoute = MsmeRegistrationFeeRouteImport.update({
   id: '/msme-registration-fee',
   path: '/msme-registration-fee',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeRegistrationChargesRoute = MsmeRegistrationChargesRouteImport.update({
-  id: '/msme-registration-charges',
-  path: '/msme-registration-charges',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeRegistrationCertificateDownloadRoute =
-  MsmeRegistrationCertificateDownloadRouteImport.update({
-    id: '/msme-registration-certificate-download',
-    path: '/msme-registration-certificate-download',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const MsmeRegistrationRoute = MsmeRegistrationRouteImport.update({
-  id: '/msme-registration',
-  path: '/msme-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeCertificateBenefitsRoute = MsmeCertificateBenefitsRouteImport.update({
-  id: '/msme-certificate-benefits',
-  path: '/msme-certificate-benefits',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MsmeCertificateRoute = MsmeCertificateRouteImport.update({
-  id: '/msme-certificate',
-  path: '/msme-certificate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MigrateUdyogAadhaarToUdyamRoute =
@@ -595,23 +263,6 @@ const GrievanceRedressalPolicyRoute =
     path: '/grievance-redressal-policy',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ForgotUdyamRegistrationNumberRoute =
-  ForgotUdyamRegistrationNumberRouteImport.update({
-    id: '/forgot-udyam-registration-number',
-    path: '/forgot-udyam-registration-number',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const DownloadUdyamCertificateRoute =
-  DownloadUdyamCertificateRouteImport.update({
-    id: '/download-udyam-certificate',
-    path: '/download-udyam-certificate',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const DownloadMsmeCertificateRoute = DownloadMsmeCertificateRouteImport.update({
-  id: '/download-msme-certificate',
-  path: '/download-msme-certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DisclaimerRoute = DisclaimerRouteImport.update({
   id: '/disclaimer',
   path: '/disclaimer',
@@ -676,21 +327,6 @@ const AboutUsRoute = AboutUsRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AadharUdyogRegistrationRoute = AadharUdyogRegistrationRouteImport.update({
-  id: '/aadhar-udyog-registration',
-  path: '/aadhar-udyog-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AadharUdyamRegistrationRoute = AadharUdyamRegistrationRouteImport.update({
-  id: '/aadhar-udyam-registration',
-  path: '/aadhar-udyam-registration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AadharUdyamDownloadRoute = AadharUdyamDownloadRouteImport.update({
-  id: '/aadhar-udyam-download',
-  path: '/aadhar-udyam-download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -1216,9 +852,6 @@ const AdminServicesFormsServiceCodeRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/aadhar-udyam-download': typeof AadharUdyamDownloadRoute
-  '/aadhar-udyam-registration': typeof AadharUdyamRegistrationRoute
-  '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
   '/about-us': typeof AboutUsRoute
   '/admin': typeof AdminRouteWithChildren
@@ -1232,9 +865,6 @@ export interface FileRoutesByFullPath {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
-  '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
-  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1242,25 +872,13 @@ export interface FileRoutesByFullPath {
   '/llms.txt': typeof LlmsDottxtRoute
   '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
-  '/msme-certificate': typeof MsmeCertificateRoute
-  '/msme-certificate-benefits': typeof MsmeCertificateBenefitsRoute
-  '/msme-registration': typeof MsmeRegistrationRoute
-  '/msme-registration-certificate-download': typeof MsmeRegistrationCertificateDownloadRoute
-  '/msme-registration-charges': typeof MsmeRegistrationChargesRoute
   '/msme-registration-fee': typeof MsmeRegistrationFeeRoute
-  '/msme-registration-free': typeof MsmeRegistrationFreeRoute
-  '/msme-registration-login': typeof MsmeRegistrationLoginRoute
-  '/msme-udyam-registration': typeof MsmeUdyamRegistrationRoute
-  '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
-  '/print-msme-certificate': typeof PrintMsmeCertificateRoute
-  '/print-msme-udyam-certificate': typeof PrintMsmeUdyamCertificateRoute
-  '/print-udyam-certificate': typeof PrintUdyamCertificateRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/seo-admin': typeof SeoAdminRoute
@@ -1268,48 +886,8 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
-  '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
-  '/udyam-aadhaar-registration': typeof UdyamAadhaarRegistrationRoute
-  '/udyam-aadhaar-verify': typeof UdyamAadhaarVerifyRoute
-  '/udyam-aadhar-registration': typeof UdyamAadharRegistrationRoute
-  '/udyam-adhar-2': typeof UdyamAdhar2Route
-  '/udyam-certificate': typeof UdyamCertificateRoute
-  '/udyam-edit': typeof UdyamEditRoute
-  '/udyam-login': typeof UdyamLoginRoute
-  '/udyam-new-registration': typeof UdyamNewRegistrationRoute
-  '/udyam-register-certificate-download': typeof UdyamRegisterCertificateDownloadRoute
-  '/udyam-registration': typeof UdyamRegistrationRoute
-  '/udyam-registration-benefits': typeof UdyamRegistrationBenefitsRoute
-  '/udyam-registration-certificate': typeof UdyamRegistrationCertificateRoute
-  '/udyam-registration-certificate-download': typeof UdyamRegistrationCertificateDownloadRoute
-  '/udyam-registration-documents-required': typeof UdyamRegistrationDocumentsRequiredRoute
-  '/udyam-registration-download': typeof UdyamRegistrationDownloadRoute
-  '/udyam-registration-eligibility': typeof UdyamRegistrationEligibilityRoute
-  '/udyam-registration-fee': typeof UdyamRegistrationFeeRoute
-  '/udyam-registration-form': typeof UdyamRegistrationFormRoute
-  '/udyam-registration-free': typeof UdyamRegistrationFreeRoute
-  '/udyam-registration-number': typeof UdyamRegistrationNumberRoute
-  '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
-  '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
-  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
-  '/udyam-registration-status': typeof UdyamRegistrationStatusRoute
-  '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
-  '/udyam-reprint': typeof UdyamReprintRoute
-  '/udyog-aadhaar': typeof UdyogAadhaarRoute
-  '/udyog-aadhaar-download': typeof UdyogAadhaarDownloadRoute
-  '/udyog-aadhaar-register': typeof UdyogAadhaarRegisterRoute
-  '/udyog-aadhaar-to-udyam-migration': typeof UdyogAadhaarToUdyamMigrationRoute
-  '/udyog-aadhar': typeof UdyogAadharRoute
-  '/udyog-aadhar-card': typeof UdyogAadharCardRoute
-  '/udyog-aadhar-certificate': typeof UdyogAadharCertificateRoute
-  '/udyog-aadhar-download': typeof UdyogAadharDownloadRoute
-  '/udyog-aadhar-free-registration': typeof UdyogAadharFreeRegistrationRoute
-  '/udyog-aadhar-registration': typeof UdyogAadharRegistrationRoute
-  '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
-  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
-  '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1410,9 +988,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/aadhar-udyam-download': typeof AadharUdyamDownloadRoute
-  '/aadhar-udyam-registration': typeof AadharUdyamRegistrationRoute
-  '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
   '/about-us': typeof AboutUsRoute
   '/admin-login': typeof AdminLoginRoute
@@ -1425,9 +1000,6 @@ export interface FileRoutesByTo {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
-  '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
-  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1435,25 +1007,13 @@ export interface FileRoutesByTo {
   '/llms.txt': typeof LlmsDottxtRoute
   '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
-  '/msme-certificate': typeof MsmeCertificateRoute
-  '/msme-certificate-benefits': typeof MsmeCertificateBenefitsRoute
-  '/msme-registration': typeof MsmeRegistrationRoute
-  '/msme-registration-certificate-download': typeof MsmeRegistrationCertificateDownloadRoute
-  '/msme-registration-charges': typeof MsmeRegistrationChargesRoute
   '/msme-registration-fee': typeof MsmeRegistrationFeeRoute
-  '/msme-registration-free': typeof MsmeRegistrationFreeRoute
-  '/msme-registration-login': typeof MsmeRegistrationLoginRoute
-  '/msme-udyam-registration': typeof MsmeUdyamRegistrationRoute
-  '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
-  '/print-msme-certificate': typeof PrintMsmeCertificateRoute
-  '/print-msme-udyam-certificate': typeof PrintMsmeUdyamCertificateRoute
-  '/print-udyam-certificate': typeof PrintUdyamCertificateRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/seo-admin': typeof SeoAdminRoute
@@ -1461,48 +1021,8 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
-  '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
-  '/udyam-aadhaar-registration': typeof UdyamAadhaarRegistrationRoute
-  '/udyam-aadhaar-verify': typeof UdyamAadhaarVerifyRoute
-  '/udyam-aadhar-registration': typeof UdyamAadharRegistrationRoute
-  '/udyam-adhar-2': typeof UdyamAdhar2Route
-  '/udyam-certificate': typeof UdyamCertificateRoute
-  '/udyam-edit': typeof UdyamEditRoute
-  '/udyam-login': typeof UdyamLoginRoute
-  '/udyam-new-registration': typeof UdyamNewRegistrationRoute
-  '/udyam-register-certificate-download': typeof UdyamRegisterCertificateDownloadRoute
-  '/udyam-registration': typeof UdyamRegistrationRoute
-  '/udyam-registration-benefits': typeof UdyamRegistrationBenefitsRoute
-  '/udyam-registration-certificate': typeof UdyamRegistrationCertificateRoute
-  '/udyam-registration-certificate-download': typeof UdyamRegistrationCertificateDownloadRoute
-  '/udyam-registration-documents-required': typeof UdyamRegistrationDocumentsRequiredRoute
-  '/udyam-registration-download': typeof UdyamRegistrationDownloadRoute
-  '/udyam-registration-eligibility': typeof UdyamRegistrationEligibilityRoute
-  '/udyam-registration-fee': typeof UdyamRegistrationFeeRoute
-  '/udyam-registration-form': typeof UdyamRegistrationFormRoute
-  '/udyam-registration-free': typeof UdyamRegistrationFreeRoute
-  '/udyam-registration-number': typeof UdyamRegistrationNumberRoute
-  '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
-  '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
-  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
-  '/udyam-registration-status': typeof UdyamRegistrationStatusRoute
-  '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
-  '/udyam-reprint': typeof UdyamReprintRoute
-  '/udyog-aadhaar': typeof UdyogAadhaarRoute
-  '/udyog-aadhaar-download': typeof UdyogAadhaarDownloadRoute
-  '/udyog-aadhaar-register': typeof UdyogAadhaarRegisterRoute
-  '/udyog-aadhaar-to-udyam-migration': typeof UdyogAadhaarToUdyamMigrationRoute
-  '/udyog-aadhar': typeof UdyogAadharRoute
-  '/udyog-aadhar-card': typeof UdyogAadharCardRoute
-  '/udyog-aadhar-certificate': typeof UdyogAadharCertificateRoute
-  '/udyog-aadhar-download': typeof UdyogAadharDownloadRoute
-  '/udyog-aadhar-free-registration': typeof UdyogAadharFreeRegistrationRoute
-  '/udyog-aadhar-registration': typeof UdyogAadharRegistrationRoute
-  '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
-  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
-  '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1600,9 +1120,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/aadhar-udyam-download': typeof AadharUdyamDownloadRoute
-  '/aadhar-udyam-registration': typeof AadharUdyamRegistrationRoute
-  '/aadhar-udyog-registration': typeof AadharUdyogRegistrationRoute
   '/about': typeof AboutRoute
   '/about-us': typeof AboutUsRoute
   '/admin': typeof AdminRouteWithChildren
@@ -1616,9 +1133,6 @@ export interface FileRoutesById {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
-  '/download-msme-certificate': typeof DownloadMsmeCertificateRoute
-  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
-  '/forgot-udyam-registration-number': typeof ForgotUdyamRegistrationNumberRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1626,25 +1140,13 @@ export interface FileRoutesById {
   '/llms.txt': typeof LlmsDottxtRoute
   '/mcp': typeof McpRoute
   '/migrate-udyog-aadhaar-to-udyam': typeof MigrateUdyogAadhaarToUdyamRoute
-  '/msme-certificate': typeof MsmeCertificateRoute
-  '/msme-certificate-benefits': typeof MsmeCertificateBenefitsRoute
-  '/msme-registration': typeof MsmeRegistrationRoute
-  '/msme-registration-certificate-download': typeof MsmeRegistrationCertificateDownloadRoute
-  '/msme-registration-charges': typeof MsmeRegistrationChargesRoute
   '/msme-registration-fee': typeof MsmeRegistrationFeeRoute
-  '/msme-registration-free': typeof MsmeRegistrationFreeRoute
-  '/msme-registration-login': typeof MsmeRegistrationLoginRoute
-  '/msme-udyam-registration': typeof MsmeUdyamRegistrationRoute
-  '/msme-udyog-aadhar': typeof MsmeUdyogAadharRoute
   '/new-udyam-registration': typeof NewUdyamRegistrationRoute
   '/notice': typeof NoticeRoute
   '/other-problem': typeof OtherProblemRoute
   '/payment-notice': typeof PaymentNoticeRoute
   '/payment-notice-service-acknowledgment': typeof PaymentNoticeServiceAcknowledgmentRoute
   '/pricing-transparency': typeof PricingTransparencyRoute
-  '/print-msme-certificate': typeof PrintMsmeCertificateRoute
-  '/print-msme-udyam-certificate': typeof PrintMsmeUdyamCertificateRoute
-  '/print-udyam-certificate': typeof PrintUdyamCertificateRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
   '/seo-admin': typeof SeoAdminRoute
@@ -1652,48 +1154,8 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
-  '/udhar-aadhar-registration': typeof UdharAadharRegistrationRoute
-  '/udyam-aadhaar-registration': typeof UdyamAadhaarRegistrationRoute
-  '/udyam-aadhaar-verify': typeof UdyamAadhaarVerifyRoute
-  '/udyam-aadhar-registration': typeof UdyamAadharRegistrationRoute
-  '/udyam-adhar-2': typeof UdyamAdhar2Route
-  '/udyam-certificate': typeof UdyamCertificateRoute
-  '/udyam-edit': typeof UdyamEditRoute
-  '/udyam-login': typeof UdyamLoginRoute
-  '/udyam-new-registration': typeof UdyamNewRegistrationRoute
-  '/udyam-register-certificate-download': typeof UdyamRegisterCertificateDownloadRoute
-  '/udyam-registration': typeof UdyamRegistrationRoute
-  '/udyam-registration-benefits': typeof UdyamRegistrationBenefitsRoute
-  '/udyam-registration-certificate': typeof UdyamRegistrationCertificateRoute
-  '/udyam-registration-certificate-download': typeof UdyamRegistrationCertificateDownloadRoute
-  '/udyam-registration-documents-required': typeof UdyamRegistrationDocumentsRequiredRoute
-  '/udyam-registration-download': typeof UdyamRegistrationDownloadRoute
-  '/udyam-registration-eligibility': typeof UdyamRegistrationEligibilityRoute
-  '/udyam-registration-fee': typeof UdyamRegistrationFeeRoute
-  '/udyam-registration-form': typeof UdyamRegistrationFormRoute
-  '/udyam-registration-free': typeof UdyamRegistrationFreeRoute
-  '/udyam-registration-number': typeof UdyamRegistrationNumberRoute
-  '/udyam-registration-online': typeof UdyamRegistrationOnlineRoute
-  '/udyam-registration-portal': typeof UdyamRegistrationPortalRoute
-  '/udyam-registration-process': typeof UdyamRegistrationProcessRoute
-  '/udyam-registration-status': typeof UdyamRegistrationStatusRoute
-  '/udyam-registration-update': typeof UdyamRegistrationUpdateRoute
-  '/udyam-reprint': typeof UdyamReprintRoute
-  '/udyog-aadhaar': typeof UdyogAadhaarRoute
-  '/udyog-aadhaar-download': typeof UdyogAadhaarDownloadRoute
-  '/udyog-aadhaar-register': typeof UdyogAadhaarRegisterRoute
-  '/udyog-aadhaar-to-udyam-migration': typeof UdyogAadhaarToUdyamMigrationRoute
-  '/udyog-aadhar': typeof UdyogAadharRoute
-  '/udyog-aadhar-card': typeof UdyogAadharCardRoute
-  '/udyog-aadhar-certificate': typeof UdyogAadharCertificateRoute
-  '/udyog-aadhar-download': typeof UdyogAadharDownloadRoute
-  '/udyog-aadhar-free-registration': typeof UdyogAadharFreeRegistrationRoute
-  '/udyog-aadhar-registration': typeof UdyogAadharRegistrationRoute
-  '/udyog-aadhar-registration-2': typeof UdyogAadharRegistration2Route
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
-  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
-  '/www-udyamregistration': typeof WwwUdyamregistrationRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1796,9 +1258,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
-    | '/aadhar-udyam-download'
-    | '/aadhar-udyam-registration'
-    | '/aadhar-udyog-registration'
     | '/about'
     | '/about-us'
     | '/admin'
@@ -1812,9 +1271,6 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
-    | '/download-msme-certificate'
-    | '/download-udyam-certificate'
-    | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -1822,25 +1278,13 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
-    | '/msme-certificate'
-    | '/msme-certificate-benefits'
-    | '/msme-registration'
-    | '/msme-registration-certificate-download'
-    | '/msme-registration-charges'
     | '/msme-registration-fee'
-    | '/msme-registration-free'
-    | '/msme-registration-login'
-    | '/msme-udyam-registration'
-    | '/msme-udyog-aadhar'
     | '/new-udyam-registration'
     | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
-    | '/print-msme-certificate'
-    | '/print-msme-udyam-certificate'
-    | '/print-udyam-certificate'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
     | '/seo-admin'
@@ -1848,48 +1292,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/talk-to-expert'
     | '/terms-conditions'
-    | '/udhar-aadhar-registration'
-    | '/udyam-aadhaar-registration'
-    | '/udyam-aadhaar-verify'
-    | '/udyam-aadhar-registration'
-    | '/udyam-adhar-2'
-    | '/udyam-certificate'
-    | '/udyam-edit'
-    | '/udyam-login'
-    | '/udyam-new-registration'
-    | '/udyam-register-certificate-download'
-    | '/udyam-registration'
-    | '/udyam-registration-benefits'
-    | '/udyam-registration-certificate'
-    | '/udyam-registration-certificate-download'
-    | '/udyam-registration-documents-required'
-    | '/udyam-registration-download'
-    | '/udyam-registration-eligibility'
-    | '/udyam-registration-fee'
-    | '/udyam-registration-form'
-    | '/udyam-registration-free'
-    | '/udyam-registration-number'
-    | '/udyam-registration-online'
-    | '/udyam-registration-portal'
-    | '/udyam-registration-process'
-    | '/udyam-registration-status'
-    | '/udyam-registration-update'
-    | '/udyam-reprint'
-    | '/udyog-aadhaar'
-    | '/udyog-aadhaar-download'
-    | '/udyog-aadhaar-register'
-    | '/udyog-aadhaar-to-udyam-migration'
-    | '/udyog-aadhar'
-    | '/udyog-aadhar-card'
-    | '/udyog-aadhar-certificate'
-    | '/udyog-aadhar-download'
-    | '/udyog-aadhar-free-registration'
-    | '/udyog-aadhar-registration'
-    | '/udyog-aadhar-registration-2'
     | '/unauthorized'
     | '/update-udyam-certificate'
-    | '/verify-udyam-certificate'
-    | '/www-udyamregistration'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -1990,9 +1394,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/aadhar-udyam-download'
-    | '/aadhar-udyam-registration'
-    | '/aadhar-udyog-registration'
     | '/about'
     | '/about-us'
     | '/admin-login'
@@ -2005,9 +1406,6 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
-    | '/download-msme-certificate'
-    | '/download-udyam-certificate'
-    | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -2015,25 +1413,13 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
-    | '/msme-certificate'
-    | '/msme-certificate-benefits'
-    | '/msme-registration'
-    | '/msme-registration-certificate-download'
-    | '/msme-registration-charges'
     | '/msme-registration-fee'
-    | '/msme-registration-free'
-    | '/msme-registration-login'
-    | '/msme-udyam-registration'
-    | '/msme-udyog-aadhar'
     | '/new-udyam-registration'
     | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
-    | '/print-msme-certificate'
-    | '/print-msme-udyam-certificate'
-    | '/print-udyam-certificate'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
     | '/seo-admin'
@@ -2041,48 +1427,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/talk-to-expert'
     | '/terms-conditions'
-    | '/udhar-aadhar-registration'
-    | '/udyam-aadhaar-registration'
-    | '/udyam-aadhaar-verify'
-    | '/udyam-aadhar-registration'
-    | '/udyam-adhar-2'
-    | '/udyam-certificate'
-    | '/udyam-edit'
-    | '/udyam-login'
-    | '/udyam-new-registration'
-    | '/udyam-register-certificate-download'
-    | '/udyam-registration'
-    | '/udyam-registration-benefits'
-    | '/udyam-registration-certificate'
-    | '/udyam-registration-certificate-download'
-    | '/udyam-registration-documents-required'
-    | '/udyam-registration-download'
-    | '/udyam-registration-eligibility'
-    | '/udyam-registration-fee'
-    | '/udyam-registration-form'
-    | '/udyam-registration-free'
-    | '/udyam-registration-number'
-    | '/udyam-registration-online'
-    | '/udyam-registration-portal'
-    | '/udyam-registration-process'
-    | '/udyam-registration-status'
-    | '/udyam-registration-update'
-    | '/udyam-reprint'
-    | '/udyog-aadhaar'
-    | '/udyog-aadhaar-download'
-    | '/udyog-aadhaar-register'
-    | '/udyog-aadhaar-to-udyam-migration'
-    | '/udyog-aadhar'
-    | '/udyog-aadhar-card'
-    | '/udyog-aadhar-certificate'
-    | '/udyog-aadhar-download'
-    | '/udyog-aadhar-free-registration'
-    | '/udyog-aadhar-registration'
-    | '/udyog-aadhar-registration-2'
     | '/unauthorized'
     | '/update-udyam-certificate'
-    | '/verify-udyam-certificate'
-    | '/www-udyamregistration'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -2179,9 +1525,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
-    | '/aadhar-udyam-download'
-    | '/aadhar-udyam-registration'
-    | '/aadhar-udyog-registration'
     | '/about'
     | '/about-us'
     | '/admin'
@@ -2195,9 +1538,6 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
-    | '/download-msme-certificate'
-    | '/download-udyam-certificate'
-    | '/forgot-udyam-registration-number'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -2205,25 +1545,13 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/mcp'
     | '/migrate-udyog-aadhaar-to-udyam'
-    | '/msme-certificate'
-    | '/msme-certificate-benefits'
-    | '/msme-registration'
-    | '/msme-registration-certificate-download'
-    | '/msme-registration-charges'
     | '/msme-registration-fee'
-    | '/msme-registration-free'
-    | '/msme-registration-login'
-    | '/msme-udyam-registration'
-    | '/msme-udyog-aadhar'
     | '/new-udyam-registration'
     | '/notice'
     | '/other-problem'
     | '/payment-notice'
     | '/payment-notice-service-acknowledgment'
     | '/pricing-transparency'
-    | '/print-msme-certificate'
-    | '/print-msme-udyam-certificate'
-    | '/print-udyam-certificate'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
     | '/seo-admin'
@@ -2231,48 +1559,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/talk-to-expert'
     | '/terms-conditions'
-    | '/udhar-aadhar-registration'
-    | '/udyam-aadhaar-registration'
-    | '/udyam-aadhaar-verify'
-    | '/udyam-aadhar-registration'
-    | '/udyam-adhar-2'
-    | '/udyam-certificate'
-    | '/udyam-edit'
-    | '/udyam-login'
-    | '/udyam-new-registration'
-    | '/udyam-register-certificate-download'
-    | '/udyam-registration'
-    | '/udyam-registration-benefits'
-    | '/udyam-registration-certificate'
-    | '/udyam-registration-certificate-download'
-    | '/udyam-registration-documents-required'
-    | '/udyam-registration-download'
-    | '/udyam-registration-eligibility'
-    | '/udyam-registration-fee'
-    | '/udyam-registration-form'
-    | '/udyam-registration-free'
-    | '/udyam-registration-number'
-    | '/udyam-registration-online'
-    | '/udyam-registration-portal'
-    | '/udyam-registration-process'
-    | '/udyam-registration-status'
-    | '/udyam-registration-update'
-    | '/udyam-reprint'
-    | '/udyog-aadhaar'
-    | '/udyog-aadhaar-download'
-    | '/udyog-aadhaar-register'
-    | '/udyog-aadhaar-to-udyam-migration'
-    | '/udyog-aadhar'
-    | '/udyog-aadhar-card'
-    | '/udyog-aadhar-certificate'
-    | '/udyog-aadhar-download'
-    | '/udyog-aadhar-free-registration'
-    | '/udyog-aadhar-registration'
-    | '/udyog-aadhar-registration-2'
     | '/unauthorized'
     | '/update-udyam-certificate'
-    | '/verify-udyam-certificate'
-    | '/www-udyamregistration'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -2374,9 +1662,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
-  AadharUdyamDownloadRoute: typeof AadharUdyamDownloadRoute
-  AadharUdyamRegistrationRoute: typeof AadharUdyamRegistrationRoute
-  AadharUdyogRegistrationRoute: typeof AadharUdyogRegistrationRoute
   AboutRoute: typeof AboutRoute
   AboutUsRoute: typeof AboutUsRoute
   AdminRoute: typeof AdminRouteWithChildren
@@ -2390,9 +1675,6 @@ export interface RootRouteChildren {
   ContactUsRoute: typeof ContactUsRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DisclaimerRoute: typeof DisclaimerRoute
-  DownloadMsmeCertificateRoute: typeof DownloadMsmeCertificateRoute
-  DownloadUdyamCertificateRoute: typeof DownloadUdyamCertificateRoute
-  ForgotUdyamRegistrationNumberRoute: typeof ForgotUdyamRegistrationNumberRoute
   GrievanceRedressalPolicyRoute: typeof GrievanceRedressalPolicyRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
   IndexDothtmlRoute: typeof IndexDothtmlRoute
@@ -2400,25 +1682,13 @@ export interface RootRouteChildren {
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   McpRoute: typeof McpRoute
   MigrateUdyogAadhaarToUdyamRoute: typeof MigrateUdyogAadhaarToUdyamRoute
-  MsmeCertificateRoute: typeof MsmeCertificateRoute
-  MsmeCertificateBenefitsRoute: typeof MsmeCertificateBenefitsRoute
-  MsmeRegistrationRoute: typeof MsmeRegistrationRoute
-  MsmeRegistrationCertificateDownloadRoute: typeof MsmeRegistrationCertificateDownloadRoute
-  MsmeRegistrationChargesRoute: typeof MsmeRegistrationChargesRoute
   MsmeRegistrationFeeRoute: typeof MsmeRegistrationFeeRoute
-  MsmeRegistrationFreeRoute: typeof MsmeRegistrationFreeRoute
-  MsmeRegistrationLoginRoute: typeof MsmeRegistrationLoginRoute
-  MsmeUdyamRegistrationRoute: typeof MsmeUdyamRegistrationRoute
-  MsmeUdyogAadharRoute: typeof MsmeUdyogAadharRoute
   NewUdyamRegistrationRoute: typeof NewUdyamRegistrationRoute
   NoticeRoute: typeof NoticeRoute
   OtherProblemRoute: typeof OtherProblemRoute
   PaymentNoticeRoute: typeof PaymentNoticeRoute
   PaymentNoticeServiceAcknowledgmentRoute: typeof PaymentNoticeServiceAcknowledgmentRoute
   PricingTransparencyRoute: typeof PricingTransparencyRoute
-  PrintMsmeCertificateRoute: typeof PrintMsmeCertificateRoute
-  PrintMsmeUdyamCertificateRoute: typeof PrintMsmeUdyamCertificateRoute
-  PrintUdyamCertificateRoute: typeof PrintUdyamCertificateRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   RefundCancellationPolicyRoute: typeof RefundCancellationPolicyRoute
   SeoAdminRoute: typeof SeoAdminRoute
@@ -2426,48 +1696,8 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TalkToExpertRoute: typeof TalkToExpertRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
-  UdharAadharRegistrationRoute: typeof UdharAadharRegistrationRoute
-  UdyamAadhaarRegistrationRoute: typeof UdyamAadhaarRegistrationRoute
-  UdyamAadhaarVerifyRoute: typeof UdyamAadhaarVerifyRoute
-  UdyamAadharRegistrationRoute: typeof UdyamAadharRegistrationRoute
-  UdyamAdhar2Route: typeof UdyamAdhar2Route
-  UdyamCertificateRoute: typeof UdyamCertificateRoute
-  UdyamEditRoute: typeof UdyamEditRoute
-  UdyamLoginRoute: typeof UdyamLoginRoute
-  UdyamNewRegistrationRoute: typeof UdyamNewRegistrationRoute
-  UdyamRegisterCertificateDownloadRoute: typeof UdyamRegisterCertificateDownloadRoute
-  UdyamRegistrationRoute: typeof UdyamRegistrationRoute
-  UdyamRegistrationBenefitsRoute: typeof UdyamRegistrationBenefitsRoute
-  UdyamRegistrationCertificateRoute: typeof UdyamRegistrationCertificateRoute
-  UdyamRegistrationCertificateDownloadRoute: typeof UdyamRegistrationCertificateDownloadRoute
-  UdyamRegistrationDocumentsRequiredRoute: typeof UdyamRegistrationDocumentsRequiredRoute
-  UdyamRegistrationDownloadRoute: typeof UdyamRegistrationDownloadRoute
-  UdyamRegistrationEligibilityRoute: typeof UdyamRegistrationEligibilityRoute
-  UdyamRegistrationFeeRoute: typeof UdyamRegistrationFeeRoute
-  UdyamRegistrationFormRoute: typeof UdyamRegistrationFormRoute
-  UdyamRegistrationFreeRoute: typeof UdyamRegistrationFreeRoute
-  UdyamRegistrationNumberRoute: typeof UdyamRegistrationNumberRoute
-  UdyamRegistrationOnlineRoute: typeof UdyamRegistrationOnlineRoute
-  UdyamRegistrationPortalRoute: typeof UdyamRegistrationPortalRoute
-  UdyamRegistrationProcessRoute: typeof UdyamRegistrationProcessRoute
-  UdyamRegistrationStatusRoute: typeof UdyamRegistrationStatusRoute
-  UdyamRegistrationUpdateRoute: typeof UdyamRegistrationUpdateRoute
-  UdyamReprintRoute: typeof UdyamReprintRoute
-  UdyogAadhaarRoute: typeof UdyogAadhaarRoute
-  UdyogAadhaarDownloadRoute: typeof UdyogAadhaarDownloadRoute
-  UdyogAadhaarRegisterRoute: typeof UdyogAadhaarRegisterRoute
-  UdyogAadhaarToUdyamMigrationRoute: typeof UdyogAadhaarToUdyamMigrationRoute
-  UdyogAadharRoute: typeof UdyogAadharRoute
-  UdyogAadharCardRoute: typeof UdyogAadharCardRoute
-  UdyogAadharCertificateRoute: typeof UdyogAadharCertificateRoute
-  UdyogAadharDownloadRoute: typeof UdyogAadharDownloadRoute
-  UdyogAadharFreeRegistrationRoute: typeof UdyogAadharFreeRegistrationRoute
-  UdyogAadharRegistrationRoute: typeof UdyogAadharRegistrationRoute
-  UdyogAadharRegistration2Route: typeof UdyogAadharRegistration2Route
   UnauthorizedRoute: typeof UnauthorizedRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
-  VerifyUdyamCertificateRoute: typeof VerifyUdyamCertificateRoute
-  WwwUdyamregistrationRoute: typeof WwwUdyamregistrationRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AppTokenRoute: typeof AppTokenRoute
@@ -2509,20 +1739,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/www-udyamregistration': {
-      id: '/www-udyamregistration'
-      path: '/www-udyamregistration'
-      fullPath: '/www-udyamregistration'
-      preLoaderRoute: typeof WwwUdyamregistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/verify-udyam-certificate': {
-      id: '/verify-udyam-certificate'
-      path: '/verify-udyam-certificate'
-      fullPath: '/verify-udyam-certificate'
-      preLoaderRoute: typeof VerifyUdyamCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/update-udyam-certificate': {
       id: '/update-udyam-certificate'
       path: '/update-udyam-certificate'
@@ -2535,272 +1751,6 @@ declare module '@tanstack/react-router' {
       path: '/unauthorized'
       fullPath: '/unauthorized'
       preLoaderRoute: typeof UnauthorizedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-registration-2': {
-      id: '/udyog-aadhar-registration-2'
-      path: '/udyog-aadhar-registration-2'
-      fullPath: '/udyog-aadhar-registration-2'
-      preLoaderRoute: typeof UdyogAadharRegistration2RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-registration': {
-      id: '/udyog-aadhar-registration'
-      path: '/udyog-aadhar-registration'
-      fullPath: '/udyog-aadhar-registration'
-      preLoaderRoute: typeof UdyogAadharRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-free-registration': {
-      id: '/udyog-aadhar-free-registration'
-      path: '/udyog-aadhar-free-registration'
-      fullPath: '/udyog-aadhar-free-registration'
-      preLoaderRoute: typeof UdyogAadharFreeRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-download': {
-      id: '/udyog-aadhar-download'
-      path: '/udyog-aadhar-download'
-      fullPath: '/udyog-aadhar-download'
-      preLoaderRoute: typeof UdyogAadharDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-certificate': {
-      id: '/udyog-aadhar-certificate'
-      path: '/udyog-aadhar-certificate'
-      fullPath: '/udyog-aadhar-certificate'
-      preLoaderRoute: typeof UdyogAadharCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar-card': {
-      id: '/udyog-aadhar-card'
-      path: '/udyog-aadhar-card'
-      fullPath: '/udyog-aadhar-card'
-      preLoaderRoute: typeof UdyogAadharCardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhar': {
-      id: '/udyog-aadhar'
-      path: '/udyog-aadhar'
-      fullPath: '/udyog-aadhar'
-      preLoaderRoute: typeof UdyogAadharRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhaar-to-udyam-migration': {
-      id: '/udyog-aadhaar-to-udyam-migration'
-      path: '/udyog-aadhaar-to-udyam-migration'
-      fullPath: '/udyog-aadhaar-to-udyam-migration'
-      preLoaderRoute: typeof UdyogAadhaarToUdyamMigrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhaar-register': {
-      id: '/udyog-aadhaar-register'
-      path: '/udyog-aadhaar-register'
-      fullPath: '/udyog-aadhaar-register'
-      preLoaderRoute: typeof UdyogAadhaarRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhaar-download': {
-      id: '/udyog-aadhaar-download'
-      path: '/udyog-aadhaar-download'
-      fullPath: '/udyog-aadhaar-download'
-      preLoaderRoute: typeof UdyogAadhaarDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyog-aadhaar': {
-      id: '/udyog-aadhaar'
-      path: '/udyog-aadhaar'
-      fullPath: '/udyog-aadhaar'
-      preLoaderRoute: typeof UdyogAadhaarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-reprint': {
-      id: '/udyam-reprint'
-      path: '/udyam-reprint'
-      fullPath: '/udyam-reprint'
-      preLoaderRoute: typeof UdyamReprintRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-update': {
-      id: '/udyam-registration-update'
-      path: '/udyam-registration-update'
-      fullPath: '/udyam-registration-update'
-      preLoaderRoute: typeof UdyamRegistrationUpdateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-status': {
-      id: '/udyam-registration-status'
-      path: '/udyam-registration-status'
-      fullPath: '/udyam-registration-status'
-      preLoaderRoute: typeof UdyamRegistrationStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-process': {
-      id: '/udyam-registration-process'
-      path: '/udyam-registration-process'
-      fullPath: '/udyam-registration-process'
-      preLoaderRoute: typeof UdyamRegistrationProcessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-portal': {
-      id: '/udyam-registration-portal'
-      path: '/udyam-registration-portal'
-      fullPath: '/udyam-registration-portal'
-      preLoaderRoute: typeof UdyamRegistrationPortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-online': {
-      id: '/udyam-registration-online'
-      path: '/udyam-registration-online'
-      fullPath: '/udyam-registration-online'
-      preLoaderRoute: typeof UdyamRegistrationOnlineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-number': {
-      id: '/udyam-registration-number'
-      path: '/udyam-registration-number'
-      fullPath: '/udyam-registration-number'
-      preLoaderRoute: typeof UdyamRegistrationNumberRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-free': {
-      id: '/udyam-registration-free'
-      path: '/udyam-registration-free'
-      fullPath: '/udyam-registration-free'
-      preLoaderRoute: typeof UdyamRegistrationFreeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-form': {
-      id: '/udyam-registration-form'
-      path: '/udyam-registration-form'
-      fullPath: '/udyam-registration-form'
-      preLoaderRoute: typeof UdyamRegistrationFormRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-fee': {
-      id: '/udyam-registration-fee'
-      path: '/udyam-registration-fee'
-      fullPath: '/udyam-registration-fee'
-      preLoaderRoute: typeof UdyamRegistrationFeeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-eligibility': {
-      id: '/udyam-registration-eligibility'
-      path: '/udyam-registration-eligibility'
-      fullPath: '/udyam-registration-eligibility'
-      preLoaderRoute: typeof UdyamRegistrationEligibilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-download': {
-      id: '/udyam-registration-download'
-      path: '/udyam-registration-download'
-      fullPath: '/udyam-registration-download'
-      preLoaderRoute: typeof UdyamRegistrationDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-documents-required': {
-      id: '/udyam-registration-documents-required'
-      path: '/udyam-registration-documents-required'
-      fullPath: '/udyam-registration-documents-required'
-      preLoaderRoute: typeof UdyamRegistrationDocumentsRequiredRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-certificate-download': {
-      id: '/udyam-registration-certificate-download'
-      path: '/udyam-registration-certificate-download'
-      fullPath: '/udyam-registration-certificate-download'
-      preLoaderRoute: typeof UdyamRegistrationCertificateDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-certificate': {
-      id: '/udyam-registration-certificate'
-      path: '/udyam-registration-certificate'
-      fullPath: '/udyam-registration-certificate'
-      preLoaderRoute: typeof UdyamRegistrationCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration-benefits': {
-      id: '/udyam-registration-benefits'
-      path: '/udyam-registration-benefits'
-      fullPath: '/udyam-registration-benefits'
-      preLoaderRoute: typeof UdyamRegistrationBenefitsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-registration': {
-      id: '/udyam-registration'
-      path: '/udyam-registration'
-      fullPath: '/udyam-registration'
-      preLoaderRoute: typeof UdyamRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-register-certificate-download': {
-      id: '/udyam-register-certificate-download'
-      path: '/udyam-register-certificate-download'
-      fullPath: '/udyam-register-certificate-download'
-      preLoaderRoute: typeof UdyamRegisterCertificateDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-new-registration': {
-      id: '/udyam-new-registration'
-      path: '/udyam-new-registration'
-      fullPath: '/udyam-new-registration'
-      preLoaderRoute: typeof UdyamNewRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-login': {
-      id: '/udyam-login'
-      path: '/udyam-login'
-      fullPath: '/udyam-login'
-      preLoaderRoute: typeof UdyamLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-edit': {
-      id: '/udyam-edit'
-      path: '/udyam-edit'
-      fullPath: '/udyam-edit'
-      preLoaderRoute: typeof UdyamEditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-certificate': {
-      id: '/udyam-certificate'
-      path: '/udyam-certificate'
-      fullPath: '/udyam-certificate'
-      preLoaderRoute: typeof UdyamCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-adhar-2': {
-      id: '/udyam-adhar-2'
-      path: '/udyam-adhar-2'
-      fullPath: '/udyam-adhar-2'
-      preLoaderRoute: typeof UdyamAdhar2RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-aadhar-registration': {
-      id: '/udyam-aadhar-registration'
-      path: '/udyam-aadhar-registration'
-      fullPath: '/udyam-aadhar-registration'
-      preLoaderRoute: typeof UdyamAadharRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-aadhaar-verify': {
-      id: '/udyam-aadhaar-verify'
-      path: '/udyam-aadhaar-verify'
-      fullPath: '/udyam-aadhaar-verify'
-      preLoaderRoute: typeof UdyamAadhaarVerifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udyam-aadhaar-registration': {
-      id: '/udyam-aadhaar-registration'
-      path: '/udyam-aadhaar-registration'
-      fullPath: '/udyam-aadhaar-registration'
-      preLoaderRoute: typeof UdyamAadhaarRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/udhar-aadhar-registration': {
-      id: '/udhar-aadhar-registration'
-      path: '/udhar-aadhar-registration'
-      fullPath: '/udhar-aadhar-registration'
-      preLoaderRoute: typeof UdharAadharRegistrationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms-conditions': {
@@ -2852,27 +1802,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/print-udyam-certificate': {
-      id: '/print-udyam-certificate'
-      path: '/print-udyam-certificate'
-      fullPath: '/print-udyam-certificate'
-      preLoaderRoute: typeof PrintUdyamCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/print-msme-udyam-certificate': {
-      id: '/print-msme-udyam-certificate'
-      path: '/print-msme-udyam-certificate'
-      fullPath: '/print-msme-udyam-certificate'
-      preLoaderRoute: typeof PrintMsmeUdyamCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/print-msme-certificate': {
-      id: '/print-msme-certificate'
-      path: '/print-msme-certificate'
-      fullPath: '/print-msme-certificate'
-      preLoaderRoute: typeof PrintMsmeCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/pricing-transparency': {
       id: '/pricing-transparency'
       path: '/pricing-transparency'
@@ -2915,74 +1844,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NewUdyamRegistrationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/msme-udyog-aadhar': {
-      id: '/msme-udyog-aadhar'
-      path: '/msme-udyog-aadhar'
-      fullPath: '/msme-udyog-aadhar'
-      preLoaderRoute: typeof MsmeUdyogAadharRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-udyam-registration': {
-      id: '/msme-udyam-registration'
-      path: '/msme-udyam-registration'
-      fullPath: '/msme-udyam-registration'
-      preLoaderRoute: typeof MsmeUdyamRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-registration-login': {
-      id: '/msme-registration-login'
-      path: '/msme-registration-login'
-      fullPath: '/msme-registration-login'
-      preLoaderRoute: typeof MsmeRegistrationLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-registration-free': {
-      id: '/msme-registration-free'
-      path: '/msme-registration-free'
-      fullPath: '/msme-registration-free'
-      preLoaderRoute: typeof MsmeRegistrationFreeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/msme-registration-fee': {
       id: '/msme-registration-fee'
       path: '/msme-registration-fee'
       fullPath: '/msme-registration-fee'
       preLoaderRoute: typeof MsmeRegistrationFeeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-registration-charges': {
-      id: '/msme-registration-charges'
-      path: '/msme-registration-charges'
-      fullPath: '/msme-registration-charges'
-      preLoaderRoute: typeof MsmeRegistrationChargesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-registration-certificate-download': {
-      id: '/msme-registration-certificate-download'
-      path: '/msme-registration-certificate-download'
-      fullPath: '/msme-registration-certificate-download'
-      preLoaderRoute: typeof MsmeRegistrationCertificateDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-registration': {
-      id: '/msme-registration'
-      path: '/msme-registration'
-      fullPath: '/msme-registration'
-      preLoaderRoute: typeof MsmeRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-certificate-benefits': {
-      id: '/msme-certificate-benefits'
-      path: '/msme-certificate-benefits'
-      fullPath: '/msme-certificate-benefits'
-      preLoaderRoute: typeof MsmeCertificateBenefitsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/msme-certificate': {
-      id: '/msme-certificate'
-      path: '/msme-certificate'
-      fullPath: '/msme-certificate'
-      preLoaderRoute: typeof MsmeCertificateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/migrate-udyog-aadhaar-to-udyam': {
@@ -3032,27 +1898,6 @@ declare module '@tanstack/react-router' {
       path: '/grievance-redressal-policy'
       fullPath: '/grievance-redressal-policy'
       preLoaderRoute: typeof GrievanceRedressalPolicyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-udyam-registration-number': {
-      id: '/forgot-udyam-registration-number'
-      path: '/forgot-udyam-registration-number'
-      fullPath: '/forgot-udyam-registration-number'
-      preLoaderRoute: typeof ForgotUdyamRegistrationNumberRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/download-udyam-certificate': {
-      id: '/download-udyam-certificate'
-      path: '/download-udyam-certificate'
-      fullPath: '/download-udyam-certificate'
-      preLoaderRoute: typeof DownloadUdyamCertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/download-msme-certificate': {
-      id: '/download-msme-certificate'
-      path: '/download-msme-certificate'
-      fullPath: '/download-msme-certificate'
-      preLoaderRoute: typeof DownloadMsmeCertificateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/disclaimer': {
@@ -3144,27 +1989,6 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/aadhar-udyog-registration': {
-      id: '/aadhar-udyog-registration'
-      path: '/aadhar-udyog-registration'
-      fullPath: '/aadhar-udyog-registration'
-      preLoaderRoute: typeof AadharUdyogRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/aadhar-udyam-registration': {
-      id: '/aadhar-udyam-registration'
-      path: '/aadhar-udyam-registration'
-      fullPath: '/aadhar-udyam-registration'
-      preLoaderRoute: typeof AadharUdyamRegistrationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/aadhar-udyam-download': {
-      id: '/aadhar-udyam-download'
-      path: '/aadhar-udyam-download'
-      fullPath: '/aadhar-udyam-download'
-      preLoaderRoute: typeof AadharUdyamDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -4072,9 +2896,6 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
-  AadharUdyamDownloadRoute: AadharUdyamDownloadRoute,
-  AadharUdyamRegistrationRoute: AadharUdyamRegistrationRoute,
-  AadharUdyogRegistrationRoute: AadharUdyogRegistrationRoute,
   AboutRoute: AboutRoute,
   AboutUsRoute: AboutUsRoute,
   AdminRoute: AdminRouteWithChildren,
@@ -4088,9 +2909,6 @@ const rootRouteChildren: RootRouteChildren = {
   ContactUsRoute: ContactUsRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DisclaimerRoute: DisclaimerRoute,
-  DownloadMsmeCertificateRoute: DownloadMsmeCertificateRoute,
-  DownloadUdyamCertificateRoute: DownloadUdyamCertificateRoute,
-  ForgotUdyamRegistrationNumberRoute: ForgotUdyamRegistrationNumberRoute,
   GrievanceRedressalPolicyRoute: GrievanceRedressalPolicyRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
   IndexDothtmlRoute: IndexDothtmlRoute,
@@ -4098,17 +2916,7 @@ const rootRouteChildren: RootRouteChildren = {
   LlmsDottxtRoute: LlmsDottxtRoute,
   McpRoute: McpRoute,
   MigrateUdyogAadhaarToUdyamRoute: MigrateUdyogAadhaarToUdyamRoute,
-  MsmeCertificateRoute: MsmeCertificateRoute,
-  MsmeCertificateBenefitsRoute: MsmeCertificateBenefitsRoute,
-  MsmeRegistrationRoute: MsmeRegistrationRoute,
-  MsmeRegistrationCertificateDownloadRoute:
-    MsmeRegistrationCertificateDownloadRoute,
-  MsmeRegistrationChargesRoute: MsmeRegistrationChargesRoute,
   MsmeRegistrationFeeRoute: MsmeRegistrationFeeRoute,
-  MsmeRegistrationFreeRoute: MsmeRegistrationFreeRoute,
-  MsmeRegistrationLoginRoute: MsmeRegistrationLoginRoute,
-  MsmeUdyamRegistrationRoute: MsmeUdyamRegistrationRoute,
-  MsmeUdyogAadharRoute: MsmeUdyogAadharRoute,
   NewUdyamRegistrationRoute: NewUdyamRegistrationRoute,
   NoticeRoute: NoticeRoute,
   OtherProblemRoute: OtherProblemRoute,
@@ -4116,9 +2924,6 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentNoticeServiceAcknowledgmentRoute:
     PaymentNoticeServiceAcknowledgmentRoute,
   PricingTransparencyRoute: PricingTransparencyRoute,
-  PrintMsmeCertificateRoute: PrintMsmeCertificateRoute,
-  PrintMsmeUdyamCertificateRoute: PrintMsmeUdyamCertificateRoute,
-  PrintUdyamCertificateRoute: PrintUdyamCertificateRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   RefundCancellationPolicyRoute: RefundCancellationPolicyRoute,
   SeoAdminRoute: SeoAdminRoute,
@@ -4126,50 +2931,8 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TalkToExpertRoute: TalkToExpertRoute,
   TermsConditionsRoute: TermsConditionsRoute,
-  UdharAadharRegistrationRoute: UdharAadharRegistrationRoute,
-  UdyamAadhaarRegistrationRoute: UdyamAadhaarRegistrationRoute,
-  UdyamAadhaarVerifyRoute: UdyamAadhaarVerifyRoute,
-  UdyamAadharRegistrationRoute: UdyamAadharRegistrationRoute,
-  UdyamAdhar2Route: UdyamAdhar2Route,
-  UdyamCertificateRoute: UdyamCertificateRoute,
-  UdyamEditRoute: UdyamEditRoute,
-  UdyamLoginRoute: UdyamLoginRoute,
-  UdyamNewRegistrationRoute: UdyamNewRegistrationRoute,
-  UdyamRegisterCertificateDownloadRoute: UdyamRegisterCertificateDownloadRoute,
-  UdyamRegistrationRoute: UdyamRegistrationRoute,
-  UdyamRegistrationBenefitsRoute: UdyamRegistrationBenefitsRoute,
-  UdyamRegistrationCertificateRoute: UdyamRegistrationCertificateRoute,
-  UdyamRegistrationCertificateDownloadRoute:
-    UdyamRegistrationCertificateDownloadRoute,
-  UdyamRegistrationDocumentsRequiredRoute:
-    UdyamRegistrationDocumentsRequiredRoute,
-  UdyamRegistrationDownloadRoute: UdyamRegistrationDownloadRoute,
-  UdyamRegistrationEligibilityRoute: UdyamRegistrationEligibilityRoute,
-  UdyamRegistrationFeeRoute: UdyamRegistrationFeeRoute,
-  UdyamRegistrationFormRoute: UdyamRegistrationFormRoute,
-  UdyamRegistrationFreeRoute: UdyamRegistrationFreeRoute,
-  UdyamRegistrationNumberRoute: UdyamRegistrationNumberRoute,
-  UdyamRegistrationOnlineRoute: UdyamRegistrationOnlineRoute,
-  UdyamRegistrationPortalRoute: UdyamRegistrationPortalRoute,
-  UdyamRegistrationProcessRoute: UdyamRegistrationProcessRoute,
-  UdyamRegistrationStatusRoute: UdyamRegistrationStatusRoute,
-  UdyamRegistrationUpdateRoute: UdyamRegistrationUpdateRoute,
-  UdyamReprintRoute: UdyamReprintRoute,
-  UdyogAadhaarRoute: UdyogAadhaarRoute,
-  UdyogAadhaarDownloadRoute: UdyogAadhaarDownloadRoute,
-  UdyogAadhaarRegisterRoute: UdyogAadhaarRegisterRoute,
-  UdyogAadhaarToUdyamMigrationRoute: UdyogAadhaarToUdyamMigrationRoute,
-  UdyogAadharRoute: UdyogAadharRoute,
-  UdyogAadharCardRoute: UdyogAadharCardRoute,
-  UdyogAadharCertificateRoute: UdyogAadharCertificateRoute,
-  UdyogAadharDownloadRoute: UdyogAadharDownloadRoute,
-  UdyogAadharFreeRegistrationRoute: UdyogAadharFreeRegistrationRoute,
-  UdyogAadharRegistrationRoute: UdyogAadharRegistrationRoute,
-  UdyogAadharRegistration2Route: UdyogAadharRegistration2Route,
   UnauthorizedRoute: UnauthorizedRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
-  VerifyUdyamCertificateRoute: VerifyUdyamCertificateRoute,
-  WwwUdyamregistrationRoute: WwwUdyamregistrationRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

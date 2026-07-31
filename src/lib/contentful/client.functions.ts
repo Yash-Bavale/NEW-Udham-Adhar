@@ -408,3 +408,42 @@ export const getContentfulLandingPage = createServerFn({ method: "GET" })
       return null;
     }
   });
+
+/* -------------------------------------------------------------------------- */
+/*  SEO article index (sitemap)                                               */
+/* -------------------------------------------------------------------------- */
+
+export type ContentfulSeoSlug = {
+  slug: string;
+  canonicalUrl: string;
+  updatedAt: string;
+};
+
+/** Every published seoArticle slug in the current site's space (paginated). */
+export const listContentfulSeoSlugs = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ContentfulSeoSlug[]> => {
+    const out: ContentfulSeoSlug[] = [];
+    try {
+      let skip = 0;
+      for (;;) {
+        const page = await cfFetch<{ slug?: string; canonicalUrl?: string }>(
+          `/entries?content_type=seoArticle&select=sys.id,sys.updatedAt,fields.slug,fields.canonicalUrl&limit=200&skip=${skip}`,
+        );
+        for (const e of page.items) {
+          const slug = (e.fields.slug ?? "").trim().toLowerCase();
+          if (!slug) continue;
+          out.push({
+            slug,
+            canonicalUrl: (e.fields.canonicalUrl ?? "").trim(),
+            updatedAt: (e.sys.updatedAt ?? "").slice(0, 10),
+          });
+        }
+        skip += page.limit;
+        if (skip >= page.total) break;
+      }
+    } catch (err) {
+      console.error("[contentful] listContentfulSeoSlugs failed:", err);
+    }
+    return out;
+  },
+);
