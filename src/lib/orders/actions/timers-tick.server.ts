@@ -85,6 +85,29 @@ async function sendFormNudge(appId: string) {
 }
 
 async function autoCloseForm(appId: string) {
+  // Safety: never auto-close an order whose form already arrived or that has
+  // already moved past the form stage.
+  const { data: app } = await supabaseAdmin
+    .from("applications")
+    .select("order_status, fulfillment_status, form_status")
+    .eq("id", appId)
+    .maybeSingle();
+  const row = app as any;
+  if (!row) return;
+  const formIn =
+    String(row.form_status ?? "").toLowerCase() === "submitted" ||
+    ["form_submitted", "documents_received", "under_processing", "completed", "order_completed", "order_closed", "cancelled"].includes(
+      String(row.fulfillment_status ?? ""),
+    ) ||
+    ["FORM_RECEIVED", "INFO_RECEIVED", "IN_PROCESSING", "COMPLETED", "CLOSED", "REFUND_PROCESSED"].includes(
+      String(row.order_status ?? ""),
+    );
+  if (formIn) {
+    const { cancelTimers } = await import("./timers.server");
+    await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
+    return;
+  }
+
   // Pick a default reason: the first active "form abandoned" style reason.
   const { data: reason } = await supabaseAdmin
     .from("order_close_reasons")
