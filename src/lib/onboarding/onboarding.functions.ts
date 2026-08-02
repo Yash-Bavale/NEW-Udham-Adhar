@@ -208,6 +208,14 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         reason: "Onboarding details submitted",
       });
       if (!tr.ok) console.warn("[onboarding] transition skipped:", tr.reason);
+
+      // Form is in — stop the nudge / auto-close countdown.
+      try {
+        const { cancelTimers } = await import("@/lib/orders/actions/timers.server");
+        await cancelTimers(app.id, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
+      } catch (e) {
+        console.error("[onboarding] cancelling form timers failed", e);
+      }
     }
 
     // Fire completion emails on final submit (best-effort, never blocks)

@@ -188,5 +188,18 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     console.error("[finalize] email pipeline failed", e);
   }
 
+  // 6) Arm the form-pending lifecycle timers (4h nudge → 8h auto-close).
+  // Without this nothing ever becomes "due", so the auto-closure cron has
+  // nothing to fire. Cancelled when the onboarding form is submitted.
+  if (applicationId) {
+    try {
+      const { armTimer } = await import("@/lib/orders/actions/timers.server");
+      await armTimer({ applicationId, kind: "form_pending_nudge_4h", firesInMinutes: 4 * 60 });
+      await armTimer({ applicationId, kind: "form_pending_autoclose_8h", firesInMinutes: 8 * 60 });
+    } catch (e) {
+      console.error("[finalize] arming form timers failed", e);
+    }
+  }
+
   return { ok: true, applicationId };
 }

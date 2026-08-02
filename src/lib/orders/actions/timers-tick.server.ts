@@ -85,6 +85,29 @@ async function sendFormNudge(appId: string) {
 }
 
 async function autoCloseForm(appId: string) {
+  // Safety: never auto-close an order whose form already arrived or that has
+  // already moved past the form stage.
+  const { data: app } = await supabaseAdmin
+    .from("applications")
+    .select("order_status, fulfillment_status, form_status")
+    .eq("id", appId)
+    .maybeSingle();
+  const row = app as any;
+  if (!row) return;
+  const formIn =
+    String(row.form_status ?? "").toLowerCase() === "submitted" ||
+    ["form_submitted", "documents_received", "under_processing", "completed", "order_completed", "order_closed", "cancelled"].includes(
+      String(row.fulfillment_status ?? ""),
+    ) ||
+    ["FORM_RECEIVED", "INFO_RECEIVED", "IN_PROCESSING", "COMPLETED", "CLOSED", "REFUND_PROCESSED"].includes(
+      String(row.order_status ?? ""),
+    );
+  if (formIn) {
+    const { cancelTimers } = await import("./timers.server");
+    await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
+    return;
+  }
+
   // Pick a default reason: the first active "form abandoned" style reason.
   const { data: reason } = await supabaseAdmin
     .from("order_close_reasons")
@@ -98,18 +121,35 @@ async function autoCloseForm(appId: string) {
     console.error("[timers-tick] no default close reason found");
     return;
   }
-  // Force-close via RPC.
-  const { error } = await supabaseAdmin.rpc("transition_order_status" as any, {
-    _order_id: appId,
-    _new_status: "CLOSED",
-    _reason_id: reasonId,
-    _remarks: "Auto-close: form not received within 8h",
-    _force: true,
-  } as any);
+  // Direct admin update — the security-definer RPC needs auth.uid(), which is
+  // NULL from cron/service-role and would silently reject the transition.
+  const remarks = "Auto-close: form not received within 8h";
+  const { error } = await supabaseAdmin
+    .from("applications")
+    .update({
+      order_status: "CLOSED",
+      fulfillment_status: "order_closed",
+      application_status: "closed",
+      closure_reason_id: reasonId,
+      closure_remarks: remarks,
+      active_reason_id: null,
+      active_reason_text: null,
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq("id", appId);
   if (error) {
-    console.error("[timers-tick] autoclose transition failed", error.message);
+    console.error("[timers-tick] autoclose update failed", error.message);
     return;
   }
+  await supabaseAdmin.from("application_events").insert({
+    application_id: appId,
+    event_type: "order_status_change",
+    old_value: String(row.order_status ?? ""),
+    new_value: "CLOSED",
+    notes: remarks,
+    staff_name: "System",
+    staff_role: "system",
+  } as never);
   // Cancel remaining form timers + send E010.
   const { cancelTimers } = await import("./timers.server");
   await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
