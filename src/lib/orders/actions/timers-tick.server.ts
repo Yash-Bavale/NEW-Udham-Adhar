@@ -129,7 +129,7 @@ async function autoCloseForm(appId: string) {
     .update({
       order_status: "CLOSED",
       fulfillment_status: "order_closed",
-      application_status: "closed",
+      application_status: "cancelled",
       closure_reason_id: reasonId,
       closure_remarks: remarks,
       active_reason_id: null,
