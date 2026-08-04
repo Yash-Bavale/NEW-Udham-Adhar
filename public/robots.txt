@@ -1,33 +1,162 @@
-# Google Ads landing page checker — explicit allow so AdsBot never
-# ambiguously matches the wildcard rules below.
+# Allow All Search Engines
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+User-agent: Googlebot-Video
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: Google-InspectionTool
+Allow: /
+
 User-agent: AdsBot-Google
 Allow: /
 
-User-agent: AdsBot-Google-Mobile
+User-agent: Mediapartners-Google
 Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: AdIdxBot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: PetalBot
+Allow: /
+
+User-agent: SeznamBot
+Allow: /
+
+# OpenAI
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+# Anthropic
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+# Perplexity
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+# Meta
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: meta-externalfetcher
+Allow: /
+
+# Social Media
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: Pinterestbot
+Allow: /
+
+# SEO Crawlers
+
+User-agent: AhrefsBot
+Allow: /
+
+User-agent: SemrushBot
+Allow: /
+
+User-agent: DotBot
+Allow: /
+
+User-agent: MJ12bot
+Allow: /
+
+User-agent: Screaming Frog SEO Spider
+Allow: /
+
+# Monitoring
+
+User-agent: UptimeRobot
+Allow: /
+
+User-agent: Pingdom
+Allow: /
+
+User-agent: Better Uptime Bot
+Allow: /
+
+User-agent: Lighthouse
+Allow: /
+
+User-agent: Google Page Speed Insights
+Allow: /
+
+# Default
 
 User-agent: *
 Allow: /
-
-# Block legacy WordPress paths that no longer exist on this site
-Disallow: /wp-admin/
-Disallow: /wp-content/
-Disallow: /wp-includes/
-Disallow: /wp-json/
-Disallow: /wp-login.php
-Disallow: /xmlrpc.php
-
-# Block internal app surfaces
-Disallow: /admin/
+Disallow: /admin
 Disallow: /admin-login
-Disallow: /seo-admin/
+Disallow: /seo-admin
 Disallow: /onboarding/
-Disallow: /apply/
-Disallow: /payment
+Disallow: /payment/
+Disallow: /payment-pending/
+Disallow: /payment-failed/
 Disallow: /processing/
 Disallow: /success/
-Disallow: /complaint
+Disallow: /apply/
+Disallow: /email/
 
-Sitemap: https://udyamadhar.in/sitemap.xml
-# AI crawler index
-# https://udyamadhar.in/llms.txt
+Sitemap: /sitemap.xml
