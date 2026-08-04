@@ -150,7 +150,7 @@ export const Route = createFileRoute("/sitemap.xml")({
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            if (isExcluded(path)) continue;
+            if (isExcluded(path) || siteBlocked(path)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
@@ -170,7 +170,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           const cfSlugs = await listContentfulSeoSlugs();
           for (const row of cfSlugs) {
             const path = `/${row.slug.replace(/^\/+/, "")}`;
-            if (isExcluded(path)) continue;
+            if (isExcluded(path) || siteBlocked(path)) continue;
             if (row.canonicalUrl) {
               const canonicalPath = row.canonicalUrl
                 .replace(/^https?:\/\/[^/]+/, "")
