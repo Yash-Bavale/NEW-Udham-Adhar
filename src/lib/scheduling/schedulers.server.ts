@@ -545,7 +545,7 @@ async function fireCustomerClosure(s: {
     .update({
       order_status: "CLOSED",
       fulfillment_status: "order_closed",
-      application_status: "closed",
+      application_status: "cancelled",
       closure_reason_id: s.reason_id,
       closure_remarks: s.remarks ?? "Auto-closed after 8 hours of no reply",
       customer_hold_started_at: null,

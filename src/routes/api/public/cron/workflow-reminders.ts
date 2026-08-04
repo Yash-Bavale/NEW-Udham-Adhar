@@ -72,7 +72,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
               // Auto-close overrides the queued template to E010 so the
               // customer receives the correct closure notice.
               const isAutoClose = r.kind === "pending_closure_followup";
-              const effectiveTemplate = isAutoClose ? "bhs_e010_ticket_closed_final" : r.template_code;
+              const effectiveTemplate = isAutoClose ? "E010" : r.template_code;
 
               if (effectiveTemplate && lead?.email) {
                 const payload: any = r.payload ?? {};
@@ -81,7 +81,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   "bhs_e004_our_side_delay", "order_closure_confirmation", "order_completed",
                   "talk_to_expert_completed", "support_ticket_reply", "support_ticket_closed",
                   "support_ticket_closed_final", "refund_processed_confirmation", "bhs_e012_submitted_to_govt",
-                  "bhs_e010_ticket_closed_final",
+                  "E010",
                 ]);
                 if (allowedTemplates.has(String(effectiveTemplate))) {
                   await enqueueFromTemplateInternal(
@@ -142,7 +142,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   .update({
                     order_status: "CLOSED",
                     fulfillment_status: "order_closed",
-                    application_status: "closed",
+                    application_status: "cancelled",
                     closure_reason_id: reasonId,
                     closure_remarks: remarks,
                     customer_hold_started_at: null,
