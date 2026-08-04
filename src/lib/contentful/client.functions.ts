@@ -262,12 +262,11 @@ function richTextToSections(document: unknown, articleTitle: string): SeoBodySec
       continue;
     }
 
-    const paragraphs = text
-      .split(/\n{2,}/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (currentSubsection) currentSubsection.paragraphs.push(...paragraphs);
-    else ensureSection().paragraphs.push(...paragraphs);
+    // For paragraphs, lists, blockquotes — emit HTML to preserve bold/bullets/links.
+    const html = richTextToHtml({ nodeType: "document", content: [block] }).trim();
+    const htmlParagraphs = html ? [html] : text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    if (currentSubsection) currentSubsection.paragraphs.push(...htmlParagraphs);
+    else ensureSection().paragraphs.push(...htmlParagraphs);
   }
 
   return sections.filter(

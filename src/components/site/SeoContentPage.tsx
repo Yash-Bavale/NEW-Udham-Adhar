@@ -320,21 +320,39 @@ function SeoContentPageInner({ data }: { data: SeoPageData }) {
                 <h2 className="font-display text-2xl font-bold text-brand-navy-deep">
                   {sec.heading}
                 </h2>
-                {sec.paragraphs.map((p, j) => (
-                  <p key={j} className="mt-3">
-                    {renderParagraph(p, linkPool)}
-                  </p>
-                ))}
+                {sec.paragraphs.map((p, j) => {
+                  const isHtml = /^<[a-z]/i.test(p.trim());
+                  return isHtml ? (
+                    <div
+                      key={j}
+                      className="mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-1 [&_li]:mt-1 [&_strong]:font-semibold [&_strong]:text-foreground [&_em]:italic [&_a]:text-brand-navy [&_a]:underline"
+                      dangerouslySetInnerHTML={{ __html: p }}
+                    />
+                  ) : (
+                    <p key={j} className="mt-3">
+                      {renderParagraph(p, linkPool)}
+                    </p>
+                  );
+                })}
                 {sec.subsections?.map((sub, k) => (
                   <div key={k} className="mt-4">
                     <h3 className="font-display text-lg font-semibold text-foreground">
                       {sub.heading}
                     </h3>
-                    {sub.paragraphs.map((p, j) => (
-                      <p key={j} className="mt-2">
-                        {renderParagraph(p, linkPool)}
-                      </p>
-                    ))}
+                    {sub.paragraphs.map((p, j) => {
+                      const isHtml = /^<[a-z]/i.test(p.trim());
+                      return isHtml ? (
+                        <div
+                          key={j}
+                          className="mt-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:space-y-1 [&_li]:mt-1 [&_strong]:font-semibold [&_strong]:text-foreground [&_em]:italic [&_a]:text-brand-navy [&_a]:underline"
+                          dangerouslySetInnerHTML={{ __html: p }}
+                        />
+                      ) : (
+                        <p key={j} className="mt-2">
+                          {renderParagraph(p, linkPool)}
+                        </p>
+                      );
+                    })}
                   </div>
                 ))}
 
