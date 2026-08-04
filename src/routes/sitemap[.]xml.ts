@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
+import { BASE_URL } from "@/lib/brand";
 import { VARIANT_SLUGS } from "@/lib/seo/canonical-clusters";
 
 // Path prefixes that must never appear in the sitemap.
@@ -21,9 +22,6 @@ const EXCLUDED_PREFIXES = [
   "/apply",
   "/email",
   "/lovable",
-  "/mcp",
-  "/.mcp",
-  "/.well-known",
 ];
 
 
@@ -62,16 +60,7 @@ const HIGH_PRIORITY = new Set<string>([
 
 function isExcluded(p: string): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
-  if (
-    p.includes("$") ||
-    p.includes("*") ||
-    p.includes("[") ||
-    p.includes("]") ||
-    p.startsWith("/.") ||
-    p.includes("mcp") ||
-    p.includes("oauth")
-  )
-    return true;
+  if (p.includes("$") || p.includes("*")) return true;
   // Retired / non-indexable paths that should never appear in sitemap.
   if (
     p === "/home" ||
@@ -91,11 +80,6 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        // Resolve the correct base URL for this domain so each website
-        // (udyamadhar.in, udyamregistrations.in) gets its own sitemap URLs.
-        const reqUrl = new URL(request.url);
-        const SITE_BASE = `${reqUrl.protocol}//${reqUrl.host}`;
-
         const { resolveCurrentWebsite } = await import(
           "@/lib/websites/current-website.server"
         );
@@ -200,7 +184,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           const changefreq = e.path === "/" ? "weekly" : "monthly";
           return [
             "  <url>",
-            `    <loc>${SITE_BASE}${e.path}</loc>`,
+            `    <loc>${BASE_URL}${e.path}</loc>`,
             `    <lastmod>${e.lastmod}</lastmod>`,
             `    <changefreq>${changefreq}</changefreq>`,
             `    <priority>${priority}</priority>`,

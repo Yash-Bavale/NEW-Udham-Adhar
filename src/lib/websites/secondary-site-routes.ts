@@ -48,12 +48,14 @@ const ALLOWED_PREFIXES = [
   "/app/",
   "/email/",
   "/lovable/",
+  "/mcp",
   "/onboarding/",
   "/payment/",
   "/payment-failed/",
   "/payment-pending/",
   "/processing/",
   "/success/",
+  "/.well-known/",
 ];
 
 /**

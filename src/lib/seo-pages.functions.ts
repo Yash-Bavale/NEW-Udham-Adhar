@@ -11,51 +11,6 @@ export type SeoPage = {
   page_type?: string;
 };
 
-export type SitemapPageItem = {
-  id: string;
-  slug: string;
-  label: string;
-  source: "Contentful CMS" | "Database SEO Page" | "Static Route";
-  inSitemap: boolean;
-  lastmod: string;
-  isSensitive: boolean;
-};
-
-const SENSITIVE_PREFIXES = [
-  "/api",
-  "/admin",
-  "/admin-login",
-  "/seo-admin",
-  "/onboarding",
-  "/payment",
-  "/payment-pending",
-  "/payment-failed",
-  "/processing",
-  "/success",
-  "/apply",
-  "/email",
-  "/lovable",
-  "/mcp",
-  "/.mcp",
-  "/.well-known",
-];
-
-export function isPathSensitive(path: string): boolean {
-  const p = path.toLowerCase().trim();
-  if (
-    p.includes("$") ||
-    p.includes("*") ||
-    p.includes("[") ||
-    p.includes("]") ||
-    p.startsWith("/.") ||
-    p.includes("mcp") ||
-    p.includes("oauth")
-  ) {
-    return true;
-  }
-  return SENSITIVE_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
-}
-
 async function assertAdmin(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
@@ -68,7 +23,9 @@ async function assertAdmin(userId: string) {
   if (!data) throw new Error("Forbidden: admin role required");
 }
 
-/** Public — used by footer link list. */
+/** Public — used by footer triple-click to render the hidden link list.
+ *  Scoped to the current host's website so a secondary site never lists the
+ *  primary site's SEO pages. */
 export const listPublicSeoPages = createServerFn({ method: "GET" }).handler(
   async (): Promise<SeoPage[]> => {
     const { getRequest } = await import("@tanstack/react-start/server");
@@ -156,6 +113,8 @@ export const upsertSeoPage = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+
 export const deleteSeoPage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
@@ -178,136 +137,4 @@ export const checkIsAdmin = createServerFn({ method: "GET" })
       .eq("role", "admin")
       .maybeSingle();
     return { isAdmin: !!data };
-  });
-
-/** CRM Sitemap Page Manager — Fetches 1-to-1 page map (Contentful, DB, Static) hiding sensitive routes. */
-export const getSitemapPageManagerData = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<SitemapPageItem[]> => {
-    await assertAdmin(context.userId);
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const { resolveCurrentWebsite } = await import("@/lib/websites/current-website.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { listContentfulSeoSlugs } = await import("@/lib/contentful/client.functions");
-
-    const site = await resolveCurrentWebsite(getRequest());
-
-    const itemsMap = new Map<string, SitemapPageItem>();
-
-    // 1. Static Core Landing Pages
-    const CORE_PAGES = [
-      { slug: "/", label: "Homepage" },
-      { slug: "/udyam-registration", label: "Udyam Registration Online" },
-      { slug: "/download-udyam-certificate", label: "Download Udyam Certificate" },
-      { slug: "/print-udyam-certificate", label: "Print Udyam Certificate" },
-      { slug: "/verify-udyam-certificate", label: "Verify Udyam Certificate" },
-      { slug: "/update-udyam-certificate", label: "Update Udyam Certificate" },
-      { slug: "/forgot-udyam-registration-number", label: "Forgot Udyam Registration Number" },
-      { slug: "/msme-registration", label: "MSME Registration" },
-      { slug: "/migrate-udyog-aadhaar-to-udyam", label: "Migrate Udyog Aadhaar to Udyam" },
-      { slug: "/about-us", label: "About Us" },
-      { slug: "/contact-us", label: "Contact Us" },
-      { slug: "/terms-conditions", label: "Terms & Conditions" },
-      { slug: "/privacy-policy", label: "Privacy Policy" },
-      { slug: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
-    ];
-
-    for (const c of CORE_PAGES) {
-      if (isPathSensitive(c.slug)) continue;
-      itemsMap.set(c.slug, {
-        id: `static-${c.slug}`,
-        slug: c.slug,
-        label: c.label,
-        source: "Static Route",
-        inSitemap: true,
-        lastmod: new Date().toISOString().slice(0, 10),
-        isSensitive: false,
-      });
-    }
-
-    // 2. Database SEO Pages for this website
-    try {
-      const { data: dbPages } = await supabaseAdmin
-        .from("seo_pages")
-        .select("id, slug, label, enabled, updated_at")
-        .eq("website_id", site.id);
-      for (const row of dbPages ?? []) {
-        const path = row.slug.startsWith("/") ? row.slug : `/${row.slug}`;
-        if (isPathSensitive(path)) continue;
-        itemsMap.set(path, {
-          id: row.id,
-          slug: path,
-          label: row.label || path,
-          source: "Database SEO Page",
-          inSitemap: row.enabled ?? true,
-          lastmod: (row.updated_at ?? "").slice(0, 10) || new Date().toISOString().slice(0, 10),
-          isSensitive: false,
-        });
-      }
-    } catch {
-      // ignore
-    }
-
-    // 3. Contentful SEO Articles
-    try {
-      const cfSlugs = await listContentfulSeoSlugs();
-      for (const row of cfSlugs) {
-        const path = `/${row.slug.replace(/^\/+/, "")}`;
-        if (isPathSensitive(path)) continue;
-        const formattedLabel = row.slug
-          .replace(/-/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase());
-        itemsMap.set(path, {
-          id: `cf-${row.slug}`,
-          slug: path,
-          label: formattedLabel,
-          source: "Contentful CMS",
-          inSitemap: true,
-          lastmod: row.updatedAt || new Date().toISOString().slice(0, 10),
-          isSensitive: false,
-        });
-      }
-    } catch {
-      // ignore
-    }
-
-    return Array.from(itemsMap.values()).sort((a, b) => a.slug.localeCompare(b.slug));
-  });
-
-/** Bulk submit all clean public pages into the database sitemap list. */
-export const submitAllPagesToSitemap = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const { resolveCurrentWebsite } = await import("@/lib/websites/current-website.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { listContentfulSeoSlugs } = await import("@/lib/contentful/client.functions");
-
-    const site = await resolveCurrentWebsite(getRequest());
-
-    // Fetch all Contentful pages
-    const cfSlugs = await listContentfulSeoSlugs().catch(() => []);
-    let count = 0;
-
-    for (const cf of cfSlugs) {
-      const path = cf.slug.replace(/^\/+/, "");
-      if (isPathSensitive(`/${path}`)) continue;
-      const label = path.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
-
-      // Upsert into seo_pages table as enabled
-      const { error } = await supabaseAdmin.from("seo_pages").upsert(
-        {
-          website_id: site.id,
-          slug: path,
-          label,
-          enabled: true,
-          sort_order: 10,
-        },
-        { onConflict: "website_id,slug" },
-      );
-      if (!error) count++;
-    }
-
-    return { ok: true, submitted: count };
   });
