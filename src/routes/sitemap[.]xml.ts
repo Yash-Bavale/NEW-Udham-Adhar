@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
-import { BASE_URL } from "@/lib/brand";
 import { VARIANT_SLUGS } from "@/lib/seo/canonical-clusters";
 
 // Path prefixes that must never appear in the sitemap.
@@ -80,6 +79,11 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        // Resolve the correct base URL for this domain so each website
+        // (udyamadhar.in, udyamregistrations.in) gets its own sitemap URLs.
+        const reqUrl = new URL(request.url);
+        const SITE_BASE = `${reqUrl.protocol}//${reqUrl.host}`;
+
         const { resolveCurrentWebsite } = await import(
           "@/lib/websites/current-website.server"
         );
@@ -184,7 +188,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           const changefreq = e.path === "/" ? "weekly" : "monthly";
           return [
             "  <url>",
-            `    <loc>${BASE_URL}${e.path}</loc>`,
+            `    <loc>${SITE_BASE}${e.path}</loc>`,
             `    <lastmod>${e.lastmod}</lastmod>`,
             `    <changefreq>${changefreq}</changefreq>`,
             `    <priority>${priority}</priority>`,
