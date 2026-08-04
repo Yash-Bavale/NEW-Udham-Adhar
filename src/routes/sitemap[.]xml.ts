@@ -21,6 +21,9 @@ const EXCLUDED_PREFIXES = [
   "/apply",
   "/email",
   "/lovable",
+  "/mcp",
+  "/.mcp",
+  "/.well-known",
 ];
 
 
@@ -59,7 +62,16 @@ const HIGH_PRIORITY = new Set<string>([
 
 function isExcluded(p: string): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
-  if (p.includes("$") || p.includes("*")) return true;
+  if (
+    p.includes("$") ||
+    p.includes("*") ||
+    p.includes("[") ||
+    p.includes("]") ||
+    p.startsWith("/.") ||
+    p.includes("mcp") ||
+    p.includes("oauth")
+  )
+    return true;
   // Retired / non-indexable paths that should never appear in sitemap.
   if (
     p === "/home" ||
