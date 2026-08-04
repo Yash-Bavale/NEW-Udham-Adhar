@@ -12,10 +12,6 @@ import {
   HelpCircle,
   Printer,
   FileEdit,
-  Globe2,
-  Clock,
-  Layers,
-  Users,
 } from "lucide-react";
 
 export const UDYAM_SERVICES_LIST = [
@@ -84,10 +80,10 @@ export const UDYAM_SERVICES_LIST = [
 export function UdyamRegistrationsSections() {
   return (
     <div className="space-y-0">
-      {/* 1. Udyam Registration Online | MSME Registration & Certificate */}
+      {/* 1. Udyam Registration Online | MSME Registration & Certificate (Clean Paragraph Structure) */}
       <section className="bg-gradient-to-b from-slate-50 via-white to-slate-50/60 border-y border-border/80 py-12 md:py-16">
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="mx-auto max-w-4xl px-4">
+          <div className="text-center max-w-3xl mx-auto mb-8">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-navy/10 px-3.5 py-1 text-xs font-semibold text-brand-navy mb-3">
               <Building2 className="w-3.5 h-3.5" /> Udyam &amp; MSME Assistance
             </span>
@@ -96,34 +92,19 @@ export function UdyamRegistrationsSections() {
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-xl bg-brand-navy/10 text-brand-navy flex items-center justify-center shrink-0 mb-4">
-                <FileText className="w-5 h-5" />
-              </div>
-              <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                Apply for Udyam Registration Online through a simple online application process. Submit applications for New Udyam Registration, MSME Registration, Udyam Certificate Download, Update Udyam Registration, Forgot Udyam Registration Number, Udyam Aadhaar, Udyog Aadhaar Migration, Udyam Registration Correction, Print Udyam Certificate, MSME Certificate Download, Verify Udyam Registration, Check Udyam Registration Status, and other MSME-related requirements from one place.
-              </p>
-            </div>
+          <article className="bg-white rounded-2xl border border-border/80 p-6 md:p-10 shadow-sm space-y-6">
+            <p className="text-slate-700 text-base md:text-lg leading-relaxed">
+              Apply for Udyam Registration Online through a simple online application process. Submit applications for New Udyam Registration, MSME Registration, Udyam Certificate Download, Update Udyam Registration, Forgot Udyam Registration Number, Udyam Aadhaar, Udyog Aadhaar Migration, Udyam Registration Correction, Print Udyam Certificate, MSME Certificate Download, Verify Udyam Registration, Check Udyam Registration Status, and other MSME-related requirements from one place.
+            </p>
 
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center shrink-0 mb-4">
-                <Users className="w-5 h-5" />
-              </div>
-              <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                The online application process is designed for proprietorship firms, partnership firms, LLPs, Private Limited Companies, One Person Companies (OPCs), HUFs, trusts, societies, startups, manufacturers, traders, service providers, and other eligible business entities. Applications are reviewed carefully to minimise errors and ensure that the required details are submitted correctly.
-              </p>
-            </div>
+            <p className="text-slate-700 text-base md:text-lg leading-relaxed">
+              The online application process is designed for proprietorship firms, partnership firms, LLPs, Private Limited Companies, One Person Companies (OPCs), HUFs, trusts, societies, startups, manufacturers, traders, service providers, and other eligible business entities. Applications are reviewed carefully to minimise errors and ensure that the required details are submitted correctly.
+            </p>
 
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0 mb-4">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                Whether you are applying for a new registration, updating business information, downloading your certificate, printing another copy, verifying registration details, checking application status, or recovering your Udyam Registration Number, every service is available through a single online platform with a simple application process.
-              </p>
-            </div>
-          </div>
+            <p className="text-slate-700 text-base md:text-lg leading-relaxed">
+              Whether you are applying for a new registration, updating business information, downloading your certificate, printing another copy, verifying registration details, checking application status, or recovering your Udyam Registration Number, every service is available through a single online platform with a simple application process.
+            </p>
+          </article>
         </div>
       </section>
 
@@ -170,55 +151,6 @@ export function UdyamRegistrationsSections() {
             <p className="text-sm md:text-base font-medium text-brand-navy leading-relaxed">
               Each application follows a structured online process, making it easier to submit registration requests, certificate requests, updates, corrections, and other MSME-related applications through one platform.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Online Udyam Registration Process */}
-      <section className="bg-gradient-to-b from-slate-50 to-white py-12 md:py-16 border-b border-border/80">
-        <div className="mx-auto max-w-5xl px-4">
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-700 mb-3">
-              <Clock className="w-3.5 h-3.5" /> Structured Process
-            </span>
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold font-display text-foreground tracking-tight leading-snug">
-              Online Udyam Registration Process
-            </h2>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-brand-navy/10 text-brand-navy flex items-center justify-center shrink-0 mb-4">
-                  <Globe2 className="w-5 h-5" />
-                </div>
-                <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                  Apply for multiple Udyam and MSME-related requirements through a single online platform. From new registrations to certificate downloads, registration updates, corrections, verification, and status checks, every application is managed through an organised process designed to reduce delays and simplify submission.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0 mb-4">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                  The platform supports a wide range of Udyam-related services, allowing applicants to submit requests, upload the required details, track application progress, and complete different registration requirements without navigating multiple pages or different application systems.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/80 bg-white p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="w-10 h-10 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center shrink-0 mb-4">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <p className="text-slate-600 text-sm md:text-base leading-relaxed">
-                  Whether you are registering a new enterprise or managing an existing Udyam Registration, the entire process is designed to be straightforward, organised, and easy to complete online.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </section>

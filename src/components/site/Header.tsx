@@ -56,10 +56,6 @@ function applyLang(lang: string) {
 }
 
 export function Header() {
-  const brand = useBrand();
-  const isUdyamRegSite = brand.domain.toLowerCase().includes("udyamregistration");
-  const headerBrandTitle = isUdyamRegSite ? "Udyam Registration" : (brand.companyName || "Udyam Registration");
-
   const [open, setOpen] = useState(false);
   const navLinks = useNav(
     "header",
@@ -217,12 +213,22 @@ export function Header() {
 
           {/* Desktop */}
           <div className="hidden md:grid grid-cols-3 items-center gap-4">
-            <Link to="/" className="flex flex-col">
-              <span className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose">
-                {headerBrandTitle}
+            <Link
+              to="/"
+              className="flex flex-col"
+              aria-label="Udyam Registration"
+              title="Udyam Registration"
+              itemScope
+              itemType="https://schema.org/Organization"
+            >
+              <span
+                itemProp="name"
+                className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose"
+              >
+                Udyam Registration
               </span>
               <span className="text-sm text-foreground/80 leading-relaxed">
-                Business Consultancy & Assistance Services
+                Business Consultancy &amp; Assistance Services
               </span>
             </Link>
 
