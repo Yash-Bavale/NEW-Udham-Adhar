@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { UdyamRegistrationsSections, UDYAM_SERVICES_LIST } from "@/components/site/UdyamRegistrationsSections";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
 import { LeadForm } from "@/components/site/LeadForm";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
@@ -119,6 +120,17 @@ export const Route = createFileRoute("/")({
             "query-input": "required name=search_term_string",
           },
         }),
+        jsonLdScript({
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          "name": "Udyam & MSME Registration Services",
+          "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
+            "@type": "ListItem",
+            "position": index + 1,
+            "name": srv.title,
+            "url": `${baseUrl}${srv.path}`,
+          })),
+        }),
       ],
     };
   },
@@ -177,6 +189,9 @@ function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* 2nd Website Sections: Udyam Registration & MSME Assistance -> Our Udyam & MSME Services -> Why Apply Through Business Help Services */}
+      <UdyamRegistrationsSections />
 
       <HomeFaqSection faqs={faqList} />
 
