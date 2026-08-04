@@ -59,7 +59,7 @@ async function cfFetch<F>(path: string): Promise<CfList<F>> {
 }
 
 
-/** Walk a Contentful rich-text document and collect its plain text. */
+/** Walk a Contentful rich-text document and collect its PLAIN text (used for FAQ answers, meta, etc.). */
 function richTextToPlain(node: unknown): string {
   if (!node || typeof node !== "object") return "";
   const n = node as { nodeType?: string; value?: string; content?: unknown[] };
@@ -68,7 +68,6 @@ function richTextToPlain(node: unknown): string {
     let out = "";
     for (let i = 0; i < n.content.length; i++) {
       out += richTextToPlain(n.content[i]);
-      // Block breaks preserve readability and keep authored headings separate.
       const child = n.content[i] as { nodeType?: string } | undefined;
       if (
         child?.nodeType &&
@@ -84,6 +83,138 @@ function richTextToPlain(node: unknown): string {
     return out;
   }
   return "";
+}
+
+/**
+ * Walk a Contentful rich-text leaf TEXT node and wrap it with inline marks
+ * (bold → <strong>, italic → <em>, underline → <u>, code → <code>).
+ */
+function richTextInlineToHtml(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as {
+    nodeType?: string;
+    value?: string;
+    marks?: Array<{ type: string }>;
+    content?: unknown[];
+    data?: { uri?: string };
+  };
+
+  if (n.nodeType === "text") {
+    let text = (n.value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const marks = n.marks ?? [];
+    for (const mark of marks) {
+      if (mark.type === "bold") text = `<strong>${text}</strong>`;
+      else if (mark.type === "italic") text = `<em>${text}</em>`;
+      else if (mark.type === "underline") text = `<u>${text}</u>`;
+      else if (mark.type === "code") text = `<code>${text}</code>`;
+    }
+    return text;
+  }
+
+  if (n.nodeType === "hyperlink" && Array.isArray(n.content)) {
+    const href = (n.data?.uri ?? "").replace(/"/g, "&quot;");
+    const inner = n.content.map(richTextInlineToHtml).join("");
+    return `<a href="${href}" rel="noopener">${inner}</a>`;
+  }
+
+  if (Array.isArray(n.content)) {
+    return n.content.map(richTextInlineToHtml).join("");
+  }
+  return "";
+}
+
+/**
+ * Convert a Contentful rich-text document JSON into an HTML string.
+ * Preserves: headings (h2-h4), paragraphs, bold, italic, underline,
+ * unordered lists, ordered lists, hyperlinks.
+ * This is used wherever we render Contentful body content on-page.
+ */
+function richTextToHtml(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as { nodeType?: string; content?: unknown[] };
+  if (!Array.isArray(n.content)) return "";
+
+  const parts: string[] = [];
+
+  for (const block of n.content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as { nodeType?: string; content?: unknown[] };
+    const type = b.nodeType ?? "";
+    const children = b.content ?? [];
+
+    if (type === "paragraph") {
+      const inner = children.map(richTextInlineToHtml).join("");
+      if (inner.trim()) parts.push(`<p>${inner}</p>`);
+      continue;
+    }
+
+    if (type === "heading-2") {
+      const inner = children.map(richTextInlineToHtml).join("");
+      if (inner.trim()) parts.push(`<h2>${inner}</h2>`);
+      continue;
+    }
+    if (type === "heading-3") {
+      const inner = children.map(richTextInlineToHtml).join("");
+      if (inner.trim()) parts.push(`<h3>${inner}</h3>`);
+      continue;
+    }
+    if (type === "heading-4") {
+      const inner = children.map(richTextInlineToHtml).join("");
+      if (inner.trim()) parts.push(`<h4>${inner}</h4>`);
+      continue;
+    }
+
+    if (type === "unordered-list") {
+      const items = children.map((item) => {
+        const ic = (item as { content?: unknown[] }).content ?? [];
+        const liInner = ic.map((listItemBlock) => {
+          const lib = listItemBlock as { nodeType?: string; content?: unknown[] };
+          if (lib.nodeType === "paragraph") {
+            return (lib.content ?? []).map(richTextInlineToHtml).join("");
+          }
+          return richTextInlineToHtml(listItemBlock);
+        }).join("");
+        return `<li>${liInner}</li>`;
+      }).join("");
+      if (items) parts.push(`<ul>${items}</ul>`);
+      continue;
+    }
+
+    if (type === "ordered-list") {
+      const items = children.map((item) => {
+        const ic = (item as { content?: unknown[] }).content ?? [];
+        const liInner = ic.map((listItemBlock) => {
+          const lib = listItemBlock as { nodeType?: string; content?: unknown[] };
+          if (lib.nodeType === "paragraph") {
+            return (lib.content ?? []).map(richTextInlineToHtml).join("");
+          }
+          return richTextInlineToHtml(listItemBlock);
+        }).join("");
+        return `<li>${liInner}</li>`;
+      }).join("");
+      if (items) parts.push(`<ol>${items}</ol>`);
+      continue;
+    }
+
+    if (type === "blockquote") {
+      const inner = children.map((c) => {
+        const bc = c as { nodeType?: string; content?: unknown[] };
+        if (bc.nodeType === "paragraph") {
+          return (bc.content ?? []).map(richTextInlineToHtml).join("");
+        }
+        return richTextInlineToHtml(c);
+      }).join("");
+      if (inner.trim()) parts.push(`<blockquote>${inner}</blockquote>`);
+      continue;
+    }
+
+    if (type === "hr") {
+      parts.push("<hr />");
+      continue;
+    }
+  }
+
+  return parts.join("\n");
 }
 
 type SeoBodySection = ContentfulSeoArticle["bodySections"][number];
@@ -235,7 +366,7 @@ export const getContentfulServicePage = createServerFn({ method: "GET" })
         slug: (f.slug ?? "").trim(),
         name: (f.name ?? "").trim(),
         shortDescription: (f.shortDescription ?? "").trim(),
-        longDescription: richTextToPlain(f.longDescription).trim(),
+        longDescription: richTextToHtml(f.longDescription).trim() || richTextToPlain(f.longDescription).trim(),
         priceInclusive: typeof f.priceInclusive === "number" ? f.priceInclusive : null,
         processingDays: typeof f.processingDays === "number" ? f.processingDays : null,
         metaTitle: (f.metaTitle ?? "").trim(),
@@ -326,7 +457,7 @@ export const getContentfulSeoArticle = createServerFn({ method: "GET" })
         title: normalizedTitle,
         metaTitle: (f.metaTitle ?? "").trim(),
         metaDescription: (f.metaDescription ?? "").trim(),
-        body: richTextToPlain(f.body).trim(),
+        body: richTextToHtml(f.body).trim() || richTextToPlain(f.body).trim(),
         canonicalUrl: (f.canonicalUrl ?? "").trim(),
         publishedAt: (f.publishedAt ?? "").trim(),
         aiOverview: f.aiOverview ?? null,
