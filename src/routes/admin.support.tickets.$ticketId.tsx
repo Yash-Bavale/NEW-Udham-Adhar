@@ -1093,8 +1093,8 @@ function OrderTab({ app }: { app: any }) {
       <Row label="Stage" value={app.fulfillment_status ?? "—"} />
       <Row label="Created" value={ist(app.created_at)} />
       <Link
-        to="/admin/orders/$applicationId"
-        params={{ applicationId: app.id }}
+        to="/admin/orders/$orderId"
+        params={{ orderId: app.id }}
         className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline mt-3"
       >
         Open order workspace <ExternalLink className="h-3 w-3" />

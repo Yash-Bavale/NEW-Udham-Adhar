@@ -3,6 +3,7 @@ import { Menu, X, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
 import { useNav } from "@/lib/websites/site-content-context";
+import { useBrand } from "@/lib/websites/brand-context";
 
 declare global {
   interface Window {
@@ -55,6 +56,10 @@ function applyLang(lang: string) {
 }
 
 export function Header() {
+  const brand = useBrand();
+  const isUdyamRegSite = brand.domain.toLowerCase().includes("udyamregistration");
+  const headerBrandTitle = isUdyamRegSite ? "Udyam Registration" : (brand.companyName || "Udyam Registration");
+
   const [open, setOpen] = useState(false);
   const navLinks = useNav(
     "header",
@@ -214,7 +219,7 @@ export function Header() {
           <div className="hidden md:grid grid-cols-3 items-center gap-4">
             <Link to="/" className="flex flex-col">
               <span className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose">
-                Udyam Registration
+                {headerBrandTitle}
               </span>
               <span className="text-sm text-foreground/80 leading-relaxed">
                 Business Consultancy & Assistance Services

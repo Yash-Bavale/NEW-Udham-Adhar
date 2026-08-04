@@ -120,17 +120,21 @@ export const Route = createFileRoute("/")({
             "query-input": "required name=search_term_string",
           },
         }),
-        jsonLdScript({
-          "@context": "https://schema.org",
-          "@type": "ItemList",
-          "name": "Udyam & MSME Registration Services",
-          "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
-            "@type": "ListItem",
-            "position": index + 1,
-            "name": srv.title,
-            "url": `${baseUrl}${srv.path}`,
-          })),
-        }),
+        ...(baseUrl.toLowerCase().includes("udyamregistration")
+          ? [
+              jsonLdScript({
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                "name": "Udyam & MSME Registration Services",
+                "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
+                  "@type": "ListItem",
+                  "position": index + 1,
+                  "name": srv.title,
+                  "url": `${baseUrl}${srv.path}`,
+                })),
+              }),
+            ]
+          : []),
       ],
     };
   },
@@ -152,6 +156,10 @@ function HomePage() {
   const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
   const heroSub = cms?.hero?.subheading ||
     "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
+
+  const isUdyamRegistrations =
+    brand.domain.toLowerCase().includes("udyamregistration") ||
+    (typeof window !== "undefined" && window.location.search.includes("site=udyamregistrations"));
 
   useEffect(() => {
     trackEvent("page_view_landing", { path: "/" });
@@ -190,8 +198,8 @@ function HomePage() {
         </div>
       </section>
 
-      {/* 2nd Website Sections: Udyam Registration & MSME Assistance -> Our Udyam & MSME Services -> Why Apply Through Business Help Services */}
-      <UdyamRegistrationsSections />
+      {/* 2nd Website Sections: ONLY rendered for 2nd website udyamregistrations.in */}
+      {isUdyamRegistrations && <UdyamRegistrationsSections />}
 
       <HomeFaqSection faqs={faqList} />
 
