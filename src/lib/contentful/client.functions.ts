@@ -549,27 +549,31 @@ export type ContentfulSeoSlug = {
   updatedAt: string;
 };
 
-/** Every published seoArticle slug in the current site's space (paginated). */
+/** Every published page slug in the current site's Contentful space (paginated). */
 export const listContentfulSeoSlugs = createServerFn({ method: "GET" }).handler(
   async (): Promise<ContentfulSeoSlug[]> => {
     const out: ContentfulSeoSlug[] = [];
+    const seen = new Set<string>();
     try {
       let skip = 0;
       for (;;) {
         const page = await cfFetch<{ slug?: string; canonicalUrl?: string }>(
-          `/entries?content_type=seoArticle&select=sys.id,sys.updatedAt,fields.slug,fields.canonicalUrl&limit=200&skip=${skip}`,
+          `/entries?select=sys.id,sys.updatedAt,fields.slug,fields.canonicalUrl&limit=200&skip=${skip}`,
         );
-        for (const e of page.items) {
-          const slug = (e.fields.slug ?? "").trim().toLowerCase();
-          if (!slug) continue;
+        const items = page.items ?? [];
+        for (const e of items) {
+          const rawSlug = (e.fields?.slug ?? "").trim().toLowerCase();
+          if (!rawSlug || rawSlug === "home" || rawSlug === "index") continue;
+          if (seen.has(rawSlug)) continue;
+          seen.add(rawSlug);
           out.push({
-            slug,
-            canonicalUrl: (e.fields.canonicalUrl ?? "").trim(),
-            updatedAt: (e.sys.updatedAt ?? "").slice(0, 10),
+            slug: rawSlug,
+            canonicalUrl: (e.fields?.canonicalUrl ?? "").trim(),
+            updatedAt: (e.sys?.updatedAt ?? "").slice(0, 10),
           });
         }
-        skip += page.limit;
-        if (skip >= page.total) break;
+        skip += page.limit || 200;
+        if (skip >= (page.total || 0) || items.length === 0) break;
       }
     } catch (err) {
       console.error("[contentful] listContentfulSeoSlugs failed:", err);

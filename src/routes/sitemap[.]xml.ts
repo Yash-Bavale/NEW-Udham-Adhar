@@ -172,10 +172,11 @@ export const Route = createFileRoute("/sitemap.xml")({
             const path = `/${row.slug.replace(/^\/+/, "")}`;
             if (isExcluded(path)) continue;
             if (row.canonicalUrl) {
-              const canonicalPath = row.canonicalUrl
-                .replace(/^https?:\/\/[^/]+/, "")
-                .replace(/\/$/, "")
-                .toLowerCase();
+              let canonicalPath = row.canonicalUrl.trim().toLowerCase();
+              canonicalPath = canonicalPath.replace(/^https?:\/\/[^/]+/, "");
+              canonicalPath = canonicalPath.replace(/^[^/]+\.[a-z]{2,}/, "");
+              if (canonicalPath && !canonicalPath.startsWith("/")) canonicalPath = `/${canonicalPath}`;
+              canonicalPath = canonicalPath.replace(/\/$/, "");
               if (canonicalPath && canonicalPath !== path) continue;
             }
             entries.set(path, { path, lastmod: row.updatedAt || STATIC_LASTMOD });
