@@ -14,9 +14,9 @@ import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
 import { Route as TalkToExpertRouteImport } from './routes/talk-to-expert'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as SeoAdminRouteImport } from './routes/seo-admin'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as RefundCancellationPolicyRouteImport } from './routes/refund-cancellation-policy'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as PricingTransparencyRouteImport } from './routes/pricing-transparency'
@@ -170,11 +170,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
-  id: '/robots.txt',
-  path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
   id: '/service-delivery-policy',
   path: '/service-delivery-policy',
@@ -183,6 +178,11 @@ const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
 const SeoAdminRoute = SeoAdminRouteImport.update({
   id: '/seo-admin',
   path: '/seo-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RefundCancellationPolicyRoute =
@@ -887,10 +887,10 @@ export interface FileRoutesByFullPath {
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1023,10 +1023,10 @@ export interface FileRoutesByTo {
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1157,10 +1157,10 @@ export interface FileRoutesById {
   '/pricing-transparency': typeof PricingTransparencyRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/refund-cancellation-policy': typeof RefundCancellationPolicyRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1296,10 +1296,10 @@ export interface FileRouteTypes {
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/robots.txt'
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
-    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1432,10 +1432,10 @@ export interface FileRouteTypes {
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/robots.txt'
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
-    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1565,10 +1565,10 @@ export interface FileRouteTypes {
     | '/pricing-transparency'
     | '/privacy-policy'
     | '/refund-cancellation-policy'
+    | '/robots.txt'
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
-    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1703,10 +1703,10 @@ export interface RootRouteChildren {
   PricingTransparencyRoute: typeof PricingTransparencyRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   RefundCancellationPolicyRoute: typeof RefundCancellationPolicyRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SeoAdminRoute: typeof SeoAdminRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  RobotsDottxtRoute: typeof RobotsDottxtRoute
   TalkToExpertRoute: typeof TalkToExpertRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
@@ -1787,13 +1787,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/robots.txt': {
-      id: '/robots.txt'
-      path: '/robots.txt'
-      fullPath: '/robots.txt'
-      preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/service-delivery-policy': {
       id: '/service-delivery-policy'
       path: '/service-delivery-policy'
@@ -1806,6 +1799,13 @@ declare module '@tanstack/react-router' {
       path: '/seo-admin'
       fullPath: '/seo-admin'
       preLoaderRoute: typeof SeoAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/refund-cancellation-policy': {
@@ -2946,10 +2946,10 @@ const rootRouteChildren: RootRouteChildren = {
   PricingTransparencyRoute: PricingTransparencyRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   RefundCancellationPolicyRoute: RefundCancellationPolicyRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SeoAdminRoute: SeoAdminRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  RobotsDottxtRoute: RobotsDottxtRoute,
   TalkToExpertRoute: TalkToExpertRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UnauthorizedRoute: UnauthorizedRoute,
