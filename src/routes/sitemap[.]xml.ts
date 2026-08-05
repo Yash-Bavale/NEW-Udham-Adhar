@@ -60,7 +60,7 @@ const HIGH_PRIORITY = new Set<string>([
 ]);
 
 
-function isExcluded(p: string): boolean {
+function isExcluded(p: string, applyVariantClusters = true): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (
     p.includes("$") ||
@@ -82,8 +82,10 @@ function isExcluded(p: string): boolean {
   ) return true;
   // Keyword-variant pages stay live but are dropped from the sitemap;
   // their canonical points at the cluster primary (see canonical-clusters.ts).
+  // These clusters describe the PRIMARY site only — a secondary site owns its
+  // own keyword strategy, so its CMS pages must not be filtered by them.
   const slug = p.replace(/^\/+/, "");
-  if (VARIANT_SLUGS.has(slug)) return true;
+  if (applyVariantClusters && VARIANT_SLUGS.has(slug)) return true;
   return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
 }
 
@@ -104,7 +106,27 @@ export const Route = createFileRoute("/sitemap.xml")({
         );
         const currentSite = await resolveCurrentWebsite(request).catch(() => null);
         const publicOnly = currentSite ? !currentSite.allow_admin : false;
-        const siteBlocked = (p: string) => publicOnly && isBlockedOnSecondarySite(p);
+
+        // A secondary site still links to its own nav/service pages — those
+        // must stay in its sitemap, so feed them to the route gate.
+        let navPaths: string[] = [];
+        if (publicOnly && currentSite?.id) {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const { data } = await supabaseAdmin
+              .from("site_nav_items")
+              .select("path")
+              .eq("website_id", currentSite.id);
+            navPaths = (data ?? [])
+              .map((r) => (r as { path?: string }).path ?? "")
+              .filter(Boolean);
+          } catch {
+            // nav lookup is best-effort
+          }
+        }
+        const siteBlocked = (p: string) =>
+          publicOnly && isBlockedOnSecondarySite(p, navPaths);
+
         // 1. Discover static routes from the generated route tree.
         const mod = await import("@/routeTree.gen");
         const tree = (mod as unknown as {
@@ -150,7 +172,8 @@ export const Route = createFileRoute("/sitemap.xml")({
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            if (isExcluded(path) || siteBlocked(path)) continue;
+            // No siteBlocked() here: rows are already scoped to this website.
+            if (isExcluded(path, !publicOnly)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
@@ -170,7 +193,9 @@ export const Route = createFileRoute("/sitemap.xml")({
           const cfSlugs = await listContentfulSeoSlugs();
           for (const row of cfSlugs) {
             const path = `/${row.slug.replace(/^\/+/, "")}`;
-            if (isExcluded(path) || siteBlocked(path)) continue;
+            // No siteBlocked() here: these entries come from THIS site's own
+            // Contentful space, so publishing one there puts it in the sitemap.
+            if (isExcluded(path, !publicOnly)) continue;
             if (row.canonicalUrl) {
               const canonicalPath = row.canonicalUrl
                 .replace(/^https?:\/\/[^/]+/, "")
