@@ -14,6 +14,7 @@ import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
 import { Route as TalkToExpertRouteImport } from './routes/talk-to-expert'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServiceDeliveryPolicyRouteImport } from './routes/service-delivery-policy'
 import { Route as SeoAdminRouteImport } from './routes/seo-admin'
 import { Route as RefundCancellationPolicyRouteImport } from './routes/refund-cancellation-policy'
@@ -167,6 +168,11 @@ const TalkToExpertRoute = TalkToExpertRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ServiceDeliveryPolicyRoute = ServiceDeliveryPolicyRouteImport.update({
@@ -884,6 +890,7 @@ export interface FileRoutesByFullPath {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1019,6 +1026,7 @@ export interface FileRoutesByTo {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1152,6 +1160,7 @@ export interface FileRoutesById {
   '/seo-admin': typeof SeoAdminRoute
   '/service-delivery-policy': typeof ServiceDeliveryPolicyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/talk-to-expert': typeof TalkToExpertRoute
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
@@ -1290,6 +1299,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1425,6 +1435,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1557,6 +1568,7 @@ export interface FileRouteTypes {
     | '/seo-admin'
     | '/service-delivery-policy'
     | '/sitemap.xml'
+    | '/robots.txt'
     | '/talk-to-expert'
     | '/terms-conditions'
     | '/unauthorized'
@@ -1694,6 +1706,7 @@ export interface RootRouteChildren {
   SeoAdminRoute: typeof SeoAdminRoute
   ServiceDeliveryPolicyRoute: typeof ServiceDeliveryPolicyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   TalkToExpertRoute: typeof TalkToExpertRoute
   TermsConditionsRoute: typeof TermsConditionsRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
@@ -1772,6 +1785,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/service-delivery-policy': {
@@ -2929,6 +2949,7 @@ const rootRouteChildren: RootRouteChildren = {
   SeoAdminRoute: SeoAdminRoute,
   ServiceDeliveryPolicyRoute: ServiceDeliveryPolicyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   TalkToExpertRoute: TalkToExpertRoute,
   TermsConditionsRoute: TermsConditionsRoute,
   UnauthorizedRoute: UnauthorizedRoute,
