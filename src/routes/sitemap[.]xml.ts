@@ -191,7 +191,9 @@ export const Route = createFileRoute("/sitemap.xml")({
           const cfSlugs = await listContentfulSeoSlugs();
           for (const row of cfSlugs) {
             const path = `/${row.slug.replace(/^\/+/, "")}`;
-            if (isExcluded(path) || siteBlocked(path)) continue;
+            // No siteBlocked() here: these entries come from THIS site's own
+            // Contentful space, so publishing one there puts it in the sitemap.
+            if (isExcluded(path)) continue;
             if (row.canonicalUrl) {
               const canonicalPath = row.canonicalUrl
                 .replace(/^https?:\/\/[^/]+/, "")
