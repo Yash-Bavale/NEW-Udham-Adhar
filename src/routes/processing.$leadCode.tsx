@@ -31,6 +31,27 @@ function ProcessingPage() {
 
   useEffect(() => {
     trackEvent("processing_viewed", {});
+
+    // Fire Google Ads "Lead Form Submitted" conversion here (not on form submit)
+    // because gtag.js is guaranteed to be loaded by the time the user reaches
+    // this page, and Tag Assistant can detect it correctly.
+    if (typeof window !== "undefined") {
+      // Direct gtag conversion (fires immediately once gtag.js is loaded)
+      const fireConversion = () => {
+        if ((window as any).gtag) {
+          (window as any).gtag("event", "conversion", {
+            send_to: "AW-18336340451/tS7UCOaYs9McEOOzuadE",
+          });
+        }
+      };
+      // gtag.js might still be loading — wait up to 3s for it
+      if ((window as any).gtag) {
+        fireConversion();
+      } else {
+        const t = setTimeout(fireConversion, 2000);
+        return () => clearTimeout(t);
+      }
+    }
   }, []);
 
   useEffect(() => {

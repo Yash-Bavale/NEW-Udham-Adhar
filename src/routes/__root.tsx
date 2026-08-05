@@ -261,9 +261,8 @@ function RootComponent() {
   }, [router, queryClient]);
 
 
-  // Load gtag.js after first paint via requestIdleCallback so it never
-  // competes with LCP. dataLayer + config commands are already queued in
-  // RootShell, so once the script hydrates it replays them in order.
+  // Load gtag.js shortly after mount so it's available when the user reaches
+  // /processing/ or /success/ pages for conversion firing.
   // Skipped entirely on admin paths — internal sessions must not appear in GA.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -276,9 +275,9 @@ function RootComponent() {
       s.setAttribute("data-gtag", "1");
       document.head.appendChild(s);
     };
-    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
-    if (typeof ric === "function") ric(load, { timeout: 4000 });
-    else setTimeout(load, 2500);
+    // 300ms delay: avoids blocking LCP but loads fast enough for conversions
+    const t = setTimeout(load, 300);
+    return () => clearTimeout(t);
   }, [isAdminPath]);
 
 
