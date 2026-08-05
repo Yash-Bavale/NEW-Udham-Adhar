@@ -129,22 +129,30 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
     for (const batch of chunk(safe, 200)) {
       const admin = await getAdmin();
 
-      // Get application IDs for this batch of leads to delete application-scoped child rows
+      // 1. Get application IDs for this batch of leads
       const { data: apps } = await admin
         .from("applications")
         .select("id")
         .in("lead_id", batch);
       const appIds = (apps ?? []).map((a) => a.id as string).filter(Boolean);
 
-      // Clean up application-scoped tables
+      // 2. Unlink any other leads that reference this batch via duplicate_of
+      await (admin as any).from("leads").update({ duplicate_of: null, is_duplicate: false }).in("duplicate_of", batch);
+
+      // 3. Clean up application-scoped child tables
       if (appIds.length > 0) {
-        await admin.from("workflow_events").delete().in("application_id", appIds);
-        await admin.from("workflow_reminders").delete().in("application_id", appIds);
-        await admin.from("application_events").delete().in("application_id", appIds);
+        await (admin as any).from("workflow_events").delete().in("application_id", appIds);
+        await (admin as any).from("workflow_reminders").delete().in("application_id", appIds);
+        await (admin as any).from("workflow_delay_reasons").delete().in("application_id", appIds);
+        await (admin as any).from("workflow_closure_reasons").delete().in("application_id", appIds);
+        await (admin as any).from("application_events").delete().in("application_id", appIds);
+        await (admin as any).from("refund_requests").delete().in("application_id", appIds);
       }
 
-      // Clean up lead-scoped child tables (prevents application_events_lead_id_fkey and other FK failures)
-      await (admin as any).from("application_events").delete().in("lead_id", batch);
+      // 4. Clean up lead-scoped child tables (guarantees application_events_lead_id_fkey and all other FKs are cleared)
+      const { error: aeErr } = await (admin as any).from("application_events").delete().in("lead_id", batch);
+      if (aeErr) console.error("[bulkDeleteLeads] application_events delete error:", aeErr.message);
+
       await (admin as any).from("activity_logs").delete().in("lead_id", batch);
       await (admin as any).from("lead_notes").delete().in("lead_id", batch);
       await (admin as any).from("documents").delete().in("lead_id", batch);
@@ -153,13 +161,24 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
       await (admin as any).from("support_tickets").delete().in("lead_id", batch);
       await (admin as any).from("payment_links").delete().in("lead_id", batch);
       await (admin as any).from("analytics_events").delete().in("lead_id", batch);
+      await (admin as any).from("email_queue").delete().in("lead_id", batch);
+      await (admin as any).from("email_logs").delete().in("lead_id", batch);
+      await (admin as any).from("complaints").delete().in("lead_id", batch);
+      await (admin as any).from("certificates").delete().in("lead_id", batch);
+      await (admin as any).from("invoices").delete().in("lead_id", batch);
+      await (admin as any).from("refund_requests").delete().in("lead_id", batch);
       await (admin as any).from("applications").delete().in("lead_id", batch);
 
+      // 5. Finally delete from leads
       const { error, count } = await admin
         .from("leads")
         .delete({ count: "exact" })
         .in("id", batch);
-      if (error) throw new Error(error.message);
+
+      if (error) {
+        console.error("[bulkDeleteLeads] leads delete failed:", error.message);
+        throw new Error(error.message);
+      }
       deleted += count ?? 0;
     }
 

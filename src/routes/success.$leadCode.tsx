@@ -41,15 +41,6 @@ function SuccessPage() {
 
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
-
-    // Push to GTM dataLayer — triggers "payment_success" custom event in GTM
-    if (typeof window !== "undefined") {
-      (window as any).dataLayer = (window as any).dataLayer || [];
-      (window as any).dataLayer.push({
-        event: "payment_success",
-        lead_code: leadCode,
-      });
-    }
     let cancelled = false;
     (async () => {
       const maxAttempts = 30;
@@ -60,6 +51,28 @@ function SuccessPage() {
           const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
           if (isPaid) {
             setConfirmed(true);
+            const val = Number(res?.lead?.totalAmount || 0);
+
+            // Push to GTM dataLayer — triggers "payment_success" custom event in GTM
+            if (typeof window !== "undefined") {
+              (window as any).dataLayer = (window as any).dataLayer || [];
+              (window as any).dataLayer.push({
+                event: "payment_success",
+                lead_code: leadCode,
+                value: val,
+                currency: "INR",
+              });
+
+              // Fire direct Google Ads payment conversion with label DZTRCPqjvdwcEOOzuadE
+              if ((window as any).gtag) {
+                (window as any).gtag("event", "conversion", {
+                  send_to: "AW-18336340451/DZTRCPqjvdwcEOOzuadE",
+                  value: val,
+                  currency: "INR",
+                  transaction_id: leadCode,
+                });
+              }
+            }
             return;
           }
         } catch (err: any) {
