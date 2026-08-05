@@ -144,16 +144,16 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
       }
 
       // Clean up lead-scoped child tables (prevents application_events_lead_id_fkey and other FK failures)
-      await admin.from("application_events").delete().in("lead_id", batch);
-      await admin.from("activity_logs").delete().in("lead_id", batch);
-      await admin.from("lead_notes").delete().in("lead_id", batch);
-      await admin.from("documents").delete().in("lead_id", batch);
-      await admin.from("onboarding_submissions").delete().in("lead_id", batch);
-      await admin.from("follow_ups").delete().in("lead_id", batch);
-      await admin.from("tickets").delete().in("lead_id", batch);
-      await admin.from("payment_links").delete().in("lead_id", batch);
-      await admin.from("analytics_events").delete().in("lead_id", batch);
-      await admin.from("applications").delete().in("lead_id", batch);
+      await (admin as any).from("application_events").delete().in("lead_id", batch);
+      await (admin as any).from("activity_logs").delete().in("lead_id", batch);
+      await (admin as any).from("lead_notes").delete().in("lead_id", batch);
+      await (admin as any).from("documents").delete().in("lead_id", batch);
+      await (admin as any).from("onboarding_submissions").delete().in("lead_id", batch);
+      await (admin as any).from("follow_ups").delete().in("lead_id", batch);
+      await (admin as any).from("support_tickets").delete().in("lead_id", batch);
+      await (admin as any).from("payment_links").delete().in("lead_id", batch);
+      await (admin as any).from("analytics_events").delete().in("lead_id", batch);
+      await (admin as any).from("applications").delete().in("lead_id", batch);
 
       const { error, count } = await admin
         .from("leads")
