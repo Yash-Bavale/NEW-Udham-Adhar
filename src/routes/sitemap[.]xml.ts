@@ -195,7 +195,7 @@ export const Route = createFileRoute("/sitemap.xml")({
             const path = `/${row.slug.replace(/^\/+/, "")}`;
             // No siteBlocked() here: these entries come from THIS site's own
             // Contentful space, so publishing one there puts it in the sitemap.
-            if (isExcluded(path)) continue;
+            if (isExcluded(path, !publicOnly)) continue;
             if (row.canonicalUrl) {
               const canonicalPath = row.canonicalUrl
                 .replace(/^https?:\/\/[^/]+/, "")
