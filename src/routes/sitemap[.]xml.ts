@@ -104,7 +104,27 @@ export const Route = createFileRoute("/sitemap.xml")({
         );
         const currentSite = await resolveCurrentWebsite(request).catch(() => null);
         const publicOnly = currentSite ? !currentSite.allow_admin : false;
-        const siteBlocked = (p: string) => publicOnly && isBlockedOnSecondarySite(p);
+
+        // A secondary site still links to its own nav/service pages — those
+        // must stay in its sitemap, so feed them to the route gate.
+        let navPaths: string[] = [];
+        if (publicOnly && currentSite?.id) {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const { data } = await supabaseAdmin
+              .from("site_nav_items")
+              .select("path")
+              .eq("website_id", currentSite.id);
+            navPaths = (data ?? [])
+              .map((r) => (r as { path?: string }).path ?? "")
+              .filter(Boolean);
+          } catch {
+            // nav lookup is best-effort
+          }
+        }
+        const siteBlocked = (p: string) =>
+          publicOnly && isBlockedOnSecondarySite(p, navPaths);
+
         // 1. Discover static routes from the generated route tree.
         const mod = await import("@/routeTree.gen");
         const tree = (mod as unknown as {
