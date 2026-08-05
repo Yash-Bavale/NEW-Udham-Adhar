@@ -41,6 +41,15 @@ function SuccessPage() {
 
   useEffect(() => {
     trackEvent("payment_success_page_view", { leadCode });
+
+    // Push to GTM dataLayer — triggers "payment_success" custom event in GTM
+    if (typeof window !== "undefined") {
+      (window as any).dataLayer = (window as any).dataLayer || [];
+      (window as any).dataLayer.push({
+        event: "payment_success",
+        lead_code: leadCode,
+      });
+    }
     let cancelled = false;
     (async () => {
       const maxAttempts = 30;

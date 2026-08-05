@@ -62,6 +62,17 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
 
     trackEvent("form_submitted", { service: payload.service, state: payload.state });
 
+    // Push to GTM dataLayer — triggers "form_submission" custom event in GTM
+    if (typeof window !== "undefined") {
+      (window as any).dataLayer = (window as any).dataLayer || [];
+      (window as any).dataLayer.push({
+        event: "form_submission",
+        form_type: "lead_form",
+        service: payload.service,
+        state: payload.state,
+      });
+    }
+
     if (typeof window !== "undefined" && (window as any).gtag_report_conversion) {
       (window as any).gtag_report_conversion();
     }
