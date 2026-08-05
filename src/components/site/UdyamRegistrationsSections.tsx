@@ -1,81 +1,36 @@
 import { Link } from "@tanstack/react-router";
 import {
   FileText,
-  Download,
-  RefreshCw,
-  Search,
-  Award,
-  ShieldCheck,
   ArrowUpRight,
-  HelpCircle,
-  Printer,
-  FileEdit,
+  Globe,
 } from "lucide-react";
+import type { ContentfulSeoPage } from "@/lib/contentful/client.functions";
 
+/** Legacy static list — kept for JSON-LD schema only (not rendered as links). */
 export const UDYAM_SERVICES_LIST = [
-  {
-    title: "New Udyam Registration",
-    path: "/new-udyam-registration",
-    icon: FileText,
-  },
-  {
-    title: "MSME Registration",
-    path: "/new-udyam-registration",
-    icon: Award,
-  },
-  {
-    title: "Udyam Certificate Download",
-    path: "/download-udyam-certificate",
-    icon: Download,
-  },
-  {
-    title: "MSME Certificate Download",
-    path: "/download-udyam-certificate",
-    icon: Download,
-  },
-  {
-    title: "Update Udyam Registration",
-    path: "/update-udyam-certificate",
-    icon: RefreshCw,
-  },
-  {
-    title: "Verify Udyam Registration",
-    path: "/update-udyam-certificate",
-    icon: Search,
-  },
-  {
-    title: "Check Udyam Registration Status",
-    path: "/update-udyam-certificate",
-    icon: Search,
-  },
-  {
-    title: "Forgot Udyam Registration Number",
-    path: "/other-problem",
-    icon: HelpCircle,
-  },
-  {
-    title: "Print Udyam Certificate",
-    path: "/download-udyam-certificate",
-    icon: Printer,
-  },
-  {
-    title: "Udyam Registration Correction",
-    path: "/update-udyam-certificate",
-    icon: FileEdit,
-  },
-  {
-    title: "Udyam Aadhaar",
-    path: "/new-udyam-registration",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Udyog Aadhaar Migration",
-    path: "/migrate-udyog-aadhaar-to-udyam",
-    icon: RefreshCw,
-  },
+  { title: "New Udyam Registration", path: "/new-udyam-registration" },
+  { title: "MSME Registration", path: "/new-udyam-registration" },
+  { title: "Udyam Certificate Download", path: "/download-udyam-certificate" },
+  { title: "MSME Certificate Download", path: "/download-udyam-certificate" },
+  { title: "Update Udyam Registration", path: "/update-udyam-certificate" },
+  { title: "Verify Udyam Registration", path: "/update-udyam-certificate" },
+  { title: "Check Udyam Registration Status", path: "/update-udyam-certificate" },
+  { title: "Forgot Udyam Registration Number", path: "/other-problem" },
+  { title: "Print Udyam Certificate", path: "/download-udyam-certificate" },
+  { title: "Udyam Registration Correction", path: "/update-udyam-certificate" },
+  { title: "Udyam Aadhaar", path: "/new-udyam-registration" },
+  { title: "Udyog Aadhaar Migration", path: "/migrate-udyog-aadhaar-to-udyam" },
 ];
 
-export function UdyamRegistrationsSections() {
+interface Props {
+  /** SEO pages fetched from Contentful for the current site. Passed by the homepage loader. */
+  seoPages?: ContentfulSeoPage[];
+}
+
+export function UdyamRegistrationsSections({ seoPages }: Props) {
+  // Use only actual Contentful pages when available; otherwise show nothing in the grid.
+  const gridPages: ContentfulSeoPage[] = seoPages ?? [];
+
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-6 py-6 space-y-6">
       {/* 1. Udyam Registration & MSME Registration Services */}
@@ -113,29 +68,40 @@ export function UdyamRegistrationsSections() {
           </p>
         </div>
 
-        {/* 12 Interactive Services Grid (Full Width 4-Columns) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pt-2">
-          {UDYAM_SERVICES_LIST.map((srv, idx) => {
-            const IconComp = srv.icon;
-            return (
-              <Link
-                key={idx}
-                to={srv.path}
+        {/* Dynamic Services Grid — only shows pages that exist in Contentful */}
+        {gridPages.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pt-2">
+            {gridPages.map((page) => (
+              <a
+                key={page.slug}
+                href={`/${page.slug}`}
                 className="group flex items-center justify-between rounded-lg border border-border bg-slate-50/70 p-3.5 hover:bg-white hover:border-brand-navy/50 hover:shadow-sm transition-all duration-150"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-md bg-brand-navy/10 text-brand-navy group-hover:bg-brand-navy group-hover:text-white flex items-center justify-center transition-colors shrink-0">
-                    <IconComp className="w-4 h-4" />
+                    <FileText className="w-4 h-4" />
                   </div>
                   <h3 className="font-semibold text-foreground text-sm font-display group-hover:text-brand-navy transition-colors truncate">
-                    {srv.title}
+                    {page.title}
                   </h3>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-brand-red transition-colors shrink-0 ml-1.5" />
-              </Link>
-            );
-          })}
-        </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          /* Fallback: show a single CTA link when no Contentful pages are loaded */
+          <div className="pt-2">
+            <Link
+              to="/new-udyam-registration"
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-navy/30 bg-brand-navy/5 px-5 py-3 text-brand-navy font-semibold hover:bg-brand-navy hover:text-white transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              Apply Online Now
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* 3. One Platform for Udyam Registration Requirements */}

@@ -18,7 +18,9 @@ import { useBlockItems } from "@/lib/websites/site-content-context";
 import {
   getContentfulLandingPage,
   getContentfulFaqs,
+  listContentfulSeoPages,
   type ContentfulLandingPage,
+  type ContentfulSeoPage,
 } from "@/lib/contentful/client.functions";
 import { FAQS as FALLBACK_FAQS } from "@/lib/faqs-data";
 
@@ -45,10 +47,18 @@ const FACTS: [string, string][] = [
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const [cms, cfFaqs, brand] = await Promise.all([
+    const brand = await getCurrentBrand();
+    const isUdyamRegistrationsSite =
+      brand.baseUrl.toLowerCase().includes("udyamregistration");
+
+    const [cms, cfFaqs, cfSeoPages] = await Promise.all([
       getContentfulLandingPage({ data: { slug: "home" } }),
       getContentfulFaqs(),
-      getCurrentBrand(),
+      // Only fetch the full SEO page list for the 2nd website (avoids extra
+      // round-trip for every visitor on the primary site).
+      isUdyamRegistrationsSite
+        ? listContentfulSeoPages().catch(() => [] as ContentfulSeoPage[])
+        : Promise.resolve([] as ContentfulSeoPage[]),
     ]);
     // Prefer the Contentful `faq` content type (scales past 100 entries),
     // then the landing-page faqs field, then the local fallback dataset.
@@ -67,6 +77,7 @@ export const Route = createFileRoute("/")({
     return {
       cms,
       faqs,
+      seoPages: cfSeoPages,
       baseUrl: brand.baseUrl,
       siteName: brand.siteName,
       legalEntity: brand.legalEntity,
@@ -143,9 +154,10 @@ export const Route = createFileRoute("/")({
 
 
 function HomePage() {
-  const { cms, faqs: faqList } = useLoaderData({ from: "/" }) as {
+  const { cms, faqs: faqList, seoPages } = useLoaderData({ from: "/" }) as {
     cms: ContentfulLandingPage | null;
     faqs: Array<{ q: string; a: string }>;
+    seoPages: ContentfulSeoPage[];
   };
   const factsBlock = useBlockItems<{ label: string; value: string }>(
     "home.facts",
@@ -199,7 +211,7 @@ function HomePage() {
       </section>
 
       {/* 2nd Website Sections: ONLY rendered for 2nd website udyamregistrations.in */}
-      {isUdyamRegistrations && <UdyamRegistrationsSections />}
+      {isUdyamRegistrations && <UdyamRegistrationsSections seoPages={seoPages} />}
 
       <HomeFaqSection faqs={faqList} />
 

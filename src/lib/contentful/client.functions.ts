@@ -550,6 +550,45 @@ export type ContentfulSeoSlug = {
 };
 
 /** Every published page slug in the current site's Contentful space (paginated). */
+export type ContentfulSeoPage = {
+  slug: string;
+  title: string;
+};
+
+/** Fetch slug + title for all published seoArticle entries (used for dynamic service grids). */
+export const listContentfulSeoPages = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ContentfulSeoPage[]> => {
+    const out: ContentfulSeoPage[] = [];
+    const seen = new Set<string>();
+    try {
+      let skip = 0;
+      for (;;) {
+        const page = await cfFetch<{ slug?: string; title?: string | string[] }>(
+          `/entries?content_type=seoArticle&select=sys.id,fields.slug,fields.title&limit=200&skip=${skip}`,
+        );
+        const items = page.items ?? [];
+        for (const e of items) {
+          const rawSlug = (e.fields?.slug ?? "").trim().toLowerCase();
+          if (!rawSlug || rawSlug === "home" || rawSlug === "index") continue;
+          if (seen.has(rawSlug)) continue;
+          seen.add(rawSlug);
+          const rawTitle = Array.isArray(e.fields?.title)
+            ? (e.fields.title[0] ?? "")
+            : (e.fields?.title ?? "");
+          const title = String(rawTitle).trim() ||
+            rawSlug.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+          out.push({ slug: rawSlug, title });
+        }
+        skip += page.limit || 200;
+        if (skip >= (page.total || 0) || items.length === 0) break;
+      }
+    } catch (err) {
+      console.error("[contentful] listContentfulSeoPages failed:", err);
+    }
+    return out;
+  },
+);
+
 export const listContentfulSeoSlugs = createServerFn({ method: "GET" }).handler(
   async (): Promise<ContentfulSeoSlug[]> => {
     const out: ContentfulSeoSlug[] = [];

@@ -11,6 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
+import { listContentfulSeoPages, type ContentfulSeoPage } from "@/lib/contentful/client.functions";
 import { useBrand } from "@/lib/websites/brand-context";
 import { useNav, useBlock } from "@/lib/websites/site-content-context";
 
@@ -95,26 +96,48 @@ export function Footer() {
     [brand.companyName, brand.postalAddress].filter(Boolean).join(" ") ||
     "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
   const loadSeoPages = useServerFn(listPublicSeoPages);
+  const loadCfSeoPages = useServerFn(listContentfulSeoPages);
   const [pages, setPages] = useState<SeoPageRow[] | null>(null);
+  const [cfPages, setCfPages] = useState<ContentfulSeoPage[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const year = new Date().getFullYear();
 
+  // Detect if this is the 2nd website (udyamregistrations.in)
+  const isUdyamRegistrationsSite =
+    brand.domain?.toLowerCase().includes("udyamregistration") ||
+    (typeof window !== "undefined" && window.location.hostname.includes("udyamregistration"));
+
   // Only fetch the (heavy) SEO page list once the gated SEO tree is unlocked.
   // Avoids one server-fn round-trip on every page load for every visitor.
   const fetchPagesIfNeeded = () => {
-    if (pages !== null || loading) return;
-    setLoading(true);
-    setLoadError(false);
-    loadSeoPages()
-      .then((data) => setPages((data ?? []) as SeoPageRow[]))
-      .catch(() => {
-        setLoadError(true);
-        setPages([]);
-      })
-      .finally(() => setLoading(false));
+    if (loading) return;
+    if (isUdyamRegistrationsSite) {
+      // For 2nd website: fetch Contentful pages directly
+      if (cfPages !== null) return;
+      setLoading(true);
+      setLoadError(false);
+      loadCfSeoPages()
+        .then((data) => setCfPages(data ?? []))
+        .catch(() => {
+          setLoadError(true);
+          setCfPages([]);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      // For primary site: use DB-backed SEO pages
+      if (pages !== null) return;
+      setLoading(true);
+      setLoadError(false);
+      loadSeoPages()
+        .then((data) => setPages((data ?? []) as SeoPageRow[]))
+        .catch(() => {
+          setLoadError(true);
+          setPages([]);
+        })
+        .finally(() => setLoading(false));
+    }
   };
-
 
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
@@ -131,7 +154,15 @@ export function Footer() {
           <h4 className="text-2xl font-bold font-display leading-tight">
             MSME / Udyog Aadhaar
           </h4>
-          <SeoTree pages={pages} loading={loading} loadError={loadError} onUnlock={fetchPagesIfNeeded} unlockCode={brand.footerUnlockCode || "113355"} />
+          <SeoTree
+            pages={pages}
+            cfPages={cfPages}
+            isUdyamRegistrationsSite={isUdyamRegistrationsSite}
+            loading={loading}
+            loadError={loadError}
+            onUnlock={fetchPagesIfNeeded}
+            unlockCode={brand.footerUnlockCode || "113355"}
+          />
         </div>
 
         {/* Col 3: Useful Links */}
@@ -199,6 +230,48 @@ export function Footer() {
 }
 
 function SeoTree({
+  pages,
+  cfPages,
+  isUdyamRegistrationsSite,
+  loading,
+  loadError,
+  onUnlock,
+  unlockCode,
+}: {
+  pages: SeoPageRow[] | null;
+  cfPages: ContentfulSeoPage[] | null;
+  isUdyamRegistrationsSite: boolean;
+  loading: boolean;
+  loadError: boolean;
+  onUnlock: () => void;
+  unlockCode: string;
+}) {
+  // Route to the appropriate rendering mode based on which website is active
+  if (isUdyamRegistrationsSite) {
+    return (
+      <ContentfulSeoTree
+        cfPages={cfPages}
+        loading={loading}
+        loadError={loadError}
+        onUnlock={onUnlock}
+        unlockCode={unlockCode}
+      />
+    );
+  }
+
+  return (
+    <PrimarySeoTree
+      pages={pages}
+      loading={loading}
+      loadError={loadError}
+      onUnlock={onUnlock}
+      unlockCode={unlockCode}
+    />
+  );
+}
+
+/** DB-backed hierarchical SEO tree — used by the primary website (udyamadhar.in). */
+function PrimarySeoTree({
   pages,
   loading,
   loadError,
@@ -472,3 +545,131 @@ function SeoTree({
   );
 }
 
+/** Flat list of Contentful SEO pages — used by the 2nd website footer (udyamregistrations.in). */
+function ContentfulSeoTree({
+  cfPages,
+  loading,
+  loadError,
+  onUnlock,
+  unlockCode,
+}: {
+  cfPages: ContentfulSeoPage[] | null;
+  loading: boolean;
+  loadError: boolean;
+  onUnlock: () => void;
+  unlockCode: string;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [unlocked, setUnlocked] = useState<boolean>(false);
+  const [clicks, setClicks] = useState(0);
+  const [showPwd, setShowPwd] = useState(false);
+  const [pwd, setPwd] = useState("");
+  const [pwdError, setPwdError] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      if (window.sessionStorage.getItem("udyam_footer_unlock") === "1") {
+        setUnlocked(true);
+        onUnlock();
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleHomeRowClick() {
+    if (unlocked) return;
+    const next = clicks + 1;
+    setClicks(next);
+    if (next >= 3) setShowPwd(true);
+  }
+
+  function submitPwd(e: React.FormEvent) {
+    e.preventDefault();
+    if (pwd === unlockCode) {
+      try { window.sessionStorage.setItem("udyam_footer_unlock", "1"); } catch { /* ignore */ }
+      setUnlocked(true);
+      setShowPwd(false);
+      setPwd("");
+      setPwdError(false);
+      onUnlock();
+    } else {
+      setPwdError(true);
+      setPwd("");
+      setClicks(0);
+      setShowPwd(false);
+    }
+  }
+
+  // Sort pages alphabetically by title
+  const sortedPages = useMemo(
+    () => [...(cfPages ?? [])].sort((a, b) => a.title.localeCompare(b.title)),
+    [cfPages],
+  );
+
+  return (
+    <nav className="mt-6" aria-label="SEO landing pages">
+      <ul className="space-y-1 text-[15px] font-semibold leading-snug">
+        {/* Home row — click 3× to reveal password */}
+        <li>
+          <div
+            className="flex items-center gap-1 cursor-default select-none"
+            onClick={handleHomeRowClick}
+          >
+            <span className="inline-flex h-6 w-6 items-center justify-center text-white/40">
+              <HomeIcon className="h-3.5 w-3.5" />
+            </span>
+            <Link
+              to="/"
+              className="flex-1 py-1.5 text-white hover:text-brand-gold"
+              onClick={(e) => {
+                if (!unlocked) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleHomeRowClick();
+                }
+              }}
+            >
+              Home
+            </Link>
+          </div>
+          {showPwd && !unlocked && (
+            <form onSubmit={submitPwd} className="ml-6 mt-2 mb-3 flex items-center gap-2">
+              <input
+                type="password"
+                value={pwd}
+                onChange={(e) => { setPwd(e.target.value); setPwdError(false); }}
+                autoFocus
+                className={`flex-1 rounded-md border bg-white/10 px-2 py-1.5 text-sm text-white outline-none focus:ring-2 ${
+                  pwdError ? "border-red-400 ring-red-400/40" : "border-white/30 focus:ring-brand-gold/40"
+                }`}
+              />
+              <button type="submit" className="rounded-md bg-brand-gold px-3 py-1.5 text-sm font-semibold text-brand-navy-deep hover:bg-brand-gold/90">
+                Open
+              </button>
+            </form>
+          )}
+        </li>
+
+        {/* Unlocked: flat list of all Contentful SEO pages sorted alphabetically */}
+        {mounted && unlocked && (
+          <>
+            {loading && <li className="py-2 text-sm text-white/75">Loading pages…</li>}
+            {loadError && <li className="py-2 text-sm text-white/75">Could not load SEO pages.</li>}
+            {!loading && sortedPages.map((page) => (
+              <li key={page.slug}>
+                <a
+                  href={`/${page.slug}`}
+                  className="flex items-center gap-1 py-1 text-white/85 hover:text-brand-gold font-normal text-sm"
+                >
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                  <span>{page.title}</span>
+                </a>
+              </li>
+            ))}
+          </>
+        )}
+      </ul>
+    </nav>
+  );
+}
