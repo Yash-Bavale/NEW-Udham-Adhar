@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { INDIAN_STATES } from "@/lib/constants";
 import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
+import { formatLeadSource } from "@/lib/crm/format-lead-source";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 function formatAge(ms: number): string {
@@ -439,7 +440,7 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs capitalize" style={{ color: "var(--admin-fg-muted)" }}>{l.lead_source || "—"}</td>}
+                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }} title={l.lead_source || ""}>{formatLeadSource(l.lead_source)}</td>}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       {role.hasAny(["super_admin", "admin"]) && (
@@ -543,7 +544,7 @@ function LeadDetailSheet({ leadId, onClose }: { leadId: string | null; onClose: 
             <Field label="Mobile" value={data.lead.mobile} />
             <Field label="State" value={data.lead.state} />
             <Field label="Language" value={data.lead.language} />
-            <Field label="Source" value={data.lead.lead_source} />
+            <Field label="Source" value={formatLeadSource(data.lead.lead_source)} />
             <Field label="Interested Service" value={data.lead.service} />
             <Field label="Total Amount" value={`₹${Number(data.lead.total_amount || 0).toLocaleString("en-IN")}`} />
             <Field label="Assigned To" value={(data.lead as any).assignee_name || (data.lead.assigned_to ? "—" : "Unassigned")} />

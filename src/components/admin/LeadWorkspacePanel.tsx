@@ -56,8 +56,10 @@ import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { LogContactDialog } from "./LogContactDialog";
 import { listContactEvents } from "@/lib/crm/performance.functions";
 import { isUnconvertedConsultationLead } from "@/lib/crm/consultation";
+import { formatLeadSource } from "@/lib/crm/format-lead-source";
 
 type Staff = { id: string; display_name: string | null; email: string | null };
+
 
 type LeadShape = {
   id: string;
@@ -230,10 +232,7 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
   const waUrl = number ? `https://wa.me/${number}` : null;
 
   const total = lead.total_amount != null ? Number(lead.total_amount) : null;
-  const sourceRaw = lead.lead_source ?? "";
-  const sourceLabel = sourceRaw.startsWith("website:")
-    ? sourceRaw.slice("website:".length) || "website"
-    : sourceRaw || null;
+  const sourceLabel = formatLeadSource(lead.lead_source);
   const rel = relativeTime(lead.created_at);
 
   const cell = "flex flex-col gap-0.5 min-w-0";

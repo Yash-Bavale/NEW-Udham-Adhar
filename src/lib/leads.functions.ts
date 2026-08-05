@@ -2,6 +2,64 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { SERVICES, INDIAN_STATES, LANGUAGES } from "./constants";
 
+/**
+ * Converts a raw source URL into a clean admin-friendly label.
+ * - Google Ads traffic  → "Google Ads | Campaign: 24100987356 | kw: udyam registration"
+ * - Organic / direct   → "Website | /download-udyam-certificate"
+ * - No source          → "Website"
+ */
+function parseLeadSource(sourcePage?: string): string {
+  if (!sourcePage) return "Website";
+  try {
+    // sourcePage is stored as pathname + search, e.g. "/Download-Udyam-Certificate?Gad_source=1&..."
+    const url = new URL(sourcePage, "https://placeholder.invalid");
+    const params = url.searchParams;
+
+    // Detect Google Ads: Gad_source, gclid, gbraid, or wbraid are all Google Ads signals
+    const isGoogleAds =
+      params.has("Gad_source") ||
+      params.has("gad_source") ||
+      params.has("gclid") ||
+      params.has("Gclid") ||
+      params.has("gbraid") ||
+      params.has("Gbraid") ||
+      params.has("wbraid") ||
+      params.has("Wbraid");
+
+    if (isGoogleAds) {
+      const campaignId =
+        params.get("Gad_campaignid") ||
+        params.get("gad_campaignid") ||
+        params.get("utm_campaign") ||
+        null;
+      const keyword =
+        params.get("utm_term") ||
+        params.get("keyword") ||
+        null;
+      const adGroup =
+        params.get("utm_content") ||
+        null;
+
+      let label = "Google Ads";
+      if (campaignId) label += ` | Campaign: ${campaignId}`;
+      if (keyword) label += ` | kw: ${keyword}`;
+      if (adGroup) label += ` | adg: ${adGroup}`;
+      // Also record which landing page the ad pointed to (path only, no params)
+      const landingPath = url.pathname.replace(/^\/+/, "") || "/";
+      label += ` | Page: /${landingPath}`;
+      return label;
+    }
+
+    // Organic / direct — store just the clean path (no query string noise)
+    const cleanPath = url.pathname || "/";
+    return `Website | ${cleanPath}`;
+  } catch {
+    // Fallback for malformed URLs
+    return `Website | ${sourcePage.split("?")[0].slice(0, 120)}`;
+  }
+}
+
+
 const LeadInput = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
@@ -100,7 +158,7 @@ export const createLead = createServerFn({ method: "POST" })
           gst_amount: gstAmount,
           total_amount: totalAmount,
           status: "new_lead",
-          lead_source: data.source_page ? `website:${data.source_page.slice(0, 240)}` : "website",
+          lead_source: parseLeadSource(data.source_page),
           is_duplicate: isDuplicate,
           duplicate_of: duplicateOf,
           customer_id: customerId,

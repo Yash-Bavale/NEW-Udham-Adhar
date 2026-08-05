@@ -158,31 +158,42 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Google Tag Manager — must be as high in <head> as possible */}
-        <script dangerouslySetInnerHTML={{
-          __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NJK5QPPQ');`
-        }} />
-
-        {/* gtag stubs queued before gtag.js loads (replayed on load) */}
+        {/* Google Tag Manager — skipped entirely on admin paths to keep
+            internal traffic out of GA/Ads reports. */}
         <script dangerouslySetInnerHTML={{
           __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){window.dataLayer.push(arguments);}
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', 'G-62JC7PRPMM');
-            gtag('config', 'AW-18336340451');
-            function gtag_report_conversion(url) {
-              var callback = function () {
-                if (typeof(url) != 'undefined') { window.location = url; }
-              };
-              gtag('event', 'conversion', {
-                'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
-                'event_callback': callback
-              });
-              return false;
-            }
-            window.gtag_report_conversion = gtag_report_conversion;
+(function(){
+  var p = window.location.pathname;
+  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
+  (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NJK5QPPQ');
+})();
+          `
+        }} />
+
+        {/* gtag stubs — also skipped on admin paths */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+(function(){
+  var p = window.location.pathname;
+  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){window.dataLayer.push(arguments);}
+  window.gtag = gtag;
+  gtag('js', new Date());
+  gtag('config', 'G-62JC7PRPMM');
+  gtag('config', 'AW-18336340451');
+  function gtag_report_conversion(url) {
+    var callback = function () {
+      if (typeof(url) != 'undefined') { window.location = url; }
+    };
+    gtag('event', 'conversion', {
+      'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
+      'event_callback': callback
+    });
+    return false;
+  }
+  window.gtag_report_conversion = gtag_report_conversion;
+})();
           `
         }} />
 
@@ -253,8 +264,10 @@ function RootComponent() {
   // Load gtag.js after first paint via requestIdleCallback so it never
   // competes with LCP. dataLayer + config commands are already queued in
   // RootShell, so once the script hydrates it replays them in order.
+  // Skipped entirely on admin paths — internal sessions must not appear in GA.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isAdminPath) return;  // ← never track admin pages
     if (document.querySelector('script[data-gtag="1"]')) return;
     const load = () => {
       const s = document.createElement("script");
@@ -266,7 +279,7 @@ function RootComponent() {
     const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
     if (typeof ric === "function") ric(load, { timeout: 4000 });
     else setTimeout(load, 2500);
-  }, []);
+  }, [isAdminPath]);
 
 
 
