@@ -127,13 +127,35 @@ export const bulkDeleteLeads = createServerFn({ method: "POST" })
 
     let deleted = 0;
     for (const batch of chunk(safe, 200)) {
-      // Best-effort related rows first (no FK cascades exist).
-      await (await getAdmin()).from("documents").delete().in("lead_id", batch);
-      await (await getAdmin()).from("onboarding_submissions").delete().in("lead_id", batch);
-      await (await getAdmin()).from("applications").delete().in("lead_id", batch);
-      await (await getAdmin()).from("activity_logs").delete().in("lead_id", batch);
-      await (await getAdmin()).from("lead_notes").delete().in("lead_id", batch);
-      const { error, count } = await (await getAdmin())
+      const admin = await getAdmin();
+
+      // Get application IDs for this batch of leads to delete application-scoped child rows
+      const { data: apps } = await admin
+        .from("applications")
+        .select("id")
+        .in("lead_id", batch);
+      const appIds = (apps ?? []).map((a) => a.id as string).filter(Boolean);
+
+      // Clean up application-scoped tables
+      if (appIds.length > 0) {
+        await admin.from("workflow_events").delete().in("application_id", appIds);
+        await admin.from("workflow_reminders").delete().in("application_id", appIds);
+        await admin.from("application_events").delete().in("application_id", appIds);
+      }
+
+      // Clean up lead-scoped child tables (prevents application_events_lead_id_fkey and other FK failures)
+      await admin.from("application_events").delete().in("lead_id", batch);
+      await admin.from("activity_logs").delete().in("lead_id", batch);
+      await admin.from("lead_notes").delete().in("lead_id", batch);
+      await admin.from("documents").delete().in("lead_id", batch);
+      await admin.from("onboarding_submissions").delete().in("lead_id", batch);
+      await admin.from("follow_ups").delete().in("lead_id", batch);
+      await admin.from("tickets").delete().in("lead_id", batch);
+      await admin.from("payment_links").delete().in("lead_id", batch);
+      await admin.from("analytics_events").delete().in("lead_id", batch);
+      await admin.from("applications").delete().in("lead_id", batch);
+
+      const { error, count } = await admin
         .from("leads")
         .delete({ count: "exact" })
         .in("id", batch);
