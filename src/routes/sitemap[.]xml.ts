@@ -170,7 +170,8 @@ export const Route = createFileRoute("/sitemap.xml")({
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            if (isExcluded(path) || siteBlocked(path)) continue;
+            // No siteBlocked() here: rows are already scoped to this website.
+            if (isExcluded(path)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
