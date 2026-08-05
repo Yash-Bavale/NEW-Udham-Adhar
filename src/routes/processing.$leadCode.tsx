@@ -40,7 +40,7 @@ function ProcessingPage() {
       const fireConversion = () => {
         if ((window as any).gtag) {
           (window as any).gtag("event", "conversion", {
-            send_to: "AW-18336340451/tS7UCOaYs9McEOOzuadE",
+            send_to: "AW-18336340451/7BVbCOm2p9wcEOOzuadE",
           });
         }
       };

@@ -187,7 +187,7 @@ function RootShell({ children }: { children: ReactNode }) {
       if (typeof(url) != 'undefined') { window.location = url; }
     };
     gtag('event', 'conversion', {
-      'send_to': 'AW-18336340451/tS7UCOaYs9McEOOzuadE',
+      'send_to': 'AW-18336340451/7BVbCOm2p9wcEOOzuadE',
       'event_callback': callback
     });
     return false;
