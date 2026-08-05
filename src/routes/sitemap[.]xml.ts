@@ -60,7 +60,7 @@ const HIGH_PRIORITY = new Set<string>([
 ]);
 
 
-function isExcluded(p: string): boolean {
+function isExcluded(p: string, applyVariantClusters = true): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (
     p.includes("$") ||
@@ -82,8 +82,10 @@ function isExcluded(p: string): boolean {
   ) return true;
   // Keyword-variant pages stay live but are dropped from the sitemap;
   // their canonical points at the cluster primary (see canonical-clusters.ts).
+  // These clusters describe the PRIMARY site only — a secondary site owns its
+  // own keyword strategy, so its CMS pages must not be filtered by them.
   const slug = p.replace(/^\/+/, "");
-  if (VARIANT_SLUGS.has(slug)) return true;
+  if (applyVariantClusters && VARIANT_SLUGS.has(slug)) return true;
   return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
 }
 
