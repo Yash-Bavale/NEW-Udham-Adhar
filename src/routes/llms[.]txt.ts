@@ -16,12 +16,20 @@ export const Route = createFileRoute("/llms.txt")({
             "@/lib/websites/current-website.server"
           );
           const site = await resolveCurrentWebsite(request);
-          const { data } = await supabaseAdmin
+          let { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, label, meta_description")
             .eq("website_id", site.id)
             .eq("enabled", true)
             .order("sort_order", { ascending: true });
+          if (!data || data.length === 0) {
+            const { data: fallbackData } = await supabaseAdmin
+              .from("seo_pages")
+              .select("slug, label, meta_description")
+              .eq("enabled", true)
+              .order("sort_order", { ascending: true });
+            data = fallbackData;
+          }
           seoLinks = (data ?? []).map((r: any) => ({
             slug: r.slug,
             label: r.label,

@@ -20,7 +20,7 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
       ? [data.slug, data.slug.slice(1)]
       : [data.slug, `/${data.slug}`];
 
-    const { data: row } = await supabaseAdmin
+    let { data: row } = await supabaseAdmin
       .from("seo_pages")
       .select(
         "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq, cover_image_url, related_slugs, published_at, updated_at",
@@ -31,6 +31,19 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
       .eq("page_type", "article")
       .maybeSingle();
 
+    if (!row) {
+      const { data: fallbackRow } = await supabaseAdmin
+        .from("seo_pages")
+        .select(
+          "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq, cover_image_url, related_slugs, published_at, updated_at",
+        )
+        .in("slug", slugVariants)
+        .eq("enabled", true)
+        .eq("page_type", "article")
+        .maybeSingle();
+      row = fallbackRow;
+    }
+
     if (!row) throw notFound();
 
     // Fetch related labels.
@@ -39,12 +52,20 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
       : [];
     let related: { slug: string; label: string }[] = [];
     if (relatedSlugs.length) {
-      const { data: rel } = await supabaseAdmin
+      let { data: rel } = await supabaseAdmin
         .from("seo_pages")
         .select("slug, label")
         .in("slug", relatedSlugs)
         .eq("website_id", site.id)
         .eq("enabled", true);
+      if (!rel || rel.length === 0) {
+        const { data: fallbackRel } = await supabaseAdmin
+          .from("seo_pages")
+          .select("slug, label")
+          .in("slug", relatedSlugs)
+          .eq("enabled", true);
+        rel = fallbackRel;
+      }
       related = (rel ?? []).map((r: any) => ({ slug: r.slug, label: r.label }));
     }
 

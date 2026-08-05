@@ -39,14 +39,26 @@ export const Route = createFileRoute("/llms-full.txt")({
 
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { data } = await supabaseAdmin
+          const site = await (await import("@/lib/websites/current-website.server")).resolveCurrentWebsite(request);
+          let { data } = await supabaseAdmin
             .from("seo_pages")
             .select(
               "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq",
             )
-            .eq("website_id", (await (await import("@/lib/websites/current-website.server")).resolveCurrentWebsite(request)).id)
+            .eq("website_id", site.id)
             .eq("enabled", true)
             .order("sort_order", { ascending: true });
+
+          if (!data || data.length === 0) {
+            const { data: fallbackData } = await supabaseAdmin
+              .from("seo_pages")
+              .select(
+                "slug, label, page_type, h1, meta_title, meta_description, intro, sections, faq",
+              )
+              .eq("enabled", true)
+              .order("sort_order", { ascending: true });
+            data = fallbackData;
+          }
 
           for (const row of (data ?? []) as any[]) {
             const slugPath = row.slug.startsWith("/") ? row.slug : `/${row.slug}`;

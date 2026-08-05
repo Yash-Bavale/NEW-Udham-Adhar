@@ -162,17 +162,26 @@ export const Route = createFileRoute("/sitemap.xml")({
         //    their own updated_at so lastmod reflects real edits.
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { data } = await supabaseAdmin
+          let { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")
             .eq("website_id", currentSite?.id ?? "")
             .eq("enabled", true);
+
+          // Fallback: If no site-specific seo_pages found, load enabled seo_pages from primary/all sites
+          if (!data || data.length === 0) {
+            const { data: fallbackData } = await supabaseAdmin
+              .from("seo_pages")
+              .select("slug, updated_at")
+              .eq("enabled", true);
+            data = fallbackData;
+          }
+
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim().toLowerCase();
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            // No siteBlocked() here: rows are already scoped to this website.
             if (isExcluded(path, !publicOnly)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
