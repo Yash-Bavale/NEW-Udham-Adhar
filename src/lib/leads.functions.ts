@@ -186,21 +186,11 @@ export const createLead = createServerFn({ method: "POST" })
         .eq("id", duplicateOf);
     }
 
+    // NOTE: No application/order row is created here on purpose.
+    // An order exists only once a payment succeeds — see
+    // src/lib/payments/finalize-paid.server.ts. This keeps the order's
+    // created_at equal to the actual payment time.
 
-
-    // 3. Create application row (one per submission). Trigger writes activity log.
-    const { error: appErr } = await supabaseAdmin
-      .from("applications")
-      .insert({
-        lead_id: leadId,
-        service_id: service.id,
-        website_id: websiteId,
-        application_status: "awaiting_payment",
-      });
-    if (appErr) {
-      // non-fatal: lead is saved, but log so we can fix
-      console.error("Application insert failed:", appErr.message);
-    }
 
     // Emit internal CRM notifications to staff/admins
     try {

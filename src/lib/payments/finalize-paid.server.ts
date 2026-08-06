@@ -32,31 +32,48 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     .maybeSingle();
   if (!payment) throw new Error(`Payment ${paymentId} not found`);
 
-  // 1) Application
+  // 1) Application — orders exist only from a successful payment onwards.
   let applicationId = payment.application_id as string | null;
   if (!applicationId) {
-    const { data: lead } = await supabaseAdmin
-      .from("leads")
-      .select("id, service_id, customer_id, assigned_to")
-      .eq("id", payment.lead_id)
-      .maybeSingle();
-    const { data: createdApp, error: appErr } = await supabaseAdmin
+    // Reuse an existing (non-deleted) order for this lead, if any, so retries
+    // and multi-gateway attempts never duplicate the order.
+    const { data: existingApp } = await supabaseAdmin
       .from("applications")
-      .insert({
-        lead_id: payment.lead_id,
-        customer_id: lead?.customer_id ?? null,
-        service_id: lead?.service_id ?? null,
-        assigned_to: lead?.assigned_to ?? null,
-        fulfillment_status: "order_received" as any,
-      } as any)
       .select("id")
-      .single();
-    if (appErr) console.error("[finalize] app create failed", appErr);
-    if (createdApp) {
-      applicationId = createdApp.id;
+      .eq("lead_id", payment.lead_id)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (existingApp) {
+      applicationId = existingApp.id;
+    } else {
+      const { data: lead } = await supabaseAdmin
+        .from("leads")
+        .select("id, service_id, customer_id, assigned_to, website_id")
+        .eq("id", payment.lead_id)
+        .maybeSingle();
+      const { data: createdApp, error: appErr } = await supabaseAdmin
+        .from("applications")
+        .insert({
+          lead_id: payment.lead_id,
+          customer_id: lead?.customer_id ?? null,
+          service_id: lead?.service_id ?? null,
+          assigned_to: lead?.assigned_to ?? null,
+          website_id: (lead as any)?.website_id ?? null,
+          application_status: "payment_received" as any,
+          fulfillment_status: "order_received" as any,
+        } as any)
+        .select("id")
+        .single();
+      if (appErr) console.error("[finalize] app create failed", appErr);
+      if (createdApp) applicationId = createdApp.id;
+    }
+    if (applicationId) {
       await supabaseAdmin.from("payments").update({ application_id: applicationId } as any).eq("id", payment.id);
     }
   }
+
 
   // 2) Lead + payment_links
   await supabaseAdmin.from("leads")

@@ -182,12 +182,24 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
 
         if (newStatus === "paid") {
           try {
-            // 1. Auto-create application if missing (mirrors spec 4A-1).
+            // 1. Auto-create application if missing (orders start at payment).
             let applicationId = payment.application_id as string | null;
             if (!applicationId) {
+              const { data: existingApp } = await supabaseAdmin
+                .from("applications")
+                .select("id")
+                .eq("lead_id", payment.lead_id)
+                .eq("is_deleted", false)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle();
+              if (existingApp) {
+                applicationId = existingApp.id;
+                await supabaseAdmin.from("payments").update({ application_id: applicationId } as any).eq("id", payment.id);
+              } else {
               const { data: lead } = await supabaseAdmin
                 .from("leads")
-                .select("id, service_id, customer_id, assigned_to")
+                .select("id, service_id, customer_id, assigned_to, website_id")
                 .eq("id", payment.lead_id)
                 .maybeSingle();
               const { data: createdApp, error: appErr } = await supabaseAdmin
@@ -197,6 +209,8 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                   customer_id: lead?.customer_id ?? null,
                   service_id: lead?.service_id ?? null,
                   assigned_to: lead?.assigned_to ?? null,
+                  website_id: (lead as any)?.website_id ?? null,
+                  application_status: "payment_received" as any,
                   fulfillment_status: "order_received" as any,
                 } as any)
                 .select("id")
@@ -208,7 +222,9 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
                 applicationId = createdApp.id;
                 await supabaseAdmin.from("payments").update({ application_id: applicationId } as any).eq("id", payment.id);
               }
+              }
             }
+
 
             // 2. Flip legacy + v2 lead status to payment_successful.
             const { error: leadUpdateError } = await supabaseAdmin.from("leads")
