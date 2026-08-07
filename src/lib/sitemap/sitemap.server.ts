@@ -70,9 +70,11 @@ export async function listContentfulPageSlugsForWebsite(
   for (const type of PAGE_CONTENT_TYPES) {
     let skip = 0;
     for (;;) {
+      // NOTE: no `select` — field ids differ per content type (servicePage has
+      // no `title`/`canonicalUrl`), and Contentful rejects the whole query with
+      // 422 UnknownField, which silently emptied the sitemap for that site.
       const url =
         `${GATEWAY}/spaces/${creds.spaceId}/entries?content_type=${type}` +
-        `&select=sys.id,sys.updatedAt,fields.slug,fields.title,fields.canonicalUrl` +
         `&limit=200&skip=${skip}`;
       let page: { items?: CfItem[]; total?: number; limit?: number };
       try {
@@ -89,18 +91,24 @@ export async function listContentfulPageSlugsForWebsite(
       }
       const items = page.items ?? [];
       for (const e of items) {
-        const slug = (e.fields?.slug ?? "").trim().toLowerCase();
+        const f = (e.fields ?? {}) as Record<string, unknown>;
+        const slug = String(f["slug"] ?? "").trim().toLowerCase();
         if (!slug || slug === "home" || slug === "index") continue;
         if (seen.has(slug)) continue;
         seen.add(slug);
+        const rawTitle = f["title"] ?? f["name"] ?? f["metaTitle"] ?? "";
+        const title = Array.isArray(rawTitle)
+          ? String(rawTitle[0] ?? "")
+          : String(rawTitle ?? "");
         out.push({
           slug,
-          title: (e.fields?.title ?? "").trim(),
-          canonicalUrl: (e.fields?.canonicalUrl ?? "").trim(),
+          title: title.trim(),
+          canonicalUrl: String(f["canonicalUrl"] ?? "").trim(),
           updatedAt: (e.sys?.updatedAt ?? "").slice(0, 10),
           contentType: type,
         });
       }
+
       skip += page.limit || 200;
       if (items.length === 0 || skip >= (page.total || 0)) break;
     }

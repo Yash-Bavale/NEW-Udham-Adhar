@@ -596,9 +596,13 @@ export const listContentfulSeoSlugs = createServerFn({ method: "GET" }).handler(
     try {
       let skip = 0;
       for (;;) {
+        // No `select` here: without a content_type filter Contentful rejects
+        // field selections (and field ids differ per model), which silently
+        // returned zero slugs.
         const page = await cfFetch<{ slug?: string; canonicalUrl?: string }>(
-          `/entries?select=sys.id,sys.updatedAt,fields.slug,fields.canonicalUrl&limit=200&skip=${skip}`,
+          `/entries?limit=200&skip=${skip}`,
         );
+
         const items = page.items ?? [];
         for (const e of items) {
           const rawSlug = (e.fields?.slug ?? "").trim().toLowerCase();
