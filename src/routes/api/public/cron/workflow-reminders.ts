@@ -42,6 +42,21 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
           for (const r of due ?? []) {
             processed++;
             try {
+              const isAutoClose = r.kind === "pending_closure_followup";
+              if (isAutoClose) {
+                const { autoCloseOverdueOrder } = await import("@/lib/orders/actions/auto-close.server");
+                const result = await autoCloseOverdueOrder(r.application_id, "customer_delay");
+                if (!result.ok && result.skipped !== "resolved") {
+                  throw new Error(`Customer-delay close failed: ${result.skipped}`);
+                }
+                await supabaseAdmin
+                  .from("workflow_reminders")
+                  .update({ status: "sent", sent_at: nowIso, error: null } as never)
+                  .eq("id", r.id);
+                if (result.ok && result.emailQueued) sent++;
+                continue;
+              }
+
               // Mark as sent (advance state regardless of email)
               await supabaseAdmin
                 .from("workflow_reminders")
@@ -71,8 +86,7 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
 
               // Auto-close overrides the queued template to E010 so the
               // customer receives the correct closure notice.
-              const isAutoClose = r.kind === "pending_closure_followup";
-              const effectiveTemplate = isAutoClose ? "E010" : r.template_code;
+              const effectiveTemplate = r.template_code;
 
               if (effectiveTemplate && lead?.email) {
                 const payload: any = r.payload ?? {};
@@ -122,70 +136,6 @@ export const Route = createFileRoute("/api/public/cron/workflow-reminders")({
                   } as never);
                 }
               }
-
-              // Auto-close the order when the 8h pending-closure window elapses.
-              // Direct admin updates — the security-definer RPC requires auth.uid()
-              // which is NULL from cron/service-role and silently rejects.
-              if (isAutoClose) {
-                const { data: reason } = await supabaseAdmin
-                  .from("order_close_reasons")
-                  .select("id, label")
-                  .eq("is_active", true)
-                  .order("number")
-                  .limit(1)
-                  .maybeSingle();
-                const reasonId = (reason as any)?.id ?? null;
-                const remarks = "Auto-close: customer delay unresolved within 8 hours";
-
-                const { error: uErr } = await supabaseAdmin
-                  .from("applications")
-                  .update({
-                    order_status: "CLOSED",
-                    fulfillment_status: "order_closed",
-                    application_status: "cancelled",
-                    closure_reason_id: reasonId,
-                    closure_remarks: remarks,
-                    customer_hold_started_at: null,
-                    active_reason_id: null,
-                    active_reason_text: null,
-                    updated_at: new Date().toISOString(),
-                  } as never)
-                  .eq("id", app.id);
-
-                if (uErr) {
-                  console.error("[workflow-cron] auto-close update failed", app.id, uErr.message);
-                } else {
-                  // Cancel any still-armed schedulers for this order.
-                  try {
-                    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
-                    await cancelAllForOrder(app.id, "auto_close_customer_delay");
-                  } catch (e) { console.error("[workflow-cron] cancelAll failed", e); }
-
-                  await supabaseAdmin.from("application_events").insert({
-                    application_id: app.id,
-                    lead_id: app.lead_id,
-                    event_type: "order_status_change",
-                    old_value: app.order_status,
-                    new_value: "CLOSED",
-                    note: remarks,
-                    staff_name: "System",
-                    staff_role: "system",
-                  } as never);
-
-                  await supabaseAdmin.from("workflow_events").insert({
-                    application_id: app.id,
-                    lead_id: app.lead_id,
-                    event_type: "order_auto_closed",
-                    title: "Order auto-closed after 8h customer-delay window",
-                    description: "No response received within the 8-hour customer-delay window.",
-                    customer_visible: false,
-                    actor_name: "System",
-                    is_system: true,
-                    metadata: { reminder_id: r.id, reason: (reason as any)?.label ?? null },
-                  } as never);
-                }
-              }
-
 
               // Internal-side delay review: notify assignee, do not email customer.
               if ((r.kind as string) === "internal_review") {

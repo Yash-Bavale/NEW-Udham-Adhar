@@ -141,7 +141,7 @@ export async function autoCloseOverdueOrder(
     .select("id")
     .eq("application_id", appId)
     .eq("template_code", "E010")
-    .in("status", ["queued", "sending", "sent"])
+    .eq("status", "sent")
     .limit(1)
     .maybeSingle();
   if (priorEmail) return { ok: true, emailQueued: true };
