@@ -204,6 +204,11 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           form_submitted_at: now,
           order_status: "FORM_RECEIVED",
           fulfillment_status: "form_submitted",
+          customer_hold_started_at: null,
+          workflow_status: "processing",
+          workflow_delay_reason: null,
+          active_reason_id: null,
+          active_reason_text: null,
         } as never)
         .eq("id", app.id);
 
@@ -218,7 +223,15 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // Form is in — stop the nudge / auto-close countdown.
       try {
         const { cancelTimers } = await import("@/lib/orders/actions/timers.server");
-        await cancelTimers(app.id, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
+        await cancelTimers(app.id, ["form_pending_nudge_4h", "form_pending_autoclose_8h", "customer_hold_reminder"]);
+        await supabaseAdmin
+          .from("workflow_reminders")
+          .update({ status: "cancelled" } as never)
+          .eq("application_id", app.id)
+          .eq("kind", "pending_closure_followup")
+          .in("status", ["pending", "failed"]);
+        const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+        await cancelAllForOrder(app.id, "form_submitted");
       } catch (e) {
         console.error("[onboarding] cancelling form timers failed", e);
       }

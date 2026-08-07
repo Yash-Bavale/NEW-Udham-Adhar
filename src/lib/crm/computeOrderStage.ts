@@ -11,6 +11,8 @@ export type OrderStage =
   | "lead_received"
   | "payment_pending"
   | "payment_done"
+  | "form_not_submitted"
+  | "customer_delay"
   | "consultation_pending"
   | "consultation_completed"
   | "form_submitted"
@@ -85,8 +87,8 @@ export function computeOrderStage(
   if (fs === "verification_pending") return "under_review";
   if (fs === "documents_received") return "in_progress";
 
-  // S05/S06 delay stages keep the operator on form_submitted (main working stage)
-  if (fs === "technical_delay" || fs === "customer_delay") return "form_submitted";
+  if (fs === "customer_delay") return "customer_delay";
+  if (fs === "technical_delay") return "form_submitted";
 
   if (fs === "consultation_completed") return "consultation_completed";
 
@@ -94,6 +96,7 @@ export function computeOrderStage(
     return "consultation_pending";
   }
   if (fs === "form_submitted") return "form_submitted";
+  if (["waiting_for_customer_submission", "awaiting_customer_form", "form_not_submitted"].includes(fs)) return "form_not_submitted";
   if (!application.form_submitted_at) return "payment_done";
 
   return "form_submitted";
@@ -107,6 +110,8 @@ export const STAGE_META: Record<
   lead_received:     { label: "Lead Received",      short: "Lead",       order: 0, tone: "blue",    side: "customer" },
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
   payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
+  form_not_submitted: { label: "Form Not Submitted", short: "Form Pending", order: 3, tone: "amber", side: "customer" },
+  customer_delay:    { label: "Customer Delay",     short: "Delay",      order: 4, tone: "amber", side: "customer" },
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
   consultation_completed: { label: "Consultation Completed", short: "Consult Done", order: 3, tone: "emerald", side: "employee" },
   form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
@@ -140,6 +145,8 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   lead_received:     "bg-blue-100 text-blue-800 border-blue-200",
   payment_pending:   "bg-amber-100 text-amber-900 border-amber-200",
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
+  form_not_submitted: "bg-amber-100 text-amber-900 border-amber-200",
+  customer_delay:    "bg-amber-100 text-amber-900 border-amber-200",
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
   consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",
