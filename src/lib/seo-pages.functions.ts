@@ -285,39 +285,31 @@ export const submitAllPagesToSitemap = createServerFn({ method: "POST" })
     const { listContentfulSeoSlugs } = await import("@/lib/contentful/client.functions");
 
     const site = await resolveCurrentWebsite(getRequest());
+    if (!site?.id) throw new Error("Could not resolve the current website");
 
-    // Fetch all active website IDs
-    const { data: activeSites } = await supabaseAdmin
-      .from("websites")
-      .select("id")
-      .eq("is_active", true);
-    const targetSiteIds = new Set<string>((activeSites ?? []).map((w) => w.id));
-    if (site?.id) targetSiteIds.add(site.id);
-
-    // Fetch all Contentful pages
+    // Contentful slugs come from THIS site's space, so they may only ever be
+    // written to THIS site's seo_pages rows.
     const cfSlugs = await listContentfulSeoSlugs().catch(() => []);
     let count = 0;
 
-    for (const wId of targetSiteIds) {
-      for (const cf of cfSlugs) {
-        const path = cf.slug.replace(/^\/+/, "");
-        if (isPathSensitive(`/${path}`)) continue;
-        const label = path.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+    for (const cf of cfSlugs) {
+      const path = cf.slug.replace(/^\/+/, "");
+      if (isPathSensitive(`/${path}`)) continue;
+      const label = path.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-        // Upsert into seo_pages table as enabled for each active website
-        const { error } = await supabaseAdmin.from("seo_pages").upsert(
-          {
-            website_id: wId,
-            slug: path,
-            label,
-            enabled: true,
-            sort_order: 10,
-          },
-          { onConflict: "website_id,slug" },
-        );
-        if (!error) count++;
-      }
+      const { error } = await supabaseAdmin.from("seo_pages").upsert(
+        {
+          website_id: site.id,
+          slug: path,
+          label,
+          enabled: true,
+          sort_order: 10,
+        },
+        { onConflict: "website_id,slug" },
+      );
+      if (!error) count++;
     }
 
     return { ok: true, submitted: count };
   });
+
