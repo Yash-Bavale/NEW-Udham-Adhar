@@ -53,25 +53,31 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
 
 async function loadPrimary(): Promise<WebsiteRow> {
   if (primaryCache) return primaryCache;
-  const { data, error } = await supabaseAdmin
-    .from("websites")
-    .select(BRAND_COLUMNS)
-    .eq("is_primary", true)
-    .maybeSingle();
-  if (error) throw error;
+  const data = await withRetry(async () => {
+    const res = await supabaseAdmin
+      .from("websites")
+      .select(BRAND_COLUMNS)
+      .eq("is_primary", true)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    return res.data;
+  });
   if (data) {
     primaryCache = data as unknown as WebsiteRow;
     return primaryCache;
   }
   // Fallback: any active site with lowest sort order
-  const { data: any, error: err2 } = await supabaseAdmin
-    .from("websites")
-    .select(BRAND_COLUMNS)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (err2) throw err2;
+  const any = await withRetry(async () => {
+    const res = await supabaseAdmin
+      .from("websites")
+      .select(BRAND_COLUMNS)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    return res.data;
+  });
   if (!any) throw new Error("No websites configured");
   primaryCache = any as unknown as WebsiteRow;
   return primaryCache;
@@ -88,17 +94,22 @@ export async function resolveCurrentWebsite(request: Request | undefined): Promi
     const cached = cache.get(host);
     if (cached) return cached;
     const stripped = host.replace(/^www\./, "");
-    const { data } = await supabaseAdmin
-      .from("websites")
-      .select(BRAND_COLUMNS)
-      .eq("is_active", true)
-      .in("domain", [host, stripped])
-      .maybeSingle();
+    const data = await withRetry(async () => {
+      const res = await supabaseAdmin
+        .from("websites")
+        .select(BRAND_COLUMNS)
+        .eq("is_active", true)
+        .in("domain", [host, stripped])
+        .maybeSingle();
+      if (res.error) throw res.error;
+      return res.data;
+    });
     if (data) {
       const row = data as unknown as WebsiteRow;
       cache.set(host, row);
       return row;
     }
   }
+
   return loadPrimary();
 }
