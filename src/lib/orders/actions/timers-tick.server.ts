@@ -36,11 +36,21 @@ export async function handleNewTimer(t: {
       await autoCloseForm(t.application_id);
       return true;
 
-    case "customer_hold_reminder":
+    case "customer_hold_reminder": {
+      // Customer-side delay: close the order once the hold has run past 8h,
+      // otherwise send the reminder and re-arm.
+      const closed = await autoCloseCustomerDelayIfOverdue(t.application_id);
+      if (closed) return true;
+      await sendHoldReminder(t.application_id, t.kind, t.payload ?? {});
+      await rearmIfRecurring(t.id, t.application_id, t.kind);
+      return true;
+    }
+
     case "technical_hold_reminder":
       await sendHoldReminder(t.application_id, t.kind, t.payload ?? {});
       await rearmIfRecurring(t.id, t.application_id, t.kind);
       return true;
+
 
     case "awaiting_govt_internal_reminder":
       await notifyInternal(t.application_id);
@@ -85,98 +95,29 @@ async function sendFormNudge(appId: string) {
 }
 
 async function autoCloseForm(appId: string) {
-  // Safety: never auto-close an order whose form already arrived or that has
-  // already moved past the form stage.
-  const { data: app } = await supabaseAdmin
+  const { autoCloseOverdueOrder } = await import("./auto-close.server");
+  await autoCloseOverdueOrder(appId, "form_pending");
+}
+
+/**
+ * Close a customer-side-delay order once the hold has been open for 8h+.
+ * Returns true when the order was closed (so the caller skips the reminder).
+ */
+async function autoCloseCustomerDelayIfOverdue(appId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
     .from("applications")
-    .select("order_status, fulfillment_status, form_status")
+    .select("customer_hold_started_at")
     .eq("id", appId)
     .maybeSingle();
-  const row = app as any;
-  if (!row) return;
-  const formIn =
-    String(row.form_status ?? "").toLowerCase() === "submitted" ||
-    ["form_submitted", "documents_received", "under_processing", "completed", "order_completed", "order_closed", "cancelled"].includes(
-      String(row.fulfillment_status ?? ""),
-    ) ||
-    ["FORM_RECEIVED", "INFO_RECEIVED", "IN_PROCESSING", "COMPLETED", "CLOSED", "REFUND_PROCESSED"].includes(
-      String(row.order_status ?? ""),
-    );
-  if (formIn) {
-    const { cancelTimers } = await import("./timers.server");
-    await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
-    return;
-  }
-
-  // Pick a default reason: the first active "form abandoned" style reason.
-  const { data: reason } = await supabaseAdmin
-    .from("order_close_reasons")
-    .select("id")
-    .eq("is_active", true)
-    .order("number")
-    .limit(1)
-    .maybeSingle();
-  const reasonId = (reason as any)?.id;
-  if (!reasonId) {
-    console.error("[timers-tick] no default close reason found");
-    return;
-  }
-  // Direct admin update — the security-definer RPC needs auth.uid(), which is
-  // NULL from cron/service-role and would silently reject the transition.
-  const remarks = "Auto-close: form not received within 8h";
-  const { error } = await supabaseAdmin
-    .from("applications")
-    .update({
-      order_status: "CLOSED",
-      fulfillment_status: "order_closed",
-      application_status: "cancelled",
-      closure_reason_id: reasonId,
-      closure_remarks: remarks,
-      active_reason_id: null,
-      active_reason_text: null,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", appId);
-  if (error) {
-    console.error("[timers-tick] autoclose update failed", error.message);
-    return;
-  }
-  await supabaseAdmin.from("application_events").insert({
-    application_id: appId,
-    event_type: "order_status_change",
-    old_value: String(row.order_status ?? ""),
-    new_value: "CLOSED",
-    notes: remarks,
-    staff_name: "System",
-    staff_role: "system",
-  } as never);
-  // Cancel remaining form timers + send E010.
-  const { cancelTimers } = await import("./timers.server");
-  await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h"]);
-  const ctx = await loadCtx(appId);
-  const email = ctx?.customers?.primary_email;
-  if (email) {
-    const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
-      import("@/lib/emails/emails.server"),
-      import("@/lib/emails/bhs-templates"),
-    ]);
-    try {
-      await enqueueFromTemplateInternal(
-        BHS_EMAILS.E010_TICKET_CLOSED_FINAL,
-        email,
-        {
-          customerName: ctx?.customers?.name || "Customer",
-          orderNumber: ctx?.application_code || appId.slice(0, 8),
-          reason: "Form not received within 8 hours",
-          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
-        },
-        { applicationId: appId, leadId: ctx?.lead_id ?? undefined },
-      );
-    } catch (e) {
-      console.error("[timers-tick] autoclose E010 failed", e);
-    }
-  }
+  const startedAt = (data as any)?.customer_hold_started_at as string | null | undefined;
+  if (!startedAt) return false;
+  const overdue = Date.now() - new Date(startedAt).getTime() >= 8 * 60 * 60 * 1000;
+  if (!overdue) return false;
+  const { autoCloseOverdueOrder } = await import("./auto-close.server");
+  const res = await autoCloseOverdueOrder(appId, "customer_delay");
+  return res.ok;
 }
+
 
 async function sendHoldReminder(
   appId: string,
