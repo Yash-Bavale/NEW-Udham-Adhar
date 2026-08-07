@@ -3346,6 +3346,41 @@ export type Database = {
           },
         ]
       }
+      sitemap_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          included: boolean
+          slug: string
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          included?: boolean
+          slug: string
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          included?: boolean
+          slug?: string
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sitemap_overrides_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       smtp_settings: {
         Row: {
           created_at: string
