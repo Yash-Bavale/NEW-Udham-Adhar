@@ -32,6 +32,25 @@ const BRAND_COLUMNS =
 const cache = new Map<string, WebsiteRow>();
 let primaryCache: WebsiteRow | null = null;
 
+/**
+ * Retry transient upstream failures (DNS/network blips reaching the database)
+ * before giving up — otherwise a brief outage silently renders fallback brand
+ * and empty navigation site-wide.
+ */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 150 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+
 async function loadPrimary(): Promise<WebsiteRow> {
   if (primaryCache) return primaryCache;
   const { data, error } = await supabaseAdmin
