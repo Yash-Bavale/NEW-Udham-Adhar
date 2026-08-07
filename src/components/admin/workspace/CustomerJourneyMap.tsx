@@ -832,7 +832,7 @@ function FlowNode({
             )}
           >
             {buttonSent && <Check className="size-2.5" />}
-            {buttonPending ? "…" : buttonEnabled ? getButtonLabel(node.buttonCode) : buttonSent ? "Sent" : "Locked"}
+            {buttonPending ? "…" : buttonEnabled ? (buttonLabel ?? getButtonLabel(node.buttonCode)) : buttonSent ? "Sent" : "Locked"}
           </button>
         </div>
       )}
