@@ -24,7 +24,7 @@ import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone
 import {
   sendFormLink, markSubmittedToGovt, completeOrder, reopenOrder,
 } from "@/lib/orders/order-actions.functions";
-import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
+import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
@@ -215,6 +215,16 @@ export function WorkspaceShell(p: Props) {
       toast.success("E011 sent — technical delay resolved, order resumed");
       try { window.localStorage.setItem(techResumeKey, "1"); } catch { }
       setTechDelayResolved(true);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
+  const mutResumeCustomer = useMutation({
+    mutationFn: () => fnResumeCustomer({ data: { orderId: p.orderId } }),
+    onSuccess: () => {
+      toast.success("Order resumed — moved to Form Submitted");
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -703,14 +713,24 @@ export function WorkspaceShell(p: Props) {
                         variant: "emerald",
                         tooltip: "Resolve technical delay & resume order (E011)",
                       },
-                      B4: {
-                        code: "B04",
-                        label: "Customer Delay",
-                        emailCode: "E004",
-                        onClick: () => setDialog({ kind: "customer_delay" }),
-                        variant: "amber",
-                        tooltip: "Mark customer side delay and select reason (E004)",
-                      },
+                      B4: phase === "customer_delay"
+                        ? {
+                          code: "B04" as const,
+                          label: "Resume Order",
+                          emailCode: "",
+                          onClick: () => mutResumeCustomer.mutate(),
+                          pending: mutResumeCustomer.isPending,
+                          variant: "emerald" as const,
+                          tooltip: "Customer responded — resume order to Form Submitted",
+                        }
+                        : {
+                          code: "B04" as const,
+                          label: "Customer Delay",
+                          emailCode: "E004",
+                          onClick: () => setDialog({ kind: "customer_delay" }),
+                          variant: "amber" as const,
+                          tooltip: "Mark customer side delay and select reason (E004)",
+                        },
                       B5: {
                         code: "B05",
                         label: "Submitted to Govt",

@@ -281,3 +281,56 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     return { ok: true, order: updated, emailSent: true };
   });
+
+// ── Resume from Customer Side Delay (S06 → S04 Form Submitted, no email) ──
+export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ orderId: OrderId }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: preRow, error: preErr } = await supabaseAdmin
+      .from("applications")
+      .select("order_status, fulfillment_status")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (preErr) throw new Error(preErr.message);
+    if (!preRow) throw new Error("Order not found.");
+
+    // Best-effort status transition; the fulfillment stage below is the
+    // authoritative S04 marker for the journey map.
+    const { error: rpcError } = await context.supabase.rpc("transition_order_status", {
+      _order_id: data.orderId,
+      _new_status: "FORM_RECEIVED",
+    });
+    if (rpcError) console.warn("[resumeFromCustomerDelay] transition skipped:", rpcError.message);
+
+    const { cancelTimers } = await import("./timers.server");
+    await cancelTimers(data.orderId, ["customer_hold_reminder"]);
+
+    const { error } = await supabaseAdmin
+      .from("applications")
+      .update({
+        fulfillment_status: "form_submitted",
+        customer_hold_started_at: null,
+        active_reason_id: null,
+        active_reason_text: null,
+        workflow_status: "processing",
+        workflow_delay_reason: null,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", data.orderId);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.from("application_events").insert({
+      application_id: data.orderId,
+      event_type: "fulfillment_status_change",
+      old_value: String(preRow.fulfillment_status ?? ""),
+      new_value: "form_submitted",
+      note: "Customer side delay resolved — order resumed",
+      staff_name: "Admin",
+      staff_role: "admin",
+    } as never);
+
+    return { ok: true };
+  });

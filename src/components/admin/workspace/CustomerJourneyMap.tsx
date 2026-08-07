@@ -43,7 +43,7 @@ import { CountdownChip } from "./CountdownChip";
 import {
   sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder,
 } from "@/lib/orders/order-actions.functions";
-import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
+import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
@@ -228,6 +228,12 @@ export function CustomerJourneyMap(p: Props) {
     onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); markTechDelayResolved(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
+  const mutResumeCustomer = useMutation({
+    mutationFn: () => fnResumeCustomer({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("Order resumed — moved to Form Submitted"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
     onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); markFormLinkSent(); invalidate(); },
@@ -265,16 +271,21 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean }> = {
+  const inCustomerDelay = phase === "customer_delay";
+
+  const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean; label?: string }> = {
     B01: { onClick: () => mutFormLink.mutate(), pending: mutFormLink.isPending },
     B02: { onClick: () => setDialog({ kind: "technical_delay" }) },
     B03: { onClick: () => mutResume.mutate(), pending: mutResume.isPending },
-    B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
+    B04: inCustomerDelay
+      ? { onClick: () => mutResumeCustomer.mutate(), pending: mutResumeCustomer.isPending, label: "Resume Order" }
+      : { onClick: () => setDialog({ kind: "customer_delay" }) },
     B05: { onClick: () => mutSubmit.mutate(), pending: mutSubmit.isPending },
     B06: { onClick: () => setDialog({ kind: "consultation_completed" }), pending: mutConsultation.isPending },
     B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
     B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
+
 
   /* ─── Highlight state (pure) ─── */
   const activeBranches = useMemo(
@@ -477,6 +488,7 @@ export function CustomerJourneyMap(p: Props) {
                     buttonEnabled={enabled}
                     buttonPending={!!handler?.pending}
                     buttonSent={isSent}
+                    buttonLabel={handler?.label}
                     onButtonClick={handler?.onClick}
                     countdown={countdown}
                     phaseLabel={phase}
@@ -676,7 +688,7 @@ const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon
 
 function FlowNode({
   node, state,
-  buttonEnabled, buttonPending, buttonSent, onButtonClick,
+  buttonEnabled, buttonPending, buttonSent, buttonLabel, onButtonClick,
   countdown, phaseLabel, ticketOpen, ticketNumber, ticketHref,
 }: {
   node: NodeDef;
@@ -684,6 +696,7 @@ function FlowNode({
   buttonEnabled: boolean;
   buttonPending: boolean;
   buttonSent: boolean;
+  buttonLabel?: string;
   onButtonClick?: () => void;
   countdown?: React.ReactNode;
   phaseLabel: string;
@@ -819,7 +832,7 @@ function FlowNode({
             )}
           >
             {buttonSent && <Check className="size-2.5" />}
-            {buttonPending ? "…" : buttonEnabled ? getButtonLabel(node.buttonCode) : buttonSent ? "Sent" : "Locked"}
+            {buttonPending ? "…" : buttonEnabled ? (buttonLabel ?? getButtonLabel(node.buttonCode)) : buttonSent ? "Sent" : "Locked"}
           </button>
         </div>
       )}
