@@ -128,3 +128,147 @@ export async function loadSitemapExclusions(websiteId: string): Promise<Set<stri
   }
   return set;
 }
+
+const SENSITIVE_PREFIXES = [
+  "/api",
+  "/admin",
+  "/admin-login",
+  "/seo-admin",
+  "/onboarding",
+  "/payment",
+  "/payment-pending",
+  "/payment-failed",
+  "/processing",
+  "/success",
+  "/apply",
+  "/email",
+  "/lovable",
+  "/mcp",
+  "/.mcp",
+  "/.well-known",
+];
+
+export function isSensitivePath(path: string): boolean {
+  const p = path.toLowerCase().trim();
+  if (
+    p.includes("$") ||
+    p.includes("*") ||
+    p.includes("[") ||
+    p.includes("]") ||
+    p.startsWith("/.") ||
+    p.includes("mcp") ||
+    p.includes("oauth")
+  ) {
+    return true;
+  }
+  return SENSITIVE_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
+}
+
+export function normalizePath(slug: string): string {
+  let p = slug.trim().toLowerCase();
+  if (!p.startsWith("/")) p = `/${p}`;
+  if (p.length > 1) p = p.replace(/\/$/, "");
+  return p;
+}
+
+function titleize(slug: string) {
+  return slug
+    .replace(/^\//, "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+export type SitemapManagerItem = {
+  slug: string;
+  label: string;
+  source: "Contentful CMS" | "Database SEO Page" | "Static Route";
+  lastmod: string;
+  included: boolean;
+  hasOverride: boolean;
+};
+
+const CORE_PAGES: Array<{ slug: string; label: string }> = [
+  { slug: "/", label: "Homepage" },
+  { slug: "/about-us", label: "About Us" },
+  { slug: "/contact-us", label: "Contact Us" },
+  { slug: "/terms-conditions", label: "Terms & Conditions" },
+  { slug: "/privacy-policy", label: "Privacy Policy" },
+  { slug: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
+];
+
+/**
+ * Every page discoverable for a website (static core pages, database SEO
+ * pages, and that site's own Contentful space) with its sitemap state.
+ */
+export async function collectSitemapItems(
+  websiteId: string,
+): Promise<SitemapManagerItem[]> {
+  const overrides = new Map<string, boolean>();
+  try {
+    const { data: ov } = await supabaseAdmin
+      .from("sitemap_overrides")
+      .select("slug, included")
+      .eq("website_id", websiteId);
+    for (const row of (ov ?? []) as Array<{ slug: string; included: boolean }>) {
+      overrides.set(normalizePath(row.slug), row.included);
+    }
+  } catch {
+    // ignore
+  }
+
+  const items = new Map<string, SitemapManagerItem>();
+  const put = (
+    slug: string,
+    label: string,
+    source: SitemapManagerItem["source"],
+    lastmod: string,
+  ) => {
+    const path = normalizePath(slug);
+    if (isSensitivePath(path)) return;
+    const override = overrides.get(path);
+    items.set(path, {
+      slug: path,
+      label,
+      source,
+      lastmod,
+      included: override ?? true,
+      hasOverride: override !== undefined,
+    });
+  };
+
+  for (const c of CORE_PAGES) put(c.slug, c.label, "Static Route", "");
+
+  try {
+    const { data: dbPages } = await supabaseAdmin
+      .from("seo_pages")
+      .select("slug, label, enabled, updated_at")
+      .eq("website_id", websiteId);
+    for (const row of (dbPages ?? []) as Array<{
+      slug: string;
+      label: string | null;
+      enabled: boolean | null;
+      updated_at: string | null;
+    }>) {
+      const path = normalizePath(row.slug);
+      if (isSensitivePath(path)) continue;
+      const override = overrides.get(path);
+      items.set(path, {
+        slug: path,
+        label: row.label || titleize(path),
+        source: "Database SEO Page",
+        lastmod: (row.updated_at ?? "").slice(0, 10),
+        included: override ?? row.enabled !== false,
+        hasOverride: override !== undefined,
+      });
+    }
+  } catch {
+    // ignore
+  }
+
+  const cf = await listContentfulPageSlugsForWebsite(websiteId).catch(() => []);
+  for (const row of cf) {
+    put(row.slug, row.title || titleize(row.slug), "Contentful CMS", row.updatedAt);
+  }
+
+  return Array.from(items.values()).sort((a, b) => a.slug.localeCompare(b.slug));
+}
