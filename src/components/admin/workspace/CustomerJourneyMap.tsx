@@ -228,6 +228,12 @@ export function CustomerJourneyMap(p: Props) {
     onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); markTechDelayResolved(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
+  const mutResumeCustomer = useMutation({
+    mutationFn: () => fnResumeCustomer({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("Order resumed — moved to Form Submitted"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const mutFormLink = useMutation({
     mutationFn: () => fnFormLink({ data: { orderId: p.applicationId, transitionToWaiting: true } }),
     onSuccess: (r: any) => { toast.success(r?.emailQueued ? "E002 — Form link / incomplete-info mail sent" : "Order updated"); markFormLinkSent(); invalidate(); },
