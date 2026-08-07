@@ -186,14 +186,16 @@ export const Route = createFileRoute("/sitemap.xml")({
         }
 
         // 3. Contentful is the source of truth for SEO pages: every published
-        //    seoArticle for THIS site is added automatically. Entries whose
+        //    page entry for THIS site is added automatically. Entries whose
         //    canonical points at a different page (keyword variants) are
         //    skipped so the sitemap only lists canonical URLs.
         try {
-          const { listContentfulSeoSlugs } = await import(
-            "@/lib/contentful/client.functions"
+          const { listContentfulPageSlugsForWebsite } = await import(
+            "@/lib/sitemap/sitemap.server"
           );
-          const cfSlugs = await listContentfulSeoSlugs();
+          const cfSlugs = currentSite?.id
+            ? await listContentfulPageSlugsForWebsite(currentSite.id)
+            : [];
           for (const row of cfSlugs) {
             const path = `/${row.slug.replace(/^\/+/, "")}`;
             // No siteBlocked() here: these entries come from THIS site's own
@@ -213,7 +215,16 @@ export const Route = createFileRoute("/sitemap.xml")({
           // CMS unreachable — keep the static + DB entries.
         }
 
-
+        // 4. Admin exclusions win over every source above.
+        if (currentSite?.id) {
+          try {
+            const { loadSitemapExclusions } = await import("@/lib/sitemap/sitemap.server");
+            const excluded = await loadSitemapExclusions(currentSite.id);
+            for (const path of excluded) entries.delete(path);
+          } catch {
+            // ignore — overrides are best-effort
+          }
+        }
 
         const sorted = Array.from(entries.values()).sort((a, b) =>
           a.path.localeCompare(b.path),
@@ -247,7 +258,9 @@ export const Route = createFileRoute("/sitemap.xml")({
         return new Response(xml, {
           headers: {
             "Content-Type": "application/xml",
-            "Cache-Control": "public, max-age=3600",
+            // Newly published CMS pages must show up right away, so the
+            // sitemap is only briefly cached and always revalidated.
+            "Cache-Control": "public, max-age=60, must-revalidate",
           },
         });
       },
