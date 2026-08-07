@@ -199,8 +199,14 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // form_status is a free-text column managed alongside the audited status transition
       await supabaseAdmin
         .from("applications")
-        .update({ form_status: "submitted" })
+        .update({
+          form_status: "submitted",
+          form_submitted_at: now,
+          order_status: "FORM_RECEIVED",
+          fulfillment_status: "form_submitted",
+        } as never)
         .eq("id", app.id);
+
       const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
       const tr = await transitionStatusSystem({
         applicationId: app.id,
