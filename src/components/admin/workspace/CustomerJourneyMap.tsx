@@ -488,6 +488,7 @@ export function CustomerJourneyMap(p: Props) {
                     buttonEnabled={enabled}
                     buttonPending={!!handler?.pending}
                     buttonSent={isSent}
+                    buttonLabel={handler?.label}
                     onButtonClick={handler?.onClick}
                     countdown={countdown}
                     phaseLabel={phase}
@@ -687,7 +688,7 @@ const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon
 
 function FlowNode({
   node, state,
-  buttonEnabled, buttonPending, buttonSent, onButtonClick,
+  buttonEnabled, buttonPending, buttonSent, buttonLabel, onButtonClick,
   countdown, phaseLabel, ticketOpen, ticketNumber, ticketHref,
 }: {
   node: NodeDef;
@@ -695,6 +696,7 @@ function FlowNode({
   buttonEnabled: boolean;
   buttonPending: boolean;
   buttonSent: boolean;
+  buttonLabel?: string;
   onButtonClick?: () => void;
   countdown?: React.ReactNode;
   phaseLabel: string;
