@@ -141,6 +141,7 @@ import { Route as ApiPublicCronPayuReconcileRouteImport } from './routes/api/pub
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
+import { Route as ApiPublicCronBackfillE010RouteImport } from './routes/api/public/cron/backfill-e010'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admin.services.forms.$serviceCode'
@@ -836,6 +837,12 @@ const ApiPublicCronComplaintsSlaRoute =
     path: '/api/public/cron/complaints-sla',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronBackfillE010Route =
+  ApiPublicCronBackfillE010RouteImport.update({
+    id: '/api/public/cron/backfill-e010',
+    path: '/api/public/cron/backfill-e010',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAdminRegenerateInvoicesRoute =
   ApiPublicAdminRegenerateInvoicesRouteImport.update({
     id: '/api/public/admin/regenerate-invoices',
@@ -973,6 +980,7 @@ export interface FileRoutesByFullPath {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/cron/backfill-e010': typeof ApiPublicCronBackfillE010Route
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1105,6 +1113,7 @@ export interface FileRoutesByTo {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/cron/backfill-e010': typeof ApiPublicCronBackfillE010Route
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1243,6 +1252,7 @@ export interface FileRoutesById {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/cron/backfill-e010': typeof ApiPublicCronBackfillE010Route
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1382,6 +1392,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/cron/backfill-e010'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1514,6 +1525,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/cron/backfill-e010'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1651,6 +1663,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/cron/backfill-e010'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1731,6 +1744,7 @@ export interface RootRouteChildren {
   OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
   OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
   ApiPublicAdminRegenerateInvoicesRoute: typeof ApiPublicAdminRegenerateInvoicesRoute
+  ApiPublicCronBackfillE010Route: typeof ApiPublicCronBackfillE010Route
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronDailyDigestRoute: typeof ApiPublicCronDailyDigestRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
@@ -2676,6 +2690,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronComplaintsSlaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/backfill-e010': {
+      id: '/api/public/cron/backfill-e010'
+      path: '/api/public/cron/backfill-e010'
+      fullPath: '/api/public/cron/backfill-e010'
+      preLoaderRoute: typeof ApiPublicCronBackfillE010RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/admin/regenerate-invoices': {
       id: '/api/public/admin/regenerate-invoices'
       path: '/api/public/admin/regenerate-invoices'
@@ -2975,6 +2996,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
   OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
   ApiPublicAdminRegenerateInvoicesRoute: ApiPublicAdminRegenerateInvoicesRoute,
+  ApiPublicCronBackfillE010Route: ApiPublicCronBackfillE010Route,
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronDailyDigestRoute: ApiPublicCronDailyDigestRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
