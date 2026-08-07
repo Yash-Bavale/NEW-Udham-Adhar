@@ -146,7 +146,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, application_code, workflow_status")
+      .select("id, lead_id, application_code, workflow_status, order_status")
       .eq("id", data.applicationId)
       .maybeSingle();
     if (!app) throw new Error("Application not found");
@@ -189,6 +189,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     // to guarantee UI and backend stay in sync with the reason's classification.
     const workflowStatus = side === "internal" ? "government_portal_pending" : "waiting_for_customer";
 
+    const holdStartedAt = new Date().toISOString();
     const { error: updErr } = await admin
       .from("applications")
       .update({
@@ -196,6 +197,11 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         workflow_delay_reason: data.reasonCode,
         workflow_expected_review_at: expectedReviewIso,
         workflow_priority: data.priority,
+        ...(side === "customer" ? {
+          order_status: "CUSTOMER_HOLD",
+          fulfillment_status: "customer_delay",
+          customer_hold_started_at: holdStartedAt,
+        } : {}),
       } as never)
       .eq("id", app.id);
     if (updErr) throw new Error(updErr.message);
@@ -235,41 +241,32 @@ export const setExternalDelay = createServerFn({ method: "POST" })
     await admin.from("workflow_events").insert(events as never);
 
     if (side === "customer") {
-      // ── Customer-side: 1st intimation email now + auto-closure in 8 business hours ──
-      const { addBusinessSeconds, DEFAULT_BUSINESS_HOURS } = await import("@/lib/scheduling/business-hours");
-      let cfg = DEFAULT_BUSINESS_HOURS;
-      try {
-        const { data: bh } = await admin.from("business_hours_config").select("*").limit(1).maybeSingle();
-        if (bh) {
-          cfg = {
-            timezone: (bh as any).timezone ?? cfg.timezone,
-            openTime: (bh as any).open_time ?? cfg.openTime,
-            closeTime: (bh as any).close_time ?? cfg.closeTime,
-            workingDays: (bh as any).working_days ?? cfg.workingDays,
-            holidays: (bh as any).holidays ?? cfg.holidays,
-          } as typeof cfg;
-        }
-      } catch { /* fall back to defaults */ }
+      // One authoritative wall-clock timer. The shared timer handler closes the
+      // order first, applies A2, and only then queues E010.
+      const { data: setting } = await admin
+        .from("app_settings")
+        .select("customer_delay_autoclose_minutes")
+        .eq("id", 1)
+        .maybeSingle();
+      const closeMinutes = Math.max(1, Number(setting?.customer_delay_autoclose_minutes ?? 480));
+      const { armTimer } = await import("@/lib/orders/actions/timers.server");
+      await armTimer({
+        applicationId: app.id,
+        kind: "customer_hold_reminder",
+        firesInMinutes: closeMinutes,
+        payload: { reasonCode: data.reasonCode },
+      });
 
-      const closureDueAt = addBusinessSeconds(new Date(), 8 * 3600, cfg).toISOString();
-
-      await admin.from("workflow_reminders").insert({
-        application_id: app.id,
-        lead_id: app.lead_id,
-        kind: "pending_closure_followup",
-        template_code: "order_closure_confirmation",
-        due_at: closureDueAt,
-        assigned_to: lead?.assigned_to ?? null,
-        status: "pending",
-        payload: {
-          reason: data.reasonLabel,
-          reason_block: reasonBlock,
-          closure_reason: data.reasonLabel,
-          employee_remarks: (data.internalNote ?? data.customerNote ?? "").toString().trim() || "—",
-          customer_email: lead?.email ?? null,
-        },
-        created_by: context.userId,
-      } as never);
+      // Stop legacy reminders/schedulers so this action cannot create two
+      // independent closure attempts.
+      await admin
+        .from("workflow_reminders")
+        .update({ status: "cancelled" } as never)
+        .eq("application_id", app.id)
+        .eq("kind", "pending_closure_followup")
+        .eq("status", "pending");
+      const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+      await cancelAllForOrder(app.id, "replaced_by_customer_hold_timer");
 
       if (lead?.email) {
         try {

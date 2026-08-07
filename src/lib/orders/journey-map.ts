@@ -51,11 +51,13 @@ export function stageToJourneyIndex(stage: OrderStage): number {
     case "payment_pending":
       return 1;
     case "payment_done":
+    case "form_not_submitted":
     case "consultation_pending":
       return 2;
     case "consultation_completed":
       return 4;
     case "form_submitted":
+    case "customer_delay":
     case "in_progress":
     case "under_review":
       return 3;

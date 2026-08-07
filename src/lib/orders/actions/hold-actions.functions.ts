@@ -307,6 +307,14 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
 
     const { cancelTimers } = await import("./timers.server");
     await cancelTimers(data.orderId, ["customer_hold_reminder"]);
+    await supabaseAdmin
+      .from("workflow_reminders")
+      .update({ status: "cancelled" } as never)
+      .eq("application_id", data.orderId)
+      .eq("kind", "pending_closure_followup")
+      .in("status", ["pending", "failed"]);
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(data.orderId, "customer_delay_resumed");
 
     const { error } = await supabaseAdmin
       .from("applications")

@@ -337,12 +337,24 @@ export const sendFormLink = createServerFn({ method: "POST" })
     // (link delivered) without waiting for another action.
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const now = new Date().toISOString();
       await supabaseAdmin
         .from("applications")
-        .update({ fulfillment_status: (emailQueued ? "waiting_for_customer_submission" : "awaiting_customer_form") } as never)
+        .update({
+          order_status: "FORM_PENDING",
+          fulfillment_status: emailQueued ? "waiting_for_customer_submission" : "awaiting_customer_form",
+          form_link_sent_at: emailQueued ? now : null,
+        } as never)
         .eq("id", order.id);
+
+      if (emailQueued) {
+        const { armTimer } = await import("@/lib/orders/actions/timers.server");
+        await armTimer({ applicationId: order.id, kind: "form_pending_nudge_4h", firesInMinutes: 4 * 60 });
+        await armTimer({ applicationId: order.id, kind: "form_pending_autoclose_8h", firesInMinutes: 8 * 60 });
+      }
     } catch (e) {
-      console.error("[sendFormLink] stamp fulfillment_status failed", e);
+      console.error("[sendFormLink] stage/timer setup failed", e);
+      throw e;
     }
     if (emailQueued) {
       await notifyOrderEvent({
