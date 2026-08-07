@@ -713,14 +713,24 @@ export function WorkspaceShell(p: Props) {
                         variant: "emerald",
                         tooltip: "Resolve technical delay & resume order (E011)",
                       },
-                      B4: {
-                        code: "B04",
-                        label: "Customer Delay",
-                        emailCode: "E004",
-                        onClick: () => setDialog({ kind: "customer_delay" }),
-                        variant: "amber",
-                        tooltip: "Mark customer side delay and select reason (E004)",
-                      },
+                      B4: phase === "customer_delay"
+                        ? {
+                          code: "B04" as const,
+                          label: "Resume Order",
+                          emailCode: "",
+                          onClick: () => mutResumeCustomer.mutate(),
+                          pending: mutResumeCustomer.isPending,
+                          variant: "emerald" as const,
+                          tooltip: "Customer responded — resume order to Form Submitted",
+                        }
+                        : {
+                          code: "B04" as const,
+                          label: "Customer Delay",
+                          emailCode: "E004",
+                          onClick: () => setDialog({ kind: "customer_delay" }),
+                          variant: "amber" as const,
+                          tooltip: "Mark customer side delay and select reason (E004)",
+                        },
                       B5: {
                         code: "B05",
                         label: "Submitted to Govt",
