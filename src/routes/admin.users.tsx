@@ -3,10 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listStaffUsers, grantRole, revokeRole } from "@/lib/crm/users-admin.functions";
 import { STAFF_ROLES } from "@/lib/crm/types";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/users")({
   beforeLoad: async () => {
+    // Lazy import keeps the auth SDK out of the bundle public visitors download.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/admin-login" });
     const { data } = await supabase

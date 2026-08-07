@@ -2,7 +2,6 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { getPerformanceOverview } from "@/lib/crm/performance.functions";
 import { DateRangePicker } from "@/components/admin/DateRangePicker";
 import { SectionCard, TableSkeleton } from "@/components/admin/ui";
@@ -16,6 +15,8 @@ export const Route = createFileRoute("/admin/performance")({
     ],
   }),
   beforeLoad: async () => {
+    // Lazy import keeps the auth SDK out of the bundle public visitors download.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/admin-login" });
     const { data: rows } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
