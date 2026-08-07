@@ -420,7 +420,7 @@ export const PHASE_ENABLED_BUTTONS: Record<JourneyPhase, ButtonCode[]> = {
   form_submitted:       ["B02", "B04", "B05", "B06", "B07", "B08"],    // S04
   technical_delay:      ["B03"],                                       // S05
   post_b03_resume:      ["B04", "B05", "B06", "B07", "B08"],           // S04 post-tech-fix
-  customer_delay:       [],                                            // S06: waiting
+  customer_delay:       ["B04"],                                       // S06: B04 acts as "Resume Order" → S04
   govt_processing:      ["B04", "B06", "B07", "B08"],                  // S07 (B05 already sent)
   consultation_done:    ["B07", "B08"],                                // S08
   application_approved: ["B07"],                                       // S09
