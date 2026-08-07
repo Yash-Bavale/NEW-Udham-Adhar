@@ -244,21 +244,33 @@ function RootComponent() {
 
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Only react to real identity transitions — ignore TOKEN_REFRESHED and
-      // INITIAL_SESSION, which fire on every mount / hourly refresh and would
-      // thrash the router + query cache.
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      if (!seenInitial.current) {
-        seenInitial.current = true;
-      }
-      router.invalidate();
-      // Do NOT refetch on SIGNED_OUT — the cleared session would 401-storm
-      // every protected query and blank the screen before the redirect lands.
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+    // Loaded lazily: the auth/realtime SDK is ~90KB of JS that public visitors
+    // would otherwise download before the homepage can even render.
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/integrations/supabase/client").then(({ supabase }) => {
+      if (cancelled) return;
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        // Only react to real identity transitions — ignore TOKEN_REFRESHED and
+        // INITIAL_SESSION, which fire on every mount / hourly refresh and would
+        // thrash the router + query cache.
+        if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+        if (!seenInitial.current) {
+          seenInitial.current = true;
+        }
+        router.invalidate();
+        // Do NOT refetch on SIGNED_OUT — the cleared session would 401-storm
+        // every protected query and blank the screen before the redirect lands.
+        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      });
+      unsub = () => subscription.unsubscribe();
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, [router, queryClient]);
+
 
 
   // Load gtag.js shortly after mount so it's available when the user reaches
