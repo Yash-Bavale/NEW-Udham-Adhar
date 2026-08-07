@@ -103,7 +103,7 @@ async function autoCloseForm(appId: string) {
 async function autoCloseCustomerDelay(appId: string): Promise<boolean> {
   const { autoCloseOverdueOrder } = await import("./auto-close.server");
   const res = await autoCloseOverdueOrder(appId, "customer_delay");
-  return res.ok;
+  return res.ok || res.skipped === "resolved";
 }
 
 

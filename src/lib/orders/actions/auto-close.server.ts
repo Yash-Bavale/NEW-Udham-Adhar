@@ -59,7 +59,7 @@ function isResolved(stage: AutoCloseStage, row: any): boolean {
 
 export type AutoCloseResult =
   | { ok: true; emailQueued: boolean }
-  | { ok: false; skipped: "not_found" | "resolved" | "no_reason" | "update_failed"; message?: string };
+  | { ok: false; skipped: "not_found" | "resolved" | "no_reason" | "update_failed" | "email_failed"; message?: string };
 
 /**
  * Close one overdue order with the stage-specific reason + remark and queue the
@@ -196,7 +196,11 @@ export async function autoCloseOverdueOrder(
     return { ok: true, emailQueued: true };
   } catch (e) {
     console.error("[auto-close] E010 enqueue failed", e);
-    return { ok: true, emailQueued: false };
+    return {
+      ok: false,
+      skipped: "email_failed",
+      message: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 
