@@ -75,13 +75,16 @@ export async function autoCloseOverdueOrder(
 
   const { data: app } = await supabaseAdmin
     .from("applications")
-    .select("order_status, fulfillment_status, form_status, customer_hold_started_at")
+    .select("order_status, fulfillment_status, form_status, customer_hold_started_at, closure_remarks")
     .eq("id", appId)
     .maybeSingle();
   const row = app as any;
   const { cancelTimers } = await import("./timers.server");
   if (!row) return { ok: false, skipped: "not_found" };
-  if (isResolved(stage, row)) {
+  const alreadyAutoClosed =
+    String(row?.order_status ?? "") === "CLOSED" &&
+    String(row?.closure_remarks ?? "").includes(STAGE_REMARKS[stage]);
+  if (!alreadyAutoClosed && isResolved(stage, row)) {
     await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h", "customer_hold_reminder"]);
     return { ok: false, skipped: "resolved" };
   }
@@ -93,33 +96,37 @@ export async function autoCloseOverdueOrder(
   }
 
   const remarks = `${opts?.remarkPrefix ?? ""}${STAGE_REMARKS[stage]}`;
-  const { error } = await supabaseAdmin
-    .from("applications")
-    .update({
-      order_status: "CLOSED",
-      fulfillment_status: "order_closed",
-      application_status: "cancelled",
-      closure_reason_id: reasonId,
-      closure_remarks: remarks,
-      active_reason_id: null,
-      active_reason_text: null,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", appId);
-  if (error) {
-    console.error("[auto-close] update failed", error.message);
-    return { ok: false, skipped: "update_failed", message: error.message };
-  }
+  if (!alreadyAutoClosed) {
+    const { error } = await supabaseAdmin
+      .from("applications")
+      .update({
+        order_status: "CLOSED",
+        fulfillment_status: "order_closed",
+        application_status: "cancelled",
+        closure_reason_id: reasonId,
+        closure_remarks: remarks,
+        customer_hold_started_at: null,
+        workflow_status: "closed",
+        active_reason_id: null,
+        active_reason_text: null,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", appId);
+    if (error) {
+      console.error("[auto-close] update failed", error.message);
+      return { ok: false, skipped: "update_failed", message: error.message };
+    }
 
-  await supabaseAdmin.from("application_events").insert({
-    application_id: appId,
-    event_type: "order_status_change",
-    old_value: String(row.order_status ?? ""),
-    new_value: "CLOSED",
-    note: `${AUTO_CLOSE_REASON_LABEL} — ${remarks}`,
-    staff_name: opts?.staffName ?? "System",
-    staff_role: "system",
-  } as never);
+    await supabaseAdmin.from("application_events").insert({
+      application_id: appId,
+      event_type: "order_status_change",
+      old_value: String(row.order_status ?? ""),
+      new_value: "CLOSED",
+      note: `${AUTO_CLOSE_REASON_LABEL} — ${remarks}`,
+      staff_name: opts?.staffName ?? "System",
+      staff_role: "system",
+    } as never);
+  }
 
   await cancelTimers(appId, [
     "form_pending_nudge_4h",
@@ -128,6 +135,16 @@ export async function autoCloseOverdueOrder(
   ]);
 
   if (!sendEmail) return { ok: true, emailQueued: false };
+
+  const { data: priorEmail } = await supabaseAdmin
+    .from("email_logs")
+    .select("id")
+    .eq("application_id", appId)
+    .eq("template_code", "E010")
+    .in("status", ["queued", "sending", "sent"])
+    .limit(1)
+    .maybeSingle();
+  if (priorEmail) return { ok: true, emailQueued: true };
 
   const { data: ctx } = await supabaseAdmin
     .from("applications")

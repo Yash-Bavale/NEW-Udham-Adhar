@@ -295,11 +295,6 @@ export async function tickDueTimers(now = new Date()): Promise<{ fired: number }
     "@/lib/orders/actions/timers-tick.server"
   );
   for (const t of due ?? []) {
-    await supabase
-      .from("workflow_timers")
-      .update({ status: "fired", fired_at: now.toISOString() })
-      .eq("id", t.id);
-
     // Phase 4: new-lifecycle timer kinds are handled outside the legacy state machine.
     if (isNewTimerKind(t.kind)) {
       try {
@@ -309,7 +304,13 @@ export async function tickDueTimers(now = new Date()): Promise<{ fired: number }
           kind: t.kind,
           payload: (t as any).payload ?? null,
         });
-        if (handled) fired++;
+        if (handled) {
+          await supabase
+            .from("workflow_timers")
+            .update({ status: "fired", fired_at: now.toISOString() })
+            .eq("id", t.id);
+          fired++;
+        }
       } catch (err) {
         console.error("[workflow] new-kind timer failed", t.id, err);
       }
@@ -324,6 +325,10 @@ export async function tickDueTimers(now = new Date()): Promise<{ fired: number }
     if (event) {
       try {
         await dispatchEvent(event);
+        await supabase
+          .from("workflow_timers")
+          .update({ status: "fired", fired_at: now.toISOString() })
+          .eq("id", t.id);
         fired++;
       } catch (err) {
         console.error("[workflow] timer dispatch failed", t.id, err);

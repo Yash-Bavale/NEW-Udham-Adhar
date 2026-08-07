@@ -55,6 +55,18 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "none",
     exceptions: ["our_side_delay", "customer_hold", "cancel_refund"],
   },
+  form_not_submitted: {
+    hint: "Form link sent. Waiting for the customer to submit before the 8-hour deadline.",
+    primary: "Open Forms & Docs",
+    primaryKind: "open_form_tab",
+    exceptions: ["customer_hold", "cancel_refund"],
+  },
+  customer_delay: {
+    hint: "Waiting for the customer. Resume the order when the requested response is received.",
+    primary: null,
+    primaryKind: "none",
+    exceptions: ["cancel_refund"],
+  },
   consultation_pending: {
     hint: "Consultation lead — convert to a paid order once the customer picks a service.",
     primary: "Open Consultation Panel",

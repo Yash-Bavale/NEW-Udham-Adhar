@@ -37,12 +37,8 @@ export async function handleNewTimer(t: {
       return true;
 
     case "customer_hold_reminder": {
-      // Customer-side delay: close the order once the hold has run past 8h,
-      // otherwise send the reminder and re-arm.
-      const closed = await autoCloseCustomerDelayIfOverdue(t.application_id);
-      if (closed) return true;
-      await sendHoldReminder(t.application_id, t.kind, t.payload ?? {});
-      await rearmIfRecurring(t.id, t.application_id, t.kind);
+      const closed = await autoCloseCustomerDelay(t.application_id);
+      if (!closed) throw new Error(`Customer-delay auto-close failed for ${t.application_id}`);
       return true;
     }
 
@@ -96,23 +92,15 @@ async function sendFormNudge(appId: string) {
 
 async function autoCloseForm(appId: string) {
   const { autoCloseOverdueOrder } = await import("./auto-close.server");
-  await autoCloseOverdueOrder(appId, "form_pending");
+  const result = await autoCloseOverdueOrder(appId, "form_pending");
+  if (!result.ok) throw new Error(`Form-pending auto-close failed: ${result.skipped}`);
 }
 
 /**
  * Close a customer-side-delay order once the hold has been open for 8h+.
  * Returns true when the order was closed (so the caller skips the reminder).
  */
-async function autoCloseCustomerDelayIfOverdue(appId: string): Promise<boolean> {
-  const { data } = await supabaseAdmin
-    .from("applications")
-    .select("customer_hold_started_at")
-    .eq("id", appId)
-    .maybeSingle();
-  const startedAt = (data as any)?.customer_hold_started_at as string | null | undefined;
-  if (!startedAt) return false;
-  const overdue = Date.now() - new Date(startedAt).getTime() >= 8 * 60 * 60 * 1000;
-  if (!overdue) return false;
+async function autoCloseCustomerDelay(appId: string): Promise<boolean> {
   const { autoCloseOverdueOrder } = await import("./auto-close.server");
   const res = await autoCloseOverdueOrder(appId, "customer_delay");
   return res.ok;
