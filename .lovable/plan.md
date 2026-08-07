@@ -1,44 +1,43 @@
-## 1. Remove three homepage sections
+# Sitemap Manager for all websites
 
-Delete entirely from `src/routes/index.tsx`:
-- "About Udyam Registration"
-- "How Business Help Services Works"
-- "Why Business Owners Trust Us"
+Goal: sitemaps that always reflect what is published (Contentful, database pages, static routes) for each domain, plus a real sitemap manager and checker inside the admin panel.
 
-Also remove their data/plumbing so nothing hardcoded or dynamic remains:
-- Constants `HOW_IT_WORKS`, `WHY_BULLETS` and the About paragraphs
-- `useBlockItems("home.how_it_works")` and `useBlockItems("home.why_us")` hooks
-- The matching `home.how_it_works` / `home.why_us` rows in `site_content_blocks` (migration DELETE) and their editors in the Admin → Websites → Content page
-- `cms.howItWorks` / `cms.whyUs` usage on the homepage (the Contentful type keeps the fields, they're just unused)
+## What's wrong today
 
-Homepage order becomes: Hero/form + sample certificate → FAQ → Process steps → India coverage.
+- `sitemap.xml` is served with a 1-hour cache header, so newly published pages can take up to an hour (often longer behind the CDN) to appear.
+- Everything is scoped to the domain the request came from. Signed into the admin panel on one domain, you can only see and manage that domain's sitemap — the second website's sitemap can't be inspected or edited at all.
+- Contentful pages are auto-included with no way to exclude one, and Contentful entries of any type that happen to have a slug can leak in.
+- No way to see what is actually in the live sitemap versus what should be there.
 
-## 2. New homepage FAQ section
+## What gets built
 
-Layout follows the reference image: two columns on desktop — illustration on the left, FAQ list on the right; stacked on mobile, illustration first.
+### 1. Always-fresh sitemaps
 
-- Illustration: the uploaded question-mark artwork registered as a Lovable asset and imported (no binary in repo).
-- Questions render as a collapsible accordion (all collapsed by default), 10 per page.
-- Below the list: **Read more** loads the next 10, **Previous** goes back; a small "Showing 11–20 of 118" counter. Pagination is client-side over the full list so every question stays in the server-rendered HTML for crawlers (hidden pages rendered but visually paginated, so Google still sees all 100+ Q&As).
-- Removes the "Read all Udyam registration FAQs" button that pointed at /faqs.
+- Drop the 1-hour cache on `/sitemap.xml`; serve it with a short revalidating cache so a page published in Contentful shows up on the next request.
+- Only pull Contentful entries of the SEO/article and service page types (skip FAQs and other models), so junk slugs stop appearing.
+- `lastmod` keeps coming from the real source (Contentful `updatedAt`, database `updated_at`), never from "today".
 
-## 3. Contentful sync
+### 2. Sitemap manager in `/admin/seo` (new "Sitemap" tab)
 
-FAQs come from the existing Contentful `faq` content type (already wired in `getContentfulFaqs`, paginates to 500 entries) rather than the landing-page `faqs` field — that scales to 100+ entries and lets you edit them directly in Contentful. The homepage loader fetches them; if Contentful returns nothing, it falls back to the local FAQ list already in `src/lib/faqs-data.ts` so the page never renders empty.
+- Website switcher listing every configured website; all data below loads for the selected site regardless of which domain you are signed in on.
+- Table of every discoverable page for that site: slug, human label, source (Static route / Database page / Contentful), last modified, and an **Include in sitemap** switch.
+- Toggling the switch is stored per website and per slug and is honoured by `sitemap.xml` — this works for Contentful pages too, so a published CMS page can be kept out of the sitemap.
+- Search and source filters, plus counts (total, included, excluded).
+- Add / edit / delete database SEO pages stays available, now scoped to the selected website.
 
-## 4. Proper FAQ schema
+### 3. Sitemap checker
 
-The homepage emits a single `FAQPage` JSON-LD containing **every** FAQ (not just the visible page), with each answer as plain text. Question text is de-duplicated and answers stripped of markup so it validates in Google's Rich Results test.
-
-## 5. Delete the /faqs page
-
-- Delete `src/routes/faqs.tsx`
-- Remove the /faqs link in `src/components/site/TrustBlock.tsx`
-- Remove /faqs from `src/routes/sitemap[.]xml.ts`
-- Add a permanent 301 redirect `/faqs → /#faqs` in the legacy-redirects map so existing backlinks and indexed URLs pass authority to the homepage instead of 404ing
-- Fix the `WebSite` JSON-LD `SearchAction` target, which currently points at `/faqs?q=`
+- "Check live sitemap" fetches the selected website's real `https://<domain>/sitemap.xml` and reports:
+  - HTTP status, URL count, and whether the XML parses.
+  - **Missing** — pages that should be listed but aren't.
+  - **Unexpected** — URLs in the live sitemap that no longer exist or are excluded.
+  - Any URL whose host doesn't match the selected website (cross-site leak detector).
+- Copy-ready sitemap URL and a link to open the raw XML.
+- Google Search Console stays manual: the panel shows the exact sitemap URL to submit/refresh in GSC; no Google credentials are needed.
 
 ## Technical notes
-- `src/lib/faqs-data.ts` stays as the fallback dataset; nothing else imports it after this.
-- The FAQ block becomes its own component (`src/components/site/HomeFaqSection.tsx`) to keep `index.tsx` readable.
-- One migration removes the two obsolete content blocks; no schema changes.
+
+- New table `sitemap_overrides` (`website_id`, `slug`, `included`, timestamps, unique on the pair) with admin-only RLS and the standard grants; `sitemap.xml` applies it as the final filter over static, `seo_pages`, and Contentful entries.
+- Contentful credential resolution (`resolveCfCreds` in `src/lib/contentful/client.functions.ts`) currently derives the space from the request host. It gains an optional explicit `websiteId` so admin tools can read any site's space; the public path is unchanged.
+- Server functions in `src/lib/seo-pages.functions.ts` (`getSitemapPageManagerData`, `submitAllPagesToSitemap`, plus new `setSitemapInclusion` and `checkLiveSitemap`) take an optional `websiteId` instead of always resolving the current host; all remain admin-gated.
+- UI added as a tab in `src/routes/admin.seo.tsx`; the existing standalone `/seo-admin` page keeps working.
