@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isPathSensitive } from "@/lib/seo-pages.functions";
 
 export type SitemapWebsite = {
   id: string;
@@ -39,23 +38,9 @@ async function assertAdmin(userId: string) {
     .select("role")
     .eq("user_id", userId)
     .in("role", ["admin", "super_admin"])
-    .maybeSingle();
+    .limit(1);
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden: admin role required");
-}
-
-function normPath(slug: string) {
-  let p = slug.trim().toLowerCase();
-  if (!p.startsWith("/")) p = `/${p}`;
-  if (p.length > 1) p = p.replace(/\/$/, "");
-  return p;
-}
-
-function titleize(slug: string) {
-  return slug
-    .replace(/^\//, "")
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
+  if (!data || data.length === 0) throw new Error("Forbidden: admin role required");
 }
 
 /** Websites available in the sitemap manager. */
@@ -70,23 +55,17 @@ export const listSitemapWebsites = createServerFn({ method: "GET" })
       .order("is_primary", { ascending: false })
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((w) => ({
-      id: w.id as string,
-      name: (w.name as string) || (w.domain as string),
-      domain: w.domain as string,
-      is_primary: !!w.is_primary,
-      sitemapUrl: `https://${(w.domain as string).replace(/^https?:\/\//, "")}/sitemap.xml`,
-    }));
+    return (data ?? []).map((w) => {
+      const domain = ((w.domain as string) || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+      return {
+        id: w.id as string,
+        name: (w.name as string) || domain,
+        domain,
+        is_primary: !!w.is_primary,
+        sitemapUrl: domain ? `https://${domain}/sitemap.xml` : "",
+      };
+    });
   });
-
-const CORE_PAGES: Array<{ slug: string; label: string }> = [
-  { slug: "/", label: "Homepage" },
-  { slug: "/about-us", label: "About Us" },
-  { slug: "/contact-us", label: "Contact Us" },
-  { slug: "/terms-conditions", label: "Terms & Conditions" },
-  { slug: "/privacy-policy", label: "Privacy Policy" },
-  { slug: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
-];
 
 /** Every page discoverable for a website, with its sitemap inclusion state. */
 export const getSitemapManagerData = createServerFn({ method: "POST" })
@@ -96,73 +75,8 @@ export const getSitemapManagerData = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<SitemapManagerItem[]> => {
     await assertAdmin(context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { listContentfulPageSlugsForWebsite } = await import(
-      "@/lib/sitemap/sitemap.server"
-    );
-
-    const overrides = new Map<string, boolean>();
-    {
-      const { data: ov } = await supabaseAdmin
-        .from("sitemap_overrides")
-        .select("slug, included")
-        .eq("website_id", data.websiteId);
-      for (const row of (ov ?? []) as Array<{ slug: string; included: boolean }>) {
-        overrides.set(normPath(row.slug), row.included);
-      }
-    }
-
-    const items = new Map<string, SitemapManagerItem>();
-    const put = (
-      slug: string,
-      label: string,
-      source: SitemapManagerItem["source"],
-      lastmod: string,
-    ) => {
-      const path = normPath(slug);
-      if (isPathSensitive(path)) return;
-      const override = overrides.get(path);
-      items.set(path, {
-        slug: path,
-        label,
-        source,
-        lastmod,
-        included: override ?? true,
-        hasOverride: override !== undefined,
-      });
-    };
-
-    for (const c of CORE_PAGES) put(c.slug, c.label, "Static Route", "");
-
-    const { data: dbPages } = await supabaseAdmin
-      .from("seo_pages")
-      .select("slug, label, enabled, updated_at")
-      .eq("website_id", data.websiteId);
-    for (const row of (dbPages ?? []) as Array<{
-      slug: string;
-      label: string | null;
-      enabled: boolean | null;
-      updated_at: string | null;
-    }>) {
-      const path = normPath(row.slug);
-      if (isPathSensitive(path)) continue;
-      const override = overrides.get(path);
-      items.set(path, {
-        slug: path,
-        label: row.label || titleize(path),
-        source: "Database SEO Page",
-        lastmod: (row.updated_at ?? "").slice(0, 10),
-        included: override ?? row.enabled !== false,
-        hasOverride: override !== undefined,
-      });
-    }
-
-    const cf = await listContentfulPageSlugsForWebsite(data.websiteId).catch(() => []);
-    for (const row of cf) {
-      put(row.slug, row.title || titleize(row.slug), "Contentful CMS", row.updatedAt);
-    }
-
-    return Array.from(items.values()).sort((a, b) => a.slug.localeCompare(b.slug));
+    const { collectSitemapItems } = await import("@/lib/sitemap/sitemap.server");
+    return collectSitemapItems(data.websiteId);
   });
 
 /** Include or exclude a single page from a website's sitemap. */
@@ -180,7 +94,8 @@ export const setSitemapInclusion = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const slug = normPath(data.slug);
+    const { normalizePath } = await import("@/lib/sitemap/sitemap.server");
+    const slug = normalizePath(data.slug);
     const { error } = await supabaseAdmin.from("sitemap_overrides").upsert(
       { website_id: data.websiteId, slug, included: data.included },
       { onConflict: "website_id,slug" },
@@ -206,13 +121,18 @@ export const checkLiveSitemap = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<SitemapCheckResult> => {
     await assertAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { collectSitemapItems, normalizePath } = await import(
+      "@/lib/sitemap/sitemap.server"
+    );
     const { data: site } = await supabaseAdmin
       .from("websites")
       .select("domain")
       .eq("id", data.websiteId)
       .maybeSingle();
-    const host = ((site?.domain as string) || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const sitemapUrl = `https://${host}/sitemap.xml`;
+    const host = ((site?.domain as string) || "")
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
+    const sitemapUrl = host ? `https://${host}/sitemap.xml` : "";
 
     const base: SitemapCheckResult = {
       sitemapUrl,
@@ -248,21 +168,17 @@ export const checkLiveSitemap = createServerFn({ method: "POST" })
         if (u.hostname.replace(/^www\./, "") !== host.replace(/^www\./, "")) {
           base.wrongHost.push(loc);
         }
-        livePaths.add(normPath(u.pathname));
+        livePaths.add(normalizePath(u.pathname));
       } catch {
         base.wrongHost.push(loc);
       }
     }
 
-    const expectedItems = await getSitemapManagerData({ data: { websiteId: data.websiteId } });
-    const expected = new Set(
-      expectedItems.filter((i) => i.included).map((i) => i.slug),
-    );
-    const excluded = new Set(
-      expectedItems.filter((i) => !i.included).map((i) => i.slug),
-    );
+    const expectedItems = await collectSitemapItems(data.websiteId);
+    const expected = expectedItems.filter((i) => i.included).map((i) => i.slug);
+    const excluded = new Set(expectedItems.filter((i) => !i.included).map((i) => i.slug));
 
-    base.missing = Array.from(expected).filter((p) => !livePaths.has(p)).sort();
+    base.missing = expected.filter((p) => !livePaths.has(p)).sort();
     base.unexpected = Array.from(livePaths)
       .filter((p) => excluded.has(p))
       .sort();
