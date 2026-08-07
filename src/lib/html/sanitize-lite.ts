@@ -29,6 +29,9 @@ const DROP_CONTENT_TAGS = new Set([
 
 const VOID_TAGS = new Set(["br", "hr"]);
 
+/** Tags whose closing tag may be omitted in the source markup. */
+const IMPLICIT_CLOSE = new Set(["li", "p", "tr", "td", "th"]);
+
 const ALLOWED_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "title", "target", "rel"]),
 };
@@ -129,6 +132,12 @@ export function sanitizeHtmlLite(input: string | null | undefined): string {
       continue;
     }
 
+    // Implicitly close the previous sibling for tags that allow omitted end
+    // tags (<li>1<li>2), so we don't emit a pile of stray closers at the end.
+    if (IMPLICIT_CLOSE.has(tag) && openStack[openStack.length - 1] === tag) {
+      openStack.pop();
+      out += `</${tag}>`;
+    }
     openStack.push(tag);
     out += `<${tag}${buildAttrs(tag, rawAttrs)}>`;
   }
