@@ -10,7 +10,6 @@ import {
   getDocumentVersions,
   type DocRow,
 } from "@/lib/crm/documents-admin.functions";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/documents")({
   head: () => ({
@@ -20,6 +19,8 @@ export const Route = createFileRoute("/admin/documents")({
     ],
   }),
   beforeLoad: async () => {
+    // Lazy import keeps the auth SDK out of the bundle public visitors download.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/admin-login" });
     const { data: rows } = await supabase

@@ -1,6 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export const Route = createFileRoute("/admin")({
@@ -12,7 +11,9 @@ export const Route = createFileRoute("/admin")({
   ssr: false,
   head: () => ({ meta: [{ title: "Admin — Business Help Services" }, { name: "robots", content: "noindex,nofollow" }] }),
   beforeLoad: async () => {
-    // 1) Must be signed in.
+    // 1) Must be signed in. Imported lazily so the auth SDK ships with the
+    //    admin chunk instead of the bundle every public visitor downloads.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/admin-login" });
 
@@ -36,7 +37,9 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
   const [email, setEmail] = useState<string>();
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined));
+    void import("@/integrations/supabase/client").then(({ supabase }) =>
+      supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined)),
+    );
   }, []);
   return (
     <AdminShell email={email}>

@@ -2,7 +2,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
-import { supabase } from "@/integrations/supabase/client";
 import { SuperAdminDashboard, type DashboardRange } from "@/components/admin/SuperAdminDashboard";
 import { WorkflowStatusWidgets } from "@/components/admin/WorkflowStatusWidgets";
 import { AppSettingsCard } from "@/components/admin/AppSettingsCard";
@@ -21,6 +20,8 @@ export const Route = createFileRoute("/admin/super")({
   ] }),
   validateSearch: zodValidator(searchSchema),
   beforeLoad: async () => {
+    // Lazy import keeps the auth SDK out of the bundle public visitors download.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/admin-login" });
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id);

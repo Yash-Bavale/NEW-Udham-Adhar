@@ -22,7 +22,6 @@ import {
 } from "@/lib/crm/document-review.functions";
 import { requestDocumentReupload } from "@/lib/crm/onboarding-admin.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/review")({
   head: () => ({
@@ -32,6 +31,8 @@ export const Route = createFileRoute("/admin/review")({
     ],
   }),
   beforeLoad: async () => {
+    // Lazy import keeps the auth SDK out of the bundle public visitors download.
+    const { supabase } = await import("@/integrations/supabase/client");
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/admin-login" });
     const { data: rows } = await supabase

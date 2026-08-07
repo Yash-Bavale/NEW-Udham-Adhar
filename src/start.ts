@@ -1,7 +1,9 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+// Lazy-loading equivalent of the generated attachSupabaseAuth (keeps the auth
+// SDK out of the initial bundle).
+import { attachSupabaseAuthLazy } from "@/lib/auth/attach-supabase-auth";
 
 const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
   // Bypass app middleware for internal email routes and public unsubscribe API.
@@ -25,5 +27,5 @@ const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware],
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [attachSupabaseAuthLazy],
 }));
