@@ -1,5 +1,4 @@
 // Client-side analytics tracker — fire-and-forget insert into analytics_events.
-import { supabase } from "@/integrations/supabase/client";
 
 const SESSION_KEY = "bhs_session_id";
 
@@ -47,7 +46,10 @@ export function trackEvent(
     user_agent: window.navigator.userAgent.slice(0, 500),
   };
   // Fire-and-forget; never block UI on analytics.
-  void supabase.from("analytics_events").insert(payload).then(({ error }) => {
-    if (error && import.meta.env.DEV) console.warn("[trackEvent]", error.message);
-  });
+  // Lazy import keeps the database SDK out of the initial page bundle.
+  void import("@/integrations/supabase/client").then(({ supabase }) =>
+    supabase.from("analytics_events").insert(payload).then(({ error }) => {
+      if (error && import.meta.env.DEV) console.warn("[trackEvent]", error.message);
+    }),
+  );
 }
