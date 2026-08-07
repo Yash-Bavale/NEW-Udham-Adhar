@@ -162,20 +162,14 @@ export const Route = createFileRoute("/sitemap.xml")({
         //    their own updated_at so lastmod reflects real edits.
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          let { data } = await supabaseAdmin
+          // Strictly scoped to THIS site — never fall back to other websites'
+          // SEO pages, or one domain's sitemap lists the other domain's slugs.
+          const { data } = await supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")
             .eq("website_id", currentSite?.id ?? "")
             .eq("enabled", true);
 
-          // Fallback: If no site-specific seo_pages found, load enabled seo_pages from primary/all sites
-          if (!data || data.length === 0) {
-            const { data: fallbackData } = await supabaseAdmin
-              .from("seo_pages")
-              .select("slug, updated_at")
-              .eq("enabled", true);
-            data = fallbackData;
-          }
 
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim().toLowerCase();
