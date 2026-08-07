@@ -122,8 +122,9 @@ export function sanitizeHtmlLite(input: string | null | undefined): string {
       if (VOID_TAGS.has(tag)) continue;
       const idx = openStack.lastIndexOf(tag);
       if (idx === -1) continue; // stray close tag
-      openStack.splice(idx, 1);
-      out += `</${tag}>`;
+      // Close any still-open descendants first so nesting stays balanced.
+      for (let i = openStack.length - 1; i >= idx; i--) out += `</${openStack[i]}>`;
+      openStack.length = idx;
       continue;
     }
 
