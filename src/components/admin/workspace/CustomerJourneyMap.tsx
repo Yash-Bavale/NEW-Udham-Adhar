@@ -43,7 +43,7 @@ import { CountdownChip } from "./CountdownChip";
 import {
   sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder,
 } from "@/lib/orders/order-actions.functions";
-import { resumeFromHold } from "@/lib/orders/actions/hold-actions.functions";
+import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
@@ -265,16 +265,21 @@ export function CustomerJourneyMap(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean }> = {
+  const inCustomerDelay = phase === "customer_delay";
+
+  const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean; label?: string }> = {
     B01: { onClick: () => mutFormLink.mutate(), pending: mutFormLink.isPending },
     B02: { onClick: () => setDialog({ kind: "technical_delay" }) },
     B03: { onClick: () => mutResume.mutate(), pending: mutResume.isPending },
-    B04: { onClick: () => setDialog({ kind: "customer_delay" }) },
+    B04: inCustomerDelay
+      ? { onClick: () => mutResumeCustomer.mutate(), pending: mutResumeCustomer.isPending, label: "Resume Order" }
+      : { onClick: () => setDialog({ kind: "customer_delay" }) },
     B05: { onClick: () => mutSubmit.mutate(), pending: mutSubmit.isPending },
     B06: { onClick: () => setDialog({ kind: "consultation_completed" }), pending: mutConsultation.isPending },
     B07: { onClick: () => setDialog({ kind: "complete_with_cert" }) },
     B08: { onClick: () => setDialog({ kind: "govt_rejected" }) },
   };
+
 
   /* ─── Highlight state (pure) ─── */
   const activeBranches = useMemo(
