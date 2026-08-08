@@ -224,9 +224,20 @@ function ServicesPage() {
             </tr>
           </thead>
           <tbody>
-            {isLoading && <tr><td colSpan={8} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
-            {data?.rows.map((s) => (
+            {isLoading && <tr><td colSpan={colCount} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+            {!isLoading && visibleRows.length === 0 && (
+              <tr><td colSpan={colCount} className="px-3 py-6 text-center text-slate-500">No services for this website yet.</td></tr>
+            )}
+            {groups.map((g) => (
+              <Fragment key={g.key}>
+                <tr className="bg-slate-50/70 border-t">
+                  <td colSpan={colCount} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    {g.label} <span className="font-normal text-slate-400">({g.rows.length})</span>
+                  </td>
+                </tr>
+                {g.rows.map((s) => (
               <tr key={s.id} className="border-t">
+
                 <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
                 <td className="px-3 py-2">
                   <div className="font-medium">{s.service_name}</div>
