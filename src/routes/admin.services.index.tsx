@@ -319,7 +319,10 @@ function ServicesPage() {
                   >Delete</button>
                 </td>
               </tr>
+                ))}
+              </Fragment>
             ))}
+
           </tbody>
         </table>
       </div>
