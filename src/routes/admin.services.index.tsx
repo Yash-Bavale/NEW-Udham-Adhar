@@ -41,6 +41,7 @@ function ServicesPage() {
   const { data: tree } = useQuery({ queryKey: ["admin.websites.tree"], queryFn: () => treeFn() });
 
   const [form, setForm] = useState<ServiceForm | null>(null);
+  const [tab, setTab] = useState<string>("");
 
   const websites = tree?.websites ?? [];
   const categories = tree?.categories ?? [];
@@ -51,12 +52,89 @@ function ServicesPage() {
     [categories, form?.website_id],
   );
 
+  const allRows = data?.rows ?? [];
+  const activeTab = tab || websites[0]?.id || "__all__";
+  const unassignedCount = allRows.filter((s) => !s.website_id).length;
+
+  const tabs = useMemo(
+    () => [
+      ...websites.map((w) => ({
+        key: w.id,
+        label: w.name,
+        sub: w.domain,
+        count: allRows.filter((s) => s.website_id === w.id).length,
+      })),
+      ...(unassignedCount > 0
+        ? [{ key: "__none__", label: "Unassigned", sub: "no website", count: unassignedCount }]
+        : []),
+      { key: "__all__", label: "All websites", sub: "", count: allRows.length },
+    ],
+    [websites, allRows, unassignedCount],
+  );
+
+  const visibleRows = useMemo(() => {
+    if (activeTab === "__all__") return allRows;
+    if (activeTab === "__none__") return allRows.filter((s) => !s.website_id);
+    return allRows.filter((s) => s.website_id === activeTab);
+  }, [allRows, activeTab]);
+
+  // Group visible rows by category (Uncategorised last)
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof visibleRows>();
+    for (const s of visibleRows) {
+      const key = s.category_id ?? "__uncat__";
+      const arr = map.get(key) ?? [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    const entries = [...map.entries()].map(([key, rows]) => ({
+      key,
+      label: key === "__uncat__" ? "Uncategorised" : (categoryById[key]?.name ?? "Uncategorised"),
+      rows: [...rows].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    }));
+    entries.sort((a, b) =>
+      a.key === "__uncat__" ? 1 : b.key === "__uncat__" ? -1 : a.label.localeCompare(b.label),
+    );
+    return entries;
+  }, [visibleRows, categoryById]);
+
+  const colCount = 8;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Services</h1>
-        <button onClick={() => setForm({ ...emptyForm(), website_id: websites[0]?.id })} className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">+ New Service</button>
+        <button
+          onClick={() =>
+            setForm({
+              ...emptyForm(),
+              website_id:
+                activeTab === "__all__" || activeTab === "__none__" ? websites[0]?.id : activeTab,
+            })
+          }
+          className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm"
+        >+ New Service</button>
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => {
+          const on = t.key === activeTab;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-lg border px-3 py-1.5 text-left text-sm transition ${on ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
+            >
+              <span className="font-medium">{t.label}</span>
+              <span className={`ml-2 rounded-full px-1.5 py-0.5 text-[11px] ${on ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>{t.count}</span>
+              {t.sub && (
+                <span className={`block text-[11px] ${on ? "text-white/70" : "text-slate-400"}`}>{t.sub}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
 
       {form && (
         <div className="rounded-lg border bg-white p-4 space-y-3">
