@@ -186,8 +186,9 @@ def main():
         title = row["h1"] or row["label"] or titleize(slug)
         intro = sections[0]["paragraphs"][0] if sections else ""
         if not sections:
-            para = ("%s — this page covers the process, required documents, fees and "
-                    "timelines. Content to be updated." % title)
+            para = ("%s: understand the eligibility, documents required, step-by-step "
+                    "process, government fees and expected timelines before you apply "
+                    "online." % title)
             sections = [{"heading": title, "level": 2, "paragraphs": [para],
                          "subsections": []}]
             intro = para
