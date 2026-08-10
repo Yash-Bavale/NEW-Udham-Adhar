@@ -194,7 +194,7 @@ def main():
             intro = para
 
         meta_title = (row["meta_title"] or title)[:255]
-        meta_desc = (row["meta_description"] or intro or title)[:300]
+        meta_desc = (row["meta_description"] or intro or title)[:250]
 
         create_and_publish(slug, {
             "title": [title],
