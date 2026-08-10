@@ -600,7 +600,7 @@ export const listContentfulSeoSlugs = createServerFn({ method: "GET" }).handler(
         // field selections (and field ids differ per model), which silently
         // returned zero slugs.
         const page = await cfFetch<{ slug?: string; canonicalUrl?: string }>(
-          `/entries?limit=200&skip=${skip}`,
+          `/entries?content_type=seoArticle&limit=200&skip=${skip}`,
         );
 
         const items = page.items ?? [];

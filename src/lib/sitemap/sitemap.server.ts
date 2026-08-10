@@ -9,8 +9,8 @@ const ALLOWED_TOKEN_SECRETS = [
   "CONTENTFUL_API_KEY_2",
 ] as const;
 
-/** Content types that represent real, indexable pages. */
-const PAGE_CONTENT_TYPES = ["seoArticle", "servicePage", "landingPage"] as const;
+/** Content types that represent real, indexable pages (SEO pages). */
+const PAGE_CONTENT_TYPES = ["seoArticle"] as const;
 
 export type CfSlugRow = {
   slug: string;
