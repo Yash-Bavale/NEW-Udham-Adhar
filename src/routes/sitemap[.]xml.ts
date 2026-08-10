@@ -60,7 +60,7 @@ const HIGH_PRIORITY = new Set<string>([
 ]);
 
 
-function isExcluded(p: string, applyVariantClusters = true): boolean {
+function isExcluded(p: string, applyVariantClusters = false): boolean {
   if (p === "/sitemap.xml" || p === "/llms.txt" || p === "/llms-full.txt") return true;
   if (
     p.includes("$") ||
@@ -80,14 +80,47 @@ function isExcluded(p: string, applyVariantClusters = true): boolean {
     p === "/not-found" ||
     p === "/404"
   ) return true;
-  // Keyword-variant pages stay live but are dropped from the sitemap;
-  // their canonical points at the cluster primary (see canonical-clusters.ts).
-  // These clusters describe the PRIMARY site only — a secondary site owns its
-  // own keyword strategy, so its CMS pages must not be filtered by them.
+  // Keyword-variant pages stay live and should be included when published;
+  // only exclude if applyVariantClusters is explicitly true.
   const slug = p.replace(/^\/+/, "");
   if (applyVariantClusters && VARIANT_SLUGS.has(slug)) return true;
   return EXCLUDED_PREFIXES.some((pre) => p === pre || p.startsWith(pre + "/"));
 }
+
+const BUILTIN_STATIC_ROUTES = [
+  "/",
+  "/about-us",
+  "/about",
+  "/contact-us",
+  "/contact",
+  "/terms-conditions",
+  "/privacy-policy",
+  "/refund-cancellation-policy",
+  "/service-delivery-policy",
+  "/pricing-transparency",
+  "/disclaimer",
+  "/cookie-policy",
+  "/important-notice",
+  "/grievance-redressal-policy",
+  "/complaint-grievance-policy",
+  "/compliance-statement",
+  "/consent-acknowledgment",
+  "/aml-anti-fraud-policy",
+  "/other-problem",
+  "/notice",
+  "/complaint",
+  "/talk-to-expert",
+  "/udyam-registration",
+  "/new-udyam-registration",
+  "/download-udyam-certificate",
+  "/print-udyam-certificate",
+  "/verify-udyam-certificate",
+  "/update-udyam-certificate",
+  "/forgot-udyam-registration-number",
+  "/msme-registration",
+  "/msme-registration-fee",
+  "/migrate-udyog-aadhaar-to-udyam",
+];
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
@@ -127,18 +160,33 @@ export const Route = createFileRoute("/sitemap.xml")({
         const siteBlocked = (p: string) =>
           publicOnly && isBlockedOnSecondarySite(p, navPaths);
 
-        // 1. Discover static routes from the generated route tree.
+        // 1. Discover static routes from the generated route tree + builtin list.
         const mod = await import("@/routeTree.gen");
         const tree = (mod as unknown as {
-          routeTree: { children?: Record<string, { fullPath?: string }> };
+          routeTree: { children?: Record<string, unknown> | Array<unknown> };
         }).routeTree;
-        const all: string[] = [];
-        const walk = (node: { fullPath?: string; children?: Record<string, unknown> }) => {
-          if (node.fullPath !== undefined) all.push(node.fullPath);
-          const ch = node.children as
-            | Record<string, { fullPath?: string; children?: Record<string, unknown> }>
-            | undefined;
-          if (ch) Object.values(ch).forEach(walk);
+        const all: string[] = [...BUILTIN_STATIC_ROUTES];
+
+        const walk = (node: {
+          id?: string;
+          path?: string;
+          fullPath?: string;
+          options?: { path?: string };
+          children?: Record<string, unknown> | Array<unknown>;
+        }) => {
+          if (!node || typeof node !== "object") return;
+          const rawPath = node.fullPath || node.id || node.path || node.options?.path;
+          if (typeof rawPath === "string" && rawPath && rawPath.startsWith("/")) {
+            all.push(rawPath);
+          }
+          const ch = node.children;
+          if (ch) {
+            if (Array.isArray(ch)) {
+              ch.forEach((child) => walk(child as never));
+            } else if (typeof ch === "object") {
+              Object.values(ch).forEach((child) => walk(child as never));
+            }
+          }
         };
         walk(tree as never);
 
@@ -146,7 +194,7 @@ export const Route = createFileRoute("/sitemap.xml")({
           .filter((p): p is string => typeof p === "string")
           .map((p) => (p.length > 1 ? p.replace(/\/$/, "") : p))
           .map((p) => p.toLowerCase())
-          .filter((p) => !isExcluded(p) && !siteBlocked(p));
+          .filter((p) => !isExcluded(p, false) && !siteBlocked(p));
 
         // Stable lastmod for static routes. Bump this string only when the
         // route list or page content materially changes — do NOT use
@@ -162,21 +210,23 @@ export const Route = createFileRoute("/sitemap.xml")({
         //    their own updated_at so lastmod reflects real edits.
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          // Strictly scoped to THIS site — never fall back to other websites'
-          // SEO pages, or one domain's sitemap lists the other domain's slugs.
-          const { data } = await supabaseAdmin
+          let query = supabaseAdmin
             .from("seo_pages")
             .select("slug, updated_at")
-            .eq("website_id", currentSite?.id ?? "")
             .eq("enabled", true);
 
+          if (currentSite?.id) {
+            query = query.or(`website_id.eq.${currentSite.id},website_id.is.null`);
+          }
+
+          const { data } = await query;
 
           for (const row of data ?? []) {
             const slug = (row as { slug: string }).slug?.trim().toLowerCase();
             if (!slug) continue;
             let path = slug.startsWith("/") ? slug : `/${slug}`;
             path = path.length > 1 ? path.replace(/\/$/, "") : path;
-            if (isExcluded(path, !publicOnly)) continue;
+            if (isExcluded(path, false)) continue;
             const raw = (row as { updated_at?: string }).updated_at;
             const lastmod = raw ? raw.slice(0, 10) : STATIC_LASTMOD;
             entries.set(path, { path, lastmod });
@@ -193,14 +243,29 @@ export const Route = createFileRoute("/sitemap.xml")({
           const { listContentfulPageSlugsForWebsite } = await import(
             "@/lib/sitemap/sitemap.server"
           );
-          const cfSlugs = currentSite?.id
+          let cfSlugs = currentSite?.id
             ? await listContentfulPageSlugsForWebsite(currentSite.id)
             : [];
+
+          if (!cfSlugs || cfSlugs.length === 0) {
+            const { listContentfulSeoSlugs } = await import(
+              "@/lib/contentful/client.functions"
+            );
+            const globalCf = await listContentfulSeoSlugs().catch(() => []);
+            cfSlugs = globalCf.map((g) => ({
+              slug: g.slug,
+              title: g.slug,
+              canonicalUrl: g.canonicalUrl,
+              updatedAt: g.updatedAt,
+              contentType: "seoArticle",
+            }));
+          }
+
           for (const row of cfSlugs) {
             const path = `/${row.slug.replace(/^\/+/, "")}`;
-            // No siteBlocked() here: these entries come from THIS site's own
-            // Contentful space, so publishing one there puts it in the sitemap.
-            if (isExcluded(path, !publicOnly)) continue;
+            // No siteBlocked() here: these entries come from Contentful, so publishing
+            // one there puts it in the sitemap.
+            if (isExcluded(path, false)) continue;
             if (row.canonicalUrl) {
               let canonicalPath = row.canonicalUrl.trim().toLowerCase();
               canonicalPath = canonicalPath.replace(/^https?:\/\/[^/]+/, "");

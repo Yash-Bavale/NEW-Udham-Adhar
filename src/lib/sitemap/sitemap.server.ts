@@ -197,11 +197,32 @@ export type SitemapManagerItem = {
 
 const CORE_PAGES: Array<{ slug: string; label: string }> = [
   { slug: "/", label: "Homepage" },
+  { slug: "/udyam-registration", label: "Udyam Registration" },
+  { slug: "/new-udyam-registration", label: "New Udyam Registration" },
+  { slug: "/download-udyam-certificate", label: "Download Udyam Certificate" },
+  { slug: "/print-udyam-certificate", label: "Print Udyam Certificate" },
+  { slug: "/verify-udyam-certificate", label: "Verify Udyam Certificate" },
+  { slug: "/update-udyam-certificate", label: "Update Udyam Certificate" },
+  { slug: "/forgot-udyam-registration-number", label: "Forgot Udyam Registration Number" },
+  { slug: "/msme-registration", label: "MSME Registration" },
+  { slug: "/msme-registration-fee", label: "MSME Registration Fee" },
+  { slug: "/migrate-udyog-aadhaar-to-udyam", label: "Migrate Udyog Aadhaar to Udyam" },
+  { slug: "/talk-to-expert", label: "Talk to Expert" },
   { slug: "/about-us", label: "About Us" },
   { slug: "/contact-us", label: "Contact Us" },
   { slug: "/terms-conditions", label: "Terms & Conditions" },
   { slug: "/privacy-policy", label: "Privacy Policy" },
   { slug: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
+  { slug: "/service-delivery-policy", label: "Service Delivery Policy" },
+  { slug: "/pricing-transparency", label: "Pricing Transparency" },
+  { slug: "/disclaimer", label: "Disclaimer" },
+  { slug: "/cookie-policy", label: "Cookie Policy" },
+  { slug: "/important-notice", label: "Important Notice" },
+  { slug: "/grievance-redressal-policy", label: "Grievance Redressal Policy" },
+  { slug: "/complaint-grievance-policy", label: "Complaint Grievance Policy" },
+  { slug: "/compliance-statement", label: "Compliance Statement" },
+  { slug: "/consent-acknowledgment", label: "Consent Acknowledgment" },
+  { slug: "/aml-anti-fraud-policy", label: "AML & Anti-Fraud Policy" },
 ];
 
 /**
@@ -250,7 +271,7 @@ export async function collectSitemapItems(
     const { data: dbPages } = await supabaseAdmin
       .from("seo_pages")
       .select("slug, label, enabled, updated_at")
-      .eq("website_id", websiteId);
+      .or(`website_id.eq.${websiteId},website_id.is.null`);
     for (const row of (dbPages ?? []) as Array<{
       slug: string;
       label: string | null;
@@ -273,7 +294,23 @@ export async function collectSitemapItems(
     // ignore
   }
 
-  const cf = await listContentfulPageSlugsForWebsite(websiteId).catch(() => []);
+  let cf = await listContentfulPageSlugsForWebsite(websiteId).catch(() => []);
+  if (!cf || cf.length === 0) {
+    try {
+      const { listContentfulSeoSlugs } = await import("@/lib/contentful/client.functions");
+      const globalCf = await listContentfulSeoSlugs().catch(() => []);
+      cf = globalCf.map((g) => ({
+        slug: g.slug,
+        title: g.slug,
+        canonicalUrl: g.canonicalUrl,
+        updatedAt: g.updatedAt,
+        contentType: "seoArticle",
+      }));
+    } catch {
+      // ignore
+    }
+  }
+
   for (const row of cf) {
     put(row.slug, row.title || titleize(row.slug), "Contentful CMS", row.updatedAt);
   }

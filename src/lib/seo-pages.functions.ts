@@ -198,18 +198,31 @@ export const getSitemapPageManagerData = createServerFn({ method: "GET" })
     const CORE_PAGES = [
       { slug: "/", label: "Homepage" },
       { slug: "/udyam-registration", label: "Udyam Registration Online" },
+      { slug: "/new-udyam-registration", label: "New Udyam Registration" },
       { slug: "/download-udyam-certificate", label: "Download Udyam Certificate" },
       { slug: "/print-udyam-certificate", label: "Print Udyam Certificate" },
       { slug: "/verify-udyam-certificate", label: "Verify Udyam Certificate" },
       { slug: "/update-udyam-certificate", label: "Update Udyam Certificate" },
       { slug: "/forgot-udyam-registration-number", label: "Forgot Udyam Registration Number" },
       { slug: "/msme-registration", label: "MSME Registration" },
+      { slug: "/msme-registration-fee", label: "MSME Registration Fee" },
       { slug: "/migrate-udyog-aadhaar-to-udyam", label: "Migrate Udyog Aadhaar to Udyam" },
+      { slug: "/talk-to-expert", label: "Talk to Expert" },
       { slug: "/about-us", label: "About Us" },
       { slug: "/contact-us", label: "Contact Us" },
       { slug: "/terms-conditions", label: "Terms & Conditions" },
       { slug: "/privacy-policy", label: "Privacy Policy" },
       { slug: "/refund-cancellation-policy", label: "Refund & Cancellation Policy" },
+      { slug: "/service-delivery-policy", label: "Service Delivery Policy" },
+      { slug: "/pricing-transparency", label: "Pricing Transparency" },
+      { slug: "/disclaimer", label: "Disclaimer" },
+      { slug: "/cookie-policy", label: "Cookie Policy" },
+      { slug: "/important-notice", label: "Important Notice" },
+      { slug: "/grievance-redressal-policy", label: "Grievance Redressal Policy" },
+      { slug: "/complaint-grievance-policy", label: "Complaint Grievance Policy" },
+      { slug: "/compliance-statement", label: "Compliance Statement" },
+      { slug: "/consent-acknowledgment", label: "Consent Acknowledgment" },
+      { slug: "/aml-anti-fraud-policy", label: "AML & Anti-Fraud Policy" },
     ];
 
     for (const c of CORE_PAGES) {
@@ -230,7 +243,7 @@ export const getSitemapPageManagerData = createServerFn({ method: "GET" })
       const { data: dbPages } = await supabaseAdmin
         .from("seo_pages")
         .select("id, slug, label, enabled, updated_at")
-        .eq("website_id", site.id);
+        .or(`website_id.eq.${site.id},website_id.is.null`);
       for (const row of dbPages ?? []) {
         const path = row.slug.startsWith("/") ? row.slug : `/${row.slug}`;
         if (isPathSensitive(path)) continue;
