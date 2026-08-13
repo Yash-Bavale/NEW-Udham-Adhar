@@ -200,15 +200,17 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Contentful Homepage Rich Content Block */}
+      {/* Contentful Homepage Rich Content Section */}
       {cms?.longDescription ? (
-        <section className="mx-auto max-w-5xl px-4 py-6">
-          <article className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-            <div
-              className="p-6 md:p-8 text-foreground/90 text-[15px] space-y-4 [&_h1]:font-display [&_h1]:text-brand-navy-deep [&_h1]:text-3xl [&_h1]:md:text-4xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mb-4 [&_h2]:font-display [&_h2]:text-brand-navy-deep [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:font-display [&_h3]:text-foreground [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-3 [&_h4]:font-display [&_h4]:text-foreground [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:mt-4 [&_h4]:mb-2 [&_p]:my-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_a]:text-brand-navy [&_a]:underline [&_a]:hover:text-brand-navy-deep [&_strong]:font-bold [&_blockquote]:border-l-4 [&_blockquote]:border-brand-navy [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4"
-              dangerouslySetInnerHTML={{ __html: cms.longDescription }}
-            />
-          </article>
+        <section className="w-full bg-slate-50/60 border-y border-border/80 py-10 md:py-14 my-6 shadow-xs">
+          <div className="mx-auto max-w-7xl px-4">
+            <article className="rounded-2xl border border-border bg-card p-6 md:p-10 shadow-sm">
+              <div
+                className="text-foreground/90 text-[15px] space-y-4 [&_h1]:font-display [&_h1]:text-brand-navy-deep [&_h1]:text-3xl [&_h1]:md:text-4xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mb-6 [&_h2]:font-display [&_h2]:text-brand-navy-deep [&_h2]:text-2xl [&_h2]:md:text-3xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:pb-2 [&_h2]:border-b [&_h2]:border-border/50 [&_h3]:font-display [&_h3]:text-foreground [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-3 [&_h4]:font-display [&_h4]:text-foreground [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:mt-4 [&_h4]:mb-2 [&_p]:my-3.5 [&_p]:leading-relaxed [&_p]:text-foreground/85 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_ul]:space-y-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ol]:space-y-2 [&_a]:text-brand-navy [&_a]:font-medium [&_a]:underline [&_a]:hover:text-brand-navy-deep [&_strong]:font-semibold [&_strong]:text-foreground [&_blockquote]:border-l-4 [&_blockquote]:border-brand-navy [&_blockquote]:bg-muted/30 [&_blockquote]:p-4 [&_blockquote]:rounded-r-md [&_blockquote]:italic [&_blockquote]:my-4"
+                dangerouslySetInnerHTML={{ __html: cms.longDescription }}
+              />
+            </article>
+          </div>
         </section>
       ) : null}
 
