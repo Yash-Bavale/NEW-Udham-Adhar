@@ -121,12 +121,19 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
     ],
   });
   },
-  component: () => (
-    <RichServicePage
-      serviceTitle="Migrate Udyog Aadhaar to Udyam"
-      h1="Migrate Udyog Aadhar to Udyam — UAM to Udyam Re-registration"
-      intro="If your business holds an old Udyog Aadhar Memorandum (UAM), it must be migrated to the new Udyam registration system to remain eligible for MSME benefits. Business Help Services handles the entire UAM → Udyam migration end to end."
-      blocks={BLOCKS}
-    />
-  ),
+  component: function MigrateUdyogAadhaarPage() {
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    return (
+      <RichServicePage
+        serviceTitle={cms?.name || "Migrate Udyog Aadhaar"}
+        h1={cms?.name || "Migrate Udyog Aadhar to Udyam — UAM Migration Assistance"}
+        intro={
+          cms?.shortDescription ||
+          "Need to convert your old Udyog Aadhar Memorandum (UAM) into a valid Udyam Registration? Business Help Services provides step-by-step consultancy to complete your migration."
+        }
+        longDescriptionHtml={cms?.longDescription}
+        blocks={cms?.longDescription ? [] : BLOCKS}
+      />
+    );
+  },
 });

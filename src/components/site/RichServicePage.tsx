@@ -15,7 +15,8 @@ export type RichBlock =
 export interface RichServicePageProps {
   h1: string;
   intro: string; // TLDR text
-  blocks: RichBlock[];
+  blocks?: RichBlock[];
+  longDescriptionHtml?: string;
   /** Optional service slug; used for the LeadForm preselect. */
   serviceTitle?: string;
 }
@@ -115,7 +116,8 @@ function Block({ b }: { b: RichBlock }) {
 export function RichServicePage({
   h1,
   intro,
-  blocks,
+  blocks = [],
+  longDescriptionHtml,
   serviceTitle,
 }: RichServicePageProps) {
   return (
@@ -144,12 +146,22 @@ export function RichServicePage({
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <article className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="p-6 md:p-8 text-foreground/90 text-[15px]">
-            <h1 className="font-display text-brand-navy-deep text-3xl md:text-4xl font-bold leading-tight">
-              {h1}
-            </h1>
-            <p className="mt-4 text-base leading-relaxed text-foreground/85">
-              {intro}
-            </p>
+            {h1 && (
+              <h1 className="font-display text-brand-navy-deep text-3xl md:text-4xl font-bold leading-tight">
+                {h1}
+              </h1>
+            )}
+            {intro && (
+              <p className="mt-4 text-base leading-relaxed text-foreground/85">
+                {intro}
+              </p>
+            )}
+            {longDescriptionHtml ? (
+              <div
+                className="mt-6 space-y-4 prose max-w-none text-foreground/90"
+                dangerouslySetInnerHTML={{ __html: longDescriptionHtml }}
+              />
+            ) : null}
             {blocks.map((b, i) => (
               <Block key={i} b={b} />
             ))}

@@ -125,12 +125,19 @@ export const Route = createFileRoute("/new-udyam-registration")({
     ],
   });
   },
-  component: () => (
-    <RichServicePage
-      serviceTitle="Udyam New Registration"
-      h1="New Udyam Registration — Online MSME Certificate Application"
-      intro="Business Help Services is a private professional consultancy that assists individuals, proprietors and companies with the complete Udyam (MSME) registration process. We handle eligibility checks, document verification, application submission and certificate delivery — pan-India, in English and Hindi."
-      blocks={BLOCKS}
-    />
-  ),
+  component: function NewUdyamPage() {
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    return (
+      <RichServicePage
+        serviceTitle={cms?.name || "Udyam New Registration"}
+        h1={cms?.name || "New Udyam Registration — Online MSME Certificate Application"}
+        intro={
+          cms?.shortDescription ||
+          "Business Help Services is a private professional consultancy that assists individuals, proprietors and companies with the complete Udyam (MSME) registration process. We handle eligibility checks, document verification, application submission and certificate delivery — pan-India, in English and Hindi."
+        }
+        longDescriptionHtml={cms?.longDescription}
+        blocks={cms?.longDescription ? [] : BLOCKS}
+      />
+    );
+  },
 });

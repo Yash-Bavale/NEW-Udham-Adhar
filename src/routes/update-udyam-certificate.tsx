@@ -127,12 +127,19 @@ export const Route = createFileRoute("/update-udyam-certificate")({
     ],
   });
   },
-  component: () => (
-    <RichServicePage
-      serviceTitle="Update Udyam Certificate"
-      h1="Update Udyam Certificate — Edit MSME Registration Details"
-      intro="Need to update your Udyam (MSME) certificate? Business Help Services handles every type of edit — name, address, activity (NIC), bank, organisation type and contact details — with professional consultancy support."
-      blocks={BLOCKS}
-    />
-  ),
+  component: function UpdateUdyamPage() {
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    return (
+      <RichServicePage
+        serviceTitle={cms?.name || "Update Udyam Certificate"}
+        h1={cms?.name || "Update Udyam Certificate — Edit MSME Registration Details"}
+        intro={
+          cms?.shortDescription ||
+          "Need to update your Udyam (MSME) certificate? Business Help Services handles every type of edit — name, address, activity (NIC), bank, organisation type and contact details — with professional consultancy support."
+        }
+        longDescriptionHtml={cms?.longDescription}
+        blocks={cms?.longDescription ? [] : BLOCKS}
+      />
+    );
+  },
 });

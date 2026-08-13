@@ -124,12 +124,19 @@ export const Route = createFileRoute("/download-udyam-certificate")({
       ],
     };
   },
-  component: () => (
-    <RichServicePage
-      serviceTitle="Download Udyam Certificate"
-      h1="Download Udyam Certificate — Online MSME Download & Retrieval Assistance"
-      intro="Need to download your Udyam Certificate or retrieve a misplaced MSME registration? Business Help Services provides prompt consultancy and OTP-assisted retrieval for your official Udyam PDF certificate."
-      blocks={BLOCKS}
-    />
-  ),
+  component: function DownloadUdyamPage() {
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    return (
+      <RichServicePage
+        serviceTitle={cms?.name || "Download Udyam Certificate"}
+        h1={cms?.name || "Download Udyam Certificate — Online MSME Download & Retrieval Assistance"}
+        intro={
+          cms?.shortDescription ||
+          "Need to download your Udyam Certificate or retrieve a misplaced MSME registration? Business Help Services provides prompt consultancy and OTP-assisted retrieval for your official Udyam PDF certificate."
+        }
+        longDescriptionHtml={cms?.longDescription}
+        blocks={cms?.longDescription ? [] : BLOCKS}
+      />
+    );
+  },
 });
