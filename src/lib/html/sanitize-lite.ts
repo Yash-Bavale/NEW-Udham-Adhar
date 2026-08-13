@@ -44,7 +44,12 @@ function escapeText(text: string): string {
 }
 
 function escapeAttr(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  // Escape bare ampersands only; leave existing entities (&amp; &#39; &x;) intact
+  // so URLs with query strings aren't double-encoded.
+  return value
+    .replace(/&(?!#\d+;|#x[0-9a-fA-F]+;|[a-zA-Z][a-zA-Z0-9]{1,31};)/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
 }
 
 function isSafeUrl(raw: string): boolean {
