@@ -9,6 +9,7 @@ import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
 import mapImg from "@/assets/india-map.svg.asset.json";
 import {
   orgSchema,
+  websiteSchema,
   faqSchema,
   jsonLdScript,
 } from "@/lib/seo/jsonld";
@@ -25,9 +26,9 @@ import {
 import { FAQS as FALLBACK_FAQS } from "@/lib/faqs-data";
 
 const HOMEPAGE_TITLE =
-  "Udyam Registration & MSME Certificate Help";
+  "Udyam Registration Online | MSME Portal";
 const HOMEPAGE_DESC =
-  "Get expert assistance for Udyam registration, MSME certificate download, Udyog Aadhar update and migration. Private consultancy service. Apply online today.";
+  "Udyam Registration portal for MSME services. New Udyam Registration, Udyam Certificate Download, Forgot Udyam Certificate, Forgot Udyog Aadhaar, Udyog Aadhaar to Udyam Migration and Udyam Update";
 
 
 const STEPS = [
@@ -86,11 +87,11 @@ export const Route = createFileRoute("/")({
   head: ({ loaderData }) => {
     const ld = loaderData as
       | {
-          cms: ContentfulLandingPage | null;
-          faqs?: Array<{ q: string; a: string }>;
-          baseUrl?: string;
-          legalEntity?: string;
-        }
+        cms: ContentfulLandingPage | null;
+        faqs?: Array<{ q: string; a: string }>;
+        baseUrl?: string;
+        legalEntity?: string;
+      }
       | undefined;
     const cms = ld?.cms;
     const baseUrl = ld?.baseUrl || "https://udyamadhar.in";
@@ -119,32 +120,21 @@ export const Route = createFileRoute("/")({
       scripts: [
         jsonLdScript(orgSchema()),
         jsonLdScript(faqSchema(faqList)),
-        jsonLdScript({
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          "@id": `${baseUrl}/#website`,
-          url: `${baseUrl}/`,
-          name: orgName,
-          potentialAction: {
-            "@type": "SearchAction",
-            target: `${baseUrl}/?q={search_term_string}`,
-            "query-input": "required name=search_term_string",
-          },
-        }),
+        jsonLdScript(websiteSchema(baseUrl)),
         ...(baseUrl.toLowerCase().includes("udyamregistration")
           ? [
-              jsonLdScript({
-                "@context": "https://schema.org",
-                "@type": "ItemList",
-                "name": "Udyam & MSME Registration Services",
-                "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
-                  "@type": "ListItem",
-                  "position": index + 1,
-                  "name": srv.title,
-                  "url": `${baseUrl}${srv.path}`,
-                })),
-              }),
-            ]
+            jsonLdScript({
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              "name": "Udyam & MSME Registration Services",
+              "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "name": srv.title,
+                "url": `${baseUrl}${srv.path}`,
+              })),
+            }),
+          ]
           : []),
       ],
     };

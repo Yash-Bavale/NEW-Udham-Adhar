@@ -8,11 +8,11 @@ export const orgSchema = () => ({
   "@context": "https://schema.org",
   "@type": "Organization",
   "@id": ORG_ID,
-  name: "Business Help Services",
+  name: "Udyam Aadhar",
   url: `${SITE}/`,
   logo: `${SITE}/logo.png`,
   description:
-    "Private professional consultancy providing Udyam registration, MSME certificate assistance, Udyog Aadhar migration and compliance services.",
+    "Udyam Registration portal for MSME services. New Udyam Registration, Download Udyam Certificate, Forgot Udyam Certificate, Forgot Udyog Aadhaar, Udyog Aadhaar to Udyam Migration, MSME Certificate and Udyam Update.",
   areaServed: "India",
   knowsAbout: [
     "Udyam Registration",
@@ -26,7 +26,20 @@ export const orgSchema = () => ({
     telephone: "+91-9767870331",
     contactType: "customer service",
     areaServed: "IN",
-    availableLanguage: ["Hindi", "English", "Marathi"],
+    availableLanguage: [
+      "English",
+      "Hindi",
+      "Marathi",
+      "Bengali",
+      "Gujarati",
+      "Kannada",
+      "Malayalam",
+      "Punjabi",
+      "Sindhi",
+      "Tamil",
+      "Telugu",
+      "Urdu",
+    ],
   },
   sameAs: ["https://www.linkedin.com/company/business-help-services"],
   address: {
@@ -37,6 +50,14 @@ export const orgSchema = () => ({
     postalCode: "410505",
     addressCountry: "IN",
   },
+});
+
+export const websiteSchema = (baseUrl: string = SITE) => ({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Udyam Aadhar",
+  alternateName: "Udyam Aadhar Portal",
+  url: `${baseUrl}/`,
 });
 
 export const faqSchema = (items: Array<{ q: string; a: string }>) => ({
