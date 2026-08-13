@@ -164,7 +164,7 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
       ),
       safeCount(
         admin
-          .from("orders")
+          .from("applications")
           .select("id", { count: "exact", head: true })
           .not("fulfillment_status", "in", '("completed","cancelled","order_closed")')
       ),
@@ -188,13 +188,13 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
       ),
       safeCount(
         admin
-          .from("tickets")
+          .from("support_tickets")
           .select("id", { count: "exact", head: true })
           .not("status", "in", '("resolved","closed")')
       ),
       safeCount(
         admin
-          .from("email_quarantine")
+          .from("inbound_email_quarantine")
           .select("id", { count: "exact", head: true })
           .is("reviewed_at", null)
       ),

@@ -283,9 +283,6 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
               </div>
             </div>
           ))}
-              </div>
-            </div>
-          ))}
           <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
           <button
             onClick={async () => {
