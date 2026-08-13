@@ -502,6 +502,7 @@ export type ContentfulLandingPage = {
   whyUs: string[];
   faqs: Array<{ question: string; answer: string }>;
   ctas: Record<string, string> | null;
+  longDescription?: string;
 };
 
 type LandingPageFields = {
@@ -514,6 +515,9 @@ type LandingPageFields = {
   whyUs?: string[];
   faqs?: ContentfulLandingPage["faqs"];
   ctas?: ContentfulLandingPage["ctas"];
+  longDescription?: unknown;
+  content?: unknown;
+  body?: unknown;
 };
 
 export const getContentfulLandingPage = createServerFn({ method: "GET" })
@@ -537,6 +541,9 @@ export const getContentfulLandingPage = createServerFn({ method: "GET" })
         whyUs: Array.isArray(f.whyUs) ? f.whyUs : [],
         faqs: Array.isArray(f.faqs) ? f.faqs : [],
         ctas: f.ctas ?? null,
+        longDescription:
+          richTextToHtml(f.longDescription || f.content || f.body).trim() ||
+          richTextToPlain(f.longDescription || f.content || f.body).trim(),
       };
     } catch (err) {
       console.error("[contentful] getContentfulLandingPage failed:", err);
