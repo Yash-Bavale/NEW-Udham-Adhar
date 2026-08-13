@@ -157,6 +157,21 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Microsoft Clarity tracking code */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+(function(){
+  var p = window.location.pathname;
+  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
+  (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "y1q0o2w4ya");
+})();
+          `
+        }} />
+
         {/* Google Tag Manager — skipped entirely on admin paths to keep
             internal traffic out of GA/Ads reports. */}
         <script dangerouslySetInnerHTML={{
