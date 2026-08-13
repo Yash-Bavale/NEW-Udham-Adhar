@@ -102,12 +102,8 @@ export const setSitemapInclusion = createServerFn({ method: "POST" })
     );
     if (error) throw new Error(error.message);
 
-    // Keep database SEO pages consistent with the switch.
-    await supabaseAdmin
-      .from("seo_pages")
-      .update({ enabled: data.included })
-      .eq("website_id", data.websiteId)
-      .eq("slug", slug.replace(/^\//, ""));
+    // Note: this only controls sitemap inclusion. The page itself stays
+    // published — publishing is managed separately via seo_pages.enabled.
 
     return { ok: true };
   });
