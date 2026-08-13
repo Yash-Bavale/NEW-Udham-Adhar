@@ -9,7 +9,7 @@ export const orgSchema = () => ({
   "@type": "Organization",
   "@id": ORG_ID,
   name: "Udyam Aadhar",
-  url: `${SITE}/home`,
+  url: `${SITE}/`,
   logo: `${SITE}/logo.png`,
   description:
     "Udyam Registration portal for MSME services. New Udyam Registration, Download Udyam Certificate, Forgot Udyam Certificate, Forgot Udyog Aadhaar, Udyog Aadhaar to Udyam Migration, MSME Certificate and Udyam Update.",
@@ -100,7 +100,7 @@ export const websiteSchema = (baseUrl: string = SITE) => ({
   "@type": "WebSite",
   name: "Udyam Aadhar",
   alternateName: "Udyam Aadhar Portal",
-  url: `${baseUrl}/home`,
+  url: `${baseUrl}/`,
 });
 
 export const faqSchema = (items: Array<{ q: string; a: string }>) => ({

@@ -38,7 +38,7 @@ export const NAV_LINKS = [
   { to: "/download-udyam-certificate", label: "Download Udyam" },
   { to: "/migrate-udyog-aadhaar-to-udyam", label: "Migrate Udyog Aadhar" },
   { to: "/other-problem", label: "Other Problem" },
-  { to: "/home", label: "Home" },
+  { to: "/", label: "Home" },
   { to: "/about", label: "About Us" },
   { to: "/contact", label: "Contact us" },
   { to: "/important-notice", label: "Important Notice" },
