@@ -118,7 +118,7 @@ export const Route = createFileRoute("/")({
         },
       ],
       scripts: [
-        jsonLdScript(orgSchema()),
+        jsonLdScript(orgSchema(baseUrl)),
         jsonLdScript(faqSchema(faqList)),
         jsonLdScript(websiteSchema(baseUrl)),
         ...(baseUrl.toLowerCase().includes("udyamregistration")
