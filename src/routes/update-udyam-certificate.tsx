@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
+import {
+  getContentfulSeoArticle,
+  getContentfulServicePage,
+  type ContentfulSeoArticle,
+  type ContentfulServicePage,
+} from "@/lib/contentful/client.functions";
+import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
+import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -90,45 +97,76 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/update-udyam-certificate")({
-  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "update-udyam-certificate" } }) }),
+  loader: async () => {
+    const [cfArticle, cms] = await Promise.all([
+      getContentfulSeoArticle({ data: { slug: "update-udyam-certificate" } }).catch(() => null),
+      getContentfulServicePage({ data: { slug: "update-udyam-certificate" } }).catch(() => null),
+    ]);
+    return { cfArticle, cms };
+  },
   head: ({ loaderData }) => {
-    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
-    return ({
-    meta: [
-      { title: cms?.metaTitle || TITLE },
-      { name: "description", content: cms?.metaDescription || DESC },
-      { property: "og:title", content: cms?.metaTitle || TITLE },
-      { property: "og:description", content: cms?.metaDescription || DESC },
-      { property: "og:url", content: URL },
-    ],
-    links: [{ rel: "canonical", href: URL }],
-    scripts: [
-      jsonLdScript(
-        serviceSchema({
-          name: "Update Udyam Certificate",
-          url: URL,
-          description: DESC,
-        }),
-      ),
-      jsonLdScript(
-        howToSchema({
-          name: "How to update Udyam (MSME) certificate details",
-          totalTime: "P2D",
-          steps: STEPS,
-        }),
-      ),
-      jsonLdScript(faqSchema(FAQS)),
-      jsonLdScript(
-        breadcrumbSchema([
-          { name: "Home", url: "https://udyamadhar.in/" },
-          { name: "Update Udyam Certificate", url: URL },
-        ]),
-      ),
-    ],
-  });
+    const data = loaderData as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    } | undefined;
+    if (data?.cfArticle) {
+      const d = cfToSeoPageData(data.cfArticle);
+      return {
+        meta: [
+          { title: d.seo.metaTitle },
+          { name: "description", content: d.seo.metaDescription },
+          { property: "og:title", content: d.seo.ogTitle },
+          { property: "og:description", content: d.seo.ogDescription },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: d.canonical },
+        ],
+        links: [{ rel: "canonical", href: d.canonical }],
+        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
+      };
+    }
+    const cms = data?.cms;
+    return {
+      meta: [
+        { title: cms?.metaTitle || TITLE },
+        { name: "description", content: cms?.metaDescription || DESC },
+        { property: "og:title", content: cms?.metaTitle || TITLE },
+        { property: "og:description", content: cms?.metaDescription || DESC },
+        { property: "og:url", content: URL },
+      ],
+      links: [{ rel: "canonical", href: URL }],
+      scripts: [
+        jsonLdScript(
+          serviceSchema({
+            name: "Update Udyam Certificate",
+            url: URL,
+            description: DESC,
+          }),
+        ),
+        jsonLdScript(
+          howToSchema({
+            name: "How to update Udyam (MSME) certificate details",
+            totalTime: "P2D",
+            steps: STEPS,
+          }),
+        ),
+        jsonLdScript(faqSchema(FAQS)),
+        jsonLdScript(
+          breadcrumbSchema([
+            { name: "Home", url: "https://udyamadhar.in/" },
+            { name: "Update Udyam Certificate", url: URL },
+          ]),
+        ),
+      ],
+    };
   },
   component: function UpdateUdyamPage() {
-    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    const { cfArticle, cms } = Route.useLoaderData() as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    };
+    if (cfArticle) {
+      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
+    }
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Update Udyam Certificate"}

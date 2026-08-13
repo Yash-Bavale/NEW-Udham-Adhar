@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
+import {
+  getContentfulSeoArticle,
+  getContentfulServicePage,
+  type ContentfulSeoArticle,
+  type ContentfulServicePage,
+} from "@/lib/contentful/client.functions";
+import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
+import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -87,9 +94,34 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/download-udyam-certificate")({
-  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "download-udyam-certificate" } }) }),
+  loader: async () => {
+    const [cfArticle, cms] = await Promise.all([
+      getContentfulSeoArticle({ data: { slug: "download-udyam-certificate" } }).catch(() => null),
+      getContentfulServicePage({ data: { slug: "download-udyam-certificate" } }).catch(() => null),
+    ]);
+    return { cfArticle, cms };
+  },
   head: ({ loaderData }) => {
-    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
+    const data = loaderData as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    } | undefined;
+    if (data?.cfArticle) {
+      const d = cfToSeoPageData(data.cfArticle);
+      return {
+        meta: [
+          { title: d.seo.metaTitle },
+          { name: "description", content: d.seo.metaDescription },
+          { property: "og:title", content: d.seo.ogTitle },
+          { property: "og:description", content: d.seo.ogDescription },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: d.canonical },
+        ],
+        links: [{ rel: "canonical", href: d.canonical }],
+        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
+      };
+    }
+    const cms = data?.cms;
     return {
       meta: [
         { title: cms?.metaTitle || TITLE },
@@ -125,7 +157,13 @@ export const Route = createFileRoute("/download-udyam-certificate")({
     };
   },
   component: function DownloadUdyamPage() {
-    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    const { cfArticle, cms } = Route.useLoaderData() as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    };
+    if (cfArticle) {
+      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
+    }
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Download Udyam Certificate"}

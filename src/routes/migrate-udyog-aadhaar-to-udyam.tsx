@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
+import {
+  getContentfulSeoArticle,
+  getContentfulServicePage,
+  type ContentfulSeoArticle,
+  type ContentfulServicePage,
+} from "@/lib/contentful/client.functions";
+import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
+import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -60,69 +67,85 @@ const BLOCKS: RichBlock[] = [
   { type: "h2", text: "Who should migrate?" },
   {
     type: "p",
-    text: "Any business that holds an old Udyog Aadhar Memorandum (UAM) — typically issued between 2015 and 2020 — should migrate to Udyam to retain access to MSME benefits, government tenders, priority sector lending and subsidies. If you registered for MSME before July 2020, this service applies to you.",
+    text: "Any business possessing a legacy Udyog Aadhaar Memorandum (UAM) issued prior to July 2020 should convert to Udyam to maintain active MSME status and retain access to government benefits.",
   },
-  { type: "h2", text: "Documents required" },
-  {
-    type: "ul",
-    items: [
-      "Existing Udyog Aadhar Number (UAN) or acknowledgement copy.",
-      "Aadhaar of the proprietor / authorised signatory.",
-      "PAN of the business (or proprietor for sole proprietorships).",
-      "Bank account details, current address proof, GSTIN (if applicable).",
-      "Access to the registered mobile for OTP verification.",
-    ],
-  },
-  { type: "h2", text: "Migration process we handle for you" },
+  { type: "h2", text: "Step-by-step migration process" },
   { type: "ol", items: STEPS.map((s) => `${s.name}: ${s.text}`) },
-  {
-    type: "note",
-    text: "Government fee for migration is ₹0. Our charge is a professional consultancy fee published on our Pricing Transparency page. We are a private firm — not part of the MSME Ministry.",
-  },
   { type: "h2", text: "Frequently Asked Questions" },
   { type: "faq", items: FAQS },
 ];
 
 export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
-  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }) }),
+  loader: async () => {
+    const [cfArticle, cms] = await Promise.all([
+      getContentfulSeoArticle({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }).catch(() => null),
+      getContentfulServicePage({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }).catch(() => null),
+    ]);
+    return { cfArticle, cms };
+  },
   head: ({ loaderData }) => {
-    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
-    return ({
-    meta: [
-      { title: cms?.metaTitle || TITLE },
-      { name: "description", content: cms?.metaDescription || DESC },
-      { property: "og:title", content: cms?.metaTitle || TITLE },
-      { property: "og:description", content: cms?.metaDescription || DESC },
-      { property: "og:url", content: URL },
-    ],
-    links: [{ rel: "canonical", href: URL }],
-    scripts: [
-      jsonLdScript(
-        serviceSchema({
-          name: "Udyog Aadhar to Udyam Migration",
-          url: URL,
-          description: DESC,
-        }),
-      ),
-      jsonLdScript(
-        howToSchema({
-          name: "How to migrate Udyog Aadhar (UAM) to Udyam",
-          totalTime: "P3D",
-          steps: STEPS,
-        }),
-      ),
-      jsonLdScript(faqSchema(FAQS)),
-      jsonLdScript(
-        breadcrumbSchema([
-          { name: "Home", url: "https://udyamadhar.in/" },
-          { name: "Migrate Udyog Aadhar to Udyam", url: URL },
-        ]),
-      ),
-    ],
-  });
+    const data = loaderData as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    } | undefined;
+    if (data?.cfArticle) {
+      const d = cfToSeoPageData(data.cfArticle);
+      return {
+        meta: [
+          { title: d.seo.metaTitle },
+          { name: "description", content: d.seo.metaDescription },
+          { property: "og:title", content: d.seo.ogTitle },
+          { property: "og:description", content: d.seo.ogDescription },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: d.canonical },
+        ],
+        links: [{ rel: "canonical", href: d.canonical }],
+        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
+      };
+    }
+    const cms = data?.cms;
+    return {
+      meta: [
+        { title: cms?.metaTitle || TITLE },
+        { name: "description", content: cms?.metaDescription || DESC },
+        { property: "og:title", content: cms?.metaTitle || TITLE },
+        { property: "og:description", content: cms?.metaDescription || DESC },
+        { property: "og:url", content: URL },
+      ],
+      links: [{ rel: "canonical", href: URL }],
+      scripts: [
+        jsonLdScript(
+          serviceSchema({
+            name: "Migrate Udyog Aadhaar",
+            url: URL,
+            description: DESC,
+          }),
+        ),
+        jsonLdScript(
+          howToSchema({
+            name: "How to migrate Udyog Aadhaar to Udyam",
+            totalTime: "P2D",
+            steps: STEPS,
+          }),
+        ),
+        jsonLdScript(faqSchema(FAQS)),
+        jsonLdScript(
+          breadcrumbSchema([
+            { name: "Home", url: "https://udyamadhar.in/" },
+            { name: "Migrate Udyog Aadhaar to Udyam", url: URL },
+          ]),
+        ),
+      ],
+    };
   },
   component: function MigrateUdyogAadhaarPage() {
-    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
+    const { cfArticle, cms } = Route.useLoaderData() as {
+      cfArticle: ContentfulSeoArticle | null;
+      cms: ContentfulServicePage | null;
+    };
+    if (cfArticle) {
+      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
+    }
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Migrate Udyog Aadhaar"}
