@@ -33,6 +33,7 @@ import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as IndexDothtmlRouteImport } from './routes/index[.]html'
 import { Route as ImportantNoticeRouteImport } from './routes/important-notice'
 import { Route as GrievanceRedressalPolicyRouteImport } from './routes/grievance-redressal-policy'
+import { Route as DownloadUdyamCertificateRouteImport } from './routes/download-udyam-certificate'
 import { Route as DisclaimerRouteImport } from './routes/disclaimer'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as ContactUsRouteImport } from './routes/contact-us'
@@ -267,6 +268,12 @@ const GrievanceRedressalPolicyRoute =
   GrievanceRedressalPolicyRouteImport.update({
     id: '/grievance-redressal-policy',
     path: '/grievance-redressal-policy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DownloadUdyamCertificateRoute =
+  DownloadUdyamCertificateRouteImport.update({
+    id: '/download-udyam-certificate',
+    path: '/download-udyam-certificate',
     getParentRoute: () => rootRouteImport,
   } as any)
 const DisclaimerRoute = DisclaimerRouteImport.update({
@@ -871,6 +878,7 @@ export interface FileRoutesByFullPath {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
+  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1007,6 +1015,7 @@ export interface FileRoutesByTo {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
+  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1141,6 +1150,7 @@ export interface FileRoutesById {
   '/contact-us': typeof ContactUsRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/disclaimer': typeof DisclaimerRoute
+  '/download-udyam-certificate': typeof DownloadUdyamCertificateRoute
   '/grievance-redressal-policy': typeof GrievanceRedressalPolicyRoute
   '/important-notice': typeof ImportantNoticeRoute
   '/index.html': typeof IndexDothtmlRoute
@@ -1280,6 +1290,7 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
+    | '/download-udyam-certificate'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -1416,6 +1427,7 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
+    | '/download-udyam-certificate'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -1549,6 +1561,7 @@ export interface FileRouteTypes {
     | '/contact-us'
     | '/cookie-policy'
     | '/disclaimer'
+    | '/download-udyam-certificate'
     | '/grievance-redressal-policy'
     | '/important-notice'
     | '/index.html'
@@ -1687,6 +1700,7 @@ export interface RootRouteChildren {
   ContactUsRoute: typeof ContactUsRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DisclaimerRoute: typeof DisclaimerRoute
+  DownloadUdyamCertificateRoute: typeof DownloadUdyamCertificateRoute
   GrievanceRedressalPolicyRoute: typeof GrievanceRedressalPolicyRoute
   ImportantNoticeRoute: typeof ImportantNoticeRoute
   IndexDothtmlRoute: typeof IndexDothtmlRoute
@@ -1918,6 +1932,13 @@ declare module '@tanstack/react-router' {
       path: '/grievance-redressal-policy'
       fullPath: '/grievance-redressal-policy'
       preLoaderRoute: typeof GrievanceRedressalPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download-udyam-certificate': {
+      id: '/download-udyam-certificate'
+      path: '/download-udyam-certificate'
+      fullPath: '/download-udyam-certificate'
+      preLoaderRoute: typeof DownloadUdyamCertificateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/disclaimer': {
@@ -2929,6 +2950,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactUsRoute: ContactUsRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DisclaimerRoute: DisclaimerRoute,
+  DownloadUdyamCertificateRoute: DownloadUdyamCertificateRoute,
   GrievanceRedressalPolicyRoute: GrievanceRedressalPolicyRoute,
   ImportantNoticeRoute: ImportantNoticeRoute,
   IndexDothtmlRoute: IndexDothtmlRoute,
