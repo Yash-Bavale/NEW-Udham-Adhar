@@ -12,9 +12,16 @@ export const attachSupabaseAuthLazy = createMiddleware({ type: "function" }).cli
   async ({ next }) => {
     const { supabase } = await import("@/integrations/supabase/client");
     const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    let token = data.session?.access_token;
+    if (!token) {
+      // Session read can transiently fail (e.g. auth server briefly
+      // unreachable); try one refresh before sending an unauthenticated call.
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      token = refreshed.session?.access_token;
+    }
     return next({
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   },
 );
+
