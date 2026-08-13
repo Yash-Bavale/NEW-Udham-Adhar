@@ -2,10 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Eye, FileText, Settings2, Pencil, Trash2, Loader2 } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
 import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
+import { getBuilderSchema } from "@/lib/crm/form-builder.functions";
 import { fromBase, fromTotal } from "@/lib/pricing/gst";
+import { toast } from "sonner";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/admin/services/")({ component: ServicesPage });
 
@@ -30,7 +36,6 @@ function emptyForm(): ServiceForm {
   return { service_code: "", service_name: "", base_amount: 0, gst_amount: 0, total_amount: 0, is_active: true, sort_order: 0, govt_portal_url: "", category_id: null, expected_processing_days: null, journey_key: "default" };
 }
 
-
 function ServicesPage() {
   const listFn = useServerFn(listServices);
   const treeFn = useServerFn(listWebsiteTree);
@@ -42,6 +47,7 @@ function ServicesPage() {
 
   const [form, setForm] = useState<ServiceForm | null>(null);
   const [tab, setTab] = useState<string>("");
+  const [previewTarget, setPreviewTarget] = useState<{ code: string; name: string } | null>(null);
 
   const websites = tree?.websites ?? [];
   const categories = tree?.categories ?? [];
@@ -98,7 +104,7 @@ function ServicesPage() {
     return entries;
   }, [visibleRows, categoryById]);
 
-  const colCount = 8;
+  const colCount = 7;
 
   return (
     <div className="space-y-4">
@@ -112,8 +118,10 @@ function ServicesPage() {
                 activeTab === "__all__" || activeTab === "__none__" ? websites[0]?.id : activeTab,
             })
           }
-          className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm"
-        >+ New Service</button>
+          className="rounded bg-slate-900 text-white px-3.5 py-2 text-sm font-medium hover:bg-slate-800 transition-colors shadow-xs"
+        >
+          + New Service
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -134,7 +142,6 @@ function ServicesPage() {
           );
         })}
       </div>
-
 
       {form && (
         <div className="rounded-lg border bg-white p-4 space-y-3">
@@ -198,135 +205,360 @@ function ServicesPage() {
                   await upsertFn({ data: form as never });
                   await qc.invalidateQueries({ queryKey: ["admin.services"] });
                   setForm(null);
+                  toast.success("Service saved");
                 } catch (e) {
-                  alert("Save failed: " + (e as Error).message);
+                  toast.error("Save failed: " + (e as Error).message);
                 }
               }}
-              className="rounded bg-slate-900 text-white px-4 py-2 text-sm"
-            >Save</button>
-            <button onClick={() => setForm(null)} className="rounded border px-4 py-2 text-sm">Cancel</button>
+              className="rounded bg-slate-900 text-white px-4 py-2 text-sm font-medium"
+            >
+              Save
+            </button>
+            <button onClick={() => setForm(null)} className="rounded border px-4 py-2 text-sm font-medium">Cancel</button>
           </div>
         </div>
       )}
 
-      <div className="rounded-lg border bg-white overflow-x-auto">
+      <div className="rounded-lg border bg-white overflow-x-auto shadow-xs">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-slate-50/80 text-xs uppercase text-slate-500 border-b">
             <tr>
-              <th className="px-3 py-2 text-left">Code</th>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-right">Base</th>
-              <th className="px-3 py-2 text-right">GST</th>
-              <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-center">Sort</th>
-              <th className="px-3 py-2">Active</th>
-              <th className="px-3 py-2"></th>
+              <th className="px-3 py-2.5 text-left font-semibold">Name</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Base (₹)</th>
+              <th className="px-3 py-2.5 text-right font-semibold">GST 18%</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Total (₹)</th>
+              <th className="px-3 py-2.5 text-center font-semibold">Sort</th>
+              <th className="px-3 py-2.5 text-center font-semibold">Active</th>
+              <th className="px-3 py-2.5 text-right font-semibold">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {isLoading && <tr><td colSpan={colCount} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+          <tbody className="divide-y">
+            {isLoading && (
+              <tr>
+                <td colSpan={colCount} className="px-3 py-8 text-center text-slate-500">
+                  <div className="inline-flex items-center gap-2 text-sm">
+                    <Loader2 className="size-4 animate-spin text-slate-600" /> Loading services…
+                  </div>
+                </td>
+              </tr>
+            )}
             {!isLoading && visibleRows.length === 0 && (
-              <tr><td colSpan={colCount} className="px-3 py-6 text-center text-slate-500">No services for this website yet.</td></tr>
+              <tr><td colSpan={colCount} className="px-3 py-8 text-center text-slate-500">No services for this website yet.</td></tr>
             )}
             {groups.map((g) => (
               <Fragment key={g.key}>
-                <tr className="bg-slate-50/70 border-t">
-                  <td colSpan={colCount} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <tr className="bg-slate-100/60 border-t border-b">
+                  <td colSpan={colCount} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600">
                     {g.label} <span className="font-normal text-slate-400">({g.rows.length})</span>
                   </td>
                 </tr>
                 {g.rows.map((s) => (
-              <tr key={s.id} className="border-t">
+                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-slate-900">{s.service_name}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {s.website_id && websiteById[s.website_id] && (
+                          <span className="inline-flex items-center gap-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 font-medium">
+                            {websiteById[s.website_id].domain}
+                          </span>
+                        )}
+                        {s.category_id && categoryById[s.category_id] && (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 font-medium">
+                            {categoryById[s.category_id].name}
+                          </span>
+                        )}
+                        {s.govt_portal_url && (
+                          <a
+                            href={s.govt_portal_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
+                          >
+                            <ExternalLink className="size-3" /> Govt Portal
+                          </a>
+                        )}
+                      </div>
+                    </td>
 
-                <td className="px-3 py-2 font-mono text-xs">{s.service_code}</td>
-                <td className="px-3 py-2">
-                  <div className="font-medium">{s.service_name}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
-                    {s.website_id && websiteById[s.website_id] && (
-                      <span className="inline-flex items-center gap-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5">
-                        {websiteById[s.website_id].domain}
-                      </span>
-                    )}
-                    {s.category_id && categoryById[s.category_id] && (
-                      <span className="inline-flex items-center gap-1 rounded bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5">
-                        {categoryById[s.category_id].name}
-                      </span>
-                    )}
-                  </div>
-                  {s.govt_portal_url && (
-                    <a
-                      href={s.govt_portal_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-0.5 mt-0.5"
-                    >
-                      <ExternalLink className="size-3" /> Govt Portal
-                    </a>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right">₹{Number(s.base_amount).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right">₹{Number(s.gst_amount).toFixed(2)}</td>
-                <td className="px-3 py-2 text-right font-semibold">₹{Number(s.total_amount).toFixed(2)}</td>
-                <td className="px-3 py-2 text-center">
-                  <input
-                    type="number"
-                    defaultValue={s.sort_order ?? 0}
-                    onBlur={async (e) => {
-                      const next = Number(e.target.value);
-                      if (next === (s.sort_order ?? 0)) return;
-                      try {
-                        await upsertFn({ data: { ...(s as ServiceForm), sort_order: next } as never });
-                        await qc.invalidateQueries({ queryKey: ["admin.services"] });
-                      } catch (err) { alert((err as Error).message); }
-                    }}
-                    className="w-16 rounded border px-2 py-1 text-sm text-center"
-                  />
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <button
-                    onClick={async () => {
-                      try {
-                        await upsertFn({ data: { ...(s as ServiceForm), is_active: !s.is_active } as never });
-                        await qc.invalidateQueries({ queryKey: ["admin.services"] });
-                      } catch (e) { alert((e as Error).message); }
-                    }}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border ${s.is_active ? "bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"}`}
-                    title={s.is_active ? "Click to deactivate" : "Click to activate"}
-                  >
-                    <span className={`size-1.5 rounded-full ${s.is_active ? "bg-emerald-600" : "bg-slate-400"}`} />
-                    {s.is_active ? "Active" : "Inactive"}
-                  </button>
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <Link
-                    to="/admin/services/$serviceCode"
-                    params={{ serviceCode: s.service_code }}
-                    className="text-emerald-700 text-xs hover:underline mr-3"
-                  >Configure</Link>
-                  <Link
-                    to="/admin/services/forms/$serviceCode"
-                    params={{ serviceCode: s.service_code }}
-                    className="text-indigo-700 text-xs hover:underline mr-3"
-                  >Edit Form</Link>
-                  <button onClick={() => setForm(s as ServiceForm)} className="text-blue-700 text-xs hover:underline mr-3">Edit</button>
-                  <button
-                    onClick={async () => {
-                      if (!confirm("Delete this service?")) return;
-                      await delFn({ data: { id: s.id } });
-                      await qc.invalidateQueries({ queryKey: ["admin.services"] });
-                    }}
-                    className="text-red-700 text-xs hover:underline"
-                  >Delete</button>
-                </td>
-              </tr>
+                    {/* Inline Editable Base Amount */}
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <span className="text-xs text-slate-400 font-mono">₹</span>
+                        <input
+                          type="number"
+                          step="1"
+                          defaultValue={Number(s.base_amount ?? 0)}
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter") {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          onBlur={async (e) => {
+                            const newBase = Number(e.target.value);
+                            if (isNaN(newBase) || newBase < 0 || newBase === Number(s.base_amount ?? 0)) return;
+                            const { base, gst, total } = fromBase(newBase);
+                            try {
+                              await upsertFn({ data: { ...(s as ServiceForm), base_amount: base, gst_amount: gst, total_amount: total } as never });
+                              await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                              toast.success(`Updated base price to ₹${base.toFixed(2)} (Total: ₹${total.toFixed(2)})`);
+                            } catch (err) {
+                              toast.error((err as Error).message);
+                            }
+                          }}
+                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm font-semibold text-right focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                          title="Click to edit Base Price directly — 18% GST and Total will auto-update"
+                        />
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-2.5 text-right text-slate-600 font-mono text-xs">
+                      ₹{Number(s.gst_amount).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold text-slate-900 font-mono text-xs">
+                      ₹{Number(s.total_amount).toFixed(2)}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-center">
+                      <input
+                        type="number"
+                        defaultValue={s.sort_order ?? 0}
+                        onBlur={async (e) => {
+                          const next = Number(e.target.value);
+                          if (next === (s.sort_order ?? 0)) return;
+                          try {
+                            await upsertFn({ data: { ...(s as ServiceForm), sort_order: next } as never });
+                            await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                            toast.success("Sort order updated");
+                          } catch (err) { toast.error((err as Error).message); }
+                        }}
+                        className="w-14 rounded border border-slate-300 px-2 py-1 text-xs text-center font-medium"
+                      />
+                    </td>
+
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await upsertFn({ data: { ...(s as ServiceForm), is_active: !s.is_active } as never });
+                            await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                            toast.success(s.is_active ? "Service deactivated" : "Service activated");
+                          } catch (e) { toast.error((e as Error).message); }
+                        }}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${s.is_active ? "bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"}`}
+                        title={s.is_active ? "Click to deactivate" : "Click to activate"}
+                      >
+                        <span className={`size-1.5 rounded-full ${s.is_active ? "bg-emerald-600" : "bg-slate-400"}`} />
+                        {s.is_active ? "Active" : "Inactive"}
+                      </button>
+                    </td>
+
+                    {/* Modern Action Buttons */}
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewTarget({ code: s.service_code, name: s.service_name })}
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs"
+                          title="Preview customer application form"
+                        >
+                          <Eye className="size-3.5" /> Preview Form
+                        </button>
+                        <Link
+                          to="/admin/services/forms/$serviceCode"
+                          params={{ serviceCode: s.service_code }}
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors shadow-2xs"
+                          title="Edit form fields & schema"
+                        >
+                          <FileText className="size-3.5" /> Edit Form
+                        </Link>
+                        <Link
+                          to="/admin/services/$serviceCode"
+                          params={{ serviceCode: s.service_code }}
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs"
+                          title="Configure service settings"
+                        >
+                          <Settings2 className="size-3.5" /> Configure
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setForm(s as ServiceForm)}
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-colors shadow-2xs"
+                          title="Edit service details"
+                        >
+                          <Pencil className="size-3.5" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!confirm(`Delete service "${s.service_name}"?`)) return;
+                            try {
+                              await delFn({ data: { id: s.id } });
+                              await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                              toast.success("Service deleted");
+                            } catch (err) {
+                              toast.error((err as Error).message);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition-colors shadow-2xs"
+                          title="Delete service"
+                        >
+                          <Trash2 className="size-3.5" /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
               </Fragment>
             ))}
-
           </tbody>
         </table>
       </div>
+
+      {/* Interactive Form Preview Modal */}
+      {previewTarget && (
+        <FormPreviewModal
+          serviceCode={previewTarget.code}
+          serviceName={previewTarget.name}
+          onClose={() => setPreviewTarget(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function FormPreviewModal({
+  serviceCode,
+  serviceName,
+  onClose,
+}: {
+  serviceCode: string;
+  serviceName: string;
+  onClose: () => void;
+}) {
+  const getSchemaFn = useServerFn(getBuilderSchema);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.services.form-builder", serviceCode],
+    queryFn: () => getSchemaFn({ data: { service_code: serviceCode } }),
+  });
+
+  const schema = data?.current;
+  const sections = schema?.sections ?? [];
+  const documents = schema?.documents ?? [];
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+        <DialogHeader className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-indigo-50 to-white">
+          <div className="flex items-center gap-2">
+            <div className="grid place-items-center size-9 rounded-full bg-indigo-100 text-indigo-700 shrink-0">
+              <Eye className="size-4" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold">Form Preview — {serviceName}</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 font-mono">
+                Code: {serviceCode} ({sections.length} section{sections.length === 1 ? "" : "s"}, {documents.length} doc{documents.length === 1 ? "" : "s"})
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6 bg-slate-50/50">
+          {isLoading ? (
+            <div className="grid place-items-center h-48 text-sm text-slate-500">
+              <Loader2 className="size-5 animate-spin text-indigo-600 mb-2" />
+              Loading form schema preview…
+            </div>
+          ) : sections.length === 0 ? (
+            <div className="text-center py-10 text-slate-500 text-sm">
+              No sections configured for this form.
+            </div>
+          ) : (
+            <>
+              {sections.map((sec, idx) => (
+                <div key={sec.key || idx} className="rounded-xl border bg-white p-5 shadow-2xs space-y-4">
+                  <div className="border-b pb-2">
+                    <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                      <span className="grid place-items-center size-5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-bold">
+                        {idx + 1}
+                      </span>
+                      {sec.label}
+                    </h3>
+                    {sec.description && (
+                      <p className="text-xs text-slate-500 mt-1">{sec.description}</p>
+                    )}
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {sec.fields.map((f) => (
+                      <div key={f.key} className={f.type === "textarea" || f.type === "nic" || f.type === "plants" ? "md:col-span-2" : ""}>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">
+                          {f.label} {f.required && <span className="text-rose-500">*</span>}
+                        </label>
+                        {f.type === "select" ? (
+                          <select disabled className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
+                            <option>{f.placeholder || "Select option…"}</option>
+                            {f.options?.map((o) => (
+                              <option key={o}>{o}</option>
+                            ))}
+                          </select>
+                        ) : f.type === "textarea" ? (
+                          <textarea
+                            disabled
+                            rows={2}
+                            placeholder={f.placeholder || f.help || "Enter details…"}
+                            className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
+                          />
+                        ) : (
+                          <input
+                            type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                            disabled
+                            placeholder={f.placeholder || f.help || `Enter ${f.label.toLowerCase()}…`}
+                            className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
+                          />
+                        )}
+                        {f.help && <p className="text-[11px] text-slate-400 mt-0.5">{f.help}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {documents.length > 0 && (
+                <div className="rounded-xl border bg-white p-5 shadow-2xs space-y-3">
+                  <h3 className="font-semibold text-slate-900 text-sm flex items-center gap-2 border-b pb-2">
+                    Required Documents ({documents.length})
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {documents.map((d) => (
+                      <div key={d.key} className="rounded-lg border border-slate-200 p-3 bg-slate-50/50 flex items-start gap-2 text-xs">
+                        <FileText className="size-4 text-indigo-600 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            {d.label} {d.required && <span className="text-rose-500">*</span>}
+                          </div>
+                          {d.help && <div className="text-[11px] text-slate-500 mt-0.5">{d.help}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="shrink-0 px-5 py-3 border-t bg-slate-50 flex items-center justify-between">
+          <Link
+            to="/admin/services/forms/$serviceCode"
+            params={{ serviceCode }}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+          >
+            <Settings2 className="size-3.5" /> Edit this form in Builder →
+          </Link>
+          <Button variant="outline" size="sm" onClick={onClose}>Close Preview</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

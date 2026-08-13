@@ -16,7 +16,7 @@ const LeadCode = z.string().trim().regex(/^[A-Z]{2}-\d{4}-\d{6}$/, "Invalid refe
 async function loadLeadByCode(admin: any, leadCode: string) {
   const { data, error } = await admin
     .from("leads")
-    .select("id, lead_code, name, email, mobile, service, status, total_amount")
+    .select("id, lead_code, name, email, mobile, service, service_id, status, total_amount")
     .eq("lead_code", leadCode)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -25,34 +25,96 @@ async function loadLeadByCode(admin: any, leadCode: string) {
 }
 
 
-function serviceCodeFromLabel(serviceLabel: string | null): string {
-  if (!serviceLabel) return "new-udyam-registration";
-  const normalized = serviceLabel
-    .trim()
-    .toLowerCase()
-    .replace(/[–—]/g, "-")
-    .replace(/\s+/g, " ");
+/**
+ * Resolve the correct service_code for a lead.
+ *
+ * Resolution order (most reliable → least reliable):
+ * 1. service_id FK — look up service_code from services table. Immune to renames.
+ * 2. onboarding_submissions.service_code — saved when form was first loaded/submitted. Also immune to renames.
+ * 3. Text match against current service_name values in DB (catches unlinked leads whose service name still matches).
+ * 4. Hardcoded legacy aliases — very old leads with old name labels.
+ * 5. SERVICES constant slug match.
+ * 6. Ultimate fallback: "new-udyam-registration" (with console warning).
+ */
+async function resolveServiceCode(
+  admin: any,
+  serviceId: string | null | undefined,
+  leadId: string | null | undefined,
+  serviceLabel: string | null | undefined,
+): Promise<string> {
+  // 1️⃣ service_id FK — the gold standard, unaffected by any name or label change
+  if (serviceId) {
+    const { data } = await admin
+      .from("services")
+      .select("service_code")
+      .eq("id", serviceId)
+      .maybeSingle();
+    if (data?.service_code) return data.service_code as string;
+  }
 
-  const aliases: Record<string, string> = {
-    "new udyam registration": "new-udyam-registration",
-    "new business help services": "new-udyam-registration",
-    "update udyam certificate": "update-udyam-certificate",
-    "download udyam certificate": "download-udyam-certificate",
-    "udyam registration certificate download": "download-udyam-certificate",
-    migrate: "migrate-udyog-aadhaar-to-udyam",
-    "udyog aadhaar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
-    "udyog aadhar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
-    "forgot registered mobile / email": "forgot-mobile-email",
-    "forgot registered mobile/email": "forgot-mobile-email",
-    "correct pan / aadhaar name in udyam": "correct-pan-aadhaar",
-    "correct pan / aadhar name in udyam": "correct-pan-aadhaar",
-    "talk to expert": "talk-to-expert",
-    "talk to expert - suitable service selection": "talk-to-expert",
-    "expert consultation": "talk-to-expert",
-  };
+  // 2️⃣ onboarding_submissions.service_code — stored at form load time, never re-derived
+  //    Reliable even for old leads without service_id, after their first visit
+  if (leadId) {
+    const { data: sub } = await admin
+      .from("onboarding_submissions")
+      .select("service_code")
+      .eq("lead_id", leadId)
+      .not("service_code", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (sub?.service_code) return sub.service_code as string;
+  }
 
-  const match = SERVICES.find((s) => s.label.trim().toLowerCase().replace(/[–—]/g, "-") === normalized);
-  return aliases[normalized] ?? match?.slug ?? "new-udyam-registration";
+  // 3️⃣ Current DB service_name match — for old leads with no service_id and no prior submission
+  if (serviceLabel) {
+    const normalized = serviceLabel.trim().toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+    const { data: svcRows } = await admin
+      .from("services")
+      .select("service_code, service_name")
+      .limit(200);
+    if (svcRows?.length) {
+      const match = (svcRows as Array<{ service_code: string; service_name: string }>).find(
+        (r) => r.service_name.trim().toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ") === normalized,
+      );
+      if (match) return match.service_code;
+    }
+  }
+
+  // 4️⃣ Hardcoded legacy aliases — very old leads with old name labels that no longer exist in DB
+  if (serviceLabel) {
+    const normalized = serviceLabel.trim().toLowerCase().replace(/[–—]/g, "-").replace(/\s+/g, " ");
+    const aliases: Record<string, string> = {
+      "new udyam registration": "new-udyam-registration",
+      "new business help services": "new-udyam-registration",
+      "update udyam certificate": "update-udyam-certificate",
+      "download udyam certificate": "download-udyam-certificate",
+      "udyam registration certificate download": "download-udyam-certificate",
+      "download old udyam certificate": "download-udyam-certificate",
+      "3 page udyam certificate download": "download-udyam-certificate",
+      migrate: "migrate-udyog-aadhaar-to-udyam",
+      "udyog aadhaar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
+      "udyog aadhar to udyam migration": "migrate-udyog-aadhaar-to-udyam",
+      "forgot registered mobile / email": "forgot-mobile-email",
+      "forgot registered mobile/email": "forgot-mobile-email",
+      "correct pan / aadhaar name in udyam": "correct-pan-aadhaar",
+      "correct pan / aadhar name in udyam": "correct-pan-aadhaar",
+      "talk to expert": "talk-to-expert",
+      "talk to expert - suitable service selection": "talk-to-expert",
+      "expert consultation": "talk-to-expert",
+    };
+    if (aliases[normalized]) return aliases[normalized];
+
+    // 5️⃣ SERVICES constant slug match
+    const match = SERVICES.find(
+      (s) => s.label.trim().toLowerCase().replace(/[–—]/g, "-") === normalized,
+    );
+    if (match?.slug) return match.slug;
+  }
+
+  // 6️⃣ Ultimate fallback
+  console.warn(`[resolveServiceCode] Could not resolve service code for label="${serviceLabel}" id="${serviceId}" leadId="${leadId}" — falling back to new-udyam-registration`);
+  return "new-udyam-registration";
 }
 
 /** Public: read everything needed to render the onboarding form. */
@@ -62,7 +124,7 @@ export const getOnboarding = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
     const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
-    const serviceCode = serviceCodeFromLabel(lead.service);
+    const serviceCode = await resolveServiceCode(supabaseAdmin, (lead as any).service_id, lead.id, lead.service);
     const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
 
     const [submissionRes, docsRes, paidPaymentRes] = await Promise.all([
@@ -124,7 +186,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
     const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
-    const serviceCode = serviceCodeFromLabel(lead.service);
+    const serviceCode = await resolveServiceCode(supabaseAdmin, (lead as any).service_id, lead.id, lead.service);
     const schema = await loadServiceSchema(serviceCode);
 
     // For correct-pan-aadhaar: Stage 2 submit only carries Stage 2 values; merge
