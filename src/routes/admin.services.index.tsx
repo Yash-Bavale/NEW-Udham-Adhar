@@ -441,9 +441,20 @@ function FormPreviewModal({
     queryFn: () => getSchemaFn({ data: { service_code: serviceCode } }),
   });
 
-  const schema = data?.current;
-  const sections = schema?.sections ?? [];
-  const documents = schema?.documents ?? [];
+  const activeRow = data?.active;
+  // schema is nested: activeRow.schema.sections (builder format) or flat activeRow.schema.fields
+  const rawSchema = (activeRow?.schema ?? {}) as {
+    sections?: Array<{ key: string; label: string; description?: string; fields: any[] }>;
+    fields?: any[];
+  };
+  const sections: Array<{ key: string; label: string; description?: string; fields: any[] }> =
+    rawSchema.sections?.length
+      ? rawSchema.sections
+      : rawSchema.fields?.length
+        ? [{ key: "default", label: "Details", fields: rawSchema.fields }]
+        : [];
+  const documents: Array<{ key: string; label: string; required?: boolean; help?: string }> =
+    (activeRow?.documents as any[]) ?? [];
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
