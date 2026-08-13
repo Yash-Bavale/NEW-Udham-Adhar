@@ -148,6 +148,11 @@ function richTextToHtml(node: unknown): string {
       continue;
     }
 
+    if (type === "heading-1") {
+      const inner = children.map(richTextInlineToHtml).join("");
+      if (inner.trim()) parts.push(`<h1>${inner}</h1>`);
+      continue;
+    }
     if (type === "heading-2") {
       const inner = children.map(richTextInlineToHtml).join("");
       if (inner.trim()) parts.push(`<h2>${inner}</h2>`);

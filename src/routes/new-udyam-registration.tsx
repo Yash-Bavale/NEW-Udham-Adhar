@@ -1,12 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  getContentfulSeoArticle,
-  getContentfulServicePage,
-  type ContentfulSeoArticle,
-  type ContentfulServicePage,
-} from "@/lib/contentful/client.functions";
-import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
-import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
+import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -95,34 +88,9 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/new-udyam-registration")({
-  loader: async () => {
-    const [cfArticle, cms] = await Promise.all([
-      getContentfulSeoArticle({ data: { slug: "new-udyam-registration" } }).catch(() => null),
-      getContentfulServicePage({ data: { slug: "new-udyam-registration" } }).catch(() => null),
-    ]);
-    return { cfArticle, cms };
-  },
+  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "new-udyam-registration" } }) }),
   head: ({ loaderData }) => {
-    const data = loaderData as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    } | undefined;
-    if (data?.cfArticle) {
-      const d = cfToSeoPageData(data.cfArticle);
-      return {
-        meta: [
-          { title: d.seo.metaTitle },
-          { name: "description", content: d.seo.metaDescription },
-          { property: "og:title", content: d.seo.ogTitle },
-          { property: "og:description", content: d.seo.ogDescription },
-          { property: "og:type", content: "article" },
-          { property: "og:url", content: d.canonical },
-        ],
-        links: [{ rel: "canonical", href: d.canonical }],
-        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
-      };
-    }
-    const cms = data?.cms;
+    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
     return {
       meta: [
         { title: cms?.metaTitle || TITLE },
@@ -158,21 +126,12 @@ export const Route = createFileRoute("/new-udyam-registration")({
     };
   },
   component: function NewUdyamPage() {
-    const { cfArticle, cms } = Route.useLoaderData() as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    };
-    if (cfArticle) {
-      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
-    }
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Udyam New Registration"}
         h1={cms?.name || "New Udyam Registration — Online MSME Certificate Application"}
-        intro={
-          cms?.shortDescription ||
-          "Business Help Services is a private professional consultancy that assists individuals, proprietors and companies with the complete Udyam (MSME) registration process. We handle eligibility checks, document verification, application submission and certificate delivery — pan-India, in English and Hindi."
-        }
+        intro={cms?.shortDescription || ""}
         longDescriptionHtml={cms?.longDescription}
         blocks={cms?.longDescription ? [] : BLOCKS}
       />

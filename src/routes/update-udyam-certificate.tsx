@@ -1,12 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  getContentfulSeoArticle,
-  getContentfulServicePage,
-  type ContentfulSeoArticle,
-  type ContentfulServicePage,
-} from "@/lib/contentful/client.functions";
-import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
-import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
+import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -97,34 +90,9 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/update-udyam-certificate")({
-  loader: async () => {
-    const [cfArticle, cms] = await Promise.all([
-      getContentfulSeoArticle({ data: { slug: "update-udyam-certificate" } }).catch(() => null),
-      getContentfulServicePage({ data: { slug: "update-udyam-certificate" } }).catch(() => null),
-    ]);
-    return { cfArticle, cms };
-  },
+  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "update-udyam-certificate" } }) }),
   head: ({ loaderData }) => {
-    const data = loaderData as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    } | undefined;
-    if (data?.cfArticle) {
-      const d = cfToSeoPageData(data.cfArticle);
-      return {
-        meta: [
-          { title: d.seo.metaTitle },
-          { name: "description", content: d.seo.metaDescription },
-          { property: "og:title", content: d.seo.ogTitle },
-          { property: "og:description", content: d.seo.ogDescription },
-          { property: "og:type", content: "article" },
-          { property: "og:url", content: d.canonical },
-        ],
-        links: [{ rel: "canonical", href: d.canonical }],
-        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
-      };
-    }
-    const cms = data?.cms;
+    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
     return {
       meta: [
         { title: cms?.metaTitle || TITLE },
@@ -160,21 +128,12 @@ export const Route = createFileRoute("/update-udyam-certificate")({
     };
   },
   component: function UpdateUdyamPage() {
-    const { cfArticle, cms } = Route.useLoaderData() as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    };
-    if (cfArticle) {
-      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
-    }
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Update Udyam Certificate"}
         h1={cms?.name || "Update Udyam Certificate — Edit MSME Registration Details"}
-        intro={
-          cms?.shortDescription ||
-          "Need to update your Udyam (MSME) certificate? Business Help Services handles every type of edit — name, address, activity (NIC), bank, organisation type and contact details — with professional consultancy support."
-        }
+        intro={cms?.shortDescription || ""}
         longDescriptionHtml={cms?.longDescription}
         blocks={cms?.longDescription ? [] : BLOCKS}
       />

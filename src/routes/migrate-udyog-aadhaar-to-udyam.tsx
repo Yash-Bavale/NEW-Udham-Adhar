@@ -1,12 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  getContentfulSeoArticle,
-  getContentfulServicePage,
-  type ContentfulSeoArticle,
-  type ContentfulServicePage,
-} from "@/lib/contentful/client.functions";
-import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
-import { SeoContentPage, buildSeoJsonLd } from "@/components/site/SeoContentPage";
+import { getContentfulServicePage, type ContentfulServicePage } from "@/lib/contentful/client.functions";
 import { RichServicePage, type RichBlock } from "@/components/site/RichServicePage";
 import {
   jsonLdScript,
@@ -76,34 +69,9 @@ const BLOCKS: RichBlock[] = [
 ];
 
 export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
-  loader: async () => {
-    const [cfArticle, cms] = await Promise.all([
-      getContentfulSeoArticle({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }).catch(() => null),
-      getContentfulServicePage({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }).catch(() => null),
-    ]);
-    return { cfArticle, cms };
-  },
+  loader: async () => ({ cms: await getContentfulServicePage({ data: { slug: "migrate-udyog-aadhaar-to-udyam" } }) }),
   head: ({ loaderData }) => {
-    const data = loaderData as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    } | undefined;
-    if (data?.cfArticle) {
-      const d = cfToSeoPageData(data.cfArticle);
-      return {
-        meta: [
-          { title: d.seo.metaTitle },
-          { name: "description", content: d.seo.metaDescription },
-          { property: "og:title", content: d.seo.ogTitle },
-          { property: "og:description", content: d.seo.ogDescription },
-          { property: "og:type", content: "article" },
-          { property: "og:url", content: d.canonical },
-        ],
-        links: [{ rel: "canonical", href: d.canonical }],
-        scripts: [{ type: "application/ld+json", children: buildSeoJsonLd(d) }],
-      };
-    }
-    const cms = data?.cms;
+    const cms = (loaderData as { cms: ContentfulServicePage | null } | undefined)?.cms;
     return {
       meta: [
         { title: cms?.metaTitle || TITLE },
@@ -139,21 +107,12 @@ export const Route = createFileRoute("/migrate-udyog-aadhaar-to-udyam")({
     };
   },
   component: function MigrateUdyogAadhaarPage() {
-    const { cfArticle, cms } = Route.useLoaderData() as {
-      cfArticle: ContentfulSeoArticle | null;
-      cms: ContentfulServicePage | null;
-    };
-    if (cfArticle) {
-      return <SeoContentPage data={cfToSeoPageData(cfArticle)} />;
-    }
+    const { cms } = Route.useLoaderData() as { cms: ContentfulServicePage | null };
     return (
       <RichServicePage
         serviceTitle={cms?.name || "Migrate Udyog Aadhaar"}
         h1={cms?.name || "Migrate Udyog Aadhar to Udyam — UAM Migration Assistance"}
-        intro={
-          cms?.shortDescription ||
-          "Need to convert your old Udyog Aadhar Memorandum (UAM) into a valid Udyam Registration? Business Help Services provides step-by-step consultancy to complete your migration."
-        }
+        intro={cms?.shortDescription || ""}
         longDescriptionHtml={cms?.longDescription}
         blocks={cms?.longDescription ? [] : BLOCKS}
       />

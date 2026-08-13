@@ -146,25 +146,28 @@ export function RichServicePage({
       <section className="mx-auto max-w-5xl px-4 pb-10">
         <article className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="p-6 md:p-8 text-foreground/90 text-[15px]">
-            {h1 && (
-              <h1 className="font-display text-brand-navy-deep text-3xl md:text-4xl font-bold leading-tight">
-                {h1}
-              </h1>
-            )}
-            {intro && (
-              <p className="mt-4 text-base leading-relaxed text-foreground/85">
-                {intro}
-              </p>
-            )}
             {longDescriptionHtml ? (
               <div
-                className="mt-6 space-y-4 prose max-w-none text-foreground/90"
+                className="space-y-4 text-foreground/90 text-[15px] [&_h1]:font-display [&_h1]:text-brand-navy-deep [&_h1]:text-3xl [&_h1]:md:text-4xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mb-4 [&_h2]:font-display [&_h2]:text-brand-navy-deep [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:font-display [&_h3]:text-foreground [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-3 [&_h4]:font-display [&_h4]:text-foreground [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:mt-4 [&_h4]:mb-2 [&_p]:my-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_a]:text-brand-navy [&_a]:underline [&_a]:hover:text-brand-navy-deep [&_strong]:font-bold [&_blockquote]:border-l-4 [&_blockquote]:border-brand-navy [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4"
                 dangerouslySetInnerHTML={{ __html: longDescriptionHtml }}
               />
-            ) : null}
-            {blocks.map((b, i) => (
-              <Block key={i} b={b} />
-            ))}
+            ) : (
+              <>
+                {h1 && (
+                  <h1 className="font-display text-brand-navy-deep text-3xl md:text-4xl font-bold leading-tight">
+                    {h1}
+                  </h1>
+                )}
+                {intro && (
+                  <p className="mt-4 text-base leading-relaxed text-foreground/85">
+                    {intro}
+                  </p>
+                )}
+                {blocks.map((b, i) => (
+                  <Block key={i} b={b} />
+                ))}
+              </>
+            )}
           </div>
         </article>
       </section>
