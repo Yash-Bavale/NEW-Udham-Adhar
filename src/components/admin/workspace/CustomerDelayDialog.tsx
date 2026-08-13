@@ -113,10 +113,10 @@ export function CustomerDelayDialog({ applicationId, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
-        <DialogHeader className="px-5 py-4 border-b bg-gradient-to-r from-amber-50 to-white">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+        <DialogHeader className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-amber-50 to-white">
           <div className="flex items-center gap-2">
-            <div className="grid place-items-center size-9 rounded-full bg-amber-100 text-amber-700">
+            <div className="grid place-items-center size-9 rounded-full bg-amber-100 text-amber-700 shrink-0">
               <User2 className="size-4" />
             </div>
             <div>
@@ -128,113 +128,112 @@ export function CustomerDelayDialog({ applicationId, open, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px]">
-          {/* Reason list */}
-          <div className="border-r">
-            <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search customer reasons…"
-                  className="pl-8 h-8 text-sm"
-                />
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                {filteredReasons.length} reason{filteredReasons.length === 1 ? "" : "s"}
-              </Badge>
-            </div>
-
-            <ScrollArea className="h-[340px] px-4 pb-4">
-              {reasonsLoading ? (
-                <div className="grid place-items-center h-40 text-sm text-slate-500">
-                  <Loader2 className="size-4 animate-spin" />
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="border-r">
+              <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search customer reasons…"
+                    className="pl-8 h-8 text-sm"
+                  />
                 </div>
-              ) : filteredReasons.length === 0 ? (
-                <div className="text-sm text-slate-500 py-10 text-center">No customer reasons configured.</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {filteredReasons.map((r: any) => {
-                    const on = r.code === reasonCode;
-                    return (
-                      <button
-                        key={r.code}
-                        type="button"
-                        onClick={() => setReasonCode(r.code)}
-                        className={cn(
-                          "w-full text-left rounded-lg border p-2.5 transition",
-                          on ? "border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-200" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                        )}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className={cn("mt-0.5 size-4 rounded-full border grid place-items-center shrink-0", on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-300 bg-white")}>
-                            {on && <CheckCircle2 className="size-3" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-medium text-slate-900 leading-snug">{r.label}</div>
-                            {r.description && (
-                              <div className="text-[11.5px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{r.description}</div>
-                            )}
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <span className="text-[9.5px] font-mono uppercase text-slate-400 tracking-wider">{r.code}</span>
-                              {r.email_template_code && (
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono">
-                                  {r.email_template_code.toUpperCase().replace("BHS_", "")}
-                                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {filteredReasons.length} reason{filteredReasons.length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+
+              <ScrollArea className="h-[220px] md:h-[260px] px-4 pb-4">
+                {reasonsLoading ? (
+                  <div className="grid place-items-center h-40 text-sm text-slate-500">
+                    <Loader2 className="size-4 animate-spin" />
+                  </div>
+                ) : filteredReasons.length === 0 ? (
+                  <div className="text-sm text-slate-500 py-10 text-center">No customer reasons configured.</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredReasons.map((r: any) => {
+                      const on = r.code === reasonCode;
+                      return (
+                        <button
+                          key={r.code}
+                          type="button"
+                          onClick={() => setReasonCode(r.code)}
+                          className={cn(
+                            "w-full text-left rounded-lg border p-2.5 transition",
+                            on ? "border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-200" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={cn("mt-0.5 size-4 rounded-full border grid place-items-center shrink-0", on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-300 bg-white")}>
+                              {on && <CheckCircle2 className="size-3" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-medium text-slate-900 leading-snug">{r.label}</div>
+                              {r.description && (
+                                <div className="text-[11.5px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{r.description}</div>
                               )}
+                              <div className="flex items-center gap-1.5 mt-1.5">
+                                <span className="text-[9.5px] font-mono uppercase text-slate-400 tracking-wider">{r.code}</span>
+                                {r.email_template_code && (
+                                  <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono">
+                                    {r.email_template_code.toUpperCase().replace("BHS_", "")}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
 
-          {/* Info panel */}
-          <div className="p-4 bg-slate-50/30">
-            <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 text-[11.5px] text-amber-900 flex gap-2">
-              <Info className="size-3.5 shrink-0 mt-0.5" />
-              <div className="leading-snug">
-                Customer receives <b>E003</b> now. Order auto-closes after <b>{fmtDuration(autocloseMinutes)}</b> if there's no reply. You can <b>Resume</b> anytime before that.
+            <div className="p-4 bg-slate-50/30">
+              <div className="rounded-md border border-amber-200 bg-amber-50/70 p-3 text-[11.5px] text-amber-900 flex gap-2">
+                <Info className="size-3.5 shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  Customer receives <b>E003</b> now. Order auto-closes after <b>{fmtDuration(autocloseMinutes)}</b> if there's no reply. You can <b>Resume</b> anytime before that.
+                </div>
+              </div>
+              <div className="mt-3 text-[11px] text-slate-500 leading-snug">
+                No internal follow-up reminder is set — that's tracked automatically by the auto-close timer. If you need our-side follow-ups, use <b>Technical Delay</b> instead.
               </div>
             </div>
-            <div className="mt-3 text-[11px] text-slate-500 leading-snug">
-              No internal follow-up reminder is set — that's tracked automatically by the auto-close timer. If you need our-side follow-ups, use <b>Technical Delay</b> instead.
+          </div>
+
+          <div className="px-5 py-4 border-t space-y-3 bg-white">
+            <div>
+              <Label className="text-[11px] uppercase tracking-wider text-slate-500">Internal note (visible to the team only)</Label>
+              <Textarea
+                value={internalNote}
+                onChange={(e) => setInternalNote(e.target.value)}
+                rows={2}
+                className="mt-1 text-sm"
+                placeholder={selected?.description ? `e.g. ${selected.description.slice(0, 80)}…` : "Add context for the team"}
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <MessageCircle className="size-3" /> Customer-visible note (optional — appended to the email)
+              </Label>
+              <Textarea
+                value={customerNote}
+                onChange={(e) => setCustomerNote(e.target.value)}
+                rows={2}
+                className="mt-1 text-sm"
+                placeholder="Will be included at the bottom of the delay email"
+              />
             </div>
           </div>
         </div>
 
-        {/* Notes */}
-        <div className="px-5 py-4 border-t space-y-3 bg-white">
-          <div>
-            <Label className="text-[11px] uppercase tracking-wider text-slate-500">Internal note (visible to the team only)</Label>
-            <Textarea
-              value={internalNote}
-              onChange={(e) => setInternalNote(e.target.value)}
-              rows={2}
-              className="mt-1 text-sm"
-              placeholder={selected?.description ? `e.g. ${selected.description.slice(0, 80)}…` : "Add context for the team"}
-            />
-          </div>
-          <div>
-            <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
-              <MessageCircle className="size-3" /> Customer-visible note (optional — appended to the email)
-            </Label>
-            <Textarea
-              value={customerNote}
-              onChange={(e) => setCustomerNote(e.target.value)}
-              rows={2}
-              className="mt-1 text-sm"
-              placeholder="Will be included at the bottom of the delay email"
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="px-5 py-3 border-t bg-slate-50 gap-2">
+        <DialogFooter className="shrink-0 px-5 py-3 border-t bg-slate-50 gap-2">
           <div className="mr-auto text-[11px] text-slate-500 flex items-center gap-1.5">
             {selected ? (
               <>
@@ -248,7 +247,7 @@ export function CustomerDelayDialog({ applicationId, open, onClose }: Props) {
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending || !reasonCode} className="gap-1.5">
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
-            Save & notify customer
+            Mark Customer Delay
           </Button>
         </DialogFooter>
       </DialogContent>

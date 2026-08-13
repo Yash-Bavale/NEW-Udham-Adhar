@@ -131,10 +131,10 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0">
-        <DialogHeader className="px-5 py-4 border-b bg-gradient-to-r from-sky-50 to-white">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+        <DialogHeader className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-sky-50 to-white">
           <div className="flex items-center gap-2">
-            <div className="grid place-items-center size-9 rounded-full bg-sky-100 text-sky-700">
+            <div className="grid place-items-center size-9 rounded-full bg-sky-100 text-sky-700 shrink-0">
               <Server className="size-4" />
             </div>
             <div>
@@ -146,186 +146,186 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
-          {/* Reason list */}
-          <div className="border-r">
-            <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search internal reasons…"
-                  className="pl-8 h-8 text-sm"
-                />
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                {filteredReasons.length} reason{filteredReasons.length === 1 ? "" : "s"}
-              </Badge>
-            </div>
-
-            <ScrollArea className="h-[380px] px-4 pb-4">
-              {reasonsLoading ? (
-                <div className="grid place-items-center h-40 text-sm text-slate-500">
-                  <Loader2 className="size-4 animate-spin" />
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="border-r">
+              <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="size-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search internal reasons…"
+                    className="pl-8 h-8 text-sm"
+                  />
                 </div>
-              ) : filteredReasons.length === 0 ? (
-                <div className="text-sm text-slate-500 py-10 text-center">No internal reasons configured.</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {filteredReasons.map((r: any) => {
-                    const on = r.code === reasonCode;
-                    return (
-                      <button
-                        key={r.code}
-                        type="button"
-                        onClick={() => setReasonCode(r.code)}
-                        className={cn(
-                          "w-full text-left rounded-lg border p-2.5 transition",
-                          on ? "border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-200" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                        )}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className={cn("mt-0.5 size-4 rounded-full border grid place-items-center shrink-0", on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-300 bg-white")}>
-                            {on && <CheckCircle2 className="size-3" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-medium text-slate-900 leading-snug">{r.label}</div>
-                            {r.description && (
-                              <div className="text-[11.5px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{r.description}</div>
-                            )}
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <span className="text-[9.5px] font-mono uppercase text-slate-400 tracking-wider">{r.code}</span>
-                              {r.email_template_code && (
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono">
-                                  {r.email_template_code.toUpperCase().replace("BHS_", "")}
-                                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {filteredReasons.length} reason{filteredReasons.length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+
+              <ScrollArea className="h-[220px] md:h-[260px] px-4 pb-4">
+                {reasonsLoading ? (
+                  <div className="grid place-items-center h-40 text-sm text-slate-500">
+                    <Loader2 className="size-4 animate-spin" />
+                  </div>
+                ) : filteredReasons.length === 0 ? (
+                  <div className="text-sm text-slate-500 py-10 text-center">No internal reasons configured.</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredReasons.map((r: any) => {
+                      const on = r.code === reasonCode;
+                      return (
+                        <button
+                          key={r.code}
+                          type="button"
+                          onClick={() => setReasonCode(r.code)}
+                          className={cn(
+                            "w-full text-left rounded-lg border p-2.5 transition",
+                            on ? "border-indigo-400 bg-indigo-50/60 ring-1 ring-indigo-200" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={cn("mt-0.5 size-4 rounded-full border grid place-items-center shrink-0", on ? "border-indigo-500 bg-indigo-500 text-white" : "border-slate-300 bg-white")}>
+                              {on && <CheckCircle2 className="size-3" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-medium text-slate-900 leading-snug">{r.label}</div>
+                              {r.description && (
+                                <div className="text-[11.5px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{r.description}</div>
                               )}
+                              <div className="flex items-center gap-1.5 mt-1.5">
+                                <span className="text-[9.5px] font-mono uppercase text-slate-400 tracking-wider">{r.code}</span>
+                                {r.email_template_code && (
+                                  <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono">
+                                    {r.email_template_code.toUpperCase().replace("BHS_", "")}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+
+            <div className="p-4 space-y-4 bg-slate-50/30">
+              <div>
+                <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Bell className="size-3" /> Follow-up reminder
+                </Label>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {REMINDER_PRESETS.map((p) => {
+                    const on = !customOpen && p.minutes === reminderMinutes;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => { setCustomOpen(false); setReminderMinutes(p.minutes); }}
+                        className={cn(
+                          "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
+                          on ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCustomOpen(true)}
+                    className={cn(
+                      "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
+                      customOpen ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                    )}
+                  >
+                    Custom…
+                  </button>
+                </div>
+                {customOpen && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={15}
+                      max={43200}
+                      value={customValue}
+                      onChange={(e) => {
+                        setCustomValue(e.target.value);
+                        const num = parseInt(e.target.value, 10);
+                        if (!isNaN(num) && num >= 15) setReminderMinutes(num);
+                      }}
+                      className="h-8 text-xs w-28"
+                      placeholder="Minutes"
+                    />
+                    <span className="text-xs text-slate-500">minutes ({fmtReminder(reminderMinutes)})</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-[11px] uppercase tracking-wider text-slate-500">Priority</Label>
+                <div className="mt-1.5 grid grid-cols-4 gap-1">
+                  {(["low", "normal", "high", "urgent"] as Priority[]).map((p) => {
+                    const meta = PRIORITY_META[p];
+                    const on = priority === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        data-on={on}
+                        onClick={() => setPriority(p)}
+                        className={cn(
+                          "text-[11px] font-medium rounded-md border py-1.5 transition text-center",
+                          meta.className,
+                          !on && "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        {meta.label}
                       </button>
                     );
                   })}
                 </div>
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* Right pane: reminder + priority */}
-          <div className="p-4 space-y-4 bg-slate-50/30">
-            <div>
-              <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                <Bell className="size-3" /> Follow-up reminder
-              </Label>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                {REMINDER_PRESETS.map((p) => {
-                  const on = !customOpen && p.minutes === reminderMinutes;
-                  return (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => { setCustomOpen(false); setReminderMinutes(p.minutes); }}
-                      className={cn(
-                        "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
-                        on ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => setCustomOpen(true)}
-                  className={cn(
-                    "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
-                    customOpen ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                  )}
-                >
-                  Custom…
-                </button>
               </div>
-              {customOpen && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={15}
-                    max={60 * 24 * 30}
-                    step={15}
-                    value={customValue}
-                    onChange={(e) => {
-                      setCustomValue(e.target.value);
-                      const n = Number(e.target.value);
-                      if (Number.isFinite(n) && n > 0) setReminderMinutes(Math.round(n));
-                    }}
-                    className="h-8 text-sm w-28"
-                  />
-                  <span className="text-[11px] text-slate-500">minutes (15 min – 30 days)</span>
+
+              <div className="rounded-md border border-sky-200 bg-sky-50/70 p-3 text-[11.5px] text-sky-900 flex gap-2">
+                <Info className="size-3.5 shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  Customer gets delay status email. System schedules reminder for assignee in <b>{fmtReminder(reminderMinutes)}</b>.
                 </div>
-              )}
-              <div className="mt-2 text-[11px] text-slate-500">
-                Next nudge in <b className="text-slate-700">{fmtReminder(reminderMinutes)}</b>{isPreset ? "" : ""} — repeats until you Resume.
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-[11px] uppercase tracking-wider text-slate-500">Priority</Label>
-              <div className="mt-1 grid grid-cols-4 gap-1">
-                {(Object.keys(PRIORITY_META) as Priority[]).map((p) => {
-                  const meta = PRIORITY_META[p];
-                  const on = priority === p;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      data-on={on}
-                      onClick={() => setPriority(p)}
-                      className={cn("text-[11px] font-semibold rounded-md border px-1.5 py-1.5 transition bg-white text-slate-600", meta.className)}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-md border border-sky-200 bg-sky-50/70 p-2.5 text-[11.5px] text-sky-900 flex gap-2">
-              <Info className="size-3.5 shrink-0 mt-0.5" />
-              <div className="leading-snug">
-                Customer receives the delay email now. Assignee gets a reminder in <b>{fmtReminder(reminderMinutes)}</b>, repeating until you <b>Resume</b>.
               </div>
             </div>
           </div>
+
+          <div className="px-5 py-4 border-t bg-white">
+            <Label className="text-[11px] uppercase tracking-wider text-slate-500">Internal note / instructions for team</Label>
+            <Textarea
+              value={internalNote}
+              onChange={(e) => setInternalNote(e.target.value)}
+              rows={2}
+              className="mt-1 text-sm"
+              placeholder={selected?.description ? `e.g. ${selected.description}` : "Describe technical issue or next action…"}
+            />
+          </div>
         </div>
 
-        {/* Note */}
-        <div className="px-5 py-4 border-t bg-white">
-          <Label className="text-[11px] uppercase tracking-wider text-slate-500">Internal note (visible to the team only)</Label>
-          <Textarea
-            value={internalNote}
-            onChange={(e) => setInternalNote(e.target.value)}
-            rows={2}
-            className="mt-1 text-sm"
-            placeholder="Add context for the team"
-          />
-        </div>
-
-        <DialogFooter className="px-5 py-3 border-t bg-slate-50 gap-2">
+        <DialogFooter className="shrink-0 px-5 py-3 border-t bg-slate-50 gap-2">
           <div className="mr-auto text-[11px] text-slate-500 flex items-center gap-1.5">
             {selected ? (
               <>
-                <CheckCircle2 className="size-3 text-emerald-600" />
+                <CheckCircle2 className="size-3 text-sky-600" />
                 <span>Selected: <b className="text-slate-700">{selected.label}</b></span>
               </>
             ) : (
-              <span>Pick a reason to continue</span>
+              <span>Pick an internal reason to continue</span>
             )}
           </div>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending || !reasonCode} className="gap-1.5">
             {mut.isPending && <Loader2 className="size-3 animate-spin" />}
-            Save & notify assignee
+            Mark Technical Delay
           </Button>
         </DialogFooter>
       </DialogContent>
