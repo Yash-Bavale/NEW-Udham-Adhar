@@ -157,12 +157,14 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Microsoft Clarity tracking code */}
+        {/* Microsoft Clarity tracking code — only for public udyamadhar.in site, excluded on admin & secondary sites */}
         <script dangerouslySetInnerHTML={{
           __html: `
 (function(){
   var p = window.location.pathname;
-  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
+  var h = window.location.hostname || '';
+  if (p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
+  if (h.includes('udyamregistration')) return;
   (function(c,l,a,r,i,t,y){
       c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
       t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
