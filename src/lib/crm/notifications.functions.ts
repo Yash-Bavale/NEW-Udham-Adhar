@@ -114,3 +114,107 @@ export async function createNotification(input: {
   });
   if (error) throw new Error(error.message);
 }
+
+export type SidebarNotificationCounts = {
+  notifications: number;
+  leads: number;
+  orders: number;
+  docReview: number;
+  tasks: number;
+  complaints: number;
+  tickets: number;
+  quarantine: number;
+  refunds: number;
+};
+
+export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SidebarNotificationCounts> => {
+    const { userId } = context;
+    const admin = await getAdmin();
+
+    const safeCount = (promise: PromiseLike<{ count: number | null; error: any }>) =>
+      Promise.resolve(promise)
+        .then(({ count, error }) => (error ? 0 : count ?? 0))
+        .catch(() => 0);
+
+    const [
+      notifications,
+      leads,
+      orders,
+      docReview,
+      tasks,
+      complaints,
+      tickets,
+      quarantine,
+      refunds,
+    ] = await Promise.all([
+      safeCount(
+        admin
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .is("read_at", null)
+      ),
+      safeCount(
+        admin
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .or("lead_status.eq.uncontacted,status.eq.new,status.eq.uncontacted")
+      ),
+      safeCount(
+        admin
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .not("fulfillment_status", "in", '("completed","cancelled","order_closed")')
+      ),
+      safeCount(
+        admin
+          .from("documents")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending")
+      ),
+      safeCount(
+        admin
+          .from("tasks")
+          .select("id", { count: "exact", head: true })
+          .not("status", "in", '("completed","cancelled")')
+      ),
+      safeCount(
+        admin
+          .from("complaints")
+          .select("id", { count: "exact", head: true })
+          .not("status", "in", '("resolved","closed")')
+      ),
+      safeCount(
+        admin
+          .from("tickets")
+          .select("id", { count: "exact", head: true })
+          .not("status", "in", '("resolved","closed")')
+      ),
+      safeCount(
+        admin
+          .from("email_quarantine")
+          .select("id", { count: "exact", head: true })
+          .is("reviewed_at", null)
+      ),
+      safeCount(
+        admin
+          .from("refund_requests")
+          .select("id", { count: "exact", head: true })
+          .in("status", ["pending", "info_needed", "escalated"])
+      ),
+    ]);
+
+    return {
+      notifications,
+      leads,
+      orders,
+      docReview,
+      tasks,
+      complaints,
+      tickets,
+      quarantine,
+      refunds,
+    };
+  });

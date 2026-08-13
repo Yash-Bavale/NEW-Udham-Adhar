@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -18,10 +18,12 @@ import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
 import {
   getUnreadNotificationCount,
+  getSidebarNotificationCounts,
   listMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   type Notification,
+  type SidebarNotificationCounts,
 } from "@/lib/crm/notifications.functions";
 import { useMutation } from "@tanstack/react-query";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
@@ -158,6 +160,28 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   }, [sidebarCollapsed]);
   const { unseen: newLeads } = useNewLeadsWatcher();
 
+  const fetchSidebarCounts = useServerFn(getSidebarNotificationCounts);
+  const { data: sidebarCounts } = useQuery<SidebarNotificationCounts>({
+    queryKey: ["sidebar-notification-counts"],
+    queryFn: () => fetchSidebarCounts(),
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
+
+  const getSidebarBadge = (to: string): number => {
+    if (!sidebarCounts) return to === "/admin/leads" && newLeads > 0 ? newLeads : 0;
+    if (to === "/admin/notifications") return sidebarCounts.notifications;
+    if (to === "/admin/leads") return Math.max(sidebarCounts.leads, newLeads);
+    if (to === "/admin/orders") return sidebarCounts.orders;
+    if (to === "/admin/review") return sidebarCounts.docReview;
+    if (to === "/admin/tasks") return sidebarCounts.tasks;
+    if (to === "/admin/complaints") return sidebarCounts.complaints;
+    if (to === "/admin/tickets") return sidebarCounts.tickets;
+    if (to === "/admin/quarantine") return sidebarCounts.quarantine;
+    if (to === "/admin/refunds") return sidebarCounts.refunds;
+    return 0;
+  };
+
   useKeyboardShortcuts(() => setPaletteOpen(true), () => { });
 
   const isActive = (to: string) =>
@@ -219,14 +243,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                 {group.items.map((n) => {
                   const active = isActive(n.to);
                   const Icon = n.icon;
-                  const badge = n.to === "/admin/leads" && newLeads > 0 ? newLeads : 0;
+                  const badge = getSidebarBadge(n.to);
                   return (
                     <Link
                       key={n.to}
                       to={n.to}
-                      title={sidebarCollapsed ? n.label : undefined}
+                      title={sidebarCollapsed ? `${n.label}${badge > 0 ? ` (${badge} new)` : ""}` : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
+                        "relative flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
                         sidebarCollapsed ? "justify-center px-1.5" : "px-2.5",
                       )}
                       style={{
@@ -235,11 +259,19 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                         fontWeight: active ? 500 : 400,
                       }}
                     >
-                      <Icon className="size-4 shrink-0" />
+                      <div className="relative shrink-0">
+                        <Icon className="size-4" />
+                        {sidebarCollapsed && badge > 0 && (
+                          <span
+                            className="absolute -top-1 -right-1 size-2 rounded-full ring-2 ring-[var(--admin-sidebar)]"
+                            style={{ background: "var(--admin-danger)" }}
+                          />
+                        )}
+                      </div>
                       {!sidebarCollapsed && <span className="truncate flex-1">{n.label}</span>}
                       {!sidebarCollapsed && badge > 0 && (
                         <span
-                          className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center"
+                          className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0"
                           style={{ background: "var(--admin-danger)", color: "#fff" }}
                         >
                           {badge > 99 ? "99+" : badge}
@@ -248,6 +280,9 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                     </Link>
                   );
                 })}
+              </div>
+            </div>
+          ))}
               </div>
             </div>
           ))}
@@ -526,11 +561,20 @@ function NotificationsBell() {
   const markAll = useServerFn(markAllNotificationsRead);
   const { data: listData, refetch: refetchList } = useQuery<{ rows: Notification[] }>({
     queryKey: ["notifications", "recent"],
-    queryFn: () => fetchList({ data: { limit: 10 } }),
+    queryFn: () => fetchList({ data: { limit: 20 } }),
     enabled: hasSession && open,
     staleTime: 15_000,
   });
-  const recent = listData?.rows ?? [];
+  const rawRecent = listData?.rows ?? [];
+  const recent = useMemo(() => {
+    const seen = new Set<string>();
+    return rawRecent.filter((n) => {
+      const key = `${n.title.trim().toLowerCase()}|${(n.body ?? "").trim().toLowerCase()}|${n.href ?? n.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawRecent]);
 
   const markOneMut = useMutation({
     mutationFn: (id: string) => markRead({ data: { id } }),
