@@ -5,7 +5,9 @@
 // Do NOT map fulfillment_status → label directly in components — that path
 // drifts and produces inconsistent stage names across surfaces.
 
-import { isUnconvertedConsultationLead } from "./consultation";export type OrderStage =
+import { isUnconvertedConsultationLead } from "./consultation";
+
+export type OrderStage =
   | "lead_received"
   | "payment_pending"
   | "payment_done"

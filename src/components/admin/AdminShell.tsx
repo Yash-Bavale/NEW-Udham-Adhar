@@ -182,10 +182,12 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     ],
     [],
   );
+  const currentPath = path ?? "";
   const [visitedPaths, setVisitedPaths] = useState<Set<string>>(() => new Set());
   useEffect(() => {
+    if (!currentPath) return;
     const matched = CLEARABLE_PATHS.find(
-      (p) => path === p || path.startsWith(p + "/"),
+      (p) => currentPath === p || currentPath.startsWith(p + "/"),
     );
     if (matched) {
       setVisitedPaths((prev) => {
@@ -195,7 +197,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         return next;
       });
     }
-  }, [path, CLEARABLE_PATHS]);
+  }, [currentPath, CLEARABLE_PATHS]);
 
   const getSidebarBadge = (to: string): number => {
     // Notifications page: always show unread count (never suppressed)
@@ -218,7 +220,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   useKeyboardShortcuts(() => setPaletteOpen(true), () => { });
 
   const isActive = (to: string) =>
-    path === to || (to !== "/admin/dashboard" && path.startsWith(to + "/"));
+    !!currentPath && (currentPath === to || (to !== "/admin/dashboard" && currentPath.startsWith(to + "/")));
 
   return (
     <div className="min-h-screen flex" style={{ background: "var(--admin-bg)", color: "var(--admin-fg)" }}>
