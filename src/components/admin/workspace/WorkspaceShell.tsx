@@ -6,6 +6,7 @@ import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
   ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
+  Link2, Send, Loader2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -28,7 +29,7 @@ import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/ho
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
-import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
+import { updateFulfillmentStatus, resendServiceChangeEmail } from "@/lib/crm/orders-v2.functions";
 
 import {
   deriveJourneyLiveState, derivePhase, PHASE_ENABLED_BUTTONS,
@@ -201,6 +202,7 @@ export function WorkspaceShell(p: Props) {
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.orderId] });
   }, [qc, p.orderId]);
 
+  const [sendingUpdateEmail, setSendingUpdateEmail] = useState(false);
   const fnFormLink = useServerFn(sendFormLink);
   const fnSubmit = useServerFn(markSubmittedToGovt);
   const fnComplete = useServerFn(completeOrder);
@@ -208,6 +210,7 @@ export function WorkspaceShell(p: Props) {
   const fnResume = useServerFn(resumeFromHold);
   const fnReopen = useServerFn(reopenOrder);
   const fnConsultation = useServerFn(markConsultationCompleted);
+  const fnResendServiceEmail = useServerFn(resendServiceChangeEmail);
 
   const mutResume = useMutation({
     mutationFn: () => fnResume({ data: { orderId: p.orderId, target: "IN_PROCESSING" } }),
@@ -368,6 +371,25 @@ export function WorkspaceShell(p: Props) {
               </TooltipTrigger>
               <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
             </Tooltip>
+            {cLeadCode && cLeadCode !== "—" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const origin = typeof window !== "undefined" ? window.location.origin : "https://udyamadhar.in";
+                      const link = `${origin}/payment/${encodeURIComponent(cLeadCode)}`;
+                      navigator.clipboard.writeText(link);
+                      toast.success(`Payment link copied for ${cLeadCode}!`);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-amber-700" /> Copy Payment Link
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Copy customer payment link ({cLeadCode}) to clipboard</TooltipContent>
+              </Tooltip>
+            )}
             {isAdmin && (
               <ChangeServiceButton
                 orderId={p.orderId}
@@ -377,6 +399,31 @@ export function WorkspaceShell(p: Props) {
                 formSubmittedAt={application?.form_submitted_at ?? null}
               />
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={sendingUpdateEmail}
+                  onClick={async () => {
+                    setSendingUpdateEmail(true);
+                    try {
+                      const r = await fnResendServiceEmail({ data: { orderId: p.orderId } });
+                      toast.success(`Service update email resent to ${r.recipient}`);
+                      invalidate();
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Failed to resend email");
+                    } finally {
+                      setSendingUpdateEmail(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100 transition-colors"
+                >
+                  {sendingUpdateEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-sky-700" />}
+                  Resend Update Email
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Resend service update email & payment link to customer</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
