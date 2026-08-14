@@ -135,6 +135,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/x-icon", href: brand?.faviconAssetUrl || "/favicon.ico" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://www.googletagmanager.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://www.google-analytics.com", crossOrigin: "anonymous" },
       { rel: "dns-prefetch", href: "https://www.googletagmanager.com" },
@@ -157,47 +159,15 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* Microsoft Clarity tracking code — only for public udyamadhar.in site, excluded on admin & secondary sites */}
+        {/* Defer non-critical third-party analytics (GTM, Clarity, Gtag) until after first paint for LCP optimization */}
         <script dangerouslySetInnerHTML={{
           __html: `
 (function(){
   var p = window.location.pathname;
-  var h = window.location.hostname || '';
   if (p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
-  if (h.includes('udyamregistration')) return;
-  (function(c,l,a,r,i,t,y){
-      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-  })(window, document, "clarity", "script", "y1q0o2w4ya");
-})();
-          `
-        }} />
-
-        {/* Google Tag Manager — skipped entirely on admin paths to keep
-            internal traffic out of GA/Ads reports. */}
-        <script dangerouslySetInnerHTML={{
-          __html: `
-(function(){
-  var p = window.location.pathname;
-  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
-  (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NJK5QPPQ');
-})();
-          `
-        }} />
-
-        {/* gtag stubs — also skipped on admin paths */}
-        <script dangerouslySetInnerHTML={{
-          __html: `
-(function(){
-  var p = window.location.pathname;
-  if(p.startsWith('/admin') || p === '/admin-login' || p.startsWith('/seo-admin')) return;
   window.dataLayer = window.dataLayer || [];
   function gtag(){window.dataLayer.push(arguments);}
   window.gtag = gtag;
-  gtag('js', new Date());
-  gtag('config', 'G-62JC7PRPMM');
-  gtag('config', 'AW-18336340451');
   function gtag_report_conversion(url) {
     var callback = function () {
       if (typeof(url) != 'undefined') { window.location = url; }
@@ -209,6 +179,27 @@ function RootShell({ children }: { children: ReactNode }) {
     return false;
   }
   window.gtag_report_conversion = gtag_report_conversion;
+
+  function loadAnalytics() {
+    var h = window.location.hostname || '';
+    if (!h.includes('udyamregistration')) {
+      (function(c,l,a,r,i,t,y){
+          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", "y1q0o2w4ya");
+    }
+    (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NJK5QPPQ');
+    gtag('js', new Date());
+    gtag('config', 'G-62JC7PRPMM');
+    gtag('config', 'AW-18336340451');
+  }
+
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(loadAnalytics, { timeout: 2500 });
+  } else {
+    setTimeout(loadAnalytics, 1000);
+  }
 })();
           `
         }} />

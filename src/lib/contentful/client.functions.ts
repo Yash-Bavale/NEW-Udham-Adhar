@@ -40,22 +40,41 @@ async function resolveCfCreds(): Promise<{ spaceId: string; apiKey: string }> {
 }
 
 
+const cfCache = new Map<string, { expiresAt: number; data: any }>();
+const CF_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
+
 async function cfFetch<F>(path: string): Promise<CfList<F>> {
+  const { spaceId, apiKey } = await resolveCfCreds();
+  const cacheKey = `${spaceId}:${path}`;
+  const now = Date.now();
+  const cached = cfCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("Contentful gateway env vars missing");
-  const { spaceId, apiKey } = await resolveCfCreds();
   const url = `${GATEWAY}/spaces/${spaceId}${path}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "X-Connection-Api-Key": apiKey,
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Contentful ${res.status}: ${body.slice(0, 300)}`);
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "X-Connection-Api-Key": apiKey,
+      },
+    });
+    if (!res.ok) {
+      if (cached) return cached.data;
+      const body = await res.text();
+      throw new Error(`Contentful ${res.status}: ${body.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as CfList<F>;
+    cfCache.set(cacheKey, { expiresAt: now + CF_TTL_MS, data });
+    return data;
+  } catch (err) {
+    if (cached) return cached.data;
+    throw err;
   }
-  return (await res.json()) as CfList<F>;
 }
 
 
