@@ -58,11 +58,28 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false });
 
+    // Check if there is an active pending payment link for a service change / top-up
+    const { data: pendingLink } = await supabaseAdmin
+      .from("payment_links" as any)
+      .select("amount, expires_at, status")
+      .eq("lead_id", lead.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const hasPendingLink = !!pendingLink && Number((pendingLink as any).amount) > 0;
+    const pendingAmount = hasPendingLink ? Number((pendingLink as any).amount) : 0;
+
     const isAwaitingConvertedServicePayment =
-      lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+      hasPendingLink || lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
     const successfulPayment = isAwaitingConvertedServicePayment
       ? null
       : payments?.find(p => p.status === 'paid') || null;
+
+    const effectiveTotal = hasPendingLink ? pendingAmount : Number(lead.total_amount ?? 0);
+    const effectiveBase = hasPendingLink ? Math.round((effectiveTotal / 1.18) * 100) / 100 : Number(lead.base_amount ?? 0);
+    const effectiveGst = hasPendingLink ? Math.round((effectiveTotal - effectiveBase) * 100) / 100 : Number(lead.gst_amount ?? 0);
 
     const { data: gateways } = await supabaseAdmin
       .from("payment_gateways")
@@ -78,13 +95,15 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         mobile: lead.mobile,
         service: lead.service,
         serviceDescription,
-        baseAmount: Number(lead.base_amount ?? 0),
-        gstAmount: Number(lead.gst_amount ?? 0),
-        totalAmount: Number(lead.total_amount ?? 0),
+        baseAmount: effectiveBase,
+        gstAmount: effectiveGst,
+        totalAmount: effectiveTotal,
         status: lead.status,
         leadStatusV2: lead.lead_status_v2,
         payment: successfulPayment,
       },
+      hasPendingLink,
+      pendingAmount,
       gateways: gateways ?? [],
     };
   });

@@ -38,15 +38,18 @@ export const createPaymentLink = createServerFn({ method: "POST" })
     if (leadErr) throw new Error(leadErr.message);
     if (!lead?.lead_code) throw new Error("Lead not found");
 
-    // If already paid, don't issue a link.
-    const { data: paidRow } = await supabaseAdmin
+    // If already paid and no balance/pending status, don't issue a link.
+    const { data: paidRows } = await supabaseAdmin
       .from("payments")
-      .select("id")
+      .select("amount")
       .eq("lead_id", lead.id)
-      .eq("status", "paid")
-      .limit(1)
-      .maybeSingle();
-    if (paidRow) throw new Error("This lead has already paid. No new link needed.");
+      .eq("status", "paid");
+    const paidSum = (paidRows ?? []).reduce((s, r: any) => s + Number(r.amount ?? 0), 0);
+    const totalAmt = Number(lead.total_amount ?? 0);
+    const isPending = lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+    if (paidRows && paidRows.length > 0 && totalAmt <= paidSum && !isPending) {
+      throw new Error("This lead has already paid in full. No new link needed.");
+    }
 
     // Reuse the most recent pending, non-expired link instead of minting a new one.
     const nowIso = new Date().toISOString();

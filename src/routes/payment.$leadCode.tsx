@@ -33,7 +33,8 @@ function PaymentPage() {
     (async () => {
       try {
         const res = await getSummary({ data: { leadCode } });
-        const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
+        const hasPendingLink = (res as any)?.hasPendingLink || (res as any)?.pendingAmount > 0;
+        const isPaid = !hasPendingLink && (!!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status));
         if (isPaid) {
           navigate({ to: "/success/$leadCode", params: { leadCode }, replace: true });
         }

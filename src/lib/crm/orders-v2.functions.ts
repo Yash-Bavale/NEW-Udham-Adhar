@@ -1169,6 +1169,22 @@ export const changeOrderService = createServerFn({ method: "POST" })
         .from("leads").select("lead_code").eq("id", app.lead_id).maybeSingle();
       const leadCode = leadRow?.lead_code as string | undefined;
       if (leadCode) {
+        // Supersede previous pending payment links
+        await admin
+          .from("payment_links" as any)
+          .update({ status: "cancelled" } as never)
+          .eq("lead_id", app.lead_id)
+          .eq("status", "pending");
+
+        // Mark lead as payment_pending so system knows a balance is due
+        await admin
+          .from("leads")
+          .update({
+            status: "payment_pending",
+            lead_status_v2: "payment_pending",
+          } as never)
+          .eq("id", app.lead_id);
+
         const origin = process.env.APP_BASE_URL || "https://udyamadhar.in";
         const txnid = `TOPUP-${leadCode}-${Date.now().toString(36)}`.toUpperCase();
         const { data: link } = await admin

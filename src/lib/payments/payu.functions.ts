@@ -48,7 +48,19 @@ export const createPayUOrder = createServerFn({ method: "POST" })
     if (!lead.lead_code) throw new Error("Lead is missing a lead code");
     const leadCode: string = lead.lead_code;
 
-    // 4. If already paid, block creating a new order.
+    // 4. Check for active pending link or paid state
+    const { data: pendingLink } = await supabaseAdmin
+      .from("payment_links" as any)
+      .select("amount")
+      .eq("lead_id", lead.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const hasPendingLink = !!pendingLink && Number((pendingLink as any).amount) > 0;
+    const pendingAmount = hasPendingLink ? Number((pendingLink as any).amount) : 0;
+
     const { data: paidAlready } = await supabaseAdmin
       .from("payments")
       .select("id")
@@ -57,10 +69,14 @@ export const createPayUOrder = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     const awaitingConvertedServicePayment =
-      lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+      hasPendingLink || lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
     if (paidAlready && !awaitingConvertedServicePayment) {
       throw new Error("This application has already been paid.");
     }
+
+    const payAmount = hasPendingLink ? pendingAmount : Number(lead.total_amount);
+    const payBase = Math.round((payAmount / 1.18) * 100) / 100;
+    const payGst = Math.round((payAmount - payBase) * 100) / 100;
 
     // 5. Mark any stale 'created' / 'attempted' PayU rows as failed so they
     // don't block retries and PayU never sees the same txnid twice.
@@ -81,9 +97,9 @@ export const createPayUOrder = createServerFn({ method: "POST" })
         gateway_name: "payu",
         transaction_id: txnid,
         razorpay_order_id: txnid, // reuse column for cross-gateway order id
-        amount: Number(lead.total_amount),
-        base_amount: Number(lead.base_amount),
-        gst_amount: Number(lead.gst_amount),
+        amount: payAmount,
+        base_amount: payBase,
+        gst_amount: payGst,
         currency: "INR",
         status: "created",
         idempotency_key: `payu:${txnid}`,
@@ -95,7 +111,7 @@ export const createPayUOrder = createServerFn({ method: "POST" })
     }
     const paymentId = inserted.id;
 
-    const amount = Number(lead.total_amount).toFixed(2);
+    const amount = payAmount.toFixed(2);
     const productinfo = (lead.service ?? "Service").slice(0, 100);
     const firstname = (lead.name ?? "Customer").slice(0, 60);
     const email = lead.email;
