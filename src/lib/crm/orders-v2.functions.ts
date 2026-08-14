@@ -1363,3 +1363,105 @@ export const changeOrderService = createServerFn({ method: "POST" })
       emailError,
     };
   });
+
+export const resendServiceChangeEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ orderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: app } = await admin
+      .from("applications")
+      .select("id, lead_id, customer_id, service_id")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (!app) throw new Error("Order not found");
+
+    const { data: lead } = await admin
+      .from("leads")
+      .select("lead_code, name, email, service, base_amount, gst_amount, total_amount")
+      .eq("id", app.lead_id)
+      .maybeSingle();
+    if (!lead?.email || !lead.lead_code) throw new Error("No customer email on file");
+
+    const { data: svc } = app.service_id
+      ? await admin.from("services").select("service_name, total_amount").eq("id", app.service_id).maybeSingle()
+      : { data: null as any };
+
+    const { data: paidRows } = await admin
+      .from("payments")
+      .select("amount, status")
+      .eq("lead_id", app.lead_id)
+      .eq("status", "paid");
+    const paidSum = (paidRows ?? []).reduce((s, r: any) => s + Number(r.amount ?? 0), 0);
+    const newTotal = Number(svc?.total_amount ?? lead.total_amount ?? 0);
+    const delta = Math.round((newTotal - paidSum) * 100) / 100;
+    const mode = delta > 0.01 ? "upgrade" : delta < -0.01 ? "downgrade" : "same";
+
+    const origin = process.env.APP_BASE_URL || "https://udyamadhar.in";
+    const onboardingUrl = `${origin}/onboarding/${encodeURIComponent(lead.lead_code)}`;
+    const paymentUrl = `${origin}/payment/${encodeURIComponent(lead.lead_code)}`;
+
+    const fmt = (n: number) => n.toFixed(2);
+    const modeMessage =
+      mode === "same"
+        ? "Your order has been updated to the new service. There is no change in the amount payable — you can continue with the onboarding form using the button below."
+        : mode === "downgrade"
+          ? `The new service costs less than what you have already paid. As per our policy, no refund is issued for the difference; the amount you have already paid is retained in full for this order. You can continue with the onboarding form using the button below.`
+          : `The new service has a higher total than the amount currently paid. Please complete the balance payment using the button below so we can proceed with processing your order.`;
+
+    const balanceRowHtml =
+      mode === "upgrade"
+        ? `<tr>
+            <td style="padding:10px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14px; color:#B54708; font-weight:700; border-top:2px solid #C9A227;">Balance Due Now</td>
+            <td style="padding:10px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14px; color:#B54708; font-weight:700; border-top:2px solid #C9A227;">&#8377;${fmt(delta)}</td>
+          </tr>`
+        : mode === "downgrade"
+          ? `<tr>
+              <td style="padding:10px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#5B6270;">Overpayment (retained, no refund)</td>
+              <td style="padding:10px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#2B2E33; font-weight:600;">&#8377;${fmt(Math.abs(delta))}</td>
+            </tr>`
+          : "";
+
+    const upgradeNoteHtml =
+      mode === "upgrade"
+        ? `<tr><td style="padding:16px 30px 0 30px;">
+            <div style="background:#FFF7E6; border:1px solid #F5D08A; border-radius:6px; padding:12px 14px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13px; color:#7A4E00; line-height:1.6;">
+              <strong>Note:</strong> The onboarding form link for the new service will be shared once the balance payment of &#8377;${fmt(delta)} is received.
+            </div>
+          </td></tr>`
+        : "";
+
+    const ctaLabel = mode === "upgrade" ? `Pay Balance ₹${fmt(delta)}` : "Continue to Onboarding Form";
+    const ctaUrl = mode === "upgrade" ? paymentUrl : onboardingUrl;
+    const ctaNote = mode === "upgrade"
+      ? "Secure payment powered by our payment partner."
+      : "This link is unique to your order — please do not share it.";
+
+    const vars: Record<string, unknown> = {
+      customer_name: lead.name ?? "",
+      order_number: lead.lead_code,
+      previous_service: "—",
+      new_service: svc?.service_name ?? lead.service,
+      amount_paid: fmt(paidSum),
+      new_total: fmt(newTotal),
+      balance_due: fmt(Math.max(0, delta)),
+      mode_message: modeMessage,
+      cta_url: ctaUrl,
+      cta_label: ctaLabel,
+      cta_note: ctaNote,
+      balance_row_html: balanceRowHtml,
+      upgrade_note_html: upgradeNoteHtml,
+      support_email: "help@businesshelpservices.com",
+    };
+
+    const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+    await enqueueFromTemplateInternal("service_changed", lead.email, vars, {
+      toName: lead.name ?? undefined,
+      leadId: app.lead_id,
+      applicationId: app.id,
+      trigger: "manual",
+      requireImmediateSuccess: false,
+    });
+
+    return { ok: true, recipient: lead.email };
+  });
