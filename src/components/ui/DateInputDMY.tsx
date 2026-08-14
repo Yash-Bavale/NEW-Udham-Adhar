@@ -4,6 +4,22 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+/** Return 00:00:00 local time for today. */
+export function getTodayStart(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export function isTodayOrFutureIso(iso: string): boolean {
+  if (!iso) return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return false;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setHours(0, 0, 0, 0);
+  return d >= getTodayStart();
+}
+
 // Convert ISO YYYY-MM-DD ↔ DD/MM/YYYY for display.
 function isoToDmy(iso: string): string {
   if (!iso) return "";
@@ -11,15 +27,24 @@ function isoToDmy(iso: string): string {
   if (!m) return "";
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
-function dmyToIso(dmy: string): string | null {
+
+function dmyToIso(dmy: string, allowFuture = false): { iso: string | null; error?: string } {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy.trim());
-  if (!m) return null;
+  if (!m) return { iso: null };
   const [, dd, mm, yyyy] = m;
   const d = Number(dd), mo = Number(mm), y = Number(yyyy);
-  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null;
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return { iso: null };
   const test = new Date(Date.UTC(y, mo - 1, d));
-  if (test.getUTCFullYear() !== y || test.getUTCMonth() !== mo - 1 || test.getUTCDate() !== d) return null;
-  return `${yyyy}-${mm}-${dd}`;
+  if (test.getUTCFullYear() !== y || test.getUTCMonth() !== mo - 1 || test.getUTCDate() !== d) return { iso: null };
+
+  const selectedDate = new Date(y, mo - 1, d);
+  selectedDate.setHours(0, 0, 0, 0);
+
+  if (!allowFuture && selectedDate >= getTodayStart()) {
+    return { iso: null, error: "Date cannot be today or a future date" };
+  }
+
+  return { iso: `${yyyy}-${mm}-${dd}` };
 }
 
 /** Auto-format the raw digits into DD/MM/YYYY as the user types. */
@@ -38,6 +63,7 @@ export type DateInputDMYProps = {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  allowFuture?: boolean; // Defaults to false
 };
 
 export function DateInputDMY({
@@ -49,21 +75,30 @@ export function DateInputDMY({
   placeholder = "DD/MM/YYYY",
   className,
   disabled,
+  allowFuture = false,
 }: DateInputDMYProps) {
   const [text, setText] = useState<string>(isoToDmy(value));
   const [open, setOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Keep local text in sync when the ISO value is updated externally.
   useEffect(() => {
     setText(isoToDmy(value));
-  }, [value]);
+    if (value && !allowFuture && isTodayOrFutureIso(value)) {
+      setErrorMsg("Date cannot be today or a future date");
+    } else {
+      setErrorMsg(null);
+    }
+  }, [value, allowFuture]);
 
   const iso = value || "";
   const selected = iso ? new Date(`${iso}T00:00:00`) : undefined;
 
-  const inputCls =
-    "w-full rounded-xl border border-border bg-background pl-4 pr-11 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
+  const inputCls = cn(
+    "w-full rounded-xl border bg-background pl-4 pr-11 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow",
+    errorMsg ? "border-destructive focus:ring-destructive" : "border-border",
+  );
 
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
@@ -81,15 +116,33 @@ export function DateInputDMY({
         onChange={(e) => {
           const masked = maskDmy(e.target.value);
           setText(masked);
-          const nextIso = dmyToIso(masked);
-          if (nextIso) onChange(nextIso);
-          else if (!masked) onChange("");
+          const res = dmyToIso(masked, allowFuture);
+          if (res.error) {
+            setErrorMsg(res.error);
+            onChange("");
+          } else if (res.iso) {
+            setErrorMsg(null);
+            onChange(res.iso);
+          } else {
+            setErrorMsg(null);
+            if (!masked) onChange("");
+          }
         }}
         onBlur={() => {
-          const nextIso = dmyToIso(text);
-          if (nextIso) onChange(nextIso);
-          else if (!text) onChange("");
-          else setText(isoToDmy(value));
+          const res = dmyToIso(text, allowFuture);
+          if (res.error) {
+            setErrorMsg(res.error);
+            onChange("");
+            setText("");
+          } else if (res.iso) {
+            setErrorMsg(null);
+            onChange(res.iso);
+          } else if (!text) {
+            setErrorMsg(null);
+            onChange("");
+          } else {
+            setText(isoToDmy(value));
+          }
         }}
         className={inputCls}
       />
@@ -109,12 +162,15 @@ export function DateInputDMY({
             mode="single"
             selected={selected}
             defaultMonth={selected}
+            disabled={allowFuture ? undefined : (date) => date >= getTodayStart()}
             onSelect={(d) => {
               if (!d) return;
+              if (!allowFuture && d >= getTodayStart()) return;
               const y = d.getFullYear();
               const mo = String(d.getMonth() + 1).padStart(2, "0");
               const dd = String(d.getDate()).padStart(2, "0");
               const nextIso = `${y}-${mo}-${dd}`;
+              setErrorMsg(null);
               onChange(nextIso);
               setText(isoToDmy(nextIso));
               setOpen(false);
@@ -123,6 +179,9 @@ export function DateInputDMY({
           />
         </PopoverContent>
       </Popover>
+      {errorMsg && (
+        <p className="mt-1 text-xs text-destructive font-medium">{errorMsg}</p>
+      )}
     </div>
   );
 }

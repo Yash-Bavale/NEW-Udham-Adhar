@@ -168,6 +168,19 @@ export function OnboardingForm({
     if (timer.current) window.clearTimeout(timer.current);
     setErr(null);
     setSubmitSuccess(false);
+
+    // Validate that no date field contains today's date or a future date
+    const { isTodayOrFutureIso } = await import("@/components/ui/DateInputDMY");
+    for (const f of schema.fields) {
+      if (f.type === "date" && values[f.key]) {
+        if (isTodayOrFutureIso(values[f.key])) {
+          setErr(`${f.label}: Date cannot be today or a future date. Please select a past date.`);
+          setSubmitSuccess(false);
+          return;
+        }
+      }
+    }
+
     try {
       await onSubmit(values);
       setSubmitSuccess(true);
