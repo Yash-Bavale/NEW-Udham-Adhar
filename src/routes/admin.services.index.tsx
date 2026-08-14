@@ -508,7 +508,7 @@ function FormPreviewModal({
                         {f.type === "select" ? (
                           <select disabled className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
                             <option>{f.placeholder || "Select option…"}</option>
-                            {f.options?.map((o) => (
+                            {f.options?.map((o: string) => (
                               <option key={o}>{o}</option>
                             ))}
                           </select>
