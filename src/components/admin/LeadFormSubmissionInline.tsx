@@ -6,6 +6,7 @@ import { getFormSubmissionForLead } from "@/lib/crm/submissions-admin.functions"
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
+import { PlantsView } from "./FormSubmissionPanel";
 
 const fmtIST = (iso?: string | null) => formatIST(iso);
 
@@ -121,14 +122,24 @@ export function LeadFormSubmissionInline({ leadId }: { leadId: string }) {
                   {section.label}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                  {visible.map((f) => (
-                    <div key={f.key} className="flex flex-col min-w-0">
-                      <span className="text-[10px] text-slate-400">{f.label}</span>
-                      <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
-                        {renderCell(f.key, formData[f.key])}
-                      </span>
-                    </div>
-                  ))}
+                  {visible.map((f) => {
+                    if (f.type === "plants" || f.key === "plants") {
+                      return (
+                        <div key={f.key} className="col-span-1 sm:col-span-2">
+                          <span className="text-[10px] text-slate-400 block mb-1">{f.label}</span>
+                          <PlantsView value={formData[f.key]} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={f.key} className="flex flex-col min-w-0">
+                        <span className="text-[10px] text-slate-400">{f.label}</span>
+                        <span className="text-xs text-slate-800 font-medium mt-0.5 break-words whitespace-pre-line">
+                          {renderCell(f.key, formData[f.key])}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

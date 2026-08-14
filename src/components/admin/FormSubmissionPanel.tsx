@@ -455,9 +455,109 @@ export function FormSubmissionPanel({
                           </div>
                         );
                       }
+type PlantItem = {
+  unit_name?: string;
+  address_flat?: string;
+  address_premises?: string;
+  address_village?: string;
+  address_block?: string;
+  address_road?: string;
+  city?: string;
+  pincode?: string;
+  state?: string;
+  district?: string;
+};
+
+export function parsePlantsData(raw: unknown): PlantItem[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as PlantItem[];
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed;
+        if (typeof parsed === "object" && parsed !== null) return [parsed];
+      } catch {}
+    }
+  }
+  return [];
+}
+
+export function PlantsView({ value }: { value: unknown }) {
+  const items = parsePlantsData(value);
+
+  if (items.length === 0) {
+    return (
+      <div className="text-xs text-slate-500 italic py-1">
+        No additional plant / unit address added (Main enterprise address used)
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 col-span-1 sm:col-span-2 w-full my-1">
+      {items.map((item, idx) => {
+        const fields = [
+          { label: "Unit / Plant Name", val: item.unit_name },
+          { label: "Flat / Door / Block No.", val: item.address_flat },
+          { label: "Name of Premises / Building", val: item.address_premises },
+          { label: "Village / Town", val: item.address_village },
+          { label: "Block", val: item.address_block },
+          { label: "Road / Street / Lane", val: item.address_road },
+          { label: "City", val: item.city },
+          { label: "PIN Code", val: item.pincode },
+          { label: "State", val: item.state },
+          { label: "District", val: item.district },
+        ].filter((f) => f.val && String(f.val).trim() !== "");
+
+        return (
+          <div
+            key={idx}
+            className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 shadow-xs"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                Plant / Unit #{idx + 1}
+                {item.unit_name ? ` — ${item.unit_name}` : ""}
+              </span>
+              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                Unit Address
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 pt-1">
+              {fields.map((f) => (
+                <div key={f.label} className="flex flex-col min-w-0">
+                  <span className="text-[11px] text-blue-600 font-medium">
+                    {f.label}
+                  </span>
+                  <span className="text-sm text-slate-800 font-semibold mt-0.5 break-words">
+                    {f.val}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
                       const v = formData[f.key];
                       const required = requiredKeys.has(f.key);
                       const blank = isBlank(v);
+                      if (f.type === "plants" || f.key === "plants") {
+                        return (
+                          <div key={f.key} className="col-span-1 sm:col-span-2">
+                            <span className="text-[11px] text-blue-600 select-none font-medium mb-1.5 block">
+                              {f.label}
+                            </span>
+                            <PlantsView value={v} />
+                          </div>
+                        );
+                      }
                       return (
                         <div key={f.key} className="flex flex-col min-w-0">
                           <span className="text-[11px] text-blue-600 select-none font-medium">
