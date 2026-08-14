@@ -56,7 +56,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     const t = setTimeout(async () => {
       try {
         const r = await search({ data: { q } });
-        setHits((r.hits || []).filter((h) => (h as any).kind !== "customer"));
+        setHits(r.hits);
       } catch { /* ignore */ }
     }, 200);
     return () => clearTimeout(t);
