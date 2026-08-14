@@ -236,15 +236,13 @@ export const changeLeadService = createServerFn({ method: "POST" })
     const isAlreadyPaid = paidSum > 0 || lead.status === "payment_successful";
 
     // 3. Update lead DB record. If lead is already paid, preserve the actual paid total_amount.
-    const leadUpdate: Record<string, any> = {
+    const leadUpdate = {
       service: newService,
       service_id: targetSvc.id,
+      ...(isAlreadyPaid
+        ? {}
+        : { base_amount: baseAmount, gst_amount: gstAmount, total_amount: totalAmount }),
     };
-    if (!isAlreadyPaid) {
-      leadUpdate.base_amount = baseAmount;
-      leadUpdate.gst_amount = gstAmount;
-      leadUpdate.total_amount = totalAmount;
-    }
 
     const { error: updLeadErr } = await admin
       .from("leads")
