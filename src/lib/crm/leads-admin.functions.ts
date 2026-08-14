@@ -230,7 +230,7 @@ export const changeLeadService = createServerFn({ method: "POST" })
       .from("payments")
       .select("amount")
       .eq("lead_id", data.leadId)
-      .in("status", ["paid", "success", "successful"]);
+      .in("status", ["paid"]);
 
     const paidSum = (paidPayments ?? []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
     const isAlreadyPaid = paidSum > 0 || lead.status === "payment_successful";
