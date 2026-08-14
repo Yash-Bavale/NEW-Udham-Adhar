@@ -361,7 +361,7 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
       admin.from("leads").select("status").eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso).limit(10000),
       admin.from("lead_attribution").select("lead_id, first_contact_at, converted_at, leads!inner(created_at)").gte("leads.created_at", startIso).lt("leads.created_at", endIso).limit(5000),
-      admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications!inner(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
+      admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
       admin.from("payments").select("application_id", { count: "exact", head: true }).eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso),
       admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "technical_delay"),
       admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "customer_delay"),
