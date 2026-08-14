@@ -88,8 +88,11 @@ export const listOrders = createServerFn({ method: "GET" })
 
     let rows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id) as any;
-      const total = Number(lead?.total_amount || 0);
       const payments = payByApp.get(a.id) ?? [];
+      const paidSum = payments
+        .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
+        .reduce((s, p) => s + Number(p.amount || 0), 0);
+      const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
       const staff = a.assigned_to ? (staffMap.get(a.assigned_to) as any) : null;
       return {
         id: a.id,

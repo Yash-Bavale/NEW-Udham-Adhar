@@ -200,7 +200,7 @@ export const changeLeadService = createServerFn({ method: "POST" })
     // 1. Fetch current lead
     const { data: lead, error: leadErr } = await admin
       .from("leads")
-      .select("id, lead_code, name, service, service_id, customer_id, base_amount, gst_amount, total_amount")
+      .select("id, lead_code, name, service, service_id, customer_id, base_amount, gst_amount, total_amount, status")
       .eq("id", data.leadId)
       .single();
 
@@ -225,16 +225,30 @@ export const changeLeadService = createServerFn({ method: "POST" })
     const gstAmount = Number(targetSvc.gst_amount);
     const totalAmount = Number(targetSvc.total_amount);
 
-    // 3. Update lead DB record instantly
+    // Check if lead has existing successful payments
+    const { data: paidPayments } = await admin
+      .from("payments")
+      .select("amount")
+      .eq("lead_id", data.leadId)
+      .in("status", ["paid", "success", "successful"]);
+
+    const paidSum = (paidPayments ?? []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+    const isAlreadyPaid = paidSum > 0 || lead.status === "payment_successful";
+
+    // 3. Update lead DB record. If lead is already paid, preserve the actual paid total_amount.
+    const leadUpdate: Record<string, any> = {
+      service: newService,
+      service_id: targetSvc.id,
+    };
+    if (!isAlreadyPaid) {
+      leadUpdate.base_amount = baseAmount;
+      leadUpdate.gst_amount = gstAmount;
+      leadUpdate.total_amount = totalAmount;
+    }
+
     const { error: updLeadErr } = await admin
       .from("leads")
-      .update({
-        service: newService,
-        service_id: targetSvc.id,
-        base_amount: baseAmount,
-        gst_amount: gstAmount,
-        total_amount: totalAmount,
-      })
+      .update(leadUpdate)
       .eq("id", data.leadId);
 
     if (updLeadErr) throw new Error(updLeadErr.message);
@@ -254,25 +268,30 @@ export const changeLeadService = createServerFn({ method: "POST" })
       .eq("lead_id", data.leadId)
       .eq("status", "pending");
 
-    // 6. Generate fresh new payment link according to new service
-    const txnid = `LNK-${lead.lead_code}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
-    const appOrigin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
-    const paymentUrl = `${appOrigin}/payment/${encodeURIComponent(lead.lead_code ?? "")}`;
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 6. Generate fresh payment link for unpaid leads or for any remaining balance
+    let newPaymentLink: any = null;
+    const remainingAmount = isAlreadyPaid ? Math.max(0, totalAmount - paidSum) : totalAmount;
+    if (remainingAmount > 0) {
+      const txnid = `LNK-${lead.lead_code}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
+      const appOrigin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
+      const paymentUrl = `${appOrigin}/payment/${encodeURIComponent(lead.lead_code ?? "")}`;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: newPaymentLink } = await admin
-      .from("payment_links" as any)
-      .insert({
-        lead_id: data.leadId,
-        txnid,
-        payment_url: paymentUrl,
-        amount: totalAmount,
-        status: "pending",
-        expires_at: expiresAt,
-        created_by: context.userId,
-      } as any)
-      .select("id, txnid, payment_url, amount, status")
-      .maybeSingle();
+      const { data: linkData } = await admin
+        .from("payment_links" as any)
+        .insert({
+          lead_id: data.leadId,
+          txnid,
+          payment_url: paymentUrl,
+          amount: remainingAmount,
+          status: "pending",
+          expires_at: expiresAt,
+          created_by: context.userId,
+        } as any)
+        .select("id, txnid, payment_url, amount, status")
+        .maybeSingle();
+      newPaymentLink = linkData;
+    }
 
     // 7. Log timeline activity events
     const [{ data: profile }, { data: roleRows }] = await Promise.all([
@@ -282,12 +301,14 @@ export const changeLeadService = createServerFn({ method: "POST" })
     const staff_name = profile?.display_name || profile?.email || "Staff";
     const staff_role = roleRows?.[0]?.role ?? "staff";
 
+    const displayAmountLog = isAlreadyPaid ? `Paid: ₹${paidSum}` : `₹${totalAmount}`;
+
     await admin.from("application_events").insert({
       lead_id: data.leadId,
       customer_id: lead.customer_id ?? null,
       event_type: "service_changed",
       old_value: oldService ?? "Unknown",
-      new_value: `${newService} (₹${totalAmount})`,
+      new_value: `${newService} (${displayAmountLog})`,
       created_by: context.userId,
       staff_name,
       staff_role,
@@ -297,7 +318,7 @@ export const changeLeadService = createServerFn({ method: "POST" })
       lead_id: data.leadId,
       user_id: context.userId,
       activity_type: "service_changed",
-      activity_description: `Service changed from ${oldService ?? "Unknown"} to ${newService} (₹${totalAmount})`,
+      activity_description: `Service changed from ${oldService ?? "Unknown"} to ${newService} (${displayAmountLog})`,
     });
 
     await writeAudit({
@@ -306,14 +327,14 @@ export const changeLeadService = createServerFn({ method: "POST" })
       entityId: data.leadId,
       action: "change_service",
       oldValue: lead,
-      newValue: { ...lead, service: newService, service_id: targetSvc.id, total_amount: totalAmount },
+      newValue: { ...lead, service: newService, service_id: targetSvc.id },
       actorId: context.userId,
     });
 
     return {
       ok: true,
       serviceName: newService,
-      totalAmount,
+      totalAmount: isAlreadyPaid ? paidSum : totalAmount,
       paymentLink: newPaymentLink,
     };
   });

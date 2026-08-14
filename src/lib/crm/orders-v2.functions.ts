@@ -169,8 +169,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
       const svc = a.service_id ? svcMap.get(a.service_id) : null;
       const staff = a.assigned_to ? staffMap.get(a.assigned_to) : null;
-      const total = Number(lead?.total_amount || 0);
       const payments = payByApp.get(a.id) ?? [];
+      const paidSum = payments
+        .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
+        .reduce((s, p) => s + Number(p.amount || 0), 0);
+      const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
       return {
         id: a.id,
         application_code: a.application_code,
@@ -291,8 +294,12 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     }
 
     const lead = (leadRes as any).data;
-    const total = Number(lead?.total_amount || 0);
     let payments = (paysRes.data ?? []) as any[];
+    const paidSum = payments
+      .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)))
+      .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+    const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
+
     // Enrich with invoice_id so admin actions know which invoice to email/download.
     if (payments.length > 0) {
       const payIds = payments.map((p) => p.id);
