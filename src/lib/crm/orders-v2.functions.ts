@@ -99,7 +99,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status",
         { count: "exact" },
       )
       .eq("is_deleted", false)
@@ -194,7 +194,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_name: staff?.display_name ?? staff?.email ?? null,
         stage: computeOrderStage(
           { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
+          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
         ),
       };
     });

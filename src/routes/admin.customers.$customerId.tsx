@@ -315,7 +315,7 @@ function OrdersTab({ data, hideMoney }: { data: any; hideMoney: boolean }) {
                 const lead = a.lead_id ? leadById.get(a.lead_id) : null;
                 const stage = computeOrderStage(
                   { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: lead?.payment_successful_at },
-                  { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status },
+                  { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: a.workflow_status },
                 );
                 return (
                   <tr key={a.id} className="border-t hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
