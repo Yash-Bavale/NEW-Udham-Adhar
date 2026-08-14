@@ -318,6 +318,106 @@ export const changeLeadService = createServerFn({ method: "POST" })
     };
   });
 
+export type SourceBreakdownItem = {
+  /** Exact value stored in lead_source — pass as `source` filter to listLeads */
+  value: string;
+  /** Human-friendly label */
+  label: string;
+  /** Top-level channel: "ads" | "website" | "whatsapp" | "referral" | "manual" | "other" */
+  channel: string;
+  count: number;
+};
+
+export type SourceBreakdown = {
+  channels: Array<{ key: string; label: string; icon: string; count: number }>;
+  items: SourceBreakdownItem[];
+};
+
+/**
+ * Returns distinct lead_source values with their lead counts.
+ * Groups them into channels (Google Ads / Website pages / WhatsApp / etc.)
+ * and surfaces every unique ad campaign automatically.
+ */
+export const getLeadSourceBreakdown = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, STAFF_READ_ROLES);
+    const admin = await getAdmin();
+
+    // Fetch all distinct lead_source values with count — this is a lightweight scan
+    const { data: rows, error } = await admin
+      .from("leads")
+      .select("lead_source")
+      .not("lead_source", "is", null);
+    if (error) throw new Error(error.message);
+
+    // Count occurrences per distinct lead_source string
+    const rawCounts: Record<string, number> = {};
+    for (const r of rows ?? []) {
+      const s = (r as any).lead_source as string;
+      if (s) rawCounts[s] = (rawCounts[s] ?? 0) + 1;
+    }
+
+    const CHANNEL_LABELS: Record<string, { label: string; icon: string }> = {
+      ads: { label: "Google Ads", icon: "📢" },
+      website: { label: "Website", icon: "🌐" },
+      whatsapp: { label: "WhatsApp", icon: "💬" },
+      referral: { label: "Referral", icon: "👥" },
+      manual: { label: "Manual / CRM", icon: "✍️" },
+      instagram: { label: "Instagram", icon: "📸" },
+      facebook: { label: "Facebook", icon: "📘" },
+      other: { label: "Other", icon: "📋" },
+    };
+    const channelCounts: Record<string, number> = {};
+
+    const items: SourceBreakdownItem[] = Object.entries(rawCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([src, count]) => {
+        const lower = src.toLowerCase();
+
+        let channel = "other";
+        let label = src;
+
+        if (lower.startsWith("google ads") || lower.includes("gclid") || lower.includes("utm_source=google")) {
+          channel = "ads";
+          // Parse campaign / keyword / page info for a nice label
+          const parts = src.split("|").map((p) => p.trim());
+          // e.g. ["Google Ads", "Campaign: c123", "kw: udyam", "Page: /"]
+          label = parts.join(" · ");
+        } else if (lower.startsWith("website")) {
+          channel = "website";
+          // "Website | /new-udyam-registration" → "Website · /new-udyam-registration"
+          const parts = src.split("|").map((p) => p.trim());
+          label = parts.join(" · ");
+        } else if (lower.includes("whatsapp")) {
+          channel = "whatsapp";
+        } else if (lower.includes("instagram")) {
+          channel = "instagram";
+        } else if (lower.includes("facebook")) {
+          channel = "facebook";
+        } else if (lower.includes("referral")) {
+          channel = "referral";
+        } else if (["manual", "crm", "website", "other"].includes(lower)) {
+          channel = "manual";
+          label = lower === "manual" ? "Manual / CRM" : src;
+        }
+
+        channelCounts[channel] = (channelCounts[channel] ?? 0) + count;
+
+        return { value: src, label, channel, count };
+      });
+
+    const channels = Object.entries(channelCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({
+        key,
+        label: CHANNEL_LABELS[key]?.label ?? key,
+        icon: CHANNEL_LABELS[key]?.icon ?? "📋",
+        count,
+      }));
+
+    return { channels, items };
+  });
 
 export const listLeads = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -340,7 +440,27 @@ export const listLeads = createServerFn({ method: "GET" })
     let query = admin.from("leads").select("*", { count: "exact" });
 
     if (data.status) query = query.eq("status", data.status);
-    if (data.source) query = query.ilike("lead_source", data.source);
+    if (data.source) {
+      if (data.source.startsWith("__channel:")) {
+        const ch = data.source.slice("__channel:".length);
+        const prefixMap: Record<string, string> = {
+          ads: "Google Ads",
+          website: "Website",
+          whatsapp: "WhatsApp",
+          referral: "Referral",
+          manual: "Manual",
+          instagram: "Instagram",
+          facebook: "Facebook",
+        };
+        const prefix = prefixMap[ch];
+        if (prefix) {
+          query = query.ilike("lead_source", `${prefix}%`);
+        }
+      } else {
+        // Exact value match (specific campaign / page)
+        query = query.eq("lead_source", data.source);
+      }
+    }
     if (data.service) query = query.eq("service", data.service);
     if (!isAdmin) {
       query = query.eq("assigned_to", context.userId);

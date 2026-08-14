@@ -7,6 +7,7 @@ import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
+  getLeadSourceBreakdown, type SourceBreakdown,
 } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
@@ -75,6 +76,7 @@ function LeadsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const role = useRole();
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
@@ -110,6 +112,13 @@ function LeadsPage() {
   }, [role.roles.join(",")]);
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
+
+  const sourceBreakdownFn = useServerFn(getLeadSourceBreakdown);
+  const { data: sourceData } = useQuery<SourceBreakdown>({
+    queryKey: ["admin.leads.sourceBreakdown"],
+    queryFn: () => sourceBreakdownFn(),
+    staleTime: 60_000,
+  });
 
   const { data: savedData } = useQuery({ queryKey: ["admin.savedFilters"], queryFn: () => savedFn() });
   useEffect(() => {
@@ -247,16 +256,24 @@ function LeadsPage() {
         </div>
         <select
           value={source}
-          onChange={(e) => setSource(e.target.value)}
+          onChange={(e) => { setSource(e.target.value); setPage(1); expandedChannel && setExpandedChannel(null); }}
           className="rounded-lg border px-3 py-2 text-sm"
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         >
           <option value="">All sources</option>
-          <option value="manual">Manual</option>
-          <option value="website">Website</option>
-          <option value="campaign">Campaign</option>
-          <option value="referral">Referral</option>
-          <option value="whatsapp">WhatsApp</option>
+          {/* Dynamic channels from DB */}
+          {(sourceData?.channels ?? []).map((ch) => (
+            <option key={ch.key} value={`__channel:${ch.key}`}>
+              {ch.icon} {ch.label} ({ch.count})
+            </option>
+          ))}
+          <optgroup label="── Specific sources ──">
+            {(sourceData?.items ?? []).map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label} ({item.count})
+              </option>
+            ))}
+          </optgroup>
         </select>
         <select
           value={service}
