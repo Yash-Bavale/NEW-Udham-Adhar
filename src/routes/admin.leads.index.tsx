@@ -657,19 +657,6 @@ function AddLeadDialog({
   const websites = websiteTree?.websites ?? [];
 
   const servicesFn = useServerFn(listServices);
-  const { data: servicesData } = useQuery({
-    queryKey: ["admin.services"],
-    queryFn: () => servicesFn(),
-    enabled: open,
-  });
-
-  // Filter services by selected website; show all if no website selected
-  const filteredServices = useMemo(() => {
-    const rows = (servicesData?.rows ?? []) as any[];
-    if (!form.website_id) return rows;
-    return rows.filter((s: any) => s.website_id === form.website_id);
-  }, [servicesData, form.website_id]);
-
   const [form, setForm] = useState({
     name: "", email: "", mobile: "", state: "", district: "", language: "en",
     service: "", lead_source: "Website",
@@ -682,6 +669,19 @@ function AddLeadDialog({
 
   const setField = <K extends keyof typeof form>(k: K, v: typeof form[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const { data: servicesData } = useQuery({
+    queryKey: ["admin.services"],
+    queryFn: () => servicesFn(),
+    enabled: open,
+  });
+
+  // Filter services by selected website; show all if no website selected
+  const filteredServices = useMemo(() => {
+    const rows = (servicesData?.rows ?? []) as any[];
+    if (!form.website_id) return rows;
+    return rows.filter((s: any) => s.website_id === form.website_id);
+  }, [servicesData, form.website_id]);
 
   const onServiceChange = (val: string) => {
     setField("service", val);
