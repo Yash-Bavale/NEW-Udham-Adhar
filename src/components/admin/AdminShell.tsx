@@ -551,44 +551,43 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
                               : "border-transparent hover:bg-slate-50 hover:border-slate-200/80"
                           )}
                         >
-                          {/* Top row: Code + Stage Pill */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono font-bold text-xs text-indigo-950 group-hover:text-indigo-600 transition-colors">
-                              {h.title}
-                            </span>
+                          {/* Top row: Customer Name FIRST + Code Badge + Stage Pill */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                {h.customerName}
+                              </span>
+                              <span className="font-mono text-[11px] font-semibold text-indigo-900 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md">
+                                {h.title}
+                              </span>
+                            </div>
                             {h.stageLabel && (
-                              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border", h.stageBadgeClass)}>
+                              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border shrink-0", h.stageBadgeClass)}>
                                 {h.stageLabel}
                               </span>
                             )}
                           </div>
 
-                          {/* Middle row: Customer Name + Mobile + Email */}
-                          <div className="flex items-center gap-3 text-xs text-slate-700 flex-wrap">
-                            <span className="font-semibold text-slate-900 flex items-center gap-1">
-                              <UserCircle2 className="size-3 text-slate-400" />
-                              {h.customerName}
-                            </span>
+                          {/* Second row: Mobile + Email + Service */}
+                          <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-0.5">
                             {h.mobile && (
-                              <span className="flex items-center gap-1 text-slate-600 text-[11px] font-mono">
-                                <Phone className="size-3 text-emerald-600" />
+                              <span className="flex items-center gap-1 font-mono text-[11px] text-slate-700">
+                                <Phone className="size-3 text-emerald-600 shrink-0" />
                                 {h.mobile}
                               </span>
                             )}
                             {h.email && (
-                              <span className="flex items-center gap-1 text-slate-600 text-[11px] truncate max-w-[200px]">
-                                <Mail className="size-3 text-sky-600" />
+                              <span className="flex items-center gap-1 text-[11px] text-slate-700 truncate max-w-[220px]">
+                                <Mail className="size-3 text-sky-600 shrink-0" />
                                 {h.email}
                               </span>
                             )}
+                            {h.serviceName && (
+                              <span className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                                · {h.serviceName}
+                              </span>
+                            )}
                           </div>
-
-                          {/* Bottom row: Service Name */}
-                          {h.serviceName && (
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 border-t border-slate-100/80">
-                              <span className="truncate">{h.serviceName}</span>
-                            </div>
-                          )}
                         </button>
                       );
                     })}
