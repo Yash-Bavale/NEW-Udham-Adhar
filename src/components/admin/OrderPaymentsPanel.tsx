@@ -30,6 +30,13 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const replaceTargetRef = useRef<string | null>(null);
 
+  // Show only paid payments, generated invoices, or refunds
+  const paidPayments = (payments ?? []).filter((p) => {
+    const status = String(p.status ?? "").toLowerCase();
+    const isPaidStatus = ["paid", "success", "successful", "refunded"].includes(status);
+    return isPaidStatus || !!p.invoice_number || !!p.parent_payment_id;
+  });
+
   const openInvoiceUrl = async (invoiceId: string) => {
     const { url } = await getUrlFn({ data: { invoiceId } });
     return url;
@@ -131,8 +138,8 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
         <CreditCard className="size-4 text-slate-600" />
         <h3 className="text-sm font-semibold">Payments &amp; Invoices</h3>
       </div>
-      {payments.length === 0 ? (
-        <div className="text-sm text-slate-500 italic">No payments recorded.</div>
+      {paidPayments.length === 0 ? (
+        <div className="text-sm text-slate-500 italic">No paid invoices recorded.</div>
       ) : (
         <table className="w-full text-xs">
           <thead className="text-slate-500 uppercase tracking-wider">
@@ -148,7 +155,7 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => {
+            {paidPayments.map((p) => {
               const amt = Number(p.amount || 0);
               const isRefund = !!p.parent_payment_id || amt < 0;
               const isPaid = String(p.status).toLowerCase() === "paid" && !isRefund;
