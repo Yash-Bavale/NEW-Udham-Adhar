@@ -67,7 +67,7 @@ async function ensurePaidOrdersIntegrated(admin: any) {
     const { data: unlinkedPayments } = await admin
       .from("payments")
       .select("id, lead_id, application_id, status")
-      .in("status", ["paid", "success", "successful", "captured"])
+      .in("status", ["paid"])
       .is("application_id", null)
       .limit(100);
 
@@ -162,7 +162,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const { data: paidRows, error: paidErr } = await admin
       .from("payments")
       .select("application_id")
-      .in("status", ["paid", "success", "successful", "captured"])
+      .in("status", ["paid"])
       .not("application_id", "is", null);
     if (paidErr) throw new Error(paidErr.message);
 
