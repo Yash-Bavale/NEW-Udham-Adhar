@@ -381,7 +381,25 @@ export const getContentfulServicePage = createServerFn({ method: "GET" })
         `/entries?content_type=servicePage&fields.slug=${encodeURIComponent(data.slug)}&limit=1`,
       );
       const e = page.items[0];
-      if (!e) return null;
+      if (!e) {
+        // Fallback: check if published as an seoArticle in Contentful
+        const article = await getContentfulSeoArticle({ data: { slug: data.slug } }).catch(() => null);
+        if (article) {
+          return {
+            id: article.id,
+            serviceCode: data.slug,
+            slug: article.slug,
+            name: article.title,
+            shortDescription: article.metaDescription,
+            longDescription: article.body,
+            priceInclusive: null,
+            processingDays: null,
+            metaTitle: article.metaTitle,
+            metaDescription: article.metaDescription,
+          };
+        }
+        return null;
+      }
       const f = e.fields;
       return {
         id: e.sys.id,
