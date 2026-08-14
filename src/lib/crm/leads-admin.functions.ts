@@ -565,6 +565,7 @@ const AddLeadSchema = z.object({
   total_amount: z.number().nonnegative().default(0),
   notes: z.string().optional(),
   assigned_to: z.string().uuid().nullable().optional(),
+  website_id: z.string().uuid().optional(),
 });
 
 export const addLead = createServerFn({ method: "POST" })
@@ -595,16 +596,24 @@ export const addLead = createServerFn({ method: "POST" })
     const { notes, district, ...rest } = data;
     const composedNotes = [notes, district ? `District: ${district}` : null].filter(Boolean).join("\n") || null;
 
-    // Resolve service_id from the selected service name so downstream views
+    // Resolve service_id and website_id from the selected service name so downstream views
     // (orders list, invoices, govt portal link) resolve correctly.
     let serviceId: string | null = null;
+    let websiteId: string | null = (data as any).website_id ?? null; // admin's explicit selection wins
     if (rest.service) {
       const { data: svc } = await admin
         .from("services")
-        .select("id")
+        .select("id, website_id")
         .eq("service_name", rest.service)
         .maybeSingle();
       serviceId = (svc?.id as string) ?? null;
+      if (!websiteId) websiteId = (svc?.website_id as string) ?? null;
+    }
+
+    // Final fallback to the default website
+    if (!websiteId) {
+      const { getDefaultWebsiteId } = await import("@/lib/websites/default-website.server");
+      websiteId = await getDefaultWebsiteId().catch(() => null);
     }
 
     const { data: inserted, error } = await admin
@@ -612,6 +621,7 @@ export const addLead = createServerFn({ method: "POST" })
       .insert({
         ...rest,
         service_id: serviceId,
+        website_id: websiteId,
         customer_id: customerId as string,
         notes: composedNotes,
         status: "new_lead",

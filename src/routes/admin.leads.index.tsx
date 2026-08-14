@@ -9,6 +9,7 @@ import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
 } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
+import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 import { fromBase, fromTotal } from "@/lib/pricing/gst";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
@@ -630,6 +631,14 @@ function AddLeadDialog({
       setFetching(false);
     }
   };
+  const websitesFn = useServerFn(listWebsiteTree);
+  const { data: websiteTree } = useQuery({
+    queryKey: ["admin.websites.tree"],
+    queryFn: () => websitesFn(),
+    enabled: open,
+  });
+  const websites = websiteTree?.websites ?? [];
+
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({
     queryKey: ["admin.services"],
@@ -637,12 +646,20 @@ function AddLeadDialog({
     enabled: open,
   });
 
+  // Filter services by selected website; show all if no website selected
+  const filteredServices = useMemo(() => {
+    const rows = (servicesData?.rows ?? []) as any[];
+    if (!form.website_id) return rows;
+    return rows.filter((s: any) => s.website_id === form.website_id);
+  }, [servicesData, form.website_id]);
+
   const [form, setForm] = useState({
     name: "", email: "", mobile: "", state: "", district: "", language: "en",
     service: "", lead_source: "Website",
     base_amount: 0, gst_amount: 0, total_amount: 0,
     notes: "",
     assigned_to: "" as string,
+    website_id: "" as string,
   });
   const [busy, setBusy] = useState(false);
 
@@ -668,6 +685,7 @@ function AddLeadDialog({
           district: form.district || undefined,
           notes: form.notes || undefined,
           assigned_to: form.assigned_to || undefined,
+          website_id: form.website_id || undefined,
         },
       });
       if (res.isReturningCustomer) {
@@ -680,7 +698,7 @@ function AddLeadDialog({
       setForm({
         name: "", email: "", mobile: "", state: "", district: "", language: "en",
         service: "", lead_source: "Website",
-        base_amount: 0, gst_amount: 0, total_amount: 0, notes: "", assigned_to: "",
+        base_amount: 0, gst_amount: 0, total_amount: 0, notes: "", assigned_to: "", website_id: "",
       });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to create lead");
@@ -748,6 +766,22 @@ function AddLeadDialog({
               <option value="Other">Other</option>
             </select>
           </Row>
+          <Row label="Website" required full>
+            <select
+              value={form.website_id}
+              onChange={(e) => {
+                setField("website_id", e.target.value);
+                setField("service", ""); // reset service when website changes
+                setForm((f) => ({ ...f, base_amount: 0, gst_amount: 0, total_amount: 0 }));
+              }}
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+            >
+              <option value="">All websites…</option>
+              {websites.map((w: any) => (
+                <option key={w.id} value={w.id}>{w.name} — {w.domain}</option>
+              ))}
+            </select>
+          </Row>
           <Row label="Interested Service" required full>
             <select
               value={form.service}
@@ -755,7 +789,7 @@ function AddLeadDialog({
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
             >
               <option value="">Select a service…</option>
-              {servicesData?.rows.map((s: any) => (
+              {filteredServices.map((s: any) => (
                 <option key={s.id} value={s.service_name}>{s.service_name}</option>
               ))}
             </select>
