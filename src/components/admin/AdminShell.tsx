@@ -7,7 +7,7 @@ import {
   Briefcase, Receipt, CreditCard, LifeBuoy, ListChecks, BarChart3, UserCog,
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
   Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
-  Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert,
+  Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert, X, ArrowRight, Phone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
@@ -398,8 +398,10 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const search = useServerFn(globalSearch);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const { data, isFetching } = useQuery<{ hits: SearchHit[] }>({
@@ -417,74 +419,284 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const hits = data?.hits ?? [];
+  // Filter out any customer hits just in case
+  const hits = useMemo(() => (data?.hits ?? []).filter((h) => (h as any).kind !== "customer"), [data]);
+
+  // Reset selected index when hits change
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [hits]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      inputRef.current?.blur();
+      return;
+    }
+    if (!open || hits.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < hits.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : hits.length - 1));
+    } else if (e.key === "Enter" && selectedIndex >= 0 && selectedIndex < hits.length) {
+      e.preventDefault();
+      const target = hits[selectedIndex];
+      if (target) {
+        setOpen(false);
+        setQ("");
+        navigate({ to: target.href });
+      }
+    }
+  };
+
+  // Categorize hits into Orders, Leads, and System
+  const appHits = useMemo(() => hits.filter((h) => h.kind === "application"), [hits]);
+  const leadHits = useMemo(() => hits.filter((h) => h.kind === "lead"), [hits]);
+  const otherHits = useMemo(() => hits.filter((h) => h.kind !== "application" && h.kind !== "lead"), [hits]);
 
   return (
-    <div ref={wrapRef} className="relative">
-      <div
-        className="flex items-center gap-2 rounded-md border px-3 h-9"
-        style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}
-      >
-        <Search className="size-4 shrink-0" style={{ color: "var(--admin-fg-muted)" }} />
+    <div ref={wrapRef} className="relative w-full max-w-xl">
+      {/* Modern Search Input Container */}
+      <div className="relative flex items-center rounded-xl border border-slate-200 bg-slate-50/80 px-3 h-10 shadow-2xs transition-all duration-150 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-3 focus-within:ring-indigo-500/15 hover:border-slate-300">
+        <Search className="size-4 shrink-0 text-slate-400 focus-within:text-indigo-600 transition-colors" />
         <input
+          ref={inputRef}
           value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => q.length >= 2 && setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); }
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
           }}
-          placeholder="Search orders, customers, mobiles, complaints, Udyam no…"
-          className="flex-1 bg-transparent outline-none text-sm placeholder:text-[var(--admin-fg-subtle)]"
+          onFocus={() => q.length >= 2 && setOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search orders, leads, mobiles, emails, application codes…"
+          className="flex-1 bg-transparent px-2.5 outline-none text-sm text-slate-900 placeholder:text-slate-400 font-medium"
           aria-label="Global search"
         />
-        {isFetching && <Loader2 className="size-3.5 animate-spin" style={{ color: "var(--admin-fg-muted)" }} />}
-        <button
-          onClick={onOpenPalette}
-          className="hidden sm:inline-flex rounded border px-1.5 py-0.5 text-[10px] font-mono"
-          style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}
-          aria-label="Open command palette"
-        >
-          ⌘K
-        </button>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {q && (
+            <button
+              type="button"
+              onClick={() => { setQ(""); setOpen(false); inputRef.current?.focus(); }}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+
+          {isFetching ? (
+            <Loader2 className="size-4 animate-spin text-indigo-600" />
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenPalette}
+              className="hidden sm:inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-2xs hover:bg-slate-50"
+              title="Open command palette"
+            >
+              <span className="font-mono">⌘K</span>
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Modern Search Results Dropdown */}
       {open && q.trim().length >= 2 && (
-        <div
-          className="absolute left-0 right-0 mt-1 rounded-md border max-h-[420px] overflow-y-auto z-40"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
-        >
+        <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 max-h-[500px] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150">
           {hits.length === 0 ? (
-            <div className="px-3 py-4 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-              {isFetching ? "Searching…" : "No matches."}
+            <div className="p-6 text-center text-xs text-slate-500 space-y-1">
+              {isFetching ? (
+                <div className="flex items-center justify-center gap-2 text-indigo-600 font-medium">
+                  <Loader2 className="size-4 animate-spin" /> Searching workspace…
+                </div>
+              ) : (
+                <>
+                  <div className="font-semibold text-slate-700 text-sm">No matching records found</div>
+                  <div>Search by Order Code (AP-XXXX), Lead Code (UA-XXXX), Mobile Number or Email</div>
+                </>
+              )}
             </div>
           ) : (
-            <ul className="py-1">
-              {hits.map((h) => (
-                <li key={`${h.kind}-${h.id}`}>
-                  <button
-                    onClick={() => {
-                      setOpen(false);
-                      setQ("");
-                      navigate({ to: h.href });
-                    }}
-                    className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-start gap-2"
-                  >
-                    <span
-                      className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-medium"
-                      style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
-                    >
-                      {h.kind}
+            <div className="p-2 space-y-3">
+              {/* Applications / Orders Section */}
+              {appHits.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-900/70 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <ShoppingBag className="size-3 text-indigo-600" /> Orders &amp; Applications
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm truncate" style={{ color: "var(--admin-fg)" }}>{h.title}</span>
-                      {h.subtitle && (
-                        <span className="block text-[11px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{h.subtitle}</span>
-                      )}
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] text-indigo-700 font-semibold">
+                      {appHits.length}
                     </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {appHits.map((h) => {
+                      const globalIdx = hits.indexOf(h);
+                      const isSelected = globalIdx === selectedIndex;
+                      return (
+                        <button
+                          key={`app-${h.id}`}
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            setQ("");
+                            navigate({ to: h.href });
+                          }}
+                          className={cn(
+                            "w-full text-left p-2.5 rounded-xl transition-all duration-150 flex flex-col gap-1.5 group border",
+                            isSelected
+                              ? "bg-indigo-50/80 border-indigo-200 shadow-2xs"
+                              : "border-transparent hover:bg-slate-50 hover:border-slate-200/80"
+                          )}
+                        >
+                          {/* Top row: Code + Stage Pill */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-bold text-xs text-indigo-950 group-hover:text-indigo-600 transition-colors">
+                              {h.title}
+                            </span>
+                            {h.stageLabel && (
+                              <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold border", h.stageBadgeClass)}>
+                                {h.stageLabel}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Middle row: Customer Name + Mobile + Email */}
+                          <div className="flex items-center gap-3 text-xs text-slate-700 flex-wrap">
+                            <span className="font-semibold text-slate-900 flex items-center gap-1">
+                              <UserCircle2 className="size-3 text-slate-400" />
+                              {h.customerName}
+                            </span>
+                            {h.mobile && (
+                              <span className="flex items-center gap-1 text-slate-600 text-[11px] font-mono">
+                                <Phone className="size-3 text-emerald-600" />
+                                {h.mobile}
+                              </span>
+                            )}
+                            {h.email && (
+                              <span className="flex items-center gap-1 text-slate-600 text-[11px] truncate max-w-[200px]">
+                                <Mail className="size-3 text-sky-600" />
+                                {h.email}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Bottom row: Service Name */}
+                          {h.serviceName && (
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 border-t border-slate-100/80">
+                              <span className="truncate">{h.serviceName}</span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Leads Section */}
+              {leadHits.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="size-3 text-slate-500" /> Leads
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 font-semibold">
+                      {leadHits.length}
+                    </span>
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {leadHits.map((h) => {
+                      const globalIdx = hits.indexOf(h);
+                      const isSelected = globalIdx === selectedIndex;
+                      return (
+                        <button
+                          key={`lead-${h.id}`}
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            setQ("");
+                            navigate({ to: h.href });
+                          }}
+                          className={cn(
+                            "w-full text-left p-2.5 rounded-xl transition-all duration-150 flex flex-col gap-1 border",
+                            isSelected
+                              ? "bg-slate-100 border-slate-300"
+                              : "border-transparent hover:bg-slate-50 hover:border-slate-200/80"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-xs text-slate-900">
+                              {h.customerName || h.title}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              Lead
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-slate-600 flex-wrap">
+                            {h.mobile && (
+                              <span className="flex items-center gap-1 font-mono">
+                                <Phone className="size-3 text-emerald-600" />
+                                {h.mobile}
+                              </span>
+                            )}
+                            {h.email && (
+                              <span className="flex items-center gap-1 truncate max-w-[220px]">
+                                <Mail className="size-3 text-sky-600" />
+                                {h.email}
+                              </span>
+                            )}
+                            {h.serviceName && <span className="text-slate-500">· {h.serviceName}</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Other Hits Section (Invoices, Certificates, Complaints) */}
+              {otherHits.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    System Records
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {otherHits.map((h) => {
+                      const globalIdx = hits.indexOf(h);
+                      const isSelected = globalIdx === selectedIndex;
+                      return (
+                        <button
+                          key={`other-${h.id}`}
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            setQ("");
+                            navigate({ to: h.href });
+                          }}
+                          className={cn(
+                            "w-full text-left p-2 rounded-lg transition-all duration-150 flex items-center justify-between text-xs border",
+                            isSelected
+                              ? "bg-slate-100 border-slate-300"
+                              : "border-transparent hover:bg-slate-50 hover:border-slate-200/80"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="uppercase text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              {h.kind}
+                            </span>
+                            <span className="font-medium text-slate-900">{h.title}</span>
+                          </div>
+                          {h.subtitle && <span className="text-slate-500 text-[11px]">{h.subtitle}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
