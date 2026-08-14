@@ -5,14 +5,13 @@
 // Do NOT map fulfillment_status → label directly in components — that path
 // drifts and produces inconsistent stage names across surfaces.
 
-import { isUnconvertedConsultationLead } from "./consultation";
-
-export type OrderStage =
+import { isUnconvertedConsultationLead } from "./consultation";export type OrderStage =
   | "lead_received"
   | "payment_pending"
   | "payment_done"
   | "form_not_submitted"
   | "customer_delay"
+  | "technical_delay"
   | "consultation_pending"
   | "consultation_completed"
   | "form_submitted"
@@ -26,9 +25,6 @@ export type OrderStage =
   | "uninterested"
   | "refund_requested"
   | "refunded";
-
-
-
 
 export interface ComputeStageLead {
   lead_status_v2?: string | null;
@@ -45,6 +41,7 @@ export interface ComputeStageApplication {
   certificate_uploaded_at?: string | null;
   fulfillment_status?: string | null;
   application_status?: string | null;
+  workflow_status?: string | null;
 }
 
 export function computeOrderStage(
@@ -70,6 +67,7 @@ export function computeOrderStage(
   // precedence over the form-submitted gate so the journey doesn't stall on
   // "Payment Done" if an order is force-completed without a customer form.
   const fs = application.fulfillment_status ?? "order_received";
+  const ws = application.workflow_status ?? "";
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
@@ -88,7 +86,7 @@ export function computeOrderStage(
   if (fs === "documents_received") return "in_progress";
 
   if (fs === "customer_delay") return "customer_delay";
-  if (fs === "technical_delay") return "form_submitted";
+  if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold") return "technical_delay";
 
   if (fs === "consultation_completed") return "consultation_completed";
 
@@ -105,13 +103,14 @@ export function computeOrderStage(
 // Display metadata. order: position on the journey strip (exception stages get -1).
 export const STAGE_META: Record<
   OrderStage,
-  { label: string; short: string; order: number; tone: "blue" | "amber" | "violet" | "indigo" | "emerald" | "rose" | "slate"; side: "customer" | "employee" | "exception" }
+  { label: string; short: string; order: number; tone: "blue" | "amber" | "violet" | "indigo" | "emerald" | "rose" | "slate" | "sky"; side: "customer" | "employee" | "exception" }
 > = {
   lead_received:     { label: "Lead Received",      short: "Lead",       order: 0, tone: "blue",    side: "customer" },
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
   payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
   form_not_submitted: { label: "Form Not Submitted", short: "Form Pending", order: 3, tone: "amber", side: "customer" },
-  customer_delay:    { label: "Customer Delay",     short: "Delay",      order: 4, tone: "amber", side: "customer" },
+  customer_delay:    { label: "Customer Delay",     short: "Delay",      order: 4, tone: "amber",   side: "customer" },
+  technical_delay:   { label: "Technical Delay",    short: "Tech Delay", order: 4, tone: "sky",     side: "employee" },
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
   consultation_completed: { label: "Consultation Completed", short: "Consult Done", order: 3, tone: "emerald", side: "employee" },
   form_submitted:    { label: "Form Submitted",     short: "Form",       order: 4, tone: "indigo",  side: "customer" },
@@ -126,7 +125,6 @@ export const STAGE_META: Record<
   refunded:          { label: "Refunded",           short: "Refunded",   order: -1, tone: "slate",  side: "exception" },
   closed:            { label: "Order Closed",       short: "Closed",     order: -1, tone: "rose",   side: "exception" },
 };
-
 
 // Stages shown on the horizontal journey strip, in order.
 export const JOURNEY_STAGES: OrderStage[] = [
@@ -147,6 +145,7 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_not_submitted: "bg-amber-100 text-amber-900 border-amber-200",
   customer_delay:    "bg-amber-100 text-amber-900 border-amber-200",
+  technical_delay:   "bg-sky-100 text-sky-800 border-sky-200",
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",
   consultation_completed: "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_submitted:    "bg-indigo-100 text-indigo-800 border-indigo-200",

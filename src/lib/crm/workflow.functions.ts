@@ -197,11 +197,16 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         workflow_delay_reason: data.reasonCode,
         workflow_expected_review_at: expectedReviewIso,
         workflow_priority: data.priority,
-        ...(side === "customer" ? {
-          order_status: "CUSTOMER_HOLD",
-          fulfillment_status: "customer_delay",
-          customer_hold_started_at: holdStartedAt,
-        } : {}),
+        ...(side === "customer"
+          ? {
+              order_status: "CUSTOMER_HOLD",
+              fulfillment_status: "customer_delay",
+              customer_hold_started_at: holdStartedAt,
+            }
+          : {
+              order_status: "TECHNICAL_HOLD",
+              fulfillment_status: "technical_delay",
+            }),
       } as never)
       .eq("id", app.id);
     if (updErr) throw new Error(updErr.message);

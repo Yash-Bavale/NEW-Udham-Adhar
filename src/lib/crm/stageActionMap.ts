@@ -67,6 +67,12 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "none",
     exceptions: ["cancel_refund"],
   },
+  technical_delay: {
+    hint: "Internal / technical delay active. Resolve the technical issue to resume order processing.",
+    primary: null,
+    primaryKind: "none",
+    exceptions: ["cancel_refund"],
+  },
   consultation_pending: {
     hint: "Consultation lead — convert to a paid order once the customer picks a service.",
     primary: "Open Consultation Panel",

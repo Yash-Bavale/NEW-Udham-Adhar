@@ -58,6 +58,7 @@ export function stageToJourneyIndex(stage: OrderStage): number {
       return 4;
     case "form_submitted":
     case "customer_delay":
+    case "technical_delay":
     case "in_progress":
     case "under_review":
       return 3;
@@ -351,9 +352,9 @@ export function deriveJourneyLiveState(input: {
     activeSubKey = null;
   } else if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
     activeSubKey = "form-not-submitted";
-  } else if (/customer_hold|customer_side|customer_delay|waiting_for_customer|external_dependency/.test(ws)) {
+  } else if (/customer_hold|customer_side|customer_delay|waiting_for_customer|external_dependency/.test(ws) || input.stage === "customer_delay") {
     activeSubKey = "customer-delay";
-  } else if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws)) {
+  } else if (/technical_hold|external_delay|govt_delay|technical_delay|government_portal_pending/.test(ws) || input.stage === "technical_delay") {
     activeSubKey = "technical-delay";
   } else if (idx === 4 || idx === 5) {
     activeSubKey = "govt-awaiting";
