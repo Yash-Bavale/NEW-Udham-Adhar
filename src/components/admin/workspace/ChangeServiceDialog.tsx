@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { changeOrderService } from "@/lib/crm/orders-v2.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 
-const ALLOWED = new Set(["order_received", "awaiting_customer_form", "waiting_for_customer_submission", "waiting_customer_submission", "S01", "S02", "S03"]);
+const TERMINAL_STAGES = new Set(["completed", "order_completed", "order_closed", "cancelled"]);
 
 interface Props {
   orderId: string;
@@ -21,7 +21,7 @@ interface Props {
 
 export function ChangeServiceButton(p: Props) {
   const [open, setOpen] = useState(false);
-  const canChange = !p.formSubmittedAt && ALLOWED.has(p.fulfillmentStatus);
+  const canChange = !TERMINAL_STAGES.has(p.fulfillmentStatus);
 
   return (
     <>
@@ -42,8 +42,8 @@ export function ChangeServiceButton(p: Props) {
         </TooltipTrigger>
         <TooltipContent>
           {canChange
-            ? "Switch this order to a different service (allowed until the form is submitted)."
-            : "Service can only be changed before the customer submits the form."}
+            ? "Switch this order to a different service."
+            : "Service cannot be changed on completed or closed orders."}
         </TooltipContent>
       </Tooltip>
       {open && (

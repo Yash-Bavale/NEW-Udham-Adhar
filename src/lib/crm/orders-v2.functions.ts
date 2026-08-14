@@ -1109,9 +1109,8 @@ export const changeOrderService = createServerFn({ method: "POST" })
     if (!app) throw new Error("Order not found");
 
     const stage = String((app as any).fulfillment_status ?? "");
-    if (app.form_submitted_at) throw new Error("Service cannot be changed after the form is submitted.");
-    if (!CHANGE_SERVICE_ALLOWED_STAGES.has(stage)) {
-      throw new Error(`Service change is only allowed before form submission (current stage: ${stage}).`);
+    if (["completed", "order_completed", "order_closed", "cancelled"].includes(stage)) {
+      throw new Error("Service cannot be changed on completed or closed orders.");
     }
 
     const { data: newSvc, error: svcErr } = await admin
@@ -1138,16 +1137,20 @@ export const changeOrderService = createServerFn({ method: "POST" })
       ? await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()
       : { data: null as any };
 
-    // Swap on lead + application (+ pricing on lead).
+    // Swap on lead + application (+ pricing on lead if not paid yet).
+    const leadUpdate: Record<string, any> = {
+      service: newSvc.service_name,
+      service_id: newSvc.id,
+    };
+    if (paidSum <= 0) {
+      leadUpdate.base_amount = newSvc.base_amount;
+      leadUpdate.gst_amount = newSvc.gst_amount;
+      leadUpdate.total_amount = newSvc.total_amount;
+    }
+
     const { error: leadUpdErr } = await admin
       .from("leads")
-      .update({
-        service: newSvc.service_name,
-        service_id: newSvc.id,
-        base_amount: newSvc.base_amount,
-        gst_amount: newSvc.gst_amount,
-        total_amount: newSvc.total_amount,
-      } as never)
+      .update(leadUpdate as never)
       .eq("id", app.lead_id);
     if (leadUpdErr) throw new Error(leadUpdErr.message);
 
