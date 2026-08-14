@@ -7,12 +7,12 @@ import {
   breadcrumbSchema,
 } from "@/lib/seo/jsonld";
 
-const URL = "https://udyamadhar.in/msme-registration-fee";
-const TITLE = "MSME Registration Fee — Government vs Consultancy Charges Explained";
-const DESC =
+export const URL = "https://udyamadhar.in/msme-registration-fee";
+export const TITLE = "MSME Registration Fee — Government vs Consultancy Charges Explained";
+export const DESC =
   "Is MSME (Udyam) registration free? Yes — government fee is ₹0. Understand the difference between official fees and private consultancy charges. Transparent pricing.";
 
-const FAQS = [
+export const FAQS = [
   {
     q: "Is Udyam / MSME registration really free on the government portal?",
     a: "Yes. The Ministry of MSME charges ₹0 for Udyam registration, updates, downloads and migrations on the official portal udyamregistration.gov.in. There is no government fee at any step.",
@@ -35,7 +35,7 @@ const FAQS = [
   },
 ];
 
-const BLOCKS: RichBlock[] = [
+export const BLOCKS: RichBlock[] = [
   { type: "h2", text: "Government MSME registration fee" },
   {
     type: "p",

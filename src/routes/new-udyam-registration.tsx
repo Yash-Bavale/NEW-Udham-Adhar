@@ -9,12 +9,12 @@ import {
   breadcrumbSchema,
 } from "@/lib/seo/jsonld";
 
-const URL = "https://udyamadhar.in/new-udyam-registration";
-const TITLE = "New Udyam Registration Online | MSME Certificate Assistance";
-const DESC =
+export const URL = "https://udyamadhar.in/new-udyam-registration";
+export const TITLE = "New Udyam Registration Online | MSME Certificate Assistance";
+export const DESC =
   "Apply for new Udyam (MSME) registration with professional consultancy assistance. Eligibility, documents, fees and timelines explained. Private service — pan-India.";
 
-const FAQS = [
+export const FAQS = [
   {
     q: "Is new Udyam registration mandatory for my business?",
     a: "It is not legally mandatory, but it is strongly recommended for any business that qualifies as an MSME. Without Udyam registration, you cannot avail MSME-specific benefits such as collateral-free loans, government tender participation, subsidies and protection under the MSMED Act for delayed payments.",
@@ -37,7 +37,7 @@ const FAQS = [
   },
 ];
 
-const STEPS = [
+export const STEPS = [
   {
     name: "Eligibility & document review",
     text: "Our team checks your business type, Aadhaar, PAN and bank details to confirm MSME eligibility and identify any document mismatches.",
@@ -56,7 +56,7 @@ const STEPS = [
   },
 ];
 
-const BLOCKS: RichBlock[] = [
+export const BLOCKS: RichBlock[] = [
   { type: "h2", text: "Who needs new Udyam registration?" },
   {
     type: "p",

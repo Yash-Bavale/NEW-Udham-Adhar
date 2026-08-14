@@ -9,12 +9,12 @@ import {
   breadcrumbSchema,
 } from "@/lib/seo/jsonld";
 
-const URL = "https://udyamadhar.in/update-udyam-certificate";
-const TITLE = "Update Udyam Certificate Online | Edit MSME Details";
-const DESC =
+export const URL = "https://udyamadhar.in/update-udyam-certificate";
+export const TITLE = "Update Udyam Certificate Online | Edit MSME Details";
+export const DESC =
   "Update your Udyam (MSME) certificate — change business name, address, NIC activity, bank or contact details. Professional consultancy assistance, pan-India.";
 
-const FAQS = [
+export const FAQS = [
   {
     q: "What details can I update on my Udyam certificate?",
     a: "You can update business name, registered address, additional activities (NIC codes), bank account, contact details, organisation type, investment and turnover. Every update is OTP-verified and reflected in a freshly signed certificate.",
@@ -37,7 +37,7 @@ const FAQS = [
   },
 ];
 
-const STEPS = [
+export const STEPS = [
   {
     name: "Specify what you want to change",
     text: "Share the exact fields to be updated (e.g., new address, additional NIC code).",
@@ -56,7 +56,7 @@ const STEPS = [
   },
 ];
 
-const BLOCKS: RichBlock[] = [
+export const BLOCKS: RichBlock[] = [
   { type: "h2", text: "When you should update your Udyam certificate" },
   {
     type: "ul",

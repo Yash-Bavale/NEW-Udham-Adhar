@@ -9,12 +9,12 @@ import {
   breadcrumbSchema,
 } from "@/lib/seo/jsonld";
 
-const URL = "https://udyamadhar.in/download-udyam-certificate";
-const TITLE = "Download Udyam Certificate Online | MSME Certificate";
-const DESC =
+export const URL = "https://udyamadhar.in/download-udyam-certificate";
+export const TITLE = "Download Udyam Certificate Online | MSME Certificate";
+export const DESC =
   "Download your Udyam (MSME) certificate online with URN or Aadhaar verification. Fast, secure assistance for misplaced or lost Udyam certificates.";
 
-const FAQS = [
+export const FAQS = [
   {
     q: "How can I download my Udyam certificate?",
     a: "You can download your Udyam certificate by providing your Udyam Registration Number (URN) and authenticating via OTP sent to your registered mobile number linked with Aadhaar.",
@@ -37,7 +37,7 @@ const FAQS = [
   },
 ];
 
-const STEPS = [
+export const STEPS = [
   {
     name: "Submit details",
     text: "Provide your Udyam Registration Number (URN) or business details for identification.",
@@ -56,7 +56,7 @@ const STEPS = [
   },
 ];
 
-const BLOCKS: RichBlock[] = [
+export const BLOCKS: RichBlock[] = [
   { type: "h2", text: "When do you need to download your Udyam certificate?" },
   {
     type: "ul",

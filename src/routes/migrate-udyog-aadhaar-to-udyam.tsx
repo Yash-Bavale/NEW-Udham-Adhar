@@ -9,12 +9,12 @@ import {
   breadcrumbSchema,
 } from "@/lib/seo/jsonld";
 
-const URL = "https://udyamadhar.in/migrate-udyog-aadhaar-to-udyam";
-const TITLE = "Migrate Udyog Aadhar to Udyam | UAM Migration Assistance";
-const DESC =
+export const URL = "https://udyamadhar.in/migrate-udyog-aadhaar-to-udyam";
+export const TITLE = "Migrate Udyog Aadhar to Udyam | UAM Migration Assistance";
+export const DESC =
   "Migrate your existing Udyog Aadhar (UAM) to the new Udyam registration. Consultancy assistance to validate, re-register and obtain a digitally signed Udyam certificate.";
 
-const FAQS = [
+export const FAQS = [
   {
     q: "Why must Udyog Aadhar be migrated to Udyam?",
     a: "The Government replaced the Udyog Aadhar Memorandum (UAM) system with the Udyam registration system in 2020. Banks, tender authorities and many ministries now recognise only the Udyam certificate. UAM-based registrations are gradually phased out, which is why migration is necessary to retain MSME benefits.",
@@ -37,7 +37,7 @@ const FAQS = [
   },
 ];
 
-const STEPS = [
+export const STEPS = [
   {
     name: "Retrieve / verify your UAN",
     text: "We confirm your existing Udyog Aadhar Number and the linked Aadhaar / PAN records.",
@@ -56,7 +56,7 @@ const STEPS = [
   },
 ];
 
-const BLOCKS: RichBlock[] = [
+export const BLOCKS: RichBlock[] = [
   { type: "h2", text: "Who should migrate?" },
   {
     type: "p",
