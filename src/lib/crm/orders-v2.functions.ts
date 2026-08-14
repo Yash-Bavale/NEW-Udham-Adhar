@@ -56,6 +56,81 @@ function rollupPaymentStatus(payments: Array<{ status: string; amount: number }>
   return "Paid";
 }
 
+/**
+ * Self-healing reconcile helper:
+ * Finds any paid payments where application_id is null or where lead status is payment_successful,
+ * creates missing applications, links the payments, and triggers finalizePaidPayment.
+ */
+async function ensurePaidOrdersIntegrated(admin: any) {
+  try {
+    // 1. Find payments with status paid/success/successful where application_id is NULL
+    const { data: unlinkedPayments } = await admin
+      .from("payments")
+      .select("id, lead_id, application_id, status")
+      .in("status", ["paid", "success", "successful", "captured"])
+      .is("application_id", null)
+      .limit(100);
+
+    if (unlinkedPayments && unlinkedPayments.length > 0) {
+      const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+      for (const p of unlinkedPayments) {
+        if (!p.lead_id) continue;
+        try {
+          await finalizePaidPayment(p.id, { source: "reconcile" });
+        } catch (err) {
+          console.error(`[self-heal] finalizePaidPayment failed for ${p.id}:`, err);
+        }
+      }
+    }
+
+    // 2. Find leads marked payment_successful that don't have an application row
+    const { data: paidLeads } = await admin
+      .from("leads")
+      .select("id, customer_id, service_id, assigned_to, website_id")
+      .in("status", ["payment_successful"])
+      .limit(100);
+
+    if (paidLeads && paidLeads.length > 0) {
+      const leadIds = paidLeads.map((l: any) => l.id);
+      const { data: existingApps } = await admin
+        .from("applications")
+        .select("lead_id")
+        .in("lead_id", leadIds)
+        .eq("is_deleted", false);
+      const existingLeadIdSet = new Set((existingApps ?? []).map((a: any) => a.lead_id));
+
+      for (const l of paidLeads) {
+        if (!existingLeadIdSet.has(l.id)) {
+          // Missing application row! Insert application row right now.
+          const { data: createdApp } = await admin
+            .from("applications")
+            .insert({
+              lead_id: l.id,
+              customer_id: l.customer_id ?? null,
+              service_id: l.service_id ?? null,
+              assigned_to: l.assigned_to ?? null,
+              website_id: l.website_id ?? null,
+              application_status: "payment_received",
+              fulfillment_status: "order_received",
+            })
+            .select("id")
+            .maybeSingle();
+
+          if (createdApp?.id) {
+            // Link any payments for this lead to the newly created application
+            await admin
+              .from("payments")
+              .update({ application_id: createdApp.id, status: "paid" })
+              .eq("lead_id", l.id);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[ensurePaidOrdersIntegrated] error:", err);
+  }
+}
+
 /* ----------------------------- listOrders ------------------------------- */
 
 export const listOrdersV2 = createServerFn({ method: "POST" })
@@ -80,19 +155,36 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
-    // Orders surface = applications with at least one successful payment.
-    // Pre-resolve paid application IDs from the payments table, then filter.
+    // Run self-healing check to integrate any paid payments/leads missing application rows
+    await ensurePaidOrdersIntegrated(admin);
+
+    // Orders surface = applications with at least one successful payment or non-lead application.
     const { data: paidRows, error: paidErr } = await admin
       .from("payments")
       .select("application_id")
-      .eq("status", "paid")
+      .in("status", ["paid", "success", "successful", "captured"])
       .not("application_id", "is", null);
     if (paidErr) throw new Error(paidErr.message);
-    const paidAppIds = Array.from(
-      new Set((paidRows ?? []).map((r: any) => r.application_id).filter(Boolean)),
-    ) as string[];
 
-    if (paidAppIds.length === 0) {
+    const paidAppIds = new Set(
+      (paidRows ?? []).map((r: any) => r.application_id).filter(Boolean),
+    );
+
+    // Also include any non-deleted applications whose application_status != 'lead'
+    const { data: nonDeletedApps } = await admin
+      .from("applications")
+      .select("id")
+      .eq("is_deleted", false)
+      .not("application_status", "eq", "lead")
+      .limit(5000);
+
+    for (const a of nonDeletedApps ?? []) {
+      paidAppIds.add(a.id);
+    }
+
+    const appIdsArr = Array.from(paidAppIds);
+
+    if (appIdsArr.length === 0) {
       return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
     }
 
@@ -103,7 +195,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .in("id", paidAppIds)
+      .in("id", appIdsArr)
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
