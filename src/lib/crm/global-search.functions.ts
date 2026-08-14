@@ -3,7 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "./computeOrderStage";
 
 export type SearchHit = {
-  kind: "customer" | "lead" | "application" | "invoice" | "certificate" | "complaint";
+  kind: "lead" | "application" | "invoice" | "certificate" | "complaint";
   id: string;
   title: string;
   subtitle?: string;
@@ -27,25 +27,26 @@ export const globalSearch = createServerFn({ method: "POST" })
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
+    // Parallel queries across customers, leads, applications, invoices, certificates, complaints
     const [c, l, aByCode, inv, cert, comp] = await Promise.all([
       s.from("customers")
         .select("id, customer_code, name, primary_email, primary_mobile, udyam_number, gst_number, pan_number")
         .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like},udyam_number.ilike.${like},gst_number.ilike.${like},pan_number.ilike.${like}`)
-        .limit(6),
+        .limit(10),
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, status, lead_status_v2, payment_successful_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(10),
+        .limit(12),
       s.from("applications")
         .select("id, application_code, application_status, fulfillment_status, workflow_status, form_submitted_at, certificate_uploaded_at, lead_id, customer_id")
         .ilike("application_code", like)
-        .limit(8),
+        .limit(10),
       s.from("invoices").select("id, invoice_number, total_amount").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status").ilike("complaint_number", like).limit(5),
     ]);
 
-    // Pull applications linked to matching leads or customers so email/mobile/name searches surface orders.
+    // Pull applications linked to matching leads OR matching customers so mobile/email/name searches surface orders.
     const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
     const customerIds = (c.data || []).map((r: any) => r.id).filter(Boolean);
 
@@ -63,7 +64,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         .select("id, application_code, application_status, fulfillment_status, workflow_status, form_submitted_at, certificate_uploaded_at, lead_id, customer_id")
         .or(orClauses.join(","))
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(15);
       linkedApps = linked ?? [];
     }
 
@@ -74,10 +75,9 @@ export const globalSearch = createServerFn({ method: "POST" })
       return true;
     });
 
-    // Gather lead records for applications to compute stage, customer name, mobile, email
+    // Gather missing leads for allApps
     const allAppLeadIds = Array.from(new Set(allApps.map((a: any) => a.lead_id).filter(Boolean))) as string[];
     const missingLeadIds = allAppLeadIds.filter((id) => !(l.data || []).some((r: any) => r.id === id));
-
     let extraLeads: any[] = [];
     if (missingLeadIds.length > 0) {
       const { data: ext } = await s
@@ -87,10 +87,22 @@ export const globalSearch = createServerFn({ method: "POST" })
       extraLeads = ext ?? [];
     }
 
-    const leadMap = new Map<string, any>([...(l.data || []), ...extraLeads].map((r: any) => [r.id, r]));
-    const customerMap = new Map<string, any>((c.data || []).map((r: any) => [r.id, r]));
+    // Gather missing customers for allApps
+    const allAppCustIds = Array.from(new Set(allApps.map((a: any) => a.customer_id).filter(Boolean))) as string[];
+    const missingCustIds = allAppCustIds.filter((id) => !(c.data || []).some((r: any) => r.id === id));
+    let extraCustomers: any[] = [];
+    if (missingCustIds.length > 0) {
+      const { data: extC } = await s
+        .from("customers")
+        .select("id, name, primary_email, primary_mobile")
+        .in("id", missingCustIds);
+      extraCustomers = extC ?? [];
+    }
 
-    // 1. Applications (Orders)
+    const leadMap = new Map<string, any>([...(l.data || []), ...extraLeads].map((r: any) => [r.id, r]));
+    const customerMap = new Map<string, any>([...(c.data || []), ...extraCustomers].map((r: any) => [r.id, r]));
+
+    // 1. Applications (Orders) - Displayed with Customer Name FIRST, stage badge, mobile, email, service
     allApps.forEach((app: any) => {
       const lead = app.lead_id ? leadMap.get(app.lead_id) : null;
       const cust = app.customer_id ? customerMap.get(app.customer_id) : null;
@@ -118,8 +130,10 @@ export const globalSearch = createServerFn({ method: "POST" })
       });
     });
 
-    // 2. Leads
-    (l.data || []).forEach((r: any) =>
+    // 2. Leads (Only leads that do not already have an Order shown above)
+    const appLeadIds = new Set(allApps.map((a: any) => a.lead_id).filter(Boolean));
+    (l.data || []).forEach((r: any) => {
+      if (appLeadIds.has(r.id)) return; // Skip lead if order is already shown
       hits.push({
         kind: "lead",
         id: r.id,
@@ -130,24 +144,13 @@ export const globalSearch = createServerFn({ method: "POST" })
         mobile: r.mobile || undefined,
         email: r.email || undefined,
         serviceName: r.service || undefined,
-      })
-    );
+      });
+    });
 
-    // 3. Customers (included so searching by customer name/email/mobile surfaces customer hits)
-    (c.data || []).forEach((r: any) =>
-      hits.push({
-        kind: "customer",
-        id: r.id,
-        title: r.name || r.customer_code,
-        subtitle: [r.customer_code, r.primary_email, r.primary_mobile, r.udyam_number].filter(Boolean).join(" · "),
-        href: `/admin/customers/${r.id}`,
-        customerName: r.name || r.customer_code,
-        mobile: r.primary_mobile || undefined,
-        email: r.primary_email || undefined,
-      })
-    );
+    // NOTE: Customer cards are intentionally omitted per user request.
+    // Searching by customer name, email, or mobile queries customers table to pull linked applications above.
 
-    // 4. Invoices, Certificates, Complaints
+    // 3. System Records (Invoices, Certificates, Complaints)
     (inv.data || []).forEach((r: any) =>
       hits.push({
         kind: "invoice",
