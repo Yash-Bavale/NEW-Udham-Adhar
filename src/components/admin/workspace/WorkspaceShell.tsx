@@ -107,6 +107,11 @@ export function WorkspaceShell(p: Props) {
   const meta = STAGE_META[p.stage];
   const availability = tabAvailability(orderStatus, !!lead?.id, p.showConsultationPanel);
 
+  const hasServiceChanged = useMemo(
+    () => (events ?? []).some((e: any) => e?.event_type === "service_changed"),
+    [events],
+  );
+
   // Gating & Journey Phase State Logic
   const reminderCount = useMemo(
     () => (events ?? []).filter((e: any) => e?.type === "ReminderScheduled" || e?.type === "ReminderFired").length,
@@ -371,7 +376,7 @@ export function WorkspaceShell(p: Props) {
               </TooltipTrigger>
               <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
             </Tooltip>
-            {cLeadCode && cLeadCode !== "—" && (
+            {hasServiceChanged && cLeadCode && cLeadCode !== "—" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -399,31 +404,33 @@ export function WorkspaceShell(p: Props) {
                 formSubmittedAt={application?.form_submitted_at ?? null}
               />
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={sendingUpdateEmail}
-                  onClick={async () => {
-                    setSendingUpdateEmail(true);
-                    try {
-                      const r = await fnResendServiceEmail({ data: { orderId: p.orderId } });
-                      toast.success(`Service update email resent to ${r.recipient}`);
-                      invalidate();
-                    } catch (e: any) {
-                      toast.error(e?.message ?? "Failed to resend email");
-                    } finally {
-                      setSendingUpdateEmail(false);
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100 transition-colors"
-                >
-                  {sendingUpdateEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-sky-700" />}
-                  Resend Update Email
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Resend service update email & payment link to customer</TooltipContent>
-            </Tooltip>
+            {hasServiceChanged && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={sendingUpdateEmail}
+                    onClick={async () => {
+                      setSendingUpdateEmail(true);
+                      try {
+                        const r = await fnResendServiceEmail({ data: { orderId: p.orderId } });
+                        toast.success(`Service update email resent to ${r.recipient}`);
+                        invalidate();
+                      } catch (e: any) {
+                        toast.error(e?.message ?? "Failed to resend email");
+                      } finally {
+                        setSendingUpdateEmail(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100 transition-colors"
+                  >
+                    {sendingUpdateEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-sky-700" />}
+                    Resend Update Email
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Resend service update email & payment link to customer</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
