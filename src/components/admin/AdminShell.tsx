@@ -419,8 +419,7 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // Filter out any customer hits just in case
-  const hits = useMemo(() => (data?.hits ?? []).filter((h) => (h as any).kind !== "customer"), [data]);
+  const hits = useMemo(() => data?.hits ?? [], [data]);
 
   // Reset selected index when hits change
   useEffect(() => {
@@ -452,10 +451,11 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
     }
   };
 
-  // Categorize hits into Orders, Leads, and System
+  // Categorize hits into Orders, Leads, Customers, and System
   const appHits = useMemo(() => hits.filter((h) => h.kind === "application"), [hits]);
   const leadHits = useMemo(() => hits.filter((h) => h.kind === "lead"), [hits]);
-  const otherHits = useMemo(() => hits.filter((h) => h.kind !== "application" && h.kind !== "lead"), [hits]);
+  const customerHits = useMemo(() => hits.filter((h) => h.kind === "customer"), [hits]);
+  const otherHits = useMemo(() => hits.filter((h) => h.kind !== "application" && h.kind !== "lead" && h.kind !== "customer"), [hits]);
 
   return (
     <div ref={wrapRef} className="relative w-full max-w-xl">
@@ -648,6 +648,66 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
                               </span>
                             )}
                             {h.serviceName && <span className="text-slate-500">· {h.serviceName}</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Customers Section */}
+              {customerHits.length > 0 && (
+                <div>
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <UserCircle2 className="size-3 text-slate-500" /> Customers
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 font-semibold">
+                      {customerHits.length}
+                    </span>
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {customerHits.map((h) => {
+                      const globalIdx = hits.indexOf(h);
+                      const isSelected = globalIdx === selectedIndex;
+                      return (
+                        <button
+                          key={`cust-${h.id}`}
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            setQ("");
+                            navigate({ to: h.href });
+                          }}
+                          className={cn(
+                            "w-full text-left p-2.5 rounded-xl transition-all duration-150 flex flex-col gap-1 border",
+                            isSelected
+                              ? "bg-slate-100 border-slate-300"
+                              : "border-transparent hover:bg-slate-50 hover:border-slate-200/80"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-xs text-slate-900">
+                              {h.customerName || h.title}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                              Customer
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[11px] text-slate-600 flex-wrap">
+                            {h.mobile && (
+                              <span className="flex items-center gap-1 font-mono">
+                                <Phone className="size-3 text-emerald-600" />
+                                {h.mobile}
+                              </span>
+                            )}
+                            {h.email && (
+                              <span className="flex items-center gap-1 truncate max-w-[220px]">
+                                <Mail className="size-3 text-sky-600" />
+                                {h.email}
+                              </span>
+                            )}
                           </div>
                         </button>
                       );
