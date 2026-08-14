@@ -168,10 +168,43 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     staleTime: 10_000,
   });
 
+  // Track which module paths have been visited this session —
+  // once you navigate to a section, its badge clears until the next page refresh.
+  const CLEARABLE_PATHS = useMemo(
+    () => [
+      "/admin/orders",
+      "/admin/review",
+      "/admin/tasks",
+      "/admin/complaints",
+      "/admin/tickets",
+      "/admin/quarantine",
+      "/admin/refunds",
+    ],
+    [],
+  );
+  const [visitedPaths, setVisitedPaths] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    const matched = CLEARABLE_PATHS.find(
+      (p) => path === p || path.startsWith(p + "/"),
+    );
+    if (matched) {
+      setVisitedPaths((prev) => {
+        if (prev.has(matched)) return prev;
+        const next = new Set(prev);
+        next.add(matched);
+        return next;
+      });
+    }
+  }, [path, CLEARABLE_PATHS]);
+
   const getSidebarBadge = (to: string): number => {
-    if (!sidebarCounts) return to === "/admin/leads" && newLeads > 0 ? newLeads : 0;
-    if (to === "/admin/notifications") return sidebarCounts.notifications;
-    if (to === "/admin/leads") return Math.max(sidebarCounts.leads, newLeads);
+    // Notifications page: always show unread count (never suppressed)
+    if (to === "/admin/notifications") return sidebarCounts?.notifications ?? 0;
+    // Leads: uses its own watcher — only new-since-last-visit
+    if (to === "/admin/leads") return newLeads > 0 ? newLeads : 0;
+    // All other clearable sections: suppress once visited
+    if (visitedPaths.has(to)) return 0;
+    if (!sidebarCounts) return 0;
     if (to === "/admin/orders") return sidebarCounts.orders;
     if (to === "/admin/review") return sidebarCounts.docReview;
     if (to === "/admin/tasks") return sidebarCounts.tasks;
