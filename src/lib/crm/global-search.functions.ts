@@ -17,36 +17,58 @@ export type SearchHit = {
   serviceName?: string;
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const globalSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { q: string }) => d)
   .handler(async ({ data, context }): Promise<{ hits: SearchHit[] }> => {
     const q = (data.q || "").trim();
     if (q.length < 2) return { hits: [] };
+
     const s = context.supabase;
+    const isUuid = UUID_REGEX.test(q);
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
     // Parallel queries across customers, leads, applications, invoices, certificates, complaints
     const [c, l, aByCode, inv, cert, comp] = await Promise.all([
-      s.from("customers")
-        .select("id, customer_code, name, primary_email, primary_mobile, udyam_number, gst_number, pan_number")
-        .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like},udyam_number.ilike.${like},gst_number.ilike.${like},pan_number.ilike.${like}`)
-        .limit(10),
-      s.from("leads")
-        .select("id, lead_code, name, email, mobile, service, status, lead_status_v2, payment_successful_at")
-        .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(12),
-      s.from("applications")
-        .select("id, application_code, application_status, fulfillment_status, workflow_status, form_submitted_at, certificate_uploaded_at, lead_id, customer_id")
-        .ilike("application_code", like)
-        .limit(10),
+      isUuid
+        ? s.from("customers")
+            .select("id, customer_code, name, primary_email, primary_mobile, udyam_number, gst_number, pan_number")
+            .eq("id", q)
+            .limit(6)
+        : s.from("customers")
+            .select("id, customer_code, name, primary_email, primary_mobile, udyam_number, gst_number, pan_number")
+            .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like},customer_code.ilike.${like},udyam_number.ilike.${like},gst_number.ilike.${like},pan_number.ilike.${like}`)
+            .limit(10),
+
+      isUuid
+        ? s.from("leads")
+            .select("id, lead_code, name, email, mobile, service, status, lead_status_v2, payment_successful_at")
+            .eq("id", q)
+            .limit(10)
+        : s.from("leads")
+            .select("id, lead_code, name, email, mobile, service, status, lead_status_v2, payment_successful_at")
+            .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
+            .limit(12),
+
+      isUuid
+        ? s.from("applications")
+            .select("id, application_code, application_status, fulfillment_status, workflow_status, form_submitted_at, certificate_uploaded_at, lead_id, customer_id")
+            .or(`id.eq.${q},lead_id.eq.${q},customer_id.eq.${q}`)
+            .limit(10)
+        : s.from("applications")
+            .select("id, application_code, application_status, fulfillment_status, workflow_status, form_submitted_at, certificate_uploaded_at, lead_id, customer_id")
+            .ilike("application_code", like)
+            .limit(10),
+
       s.from("invoices").select("id, invoice_number, total_amount").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status").ilike("complaint_number", like).limit(5),
     ]);
 
-    // Pull applications linked to matching leads OR matching customers so mobile/email/name searches surface orders.
+    // Pull applications linked to matching leads OR matching customers
     const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
     const customerIds = (c.data || []).map((r: any) => r.id).filter(Boolean);
 
@@ -146,9 +168,6 @@ export const globalSearch = createServerFn({ method: "POST" })
         serviceName: r.service || undefined,
       });
     });
-
-    // NOTE: Customer cards are intentionally omitted per user request.
-    // Searching by customer name, email, or mobile queries customers table to pull linked applications above.
 
     // 3. System Records (Invoices, Certificates, Complaints)
     (inv.data || []).forEach((r: any) =>
