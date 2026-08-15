@@ -231,3 +231,216 @@ export const updateComplaint = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const CONTACT_STATUSES = [
+  "lead_created",
+  "in_progress",
+  "contacted",
+  "resolved",
+  "closed",
+] as const;
+
+export const listContactSubmissions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { status?: string; q?: string }) =>
+    z
+      .object({
+        status: z.string().optional(),
+        q: z.string().optional(),
+      })
+      .parse(i ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    let query = supabase
+      .from("leads")
+      .select(
+        "id, name, email, mobile, state, language, service, lead_source, status, notes, lead_code, assigned_to, created_at, updated_at",
+      )
+      .or("lead_source.eq.contact_form,service.eq.Contact Enquiry")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (data.status) {
+      query = query.eq("status", data.status);
+    }
+
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const assigneeIds = Array.from(
+      new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean)),
+    );
+    const { data: profiles } = assigneeIds.length
+      ? await supabase.from("profiles").select("id, full_name, display_name, email").in("id", assigneeIds as string[])
+      : { data: [] as any[] };
+    const profMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? p.display_name ?? p.email]));
+
+    const enriched = (rows ?? []).map((r: any) => ({
+      ...r,
+      assigned_name: r.assigned_to ? profMap.get(r.assigned_to) ?? null : null,
+    }));
+
+    const text = (data.q || "").trim().toLowerCase();
+    const filtered = text
+      ? enriched.filter(
+          (r: any) =>
+            (r.name || "").toLowerCase().includes(text) ||
+            (r.email || "").toLowerCase().includes(text) ||
+            (r.mobile || "").includes(text) ||
+            (r.state || "").toLowerCase().includes(text) ||
+            (r.notes || "").toLowerCase().includes(text) ||
+            (r.lead_code || "").toLowerCase().includes(text),
+        )
+      : enriched;
+
+    const { data: allRaw } = await supabase
+      .from("leads")
+      .select("status")
+      .or("lead_source.eq.contact_form,service.eq.Contact Enquiry")
+      .limit(5000);
+
+    const counts: Record<string, number> = { all: (allRaw ?? []).length };
+    CONTACT_STATUSES.forEach((s) => (counts[s] = (allRaw ?? []).filter((x: any) => x.status === s).length));
+
+    return { rows: filtered, counts };
+  });
+
+export const updateContactSubmissionStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(CONTACT_STATUSES),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("leads")
+      .update({ status: data.status, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("activity_logs").insert({
+      lead_id: data.id,
+      activity_type: "status_changed",
+      activity_description: `Contact enquiry status changed to ${data.status}`,
+      created_by: context.userId,
+    } as never);
+
+    return { ok: true };
+  });
+
+export const updateContactSubmissionNotes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        notes: z.string().max(4000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("leads")
+      .update({ notes: data.notes, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const assignContactSubmission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        assigned_to: z.string().uuid().nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("leads")
+      .update({ assigned_to: data.assigned_to, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const convertContactToComplaint = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        lead_id: z.string().uuid(),
+        authority_name: z.string().trim().min(1).max(200),
+        authority_ref_number: z.string().trim().max(200).optional(),
+        description: z.string().max(5000).optional(),
+        severity: z.enum(SEVERITIES).optional(),
+        expected_update_at: z.string().optional(),
+        assigned_to: z.string().uuid().nullish(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    // Fetch lead details
+    const { data: lead, error: leadErr } = await supabase
+      .from("leads")
+      .select("customer_id, name, notes")
+      .eq("id", data.lead_id)
+      .single();
+    if (leadErr || !lead) throw new Error("Lead not found");
+
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
+    const complaintNumber = `CMP-${y}${m}-${rand}`;
+
+    const { data: inserted, error: cErr } = await supabase
+      .from("complaints")
+      .insert({
+        lead_id: data.lead_id,
+        customer_id: lead.customer_id ?? null,
+        complaint_number: complaintNumber,
+        authority_name: data.authority_name,
+        authority_ref_number: data.authority_ref_number ?? null,
+        description: data.description || lead.notes || null,
+        notes: `Converted from contact form enquiry.`,
+        severity: data.severity ?? "normal",
+        expected_update_at: data.expected_update_at ? new Date(data.expected_update_at).toISOString() : null,
+        assigned_to: data.assigned_to ?? null,
+        status: "submitted",
+        submitted_at: new Date().toISOString(),
+      } as never)
+      .select("id, complaint_number")
+      .single();
+
+    if (cErr || !inserted) throw new Error(cErr?.message || "Failed to create complaint");
+
+    // Update lead service & status
+    await supabase
+      .from("leads")
+      .update({ service: "Complaint", status: "in_progress", updated_at: new Date().toISOString() })
+      .eq("id", data.lead_id);
+
+    // Activity log
+    await supabase.from("activity_logs").insert({
+      lead_id: data.lead_id,
+      activity_type: "complaint_raised",
+      activity_description: `Converted contact form enquiry to Complaint ${inserted.complaint_number}`,
+      created_by: context.userId,
+    } as never);
+
+    return inserted;
+  });
+

@@ -2,12 +2,30 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Search, X, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  X,
+  Loader2,
+  Mail,
+  MessageSquareWarning,
+  ArrowRight,
+  User,
+  Phone,
+  MapPin,
+  Globe,
+  FileText,
+} from "lucide-react";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import {
   listComplaints,
   createComplaint,
   searchLeadsForComplaint,
+  listContactSubmissions,
+  updateContactSubmissionStatus,
+  updateContactSubmissionNotes,
+  assignContactSubmission,
+  convertContactToComplaint,
 } from "@/lib/crm/complaints.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { toast } from "sonner";
@@ -15,11 +33,11 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin/complaints")({
   head: () => ({
     meta: [
-      { title: "Complaints — Udyam Ops OS" },
+      { title: "Complaints & Contact Submissions — Udyam Ops OS" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  component: ComplaintsPage,
+  component: ComplaintsAndContactPage,
 });
 
 const STATUS_PILLS = [
@@ -31,9 +49,59 @@ const STATUS_PILLS = [
   { key: "closed", label: "Closed" },
 ] as const;
 
+const CONTACT_STATUS_PILLS = [
+  { key: "lead_created", label: "New / Unread" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "contacted", label: "Contacted" },
+  { key: "resolved", label: "Resolved" },
+  { key: "closed", label: "Closed" },
+] as const;
+
 const SEVERITY_PILLS = ["low", "normal", "high", "critical"] as const;
 
-function ComplaintsPage() {
+function ComplaintsAndContactPage() {
+  const [activeTab, setActiveTab] = useState<"complaints" | "contact_forms">("complaints");
+
+  return (
+    <div className="space-y-6">
+      {/* Top Navigation Tabs */}
+      <div className="border-b" style={{ borderColor: "var(--admin-border)" }}>
+        <nav className="-mb-px flex space-x-6">
+          <button
+            onClick={() => setActiveTab("complaints")}
+            className={`py-3 px-1 border-b-2 font-medium text-sm inline-flex items-center gap-2 transition-colors ${
+              activeTab === "complaints"
+                ? "border-rose-500 text-rose-600 font-semibold"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
+          >
+            <MessageSquareWarning className="size-4" />
+            Complaints
+          </button>
+          <button
+            onClick={() => setActiveTab("contact_forms")}
+            className={`py-3 px-1 border-b-2 font-medium text-sm inline-flex items-center gap-2 transition-colors ${
+              activeTab === "contact_forms"
+                ? "border-rose-500 text-rose-600 font-semibold"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+            }`}
+          >
+            <Mail className="size-4" />
+            Contact Form Submissions
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === "complaints" ? <ComplaintsTab /> : <ContactSubmissionsTab />}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              COMPLAINTS TAB                                */
+/* -------------------------------------------------------------------------- */
+
+function ComplaintsTab() {
   const listFn = useServerFn(listComplaints);
   const [status, setStatus] = useState<string | undefined>();
   const [severity, setSeverity] = useState<string | undefined>();
@@ -63,13 +131,14 @@ function ComplaintsPage() {
         </div>
         <button
           onClick={() => setAddOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-90"
           style={{ background: "var(--admin-primary)", color: "#fff" }}
         >
           <Plus className="size-3.5" /> Add Complaint
         </button>
       </header>
 
+      {/* Filter Chips */}
       <div className="flex flex-wrap gap-2">
         <FilterChip active={!status} onClick={() => setStatus(undefined)}>
           All ({counts.all ?? 0})
@@ -106,13 +175,15 @@ function ComplaintsPage() {
           >
             <option value="">All severities</option>
             {SEVERITY_PILLS.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
           </select>
         </div>
 
         {isLoading ? (
-          <TableSkeleton rows={8} cols={7} />
+          <TableSkeleton rows={8} cols={10} />
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>
             No complaints match your filters.
@@ -122,16 +193,16 @@ function ComplaintsPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0" style={{ background: "var(--admin-surface-2)" }}>
                 <tr className="text-left" style={{ color: "var(--admin-fg-muted)" }}>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Complaint No</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Customer</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Order</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Service</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Authority</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Auth Ref #</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Status</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide text-right">Days Open</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Expected Update</th>
-                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">Assigned</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">COMPLAINT NO</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">CUSTOMER</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">ORDER</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">SERVICE</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">AUTHORITY</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">AUTH REF #</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">STATUS</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide text-right">DAYS OPEN</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">EXPECTED UPDATE</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">ASSIGNED</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +216,9 @@ function ComplaintsPage() {
                       background: i % 2 ? "var(--admin-surface-2)" : "transparent",
                     }}
                   >
-                    <td className="py-2.5 px-4 font-mono text-xs">{c.complaint_number ?? c.id.slice(0, 8)}</td>
+                    <td className="py-2.5 px-4 font-mono text-xs font-semibold" style={{ color: "var(--admin-primary)" }}>
+                      {c.complaint_number ?? c.id.slice(0, 8)}
+                    </td>
                     <td className="py-2.5 px-4">
                       <div className="font-medium" style={{ color: "var(--admin-fg)" }}>
                         {c.customer?.name ?? c.lead?.name ?? "—"}
@@ -156,14 +229,20 @@ function ComplaintsPage() {
                     </td>
                     <td className="py-2.5 px-4 font-mono text-xs">{c.application?.application_code ?? "—"}</td>
                     <td className="py-2.5 px-4 text-xs">{c.application?.service_name ?? c.lead?.service ?? "—"}</td>
-                    <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg)" }}>{c.authority_name ?? "—"}</td>
+                    <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg)" }}>
+                      {c.authority_name ?? "—"}
+                    </td>
                     <td className="py-2.5 px-4 font-mono text-xs">{c.authority_ref_number ?? "—"}</td>
-                    <td className="py-2.5 px-4"><StatusBadge status={c.status} /></td>
+                    <td className="py-2.5 px-4">
+                      <StatusBadge status={c.status} />
+                    </td>
                     <td className="py-2.5 px-4 text-right tabular-nums">{c.days_open}</td>
                     <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
                       {c.expected_update_at ? formatIST(c.expected_update_at) : "—"}
                     </td>
-                    <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{c.assigned_name ?? "Unassigned"}</td>
+                    <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                      {c.assigned_name ?? "Unassigned"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -177,15 +256,512 @@ function ComplaintsPage() {
   );
 }
 
-function formatIST(iso: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(iso));
+/* -------------------------------------------------------------------------- */
+/*                         CONTACT SUBMISSIONS TAB                            */
+/* -------------------------------------------------------------------------- */
+
+function ContactSubmissionsTab() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listContactSubmissions);
+  const statusFn = useServerFn(updateContactSubmissionStatus);
+  const assignFn = useServerFn(assignContactSubmission);
+
+  const [status, setStatus] = useState<string | undefined>();
+  const [q, setQ] = useState("");
+  const [selectedContact, setSelectedContact] = useState<any | null>(null);
+  const [convertTarget, setConvertTarget] = useState<any | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.contactSubmissions", { status, q }],
+    queryFn: () => listFn({ data: { status, q } }),
+    refetchInterval: 60_000,
+  });
+
+  const rows = data?.rows ?? [];
+  const counts = data?.counts ?? ({ all: 0 } as Record<string, number>);
+
+  const handleStatusChange = async (id: string, newStatus: any) => {
+    try {
+      await statusFn({ data: { id, status: newStatus } });
+      toast.success("Status updated");
+      qc.invalidateQueries({ queryKey: ["admin.contactSubmissions"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to update status");
+    }
+  };
+
+  const handleAssignChange = async (id: string, staffId: string) => {
+    try {
+      await assignFn({ data: { id, assigned_to: staffId || null } });
+      toast.success("Assignee updated");
+      qc.invalidateQueries({ queryKey: ["admin.contactSubmissions"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to assign");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>
+            Contact Form Submissions
+          </h1>
+          <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+            Public contact us submissions, general inquiries, and pre-sales questions.
+          </p>
+        </div>
+      </header>
+
+      {/* Filter Chips */}
+      <div className="flex flex-wrap gap-2">
+        <FilterChip active={!status} onClick={() => setStatus(undefined)}>
+          All ({counts.all ?? 0})
+        </FilterChip>
+        {CONTACT_STATUS_PILLS.map((s) => (
+          <FilterChip key={s.key} active={status === s.key} onClick={() => setStatus(s.key)}>
+            {s.label} ({counts[s.key] ?? 0})
+          </FilterChip>
+        ))}
+      </div>
+
+      <SectionCard>
+        <div
+          className="p-4 flex flex-wrap items-center gap-3 border-b"
+          style={{ borderColor: "var(--admin-border)" }}
+        >
+          <div
+            className="flex items-center gap-2 rounded-md border px-3 h-9 flex-1 min-w-[240px] max-w-md"
+            style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface-2)" }}
+          >
+            <Search className="size-4" style={{ color: "var(--admin-fg-muted)" }} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search contact name, email, mobile, message, state…"
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <TableSkeleton rows={8} cols={8} />
+        ) : rows.length === 0 ? (
+          <div className="p-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+            No contact submissions match your filters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0" style={{ background: "var(--admin-surface-2)" }}>
+                <tr className="text-left" style={{ color: "var(--admin-fg-muted)" }}>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">DATE</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">CONTACT NAME</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">MOBILE & EMAIL</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">STATE / LANG</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">MESSAGE PREVIEW</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">STATUS</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">ASSIGNED</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any, i: number) => (
+                  <tr
+                    key={r.id}
+                    className="border-t hover:bg-[var(--admin-accent-soft)] transition-colors"
+                    style={{
+                      borderColor: "var(--admin-border)",
+                      background: i % 2 ? "var(--admin-surface-2)" : "transparent",
+                    }}
+                  >
+                    <td className="py-2.5 px-4 text-xs font-mono whitespace-nowrap" style={{ color: "var(--admin-fg-muted)" }}>
+                      {formatIST(r.created_at)}
+                    </td>
+                    <td className="py-2.5 px-4 font-medium" style={{ color: "var(--admin-fg)" }}>
+                      <button
+                        onClick={() => setSelectedContact(r)}
+                        className="hover:underline text-left font-semibold"
+                        style={{ color: "var(--admin-primary)" }}
+                      >
+                        {r.name || "Anonymous"}
+                      </button>
+                      {r.lead_code && (
+                        <div className="text-[10px] font-mono text-slate-400">{r.lead_code}</div>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-4 text-xs">
+                      <div>{r.mobile ? `+91 ${r.mobile}` : "—"}</div>
+                      <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                        {r.email || "—"}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-xs">
+                      <div>{r.state || "—"}</div>
+                      <div className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
+                        {r.language || "English"}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-xs max-w-xs truncate" title={r.notes}>
+                      {r.notes || "—"}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <select
+                        value={r.status}
+                        onChange={(e) => handleStatusChange(r.id, e.target.value)}
+                        className="h-7 rounded border bg-transparent text-xs px-1.5 font-medium"
+                        style={{ borderColor: "var(--admin-border)" }}
+                      >
+                        {CONTACT_STATUS_PILLS.map((s) => (
+                          <option key={s.key} value={s.key}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2.5 px-4 text-xs">
+                      <AssigneeSelect
+                        value={r.assigned_to ?? ""}
+                        onChange={(staffId) => handleAssignChange(r.id, staffId)}
+                      />
+                    </td>
+                    <td className="py-2.5 px-4 text-xs text-right whitespace-nowrap space-x-2">
+                      <button
+                        onClick={() => setSelectedContact(r)}
+                        className="px-2 py-1 rounded text-xs border font-medium hover:bg-slate-100"
+                        style={{ borderColor: "var(--admin-border)" }}
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() => setConvertTarget(r)}
+                        className="px-2 py-1 rounded text-xs font-medium bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 inline-flex items-center gap-1"
+                      >
+                        <MessageSquareWarning className="size-3" /> Escalated
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* View Contact Detail Modal */}
+      {selectedContact && (
+        <ContactDetailModal
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onEscalate={() => {
+            const c = selectedContact;
+            setSelectedContact(null);
+            setConvertTarget(c);
+          }}
+        />
+      )}
+
+      {/* Convert to Complaint Modal */}
+      {convertTarget && (
+        <ConvertContactToComplaintModal
+          contact={convertTarget}
+          onClose={() => setConvertTarget(null)}
+        />
+      )}
+    </div>
+  );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                         CONTACT DETAIL MODAL                               */
+/* -------------------------------------------------------------------------- */
+
+function ContactDetailModal({
+  contact,
+  onClose,
+  onEscalate,
+}: {
+  contact: any;
+  onClose: () => void;
+  onEscalate: () => void;
+}) {
+  const qc = useQueryClient();
+  const saveNotesFn = useServerFn(updateContactSubmissionNotes);
+  const statusFn = useServerFn(updateContactSubmissionStatus);
+
+  const [notes, setNotes] = useState(contact.notes ?? "");
+  const [status, setStatus] = useState(contact.status ?? "lead_created");
+  const [busy, setBusy] = useState(false);
+
+  const handleSave = async () => {
+    setBusy(true);
+    try {
+      await Promise.all([
+        saveNotesFn({ data: { id: contact.id, notes } }),
+        statusFn({ data: { id: contact.id, status } }),
+      ]);
+      toast.success("Contact inquiry updated");
+      qc.invalidateQueries({ queryKey: ["admin.contactSubmissions"] });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl rounded-lg shadow-xl overflow-hidden"
+        style={{ background: "var(--admin-surface)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: "var(--admin-border)" }}>
+          <div className="flex items-center gap-2">
+            <Mail className="size-4 text-rose-500" />
+            <h2 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>
+              Contact Inquiry Details
+            </h2>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-[var(--admin-surface-2)]" aria-label="Close">
+            <X className="size-4" />
+          </button>
+        </header>
+
+        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          {/* Metadata Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg border bg-slate-50/50" style={{ borderColor: "var(--admin-border)" }}>
+            <div>
+              <span className="block text-[10px] uppercase font-semibold text-slate-400">Name</span>
+              <span className="text-xs font-semibold">{contact.name}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-semibold text-slate-400">Mobile</span>
+              <span className="text-xs font-mono">{contact.mobile ? `+91 ${contact.mobile}` : "—"}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-semibold text-slate-400">Email</span>
+              <span className="text-xs truncate block">{contact.email || "—"}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-semibold text-slate-400">State / Lang</span>
+              <span className="text-xs">{contact.state || "—"} ({contact.language || "English"})</span>
+            </div>
+          </div>
+
+          {/* Submitted Message */}
+          <div>
+            <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
+              Message Content / Inquiry
+            </label>
+            <div className="p-3 rounded-lg border text-sm bg-slate-50 whitespace-pre-wrap leading-relaxed" style={{ borderColor: "var(--admin-border)" }}>
+              {contact.notes || "(No message body provided)"}
+            </div>
+          </div>
+
+          {/* Operational Notes & Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
+                Status
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-md border p-2 text-sm bg-transparent"
+                style={{ borderColor: "var(--admin-border)" }}
+              >
+                {CONTACT_STATUS_PILLS.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
+                Submitted At
+              </label>
+              <div className="p-2 text-sm font-mono text-slate-600">
+                {formatIST(contact.created_at)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer className="flex items-center justify-between px-5 py-3.5 border-t bg-slate-50/50" style={{ borderColor: "var(--admin-border)" }}>
+          <button
+            onClick={onEscalate}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 inline-flex items-center gap-1.5"
+          >
+            <MessageSquareWarning className="size-3.5" /> Convert to Complaint
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="rounded-md px-3 py-1.5 text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium"
+              style={{ background: "var(--admin-primary)", color: "#fff" }}
+            >
+              {busy && <Loader2 className="size-3.5 animate-spin" />}
+              Save Changes
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                    CONVERT CONTACT TO COMPLAINT MODAL                      */
+/* -------------------------------------------------------------------------- */
+
+function ConvertContactToComplaintModal({
+  contact,
+  onClose,
+}: {
+  contact: any;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const convertFn = useServerFn(convertContactToComplaint);
+  const navigate = useNavigate();
+
+  const [authority, setAuthority] = useState("Internal Grievance Cell");
+  const [authorityRef, setAuthorityRef] = useState("");
+  const [description, setDescription] = useState(contact.notes ?? "");
+  const [severity, setSeverity] = useState<(typeof SEVERITY_PILLS)[number]>("normal");
+  const [assignedTo, setAssignedTo] = useState<string>(contact.assigned_to ?? "");
+  const [busy, setBusy] = useState(false);
+
+  const handleConvert = async () => {
+    if (!authority.trim()) {
+      toast.error("Authority name is required");
+      return;
+    }
+    setBusy(true);
+    try {
+      const out = await convertFn({
+        data: {
+          lead_id: contact.id,
+          authority_name: authority.trim(),
+          authority_ref_number: authorityRef.trim() || undefined,
+          description: description.trim() || undefined,
+          severity,
+          assigned_to: assignedTo || null,
+        },
+      });
+      toast.success(`Converted to Complaint ${out.complaint_number}`);
+      qc.invalidateQueries({ queryKey: ["admin.complaints"] });
+      qc.invalidateQueries({ queryKey: ["admin.contactSubmissions"] });
+      onClose();
+      navigate({ to: "/admin/complaints/$complaintId", params: { complaintId: out.id } });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to convert to complaint");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-lg shadow-xl"
+        style={{ background: "var(--admin-surface)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--admin-border)" }}>
+          <h2 className="text-base font-semibold text-rose-700 flex items-center gap-2">
+            <MessageSquareWarning className="size-4" /> Escalation: Convert to Complaint
+          </h2>
+          <button onClick={onClose} className="rounded-md p-1.5 hover:bg-[var(--admin-surface-2)]">
+            <X className="size-4" />
+          </button>
+        </header>
+
+        <div className="p-5 space-y-4">
+          <div className="p-3 rounded-md border text-xs bg-slate-50 space-y-1" style={{ borderColor: "var(--admin-border)" }}>
+            <div><span className="font-semibold">Customer:</span> {contact.name} ({contact.mobile || contact.email || "No contact"})</div>
+            <div><span className="font-semibold">Lead Ref:</span> <span className="font-mono">{contact.lead_code}</span></div>
+          </div>
+
+          <Field label="Authority Name" required>
+            <input
+              value={authority}
+              onChange={(e) => setAuthority(e.target.value)}
+              placeholder="e.g. Ministry of MSME / Internal Support Desk"
+              className="w-full rounded-md border px-3 py-2 text-sm bg-transparent"
+              style={{ borderColor: "var(--admin-border)" }}
+            />
+          </Field>
+
+          <Field label="Authority Reference #">
+            <input
+              value={authorityRef}
+              onChange={(e) => setAuthorityRef(e.target.value)}
+              placeholder="Grievance Ref / Diary No."
+              className="w-full rounded-md border px-3 py-2 text-sm bg-transparent font-mono"
+              style={{ borderColor: "var(--admin-border)" }}
+            />
+          </Field>
+
+          <Field label="Complaint Description">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border px-3 py-2 text-sm bg-transparent"
+              style={{ borderColor: "var(--admin-border)" }}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Severity">
+              <select
+                value={severity}
+                onChange={(e) => setSeverity(e.target.value as any)}
+                className="w-full rounded-md border px-3 py-2 text-sm bg-transparent"
+                style={{ borderColor: "var(--admin-border)" }}
+              >
+                {SEVERITY_PILLS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Assignee">
+              <AssigneeSelect value={assignedTo} onChange={setAssignedTo} />
+            </Field>
+          </div>
+        </div>
+
+        <footer className="flex items-center justify-end gap-2 px-5 py-3 border-t" style={{ borderColor: "var(--admin-border)" }}>
+          <button onClick={onClose} className="rounded-md px-3 py-1.5 text-sm" style={{ color: "var(--admin-fg-muted)" }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleConvert}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white"
+          >
+            {busy && <Loader2 className="size-3.5 animate-spin" />}
+            Confirm Escalation
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            ADD COMPLAINT MODAL                             */
+/* -------------------------------------------------------------------------- */
 
 function AddComplaintModal({
   onClose,
@@ -461,4 +1037,14 @@ function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: stri
       ))}
     </select>
   );
+}
+
+function formatIST(iso: string) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(iso));
 }

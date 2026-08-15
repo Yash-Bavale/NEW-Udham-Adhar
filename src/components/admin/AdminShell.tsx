@@ -79,7 +79,7 @@ const NAV: NavGroup[] = [
     id: "service",
     label: "Service",
     items: [
-      { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, module: "complaints", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: ADMIN_ROLES },
