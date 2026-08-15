@@ -16,12 +16,17 @@ import {
   History,
   Loader2,
   Save,
+  Mail,
+  Phone,
+  Calendar,
+  AlertCircle,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/complaints/$complaintId")({
   head: () => ({
-    meta: [{ title: "Complaint — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }],
+    meta: [{ title: "Complaint Details — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }],
   }),
   component: ComplaintDetailPage,
 });
@@ -128,31 +133,125 @@ function ComplaintDetailPage() {
     }
   };
 
+  // Extract application reference if formatted as "Ref: XXXX"
+  const extractedRef =
+    complaint.application?.application_code ||
+    (complaint.notes?.match(/^Ref:\s*([^\n]+)/)?.[1]) ||
+    "None Specified";
+
+  // Clean submitted grievance text
+  const cleanGrievanceText =
+    complaint.description ||
+    (complaint.notes?.replace(/^Ref:[^\n]+\n\n/, "")) ||
+    complaint.lead?.notes ||
+    "No detailed text provided.";
+
+  const customerName = complaint.lead?.name || complaint.customer?.name || "Complainant";
+  const customerEmail = complaint.lead?.email || complaint.customer?.primary_email || null;
+  const customerMobile = complaint.lead?.mobile || complaint.customer?.primary_mobile || null;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
   return (
     <div className="space-y-6">
       <Link to="/admin/complaints" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
-        <ChevronLeft className="w-4 h-4" /> Back to complaints
+        <ChevronLeft className="w-4 h-4" /> Back to complaints & contact forms
       </Link>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
             <MessageSquareWarning className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 font-mono">{complaint.complaint_number || "Complaint"}</h1>
-            <p className="text-sm text-slate-500 mt-1">Submitted {fmtIST(complaint.submitted_at || complaint.created_at)}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 font-mono">{complaint.complaint_number || "Complaint"}</h1>
+              <Badge variant="outline" className="capitalize text-xs font-semibold">
+                {complaint.severity || "normal"} severity
+              </Badge>
+            </div>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Submitted on {fmtIST(complaint.submitted_at || complaint.created_at)}
+            </p>
           </div>
         </div>
         <StatusTransition kind="complaint" entityId={complaintId} current={complaint.status} onChanged={refetch} />
       </div>
 
+      {/* Primary Card: Original Received Complaint Details (From Public Form) */}
+      <Card className="border-rose-200 bg-gradient-to-br from-rose-50/30 via-white to-slate-50/50 shadow-sm">
+        <CardHeader className="py-3.5 px-5 border-b border-rose-100 bg-rose-50/50 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-bold text-rose-950 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600" />
+            Received Complaint Details (Public Form Submission)
+          </CardTitle>
+          <span className="text-xs text-rose-700 font-mono font-medium">
+            Ref: {extractedRef}
+          </span>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4 text-sm">
+          {/* Submitter Metadata Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-3.5 rounded-lg border border-slate-200/80 bg-white">
+            <div>
+              <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Full Name</span>
+              <span className="text-sm font-semibold text-slate-900">{customerName}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Mobile Number</span>
+              {customerMobile ? (
+                <a href={`tel:+91${customerMobile}`} className="text-sm font-mono font-semibold text-rose-700 hover:underline flex items-center gap-1">
+                  <Phone className="w-3 h-3" /> +91 {customerMobile}
+                </a>
+              ) : (
+                <span className="text-sm text-slate-400">Not provided</span>
+              )}
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Email Address</span>
+              {customerEmail ? (
+                <a href={`mailto:${customerEmail}`} className="text-sm font-semibold text-rose-700 hover:underline flex items-center gap-1 truncate block">
+                  <Mail className="w-3 h-3" /> {customerEmail}
+                </a>
+              ) : (
+                <span className="text-sm text-slate-400">Not provided</span>
+              )}
+            </div>
+            <div>
+              <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Application Ref</span>
+              <span className="text-sm font-mono font-semibold text-slate-800">{extractedRef}</span>
+            </div>
+          </div>
+
+          {/* Received Complaint / Grievance Text */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs uppercase font-bold text-slate-500 tracking-wider">
+                Submitted Grievance Message
+              </span>
+              <button
+                onClick={() => copyToClipboard(cleanGrievanceText, "Grievance message")}
+                className="text-xs text-rose-700 hover:underline inline-flex items-center gap-1 font-medium"
+              >
+                <Copy className="w-3 h-3" /> Copy Message
+              </button>
+            </div>
+            <div className="p-4 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-sans shadow-inner">
+              {cleanGrievanceText}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Secondary Section: Authority Filing & Escalation Status */}
       <Card>
         <CardHeader className="py-3 border-b bg-slate-50/50 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Authority & Filing Details</CardTitle>
+          <CardTitle className="text-sm font-semibold">Authority & Filing Details (Internal Ops)</CardTitle>
           <Button onClick={handleSaveAuthority} disabled={authBusy} size="sm" variant="outline">
             {authBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
-            Save
+            Save Filing Info
           </Button>
         </CardHeader>
         <CardContent className="p-4 grid md:grid-cols-2 gap-4 text-sm">
@@ -161,6 +260,7 @@ function ComplaintDetailPage() {
             <input
               value={authority}
               onChange={(e) => setAuthority(e.target.value)}
+              placeholder="e.g. Ministry of MSME / Grievance Officer"
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
@@ -169,11 +269,12 @@ function ComplaintDetailPage() {
             <input
               value={authorityRef}
               onChange={(e) => setAuthorityRef(e.target.value)}
+              placeholder="Ticket / Diary / Reference No."
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-mono"
             />
           </label>
           <label className="block">
-            <span className="block text-[11px] uppercase tracking-wide font-medium mb-1 text-slate-500">Expected Update</span>
+            <span className="block text-[11px] uppercase tracking-wide font-medium mb-1 text-slate-500">Expected Update Date</span>
             <input
               type="date"
               value={expected}
@@ -182,11 +283,12 @@ function ComplaintDetailPage() {
             />
           </label>
           <label className="block md:col-span-2">
-            <span className="block text-[11px] uppercase tracking-wide font-medium mb-1 text-slate-500">Complaint Description</span>
+            <span className="block text-[11px] uppercase tracking-wide font-medium mb-1 text-slate-500">Investigation & Action Summary</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              placeholder="Summary of actions taken with authority or resolutions provided"
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
@@ -196,18 +298,18 @@ function ComplaintDetailPage() {
       <div className="grid md:grid-cols-3 gap-6">
         <Card className="md:col-span-2">
           <CardHeader className="py-3 border-b bg-slate-50/50">
-            <CardTitle className="text-sm font-semibold">Internal Notes</CardTitle>
+            <CardTitle className="text-sm font-semibold">Internal Ops Notes</CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={6}
-              placeholder="Investigation findings, calls made, follow-up reminders…"
+              rows={5}
+              placeholder="Internal investigation notes, calls made, customer responses, follow-up reminders…"
               className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             />
             <Button onClick={handleSaveNotes} disabled={busy} size="sm">
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : null} Save Notes
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : null} Save Internal Notes
             </Button>
           </CardContent>
         </Card>
@@ -215,17 +317,17 @@ function ComplaintDetailPage() {
         <Card>
           <CardHeader className="py-3 border-b bg-slate-50/50">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <User className="w-4 h-4" /> Linked
+              <User className="w-4 h-4" /> Linked CRM Context
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 space-y-4">
             {complaint.lead && (
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Lead</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Lead Entry</div>
                 <Link
                   to="/admin/leads/$leadId"
                   params={{ leadId: complaint.lead.id }}
-                  className="text-sm font-semibold hover:underline"
+                  className="text-sm font-semibold hover:underline text-rose-700"
                 >
                   {complaint.lead.name}
                 </Link>
@@ -235,13 +337,13 @@ function ComplaintDetailPage() {
             )}
             {complaint.application && (
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Order</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Linked Order</div>
                 <Link
                   to="/admin/orders/$orderId"
                   params={{ orderId: complaint.application.id }}
-                  className="text-sm font-mono hover:underline flex items-center gap-1"
+                  className="text-sm font-mono hover:underline flex items-center gap-1 text-slate-900"
                 >
-                  <FileText className="w-3 h-3" /> {complaint.application.application_code}
+                  <FileText className="w-3 h-3 text-slate-400" /> {complaint.application.application_code}
                 </Link>
                 <Badge variant="outline" className="mt-1 text-[10px] uppercase">
                   {complaint.application.application_status?.replace(/_/g, " ")}
@@ -250,7 +352,7 @@ function ComplaintDetailPage() {
             )}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Reminders Sent</div>
-              <div className="text-sm">{complaint.reminder_count || 0}</div>
+              <div className="text-sm font-semibold">{complaint.reminder_count || 0}</div>
             </div>
           </CardContent>
         </Card>
@@ -259,12 +361,12 @@ function ComplaintDetailPage() {
       <Card>
         <CardHeader className="py-3 border-b bg-slate-50/50">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <History className="w-4 h-4" /> Activity
+            <History className="w-4 h-4" /> Audit & Activity Trail
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {audits.length === 0 ? (
-            <div className="p-6 text-sm text-center text-slate-400 italic">No activity yet.</div>
+            <div className="p-6 text-sm text-center text-slate-400 italic">No activity logged yet.</div>
           ) : (
             <ul className="divide-y">
               {audits.map((a: any) => (

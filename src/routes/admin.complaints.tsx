@@ -15,6 +15,8 @@ import {
   MapPin,
   Globe,
   FileText,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { SectionCard, TableSkeleton, StatusBadge, FilterChip } from "@/components/admin/ui";
 import {
@@ -369,7 +371,8 @@ function ContactSubmissionsTab() {
                 {rows.map((r: any, i: number) => (
                   <tr
                     key={r.id}
-                    className="border-t hover:bg-[var(--admin-accent-soft)] transition-colors"
+                    onClick={() => setSelectedContact(r)}
+                    className="border-t cursor-pointer hover:bg-[var(--admin-accent-soft)] transition-colors"
                     style={{
                       borderColor: "var(--admin-border)",
                       background: i % 2 ? "var(--admin-surface-2)" : "transparent",
@@ -379,13 +382,9 @@ function ContactSubmissionsTab() {
                       {formatIST(r.created_at)}
                     </td>
                     <td className="py-2.5 px-4 font-medium" style={{ color: "var(--admin-fg)" }}>
-                      <button
-                        onClick={() => setSelectedContact(r)}
-                        className="hover:underline text-left font-semibold"
-                        style={{ color: "var(--admin-primary)" }}
-                      >
+                      <span className="font-semibold text-rose-700 hover:underline">
                         {r.name || "Anonymous"}
-                      </button>
+                      </span>
                       {r.lead_code && (
                         <div className="text-[10px] font-mono text-slate-400">{r.lead_code}</div>
                       )}
@@ -405,7 +404,7 @@ function ContactSubmissionsTab() {
                     <td className="py-2.5 px-4 text-xs max-w-xs truncate" title={r.notes}>
                       {r.notes || "—"}
                     </td>
-                    <td className="py-2.5 px-4">
+                    <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={r.status}
                         onChange={(e) => handleStatusChange(r.id, e.target.value)}
@@ -419,19 +418,19 @@ function ContactSubmissionsTab() {
                         ))}
                       </select>
                     </td>
-                    <td className="py-2.5 px-4 text-xs">
+                    <td className="py-2.5 px-4 text-xs" onClick={(e) => e.stopPropagation()}>
                       <AssigneeSelect
                         value={r.assigned_to ?? ""}
                         onChange={(staffId) => handleAssignChange(r.id, staffId)}
                       />
                     </td>
-                    <td className="py-2.5 px-4 text-xs text-right whitespace-nowrap space-x-2">
+                    <td className="py-2.5 px-4 text-xs text-right whitespace-nowrap space-x-2" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setSelectedContact(r)}
                         className="px-2 py-1 rounded text-xs border font-medium hover:bg-slate-100"
                         style={{ borderColor: "var(--admin-border)" }}
                       >
-                        View
+                        View Details
                       </button>
                       <button
                         onClick={() => setConvertTarget(r)}
@@ -510,6 +509,11 @@ function ContactDetailModal({
     }
   };
 
+  const copyText = (txt: string, label: string) => {
+    navigator.clipboard.writeText(txt);
+    toast.success(`${label} copied`);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
       <div
@@ -521,7 +525,7 @@ function ContactDetailModal({
           <div className="flex items-center gap-2">
             <Mail className="size-4 text-rose-500" />
             <h2 className="text-base font-semibold" style={{ color: "var(--admin-fg)" }}>
-              Contact Inquiry Details
+              Contact Form Submission Details
             </h2>
           </div>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-[var(--admin-surface-2)]" aria-label="Close">
@@ -530,41 +534,77 @@ function ContactDetailModal({
         </header>
 
         <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-          {/* Metadata Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg border bg-slate-50/50" style={{ borderColor: "var(--admin-border)" }}>
-            <div>
-              <span className="block text-[10px] uppercase font-semibold text-slate-400">Name</span>
-              <span className="text-xs font-semibold">{contact.name}</span>
+          {/* Metadata Grid (Matching Website Contact Form Fields) */}
+          <div className="p-4 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3">
+            <div className="text-xs uppercase font-bold text-slate-500 tracking-wider">
+              Received Contact Form Fields
             </div>
-            <div>
-              <span className="block text-[10px] uppercase font-semibold text-slate-400">Mobile</span>
-              <span className="text-xs font-mono">{contact.mobile ? `+91 ${contact.mobile}` : "—"}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] uppercase font-semibold text-slate-400">Email</span>
-              <span className="text-xs truncate block">{contact.email || "—"}</span>
-            </div>
-            <div>
-              <span className="block text-[10px] uppercase font-semibold text-slate-400">State / Lang</span>
-              <span className="text-xs">{contact.state || "—"} ({contact.language || "English"})</span>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Applicant Name</span>
+                <span className="text-xs font-semibold text-slate-900 block truncate">{contact.name || "Anonymous"}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Mobile No</span>
+                {contact.mobile ? (
+                  <a href={`tel:+91${contact.mobile}`} className="text-xs font-mono font-semibold text-rose-700 hover:underline flex items-center gap-1">
+                    <Phone className="size-3" /> +91 {contact.mobile}
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400">Not provided</span>
+                )}
+              </div>
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Email Address</span>
+                {contact.email ? (
+                  <a href={`mailto:${contact.email}`} className="text-xs font-semibold text-rose-700 hover:underline flex items-center gap-1 truncate block">
+                    <Mail className="size-3" /> {contact.email}
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400">Not provided</span>
+                )}
+              </div>
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">State</span>
+                <span className="text-xs font-semibold text-slate-800">{contact.state || "Not Provided"}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Preferred Language</span>
+                <span className="text-xs font-semibold text-slate-800">{contact.language || "English"}</span>
+              </div>
+              <div className="bg-white p-2.5 rounded border border-slate-200">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Submitted Date</span>
+                <span className="text-xs font-mono text-slate-700">{formatIST(contact.created_at)}</span>
+              </div>
             </div>
           </div>
 
-          {/* Submitted Message */}
+          {/* Received Purpose of Contact / Message Content */}
           <div>
-            <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
-              Message Content / Inquiry
-            </label>
-            <div className="p-3 rounded-lg border text-sm bg-slate-50 whitespace-pre-wrap leading-relaxed" style={{ borderColor: "var(--admin-border)" }}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] uppercase tracking-wide font-bold text-slate-500">
+                Purpose of Contact / Message Body
+              </label>
+              {contact.notes && (
+                <button
+                  onClick={() => copyText(contact.notes, "Message")}
+                  className="text-xs text-rose-700 hover:underline inline-flex items-center gap-1 font-medium"
+                >
+                  <Copy className="size-3" /> Copy Message
+                </button>
+              )}
+            </div>
+            <div className="p-3.5 rounded-lg border border-slate-200 text-sm bg-white whitespace-pre-wrap leading-relaxed shadow-inner font-sans">
               {contact.notes || "(No message body provided)"}
             </div>
           </div>
 
-          {/* Operational Notes & Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Status & Operational Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3" style={{ borderColor: "var(--admin-border)" }}>
             <div>
               <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
-                Status
+                Response Status
               </label>
               <select
                 value={status}
@@ -581,10 +621,10 @@ function ContactDetailModal({
             </div>
             <div>
               <label className="block text-[11px] uppercase tracking-wide font-semibold text-slate-500 mb-1">
-                Submitted At
+                Lead Reference ID
               </label>
-              <div className="p-2 text-sm font-mono text-slate-600">
-                {formatIST(contact.created_at)}
+              <div className="p-2 text-sm font-mono text-slate-600 bg-slate-50 rounded border" style={{ borderColor: "var(--admin-border)" }}>
+                {contact.lead_code || contact.id.slice(0, 8)}
               </div>
             </div>
           </div>
