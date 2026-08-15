@@ -234,9 +234,9 @@ export const updateComplaint = createServerFn({ method: "POST" })
 
 export const CONTACT_STATUSES = [
   "lead_created",
-  "in_progress",
+  "under_process",
   "contacted",
-  "resolved",
+  "completed",
   "closed",
 ] as const;
 
@@ -262,7 +262,7 @@ export const listContactSubmissions = createServerFn({ method: "GET" })
       .limit(500);
 
     if (data.status) {
-      query = query.eq("status", data.status);
+      query = query.eq("status", data.status as (typeof CONTACT_STATUSES)[number]);
     }
 
     const { data: rows, error } = await query;
@@ -430,7 +430,7 @@ export const convertContactToComplaint = createServerFn({ method: "POST" })
     // Update lead service & status
     await supabase
       .from("leads")
-      .update({ service: "Complaint", status: "in_progress", updated_at: new Date().toISOString() })
+      .update({ service: "Complaint", status: "under_process", updated_at: new Date().toISOString() })
       .eq("id", data.lead_id);
 
     // Activity log
