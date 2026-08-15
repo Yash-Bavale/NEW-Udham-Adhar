@@ -1,6 +1,6 @@
 // Phase 3 — Reason Picker (14 close reasons grouped A/B/C).
 // Shows the standard reply for the selected reason as an editable draft.
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listCloseReasons, STANDARD_CLOSE_REASONS, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
@@ -48,11 +48,15 @@ export function ReasonPicker({ value, onChange, reply, onReplyChange, hideReply,
   const selected = reasons.find((r) => r.id === value) ?? null;
 
   // Auto-fill standard reply when selected reason changes
+  const lastIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selected && selected.standard_reply && !reply) {
-      onReplyChange(selected.standard_reply);
+    if (selected && selected.id !== lastIdRef.current) {
+      lastIdRef.current = selected.id;
+      if (selected.standard_reply) {
+        onReplyChange(selected.standard_reply);
+      }
     }
-  }, [selected?.id]);
+  }, [selected?.id, selected?.standard_reply, onReplyChange]);
 
   const handleSelectReason = (id: string) => {
     const r = reasons.find((item) => item.id === id) ?? null;

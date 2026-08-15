@@ -18,7 +18,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 1,
     label: "Government Platform Assumption",
     standard_reply:
-      "Your query has been reviewed. During our communication, it was noted that the order was placed under the assumption that Business Help Services was an official Government website or Government portal.\n\nBusiness Help Services is an independent private consultancy and assistance service provider. The applicable service information and website notices remain applicable to this order.",
+      "Your query has been reviewed. During our communication, it was noted that the order was placed under the assumption that Business Help Services was an official Government website or Government portal.\nBusiness Help Services is an independent private consultancy and assistance service provider. The applicable service information and website notices remain applicable to this order.",
     sort_order: 1,
   },
   {
@@ -27,7 +27,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 2,
     label: "Change of Mind",
     standard_reply:
-      "Your request has been reviewed. During our communication, you informed us that you no longer wish to continue with the requested service after placing the order.\n\nYour request has been recorded and will be processed in accordance with our applicable policies.",
+      "Your request has been reviewed. During our communication, you informed us that you no longer wish to continue with the requested service after placing the order.\nYour request has been recorded and will be processed in accordance with our applicable policies.",
     sort_order: 2,
   },
   {
@@ -36,7 +36,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 3,
     label: "User Does Not Wish to Proceed",
     standard_reply:
-      "Based on your communication, you have indicated that you do not wish to proceed further with the requested service.\n\nYour request has been noted and the order will be handled in accordance with our applicable policies.",
+      "Based on your communication, you have indicated that you do not wish to proceed further with the requested service.\nYour request has been noted and the order will be handled in accordance with our applicable policies.",
     sort_order: 3,
   },
   {
@@ -45,7 +45,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 4,
     label: "OTP / Verification Assistance Not Provided",
     standard_reply:
-      "Further processing requires OTP verification, authentication, confirmation, or other verification details.\n\nKindly reply to this email with the required verification information so that further processing can continue.",
+      "Further processing requires OTP verification, authentication, confirmation, or other verification details.\nKindly reply to this email with the required verification information so that further processing can continue.",
     sort_order: 4,
   },
   {
@@ -54,7 +54,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 5,
     label: "Change in Service Requirement",
     standard_reply:
-      "During our communication, it was observed that your current service requirement differs from the service originally selected while placing the order.\n\nKindly confirm the required service so that we may guide you regarding the appropriate next steps.",
+      "During our communication, it was observed that your current service requirement differs from the service originally selected while placing the order.\nKindly confirm the required service so that we may guide you regarding the appropriate next steps.",
     sort_order: 5,
   },
   {
@@ -63,7 +63,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 6,
     label: "Incorrect Information",
     standard_reply:
-      "The information or documents currently available are Incorrect or incomplete, inconsistent, or require clarification before further processing can continue.\n\nKindly provide the correct requested information by replying to this email.",
+      "The information or documents currently available are Incorrect or incomplete, inconsistent, or require clarification before further processing can continue.\nKindly provide the correct requested information by replying to this email.",
     sort_order: 6,
   },
   {
@@ -72,7 +72,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 7,
     label: "Required Documents or Communication Not Received",
     standard_reply:
-      "The required documents, confirmations, or communication necessary for further processing have not yet been received.\n\nKindly reply with the requested information so that we may continue processing your request.",
+      "The required documents, confirmations, or communication necessary for further processing have not yet been received.\nKindly reply with the requested information so that we may continue processing your request.",
     sort_order: 7,
   },
   {
@@ -81,7 +81,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 8,
     label: "Customer Unreachable / Non-Responsive",
     standard_reply:
-      "Multiple attempts were made to contact you; however, we were unable to complete the required communication.\n\nKindly reply to this email at your convenience so that further assistance can be provided.",
+      "Multiple attempts were made to contact you; however, we were unable to complete the required communication.\nKindly reply to this email at your convenience so that further assistance can be provided.",
     sort_order: 8,
   },
   {
@@ -90,7 +90,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 9,
     label: "Eligibility / Verification Related Issue",
     standard_reply:
-      "During verification, certain eligibility requirements or verification conditions were identified that require clarification before further processing can continue.\n\nKindly review the requested information and reply to this email.",
+      "During verification, certain eligibility requirements or verification conditions were identified that require clarification before further processing can continue.\nKindly review the requested information and reply to this email.",
     sort_order: 9,
   },
   {
@@ -99,7 +99,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 10,
     label: "Service Activities Already Initiated",
     standard_reply:
-      "Our records indicate that consultation, documentation review, coordination, or other service-related activities have already commenced under this order.\n\nFurther handling of your request will therefore be governed by the applicable Terms & Conditions and Refund & Cancellation Policy.",
+      "Our records indicate that consultation, documentation review, coordination, or other service-related activities have already commenced under this order.\nFurther handling of your request will therefore be governed by the applicable Terms & Conditions and Refund & Cancellation Policy.",
     sort_order: 10,
   },
   {
@@ -108,7 +108,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 11,
     label: "Government Portal Down / Unavailability",
     standard_reply:
-      "The concerned Government portal is presently unavailable or experiencing technical issues, preventing further processing of your application.\n\nProcessing will continue once the portal becomes operational.",
+      "The concerned Government portal is presently unavailable or experiencing technical issues, preventing further processing of your application.\nProcessing will continue once the portal becomes operational.",
     sort_order: 11,
   },
   {
@@ -117,7 +117,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 12,
     label: "External System / Portal Dependency Issue",
     standard_reply:
-      "Processing of your request is presently affected due to dependency on an external Government portal, authority, or third-party system.\n\nWe will continue processing once the required external services become available.",
+      "Processing of your request is presently affected due to dependency on an external Government portal, authority, or third-party system.\nWe will continue processing once the required external services become available.",
     sort_order: 12,
   },
   {
@@ -126,7 +126,7 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 13,
     label: "Technical / Server Interruption",
     standard_reply:
-      "Further processing is temporarily affected due to technical issues, server interruption, or portal unavailability.\n\nProcessing will resume once the technical issue is resolved.",
+      "Further processing is temporarily affected due to technical issues, server interruption, or portal unavailability.\nProcessing will resume once the technical issue is resolved.",
     sort_order: 13,
   },
   {
@@ -135,21 +135,13 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
     number: 14,
     label: "Operational / Technical Issue Beyond Control",
     standard_reply:
-      "Further processing is temporarily delayed due to operational or technical conditions beyond our reasonable control.\n\nWe appreciate your patience while the matter is being addressed.",
+      "Further processing is temporarily delayed due to operational or technical conditions beyond our reasonable control.\nWe appreciate your patience while the matter is being addressed.",
     sort_order: 14,
   },
 ];
 
 export const listCloseReasons = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    try {
-      const { data, error } = await context.supabase.rpc("list_order_close_reasons");
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data as OrderCloseReason[];
-      }
-    } catch {
-      // Fallback to static standard close reasons
-    }
+  .handler(async () => {
     return STANDARD_CLOSE_REASONS;
   });
