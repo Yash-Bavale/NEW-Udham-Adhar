@@ -178,7 +178,7 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
         admin
           .from("tasks")
           .select("id", { count: "exact", head: true })
-          .not("status", "in", '("completed","cancelled")')
+          .eq("is_completed", false)
       ),
       safeCount(
         admin
