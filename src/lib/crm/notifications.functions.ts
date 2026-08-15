@@ -160,7 +160,7 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
         admin
           .from("leads")
           .select("id", { count: "exact", head: true })
-          .or("lead_status.eq.uncontacted,status.eq.new,status.eq.uncontacted")
+          .in("status", ["new_lead", "lead_created"])
       ),
       safeCount(
         admin
@@ -178,7 +178,7 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
         admin
           .from("tasks")
           .select("id", { count: "exact", head: true })
-          .not("status", "in", '("completed","cancelled")')
+          .eq("is_completed", false)
       ),
       safeCount(
         admin

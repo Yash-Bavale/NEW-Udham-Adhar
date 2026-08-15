@@ -29,7 +29,7 @@ function renderCell(key: string, v: unknown): string {
 }
 
 
-type SectionGroup = { label: string; fields: { key: string; label: string }[] };
+type SectionGroup = { label: string; fields: { key: string; label: string; type?: string }[] };
 
 function groupFields(serviceCode: string | null): SectionGroup[] {
   if (!serviceCode) return [];
@@ -42,7 +42,7 @@ function groupFields(serviceCode: string | null): SectionGroup[] {
       if (current.fields.length) groups.push(current);
       current = { label: f.label, fields: [] };
     } else {
-      current.fields.push({ key: f.key, label: f.label });
+      current.fields.push({ key: f.key, label: f.label, type: f.type });
     }
   }
   if (current.fields.length) groups.push(current);

@@ -21,7 +21,10 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           return new Response("Gateway not configured", { status: 500 });
         }
 
-        const form = await request.formData();
+        const form = await readFormFields(request);
+        if (!form) {
+          return new Response("Unsupported payload", { status: 400 });
+        }
         const encResp = form.get("encResp")?.toString() ?? "";
         if (!encResp) {
           return new Response("Missing encResp", { status: 400 });
@@ -297,4 +300,27 @@ function redirectToFailure(leadCode: string, reason: string) {
     status: 303,
     headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
   });
+}
+
+async function readFormFields(request: Request): Promise<URLSearchParams | null> {
+  const ct = (request.headers.get("content-type") ?? "").toLowerCase();
+  try {
+    if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
+      const fd = await request.formData();
+      const params = new URLSearchParams();
+      for (const [k, v] of fd.entries()) params.append(k, typeof v === "string" ? v : "");
+      return params;
+    }
+    const body = await request.text();
+    if (!body) return new URLSearchParams();
+    if (ct.includes("application/json") || body.trimStart().startsWith("{")) {
+      const json = JSON.parse(body) as Record<string, unknown>;
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(json)) params.append(k, v == null ? "" : String(v));
+      return params;
+    }
+    return new URLSearchParams(body);
+  } catch {
+    return null;
+  }
 }
