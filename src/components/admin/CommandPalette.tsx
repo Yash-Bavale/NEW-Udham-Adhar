@@ -75,7 +75,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder="Search customers, applications, invoices…  or jump to a page"
+        placeholder="Search orders, leads, invoices… or jump to a page"
         value={q}
         onValueChange={setQ}
       />

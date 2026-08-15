@@ -433,7 +433,7 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
           onKeyDown={(e) => {
             if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); }
           }}
-          placeholder="Search orders, customers, mobiles, complaints, Udyam no…"
+          placeholder="Search orders, leads, mobiles, complaints, Udyam no…"
           className="flex-1 bg-transparent outline-none text-sm placeholder:text-[var(--admin-fg-subtle)]"
           aria-label="Global search"
         />
@@ -473,7 +473,7 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
                       className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-medium"
                       style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
                     >
-                      {h.kind}
+                      {h.kind === "application" ? "order" : h.kind}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm truncate" style={{ color: "var(--admin-fg)" }}>{h.title}</span>
