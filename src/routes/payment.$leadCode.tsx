@@ -93,7 +93,7 @@ function PaymentPage() {
                 disabled={busy}
                 className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold py-3 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
               >
-                {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting secure session…</> : "Proceed to Payment"}
+                {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting secure session…</> : "Pay Now"}
               </button>
               <DummyUrgencyTimer />
             </>

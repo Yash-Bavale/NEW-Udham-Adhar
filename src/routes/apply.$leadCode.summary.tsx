@@ -467,7 +467,7 @@ function SummaryPage() {
                 Opening secure payment…
               </span>
             ) : (
-              <>Pay Now ₹{lead.totalAmount.toFixed(2)} securely →</>
+              "Pay Now"
             )}
           </motion.button>
 
