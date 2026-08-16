@@ -140,10 +140,10 @@ function ComplaintDetailPage() {
     "None Specified";
 
   // Clean submitted grievance text
+  const rawNotes = complaint.notes || complaint.lead?.notes || "";
   const cleanGrievanceText =
+    rawNotes.replace(/^Ref:\s*[^\n]+\n*/i, "").trim() ||
     complaint.description ||
-    (complaint.notes?.replace(/^Ref:[^\n]+\n\n/, "")) ||
-    complaint.lead?.notes ||
     "No detailed text provided.";
 
   const customerName = complaint.lead?.name || complaint.customer?.name || "Complainant";

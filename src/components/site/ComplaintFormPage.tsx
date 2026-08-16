@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { Mail, Phone, MapPin, Clock, ShieldAlert } from "lucide-react";
@@ -10,9 +10,15 @@ export function ComplaintFormPage() {
   const [submitted, setSubmitted] = useState<{ complaintNumber: string; submittedAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const inputCls =
-    "w-full rounded-full border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+    "w-full rounded-xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 font-medium focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/20 shadow-sm transition-colors";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -56,14 +62,16 @@ export function ComplaintFormPage() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:py-12 grid gap-8 lg:grid-cols-2 items-start">
       {/* Left: intro + contact details */}
-      <div className="space-y-5 text-foreground/90 text-[15px] leading-relaxed">
-        <div className="inline-flex items-center gap-2 rounded-full bg-brand-navy/10 px-3.5 py-1 text-xs font-semibold text-brand-navy">
+      <div className="space-y-5 text-slate-800 dark:text-slate-200 text-base leading-relaxed">
+        <div className="inline-flex items-center gap-2 rounded-full bg-brand-navy/10 dark:bg-brand-navy/30 px-4 py-1.5 text-sm font-bold text-brand-navy dark:text-sky-300">
           <ShieldAlert className="size-4" /> Official Grievance Portal
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+        <h1 className="text-3xl md:text-4xl font-extrabold font-display text-slate-900 dark:text-white tracking-tight">
           File a Complaint — Business Help Services
         </h1>
-        <p>Welcome to the Business Help Services Complaint & Grievance Redressal Desk.</p>
+        <p className="font-medium text-slate-700 dark:text-slate-300">
+          Welcome to the Business Help Services Complaint & Grievance Redressal Desk.
+        </p>
         <p>
           We take user feedback, operational difficulties, and service complaints with utmost seriousness. Our team is dedicated to providing transparent, fair, and prompt resolution for any concern regarding your application or consultancy services.
         </p>
@@ -71,32 +79,51 @@ export function ComplaintFormPage() {
           If you are facing any delays, verification issues, or service dissatisfaction, please fill out the complaint form below or reach our team directly using the details provided.
         </p>
 
+        {/* Live IST Time & Working Hours Desk Card */}
+        <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 dark:bg-slate-900/60 dark:border-slate-800 p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-brand-navy dark:text-sky-400 font-bold text-sm sm:text-base">
+              <Clock className="w-5 h-5 text-brand-navy shrink-0 animate-pulse" />
+              Current IST Time:
+            </span>
+            <span className="font-mono text-sm sm:text-base bg-white dark:bg-slate-800 px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-extrabold shadow-xs">
+              {formatIST(now, { timeOnly: true })} IST
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-semibold pt-2 border-t border-slate-200 dark:border-slate-800 gap-1">
+            <span>Working Hours: 10:00 AM to 05:00 PM (IST)</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-300 self-start sm:self-auto">
+              Desk Active
+            </span>
+          </div>
+        </div>
+
         <ul className="space-y-4 pt-2">
           <li className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
-            <span>
-              <strong>Working Hours:</strong>{" "}
+            <span className="text-slate-800 dark:text-slate-200">
+              <strong className="text-slate-900 dark:text-white font-bold">Working Hours:</strong>{" "}
               <span>10:00 AM to 05:00 PM (IST) (Sunday &amp; Public Holidays off)</span>
             </span>
           </li>
           <li className="flex items-start gap-3">
             <Mail className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
-            <a href="mailto:help@businesshelpservices.com" className="text-brand-navy hover:underline">
+            <a href="mailto:help@businesshelpservices.com" className="text-brand-navy dark:text-sky-400 font-bold hover:underline">
               <strong>Email:</strong>{" "}
               <span>help@businesshelpservices.com</span>
             </a>
           </li>
           <li className="flex items-start gap-3">
             <Phone className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
-            <a href="tel:+919767870331" className="text-brand-navy hover:underline">
+            <a href="tel:+919767870331" className="text-brand-navy dark:text-sky-400 font-bold hover:underline">
               <strong>Phone:</strong>{" "}
               <span>+91-9767870331</span>
             </a>
           </li>
           <li className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-brand-navy mt-0.5 shrink-0" />
-            <span>
-              <strong>Address:</strong>{" "}
+            <span className="text-slate-800 dark:text-slate-200">
+              <strong className="text-slate-900 dark:text-white font-bold">Address:</strong>{" "}
               <span>Koregaon Bk, Khed, Pune, Maharashtra – 410505, India</span>
             </span>
           </li>
@@ -104,27 +131,35 @@ export function ComplaintFormPage() {
       </div>
 
       {/* Right: complaint form card */}
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="bg-form-header text-white text-center py-4">
-          <h2 className="text-xl font-bold font-display">Complaint Form</h2>
+      <div className="rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-card shadow-md overflow-hidden">
+        <div className="bg-brand-navy text-white text-center py-4 px-6">
+          <h2 className="text-xl md:text-2xl font-bold font-display tracking-wide">Complaint Form</h2>
         </div>
 
         {submitted ? (
-          <div className="p-6 md:p-8 text-center space-y-3">
-            <p className="text-lg font-semibold text-foreground">Thank you!</p>
-            <p className="text-sm text-muted-foreground">
-              Your complaint has been recorded. Reference number:
-            </p>
-            <p className="text-lg font-mono font-bold text-brand-navy">{submitted.complaintNumber}</p>
-            <div className="inline-block rounded-lg bg-muted/60 px-4 py-2 text-xs font-mono text-foreground font-medium">
-              Submitted Time: {formatIST(submitted.submittedAt)}
+          <div className="p-6 md:p-8 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-2xl font-bold">
+              ✓
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-2xl font-extrabold text-slate-900 dark:text-white">Complaint Recorded!</p>
+            <p className="text-base font-medium text-slate-700 dark:text-slate-300">
+              Your complaint reference ticket number:
+            </p>
+            <p className="text-xl font-mono font-extrabold text-brand-navy dark:text-sky-400 tracking-wider bg-slate-100 dark:bg-slate-800 py-2.5 px-5 rounded-xl border border-slate-300 dark:border-slate-700 inline-block shadow-xs">
+              {submitted.complaintNumber}
+            </p>
+            <div className="block pt-1">
+              <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-300 dark:border-emerald-700 px-5 py-3 text-sm sm:text-base font-mono font-bold text-emerald-950 dark:text-emerald-200 shadow-sm">
+                <Clock className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                Submitted Time: {formatIST(submitted.submittedAt)}
+              </div>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">
               A confirmation email has been sent to you. Our grievance team will review your case and respond within working hours.
             </p>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-5">
+          <form onSubmit={onSubmit} className="p-6 md:p-8 space-y-6">
             <Field label="Applicant Name / आवेदक का नाम" htmlFor="complaint-name">
               <input
                 id="complaint-name"
@@ -150,7 +185,7 @@ export function ComplaintFormPage() {
 
             <Field label="Mobile No / मोबाइल नंबर" htmlFor="complaint-mobile">
               <div className="relative">
-                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-sm text-foreground/80 font-medium">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-base text-slate-900 font-bold">
                   +91
                 </span>
                 <input
@@ -200,18 +235,18 @@ export function ComplaintFormPage() {
                 rows={5}
                 minLength={10}
                 maxLength={2000}
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Please describe your complaint in detail…"
+                className="w-full rounded-2xl border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 font-medium focus:outline-none focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/20 shadow-sm"
+                placeholder="Please describe your complaint or grievance in detail…"
               />
             </Field>
 
             {error && (
-              <p className="text-sm text-red-600 -mt-2">{error}</p>
+              <p className="text-sm font-semibold text-red-600 -mt-2">{error}</p>
             )}
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold py-3 transition-colors disabled:opacity-60"
+              className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-bold text-base py-3.5 transition-colors disabled:opacity-60 shadow-md"
             >
               {busy ? "Submitting…" : "SUBMIT COMPLAINT"}
             </button>
@@ -251,11 +286,11 @@ export function ComplaintFormPage() {
           </ul>
         </InfoBlock>
 
-        <div className="rounded-2xl border border-border bg-card p-6 md:p-8 text-center">
-          <h3 className="text-xl md:text-2xl font-bold font-display text-foreground">
+        <div className="rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-card p-6 md:p-8 text-center shadow-sm">
+          <h3 className="text-xl md:text-2xl font-bold font-display text-slate-900 dark:text-white">
             For urgent grievance support, contact our compliance desk directly.
           </h3>
-          <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-brand-navy font-semibold">
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-brand-navy dark:text-sky-400 font-bold text-base">
             <a href="tel:+919767870331" className="inline-flex items-center gap-2 hover:underline">
               <Phone className="w-5 h-5" /> +91-9767870331
             </a>
@@ -265,9 +300,9 @@ export function ComplaintFormPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl overflow-hidden border border-border bg-card shadow-sm">
+        <div className="rounded-3xl overflow-hidden border-2 border-slate-200 dark:border-slate-800 bg-card shadow-sm">
           <div className="bg-gradient-to-br from-brand-navy to-brand-navy-deep text-white px-6 md:px-10 py-8 md:py-10">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider mb-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wider mb-3">
               <ShieldAlert className="size-3.5" /> Grievance Policy
             </div>
             <h2 className="text-2xl md:text-3xl font-bold font-display">Grievance Redressal Policy</h2>
@@ -296,11 +331,11 @@ export function ComplaintFormPage() {
 
 function InfoBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-      <div className="bg-form-header text-white px-6 py-3">
+    <div className="rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-card shadow-sm overflow-hidden">
+      <div className="bg-brand-navy text-white px-6 py-3.5">
         <h3 className="text-lg font-bold font-display tracking-wide uppercase">{title}</h3>
       </div>
-      <div className="p-6 md:p-8 space-y-3 text-foreground/85 text-[15px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1.5 [&_p]:my-2">
+      <div className="p-6 md:p-8 space-y-3 text-slate-800 dark:text-slate-200 text-base leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-2 [&_p]:my-2 font-normal">
         {children}
       </div>
     </div>
@@ -310,7 +345,7 @@ function InfoBlock({ title, children }: { title: string; children: React.ReactNo
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="block text-sm font-semibold text-foreground mb-1.5">
+      <label htmlFor={htmlFor} className="block text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 mb-1.5">
         {label}
       </label>
       {children}

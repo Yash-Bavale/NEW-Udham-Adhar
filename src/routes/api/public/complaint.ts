@@ -107,6 +107,7 @@ export const Route = createFileRoute("/api/public/complaint")({
             lead_id: leadId,
             complaint_number: complaintNumber,
             notes: noteText,
+            description: parsed.message,
             status: "pending",
             submitted_at: submittedAt,
           })

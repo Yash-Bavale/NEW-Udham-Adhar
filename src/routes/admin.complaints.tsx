@@ -53,9 +53,9 @@ const STATUS_PILLS = [
 
 const CONTACT_STATUS_PILLS = [
   { key: "lead_created", label: "New / Unread" },
-  { key: "in_progress", label: "In Progress" },
+  { key: "under_process", label: "In Progress" },
   { key: "contacted", label: "Contacted" },
-  { key: "resolved", label: "Resolved" },
+  { key: "completed", label: "Resolved" },
   { key: "closed", label: "Closed" },
 ] as const;
 
@@ -199,6 +199,7 @@ function ComplaintsTab() {
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">CUSTOMER</th>
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">ORDER</th>
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">SERVICE</th>
+                  <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">MESSAGE PREVIEW</th>
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">AUTHORITY</th>
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">AUTH REF #</th>
                   <th className="py-2.5 px-4 font-medium text-[11px] uppercase tracking-wide">STATUS</th>
@@ -231,6 +232,9 @@ function ComplaintsTab() {
                     </td>
                     <td className="py-2.5 px-4 font-mono text-xs">{c.application?.application_code ?? "—"}</td>
                     <td className="py-2.5 px-4 text-xs">{c.application?.service_name ?? c.lead?.service ?? "—"}</td>
+                    <td className="py-2.5 px-4 text-xs max-w-xs truncate" title={c.description || c.notes || c.lead?.notes || ""}>
+                      {c.description || c.notes || c.lead?.notes || "—"}
+                    </td>
                     <td className="py-2.5 px-4 text-xs" style={{ color: "var(--admin-fg)" }}>
                       {c.authority_name ?? "—"}
                     </td>
