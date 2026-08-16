@@ -3,9 +3,10 @@ import { toast } from "sonner";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import { formatIST } from "@/lib/datetime";
 
 export function ContactPage() {
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState<{ submittedAt: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +40,7 @@ export function ContactPage() {
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error || `Could not submit (status ${res.status}). Please try again.`);
       }
-      setSubmitted(true);
+      setSubmitted({ submittedAt: json.submittedAt || new Date().toISOString() });
       toast.success("Message sent. We'll be in touch soon.");
       trackEvent("contact_form_submitted", { state: payload.state });
     } catch (err) {
@@ -113,6 +114,11 @@ export function ContactPage() {
             <p className="text-lg font-semibold text-foreground">Thank you!</p>
             <p className="text-sm text-muted-foreground">
               We've received your message and sent a confirmation to your email.
+            </p>
+            <div className="inline-block rounded-lg bg-muted/60 px-4 py-2 text-xs font-mono text-foreground font-medium">
+              Submitted Time: {formatIST(submitted.submittedAt)}
+            </div>
+            <p className="text-xs text-muted-foreground">
               Our team will respond within working hours.
             </p>
           </div>

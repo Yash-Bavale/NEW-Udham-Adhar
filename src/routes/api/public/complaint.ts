@@ -7,6 +7,8 @@ const ComplaintSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email().max(160),
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile"),
+  state: z.string().trim().optional().default("Not Provided"),
+  language: z.string().trim().optional().default("English"),
   application_ref: z.string().trim().max(80).optional().default(""),
   message: z.string().trim().min(10).max(2000),
 });
@@ -71,8 +73,8 @@ export const Route = createFileRoute("/api/public/complaint")({
               name: parsed.name,
               email: parsed.email,
               mobile: parsed.mobile,
-              state: "Not Provided",
-              language: "English",
+              state: parsed.state || "Not Provided",
+              language: parsed.language || "English",
               service: "Complaint",
               lead_source: "complaint_form",
               status: "lead_created",
@@ -94,6 +96,7 @@ export const Route = createFileRoute("/api/public/complaint")({
         }
 
         const complaintNumber = genComplaintNumber();
+        const submittedAt = new Date().toISOString();
         const noteText = parsed.application_ref
           ? `Ref: ${parsed.application_ref}\n\n${parsed.message}`
           : parsed.message;
@@ -105,7 +108,7 @@ export const Route = createFileRoute("/api/public/complaint")({
             complaint_number: complaintNumber,
             notes: noteText,
             status: "pending",
-            submitted_at: new Date().toISOString(),
+            submitted_at: submittedAt,
           })
           .select("id, complaint_number")
           .single();
@@ -155,7 +158,7 @@ export const Route = createFileRoute("/api/public/complaint")({
 
 
         return new Response(
-          JSON.stringify({ ok: true, complaintNumber: complaint.complaint_number }),
+          JSON.stringify({ ok: true, complaintNumber: complaint.complaint_number, submittedAt }),
           { status: 200, headers: cors },
         );
       },

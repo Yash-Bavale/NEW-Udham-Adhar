@@ -59,6 +59,7 @@ export const Route = createFileRoute("/api/public/contact")({
           .maybeSingle();
 
         let leadId: string;
+        const submittedAt = new Date().toISOString();
         if (recent?.id) {
           leadId = recent.id;
         } else {
@@ -102,7 +103,6 @@ export const Route = createFileRoute("/api/public/contact")({
         const adminTo =
           process.env.INTERNAL_NOTIFICATION_EMAIL || FALLBACK_INTERNAL_EMAIL;
 
-
         // Fire-and-forget enqueues — never block the user on email backend
         try {
           const { enqueueFromTemplateInternal } = await import(
@@ -135,10 +135,11 @@ export const Route = createFileRoute("/api/public/contact")({
         }
 
         return new Response(
-          JSON.stringify({ ok: true, leadId }),
+          JSON.stringify({ ok: true, leadId, submittedAt }),
           { status: 200, headers: cors },
         );
       },
     },
   },
 });
+

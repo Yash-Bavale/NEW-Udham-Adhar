@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WpPage } from "@/components/site/PageHero";
-import html from "@/content/wp/complaint.html?raw";
+import { ComplaintFormPage } from "@/components/site/ComplaintFormPage";
 
 export const Route = createFileRoute("/complaint")({
   head: () => ({
@@ -15,5 +14,6 @@ export const Route = createFileRoute("/complaint")({
       { rel: "canonical", href: "https://udyamadhar.in/complaint" },
     ],
   }),
-  component: () => <WpPage title="Complaint" html={html} />,
+  component: ComplaintFormPage,
 });
+
