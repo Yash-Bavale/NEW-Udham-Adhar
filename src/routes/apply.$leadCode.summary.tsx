@@ -17,8 +17,6 @@ import {
   CreditCard,
   Sparkles,
   ClipboardCheck,
-  Clock,
-  ArrowRight,
 } from "lucide-react";
 import {
   getApplicationSummary,
@@ -172,21 +170,6 @@ function SummaryPage() {
   const [payBusy, setPayBusy] = useState(false);
   const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
-
-  const [payCountdown, setPayCountdown] = useState(30);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPayCountdown((prev) => (prev > 0 ? prev - 1 : 30));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formatCountdown = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  };
 
 
   useEffect(() => {
@@ -459,7 +442,71 @@ function SummaryPage() {
             </div>
           </div>
 
+          {/* Payment gateways */}
+          <div className="space-y-2.5">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-brand-navy" /> Choose payment method
+            </h2>
+            <div className="space-y-2">
+              {gateways.map((g) => {
+                const brand = GATEWAY_BRAND[g.name] ?? {
+                  bg: "#1f2937",
+                  fg: "#fff",
+                  label: g.display_name,
+                };
+                const supported = isSupportedGateway(g.name);
+                const selected = activeGateway === g.name;
 
+                return (
+                  <label
+                    key={g.name}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2.5 transition-all ${
+                      selected
+                        ? "border-brand-navy bg-brand-navy/5 ring-2 ring-brand-navy/20"
+                        : "border-border bg-background"
+                    } ${supported ? "cursor-pointer hover:border-brand-navy/50" : "opacity-60 cursor-not-allowed"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="gateway"
+                        value={g.name}
+                        checked={selected}
+                        disabled={!supported}
+                        onChange={() => supported && setChosen(g.name)}
+                        className="accent-brand-navy"
+                      />
+                      <GatewayLogo brand={brand} />
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground leading-tight">
+                          {g.display_name}
+                        </div>
+                        {brand.tag && (
+                          <div className="text-[11px] text-muted-foreground leading-tight">
+                            {brand.tag}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {supported ? (
+                      <span className="text-[10px] uppercase font-bold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                        Live
+                      </span>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Soon
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+              {gateways.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No payment methods are enabled. Please contact support.
+                </p>
+              )}
+            </div>
+          </div>
 
           {payError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -485,19 +532,9 @@ function SummaryPage() {
                 Opening secure payment…
               </span>
             ) : (
-              <span className="inline-flex items-center justify-center gap-2">
-                Pay Now <ArrowRight className="w-5 h-5" />
-              </span>
+              <>Pay Now ₹{lead.totalAmount.toFixed(2)} securely →</>
             )}
           </motion.button>
-
-          {/* 30 sec urgency countdown box below payment button */}
-          <div className="rounded-xl border border-rose-300 bg-rose-100/90 dark:bg-rose-950/60 dark:border-rose-800 px-4 py-3 text-center shadow-xs flex items-center justify-center gap-2">
-            <Clock className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
-            <span className="text-base sm:text-lg font-bold text-rose-700 dark:text-rose-300">
-              Complete Your Payment In: {formatCountdown(payCountdown)}
-            </span>
-          </div>
 
           <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
             By clicking “Pay Now” you confirm that you have read and agreed to our{" "}
