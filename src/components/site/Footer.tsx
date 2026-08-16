@@ -142,10 +142,10 @@ export function Footer() {
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
       <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-3">
-        {/* Col 1: MSME / Udyog Aadhaar — full SEO tree inline (client review mode) */}
+        {/* Col 1: MSME / Udyam Aadhar Registration — full SEO tree inline (client review mode) */}
         <div>
           <h4 className="text-2xl font-bold font-display leading-tight">
-            MSME / Udyog Aadhaar
+            MSME/ Udyam Aadhar Registration
           </h4>
           <SeoTree
             pages={pages}
