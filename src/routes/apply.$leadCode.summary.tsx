@@ -17,6 +17,8 @@ import {
   CreditCard,
   Sparkles,
   ClipboardCheck,
+  Clock,
+  ArrowRight,
 } from "lucide-react";
 import {
   getApplicationSummary,
@@ -170,6 +172,22 @@ function SummaryPage() {
   const [payBusy, setPayBusy] = useState(false);
   const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  const [payCountdown, setPayCountdown] = useState(30);
+
+  useEffect(() => {
+    if (payCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setPayCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [payCountdown]);
+
+  const formatCountdown = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
 
   useEffect(() => {
@@ -532,9 +550,19 @@ function SummaryPage() {
                 Opening secure payment…
               </span>
             ) : (
-              <>Pay Now ₹{lead.totalAmount.toFixed(2)} securely →</>
+              <span className="inline-flex items-center justify-center gap-2">
+                Pay Now <ArrowRight className="w-5 h-5" />
+              </span>
             )}
           </motion.button>
+
+          {/* 30 sec urgency countdown box below payment button */}
+          <div className="rounded-xl border border-rose-300 bg-rose-100/90 dark:bg-rose-950/60 dark:border-rose-800 px-4 py-3 text-center shadow-xs flex items-center justify-center gap-2">
+            <Clock className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
+            <span className="text-base sm:text-lg font-bold text-rose-700 dark:text-rose-300">
+              Complete Your Payment In: {formatCountdown(payCountdown)}
+            </span>
+          </div>
 
           <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
             By clicking “Pay Now” you confirm that you have read and agreed to our{" "}

@@ -224,7 +224,7 @@
 .marquee-track {
   display: inline-flex;
   white-space: nowrap;
-  animation: marquee 60s linear infinite;
+  animation: marquee 20s linear infinite;
 }
 
 /* Google Translate widget styling */
