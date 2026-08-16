@@ -73,7 +73,7 @@ export function StageStepper({ stage, timestamps, onPick }: Props) {
                 type="button"
                 onClick={onPick}
                 title={ts ? `${meta.label} · ${formatIST(ts)}` : meta.label}
-                className="flex flex-col items-center gap-1.5 px-1 min-w-0 group hover:-translate-y-0.5 transition-transform"
+                className="flex flex-col items-center gap-1.5 px-1 min-w-0 group hover:-translate-y-0.5 transition-transform cursor-pointer"
               >
                 <div className={`size-10 rounded-full flex items-center justify-center transition-all ${circleCls}`}>
                   {isDone ? (

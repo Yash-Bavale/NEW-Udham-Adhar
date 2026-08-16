@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useMemo, useState } from "react";
-import { ExternalLink, Eye, FileText, Settings2, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Fragment, useMemo, useState, useEffect } from "react";
+import { ExternalLink, Eye, FileText, Settings2, Pencil, Trash2, Loader2, Check, X } from "lucide-react";
 import { listServices, upsertService, deleteService } from "@/lib/crm/services-admin.functions";
 import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 import { getBuilderSchema } from "@/lib/crm/form-builder.functions";
@@ -280,35 +280,22 @@ function ServicesPage() {
                       </div>
                     </td>
 
-                    {/* Inline Editable Base Amount */}
+                    {/* Inline Editable Base Amount with Edit & Confirm */}
                     <td className="px-3 py-2.5 text-right">
-                      <div className="inline-flex items-center justify-end gap-1">
-                        <span className="text-xs text-slate-400 font-mono">₹</span>
-                        <input
-                          type="number"
-                          step="1"
-                          defaultValue={Number(s.base_amount ?? 0)}
-                          onKeyDown={async (e) => {
-                            if (e.key === "Enter") {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                          onBlur={async (e) => {
-                            const newBase = Number(e.target.value);
-                            if (isNaN(newBase) || newBase < 0 || newBase === Number(s.base_amount ?? 0)) return;
-                            const { base, gst, total } = fromBase(newBase);
-                            try {
-                              await upsertFn({ data: { ...(s as ServiceForm), base_amount: base, gst_amount: gst, total_amount: total } as never });
-                              await qc.invalidateQueries({ queryKey: ["admin.services"] });
-                              toast.success(`Updated base price to ₹${base.toFixed(2)} (Total: ₹${total.toFixed(2)})`);
-                            } catch (err) {
-                              toast.error((err as Error).message);
-                            }
-                          }}
-                          className="w-24 rounded border border-slate-300 px-2 py-1 text-sm font-semibold text-right focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                          title="Click to edit Base Price directly — 18% GST and Total will auto-update"
-                        />
-                      </div>
+                      <InlineBasePriceCell
+                        service={s as ServiceForm}
+                        onSave={async (newBase) => {
+                          const { base, gst, total } = fromBase(newBase);
+                          try {
+                            await upsertFn({ data: { ...(s as ServiceForm), base_amount: base, gst_amount: gst, total_amount: total } as never });
+                            await qc.invalidateQueries({ queryKey: ["admin.services"] });
+                            toast.success(`Updated base price to ₹${base.toFixed(2)} (Total: ₹${total.toFixed(2)})`);
+                          } catch (err) {
+                            toast.error((err as Error).message);
+                            throw err;
+                          }
+                        }}
+                      />
                     </td>
 
                     <td className="px-3 py-2.5 text-right text-slate-600 font-mono text-xs">
@@ -602,5 +589,95 @@ function Select({
         ))}
       </select>
     </label>
+  );
+}
+
+function InlineBasePriceCell({
+  service,
+  onSave,
+}: {
+  service: ServiceForm;
+  onSave: (newBase: number) => Promise<void>;
+}) {
+  const currentBase = Number(service.base_amount ?? 0);
+  const [value, setValue] = useState(String(currentBase));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(String(currentBase));
+  }, [currentBase]);
+
+  const numericValue = Number(value);
+  const isChanged =
+    !isNaN(numericValue) &&
+    numericValue >= 0 &&
+    numericValue !== currentBase;
+
+  async function handleConfirm() {
+    if (!isChanged || saving) return;
+    setSaving(true);
+    try {
+      await onSave(numericValue);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setValue(String(currentBase));
+  }
+
+  return (
+    <div className="inline-flex items-center justify-end gap-1">
+      <span className="text-xs text-slate-400 font-mono">₹</span>
+      <div className="relative flex items-center gap-1">
+        <input
+          type="number"
+          step="1"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onWheel={(e) => (e.target as HTMLElement).blur()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void handleConfirm();
+            } else if (e.key === "Escape") {
+              handleCancel();
+            }
+          }}
+          disabled={saving}
+          className={`w-24 rounded border px-2 py-1 text-sm font-semibold text-right transition-colors focus:outline-none ${
+            isChanged
+              ? "border-amber-500 bg-amber-50/70 text-amber-900 focus:ring-2 focus:ring-amber-500/40"
+              : "border-slate-300 bg-white text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          }`}
+          title="Type new Base Price — click Confirm or press Enter to save"
+        />
+
+        {isChanged && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={saving}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs transition-colors disabled:opacity-50"
+              title="Confirm price change"
+            >
+              {saving ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3.5" />}
+              Confirm
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+              title="Cancel changes"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -510,7 +510,7 @@ export function CustomerJourneyMap(p: Props) {
                 type="button"
                 onClick={() => mutTalkExpert.mutate()}
                 disabled={closed || completed || mutTalkExpert.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="size-3.5" />
                 Talk-to-Expert Completed (E009)
@@ -526,7 +526,7 @@ export function CustomerJourneyMap(p: Props) {
               type="button"
               onClick={() => setDialog({ kind: "force_close" })}
               disabled={closed}
-              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               Force Close
             </button>
@@ -676,14 +676,14 @@ function getButtonLabel(code?: string): string {
 /* ═════════════════════════ FlowNode ═════════════════════════ */
 
 const TONE_STYLES: Record<Tone, { border: string; bg: string; text: string; icon: string; btn: string; ring: string; solid: string }> = {
-  maroon: { border: "border-rose-900", bg: "bg-rose-950", text: "text-white", icon: "text-white", btn: "bg-rose-800 hover:bg-rose-700 text-white", ring: "ring-rose-400", solid: "bg-rose-900 text-white" },
-  slate: { border: "border-slate-400", bg: "bg-white", text: "text-slate-800", icon: "text-slate-600", btn: "bg-slate-700 hover:bg-slate-800 text-white", ring: "ring-slate-300", solid: "bg-slate-700 text-white" },
-  amber: { border: "border-amber-400", bg: "bg-amber-50", text: "text-amber-900", icon: "text-amber-700", btn: "bg-amber-600 hover:bg-amber-700 text-white", ring: "ring-amber-300", solid: "bg-amber-600 text-white" },
-  rose: { border: "border-rose-400", bg: "bg-rose-50", text: "text-rose-900", icon: "text-rose-700", btn: "bg-rose-600 hover:bg-rose-700 text-white", ring: "ring-rose-300", solid: "bg-rose-600 text-white" },
-  sky: { border: "border-sky-400", bg: "bg-sky-50", text: "text-sky-900", icon: "text-sky-700", btn: "bg-sky-600 hover:bg-sky-700 text-white", ring: "ring-sky-300", solid: "bg-sky-600 text-white" },
-  violet: { border: "border-violet-400", bg: "bg-violet-50", text: "text-violet-900", icon: "text-violet-700", btn: "bg-violet-600 hover:bg-violet-700 text-white", ring: "ring-violet-300", solid: "bg-violet-600 text-white" },
-  emerald: { border: "border-emerald-500", bg: "bg-emerald-600", text: "text-white", icon: "text-white", btn: "bg-emerald-700 hover:bg-emerald-800 text-white", ring: "ring-emerald-300", solid: "bg-emerald-600 text-white" },
-  indigo: { border: "border-indigo-400", bg: "bg-indigo-50", text: "text-indigo-900", icon: "text-indigo-700", btn: "bg-indigo-600 hover:bg-indigo-700 text-white", ring: "ring-indigo-300", solid: "bg-indigo-600 text-white" },
+  maroon: { border: "border-rose-900", bg: "bg-rose-950", text: "text-white", icon: "text-white", btn: "bg-rose-800 hover:bg-rose-700 text-white cursor-pointer", ring: "ring-rose-400", solid: "bg-rose-900 text-white" },
+  slate: { border: "border-slate-400", bg: "bg-white", text: "text-slate-800", icon: "text-slate-600", btn: "bg-slate-700 hover:bg-slate-800 text-white cursor-pointer", ring: "ring-slate-300", solid: "bg-slate-700 text-white" },
+  amber: { border: "border-amber-400", bg: "bg-amber-50", text: "text-amber-900", icon: "text-amber-700", btn: "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer", ring: "ring-amber-300", solid: "bg-amber-600 text-white" },
+  rose: { border: "border-rose-400", bg: "bg-rose-50", text: "text-rose-900", icon: "text-rose-700", btn: "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer", ring: "ring-rose-300", solid: "bg-rose-600 text-white" },
+  sky: { border: "border-sky-400", bg: "bg-sky-50", text: "text-sky-900", icon: "text-sky-700", btn: "bg-sky-600 hover:bg-sky-700 text-white cursor-pointer", ring: "ring-sky-300", solid: "bg-sky-600 text-white" },
+  violet: { border: "border-violet-400", bg: "bg-violet-50", text: "text-violet-900", icon: "text-violet-700", btn: "bg-violet-600 hover:bg-violet-700 text-white cursor-pointer", ring: "ring-violet-300", solid: "bg-violet-600 text-white" },
+  emerald: { border: "border-emerald-500", bg: "bg-emerald-600", text: "text-white", icon: "text-white", btn: "bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer", ring: "ring-emerald-300", solid: "bg-emerald-600 text-white" },
+  indigo: { border: "border-indigo-400", bg: "bg-indigo-50", text: "text-indigo-900", icon: "text-indigo-700", btn: "bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer", ring: "ring-indigo-300", solid: "bg-indigo-600 text-white" },
 };
 
 function FlowNode({
@@ -828,7 +828,7 @@ function FlowNode({
             title={!buttonEnabled ? `${node.buttonCode} locked in phase "${phaseLabel}"` : node.label}
             className={cn(
               "w-full inline-flex items-center justify-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold shadow-xs transition disabled:cursor-not-allowed",
-              buttonEnabled ? t.btn : "bg-slate-100 text-slate-500 border border-slate-200",
+              buttonEnabled ? cn(t.btn, "cursor-pointer") : "bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed",
             )}
           >
             {buttonSent && <Check className="size-2.5" />}
@@ -841,7 +841,7 @@ function FlowNode({
         <div className="pt-0.5">
           <a
             href={ticketHref ?? "#"}
-            className="inline-flex w-full items-center justify-center gap-1 rounded bg-violet-600 px-1 py-0.5 text-[9px] font-bold text-white shadow-sm hover:bg-violet-700"
+            className="inline-flex w-full items-center justify-center gap-1 rounded bg-violet-600 px-1 py-0.5 text-[9px] font-bold text-white shadow-sm hover:bg-violet-700 cursor-pointer"
           >
             #{ticketNumber} <ArrowRight className="size-2.5" />
           </a>

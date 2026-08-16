@@ -878,7 +878,7 @@ export function WorkspaceShell(p: Props) {
                               disabled={!enabled || btn.pending}
                               className={cn(
                                 "h-9 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-1.5 transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed select-none",
-                                enabled ? style.active : "bg-slate-50 border-slate-200 text-slate-400"
+                                enabled ? cn(style.active, "cursor-pointer") : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
                               )}
                             >
                               <div className="flex items-center gap-1.5 min-w-0">
@@ -1032,7 +1032,7 @@ function QuickTile({
   };
   // Note: we do NOT disable the button — it stays clickable so runQuickAction can
   // fire the "why disabled" toast. Visual affordance is dimmed instead.
-  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg transition ${disabled ? "opacity-50" : ""}`;
+  const cls = `flex flex-col items-center px-1 py-1.5 rounded-lg transition cursor-pointer ${disabled ? "opacity-50" : ""}`;
   return (
     <button type="button" onClick={onClick} className={cls} aria-disabled={disabled}>
       <span className={`w-9 h-9 grid place-items-center rounded-lg ${tintMap[tint]}`}>
