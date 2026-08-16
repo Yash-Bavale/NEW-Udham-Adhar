@@ -63,7 +63,7 @@ export function TrustBlock() {
         <div className="rounded-lg border border-border overflow-hidden bg-card">
           <div className="bg-muted/40 px-6 py-5 border-b border-border">
             <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
-              We provide consultancy services across India.
+              A Vision on India
             </h2>
           </div>
           <div className="p-4 md:p-6 flex justify-center">

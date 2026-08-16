@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Lock, Loader2 } from "lucide-react";
+import { Lock, Loader2, Clock } from "lucide-react";
 import { createPayUOrder } from "@/lib/payments/payu.functions";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
@@ -87,13 +87,16 @@ function PaymentPage() {
           </p>
 
           {!order && (
-            <button
-              onClick={pay}
-              disabled={busy}
-              className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold py-3 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
-            >
-              {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting secure session…</> : "Proceed to Payment"}
-            </button>
+            <>
+              <button
+                onClick={pay}
+                disabled={busy}
+                className="w-full rounded-full bg-brand-navy hover:bg-brand-navy-deep text-white font-semibold py-3 transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              >
+                {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting secure session…</> : "Proceed to Payment"}
+              </button>
+              <DummyUrgencyTimer />
+            </>
           )}
 
           {order && (
@@ -118,5 +121,25 @@ function PaymentPage() {
         </form>
       )}
     </section>
+  );
+}
+
+function DummyUrgencyTimer() {
+  const [seconds, setSeconds] = useState(30);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((prev) => (prev <= 1 ? 30 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatted = String(seconds).padStart(2, "0");
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50/90 py-3.5 px-4 text-center font-bold text-red-600 text-sm md:text-base flex items-center justify-center gap-2 shadow-sm">
+      <Clock className="w-5 h-5 text-red-600 animate-pulse shrink-0" />
+      <span>Complete Your Payment In: 00:{formatted}</span>
+    </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   CreditCard,
   Sparkles,
   ClipboardCheck,
+  Clock,
 } from "lucide-react";
 import {
   getApplicationSummary,
@@ -442,72 +443,6 @@ function SummaryPage() {
             </div>
           </div>
 
-          {/* Payment gateways */}
-          <div className="space-y-2.5">
-            <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-brand-navy" /> Choose payment method
-            </h2>
-            <div className="space-y-2">
-              {gateways.map((g) => {
-                const brand = GATEWAY_BRAND[g.name] ?? {
-                  bg: "#1f2937",
-                  fg: "#fff",
-                  label: g.display_name,
-                };
-                const supported = isSupportedGateway(g.name);
-                const selected = activeGateway === g.name;
-
-                return (
-                  <label
-                    key={g.name}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2.5 transition-all ${
-                      selected
-                        ? "border-brand-navy bg-brand-navy/5 ring-2 ring-brand-navy/20"
-                        : "border-border bg-background"
-                    } ${supported ? "cursor-pointer hover:border-brand-navy/50" : "opacity-60 cursor-not-allowed"}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="gateway"
-                        value={g.name}
-                        checked={selected}
-                        disabled={!supported}
-                        onChange={() => supported && setChosen(g.name)}
-                        className="accent-brand-navy"
-                      />
-                      <GatewayLogo brand={brand} />
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-foreground leading-tight">
-                          {g.display_name}
-                        </div>
-                        {brand.tag && (
-                          <div className="text-[11px] text-muted-foreground leading-tight">
-                            {brand.tag}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {supported ? (
-                      <span className="text-[10px] uppercase font-bold tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                        Live
-                      </span>
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Soon
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-              {gateways.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No payment methods are enabled. Please contact support.
-                </p>
-              )}
-            </div>
-          </div>
-
           {payError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {payError}
@@ -535,6 +470,9 @@ function SummaryPage() {
               <>Pay Now ₹{lead.totalAmount.toFixed(2)} securely →</>
             )}
           </motion.button>
+
+          {/* 30s rotating dummy countdown timer */}
+          <DummyUrgencyTimer />
 
           <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
             By clicking “Pay Now” you confirm that you have read and agreed to our{" "}
@@ -639,6 +577,26 @@ function GatewayLogo({
       style={{ backgroundColor: brand.bg, color: brand.fg }}
     >
       {brand.label}
+    </div>
+  );
+}
+
+function DummyUrgencyTimer() {
+  const [seconds, setSeconds] = useState(30);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((prev) => (prev <= 1 ? 30 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatted = String(seconds).padStart(2, "0");
+
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50/90 py-3.5 px-4 text-center font-bold text-red-600 text-sm md:text-base flex items-center justify-center gap-2 shadow-sm">
+      <Clock className="w-5 h-5 text-red-600 animate-pulse shrink-0" />
+      <span>Complete Your Payment In: 00:{formatted}</span>
     </div>
   );
 }

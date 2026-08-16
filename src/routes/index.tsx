@@ -254,21 +254,10 @@ function HomePage() {
         <div className="rounded-lg border border-border overflow-hidden bg-card">
           <div className="bg-muted/40 px-6 py-5 border-b border-border">
             <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
-              We Provide Consultancy Services Across India
+              A Vision on India
             </h2>
           </div>
-          <div className="p-6 text-sm md:text-base text-foreground/85 leading-relaxed">
-            <p>
-              Business Help Services operates as a national consultancy,
-              assisting clients in every state and union territory. Our team
-              has handled Udyam registrations and MSME certificate services for
-              businesses in Maharashtra, Gujarat, Rajasthan, Uttar Pradesh,
-              Madhya Pradesh, Karnataka, Tamil Nadu, Telangana, West Bengal,
-              Punjab and beyond. Language is not a barrier — we support
-              consultations in Hindi &amp; English.
-            </p>
-          </div>
-          <div className="p-4 md:p-6 flex justify-center border-t border-border">
+          <div className="p-4 md:p-6 flex justify-center">
             <img
               src={mapImg.url}
               alt="Map of India showing all states where consultancy services are provided"
