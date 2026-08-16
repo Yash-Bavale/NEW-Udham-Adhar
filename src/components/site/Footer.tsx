@@ -141,15 +141,8 @@ export function Footer() {
 
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
-      <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-        {/* Col 1: Brand + socials */}
-        <div>
-          <h3 className="text-2xl font-bold font-display leading-tight">
-            © {brand.companyName}
-          </h3>
-        </div>
-
-        {/* Col 2: MSME / Udyog Aadhaar — full SEO tree inline (client review mode) */}
+      <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-3">
+        {/* Col 1: MSME / Udyog Aadhaar — full SEO tree inline (client review mode) */}
         <div>
           <h4 className="text-2xl font-bold font-display leading-tight">
             MSME / Udyog Aadhaar
