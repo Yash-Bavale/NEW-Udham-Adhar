@@ -46,7 +46,7 @@ const POST_PAY_STEPS: readonly CountdownStep[] = [
 export const Route = createFileRoute("/apply/$leadCode/summary")({
   head: () => ({
     meta: [
-      { title: "Pay Application Fee — Business Help Services" },
+      { title: "Your Application Is Ready — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -280,7 +280,7 @@ function SummaryPage() {
       >
         <div className="bg-form-header text-white px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold font-display">Pay Application Fee</h1>
+            <h1 className="text-lg font-bold font-display">Your Application Is Ready</h1>
             <p className="text-xs text-white/80">Ref: {lead.leadCode}</p>
           </div>
           <div className="flex items-center gap-1 text-xs">

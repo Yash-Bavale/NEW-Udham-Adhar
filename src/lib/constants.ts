@@ -46,4 +46,4 @@ export const NAV_LINKS = [
 ] as const;
 
 export const DISCLAIMER_TEXT =
-  "Disclaimer: Business Help Services Is A Private Consultancy And Assistance Service Provider And Is Not Affiliated With, Authorized By, Endorsed By, Or Associated With Any Government Authority Or Department. All Charges Collected On This Website Are Strictly Consultancy & Assistance Service Fees Only, And Not Any Government Fee.";
+  "Disclaimer: Business Help Services is an independent business assistance and support service provider and is not affiliated with, authorized by, endorsed by, or associated with any government authority or department. All charges collected through this website are solely for assistance, processing, documentation, and support services and do not constitute any government fee or statutory fee payable to any government authority.";
