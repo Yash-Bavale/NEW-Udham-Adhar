@@ -56,6 +56,22 @@ function toTitleCase(input: string): string {
     .join(" ");
 }
 
+export function validatePattern(pattern: string, val: string): boolean {
+  if (!pattern || !val) return true;
+  try {
+    const anchored = pattern.startsWith("^") && pattern.endsWith("$")
+      ? pattern
+      : `^(${pattern})$`;
+    return new RegExp(anchored).test(val);
+  } catch {
+    try {
+      return new RegExp(pattern).test(val);
+    } catch {
+      return true;
+    }
+  }
+}
+
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
 
