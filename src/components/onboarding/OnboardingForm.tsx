@@ -163,18 +163,61 @@ export function OnboardingForm({
     });
   }
 
+export function validatePattern(pattern: string, val: string): boolean {
+  if (!pattern || !val) return true;
+  try {
+    const anchored = pattern.startsWith("^") && pattern.endsWith("$")
+      ? pattern
+      : `^(${pattern})$`;
+    return new RegExp(anchored).test(val);
+  } catch {
+    try {
+      return new RegExp(pattern).test(val);
+    } catch {
+      return true;
+    }
+  }
+}
+
   async function handle(e: React.FormEvent) {
     e.preventDefault();
     if (timer.current) window.clearTimeout(timer.current);
     setErr(null);
     setSubmitSuccess(false);
 
-    // Validate that no date field contains today's date or a future date
+    // 1. Validate required fields
+    for (const f of schema.fields) {
+      if (f.type === "note" || f.type === "section") continue;
+      if (f.required) {
+        const v = values[f.key];
+        if (v === undefined || v === null || String(v).trim() === "") {
+          setErr(`Please fill out required field: ${f.label}`);
+          setSubmitSuccess(false);
+          return;
+        }
+      }
+    }
+
+    // 2. Validate that no date field contains today's date or a future date
     const { isTodayOrFutureIso } = await import("@/components/ui/DateInputDMY");
     for (const f of schema.fields) {
       if (f.type === "date" && values[f.key]) {
         if (isTodayOrFutureIso(values[f.key])) {
           setErr(`${f.label}: Date cannot be today or a future date. Please select a past date.`);
+          setSubmitSuccess(false);
+          return;
+        }
+      }
+    }
+
+    // 3. Validate field regex patterns
+    for (const f of schema.fields) {
+      if (f.type === "note" || f.type === "section") continue;
+      if (f.pattern && values[f.key] && String(values[f.key]).trim() !== "") {
+        const val = String(values[f.key]).trim();
+        if (!validatePattern(f.pattern, val)) {
+          const hint = f.help ? ` (${f.help})` : f.placeholder ? ` (e.g. ${f.placeholder})` : "";
+          setErr(`Invalid format for ${f.label}${hint}.`);
           setSubmitSuccess(false);
           return;
         }
@@ -332,10 +375,11 @@ function FieldRenderer({
 
   const isState = field.type === "state" || field.key === "state";
   const isDistrict = field.type === "district" || field.key === "district";
-  const isPincode = field.key === "pincode" || field.pattern === "^\\d{6}$";
-  const isMobile = field.type === "tel" && field.pattern === "^[6-9]\\d{9}$";
-  const isAadhaar = field.pattern === "^\\d{12}$";
-  const isPan = field.pattern === "^[A-Z]{5}\\d{4}[A-Z]$";
+  const pat = field.pattern ?? "";
+  const isPincode = field.key === "pincode" || /^(\^|\()?(\\d|\[0-9\])\{6\}(\$|\))?$/.test(pat);
+  const isMobile = field.type === "tel" || /^(\^|\()?\[6-9\](\\d|\[0-9\])\{9\}(\$|\))?$/.test(pat);
+  const isAadhaar = field.key === "aadhaar_number" || /^(\^|\()?(\\d|\[0-9\])\{12\}(\$|\))?$/.test(pat);
+  const isPan = field.key === "pan_number" || /^(\^|\()?\[A-Z\]\{5\}(\\d|\[0-9\])\{4\}\[A-Z\](\$|\))?$/i.test(pat);
   const isUpper = UPPERCASE_FIELDS.has(field.key);
   const isTitle = TITLECASE_FIELDS.has(field.key);
 

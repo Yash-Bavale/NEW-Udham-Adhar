@@ -225,8 +225,23 @@ export const submitOnboarding = createServerFn({ method: "POST" })
         if (!f.pattern) continue;
         const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") continue;
-        if (!new RegExp(f.pattern).test(String(v))) {
-          throw new Error(`Invalid format for ${f.label}.`);
+        const valStr = String(v).trim();
+        const pat = f.pattern.startsWith("^") && f.pattern.endsWith("$")
+          ? f.pattern
+          : `^(${f.pattern})$`;
+        try {
+          if (!new RegExp(pat).test(valStr)) {
+            throw new Error(`Invalid format for ${f.label}.`);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message.startsWith("Invalid format")) throw err;
+          try {
+            if (!new RegExp(f.pattern).test(valStr)) {
+              throw new Error(`Invalid format for ${f.label}.`);
+            }
+          } catch (e2) {
+            if (e2 instanceof Error && e2.message.startsWith("Invalid format")) throw e2;
+          }
         }
       }
     }
