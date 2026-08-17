@@ -163,21 +163,6 @@ export function OnboardingForm({
     });
   }
 
-export function validatePattern(pattern: string, val: string): boolean {
-  if (!pattern || !val) return true;
-  try {
-    const anchored = pattern.startsWith("^") && pattern.endsWith("$")
-      ? pattern
-      : `^(${pattern})$`;
-    return new RegExp(anchored).test(val);
-  } catch {
-    try {
-      return new RegExp(pattern).test(val);
-    } catch {
-      return true;
-    }
-  }
-}
 
   async function handle(e: React.FormEvent) {
     e.preventDefault();
