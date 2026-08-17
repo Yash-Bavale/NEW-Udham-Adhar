@@ -193,6 +193,7 @@ function RootShell({ children }: { children: ReactNode }) {
     gtag('js', new Date());
     gtag('config', 'G-62JC7PRPMM');
     gtag('config', 'AW-18336340451');
+    gtag('event', 'conversion', { 'send_to': 'AW-18336340451/XzVkCPHI7eIcEOOzuadE' });
   }
 
   if ('requestIdleCallback' in window) {
@@ -298,6 +299,16 @@ function RootComponent() {
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [isAdminPath]);
+
+  // Track page views on client-side SPA navigation
+  useEffect(() => {
+    if (typeof window === "undefined" || isAdminPath) return;
+    if ((window as any).gtag) {
+      (window as any).gtag("event", "conversion", {
+        send_to: "AW-18336340451/XzVkCPHI7eIcEOOzuadE",
+      });
+    }
+  }, [path, isAdminPath]);
 
 
 
