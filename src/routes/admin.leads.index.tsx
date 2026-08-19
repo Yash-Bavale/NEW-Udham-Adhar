@@ -637,6 +637,7 @@ function AddLeadDialog({
         language: lead.language ?? f.language,
         service: lead.service ?? f.service,
         lead_source: lead.lead_source ?? f.lead_source,
+        website_id: lead.website_id ?? f.website_id,
         base_amount: Number(lead.base_amount ?? f.base_amount) || 0,
         gst_amount: Number(lead.gst_amount ?? f.gst_amount) || 0,
         total_amount: Number(lead.total_amount ?? f.total_amount) || 0,

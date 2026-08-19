@@ -740,11 +740,27 @@ export const addLead = createServerFn({ method: "POST" })
     let serviceId: string | null = null;
     let websiteId: string | null = (data as any).website_id ?? null; // admin's explicit selection wins
     if (rest.service) {
-      const { data: svc } = await admin
+      let { data: svc } = await admin
         .from("services")
         .select("id, website_id")
         .eq("service_name", rest.service)
         .maybeSingle();
+      if (!svc) {
+        const { data: svci } = await admin
+          .from("services")
+          .select("id, website_id")
+          .ilike("service_name", rest.service.trim())
+          .maybeSingle();
+        svc = svci;
+      }
+      if (!svc) {
+        const { data: svcc } = await admin
+          .from("services")
+          .select("id, website_id")
+          .ilike("service_code", rest.service.trim())
+          .maybeSingle();
+        svc = svcc;
+      }
       serviceId = (svc?.id as string) ?? null;
       if (!websiteId) websiteId = (svc?.website_id as string) ?? null;
     }

@@ -126,6 +126,56 @@ async function ensurePaidOrdersIntegrated(admin: any) {
         }
       }
     }
+
+    // 3. Self-heal applications rows where service_id IS NULL but lead has service_id or service text
+    const { data: nullSvcApps } = await admin
+      .from("applications")
+      .select("id, lead_id, service_id")
+      .is("service_id", null)
+      .not("lead_id", "is", null)
+      .eq("is_deleted", false)
+      .limit(100);
+
+    if (nullSvcApps && nullSvcApps.length > 0) {
+      const leadIds = Array.from(new Set(nullSvcApps.map((a: any) => a.lead_id)));
+      const { data: leadsWithSvc } = await admin
+        .from("leads")
+        .select("id, service_id, service")
+        .in("id", leadIds);
+
+      const leadSvcMap = new Map((leadsWithSvc ?? []).map((l: any) => [l.id, l]));
+      const { data: allServices } = await admin
+        .from("services")
+        .select("id, service_name");
+
+      const svcNameToId = new Map<string, string>();
+      for (const s of allServices ?? []) {
+        if (s.service_name) {
+          svcNameToId.set(s.service_name.trim().toLowerCase(), s.id);
+        }
+      }
+
+      for (const app of nullSvcApps) {
+        const lead = leadSvcMap.get(app.lead_id);
+        if (!lead) continue;
+        let resolvedServiceId = lead.service_id;
+        if (!resolvedServiceId && lead.service) {
+          resolvedServiceId = svcNameToId.get(lead.service.trim().toLowerCase()) ?? null;
+        }
+        if (resolvedServiceId) {
+          await admin
+            .from("applications")
+            .update({ service_id: resolvedServiceId })
+            .eq("id", app.id);
+          if (!lead.service_id) {
+            await admin
+              .from("leads")
+              .update({ service_id: resolvedServiceId })
+              .eq("id", lead.id);
+          }
+        }
+      }
+    }
   } catch (err) {
     console.error("[ensurePaidOrdersIntegrated] error:", err);
   }
@@ -221,15 +271,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
     const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
 
-    const [leadsRes, custsRes, svcsRes, paysRes, staffRes] = await Promise.all([
+    const [leadsRes, custsRes, paysRes, staffRes] = await Promise.all([
       leadIds.length
-        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service").in("id", leadIds)
+        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", leadIds)
         : Promise.resolve({ data: [] as any[] }),
       customerIds.length
         ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
-        : Promise.resolve({ data: [] as any[] }),
-      serviceIds.length
-        ? admin.from("services").select("id, service_name").in("id", serviceIds)
         : Promise.resolve({ data: [] as any[] }),
       ids.length
         ? admin.from("payments").select("application_id, status, amount, payment_date").in("application_id", ids)
@@ -240,8 +287,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ]);
 
     const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
+
+    // Gather all serviceIds from applications and linked leads
+    const allServiceIds = Array.from(
+      new Set([
+        ...serviceIds,
+        ...(leadsRes.data ?? []).map((l: any) => l.service_id),
+      ].filter(Boolean))
+    ) as string[];
+
+    const { data: svcsData } = allServiceIds.length
+      ? await admin.from("services").select("id, service_name").in("id", allServiceIds)
+      : { data: [] as any[] };
+
     const custMap = new Map((custsRes.data ?? []).map((c: any) => [c.id, c]));
-    const svcMap  = new Map((svcsRes.data  ?? []).map((s: any) => [s.id, s]));
+    const svcMap  = new Map((svcsData ?? []).map((s: any) => [s.id, s]));
     const staffMap = new Map((staffRes.data ?? []).map((s: any) => [s.id, s]));
     const payByApp = new Map<string, Array<{ status: string; amount: number }>>();
     const paidAtByApp = new Map<string, string>();
@@ -259,7 +319,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     let rows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
-      const svc = a.service_id ? svcMap.get(a.service_id) : null;
+      const effectiveSvcId = a.service_id || lead?.service_id || null;
+      const svc = effectiveSvcId ? svcMap.get(effectiveSvcId) : null;
       const staff = a.assigned_to ? staffMap.get(a.assigned_to) : null;
       const payments = payByApp.get(a.id) ?? [];
       const paidSum = payments
@@ -278,8 +339,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         customer_name: lead?.name ?? cust?.name ?? "—",
         customer_mobile: lead?.mobile ?? cust?.primary_mobile ?? null,
         customer_email: lead?.email ?? cust?.primary_email ?? null,
-        service_id: a.service_id,
-        service_name: svc?.service_name ?? null,
+        service_id: effectiveSvcId,
+        service_name: svc?.service_name ?? lead?.service ?? null,
         total_amount: total,
         payment_status: rollupPaymentStatus(payments, total),
         assigned_to: a.assigned_to,

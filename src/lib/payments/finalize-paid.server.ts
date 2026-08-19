@@ -50,15 +50,29 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     } else {
       const { data: lead } = await supabaseAdmin
         .from("leads")
-        .select("id, service_id, customer_id, assigned_to, website_id")
+        .select("id, service_id, service, customer_id, assigned_to, website_id")
         .eq("id", payment.lead_id)
         .maybeSingle();
+
+      let targetServiceId = lead?.service_id ?? null;
+      if (!targetServiceId && lead?.service) {
+        const { data: svc } = await supabaseAdmin
+          .from("services")
+          .select("id")
+          .ilike("service_name", lead.service.trim())
+          .maybeSingle();
+        if (svc?.id) {
+          targetServiceId = svc.id;
+          await supabaseAdmin.from("leads").update({ service_id: svc.id } as any).eq("id", payment.lead_id);
+        }
+      }
+
       const { data: createdApp, error: appErr } = await supabaseAdmin
         .from("applications")
         .insert({
           lead_id: payment.lead_id,
           customer_id: lead?.customer_id ?? null,
-          service_id: lead?.service_id ?? null,
+          service_id: targetServiceId,
           assigned_to: lead?.assigned_to ?? null,
           website_id: (lead as any)?.website_id ?? null,
           application_status: "payment_received" as any,
