@@ -25,7 +25,7 @@ function PaymentPage() {
   const getSummary = useServerFn(getApplicationSummary);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [order, setOrder] = useState<Awaited<ReturnType<typeof createPayUOrder>> | null>(null);
+  const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
