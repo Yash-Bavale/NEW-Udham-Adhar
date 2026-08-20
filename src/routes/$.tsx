@@ -8,6 +8,7 @@ import {
   type ArticleSection,
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
+import { WpPage } from "@/components/site/PageHero";
 import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
 import {
   SeoContentPage,
