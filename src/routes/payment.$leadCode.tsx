@@ -45,7 +45,7 @@ function PaymentPage() {
   async function pay() {
     setBusy(true);
     setError(null);
-    trackEvent("payment_initiated", { gateway: "payu", leadCode });
+    trackEvent("payment_initiated", { leadCode });
     try {
       const res = await createOrder({ data: { leadCode } });
       setOrder(res);
@@ -83,7 +83,7 @@ function PaymentPage() {
           )}
 
           <p className="text-sm text-muted-foreground">
-            You'll be redirected to PayU's secure gateway to complete payment by UPI, Card, Net Banking or Wallets.
+            You'll be redirected to a secure payment gateway to complete payment by UPI, Card, Net Banking or Wallets.
           </p>
 
           {!order && (
@@ -102,7 +102,7 @@ function PaymentPage() {
           {order && (
             <div className="text-center text-sm text-muted-foreground">
               <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-              Redirecting to PayU…
+              Redirecting to the secure gateway…
             </div>
           )}
 
