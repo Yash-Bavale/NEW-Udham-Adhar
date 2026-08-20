@@ -252,19 +252,26 @@ export async function callRefundApi(args: {
   refundAmount: number;
   refundRef: string;      // our idempotency reference
 }): Promise<CcavRefundResult> {
-  const { merchantId } = getCcavCreds();
   const result = await callDoWebTrans({
     command: "refundOrder",
     payload: {
-      merchant_id: merchantId,
       reference_no: args.refNo,
       refund_amount: args.refundAmount.toFixed(2),
       refund_ref_no: args.refundRef,
     },
   });
   const r = result.body;
+  if (r.error_code) {
+    return {
+      ok: false,
+      refundStatus: r.error_code,
+      refundRef: args.refundRef,
+      reason: r.error_desc || null,
+      raw: r,
+    };
+  }
   // CCAvenue refund_status: "0" = success, anything else = failure.
-  const refundStatus = r.refund_status || r.RefundStatus || r.status || "";
+  const refundStatus = r.refund_status || r.RefundStatus || "";
   const ok = refundStatus === "0" || refundStatus.toLowerCase() === "success";
   return {
     ok,
