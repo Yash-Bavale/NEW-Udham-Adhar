@@ -153,7 +153,7 @@ function OrdersListPage() {
   const allRows = (data?.rows ?? []) as any[];
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
-  const colCount = 7 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
+  const colCount = 5 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
 
   // Compute pending-age threshold in days from filter selection.
   const minDays: number | null = useMemo(() => {
@@ -389,12 +389,11 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Order #</th>
                 <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
-                <th className="text-left font-medium px-2 py-2.5">Action Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
+                <th className="text-left font-medium px-2 py-2.5">Action Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                <th className="text-left font-medium px-2 py-2.5">Final Status</th>
-                {isAdmin && <th className="text-left font-medium px-2 py-2.5">Assigned</th>}
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
+                {isAdmin && <th className="text-left font-medium px-2 py-2.5">Assigned</th>}
               </tr>
             </thead>
             <tbody>
@@ -449,7 +448,12 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
-  // Terminal / completed states -> Subtle Green
+  // Closed states -> Subtle Green "Order Closed"
+  if (fs === "order_closed" || fs === "cancelled" || stage === "closed") {
+    return { label: "Order Closed", tone: "green" };
+  }
+
+  // Terminal / completed states -> Subtle Green "Completed"
   const greenStatuses = new Set([
     "application_approved",
     "consultation_completed",
@@ -457,15 +461,17 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "completed",
   ]);
 
-  // Action taken / in-progress states -> Subtle Blue
+  if (greenStatuses.has(fs) || stage === "completed") {
+    return { label: "Completed", tone: "green" };
+  }
+
+  // Action taken / in-progress states -> Subtle Blue "Action Taken"
   const blueStatuses = new Set([
     "government_processing",
     "technical_delay",
     "customer_delay",
     "application_rejected",
     "certificate_rejected",
-    "order_closed",
-    "cancelled",
     "under_processing",
     "application_submitted",
     "verification_pending",
@@ -481,14 +487,9 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "submitted_to_govt",
     "under_processing",
     "certificate_ready",
-    "closed",
     "refunded",
     "refund_requested",
   ]);
-
-  if (greenStatuses.has(fs) || stage === "completed") {
-    return { label: "Completed", tone: "green" };
-  }
 
   if (blueStatuses.has(fs) || blueStages.has(stage)) {
     return { label: "Action Taken", tone: "blue" };
@@ -524,7 +525,10 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
         onOpen(order.id);
       }}
     >
+      {/* 1. Order # */}
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+
+      {/* 2. Created */}
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div className="flex items-center gap-1.5">
           <div>
@@ -541,33 +545,41 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
           )}
         </div>
       </td>
+
+      {/* 3. Customer */}
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{order.customer_mobile}</div>
         )}
       </td>
+
+      {/* 4. Service */}
+      <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
+
+      {/* 5. Action Status */}
       <td className="px-2 py-2.5 whitespace-nowrap">
         {actionStatus.tone === "red" && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
-            Action Required
+            {actionStatus.label}
           </span>
         )}
         {actionStatus.tone === "green" && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="size-1.5 rounded-full bg-emerald-500" />
-            Completed
+            {actionStatus.label}
           </span>
         )}
         {actionStatus.tone === "blue" && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
             <span className="size-1.5 rounded-full bg-sky-500" />
-            Action Taken
+            {actionStatus.label}
           </span>
         )}
       </td>
-      <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
+
+      {/* 6. Stage */}
       <td className="px-2 py-2.5 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
@@ -590,28 +602,16 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
           })()}
         </div>
       </td>
-      <td className="px-2 py-2.5 whitespace-nowrap">
-        {(() => {
-          const b = bucketOfRow(order);
-          const label = b === "closed" ? "Closed" : b === "completed" ? "Completed" : b === "exception" ? "Exception" : "Pending";
-          const tone =
-            b === "closed" ? "bg-rose-50 text-rose-700 border-rose-200"
-            : b === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-            : b === "exception" ? "bg-amber-50 text-amber-800 border-amber-200"
-            : "bg-slate-100 text-slate-700 border-slate-200";
-          return (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${tone}`}>
-              {label}
-            </span>
-          );
-        })()}
-      </td>
-      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
+
+      {/* 7. Amount */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
         </td>
       )}
+
+      {/* 8. Assigned */}
+      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
     </tr>
   );
 }
