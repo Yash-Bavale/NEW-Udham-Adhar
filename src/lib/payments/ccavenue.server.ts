@@ -218,14 +218,17 @@ export type CcavStatusResult = {
 };
 
 export async function callOrderStatusApi(orderNo: string): Promise<CcavStatusResult> {
-  const { merchantId } = getCcavCreds();
   const result = await callDoWebTrans({
     command: "orderStatusTracker",
-    payload: { reference_no: orderNo, order_no: orderNo, merchant_id: merchantId },
+    payload: { order_no: orderNo },
   });
 
   const r = result.body;
-  const orderStatus = r.order_status || r.Order_Status || r.status || "";
+  // Error replies look like { error_desc, error_code, status: 1 } — never treat
+  // the numeric envelope `status` as an order status.
+  const orderStatus = r.error_code
+    ? ""
+    : r.order_status || r.Order_Status || "";
   return {
     status: normalizeCcavStatus(orderStatus),
     orderNo: r.order_no || r.order_id || orderNo,
