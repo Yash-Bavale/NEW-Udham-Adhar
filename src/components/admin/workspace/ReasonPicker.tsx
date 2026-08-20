@@ -3,7 +3,7 @@
 import { useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listCloseReasons, STANDARD_CLOSE_REASONS, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
+import { listCloseReasons, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
