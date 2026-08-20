@@ -38,17 +38,44 @@ export const listReasons = createServerFn({ method: "GET" })
     return { rows: rows ?? [] };
   });
 
-const ReasonInput = z.object({
-  table: TableEnum,
-  id: z.string().uuid().optional(),
-  code: z.string().min(1).max(64).regex(/^[a-z0-9_]+$/, "lowercase letters / digits / underscore"),
-  label: z.string().min(1).max(160),
-  description: z.string().max(2000).optional().nullable(),
-  side: z.enum(["customer", "internal"]).optional(),
-  emailTemplateCode: z.string().max(160).optional().nullable(),
-  isActive: z.boolean().default(true),
-  sortOrder: z.number().int().min(0).max(9999).default(100),
-});
+const sanitizeCode = (codeStr: string) => {
+  return codeStr
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};
+
+const ReasonInput = z.preprocess(
+  (raw: unknown) => {
+    if (raw && typeof raw === "object" && raw !== null) {
+      const obj = { ...(raw as Record<string, unknown>) };
+      let codeVal = typeof obj.code === "string" ? obj.code : "";
+      if (!codeVal.trim() && typeof obj.label === "string") {
+        codeVal = obj.label;
+      }
+      obj.code = sanitizeCode(codeVal);
+      return obj;
+    }
+    return raw;
+  },
+  z.object({
+    table: TableEnum,
+    id: z.string().uuid().optional(),
+    code: z
+      .string()
+      .min(1, "Code is required")
+      .max(64, "Code must be 64 characters or fewer")
+      .regex(/^[a-z0-9_]+$/, "lowercase letters / digits / underscore"),
+    label: z.string().trim().min(1, "Label is required").max(160),
+    description: z.string().max(2000).optional().nullable(),
+    side: z.enum(["customer", "internal"]).optional(),
+    emailTemplateCode: z.string().max(160).optional().nullable(),
+    isActive: z.boolean().default(true),
+    sortOrder: z.number().int().min(0).max(9999).default(100),
+  })
+);
 
 export const upsertReason = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

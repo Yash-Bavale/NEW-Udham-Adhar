@@ -119,6 +119,35 @@ function ReasonTable({ table, side }: { table: Table; side?: "customer" | "inter
   );
 }
 
+function parseErrorMessage(e: unknown): string {
+  if (!(e instanceof Error)) return "Failed to save reason";
+  const msg = e.message;
+  if (msg.startsWith("[") || msg.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(msg);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const first = parsed[0];
+        if (first?.message) {
+          const field = Array.isArray(first.path) && first.path.length ? `${first.path.join(".")}: ` : "";
+          return `${field}${first.message}`;
+        }
+      } else if (parsed && typeof parsed === "object" && (parsed as any).message) {
+        return (parsed as any).message;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return msg;
+}
+
+function slugifyCode(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_");
+}
+
 function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: "customer" | "internal"; initial: any | null; onClose: () => void }) {
   const qc = useQueryClient();
   const fn = useServerFn(upsertReason);
@@ -127,14 +156,28 @@ function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: 
   const [description, setDescription] = useState(initial?.description ?? "");
   const [sortOrder, setSortOrder] = useState<number>(initial?.sort_order ?? 100);
   const [isActive, setIsActive] = useState<boolean>(initial?.is_active ?? true);
+  const [isCodeEdited, setIsCodeEdited] = useState(!!initial);
+
+  const handleLabelChange = (val: string) => {
+    setLabel(val);
+    if (!initial && !isCodeEdited) {
+      setCode(slugifyCode(val).replace(/^_+|_+$/g, ""));
+    }
+  };
+
+  const handleCodeChange = (val: string) => {
+    setIsCodeEdited(true);
+    setCode(slugifyCode(val));
+  };
 
   const mut = useMutation({
-    mutationFn: () =>
-      fn({
+    mutationFn: () => {
+      const sanitizedCode = slugifyCode(code || label).replace(/^_+|_+$/g, "");
+      return fn({
         data: {
           table,
           id: initial?.id,
-          code,
+          code: sanitizedCode,
           label,
           description: description || null,
           side,
@@ -142,14 +185,17 @@ function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: 
           sortOrder,
           isActive,
         },
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success("Saved");
+      toast.success("Reason saved successfully");
       qc.invalidateQueries({ queryKey: ["reason-library", table] });
       onClose();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e) => toast.error(parseErrorMessage(e)),
   });
+
+  const effectiveCode = slugifyCode(code || label).replace(/^_+|_+$/g, "");
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
@@ -159,11 +205,27 @@ function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: 
           <button onClick={onClose}><X className="size-4" /></button>
         </div>
         <div className="space-y-3 text-sm">
-          <Labeled label="Code (lowercase, no spaces)">
-            <input value={code} onChange={(e) => setCode(e.target.value)} disabled={!!initial} className="w-full rounded-md border bg-background px-2 py-1.5 disabled:opacity-60" />
-          </Labeled>
           <Labeled label="Label">
-            <input value={label} onChange={(e) => setLabel(e.target.value)} className="w-full rounded-md border bg-background px-2 py-1.5" />
+            <input
+              value={label}
+              onChange={(e) => handleLabelChange(e.target.value)}
+              placeholder="e.g. Invalid PAN Card Details"
+              className="w-full rounded-md border bg-background px-2 py-1.5"
+            />
+          </Labeled>
+          <Labeled label="Code (lowercase, digits, underscore only)">
+            <input
+              value={code}
+              onChange={(e) => handleCodeChange(e.target.value)}
+              disabled={!!initial}
+              placeholder="e.g. invalid_pan_card"
+              className="w-full rounded-md border bg-background px-2 py-1.5 disabled:opacity-60 font-mono text-xs"
+            />
+            {effectiveCode && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Code key: <code className="font-mono text-primary font-medium">{effectiveCode}</code>
+              </p>
+            )}
           </Labeled>
           <Labeled label="Description">
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full rounded-md border bg-background px-2 py-1.5" />
@@ -182,7 +244,11 @@ function ReasonDialog({ table, side, initial, onClose }: { table: Table; side?: 
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
-          <button onClick={() => mut.mutate()} disabled={mut.isPending || !code || !label} className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground inline-flex items-center gap-2 disabled:opacity-50">
+          <button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending || !label.trim() || !effectiveCode}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground inline-flex items-center gap-2 disabled:opacity-50"
+          >
             {mut.isPending && <Loader2 className="size-3 animate-spin" />} Save
           </button>
         </div>
