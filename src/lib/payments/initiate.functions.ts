@@ -1,7 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createPayUOrder } from "@/lib/payments/payu.functions";
-import { createCcavenueOrder } from "@/lib/payments/ccavenue.functions";
 
 /**
  * Gateway-agnostic payment initiator. Picks the right gateway impl by code
@@ -41,26 +39,16 @@ export const initiatePayment = createServerFn({ method: "POST" })
 
     switch (chosen) {
       case "payu": {
-        const order = await createPayUOrder({ data: { leadCode: data.leadCode } });
-        return {
-          actionUrl: order.actionUrl,
-          fields: order.fields,
-          paymentId: order.paymentId,
-          leadCode: order.leadCode,
-          totalAmount: order.totalAmount,
-          gateway: "payu",
-        };
+        const { buildPayUOrder } = await import("@/lib/payments/payu-order.server");
+        const order = await buildPayUOrder(data.leadCode);
+        return { ...order, gateway: "payu" };
       }
       case "ccavenue": {
-        const order = await createCcavenueOrder({ data: { leadCode: data.leadCode } });
-        return {
-          actionUrl: order.actionUrl,
-          fields: order.fields,
-          paymentId: order.paymentId,
-          leadCode: order.leadCode,
-          totalAmount: order.totalAmount,
-          gateway: "ccavenue",
-        };
+        const { buildCcavenueOrderForLead } = await import(
+          "@/lib/payments/ccavenue-order.server"
+        );
+        const order = await buildCcavenueOrderForLead(data.leadCode);
+        return { ...order, gateway: "ccavenue" };
       }
       case "razorpay":
       case "cashfree":
