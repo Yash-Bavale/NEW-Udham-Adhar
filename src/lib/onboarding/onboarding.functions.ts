@@ -220,7 +220,39 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       }
       if (missing.length) throw new Error("Please fill: " + missing.slice(0, 4).join(", ") + (missing.length > 4 ? "…" : ""));
 
-      // Pattern validation
+      // Sanitize inputs (e.g. lowercase emails)
+      for (const f of validationFields) {
+        const key = f.key;
+        if (typeof mergedData[key] === "string") {
+          const isEmail = f.type === "email" || key.toLowerCase().includes("email") || f.label.toLowerCase().includes("email");
+          if (isEmail) {
+            mergedData[key] = String(mergedData[key]).trim().toLowerCase();
+          }
+        }
+      }
+
+      // Check Plants requirement on server
+      const plantsField = validationFields.find((f) => f.type === "plants" || f.key === "plants" || (f.required && f.type === "plants"));
+      if (plantsField) {
+        const rawPlants = mergedData[plantsField.key || "plants"];
+        let plantArr: any[] = [];
+        if (typeof rawPlants === "string" && rawPlants.trim()) {
+          try { plantArr = JSON.parse(rawPlants); } catch {}
+        } else if (Array.isArray(rawPlants)) {
+          plantArr = rawPlants;
+        }
+        if (!Array.isArray(plantArr) || plantArr.length === 0) {
+          throw new Error("At least one Plant / Unit detail is required.");
+        }
+        for (let i = 0; i < plantArr.length; i++) {
+          const p = plantArr[i] || {};
+          if (!p.unit_name || !p.city || !p.state || !p.pincode) {
+            throw new Error(`Plant / Unit #${i + 1} is missing required address details.`);
+          }
+        }
+      }
+
+      // Pattern validation (case-insensitive flag "i")
       for (const f of validationFields) {
         if (!f.pattern) continue;
         const v = mergedData[f.key];
@@ -230,13 +262,13 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           ? f.pattern
           : `^(${f.pattern})$`;
         try {
-          if (!new RegExp(pat).test(valStr)) {
+          if (!new RegExp(pat, "i").test(valStr)) {
             throw new Error(`Invalid format for ${f.label}.`);
           }
         } catch (err) {
           if (err instanceof Error && err.message.startsWith("Invalid format")) throw err;
           try {
-            if (!new RegExp(f.pattern).test(valStr)) {
+            if (!new RegExp(f.pattern, "i").test(valStr)) {
               throw new Error(`Invalid format for ${f.label}.`);
             }
           } catch (e2) {

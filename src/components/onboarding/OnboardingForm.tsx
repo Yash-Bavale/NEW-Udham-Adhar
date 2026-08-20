@@ -58,14 +58,15 @@ function toTitleCase(input: string): string {
 
 export function validatePattern(pattern: string, val: string): boolean {
   if (!pattern || !val) return true;
+  const trimmed = val.trim();
   try {
     const anchored = pattern.startsWith("^") && pattern.endsWith("$")
       ? pattern
       : `^(${pattern})$`;
-    return new RegExp(anchored).test(val);
+    return new RegExp(anchored, "i").test(trimmed);
   } catch {
     try {
-      return new RegExp(pattern).test(val);
+      return new RegExp(pattern, "i").test(trimmed);
     } catch {
       return true;
     }
@@ -199,6 +200,34 @@ export function OnboardingForm({
       }
     }
 
+    // 1b. Validate compulsory Plants/Units details
+    const plantsField = schema.fields.find((f) => f.type === "plants" || f.key === "plants");
+    if (plantsField) {
+      const parsedPlants = parsePlants(values[plantsField.key] ?? "");
+      if (parsedPlants.length === 0) {
+        setErr("At least one Plant / Unit detail is required. Please fill in address details for Plant / Unit #1.");
+        setSubmitSuccess(false);
+        return;
+      }
+      for (let i = 0; i < parsedPlants.length; i++) {
+        const p = parsedPlants[i];
+        if (
+          !p.unit_name?.trim() ||
+          !p.address_flat?.trim() ||
+          !p.address_village?.trim() ||
+          !p.address_road?.trim() ||
+          !p.city?.trim() ||
+          !p.pincode?.trim() ||
+          !p.state?.trim() ||
+          !p.district?.trim()
+        ) {
+          setErr(`Please complete all required address details for Plant / Unit #${i + 1} (Unit Name, Flat No, Village, Road, City, Pincode, State, District).`);
+          setSubmitSuccess(false);
+          return;
+        }
+      }
+    }
+
     // 2. Validate that no date field contains today's date or a future date
     const { isTodayOrFutureIso } = await import("@/components/ui/DateInputDMY");
     for (const f of schema.fields) {
@@ -215,7 +244,12 @@ export function OnboardingForm({
     for (const f of schema.fields) {
       if (f.type === "note" || f.type === "section") continue;
       if (f.pattern && values[f.key] && String(values[f.key]).trim() !== "") {
-        const val = String(values[f.key]).trim();
+        let val = String(values[f.key]).trim();
+        const isEmail = f.type === "email" || f.key.toLowerCase().includes("email") || f.label.toLowerCase().includes("email");
+        if (isEmail) {
+          val = val.toLowerCase();
+          values[f.key] = val;
+        }
         if (!validatePattern(f.pattern, val)) {
           const hint = f.help ? ` (${f.help})` : f.placeholder ? ` (e.g. ${f.placeholder})` : "";
           setErr(`Invalid format for ${f.label}${hint}.`);
@@ -554,7 +588,8 @@ function parsePlants(value: string): Plant[] {
 }
 
 function PlantsField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const plants = parsePlants(value);
+  const parsed = parsePlants(value);
+  const plants = parsed.length > 0 ? parsed : [emptyPlant()];
 
   const commit = (next: Plant[]) => {
     onChange(next.length ? JSON.stringify(next) : "");
@@ -573,39 +608,39 @@ function PlantsField({ value, onChange }: { value: string; onChange: (v: string)
 
   return (
     <div className="space-y-4">
-      {plants.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          Add one row for each plant / unit / branch. Skip if you have only the main enterprise address above.
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground font-medium">
+        At least 1 Plant / Unit / Branch address details entry is compulsory.
+      </p>
       {plants.map((p, i) => {
         const districtOpts = INDIA_DISTRICTS[p.state] ?? [];
         return (
           <div key={i} className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-brand-navy-deep">Plant / Unit #{i + 1}</h4>
-              <button
-                type="button"
-                onClick={() => commit(plants.filter((_, j) => j !== i))}
-                className="text-xs inline-flex items-center gap-1 text-destructive hover:underline"
-              >
-                <Trash2 className="w-3 h-3" /> Remove
-              </button>
+              <h4 className="text-sm font-semibold text-brand-navy-deep">
+                Plant / Unit #{i + 1} <span className="text-destructive">*</span>
+              </h4>
+              {plants.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => commit(plants.filter((_, j) => j !== i))}
+                  className="text-xs inline-flex items-center gap-1 text-destructive hover:underline"
+                >
+                  <Trash2 className="w-3 h-3" /> Remove
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <PlantInput label="Unit / Plant Name" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)} />
-
-
-              <PlantInput label="Flat / Door / Block No." value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
+              <PlantInput label="Unit / Plant Name *" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)} />
+              <PlantInput label="Flat / Door / Block No. *" value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
               <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} />
-              <PlantInput label="Village / Town" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
+              <PlantInput label="Village / Town *" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
               <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} />
-              <PlantInput label="Road / Street / Lane" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} />
-              <PlantInput label="City" value={p.city} onChange={(v) => setField(i, "city", v)} />
-              <PlantInput label="PIN Code" value={p.pincode} onChange={(v) => setField(i, "pincode", v)} inputMode="numeric" maxLength={6} />
-              <PlantSelect label="State" value={p.state} onChange={(v) => setField(i, "state", v)}
+              <PlantInput label="Road / Street / Lane *" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} />
+              <PlantInput label="City *" value={p.city} onChange={(v) => setField(i, "city", v)} />
+              <PlantInput label="PIN Code *" value={p.pincode} onChange={(v) => setField(i, "pincode", v)} inputMode="numeric" maxLength={6} />
+              <PlantSelect label="State *" value={p.state} onChange={(v) => setField(i, "state", v)}
                 options={INDIA_STATES as unknown as string[]} placeholder="Select state…" />
-              <PlantSelect label="District" value={p.district} onChange={(v) => setField(i, "district", v)}
+              <PlantSelect label="District *" value={p.district} onChange={(v) => setField(i, "district", v)}
                 options={districtOpts} placeholder={p.state ? "Select district…" : "Select state first"} disabled={!p.state} />
             </div>
           </div>

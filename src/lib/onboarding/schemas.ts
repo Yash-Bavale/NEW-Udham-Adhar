@@ -174,7 +174,7 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "state", label: "State", type: "select", required: true, options: INDIA_STATES },
     { key: "district", label: "District", type: "select", required: true },
     { key: "section_plants", label: "15. Location of Plant(s) / Unit(s) and Details", type: "section" },
-    { key: "plants", label: "Add one row for each plant / unit / branch", type: "plants" },
+    { key: "plants", label: "Location of Plant(s) / Unit(s) and Details", type: "plants", required: true },
     { key: "previous_registration", label: "16. Previous EM-II / UAM Registration Number, if any", type: "select", required: true, options: REGISTRATION_HISTORY },
     { key: "section_status", label: "17. Status of Enterprise", type: "section" },
     { key: "incorporation_date", label: "a. Date of Incorporation / Registration", type: "date", required: true, placeholder: "DD/MM/YYYY" },
