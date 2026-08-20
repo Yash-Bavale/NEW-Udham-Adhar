@@ -153,7 +153,9 @@ async function callDoWebTrans({ command, payload }: DoWebTransOptions): Promise<
   raw: string;
 }> {
   const { accessCode, workingKey } = getCcavCreds();
-  const enc = encryptRequest(buildCcavPayload(payload), workingKey);
+  // DoWebTrans runs in request_type=JSON mode: the encrypted payload must be a
+  // JSON object, not the pipe/form style used by the checkout request.
+  const enc = encryptRequest(JSON.stringify(payload), workingKey);
   const body = new URLSearchParams({
     enc_request: enc,
     access_code: accessCode,
