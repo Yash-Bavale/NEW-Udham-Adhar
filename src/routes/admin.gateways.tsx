@@ -9,6 +9,9 @@ export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPag
 function GatewaysPage() {
   const listFn = useServerFn(listGateways);
   const updFn = useServerFn(updateGateway);
+  const ccavCheckFn = useServerFn(checkCcavenueCredentials);
+  const [ccavChecking, setCcavChecking] = useState(false);
+  const [ccavResult, setCcavResult] = useState<{ ok: boolean; message: string } | null>(null);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin.gateways"], queryFn: () => listFn() });
   const [busy, setBusy] = useState<string | null>(null);
