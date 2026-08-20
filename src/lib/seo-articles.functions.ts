@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { notFound } from "@tanstack/react-router";
+
 
 // Public server fn — read an enabled article-type SEO page by slug.
 export const getArticleBySlug = createServerFn({ method: "GET" })
@@ -44,7 +44,11 @@ export const getArticleBySlug = createServerFn({ method: "GET" })
       row = fallbackRow;
     }
 
-    if (!row) throw notFound();
+    // A missing row is a normal "no such page" answer, not an error. Returning
+    // null lets the caller tell it apart from a database outage (which throws)
+    // so a temporary backend problem never turns a real page into a 404.
+    if (!row) return { article: null as any, related: [] as { slug: string; label: string }[] };
+
 
     // Fetch related labels.
     const relatedSlugs = Array.isArray((row as any).related_slugs)

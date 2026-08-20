@@ -8,6 +8,7 @@ import {
   type ArticleSection,
 } from "@/components/site/ArticlePageLayout";
 import { BASE_URL } from "@/lib/brand";
+import { WpPage } from "@/components/site/PageHero";
 import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
 import {
   SeoContentPage,
@@ -26,6 +27,31 @@ const setGoneStatus = createIsomorphicFn()
       setResponseStatus(410),
     );
   });
+
+// A CMS/database outage must NOT look like a missing page: Google (and Google
+// Ads) treat a 404 as "destination not accessible" and disapprove ads, while a
+// 503 just tells them to come back later.
+const setUnavailableStatus = createIsomorphicFn()
+  .client(() => {})
+  .server(() => {
+    void import("@tanstack/react-start/server").then(({ setResponseStatus }) =>
+      setResponseStatus(503),
+    );
+  });
+
+// Ported legacy page content bundled with the app. Used as a last-resort
+// fallback so a page that exists in content stays reachable even when the CMS
+// or database is briefly unavailable.
+const WP_HTML = import.meta.glob("../content/wp/*.html", {
+  query: "?raw",
+  import: "default",
+}) as Record<string, () => Promise<string>>;
+
+function titleize(slug: string) {
+  return slug
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
 
 
 
@@ -124,17 +150,36 @@ export const Route = createFileRoute("/$")({
 
     // Contentful is the source of truth for SEO pages — check it first so a
     // newly published (or edited) entry goes live with no code change.
+    let cmsDown = false;
     const cf = await getContentfulSeoArticle({ data: { slug: lower } }).catch(
-      () => null,
+      () => {
+        cmsDown = true;
+        return null;
+      },
     );
     if (cf) return { cfArticle: cf };
 
-    try {
-      return await getArticleBySlug({ data: { slug: lower } });
-    } catch {
-      throw notFound();
+    let dbDown = false;
+    const db = await getArticleBySlug({ data: { slug: lower } }).catch(() => {
+      dbDown = true;
+      return null;
+    });
+    if (db?.article) return db;
+
+    // Last resort: the ported page content shipped with the app.
+    const loadHtml = WP_HTML[`../content/wp/${lower}.html`];
+    if (loadHtml) {
+      const wpHtml = await loadHtml();
+      return { wpHtml, slug: lower };
     }
 
+    // Nothing served it AND a backend was unreachable → temporary, not missing.
+    if (cmsDown || dbDown) {
+      setUnavailableStatus();
+      return { unavailable: true as const };
+    }
+
+    throw notFound();
   },
   head: ({ loaderData }) => {
     const cf = (loaderData as any)?.cfArticle;
@@ -156,12 +201,33 @@ export const Route = createFileRoute("/$")({
         ],
       };
     }
+    const wpSlug = (loaderData as any)?.wpHtml ? (loaderData as any).slug : null;
+    if (wpSlug) {
+      const t = `${titleize(wpSlug)} | Udyam Aadhar`;
+      return {
+        meta: [
+          { title: t },
+          { property: "og:title", content: t },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: `${BASE_URL}/${wpSlug}` },
+        ],
+        links: [{ rel: "canonical", href: `${BASE_URL}/${wpSlug}` }],
+      };
+    }
     const a = (loaderData as any)?.article;
     if (!a) {
       if ((loaderData as any)?.gone) {
         return {
           meta: [
             { title: "Gone — Udyam Adhar" },
+            { name: "robots", content: "noindex" },
+          ],
+        };
+      }
+      if ((loaderData as any)?.unavailable) {
+        return {
+          meta: [
+            { title: "Temporarily unavailable — Udyam Aadhar" },
             { name: "robots", content: "noindex" },
           ],
         };
@@ -241,6 +307,22 @@ function ArticleRoute() {
         </a>
       </div>
     );
+  }
+  if (data?.unavailable) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">Temporarily unavailable</h1>
+        <p className="mt-4 text-muted-foreground">
+          We couldn't load this page right now. Please try again in a moment.
+        </p>
+        <a href="/" className="mt-6 inline-block text-primary underline">
+          Return to homepage
+        </a>
+      </div>
+    );
+  }
+  if (data?.wpHtml) {
+    return <WpPage title={titleize(data.slug)} html={data.wpHtml} />;
   }
   if (data?.cfArticle) {
     return <SeoContentPage data={cfToSeoPageData(data.cfArticle)} />;

@@ -143,7 +143,9 @@ async function ensurePaidOrdersIntegrated(admin: any) {
         .select("id, service_id, service")
         .in("id", leadIds);
 
-      const leadSvcMap = new Map((leadsWithSvc ?? []).map((l: any) => [l.id, l]));
+      const leadSvcMap = new Map<string, any>(
+        (leadsWithSvc ?? []).map((l: any) => [l.id as string, l]),
+      );
       const { data: allServices } = await admin
         .from("services")
         .select("id, service_name");
