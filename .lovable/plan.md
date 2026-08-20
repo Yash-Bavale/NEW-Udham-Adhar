@@ -57,3 +57,7 @@ There are two robots.txt sources: a dynamic route and a static `public/robots.tx
 ## After this ships
 
 Re-submit the disapproved ads for review. If a specific ad final URL is not in the table above, tell me the exact URL and I'll verify it too.
+
+## Pre-step: fix the current build error
+
+`src/lib/crm/orders-v2.functions.ts` fails to typecheck — the lead lookup map is inferred as an empty type, so `lead.service_id` / `lead.service` / `lead.id` error. One-line fix: type the map explicitly (`new Map<string, any>(...)`). This must go in before anything else, since the site can't build otherwise.
