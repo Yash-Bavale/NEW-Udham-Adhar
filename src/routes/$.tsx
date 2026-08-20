@@ -200,12 +200,33 @@ export const Route = createFileRoute("/$")({
         ],
       };
     }
+    const wpSlug = (loaderData as any)?.wpHtml ? (loaderData as any).slug : null;
+    if (wpSlug) {
+      const t = `${titleize(wpSlug)} | Udyam Aadhar`;
+      return {
+        meta: [
+          { title: t },
+          { property: "og:title", content: t },
+          { property: "og:type", content: "article" },
+          { property: "og:url", content: `${BASE_URL}/${wpSlug}` },
+        ],
+        links: [{ rel: "canonical", href: `${BASE_URL}/${wpSlug}` }],
+      };
+    }
     const a = (loaderData as any)?.article;
     if (!a) {
       if ((loaderData as any)?.gone) {
         return {
           meta: [
             { title: "Gone — Udyam Adhar" },
+            { name: "robots", content: "noindex" },
+          ],
+        };
+      }
+      if ((loaderData as any)?.unavailable) {
+        return {
+          meta: [
+            { title: "Temporarily unavailable — Udyam Aadhar" },
             { name: "robots", content: "noindex" },
           ],
         };
