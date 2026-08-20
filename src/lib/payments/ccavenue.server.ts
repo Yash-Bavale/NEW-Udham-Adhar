@@ -174,11 +174,35 @@ async function callDoWebTrans({ command, payload }: DoWebTransOptions): Promise<
   const text = await res.text();
   // CCAvenue replies as `status=N&enc_response=...` (URL-encoded).
   const outer = parseCcavPayload(text);
-  const encResponse = outer.enc_response || outer.encResponse || "";
+  const encResponse = (outer.enc_response || outer.encResponse || "").trim();
   if (!encResponse) {
     return { ok: false, status: res.status, body: outer, raw: text };
   }
-  const decrypted = decryptResponse(encResponse, workingKey);
+  // On gate errors (e.g. 51407 access blocked / IP not whitelisted) CCAvenue
+  // returns a plaintext message in enc_response instead of hex ciphertext.
+  if (!/^[0-9a-fA-F]+$/.test(encResponse) || encResponse.length % 32 !== 0) {
+    return {
+      ok: false,
+      status: res.status,
+      body: {
+        error_code: outer.enc_error_code || "api_error",
+        error_desc: encResponse,
+      },
+      raw: text,
+    };
+  }
+  let decrypted: string;
+  try {
+    decrypted = decryptResponse(encResponse, workingKey);
+  } catch {
+    return {
+      ok: false,
+      status: res.status,
+      body: { error_code: "decrypt_failed", error_desc: "Could not decrypt the CCAvenue response (working key mismatch)." },
+      raw: text,
+    };
+  }
+
   // The inner payload is typically JSON for DoWebTrans, but older accounts
   // still return key=value form. Try JSON first, fall back to form parse.
   let inner: Record<string, string> = {};
