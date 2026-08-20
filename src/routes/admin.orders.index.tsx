@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
-
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
@@ -24,10 +23,6 @@ export const Route = createFileRoute("/admin/orders/")({
 
 type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
 
-// Bucket mapping uses fulfillment_status (S01–S12) directly, per user spec:
-//   Pending   = S01, S02, S03, S04, S05, S06, S07, S09
-//   Completed = S08 (consultation_completed) + S11 (order_completed)
-//   Closed    = S10 (application_rejected) + S12 (order_closed)
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
 ]);
@@ -60,7 +55,6 @@ const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "exception",    label: "Exception" },
 ];
 
-
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
 const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
   { id: "any",    label: "Any age" },
@@ -78,15 +72,6 @@ function daysSince(iso: string | null | undefined): number {
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
-const PAYMENT_TONE: Record<string, string> = {
-  Paid:             "bg-slate-100 text-slate-700",
-  "Partially Paid": "bg-amber-50 text-amber-700",
-  Refunded:         "bg-rose-50 text-rose-700",
-  Pending:          "bg-slate-100 text-slate-600",
-  Failed:           "bg-rose-50 text-rose-700",
-};
-
-
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
   const staffFn = useServerFn(listStaff);
@@ -94,7 +79,6 @@ function OrdersListPage() {
   const role = useRole();
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
-
 
   const [search, setSearch] = useState("");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>("all");
@@ -153,7 +137,9 @@ function OrdersListPage() {
   const allRows = (data?.rows ?? []) as any[];
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
-  const colCount = 5 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
+  // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
+  // Plus Amount (1) and Assigned (1) = 8 total columns
+  const colCount = 6 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
 
   // Compute pending-age threshold in days from filter selection.
   const minDays: number | null = useMemo(() => {
@@ -165,11 +151,10 @@ function OrdersListPage() {
     return parseInt(pendingAge, 10);
   }, [pendingAge, customDays]);
 
-  // Age filter applies to pending rows only (rows that are not completed/exception).
   const ageFiltered = useMemo(() => {
     if (minDays == null) return allRows;
     return allRows.filter((r) => {
-      if (!isPendingRow(r)) return true; // don't hide completed/exception here
+      if (!isPendingRow(r)) return true;
       return daysSince(r.created_at) >= minDays;
     });
   }, [allRows, minDays]);
@@ -177,11 +162,9 @@ function OrdersListPage() {
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0 };
     for (const r of ageFiltered) c[bucketOfRow(r)]++;
-
     return c;
   }, [ageFiltered]);
 
-  // Ageing histogram — shown when Pending bucket is active.
   const ageBuckets = useMemo(() => {
     const b = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
     for (const r of ageFiltered) {
@@ -210,7 +193,6 @@ function OrdersListPage() {
 
   const total = data?.total ?? 0;
 
-  // Group by day
   const groups = useMemo(() => {
     const g = new Map<string, any[]>();
     for (const r of rows) {
@@ -223,103 +205,167 @@ function OrdersListPage() {
     return Array.from(g.entries());
   }, [rows]);
 
+  const isFilterActive =
+    search !== "" ||
+    fulfillmentStatus !== "all" ||
+    serviceId !== "all" ||
+    assignedTo !== "all" ||
+    paymentStatus !== "all" ||
+    actionStatusFilter !== "all" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    pendingAge !== "any" ||
+    bucket !== "all";
+
+  const resetFilters = () => {
+    setSearch("");
+    setFulfillmentStatus("all");
+    setServiceId("all");
+    setAssignedTo("all");
+    setPaymentStatus("all");
+    setActionStatusFilter("all");
+    setDateFrom("");
+    setDateTo("");
+    setPendingAge("any");
+    setCustomDays("");
+    setBucket("all");
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Orders</h1>
-        <p className="text-xs text-slate-500 mt-1">
-          {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
-        </p>
+    <div className="w-full space-y-4">
+      {/* Header & Reset Button */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
+          </p>
+        </div>
+        {isFilterActive && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+          >
+            <RotateCcw className="size-3.5" /> Reset Filters
+          </button>
+        )}
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[260px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-          <Input
-            placeholder="Search order #, customer, mobile, lead code…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm bg-white"
-          />
-        </div>
-        <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-          <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="Action status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All action status</SelectItem>
-            <SelectItem value="action_required">Action Required (Red)</SelectItem>
-            <SelectItem value="processed">Completed / Action Taken</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={serviceId} onValueChange={setServiceId}>
-          <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All services" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All services</SelectItem>
-            {(svcData?.rows ?? []).map((s: any) => (
-              <SelectItem key={s.id} value={s.id}>{s.service_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {role.hasAny(["admin", "super_admin"]) && (
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All assignees" /></SelectTrigger>
+      {/* Modern Filter Card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
+        <div className="flex flex-wrap gap-2.5 items-center">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+            <Input
+              placeholder="Search order #, customer, mobile, lead code…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Action Status Filter */}
+          <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All assignees</SelectItem>
-              {(staffData?.profiles ?? []).map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>{s.display_name || s.email}</SelectItem>
+              <SelectItem value="all">All Action Status</SelectItem>
+              <SelectItem value="action_required">Action Required (Red)</SelectItem>
+              <SelectItem value="processed">Completed / Action Taken</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Services Filter */}
+          <Select value={serviceId} onValueChange={setServiceId}>
+            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All services" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All services</SelectItem>
+              {(svcData?.rows ?? []).map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>{s.service_name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="h-9 w-[140px] text-sm bg-white"><SelectValue placeholder="All payment" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All payment</SelectItem>
-            <SelectItem value="Paid">Paid</SelectItem>
-            <SelectItem value="Partially Paid">Partially paid</SelectItem>
-            <SelectItem value="Refunded">Refunded</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="h-9 w-[160px] text-sm bg-white"
-        />
-        <Input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="h-9 w-[160px] text-sm bg-white"
-        />
-        <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-          <SelectTrigger className="h-9 w-[170px] text-sm bg-white">
-            <SelectValue placeholder="Pending age" />
-          </SelectTrigger>
-          <SelectContent>
-            {PENDING_AGE_OPTIONS.map((o) => (
-              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {pendingAge === "custom" && (
-          <Input
-            type="number"
-            min={1}
-            value={customDays}
-            onChange={(e) => setCustomDays(e.target.value)}
-            placeholder="Days"
-            className="h-9 w-[90px] text-sm bg-white"
-          />
-        )}
+
+          {/* Assignees Filter (Admin only) */}
+          {role.hasAny(["admin", "super_admin"]) && (
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All assignees</SelectItem>
+                {(staffData?.profiles ?? []).map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>{s.display_name || s.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Payment Status Filter */}
+          <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+            <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All payment" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All payment</SelectItem>
+              <SelectItem value="Paid">Paid</SelectItem>
+              <SelectItem value="Partially Paid">Partially paid</SelectItem>
+              <SelectItem value="Refunded">Refunded</SelectItem>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Date range */}
+          <div className="flex items-center gap-1">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"
+            />
+            <span className="text-slate-300 text-xs">–</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"
+            />
+          </div>
+
+          {/* Pending Age */}
+          <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+            <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Pending age" />
+            </SelectTrigger>
+            <SelectContent>
+              {PENDING_AGE_OPTIONS.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {pendingAge === "custom" && (
+            <Input
+              type="number"
+              min={1}
+              value={customDays}
+              onChange={(e) => setCustomDays(e.target.value)}
+              placeholder="Days"
+              className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
+            />
+          )}
+        </div>
       </div>
 
-      {/* Pending ageing summary — shown when Pending bucket active or an age filter is applied */}
+      {/* Pending ageing summary */}
       {(bucket === "pending" || minDays != null) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-[11px] text-amber-900">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
           <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
           <AgeChip label="< 1d" n={ageBuckets.d1} />
           <AgeChip label="1d+"  n={ageBuckets.d2} />
@@ -338,14 +384,14 @@ function OrdersListPage() {
               key={b.id}
               type="button"
               onClick={() => setBucket(b.id)}
-              className={`inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-medium transition-colors border ${
+              className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${
                 active
                   ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
               }`}
             >
               <span>{b.label}</span>
-              <span className={`text-[10px] font-semibold ${active ? "text-slate-300" : "text-slate-500"}`}>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
                 {counts[b.id]}
               </span>
             </button>
@@ -353,9 +399,9 @@ function OrdersListPage() {
         })}
       </div>
 
-      {/* Pagination — top */}
+      {/* Pagination bar */}
       {total > pageSize && (
-        <div className="flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 bg-white text-xs text-slate-600">
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs">
           <div>
             Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
           </div>
@@ -364,7 +410,7 @@ function OrdersListPage() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1 || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="size-3.5" /> Prev
             </button>
@@ -372,7 +418,7 @@ function OrdersListPage() {
               type="button"
               onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
               disabled={page * pageSize >= total || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Next <ChevronRight className="size-3.5" />
             </button>
@@ -380,42 +426,157 @@ function OrdersListPage() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-lg border border-slate-200 bg-white">
+      {/* Desktop Table View */}
+      <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
         <ScrollableTable>
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[950px]">
             <thead>
-              <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50">
-                <th className="text-left font-medium px-2 py-2.5">Order #</th>
-                <th className="text-left font-medium px-2 py-2.5">Created</th>
-                <th className="text-left font-medium px-2 py-2.5">Customer</th>
-                <th className="text-left font-medium px-2 py-2.5">Service</th>
-                <th className="text-left font-medium px-2 py-2.5">Action Status</th>
-                <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
-                {isAdmin && <th className="text-left font-medium px-2 py-2.5">Assigned</th>}
+              <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
+                <th className="text-left font-semibold px-3 py-2.5">Order #</th>
+                <th className="text-left font-semibold px-3 py-2.5">Created</th>
+                <th className="text-left font-semibold px-3 py-2.5">Customer</th>
+                <th className="text-left font-semibold px-3 py-2.5">Service</th>
+                <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
+                <th className="text-left font-semibold px-3 py-2.5">Stage</th>
+                {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
+                {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-slate-500">Loading orders…</td></tr>
+                <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-slate-500">No orders in this view.</td></tr>
+                <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
               )}
               {!isLoading && groups.map(([day, items]) => (
-                <>
-                  <tr key={`h-${day}`} className="bg-slate-900 text-white">
-                    <td colSpan={colCount} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                <Fragment key={`g-${day}`}>
+                  <tr className="bg-slate-900 text-white border-b border-slate-800">
+                    <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
                       {formatDayHeader(day)}
                     </td>
                   </tr>
-                  {items.map((r) => <OrderRow key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />)}
-                </>
+                  {items.map((r) => (
+                    <OrderRow key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
         </ScrollableTable>
+      </div>
+
+      {/* Mobile Touch-Friendly Card View */}
+      <div className="block md:hidden space-y-4">
+        {isLoading && (
+          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+            Loading orders…
+          </div>
+        )}
+        {!isLoading && rows.length === 0 && (
+          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+            No orders match the selected filters.
+          </div>
+        )}
+        {!isLoading && groups.map(([day, items]) => (
+          <div key={`m-g-${day}`} className="space-y-2">
+            <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+              {formatDayHeader(day)}
+            </div>
+            <div className="space-y-2.5">
+              {items.map((r) => (
+                <OrderCardMobile key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrderCardMobile({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney: boolean; isAdmin: boolean; onOpen: (id: string) => void }) {
+  const stage: OrderStage = order.stage;
+  const meta = STAGE_META[stage];
+  const actionStatus = getOrderActionStatus(order);
+
+  const stageToneMap: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    amber:   "bg-amber-50 text-amber-700 border-amber-200",
+    rose:    "bg-rose-50 text-rose-700 border-rose-200",
+    slate:   "bg-slate-100 text-slate-700 border-slate-200",
+    blue:    "bg-sky-50 text-sky-700 border-sky-200",
+    indigo:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+    violet:  "bg-violet-50 text-violet-700 border-violet-200",
+  };
+  const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+  return (
+    <div
+      onClick={() => onOpen(order.id)}
+      className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all space-y-2.5 active:bg-slate-50 cursor-pointer"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-semibold text-slate-800">{order.application_code}</span>
+          {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+            </span>
+          )}
+        </div>
+        {!hideMoney && (
+          <span className="font-semibold text-slate-900 text-sm">
+            {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-100 pb-2">
+        <div>
+          <span className="font-medium text-slate-900">{order.customer_name ?? "—"}</span>
+          {order.customer_mobile && <span className="ml-1.5 text-slate-500">({order.customer_mobile})</span>}
+        </div>
+        <div className="text-[11px] text-slate-400">
+          {formatIST(order.created_at, { dateOnly: true })} {formatIST(order.created_at, { timeOnly: true })}
+        </div>
+      </div>
+
+      <div className="text-xs text-slate-700 font-medium">
+        {order.service_name ?? "—"}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {actionStatus.tone === "red" && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
+              {actionStatus.label}
+            </span>
+          )}
+          {actionStatus.tone === "green" && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              {actionStatus.label}
+            </span>
+          )}
+          {actionStatus.tone === "blue" && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+              <span className="size-1.5 rounded-full bg-sky-500" />
+              {actionStatus.label}
+            </span>
+          )}
+
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${stageTone}`}>
+            {meta?.label ?? stage}
+          </span>
+        </div>
+
+        {isAdmin && (
+          <span className="text-[11px] text-slate-500 font-medium">
+            {order.assigned_name ? `Assigned: ${order.assigned_name}` : "Unassigned"}
+          </span>
+        )}
       </div>
     </div>
   );
