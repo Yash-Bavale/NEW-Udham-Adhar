@@ -222,8 +222,16 @@ export const checkCcavenueCredentials = createServerFn({ method: "POST" })
         };
       }
       if (errText.includes("access code") || errText.includes("merchant") || errText.includes("authentication")) {
-        return { ok: false, message: `CCAvenue rejected the credentials: ${errText}` };
+        return {
+          ok: false,
+          message:
+            `CCAvenue blocked the Status/Refund API (${errText}). Checkout is unaffected — this only means CCAvenue has not enabled the Merchant Web API for this account, or this server's outbound IP is not whitelisted.`,
+        };
       }
+      if (errText.includes("decrypt")) {
+        return { ok: false, message: "Could not decrypt the CCAvenue response — the working key looks wrong." };
+      }
+
       return {
         ok: true,
         message:
