@@ -75,7 +75,8 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
 
         // For "attempted" (Awaited / Initiated) or amount mismatch, reconcile
         // via Status API to get the authoritative state.
-        const amountMismatch = amount && Number(amount) !== Number(payment.amount);
+        const amountMismatch = Boolean(amount) && Number(amount) !== Number(payment.amount);
+        let reconciliationFailed = false;
         if (amountMismatch || normalized === "attempted" || normalized === "created") {
           try {
             const reconciled = await callOrderStatusApi(orderId);
@@ -92,9 +93,22 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             }
             payload._reconciled = JSON.stringify(reconciled.raw);
           } catch (e) {
+            reconciliationFailed = true;
             console.error("[ccavenue] status api lookup failed", { orderId, error: e });
           }
         }
+
+        // Never auto-confirm a payment whose amount disagrees with our record
+        // when the Status API could not vouch for it — hold it for manual review.
+        if (amountMismatch && reconciliationFailed && normalized === "paid") {
+          console.error("[ccavenue] amount mismatch unverified, holding as attempted", {
+            orderId,
+            postedAmount: amount,
+            expectedAmount: payment.amount,
+          });
+          normalized = "attempted";
+        }
+
 
         // Idempotency: never downgrade a paid record.
         if (payment.status === "paid") {
