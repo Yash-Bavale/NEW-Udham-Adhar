@@ -14,5 +14,8 @@ export default defineConfig({
   },
   vite: {
     plugins: [],
+    server: {
+      allowedHosts: ["udyamadhar.in", "www.udyamadhar.in", "udyamregistrations.in", "www.udyamregistrations.in"],
+    },
   },
 });
