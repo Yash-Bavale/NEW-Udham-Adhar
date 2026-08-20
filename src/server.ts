@@ -62,10 +62,12 @@ async function rewriteHostInHtml(request: Request, response: Response): Promise<
     .join(origin)
     .split(`https://${PRIMARY_HOST}`)
     .join(origin);
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
   return new Response(body, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers,
   });
 }
 
