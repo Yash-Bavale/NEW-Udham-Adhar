@@ -27,6 +27,31 @@ const setGoneStatus = createIsomorphicFn()
     );
   });
 
+// A CMS/database outage must NOT look like a missing page: Google (and Google
+// Ads) treat a 404 as "destination not accessible" and disapprove ads, while a
+// 503 just tells them to come back later.
+const setUnavailableStatus = createIsomorphicFn()
+  .client(() => {})
+  .server(() => {
+    void import("@tanstack/react-start/server").then(({ setResponseStatus }) =>
+      setResponseStatus(503),
+    );
+  });
+
+// Ported legacy page content bundled with the app. Used as a last-resort
+// fallback so a page that exists in content stays reachable even when the CMS
+// or database is briefly unavailable.
+const WP_HTML = import.meta.glob("../content/wp/*.html", {
+  query: "?raw",
+  import: "default",
+}) as Record<string, () => Promise<string>>;
+
+function titleize(slug: string) {
+  return slug
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
 
 
 // Retired / never-offered legacy slugs — return 410 Gone so Google de-indexes
@@ -124,17 +149,36 @@ export const Route = createFileRoute("/$")({
 
     // Contentful is the source of truth for SEO pages — check it first so a
     // newly published (or edited) entry goes live with no code change.
+    let cmsDown = false;
     const cf = await getContentfulSeoArticle({ data: { slug: lower } }).catch(
-      () => null,
+      () => {
+        cmsDown = true;
+        return null;
+      },
     );
     if (cf) return { cfArticle: cf };
 
-    try {
-      return await getArticleBySlug({ data: { slug: lower } });
-    } catch {
-      throw notFound();
+    let dbDown = false;
+    const db = await getArticleBySlug({ data: { slug: lower } }).catch(() => {
+      dbDown = true;
+      return null;
+    });
+    if (db?.article) return db;
+
+    // Last resort: the ported page content shipped with the app.
+    const loadHtml = WP_HTML[`../content/wp/${lower}.html`];
+    if (loadHtml) {
+      const wpHtml = await loadHtml();
+      return { wpHtml, slug: lower };
     }
 
+    // Nothing served it AND a backend was unreachable → temporary, not missing.
+    if (cmsDown || dbDown) {
+      setUnavailableStatus();
+      return { unavailable: true as const };
+    }
+
+    throw notFound();
   },
   head: ({ loaderData }) => {
     const cf = (loaderData as any)?.cfArticle;

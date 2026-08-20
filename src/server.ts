@@ -39,6 +39,36 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+const PRIMARY_HOST = "udyamadhar.in";
+
+/**
+ * Secondary domains (udyamregistrations.in, …) render the same components, but
+ * a lot of SEO metadata (canonical, og:url, JSON-LD) is hardcoded to the
+ * primary host. Rewriting those absolute URLs to the requesting host keeps each
+ * domain self-canonical instead of handing its rankings to the primary site.
+ */
+async function rewriteHostInHtml(request: Request, response: Response): Promise<Response> {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (host === PRIMARY_HOST || host.includes("lovable") || host === "localhost") return response;
+  if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api")) return response;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+
+  const html = await response.text();
+  const origin = `${url.protocol}//${url.host}`;
+  const body = html
+    .split(`https://www.${PRIMARY_HOST}`)
+    .join(origin)
+    .split(`https://${PRIMARY_HOST}`)
+    .join(origin);
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -48,7 +78,8 @@ export default {
           : { ...(ctx && typeof ctx === "object" ? ctx : {}), waitUntil: () => undefined };
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, safeCtx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return await rewriteHostInHtml(request, normalized);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
