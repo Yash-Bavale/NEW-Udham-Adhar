@@ -249,7 +249,7 @@ function OrdersListPage() {
           <SelectContent>
             <SelectItem value="all">All action status</SelectItem>
             <SelectItem value="action_required">Action Required (Red)</SelectItem>
-            <SelectItem value="processed">Processed / Action Taken</SelectItem>
+            <SelectItem value="processed">Completed / Action Taken</SelectItem>
           </SelectContent>
         </Select>
         <Select value={serviceId} onValueChange={setServiceId}>
@@ -392,7 +392,7 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Action Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
-                <th className="text-left font-medium px-2 py-2.5">Status</th>
+                <th className="text-left font-medium px-2 py-2.5">Final Status</th>
                 {isAdmin && <th className="text-left font-medium px-2 py-2.5">Assigned</th>}
                 {!hideMoney && <th className="text-right font-medium px-2 py-2.5">Amount</th>}
               </tr>
@@ -487,7 +487,7 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
   ]);
 
   if (greenStatuses.has(fs) || stage === "completed") {
-    return { label: "Processed", tone: "green" };
+    return { label: "Completed", tone: "green" };
   }
 
   if (blueStatuses.has(fs) || blueStages.has(stage)) {
@@ -557,7 +557,7 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
         {actionStatus.tone === "green" && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="size-1.5 rounded-full bg-emerald-500" />
-            Processed
+            Completed
           </span>
         )}
         {actionStatus.tone === "blue" && (
