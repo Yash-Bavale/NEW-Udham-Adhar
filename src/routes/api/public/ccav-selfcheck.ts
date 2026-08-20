@@ -1,20 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-/**
- * Temporary, secret-guarded read-only CCAvenue Order Status API probe.
- * Requires the x-cron-secret header. No writes.
- */
+/** Temporary read-only CCAvenue Order Status API probe (no writes). */
 export const Route = createFileRoute("/api/public/ccav-selfcheck")({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        void request;
+      GET: async () => {
         try {
-          const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
-          const res = await callOrderStatusApi("CCAV-SELFCHECK-000000");
-          return Response.json({ ok: true, raw: res.raw, status: res.status });
+          const { encryptRequest, getCcavCreds, CCAV_API_URL } = await import(
+            "@/lib/payments/ccavenue.server"
+          );
+          const { accessCode, workingKey } = getCcavCreds();
+          const enc = encryptRequest(
+            JSON.stringify({ order_no: "CCAV-SELFCHECK-000000" }),
+            workingKey,
+          );
+          const res = await fetch(CCAV_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              enc_request: enc,
+              access_code: accessCode,
+              command: "orderStatusTracker",
+              request_type: "JSON",
+              response_type: "JSON",
+              version: "1.2",
+            }),
+          });
+          const text = await res.text();
+          return Response.json({ httpStatus: res.status, text: text.slice(0, 1000) });
         } catch (e) {
-          return Response.json({ ok: false, error: (e as Error).message }, { status: 200 });
+          return Response.json({ error: (e as Error).message });
         }
       },
     },
