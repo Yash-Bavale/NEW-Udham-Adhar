@@ -153,7 +153,9 @@ async function callDoWebTrans({ command, payload }: DoWebTransOptions): Promise<
   raw: string;
 }> {
   const { accessCode, workingKey } = getCcavCreds();
-  const enc = encryptRequest(buildCcavPayload(payload), workingKey);
+  // DoWebTrans runs in request_type=JSON mode: the encrypted payload must be a
+  // JSON object, not the pipe/form style used by the checkout request.
+  const enc = encryptRequest(JSON.stringify(payload), workingKey);
   const body = new URLSearchParams({
     enc_request: enc,
     access_code: accessCode,
@@ -216,14 +218,17 @@ export type CcavStatusResult = {
 };
 
 export async function callOrderStatusApi(orderNo: string): Promise<CcavStatusResult> {
-  const { merchantId } = getCcavCreds();
   const result = await callDoWebTrans({
     command: "orderStatusTracker",
-    payload: { reference_no: orderNo, order_no: orderNo, merchant_id: merchantId },
+    payload: { order_no: orderNo },
   });
 
   const r = result.body;
-  const orderStatus = r.order_status || r.Order_Status || r.status || "";
+  // Error replies look like { error_desc, error_code, status: 1 } — never treat
+  // the numeric envelope `status` as an order status.
+  const orderStatus = r.error_code
+    ? ""
+    : r.order_status || r.Order_Status || "";
   return {
     status: normalizeCcavStatus(orderStatus),
     orderNo: r.order_no || r.order_id || orderNo,
@@ -247,19 +252,26 @@ export async function callRefundApi(args: {
   refundAmount: number;
   refundRef: string;      // our idempotency reference
 }): Promise<CcavRefundResult> {
-  const { merchantId } = getCcavCreds();
   const result = await callDoWebTrans({
     command: "refundOrder",
     payload: {
-      merchant_id: merchantId,
       reference_no: args.refNo,
       refund_amount: args.refundAmount.toFixed(2),
       refund_ref_no: args.refundRef,
     },
   });
   const r = result.body;
+  if (r.error_code) {
+    return {
+      ok: false,
+      refundStatus: r.error_code,
+      refundRef: args.refundRef,
+      reason: r.error_desc || null,
+      raw: r,
+    };
+  }
   // CCAvenue refund_status: "0" = success, anything else = failure.
-  const refundStatus = r.refund_status || r.RefundStatus || r.status || "";
+  const refundStatus = r.refund_status || r.RefundStatus || "";
   const ok = refundStatus === "0" || refundStatus.toLowerCase() === "success";
   return {
     ok,
