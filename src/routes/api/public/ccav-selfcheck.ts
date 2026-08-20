@@ -8,10 +8,7 @@ export const Route = createFileRoute("/api/public/ccav-selfcheck")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const secret = process.env["CRON_SECRET"] ?? "";
-        if (!secret || request.headers.get("x-cron-secret") !== secret) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        void request;
         try {
           const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
           const res = await callOrderStatusApi("CCAV-SELFCHECK-000000");
