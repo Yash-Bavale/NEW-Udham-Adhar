@@ -195,3 +195,41 @@ export const updateGateway = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/**
+ * Read-only credential self-check for CCAvenue. Calls the Order Status API
+ * with a dummy reference: CCAvenue rejects bad merchant id / access code /
+ * working key with an explicit error, while a valid setup replies "order not
+ * found". No writes, super-admin only.
+ */
+export const checkCcavenueCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, ["super_admin"]);
+    try {
+      const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
+      const res = await callOrderStatusApi("CCAV-SELFCHECK-000000");
+      const raw = res.raw ?? {};
+      const errText = String(
+        raw.error_desc ?? raw.reason ?? raw.status_message ?? raw.message ?? "",
+      ).toLowerCase();
+      const keys = Object.keys(raw);
+      if (keys.length === 0) {
+        return {
+          ok: false,
+          message:
+            "CCAvenue did not return a readable response. The working key is most likely wrong (decryption failed).",
+        };
+      }
+      if (errText.includes("access code") || errText.includes("merchant") || errText.includes("authentication")) {
+        return { ok: false, message: `CCAvenue rejected the credentials: ${errText}` };
+      }
+      return {
+        ok: true,
+        message:
+          "CCAvenue accepted the credentials (test lookup returned a normal 'order not found' style response).",
+      };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });

@@ -2,13 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials } from "@/lib/payments/gateways.functions";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
 
 function GatewaysPage() {
   const listFn = useServerFn(listGateways);
   const updFn = useServerFn(updateGateway);
+  const ccavCheckFn = useServerFn(checkCcavenueCredentials);
+  const [ccavChecking, setCcavChecking] = useState(false);
+  const [ccavResult, setCcavResult] = useState<{ ok: boolean; message: string } | null>(null);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin.gateways"], queryFn: () => listFn() });
   const [busy, setBusy] = useState<string | null>(null);
@@ -22,19 +25,49 @@ function GatewaysPage() {
         <h1 className="text-2xl font-semibold">Payment Gateways</h1>
         <p className="text-sm text-slate-500 mt-1">
           Toggle gateways and set priority (lower number shows first to customers).
-          Only PayU is wired end-to-end today; others render as "coming soon" on the customer summary page until you implement them.
+          PayU and CCAvenue are wired end-to-end (checkout, callback, invoice, refund and reconciliation).
+          Razorpay, Cashfree and PhonePe render as "coming soon" on the customer summary page until they're implemented.
         </p>
       </div>
 
       <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <div className="font-semibold">CCAvenue webhooks are not HMAC-signed</div>
+        <div className="font-semibold">How CCAvenue callbacks are verified</div>
         <p className="mt-1">
-          CCAvenue's standard checkout does not sign webhook callbacks with HMAC — verification relies on the
-          encrypted response from CCAvenue plus our own order lookup. This is an architectural limitation of the
-          provider, not a configuration bug. Keep CCAvenue disabled unless you've reviewed the webhook handler
-          and accept this tradeoff. PayU webhooks are fully signature-verified.
+          CCAvenue's standard checkout does not sign callbacks with HMAC. Instead we decrypt CCAvenue's encrypted
+          response with the working key and re-check the transaction against CCAvenue's Order Status API before
+          marking a payment as paid, so a forged callback can't mark an order paid. PayU webhooks remain fully
+          signature-verified.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={async () => {
+              setCcavChecking(true);
+              setCcavResult(null);
+              try {
+                setCcavResult(await ccavCheckFn({}));
+              } catch (e) {
+                setCcavResult({ ok: false, message: (e as Error).message });
+              } finally {
+                setCcavChecking(false);
+              }
+            }}
+            disabled={ccavChecking}
+            className="rounded bg-amber-900 text-white px-3 py-1 text-xs disabled:opacity-40"
+          >
+            {ccavChecking ? "Checking…" : "Test CCAvenue credentials"}
+          </button>
+          {ccavResult && (
+            <span className={`text-xs ${ccavResult.ok ? "text-emerald-700" : "text-red-700"}`}>
+              {ccavResult.message}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-xs">
+          Response &amp; cancel URL to configure in the CCAvenue dashboard:{" "}
+          <code className="font-mono">https://udyamadhar.in/api/public/webhooks/ccavenue</code>
         </p>
       </div>
+
 
 
       <div className="overflow-x-auto rounded-md border">
