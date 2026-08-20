@@ -101,6 +101,7 @@ function OrdersListPage() {
   const [serviceId, setServiceId] = useState<string>("all");
   const [assignedTo, setAssignedTo] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
+  const [actionStatusFilter, setActionStatusFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [bucket, setBucket] = useState<Bucket>("all");
@@ -152,7 +153,7 @@ function OrdersListPage() {
   const allRows = (data?.rows ?? []) as any[];
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
-  const colCount = 6 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
+  const colCount = 7 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
 
   // Compute pending-age threshold in days from filter selection.
   const minDays: number | null = useMemo(() => {
@@ -195,7 +196,18 @@ function OrdersListPage() {
     return b;
   }, [ageFiltered]);
 
-  const rows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOfRow(r) === bucket);
+  const bucketRows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOfRow(r) === bucket);
+
+  const rows = useMemo(() => {
+    if (actionStatusFilter === "all") return bucketRows;
+    return bucketRows.filter((r) => {
+      const st = getOrderActionStatus(r);
+      if (actionStatusFilter === "action_required") return st.tone === "red";
+      if (actionStatusFilter === "processed") return st.tone === "green" || st.tone === "blue";
+      return true;
+    });
+  }, [bucketRows, actionStatusFilter]);
+
   const total = data?.total ?? 0;
 
   // Group by day
@@ -232,6 +244,14 @@ function OrdersListPage() {
             className="pl-8 h-9 text-sm bg-white"
           />
         </div>
+        <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
+          <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="Action status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All action status</SelectItem>
+            <SelectItem value="action_required">Action Required (Red)</SelectItem>
+            <SelectItem value="processed">Processed / Action Taken</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={serviceId} onValueChange={setServiceId}>
           <SelectTrigger className="h-9 w-[160px] text-sm bg-white"><SelectValue placeholder="All services" /></SelectTrigger>
           <SelectContent>
@@ -369,6 +389,7 @@ function OrdersListPage() {
                 <th className="text-left font-medium px-2 py-2.5">Order #</th>
                 <th className="text-left font-medium px-2 py-2.5">Created</th>
                 <th className="text-left font-medium px-2 py-2.5">Customer</th>
+                <th className="text-left font-medium px-2 py-2.5">Action Status</th>
                 <th className="text-left font-medium px-2 py-2.5">Service</th>
                 <th className="text-left font-medium px-2 py-2.5">Stage</th>
                 <th className="text-left font-medium px-2 py-2.5">Status</th>
@@ -424,6 +445,59 @@ function formatDayHeader(day: string): string {
   return base;
 }
 
+export function getOrderActionStatus(order: any): { label: string; tone: "red" | "green" | "blue" } {
+  const fs = order.fulfillment_status ?? "order_received";
+  const stage = order.stage;
+
+  // Terminal / completed states -> Subtle Green
+  const greenStatuses = new Set([
+    "application_approved",
+    "consultation_completed",
+    "order_completed",
+    "completed",
+  ]);
+
+  // Action taken / in-progress states -> Subtle Blue
+  const blueStatuses = new Set([
+    "government_processing",
+    "technical_delay",
+    "customer_delay",
+    "application_rejected",
+    "certificate_rejected",
+    "order_closed",
+    "cancelled",
+    "under_processing",
+    "application_submitted",
+    "verification_pending",
+    "documents_received",
+  ]);
+
+  const blueStages = new Set([
+    "technical_delay",
+    "customer_delay",
+    "consultation_completed",
+    "under_review",
+    "in_progress",
+    "submitted_to_govt",
+    "under_processing",
+    "certificate_ready",
+    "closed",
+    "refunded",
+    "refund_requested",
+  ]);
+
+  if (greenStatuses.has(fs) || stage === "completed") {
+    return { label: "Processed", tone: "green" };
+  }
+
+  if (blueStatuses.has(fs) || blueStages.has(stage)) {
+    return { label: "Action Taken", tone: "blue" };
+  }
+
+  // Untouched / initial unhandled states -> Red
+  return { label: "Action Required", tone: "red" };
+}
+
 function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney: boolean; isAdmin: boolean; onOpen: (id: string) => void }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
@@ -438,6 +512,7 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
     violet:  "bg-violet-50 text-violet-700",
   };
   const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700";
+  const actionStatus = getOrderActionStatus(order);
 
   return (
     <tr
@@ -470,6 +545,26 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{order.customer_mobile}</div>
+        )}
+      </td>
+      <td className="px-2 py-2.5 whitespace-nowrap">
+        {actionStatus.tone === "red" && (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+            <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
+            Action Required
+          </span>
+        )}
+        {actionStatus.tone === "green" && (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="size-1.5 rounded-full bg-emerald-500" />
+            Processed
+          </span>
+        )}
+        {actionStatus.tone === "blue" && (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+            <span className="size-1.5 rounded-full bg-sky-500" />
+            Action Taken
+          </span>
         )}
       </td>
       <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
