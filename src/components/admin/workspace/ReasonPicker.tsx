@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 const CATEGORY_LABEL: Record<string, string> = {
+  "Closure Reasons": "Closure Reasons (Reason Library)",
   A: "Category A – Customer Side Delay / Customer Action Required",
   B: "Category B – Technical Delay (External Dependency)",
   C: "Category C – Technical Delay (Our Internal Operational)",

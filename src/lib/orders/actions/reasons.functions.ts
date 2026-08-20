@@ -140,14 +140,39 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
   },
 ];
 
-// Reasons MUST come from public.order_close_reasons: their UUIDs are written to
-// applications.active_reason_id / closure_reason_id (UUID FKs). The hardcoded
-// STANDARD_CLOSE_REASONS above is reference copy only — never a picker source,
-// since its "A1"/"B11" ids fail uuid validation downstream.
+// Reasons come from workflow_closure_reasons (Settings -> Reason Library) with fallback to order_close_reasons
 export const listCloseReasons = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OrderCloseReason[]> => {
-    const { data, error } = await context.supabase.rpc("list_order_close_reasons");
-    if (error) throw new Error(error.message);
-    return (data ?? []) as OrderCloseReason[];
+    const admin = (await import("@/integrations/supabase/client.server")).supabaseAdmin;
+
+    // Fetch active closure reasons managed via Settings -> Reason Library
+    const { data: wfReasons } = await admin
+      .from("workflow_closure_reasons")
+      .select("id, code, label, description, sort_order, is_active")
+      .eq("is_active", true)
+      .order("sort_order");
+
+    const mappedWf: OrderCloseReason[] = (wfReasons ?? []).map((r, idx) => ({
+      id: r.id,
+      category: "Closure Reasons",
+      number: idx + 1,
+      label: r.label,
+      standard_reply: r.description || null,
+      sort_order: r.sort_order ?? (idx + 1) * 10,
+    }));
+
+    // Fetch legacy order_close_reasons as fallback or secondary categories
+    try {
+      const { data: legacyData } = await context.supabase.rpc("list_order_close_reasons");
+      const legacy = (legacyData ?? []) as OrderCloseReason[];
+      if (mappedWf.length > 0) {
+        const wfLabels = new Set(mappedWf.map((w) => w.label.toLowerCase().trim()));
+        const filteredLegacy = legacy.filter((l) => !wfLabels.has(l.label.toLowerCase().trim()));
+        return [...mappedWf, ...filteredLegacy];
+      }
+      return legacy;
+    } catch {
+      return mappedWf;
+    }
   });
