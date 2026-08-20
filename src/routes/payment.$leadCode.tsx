@@ -21,7 +21,7 @@ export const Route = createFileRoute("/payment/$leadCode")({
 function PaymentPage() {
   const { leadCode } = Route.useParams();
   const navigate = useNavigate();
-  const createOrder = useServerFn(createPayUOrder);
+  const createOrder = useServerFn(initiatePayment);
   const getSummary = useServerFn(getApplicationSummary);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
