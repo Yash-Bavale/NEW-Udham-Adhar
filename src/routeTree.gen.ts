@@ -110,7 +110,6 @@ import { Route as ApplyLeadCodeSummaryRouteImport } from './routes/apply.$leadCo
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
-import { Route as ApiPublicCcavSelfcheckRouteImport } from './routes/api/public/ccav-selfcheck'
 import { Route as AdminWebsiteContentWebsiteIdRouteImport } from './routes/admin.website-content.$websiteId'
 import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin.tickets.$ticketId'
 import { Route as AdminSupportTicketsRouteImport } from './routes/admin.support.tickets'
@@ -662,11 +661,6 @@ const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   path: '/api/public/complaint',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicCcavSelfcheckRoute = ApiPublicCcavSelfcheckRouteImport.update({
-  id: '/api/public/ccav-selfcheck',
-  path: '/api/public/ccav-selfcheck',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminWebsiteContentWebsiteIdRoute =
   AdminWebsiteContentWebsiteIdRouteImport.update({
     id: '/website-content/$websiteId',
@@ -979,7 +973,6 @@ export interface FileRoutesByFullPath {
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
-  '/api/public/ccav-selfcheck': typeof ApiPublicCcavSelfcheckRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1114,7 +1107,6 @@ export interface FileRoutesByTo {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
-  '/api/public/ccav-selfcheck': typeof ApiPublicCcavSelfcheckRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1255,7 +1247,6 @@ export interface FileRoutesById {
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
-  '/api/public/ccav-selfcheck': typeof ApiPublicCcavSelfcheckRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1397,7 +1388,6 @@ export interface FileRouteTypes {
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
-    | '/api/public/ccav-selfcheck'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1532,7 +1522,6 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
-    | '/api/public/ccav-selfcheck'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1672,7 +1661,6 @@ export interface FileRouteTypes {
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
-    | '/api/public/ccav-selfcheck'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1761,7 +1749,6 @@ export interface RootRouteChildren {
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
-  ApiPublicCcavSelfcheckRoute: typeof ApiPublicCcavSelfcheckRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
@@ -2499,13 +2486,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicComplaintRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/ccav-selfcheck': {
-      id: '/api/public/ccav-selfcheck'
-      path: '/api/public/ccav-selfcheck'
-      fullPath: '/api/public/ccav-selfcheck'
-      preLoaderRoute: typeof ApiPublicCcavSelfcheckRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/website-content/$websiteId': {
       id: '/admin/website-content/$websiteId'
       path: '/website-content/$websiteId'
@@ -3029,7 +3009,6 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
-  ApiPublicCcavSelfcheckRoute: ApiPublicCcavSelfcheckRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,
