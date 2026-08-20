@@ -3,7 +3,7 @@
 import { useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listCloseReasons, STANDARD_CLOSE_REASONS, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
+import { listCloseReasons, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -34,7 +34,9 @@ export function ReasonPicker({ value, onChange, reply, onReplyChange, hideReply,
     staleTime: 5 * 60_000,
   });
 
-  const reasons = serverReasons.length > 0 ? serverReasons : STANDARD_CLOSE_REASONS;
+  // Only DB-backed reasons (real UUIDs) are selectable — the hardcoded
+  // STANDARD_CLOSE_REASONS ids would be rejected by downstream validation.
+  const reasons = serverReasons;
 
   const grouped = useMemo(() => {
     const g = new Map<string, OrderCloseReason[]>();

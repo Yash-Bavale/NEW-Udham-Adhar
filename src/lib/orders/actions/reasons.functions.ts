@@ -140,8 +140,14 @@ export const STANDARD_CLOSE_REASONS: OrderCloseReason[] = [
   },
 ];
 
+// Reasons MUST come from public.order_close_reasons: their UUIDs are written to
+// applications.active_reason_id / closure_reason_id (UUID FKs). The hardcoded
+// STANDARD_CLOSE_REASONS above is reference copy only — never a picker source,
+// since its "A1"/"B11" ids fail uuid validation downstream.
 export const listCloseReasons = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    return STANDARD_CLOSE_REASONS;
+  .handler(async ({ context }): Promise<OrderCloseReason[]> => {
+    const { data, error } = await context.supabase.rpc("list_order_close_reasons");
+    if (error) throw new Error(error.message);
+    return (data ?? []) as OrderCloseReason[];
   });
