@@ -307,6 +307,22 @@ function ArticleRoute() {
       </div>
     );
   }
+  if (data?.unavailable) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h1 className="text-3xl font-bold">Temporarily unavailable</h1>
+        <p className="mt-4 text-muted-foreground">
+          We couldn't load this page right now. Please try again in a moment.
+        </p>
+        <a href="/" className="mt-6 inline-block text-primary underline">
+          Return to homepage
+        </a>
+      </div>
+    );
+  }
+  if (data?.wpHtml) {
+    return <WpPage title={titleize(data.slug)} html={data.wpHtml} />;
+  }
   if (data?.cfArticle) {
     return <SeoContentPage data={cfToSeoPageData(data.cfArticle)} />;
   }
