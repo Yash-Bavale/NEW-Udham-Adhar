@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyUdyamCertificateRouteImport } from './routes/verify-udyam-certificate'
 import { Route as UpdateUdyamCertificateRouteImport } from './routes/update-udyam-certificate'
 import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as TermsConditionsRouteImport } from './routes/terms-conditions'
@@ -146,6 +147,11 @@ import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/a
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admin.services.forms.$serviceCode'
 
+const VerifyUdyamCertificateRoute = VerifyUdyamCertificateRouteImport.update({
+  id: '/verify-udyam-certificate',
+  path: '/verify-udyam-certificate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UpdateUdyamCertificateRoute = UpdateUdyamCertificateRouteImport.update({
   id: '/update-udyam-certificate',
   path: '/update-udyam-certificate',
@@ -903,6 +909,7 @@ export interface FileRoutesByFullPath {
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1040,6 +1047,7 @@ export interface FileRoutesByTo {
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1175,6 +1183,7 @@ export interface FileRoutesById {
   '/terms-conditions': typeof TermsConditionsRoute
   '/unauthorized': typeof UnauthorizedRoute
   '/update-udyam-certificate': typeof UpdateUdyamCertificateRoute
+  '/verify-udyam-certificate': typeof VerifyUdyamCertificateRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/activity': typeof AdminActivityRoute
@@ -1315,6 +1324,7 @@ export interface FileRouteTypes {
     | '/terms-conditions'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -1452,6 +1462,7 @@ export interface FileRouteTypes {
     | '/terms-conditions'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -1586,6 +1597,7 @@ export interface FileRouteTypes {
     | '/terms-conditions'
     | '/unauthorized'
     | '/update-udyam-certificate'
+    | '/verify-udyam-certificate'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/activity'
@@ -1725,6 +1737,7 @@ export interface RootRouteChildren {
   TermsConditionsRoute: typeof TermsConditionsRoute
   UnauthorizedRoute: typeof UnauthorizedRoute
   UpdateUdyamCertificateRoute: typeof UpdateUdyamCertificateRoute
+  VerifyUdyamCertificateRoute: typeof VerifyUdyamCertificateRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AppTokenRoute: typeof AppTokenRoute
@@ -1766,6 +1779,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-udyam-certificate': {
+      id: '/verify-udyam-certificate'
+      path: '/verify-udyam-certificate'
+      fullPath: '/verify-udyam-certificate'
+      preLoaderRoute: typeof VerifyUdyamCertificateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/update-udyam-certificate': {
       id: '/update-udyam-certificate'
       path: '/update-udyam-certificate'
@@ -2976,6 +2996,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsConditionsRoute: TermsConditionsRoute,
   UnauthorizedRoute: UnauthorizedRoute,
   UpdateUdyamCertificateRoute: UpdateUdyamCertificateRoute,
+  VerifyUdyamCertificateRoute: VerifyUdyamCertificateRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
