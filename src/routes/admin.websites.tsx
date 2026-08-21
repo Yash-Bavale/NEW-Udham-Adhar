@@ -34,6 +34,8 @@ type WebsiteForm = {
   sort_order: number;
   contentful_space_id?: string | null;
   contentful_delivery_token_secret?: "CONTENTFUL_API_KEY" | "CONTENTFUL_API_KEY_1" | "CONTENTFUL_API_KEY_2" | null;
+  sanity_project_id?: string | null;
+  sanity_dataset?: string | null;
 };
 type CategoryForm = { id?: string; website_id: string; name: string; is_active: boolean; sort_order: number };
 
@@ -47,6 +49,8 @@ function emptyWebsite(): WebsiteForm {
     sort_order: 0,
     contentful_space_id: "",
     contentful_delivery_token_secret: "CONTENTFUL_API_KEY",
+    sanity_project_id: "",
+    sanity_dataset: "",
   };
 }
 
@@ -180,7 +184,28 @@ function WebsitesPage() {
                 </label>
               </div>
             </div>
+
+            <div className="md:col-span-2 border-t pt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                Sanity (live CMS)
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <Input
+                  label="Sanity Project ID"
+                  value={webForm.sanity_project_id ?? ""}
+                  onChange={(v) => setWebForm({ ...webForm, sanity_project_id: v })}
+                  placeholder="519jq1ws"
+                />
+                <Input
+                  label="Sanity Dataset"
+                  value={webForm.sanity_dataset ?? ""}
+                  onChange={(v) => setWebForm({ ...webForm, sanity_dataset: v })}
+                  placeholder="production"
+                />
+              </div>
+            </div>
           </div>
+
 
 
           <div className="flex gap-2 pt-2">
@@ -283,7 +308,7 @@ function WebsitesPage() {
                 </Link>
                 <button
 
-                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order, contentful_space_id: (w as any).contentful_space_id ?? "", contentful_delivery_token_secret: (w as any).contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY" })}
+                  onClick={() => setWebForm({ id: w.id, name: w.name, domain: w.domain, description: (w as any).description ?? "", is_active: w.is_active, allow_admin: (w as any).allow_admin ?? true, sort_order: w.sort_order, contentful_space_id: (w as any).contentful_space_id ?? "", contentful_delivery_token_secret: (w as any).contentful_delivery_token_secret ?? "CONTENTFUL_API_KEY", sanity_project_id: (w as any).sanity_project_id ?? "", sanity_dataset: (w as any).sanity_dataset ?? "" })}
                   className="p-1.5 hover:bg-slate-200 rounded"
                   title="Edit website"
                 >

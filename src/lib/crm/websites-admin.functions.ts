@@ -50,6 +50,20 @@ const WebsiteInput = z.object({
     .enum(["CONTENTFUL_API_KEY", "CONTENTFUL_API_KEY_1", "CONTENTFUL_API_KEY_2"])
     .nullable()
     .optional(),
+  sanity_project_id: z
+    .string()
+    .trim()
+    .max(64)
+    .regex(/^[a-z0-9]*$/i, "Project ID must be letters and digits only")
+    .nullable()
+    .optional(),
+  sanity_dataset: z
+    .string()
+    .trim()
+    .max(64)
+    .regex(/^[a-z0-9_-]*$/i, "Dataset must be letters, digits, hyphens or underscores")
+    .nullable()
+    .optional(),
 });
 
 

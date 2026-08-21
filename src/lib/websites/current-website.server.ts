@@ -17,6 +17,8 @@ export interface WebsiteRow {
   sample_certificate_asset_url: string | null;
   contentful_space_id: string | null;
   contentful_delivery_token_secret: string | null;
+  sanity_project_id: string | null;
+  sanity_dataset: string | null;
   legal_footer_line: string | null;
   postal_address: string | null;
   footer_unlock_code: string | null;
@@ -27,7 +29,7 @@ export interface WebsiteRow {
 }
 
 const BRAND_COLUMNS =
-  "id, domain, name, brand_name, legal_entity, company_name, support_email, support_phone, whatsapp_number, business_hours, primary_color, logo_asset_url, favicon_asset_url, sample_certificate_asset_url, contentful_space_id, contentful_delivery_token_secret, legal_footer_line, postal_address, footer_unlock_code, google_site_verification, gtag_id, is_primary, allow_admin";
+  "id, domain, name, brand_name, legal_entity, company_name, support_email, support_phone, whatsapp_number, business_hours, primary_color, logo_asset_url, favicon_asset_url, sample_certificate_asset_url, contentful_space_id, contentful_delivery_token_secret, sanity_project_id, sanity_dataset, legal_footer_line, postal_address, footer_unlock_code, google_site_verification, gtag_id, is_primary, allow_admin";
 
 const cache = new Map<string, WebsiteRow>();
 let primaryCache: WebsiteRow | null = null;

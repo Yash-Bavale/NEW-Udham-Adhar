@@ -3863,6 +3863,8 @@ export type Database = {
           postal_address: string | null
           primary_color: string | null
           sample_certificate_asset_url: string | null
+          sanity_dataset: string | null
+          sanity_project_id: string | null
           sort_order: number
           support_email: string | null
           support_phone: string | null
@@ -3893,6 +3895,8 @@ export type Database = {
           postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
+          sanity_dataset?: string | null
+          sanity_project_id?: string | null
           sort_order?: number
           support_email?: string | null
           support_phone?: string | null
@@ -3923,6 +3927,8 @@ export type Database = {
           postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
+          sanity_dataset?: string | null
+          sanity_project_id?: string | null
           sort_order?: number
           support_email?: string | null
           support_phone?: string | null
