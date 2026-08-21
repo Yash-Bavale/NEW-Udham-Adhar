@@ -112,27 +112,49 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   }
 
 
-  // 2) Lead + payment_links
-  // NOTE: `leads` has no payment_successful_at column — including it here made
-  // the whole update fail silently, which is why paid leads kept showing
-  // "payment pending" in the admin list.
-  const { error: leadErr } = await supabaseAdmin.from("leads")
-    .update({
-      status: "payment_successful",
-      lead_status_v2: "payment_successful",
-    } as any)
-    .eq("id", payment.lead_id);
-  if (leadErr) console.error("[finalize] lead status update failed", leadErr);
-
-
-  await supabaseAdmin
+  // 2) payment_links — settle ONLY the link this payment actually pays for
+  // (issued before the payment, same amount). Marking every pending link paid
+  // is what made unpaid top-ups look settled.
+  const payAmount = Number((payment as any).amount ?? 0);
+  const { data: pendingLinks } = await supabaseAdmin
     .from("payment_links" as any)
-    .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: payment.id } as any)
+    .select("id, amount, created_at")
+    .eq("lead_id", payment.lead_id)
+    .eq("status", "pending")
+    .lte("created_at", (payment as any).created_at)
+    .order("created_at", { ascending: false });
+  const matchLink = (pendingLinks ?? []).find(
+    (l: any) => payAmount > 0 && Math.abs(Number(l.amount ?? 0) - payAmount) < 0.01,
+  );
+  if (matchLink) {
+    await supabaseAdmin
+      .from("payment_links" as any)
+      .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: payment.id } as any)
+      .eq("id", (matchLink as any).id);
+  }
+
+  // Lead is only "payment successful" when nothing is still outstanding.
+  const { count: stillPending } = await supabaseAdmin
+    .from("payment_links" as any)
+    .select("id", { count: "exact", head: true })
     .eq("lead_id", payment.lead_id)
     .eq("status", "pending");
+  if (!stillPending) {
+    // NOTE: `leads` has no payment_successful_at column — including it here made
+    // the whole update fail silently, which is why paid leads kept showing
+    // "payment pending" in the admin list.
+    const { error: leadErr } = await supabaseAdmin.from("leads")
+      .update({
+        status: "payment_successful",
+        lead_status_v2: "payment_successful",
+      } as any)
+      .eq("id", payment.lead_id);
+    if (leadErr) console.error("[finalize] lead status update failed", leadErr);
+  }
 
-  // 3) Move application forward
-  if (applicationId) {
+  // 3) Move application forward — first payment only. A top-up must never drag
+  // an in-progress order back to "payment received".
+  if (applicationId && !isTopUp) {
     try {
       const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
       const tr = await transitionStatusSystem({
@@ -146,6 +168,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
       console.error("[finalize] transition threw", e);
     }
   }
+
 
   // 4) Invoice
   let invoiceAttachment: Awaited<ReturnType<typeof loadInvoiceAttachmentByPayment>> = null;
