@@ -24,7 +24,12 @@ function getClient({ projectId, dataset }: Creds): SanityClient {
       apiVersion: SANITY_API_VERSION,
       useCdn: true,
       perspective: "published",
-      token: process.env["SANITY_READ_TOKEN"] || undefined,
+      // The datasets require an authenticated read; fall back to the write
+      // token (server-only) so a missing read token can never blank the site.
+      token:
+        process.env["SANITY_READ_TOKEN"] ||
+        process.env["SANITY_WRITE_TOKEN"] ||
+        undefined,
     });
     clients.set(key, client);
   }
