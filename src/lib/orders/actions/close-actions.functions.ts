@@ -53,16 +53,15 @@ export const closeOrderSystem = createServerFn({ method: "POST" })
       .update({ fulfillment_status: "order_closed" } as never)
       .eq("id", data.orderId);
 
-    // Queue E010 (support_ticket_closed_final in current registry — same body
-    // shape works for system-closure notices per spec v2).
+    // Queue E010 Order Closed notice with previous selected reason.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ctx } = await supabaseAdmin
       .from("applications")
-      .select("application_code, lead_id, closure_reason_id, closure_remarks, customers(primary_email, name), order_close_reasons:closure_reason_id(label, standard_reply)")
+      .select("application_code, lead_id, closure_reason_id, active_reason_id, closure_remarks, customers(primary_email, name), order_close_reasons:closure_reason_id(label, standard_reply), delay_reasons:active_reason_id(label)")
       .eq("id", data.orderId)
       .maybeSingle();
     const email = (ctx as any)?.customers?.primary_email as string | undefined;
-    const reasonLabel = ((ctx as any)?.order_close_reasons?.label as string) || null;
+    const reasonLabel = ((ctx as any)?.order_close_reasons?.label as string) || ((ctx as any)?.delay_reasons?.label as string) || (ctx as any)?.closure_remarks || null;
     let e010Ok = false;
     let e010Err: string | null = null;
     if (email) {
@@ -72,15 +71,18 @@ export const closeOrderSystem = createServerFn({ method: "POST" })
           import("@/lib/emails/bhs-templates"),
         ]);
         await enqueueFromTemplateInternal(
-          BHS_EMAILS.E010_TICKET_CLOSED_FINAL,
+          BHS_EMAILS.E010_ORDER_CLOSED,
           email,
           {
             customerName: ((ctx as any)?.customers?.name as string) || "Customer",
+            customer_name: ((ctx as any)?.customers?.name as string) || "Customer",
             orderNumber: ((ctx as any)?.application_code as string) || data.orderId.slice(0, 8),
-            reason: reasonLabel || data.remarks || "System closure",
+            order_number: ((ctx as any)?.application_code as string) || data.orderId.slice(0, 8),
+            reason: reasonLabel || data.remarks || "Order closed per selected reason",
+            closure_reason: reasonLabel || data.remarks || "Order closed per selected reason",
             fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
           },
-          { applicationId: data.orderId, leadId: ((ctx as any)?.lead_id as string) ?? undefined },
+          { applicationId: data.orderId, leadId: ((ctx as any)?.lead_id as string) ?? undefined, trigger: "manual" },
         );
         e010Ok = true;
       } catch (e: any) {

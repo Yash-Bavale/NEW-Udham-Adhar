@@ -325,7 +325,7 @@ export function CustomerJourneyMap(p: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
         {/* Header */}
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-slate-100 pb-3">
           <div className="min-w-0">

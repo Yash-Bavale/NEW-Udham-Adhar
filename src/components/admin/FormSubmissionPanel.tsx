@@ -359,14 +359,17 @@ export function FormSubmissionPanel({
     <>
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
         {/* Unified header: customer identity + form title in one card */}
-        <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap text-sm">
-          <div className="flex items-center gap-2">
+        <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap text-base md:text-lg">
             <span className="text-slate-500 font-medium">Customer:</span>
-            <span className="text-slate-800 font-bold">{lead?.name ?? "—"}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium">Mobile:</span>
-            <span className="text-slate-800 font-semibold font-mono">{lead?.mobile ?? "—"}</span>
+            <span className="text-slate-900 font-bold">{lead?.name ?? "—"}</span>
+            {lead?.mobile && (
+              <>
+                <span className="text-slate-300 font-light mx-1">•</span>
+                <span className="text-slate-500 font-medium">Mobile:</span>
+                <span className="text-slate-900 font-bold font-mono">{lead.mobile}</span>
+              </>
+            )}
           </div>
         </div>
         {/* Header */}
