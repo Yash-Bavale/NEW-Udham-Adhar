@@ -412,7 +412,7 @@ export const sendPaymentLinkEmail = createServerFn({ method: "POST" })
       toEmail: lead.email,
       toName: lead.name ?? null,
       subject: `Complete Your Payment – Order No. ${leadCode}`,
-      bodyHtml,
+      bodyHtml: htmlBody,
       leadId: lead.id,
       allowWithoutTemplate: true,
       requireImmediateSuccess: true,
