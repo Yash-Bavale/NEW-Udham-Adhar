@@ -77,23 +77,23 @@ export function PageHero({
   );
 }
 
+const H1_BLOCK_RE = /(?:<a\b[^>]*>\s*)?<h1\b[^>]*>([\s\S]*?)<\/h1\s*>(?:\s*<\/a>)?/gi;
+
+const plain = (s: string) =>
+  s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+/** First <h1> text inside ported HTML — usually the fullest page title. */
+function firstH1Text(html: string) {
+  const m = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i);
+  return m ? plain(m[1]) : "";
+}
+
 /**
- * Removes headings/anchors at the top of ported HTML that simply repeat the
- * page title, so the fallback page never shows the same title 2-3 times.
+ * Ported HTML often repeats the page title as one or more <h1> blocks. The
+ * shell already renders the title, so drop them: one H1 per page.
  */
-function stripDuplicateTitle(html: string, title: string) {
-  const norm = (s: string) =>
-    s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-  const target = norm(title);
-  if (!target) return html;
-  let out = html;
-  const blockRe = /^\s*(?:<a\b[^>]*>\s*)?<h1\b[^>]*>[\s\S]*?<\/h1\s*>(?:\s*<\/a>)?\s*/i;
-  for (let i = 0; i < 4; i++) {
-    const m = out.match(blockRe);
-    if (!m || norm(m[0]) !== target) break;
-    out = out.slice(m[0].length);
-  }
-  return out;
+function stripH1Blocks(html: string) {
+  return html.replace(H1_BLOCK_RE, "");
 }
 
 /** Same shell as PageHero, but renders trusted HTML (e.g. ported WordPress content). */
