@@ -291,7 +291,7 @@ export const sendPaymentLinkEmail = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, [...STAFF_ROLES] as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { sendEmailDirectInternal } = await import("@/lib/emails/emails.server");
+    const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
 
     // 1. Create or fetch existing payment link
     const linkRes = await createPaymentLink({ data: { leadId: data.leadId } });
@@ -348,12 +348,14 @@ export const sendPaymentLinkEmail = createServerFn({ method: "POST" })
       </div>
     `;
 
-    await sendEmailDirectInternal({
-      to: lead.email,
+    await enqueueEmailInternal({
+      toEmail: lead.email,
+      toName: lead.name ?? null,
       subject: `Payment Link for ${serviceName} - Lead ID: ${leadCode}`,
-      html: htmlBody,
-      applicationId: undefined,
+      bodyHtml: htmlBody,
       leadId: lead.id,
+      allowWithoutTemplate: true,
+      requireImmediateSuccess: true,
     });
 
     // Also record event log
