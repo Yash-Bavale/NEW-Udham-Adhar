@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Lock, Loader2, Clock } from "lucide-react";
+import { Lock, Loader2, Clock, CreditCard } from "lucide-react";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
