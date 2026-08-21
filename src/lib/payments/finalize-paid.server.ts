@@ -144,17 +144,16 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   // finalizer repeatedly; without this guard the customer gets duplicate
   // "Order Confirmation & Tax Invoice" mails for the same money.
   const alreadyEmailed = !!invoiceRow?.last_emailed_at;
+  if (alreadyEmailed) {
+    console.info("[finalize] E001 already sent for payment, skipping", payment.id);
+  }
   try {
-    if (alreadyEmailed) {
-      console.info("[finalize] E001 already sent for payment, skipping", payment.id);
-      throw new SkipEmail();
-    }
     const { data: leadRow } = await supabaseAdmin
       .from("leads")
       .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
       .eq("id", payment.lead_id)
       .maybeSingle();
-    if (leadRow?.email && leadRow.lead_code) {
+    if (!alreadyEmailed && leadRow?.email && leadRow.lead_code) {
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
       const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
