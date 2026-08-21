@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway, checkCcavenueCredentials } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo } from "@/lib/payments/gateways.functions";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
 
 function GatewaysPage() {
   const listFn = useServerFn(listGateways);
   const updFn = useServerFn(updateGateway);
+  const uploadFn = useServerFn(uploadGatewayLogo);
   const ccavCheckFn = useServerFn(checkCcavenueCredentials);
   const [ccavChecking, setCcavChecking] = useState(false);
   const [ccavResult, setCcavResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -24,9 +25,7 @@ function GatewaysPage() {
       <div>
         <h1 className="text-2xl font-semibold">Payment Gateways</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Toggle gateways and set priority (lower number shows first to customers).
-          PayU and CCAvenue are wired end-to-end (checkout, callback, invoice, refund and reconciliation).
-          Razorpay, Cashfree and PhonePe render as "coming soon" on the customer summary page until they're implemented.
+          Toggle gateways, upload custom gateway logos, and set default gateway priority.
         </p>
       </div>
 
@@ -75,7 +74,7 @@ function GatewaysPage() {
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="p-3">Gateway Name</th>
-              <th className="p-3">Logo URL</th>
+              <th className="p-3">Gateway Logo</th>
               <th className="p-3 w-28 text-center">Default</th>
               <th className="p-3 w-24">Priority</th>
               <th className="p-3 w-28">Status</th>
@@ -88,6 +87,39 @@ function GatewaysPage() {
                 key={g.id}
                 row={g}
                 busy={busy === g.id}
+                onUploadLogo={async (file) => {
+                  setBusy(g.id);
+                  setMsg(null);
+                  try {
+                    const reader = new FileReader();
+                    const base64Promise = new Promise<string>((resolve, reject) => {
+                      reader.onload = () => {
+                        const res = reader.result as string;
+                        const b64 = res.split(",")[1] || res;
+                        resolve(b64);
+                      };
+                      reader.onerror = reject;
+                    });
+                    reader.readAsDataURL(file);
+                    const fileBase64 = await base64Promise;
+                    const res = await uploadFn({
+                      data: {
+                        id: g.id,
+                        fileBase64,
+                        fileName: file.name,
+                        mimeType: file.type || "image/png",
+                      },
+                    });
+                    await qc.invalidateQueries({ queryKey: ["admin.gateways"] });
+                    setMsg(`Uploaded logo for ${g.display_name}.`);
+                    return res.logoUrl;
+                  } catch (e) {
+                    setMsg((e as Error).message);
+                    return null;
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
                 onSave={async (patch) => {
                   setBusy(g.id);
                   setMsg(null);
@@ -129,10 +161,12 @@ function GatewayRow({
   row,
   busy,
   onSave,
+  onUploadLogo,
 }: {
   row: Row;
   busy: boolean;
   onSave: (p: { display_name: string; logo_url: string | null; is_default: boolean; is_enabled: boolean; priority: number }) => Promise<void>;
+  onUploadLogo: (file: File) => Promise<string | null>;
 }) {
   const curConfig = row.config || {};
   const [displayName, setDisplayName] = useState(row.display_name);
@@ -140,6 +174,7 @@ function GatewayRow({
   const [isDefault, setIsDefault] = useState(Boolean(curConfig.is_default));
   const [enabled, setEnabled] = useState(row.is_enabled);
   const [priority, setPriority] = useState(row.priority);
+  const [uploading, setUploading] = useState(false);
 
   const dirty =
     displayName !== row.display_name ||
@@ -161,19 +196,45 @@ function GatewayRow({
         <div className="text-xs text-slate-400 font-mono mt-1 px-0.5">Code: {row.name}</div>
       </td>
       <td className="p-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {logoUrl ? (
-            <img src={logoUrl} alt={displayName} className="h-6 w-auto max-w-16 object-contain rounded shrink-0 border bg-white px-1" />
+            <img src={logoUrl} alt={displayName} className="h-8 w-auto max-w-24 object-contain rounded shrink-0 border bg-white p-1" />
           ) : (
-            <div className="h-6 w-12 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 shrink-0">No logo</div>
+            <div className="h-8 w-16 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 shrink-0">No logo</div>
           )}
-          <input
-            type="text"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            className="w-full text-xs font-mono border border-slate-300 rounded px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-900"
-            placeholder="Logo image URL (HTTPS / SVG / PNG)"
-          />
+          
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs px-2.5 py-1.5 font-medium transition-colors inline-flex items-center gap-1.5">
+              <span>{uploading ? "Uploading…" : "Upload Logo"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading || busy}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploading(true);
+                  try {
+                    const newUrl = await onUploadLogo(file);
+                    if (newUrl) setLogoUrl(newUrl);
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+              />
+            </label>
+
+            {logoUrl && (
+              <button
+                type="button"
+                onClick={() => setLogoUrl("")}
+                className="text-xs text-rose-600 hover:underline"
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       </td>
       <td className="p-3 text-center">

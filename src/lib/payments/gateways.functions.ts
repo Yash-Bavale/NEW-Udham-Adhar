@@ -39,19 +39,6 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
     }
     if (!lead) throw new Error("Application not found");
 
-    // When customer opens summary / payment page, mark status as payment_pending if currently new/contacted
-    if (
-      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.status ?? "") ||
-      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.lead_status_v2 ?? "")
-    ) {
-      await supabaseAdmin
-        .from("leads")
-        .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
-        .eq("id", lead.id);
-      lead.status = "payment_pending";
-      lead.lead_status_v2 = "payment_pending";
-    }
-
 
     // Fetch service description separately
     let serviceDescription = "";
@@ -255,6 +242,57 @@ export const updateGateway = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+const LogoUploadSchema = z.object({
+  id: z.string().uuid(),
+  fileBase64: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+});
+
+export const uploadGatewayLogo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LogoUploadSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    await assertRole(supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let logoUrl = `data:${data.mimeType};base64,${data.fileBase64}`;
+    try {
+      const buffer = Buffer.from(data.fileBase64, "base64");
+      const ext = data.fileName.split(".").pop() || "png";
+      const filePath = `gateway-logos/${data.id}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabaseAdmin.storage
+        .from("documents")
+        .upload(filePath, buffer, { contentType: data.mimeType, upsert: true });
+
+      if (!uploadErr) {
+        const { data: pubUrlData } = supabaseAdmin.storage.from("documents").getPublicUrl(filePath);
+        if (pubUrlData?.publicUrl) logoUrl = pubUrlData.publicUrl;
+      }
+    } catch (e) {
+      console.warn("[uploadGatewayLogo] storage upload fallback to data URL", e);
+    }
+
+    const { data: current } = await supabaseAdmin
+      .from("payment_gateways")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!current) throw new Error("Gateway not found");
+
+    const curConfig = (current.config as Record<string, any>) || {};
+    const newConfig = { ...curConfig, logo_url: logoUrl };
+
+    const { error } = await supabaseAdmin
+      .from("payment_gateways")
+      .update({ config: newConfig, updated_at: new Date().toISOString() } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true, logoUrl };
   });
 
 /**

@@ -63,6 +63,63 @@ function rollupPaymentStatus(payments: Array<{ status: string; amount: number }>
  */
 async function ensurePaidOrdersIntegrated(admin: any) {
   try {
+    // 0. Live gateway check for recent payment attempts (created/attempted/failed) to heal any missed webhooks
+    const lookbackDate = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
+    const { data: pendingPayments } = await admin
+      .from("payments")
+      .select("id, lead_id, gateway_name, transaction_id, razorpay_order_id, status")
+      .in("status", ["created", "attempted", "failed"])
+      .gt("created_at", lookbackDate)
+      .limit(50);
+
+    if (pendingPayments && pendingPayments.length > 0) {
+      const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+      for (const p of pendingPayments) {
+        const txnid = p.transaction_id || p.razorpay_order_id;
+        if (!txnid) continue;
+        const gw = String(p.gateway_name ?? "payu").toLowerCase();
+
+        if (gw === "payu") {
+          try {
+            const { verifyPayUPayment } = await import("@/lib/payments/payu.server");
+            const verified = await verifyPayUPayment(txnid);
+            const status = String(verified?.status ?? "").trim().toLowerCase();
+            const unmapped = String(verified?.unmappedstatus ?? "").trim().toLowerCase();
+            if (status === "success" || unmapped === "captured") {
+              const mihpayid = verified?.mihpayid ? String(verified.mihpayid) : null;
+              await admin.from("payments").update({
+                status: "paid",
+                payment_date: new Date().toISOString(),
+                razorpay_payment_id: mihpayid,
+                payu_mihpayid: mihpayid,
+                raw_response: { verified_payment: verified, source: "ensurePaidOrdersIntegrated" } as any,
+              } as any).eq("id", p.id);
+
+              await finalizePaidPayment(p.id, { source: "reconcile", txnid, mihpayid });
+            }
+          } catch (err) {
+            console.error(`[ensurePaidOrdersIntegrated] PayU verify failed for ${txnid}:`, err);
+          }
+        } else if (gw === "ccavenue") {
+          try {
+            const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
+            const reconciled = await callOrderStatusApi(txnid);
+            if (reconciled.status === "paid") {
+              await admin.from("payments").update({
+                status: "paid",
+                payment_date: new Date().toISOString(),
+                raw_response: { reconciled: reconciled.raw, source: "ensurePaidOrdersIntegrated" } as any,
+              } as any).eq("id", p.id);
+
+              await finalizePaidPayment(p.id, { source: "reconcile", txnid, mihpayid: reconciled.trackingId || null });
+            }
+          } catch (err) {
+            console.error(`[ensurePaidOrdersIntegrated] CCAvenue verify failed for ${txnid}:`, err);
+          }
+        }
+      }
+    }
+
     // 1. Find payments with status paid/success/successful where application_id is NULL
     const { data: unlinkedPayments } = await admin
       .from("payments")
@@ -143,34 +200,30 @@ async function ensurePaidOrdersIntegrated(admin: any) {
           }
         }
       }
-    }
-
-    // 3. Self-heal leads with pending payment links or payment attempts to payment_pending status
-    const { data: pendingLinkLeads } = await admin
-      .from("payment_links" as any)
-      .select("lead_id")
-      .eq("status", "pending")
+    // 3. Revert leads prematurely marked payment_pending without any payment attempt or payment link
+    const { data: pendingLeads } = await admin
+      .from("leads")
+      .select("id")
+      .eq("status", "payment_pending")
       .limit(100);
 
-    const { data: attemptedPaymentLeads } = await admin
-      .from("payments")
-      .select("lead_id")
-      .in("status", ["created", "attempted"])
-      .limit(100);
+    if (pendingLeads && pendingLeads.length > 0) {
+      const pIds = pendingLeads.map((l: any) => l.id);
+      const { data: pmtRows } = await admin.from("payments").select("lead_id").in("lead_id", pIds);
+      const { data: linkRows } = await admin.from("payment_links" as any).select("lead_id").in("lead_id", pIds);
 
-    const pLeadIds = Array.from(
-      new Set([
-        ...(pendingLinkLeads ?? []).map((p: any) => p.lead_id),
-        ...(attemptedPaymentLeads ?? []).map((p: any) => p.lead_id),
-      ].filter(Boolean))
-    );
+      const activePLeadIds = new Set([
+        ...(pmtRows ?? []).map((p: any) => p.lead_id),
+        ...(linkRows ?? []).map((l: any) => l.lead_id),
+      ].filter(Boolean));
 
-    if (pLeadIds.length > 0) {
-      await admin
-        .from("leads")
-        .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
-        .in("id", pLeadIds)
-        .in("status", ["new_lead", "contacted", "lead_created"]);
+      const orphanedLeadIds = pIds.filter((id: string) => !activePLeadIds.has(id));
+      if (orphanedLeadIds.length > 0) {
+        await admin
+          .from("leads")
+          .update({ status: "new_lead", lead_status_v2: "new_lead" } as any)
+          .in("id", orphanedLeadIds);
+      }
     }
 
     // 3. Self-heal applications rows where service_id IS NULL but lead has service_id or service text

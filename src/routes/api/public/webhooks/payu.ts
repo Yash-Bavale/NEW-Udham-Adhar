@@ -102,14 +102,47 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         }
 
         // Load payment by txnid (we stored it as both transaction_id and razorpay_order_id)
-        const { data: payment } = await supabaseAdmin
+        let payment = (await supabaseAdmin
           .from("payments")
           .select("id, lead_id, application_id, status, amount")
           .or(`transaction_id.eq.${fields.txnid},razorpay_order_id.eq.${fields.txnid}`)
-          .maybeSingle();
+          .maybeSingle()).data;
+
+        if (!payment && (fields.udf1 || fields.udf3)) {
+          const leadId = fields.udf1;
+          const leadCode = fields.udf3;
+          const { data: targetLead } = await supabaseAdmin
+            .from("leads")
+            .select("id, lead_code")
+            .or(`id.eq.${leadId || "invalid-uuid"},lead_code.eq.${leadCode || "invalid-code"}`)
+            .maybeSingle();
+
+          if (targetLead) {
+            const payAmt = Number(fields.amount || 0);
+            const baseAmt = Math.round((payAmt / 1.18) * 100) / 100;
+            const gstAmt = Math.round((payAmt - baseAmt) * 100) / 100;
+            const { data: createdPmt } = await supabaseAdmin
+              .from("payments")
+              .insert({
+                lead_id: targetLead.id,
+                gateway_name: "payu",
+                transaction_id: fields.txnid,
+                razorpay_order_id: fields.txnid,
+                amount: payAmt,
+                base_amount: baseAmt,
+                gst_amount: gstAmt,
+                currency: "INR",
+                status: "created",
+                idempotency_key: `payu:${fields.txnid}`,
+              } as any)
+              .select("id, lead_id, application_id, status, amount")
+              .maybeSingle();
+            if (createdPmt) payment = createdPmt;
+          }
+        }
 
         if (!payment) {
-          console.error("[payu] payment row missing", fields.txnid);
+          console.error("[payu] payment row missing even after lead lookup", fields.txnid);
           return isBrowser
             ? redirectToPending(get("udf3") || fields.txnid)
             : new Response("payment-not-found", { status: 200 });

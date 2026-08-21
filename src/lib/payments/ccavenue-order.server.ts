@@ -76,10 +76,10 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
 
   await supabaseAdmin
     .from("payments")
-    .update({ status: "failed" })
+    .update({ status: "attempted" })
     .eq("lead_id", lead.id)
     .eq("gateway_name", "ccavenue")
-    .in("status", ["created", "attempted"]);
+    .in("status", ["created"]);
 
   const orderId = buildCcavOrderId(lead.lead_code);
   const amount = payAmount.toFixed(2);

@@ -79,10 +79,10 @@ export async function buildPayUOrder(leadCodeInput: string) {
 
   await supabaseAdmin
     .from("payments")
-    .update({ status: "failed" })
+    .update({ status: "attempted" })
     .eq("lead_id", lead.id)
     .eq("gateway_name", "payu")
-    .in("status", ["created", "attempted"]);
+    .in("status", ["created"]);
 
   const txnid = buildTxnId(leadCode);
   const { data: inserted, error: insErr } = await supabaseAdmin
