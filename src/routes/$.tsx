@@ -322,7 +322,7 @@ function ArticleRoute() {
     );
   }
   if (data?.wpHtml) {
-    return <WpPage title={titleize(data.slug)} html={data.wpHtml} />;
+    return <WpPage title={titleize(data.slug)} html={data.wpHtml} withForm />;
   }
   if (data?.cfArticle) {
     return <SeoContentPage data={cfToSeoPageData(data.cfArticle)} />;
