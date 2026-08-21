@@ -110,8 +110,19 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         }
 
 
-        // Idempotency: never downgrade a paid record.
+        // Idempotency: never downgrade a paid record. Rerun the idempotent
+        // finalizer so retries repair an interrupted lead/application update.
         if (payment.status === "paid") {
+          try {
+            const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+            await finalizePaidPayment(payment.id, {
+              source: "webhook",
+              txnid: orderId,
+              mihpayid: trackingId || null,
+            });
+          } catch (e) {
+            console.error("[ccavenue] paid payment finalization retry failed", e);
+          }
           return isBrowser
             ? redirectToSuccess(leadCodeFromParam || orderId)
             : new Response("OK", { status: 200 });

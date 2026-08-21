@@ -157,7 +157,19 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         }
 
         // Idempotency: once paid, never let a later browser/S2S retry downgrade it.
+        // Still rerun the idempotent finalizer so a callback retry repairs any
+        // previously interrupted lead/application workflow.
         if (payment.status === "paid") {
+          try {
+            const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+            await finalizePaidPayment(payment.id, {
+              source: "webhook",
+              txnid: fields.txnid,
+              mihpayid: mihpayid || null,
+            });
+          } catch (e) {
+            console.error("[payu] paid payment finalization retry failed", e);
+          }
           return isBrowser
             ? redirectToSuccess(get("udf3") || fields.txnid)
             : new Response("OK", { status: 200 });

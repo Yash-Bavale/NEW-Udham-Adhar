@@ -163,7 +163,6 @@ async function ensurePaidOrdersIntegrated(admin: any) {
           .update({
             status: "payment_successful",
             lead_status_v2: "payment_successful",
-            payment_successful_at: new Date().toISOString(),
           } as any)
           .in("id", unsyncedIds);
       }
