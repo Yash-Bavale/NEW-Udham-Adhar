@@ -140,8 +140,15 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     console.error("[finalize] invoice generation failed", e);
   }
 
-  // 5) E001 email
+  // 5) E001 email — send ONCE per payment. Reconcile/webhook retries call this
+  // finalizer repeatedly; without this guard the customer gets duplicate
+  // "Order Confirmation & Tax Invoice" mails for the same money.
+  const alreadyEmailed = !!invoiceRow?.last_emailed_at;
   try {
+    if (alreadyEmailed) {
+      console.info("[finalize] E001 already sent for payment, skipping", payment.id);
+      throw new SkipEmail();
+    }
     const { data: leadRow } = await supabaseAdmin
       .from("leads")
       .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
