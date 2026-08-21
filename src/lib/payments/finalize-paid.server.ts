@@ -132,7 +132,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
     const { data: inv } = await supabaseAdmin
       .from("invoices")
-      .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
+      .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount, last_emailed_at")
       .eq("payment_id", payment.id)
       .maybeSingle();
     invoiceRow = inv;
