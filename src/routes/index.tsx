@@ -114,7 +114,7 @@ export const Route = createFileRoute("/")({
           rel: "preload",
           as: "image",
           href: certImg.url,
-          fetchpriority: "high",
+          fetchPriority: "high",
         },
       ],
       scripts: [

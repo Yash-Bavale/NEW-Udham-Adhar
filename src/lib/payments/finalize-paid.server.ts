@@ -90,11 +90,12 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
 
 
   // 2) Lead + payment_links
-  const { data: curLead } = await supabaseAdmin
+  const { data: curLeadRaw } = await supabaseAdmin
     .from("leads")
-    .select("payment_successful_at")
+    .select("payment_successful_at" as any)
     .eq("id", payment.lead_id)
     .maybeSingle();
+  const curLead = curLeadRaw as { payment_successful_at?: string | null } | null;
 
   const leadPatch: Record<string, any> = {
     status: "payment_successful",

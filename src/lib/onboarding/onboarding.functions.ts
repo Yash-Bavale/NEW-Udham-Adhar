@@ -232,7 +232,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       }
 
       // Check Plants requirement on server
-      const plantsField = validationFields.find((f) => f.type === "plants" || f.key === "plants" || (f.required && f.type === "plants"));
+      const plantsField = validationFields.find((f) => String(f.type) === "plants" || f.key === "plants");
       if (plantsField) {
         const rawPlants = mergedData[plantsField.key || "plants"];
         let plantArr: any[] = [];
