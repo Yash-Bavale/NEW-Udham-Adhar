@@ -99,32 +99,78 @@ async function ensurePaidOrdersIntegrated(admin: any) {
         .eq("is_deleted", false);
       const existingLeadIdSet = new Set((existingApps ?? []).map((a: any) => a.lead_id));
 
+      const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
       for (const l of paidLeads) {
         if (!existingLeadIdSet.has(l.id)) {
-          // Missing application row! Insert application row right now.
-          const { data: createdApp } = await admin
-            .from("applications")
-            .insert({
-              lead_id: l.id,
-              customer_id: l.customer_id ?? null,
-              service_id: l.service_id ?? null,
-              assigned_to: l.assigned_to ?? null,
-              website_id: l.website_id ?? null,
-              application_status: "payment_received",
-              fulfillment_status: "order_received",
-            })
+          // Missing application row! Find the paid payment for this lead and run finalizePaidPayment.
+          const { data: p } = await admin
+            .from("payments")
             .select("id")
+            .eq("lead_id", l.id)
+            .eq("status", "paid")
+            .order("created_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
 
-          if (createdApp?.id) {
-            // Link any payments for this lead to the newly created application
-            await admin
-              .from("payments")
-              .update({ application_id: createdApp.id, status: "paid" })
-              .eq("lead_id", l.id);
+          if (p?.id) {
+            try {
+              await finalizePaidPayment(p.id, { source: "reconcile" });
+            } catch (err) {
+              console.error(`[self-heal] finalizePaidPayment failed for lead ${l.id}:`, err);
+            }
+          } else {
+            // If no payment row exists, create the application row directly.
+            const { data: createdApp } = await admin
+              .from("applications")
+              .insert({
+                lead_id: l.id,
+                customer_id: l.customer_id ?? null,
+                service_id: l.service_id ?? null,
+                assigned_to: l.assigned_to ?? null,
+                website_id: l.website_id ?? null,
+                application_status: "payment_received",
+                fulfillment_status: "order_received",
+              })
+              .select("id")
+              .maybeSingle();
+
+            if (createdApp?.id) {
+              await admin
+                .from("payments")
+                .update({ application_id: createdApp.id, status: "paid" })
+                .eq("lead_id", l.id);
+            }
           }
         }
       }
+    }
+
+    // 3. Self-heal leads with pending payment links or payment attempts to payment_pending status
+    const { data: pendingLinkLeads } = await admin
+      .from("payment_links" as any)
+      .select("lead_id")
+      .eq("status", "pending")
+      .limit(100);
+
+    const { data: attemptedPaymentLeads } = await admin
+      .from("payments")
+      .select("lead_id")
+      .in("status", ["created", "attempted"])
+      .limit(100);
+
+    const pLeadIds = Array.from(
+      new Set([
+        ...(pendingLinkLeads ?? []).map((p: any) => p.lead_id),
+        ...(attemptedPaymentLeads ?? []).map((p: any) => p.lead_id),
+      ].filter(Boolean))
+    );
+
+    if (pLeadIds.length > 0) {
+      await admin
+        .from("leads")
+        .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
+        .in("id", pLeadIds)
+        .in("status", ["new_lead", "contacted", "lead_created"]);
     }
 
     // 3. Self-heal applications rows where service_id IS NULL but lead has service_id or service text

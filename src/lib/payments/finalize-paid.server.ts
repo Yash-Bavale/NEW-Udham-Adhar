@@ -90,8 +90,22 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
 
 
   // 2) Lead + payment_links
+  const { data: curLead } = await supabaseAdmin
+    .from("leads")
+    .select("payment_successful_at")
+    .eq("id", payment.lead_id)
+    .maybeSingle();
+
+  const leadPatch: Record<string, any> = {
+    status: "payment_successful",
+    lead_status_v2: "payment_successful",
+  };
+  if (!curLead?.payment_successful_at) {
+    leadPatch.payment_successful_at = new Date().toISOString();
+  }
+
   await supabaseAdmin.from("leads")
-    .update({ status: "payment_successful", lead_status_v2: "payment_successful" } as any)
+    .update(leadPatch as any)
     .eq("id", payment.lead_id);
 
   await supabaseAdmin

@@ -90,6 +90,17 @@ export const createPaymentLink = createServerFn({ method: "POST" })
       .single();
     if (insErr || !inserted) throw new Error(insErr?.message ?? "Could not create payment link");
 
+    // Update lead status to payment_pending if currently new/contacted
+    if (
+      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.status ?? "") ||
+      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.lead_status_v2 ?? "")
+    ) {
+      await supabaseAdmin
+        .from("leads")
+        .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
+        .eq("id", lead.id);
+    }
+
     return {
       ...(inserted as any),
       amount: Number((inserted as any).amount),

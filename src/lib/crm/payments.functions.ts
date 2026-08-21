@@ -275,6 +275,15 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
           })
           .eq("id", payment.id);
 
+        if (newStatus === "paid") {
+          const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+          await finalizePaidPayment(payment.id, { source: "reconcile", txnid: orderId, mihpayid: result.trackingId || null });
+        } else if (newStatus === "failed") {
+          await (await getAdmin()).from("leads")
+            .update({ status: "payment_pending", lead_status_v2: "payment_failed" } as any)
+            .eq("id", payment.lead_id);
+        }
+
         await writeAudit({
           supabase: context.supabase,
           entityType: "payment",

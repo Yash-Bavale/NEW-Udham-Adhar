@@ -34,6 +34,18 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     .limit(1)
     .maybeSingle();
 
+  const { data: pendingLink } = await supabaseAdmin
+    .from("payment_links" as any)
+    .select("amount")
+    .eq("lead_id", lead.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const hasPendingLink = !!pendingLink && Number((pendingLink as any).amount) > 0;
+  const pendingAmount = hasPendingLink ? Number((pendingLink as any).amount) : 0;
+
   const { data: paidAlready } = await supabaseAdmin
     .from("payments")
     .select("id")
@@ -42,9 +54,24 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     .limit(1)
     .maybeSingle();
   const awaitingConvertedServicePayment =
-    lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
+    hasPendingLink || lead.status === "payment_pending" || lead.lead_status_v2 === "payment_pending";
   if (paidAlready && !awaitingConvertedServicePayment) {
     throw new Error("This application has already been paid.");
+  }
+
+  const payAmount = hasPendingLink ? pendingAmount : Number(lead.total_amount);
+  const payBase = Math.round((payAmount / 1.18) * 100) / 100;
+  const payGst = Math.round((payAmount - payBase) * 100) / 100;
+
+  // Mark lead status as payment_pending if currently new/contacted
+  if (
+    ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.status ?? "") ||
+    ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.lead_status_v2 ?? "")
+  ) {
+    await supabaseAdmin
+      .from("leads")
+      .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
+      .eq("id", lead.id);
   }
 
   await supabaseAdmin
@@ -55,7 +82,7 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     .in("status", ["created", "attempted"]);
 
   const orderId = buildCcavOrderId(lead.lead_code);
-  const amount = Number(lead.total_amount).toFixed(2);
+  const amount = payAmount.toFixed(2);
 
   const { data: inserted, error: insErr } = await supabaseAdmin
     .from("payments")
@@ -65,9 +92,9 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
       gateway_name: "ccavenue",
       transaction_id: orderId,
       razorpay_order_id: orderId,
-      amount: Number(lead.total_amount),
-      base_amount: Number(lead.base_amount),
-      gst_amount: Number(lead.gst_amount),
+      amount: payAmount,
+      base_amount: payBase,
+      gst_amount: payGst,
       currency: "INR",
       status: "created",
       idempotency_key: `ccavenue:${orderId}`,
@@ -115,6 +142,6 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     } as Record<string, string>,
     paymentId,
     leadCode: lead.lead_code,
-    totalAmount: Number(lead.total_amount),
+    totalAmount: payAmount,
   };
 }

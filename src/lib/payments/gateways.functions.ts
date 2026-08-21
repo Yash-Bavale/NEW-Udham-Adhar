@@ -39,6 +39,19 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
     }
     if (!lead) throw new Error("Application not found");
 
+    // When customer opens summary / payment page, mark status as payment_pending if currently new/contacted
+    if (
+      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.status ?? "") ||
+      ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.lead_status_v2 ?? "")
+    ) {
+      await supabaseAdmin
+        .from("leads")
+        .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
+        .eq("id", lead.id);
+      lead.status = "payment_pending";
+      lead.lead_status_v2 = "payment_pending";
+    }
+
 
     // Fetch service description separately
     let serviceDescription = "";

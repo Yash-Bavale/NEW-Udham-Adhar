@@ -66,6 +66,17 @@ export async function buildPayUOrder(leadCodeInput: string) {
   const payBase = Math.round((payAmount / 1.18) * 100) / 100;
   const payGst = Math.round((payAmount - payBase) * 100) / 100;
 
+  // Mark lead status as payment_pending if currently new/contacted
+  if (
+    ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.status ?? "") ||
+    ["new_lead", "contacted", "follow_up_required", "lead_created"].includes(lead.lead_status_v2 ?? "")
+  ) {
+    await supabaseAdmin
+      .from("leads")
+      .update({ status: "payment_pending", lead_status_v2: "payment_pending" } as any)
+      .eq("id", lead.id);
+  }
+
   await supabaseAdmin
     .from("payments")
     .update({ status: "failed" })
