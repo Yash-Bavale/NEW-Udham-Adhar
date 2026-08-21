@@ -33,9 +33,11 @@ function GatewaysPage() {
         <div className="font-semibold">How CCAvenue callbacks are verified</div>
         <p className="mt-1">
           CCAvenue's standard checkout does not sign callbacks with HMAC. Instead we decrypt CCAvenue's encrypted
-          response with the working key and re-check the transaction against CCAvenue's Order Status API before
-          marking a payment as paid, so a forged callback can't mark an order paid. PayU webhooks remain fully
-          signature-verified.
+          response with the working key — only someone holding the working key can produce a valid response, so a
+          forged callback can't mark an order paid. Checkout runs entirely from the website domain and needs no IP
+          whitelisting. The Order Status API is used only as an extra re-check for ambiguous results (awaited /
+          amount mismatch) and for admin refunds; it is optional and its absence does not block payments. PayU
+          webhooks remain fully signature-verified.
         </p>
         <div className="mt-3 flex items-center gap-3">
           <button
