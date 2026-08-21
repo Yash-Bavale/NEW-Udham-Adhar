@@ -606,28 +606,6 @@ function Input2(props: React.InputHTMLAttributes<HTMLInputElement> & { label: st
   );
 }
 
-function GatewayLogo({
-  brand,
-}: {
-  brand: { bg: string; fg: string; label: string; logo?: string };
-}) {
-  if (brand.logo) {
-    return (
-      <div className="w-16 h-9 rounded-md bg-white border border-border flex items-center justify-center p-1 shadow-sm">
-        <img src={brand.logo} alt={`${brand.label} logo`} className="max-h-full max-w-full object-contain" loading="lazy" />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="w-16 h-9 rounded-md flex items-center justify-center text-[11px] font-extrabold tracking-tight shadow-sm"
-      style={{ backgroundColor: brand.bg, color: brand.fg }}
-    >
-      {brand.label}
-    </div>
-  );
-}
-
 function DummyUrgencyTimer() {
   const [seconds, setSeconds] = useState(30);
 
