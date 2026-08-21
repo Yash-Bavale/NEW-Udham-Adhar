@@ -119,7 +119,7 @@ export function WpPage({
           id="lead-form"
           className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start"
         >
-          <LeadForm title={title} />
+          <LeadForm title={heading} />
           <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
             <div className="bg-form-header text-white text-center py-4">
               <h2 className="text-xl font-bold font-display">Sample Certificate</h2>
