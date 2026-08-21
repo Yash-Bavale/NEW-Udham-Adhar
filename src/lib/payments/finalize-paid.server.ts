@@ -90,24 +90,17 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
 
 
   // 2) Lead + payment_links
-  const { data: curLeadRaw } = await supabaseAdmin
-    .from("leads")
-    .select("payment_successful_at" as any)
-    .eq("id", payment.lead_id)
-    .maybeSingle();
-  const curLead = curLeadRaw as { payment_successful_at?: string | null } | null;
-
-  const leadPatch: Record<string, any> = {
-    status: "payment_successful",
-    lead_status_v2: "payment_successful",
-  };
-  if (!curLead?.payment_successful_at) {
-    leadPatch.payment_successful_at = new Date().toISOString();
-  }
-
-  await supabaseAdmin.from("leads")
-    .update(leadPatch as any)
+  // NOTE: `leads` has no payment_successful_at column — including it here made
+  // the whole update fail silently, which is why paid leads kept showing
+  // "payment pending" in the admin list.
+  const { error: leadErr } = await supabaseAdmin.from("leads")
+    .update({
+      status: "payment_successful",
+      lead_status_v2: "payment_successful",
+    } as any)
     .eq("id", payment.lead_id);
+  if (leadErr) console.error("[finalize] lead status update failed", leadErr);
+
 
   await supabaseAdmin
     .from("payment_links" as any)
