@@ -637,6 +637,10 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "application_submitted",
     "verification_pending",
     "documents_received",
+    "waiting_for_customer_submission",
+    "awaiting_customer_form",
+    "form_link_sent",
+    "form_pending",
   ]);
 
   const blueStages = new Set([
@@ -652,7 +656,7 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "refund_requested",
   ]);
 
-  if (blueStatuses.has(fs) || blueStages.has(stage)) {
+  if (blueStatuses.has(fs) || blueStages.has(stage) || Boolean((order as any).form_link_sent_at)) {
     return { label: "Action Taken", tone: "blue" };
   }
 

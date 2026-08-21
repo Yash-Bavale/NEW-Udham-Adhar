@@ -50,7 +50,7 @@ import {
 import { transitionLeadStatus, addManualNote, listLeadEvents } from "@/lib/crm/lead-status.functions";
 import { approveRefund, markRefundProcessed, rejectRefund } from "@/lib/crm/refunds.functions";
 import { createFollowUp, listFollowUpsForLead } from "@/lib/crm/follow-ups.functions";
-import { createPaymentLink, getPaymentLinkStatusForLead } from "@/lib/payments/payment-links.functions";
+import { createPaymentLink, getPaymentLinkStatusForLead, sendPaymentLinkEmail as sendPaymentLinkEmailFn } from "@/lib/payments/payment-links.functions";
 import { useRole } from "@/hooks/useRole";
 import { ConvertConsultationPanel } from "./ConvertConsultationPanel";
 import { LogContactDialog } from "./LogContactDialog";
@@ -385,111 +385,24 @@ function QuickActionsCard({
   currentStatus: LeadStatusV2;
   hideMoney: boolean;
 }) {
-  const qc = useQueryClient();
-  const transitionFn = useServerFn(transitionLeadStatus);
-  const createLinkFn = useServerFn(createPaymentLink);
-  const linkStatusFn = useServerFn(getPaymentLinkStatusForLead);
-  const role = useRole();
-  const employeeName = role.displayName;
-
-  const [contactBusy, setContactBusy] = useState(false);
-  const [linkBusy, setLinkBusy] = useState(false);
-  const [logOpen, setLogOpen] = useState(false);
-
-  const { data: linkStatus } = useQuery({
-    queryKey: ["lead.paymentLink", lead.id],
-    queryFn: () => linkStatusFn({ data: { leadId: lead.id } }),
-    staleTime: 30_000,
-  });
-  const paymentUrl = readPaymentUrl(linkStatus);
-
-  const number = waNumber(lead.mobile);
-  const introMsg = buildIntroMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null);
-  const introWaUrl = number ? whatsappUrl(number, introMsg) : null;
-
-  const toggleContacted = async () => {
-    const next = currentStatus === "contacted" ? "new_lead" : "contacted";
-    setContactBusy(true);
-    try {
-      await transitionFn({ data: { leadId: lead.id, toStatus: next } });
-      toast.success(next === "contacted" ? "Marked as Contacted" : "Marked as New Lead");
-      qc.invalidateQueries({ queryKey: ["admin.lead", lead.id] });
-      qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
-      qc.invalidateQueries({ queryKey: ["admin.leads"] });
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
-    } finally {
-      setContactBusy(false);
-    }
-  };
-
-  const contactOnWhatsApp = () => {
-    if (!number) {
-      toast.error("Add a mobile number first");
-      return;
-    }
-    if (!introWaUrl) return;
-    openWhatsApp(introWaUrl);
-  };
-
-  const ensurePaymentUrl = async (): Promise<string | null> => {
-    if (paymentUrl) return paymentUrl;
-    setLinkBusy(true);
-    try {
-      const res: any = await createLinkFn({ data: { leadId: lead.id } });
-      const url = readPaymentUrl(res);
-      await qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
-      return url;
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to generate link");
-      return null;
-    } finally {
-      setLinkBusy(false);
-    }
-  };
-
-  const generateLink = async () => {
-    const url = await ensurePaymentUrl();
-    if (!url) return;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Payment link copied");
-    } catch {
-      toast.success("Payment link generated");
-    }
-  };
-
-  const sendPaymentLinkWhatsApp = async () => {
-    if (!number) {
-      toast.error("Add a mobile number first");
-      return;
-    }
-    if (paymentUrl) {
-      const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, paymentUrl);
-      openWhatsApp(whatsappUrl(number, msg));
-      return;
-    }
-
-    const waWin = window.open("about:blank", "_blank");
-    const url = paymentUrl ?? (await ensurePaymentUrl());
-    if (!url) {
-      waWin?.close();
-      return;
-    }
-    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
-    openWhatsApp(whatsappUrl(number, msg), waWin);
-  };
+  const sendPaymentEmailFn = useServerFn(sendPaymentLinkEmailFn);
 
   const sendPaymentLinkEmail = async () => {
     if (!lead.email) {
       toast.error("Add a customer email first");
       return;
     }
-    const url = paymentUrl ?? (await ensurePaymentUrl());
-    if (!url) return;
-    const msg = buildPaymentLinkMessage(lead.name, employeeName, lead.lead_code, lead.service ?? null, url);
-    const subject = encodeURIComponent("Your Payment Link – Udyam Aadhar Advisory");
-    window.location.href = `mailto:${lead.email}?subject=${subject}&body=${encodeURIComponent(msg)}`;
+    setLinkBusy(true);
+    try {
+      const res = await sendPaymentEmailFn({ data: { leadId: lead.id } });
+      toast.success(res.message || `Payment link email sent to ${lead.email}`);
+      qc.invalidateQueries({ queryKey: ["lead.paymentLink", lead.id] });
+      qc.invalidateQueries({ queryKey: ["admin.lead-events", lead.id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to send payment link email");
+    } finally {
+      setLinkBusy(false);
+    }
   };
 
   const isContacted = currentStatus === "contacted";

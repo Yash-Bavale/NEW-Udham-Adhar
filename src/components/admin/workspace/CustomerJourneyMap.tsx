@@ -153,16 +153,31 @@ export function CustomerJourneyMap(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.activeSubKey, currentIdx]);
 
+  const isFormLinkSent = useMemo(() => {
+    if (formLinkSent) return true;
+    const ws = (p.workflowStatus ?? "").toLowerCase();
+    if (ws === "waiting_for_customer_submission" || ws === "form_link_sent" || ws === "form_pending") return true;
+    if (events && events.some((e: any) =>
+      e?.type === "FormLinkSent" ||
+      e?.event_type === "form_link_sent" ||
+      e?.event_type === "email_queued" ||
+      e?.template_code === "E002" ||
+      e?.type === "EmailSent" ||
+      e?.type === "WelcomeMailSent"
+    )) return true;
+    return false;
+  }, [formLinkSent, p.workflowStatus, events]);
+
   const phase = useMemo(() => derivePhase({
     stage: p.stage,
     workflowStatus: p.workflowStatus,
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
     reminderCount,
-    formLinkSent,
+    formLinkSent: isFormLinkSent,
     techDelayResolved,
     adminOverride: p.adminOverride,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, formLinkSent, techDelayResolved, p.adminOverride]);
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, isFormLinkSent, techDelayResolved, p.adminOverride]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
   const gate = (code: ButtonCode) => {

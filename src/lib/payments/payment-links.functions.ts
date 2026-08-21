@@ -273,3 +273,86 @@ export const regeneratePaymentLink = createServerFn({ method: "POST" })
     // Reuse the same create-link path now that no pending row exists.
     return createPaymentLink({ data });
   });
+
+/** Send a professional HTML payment link email directly to the lead. */
+export const sendPaymentLinkEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LeadIdInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, [...STAFF_ROLES] as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendEmailDirectInternal } = await import("@/lib/emails/emails.server");
+
+    // 1. Create or fetch existing payment link
+    const linkRes = await createPaymentLink({ data: { leadId: data.leadId } });
+    const paymentUrl = (linkRes as any).payment_url;
+
+    // 2. Fetch lead details
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("id, lead_code, name, email, service, total_amount")
+      .eq("id", data.leadId)
+      .single();
+
+    if (!lead || !lead.email) {
+      throw new Error("Lead email not found. Please add a valid email first.");
+    }
+
+    const customerName = lead.name || "Valued Customer";
+    const serviceName = lead.service || "Udyam Registration Service";
+    const amount = Number(lead.total_amount || 0).toLocaleString("en-IN");
+    const leadCode = lead.lead_code || lead.id.slice(0, 8);
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
+        <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #0f172a;">
+          <h2 style="color: #0f172a; margin: 0;">Udyam Aadhar Advisory Services</h2>
+          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Payment Link for Lead ID: <strong>${leadCode}</strong></p>
+        </div>
+
+        <div style="padding: 20px 0;">
+          <p style="font-size: 16px; color: #1e293b;">Dear <strong>${customerName}</strong>,</p>
+          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+            Thank you for choosing Udyam Aadhar Advisory for your <strong>${serviceName}</strong>.
+          </p>
+          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+            Please click the button below to complete your payment of <strong>₹${amount}</strong> securely:
+          </p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${paymentUrl}" style="background-color: #0f172a; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 16px; display: inline-block;">
+              Pay Now (₹${amount}) →
+            </a>
+          </div>
+
+          <p style="font-size: 12px; color: #64748b; text-align: center;">
+            Or copy and paste this payment link into your browser:<br />
+            <a href="${paymentUrl}" style="color: #2563eb; word-break: break-all;">${paymentUrl}</a>
+          </p>
+        </div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 12px; color: #94a3b8; text-align: center;">
+          <p style="margin: 0;">If you have any questions, feel free to reply directly to this email.</p>
+          <p style="margin: 5px 0 0;">© Udyam Aadhar Advisory · All Rights Reserved</p>
+        </div>
+      </div>
+    `;
+
+    await sendEmailDirectInternal({
+      to: lead.email,
+      subject: `Payment Link for ${serviceName} - Lead ID: ${leadCode}`,
+      html: htmlBody,
+      applicationId: undefined,
+      leadId: lead.id,
+    });
+
+    // Also record event log
+    await supabaseAdmin.from("application_events").insert({
+      lead_id: lead.id,
+      event_type: "payment_link_emailed",
+      new_value: `Payment link emailed to ${lead.email} (${paymentUrl})`,
+      created_by: context.userId,
+    } as any);
+
+    return { ok: true, message: `Payment link email sent to ${lead.email}` };
+  });
