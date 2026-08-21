@@ -671,21 +671,21 @@ export const getLeadCounts = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
-    // Paginate beyond PostgREST's 1000-row cap to get true counts per status.
-    const counts: Record<string, number> = { all: 0 };
-    const pageSize = 1000;
-    for (let from = 0; from < 500_000; from += pageSize) {
-      let q = admin.from("leads").select("status");
-      if (!isAdmin) {
-        q = q.eq("assigned_to", context.userId);
-      }
-      const { data, error } = await q.range(from, from + pageSize - 1);
-      if (error) throw new Error(error.message);
-      const rows = data ?? [];
-      counts.all += rows.length;
-      for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
-      if (rows.length < pageSize) break;
-    }
+    // Use head-only exact counts (no row transfer) to avoid timeouts on large tables.
+    const statuses = LEAD_STATUSES as readonly string[];
+    const scope = (q: any) => (isAdmin ? q : q.eq("assigned_to", context.userId));
+
+    const [allRes, ...perStatus] = await Promise.all([
+      scope(admin.from("leads").select("id", { count: "exact", head: true })),
+      ...statuses.map((s) =>
+        scope(admin.from("leads").select("id", { count: "exact", head: true })).eq("status", s),
+      ),
+    ]);
+
+    const counts: Record<string, number> = { all: allRes.count ?? 0 };
+    statuses.forEach((s, i) => {
+      counts[s] = perStatus[i]?.count ?? 0;
+    });
     return { counts };
   });
 
