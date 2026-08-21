@@ -386,8 +386,8 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
 
     // Leads breakdown by current status (not by lead_attribution — status is
     // what employees actually change and what the CRM shows).
-    const NOT_CONTACTED_STATUSES = new Set(["new_lead", "lead_created"]);
-    const CONTACTED_STATUSES = new Set(["contacted", "payment_pending"]);
+    const NOT_CONTACTED_STATUSES = new Set(["new_lead", "lead_created", "payment_pending"]);
+    const CONTACTED_STATUSES = new Set(["contacted"]);
     const CONVERTED_STATUSES = new Set([
       "payment_successful",
       "details_pending",
