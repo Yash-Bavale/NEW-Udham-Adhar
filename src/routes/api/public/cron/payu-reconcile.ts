@@ -25,8 +25,8 @@ export const Route = createFileRoute("/api/public/cron/payu-reconcile")({
           // Candidates: PayU rows still 'created' or 'attempted' that are older
           // than 3 min (allow the real webhook to arrive first) and younger
           // than 24h (older ones are stale — surface them to ops instead).
-          const cutOff = new Date(Date.now() - 3 * 60_000).toISOString();
-          const lookback = new Date(Date.now() - 24 * 3600_000).toISOString();
+          const cutOff = new Date(Date.now() - 1 * 60_000).toISOString();
+          const lookback = new Date(Date.now() - 30 * 24 * 3600_000).toISOString();
           const { data: candidates } = await supabaseAdmin
             .from("payments")
             .select("id, transaction_id, razorpay_order_id, status")
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/cron/payu-reconcile")({
             .in("status", ["created", "attempted"])
             .lt("created_at", cutOff)
             .gt("created_at", lookback)
-            .limit(50);
+            .limit(100);
 
           const results: any[] = [];
           for (const p of candidates ?? []) {

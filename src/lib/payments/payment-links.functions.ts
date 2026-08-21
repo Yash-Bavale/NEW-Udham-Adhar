@@ -133,7 +133,107 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
     // an earlier ₹99 consultation charge, or a top-up sibling) caused false
     // "Payment Received" banners on Talk-to-Expert / service-change flows.
     const linkRow: any = link;
-    const isPaid = linkRow.status === "paid";
+    let isPaid = linkRow.status === "paid";
+
+    // 1. If link status is not paid yet, check if there is a paid payment for this lead.
+    if (!isPaid) {
+      const { data: paidPayment } = await supabaseAdmin
+        .from("payments")
+        .select("id, amount, created_at")
+        .eq("lead_id", data.leadId)
+        .eq("status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (paidPayment) {
+        await supabaseAdmin
+          .from("payment_links" as any)
+          .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: paidPayment.id } as any)
+          .eq("lead_id", data.leadId)
+          .eq("status", "pending");
+
+        try {
+          const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+          await finalizePaidPayment(paidPayment.id, { source: "reconcile" });
+        } catch { /* ignore */ }
+
+        isPaid = true;
+        linkRow.status = "paid";
+        linkRow.paid_at = paidPayment.created_at;
+        linkRow.payment_id = paidPayment.id;
+      }
+    }
+
+    // 2. If still not paid, query payment gateway API for any attempted payment rows for this lead.
+    if (!isPaid) {
+      const { data: attemptedPayments } = await supabaseAdmin
+        .from("payments")
+        .select("id, gateway_name, transaction_id, razorpay_order_id")
+        .eq("lead_id", data.leadId)
+        .in("status", ["created", "attempted"])
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      for (const p of attemptedPayments ?? []) {
+        const txnid = p.transaction_id || p.razorpay_order_id;
+        if (!txnid) continue;
+        const gw = String(p.gateway_name ?? "payu").toLowerCase();
+
+        if (gw === "payu") {
+          try {
+            const { verifyPayUPayment } = await import("@/lib/payments/payu.server");
+            const verified = await verifyPayUPayment(txnid);
+            const status = String(verified?.status ?? "").trim().toLowerCase();
+            const unmapped = String(verified?.unmappedstatus ?? "").trim().toLowerCase();
+            if (status === "success" || unmapped === "captured") {
+              const mihpayid = verified?.mihpayid ? String(verified.mihpayid) : null;
+              await supabaseAdmin.from("payments").update({
+                status: "paid",
+                payment_date: new Date().toISOString(),
+                razorpay_payment_id: mihpayid,
+                payu_mihpayid: mihpayid,
+                raw_response: { verified_payment: verified, source: "link-status-auto-check" } as any,
+              } as any).eq("id", p.id);
+
+              const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+              await finalizePaidPayment(p.id, { source: "reconcile", txnid, mihpayid });
+
+              isPaid = true;
+              linkRow.status = "paid";
+              linkRow.paid_at = new Date().toISOString();
+              linkRow.payment_id = p.id;
+              break;
+            }
+          } catch (e) {
+            console.error("[getPaymentLinkStatus] PayU verify failed for txnid", txnid, e);
+          }
+        } else if (gw === "ccavenue") {
+          try {
+            const { callOrderStatusApi } = await import("@/lib/payments/ccavenue.server");
+            const reconciled = await callOrderStatusApi(txnid);
+            if (reconciled.status === "paid") {
+              await supabaseAdmin.from("payments").update({
+                status: "paid",
+                payment_date: new Date().toISOString(),
+                raw_response: { reconciled: reconciled.raw, source: "link-status-auto-check" } as any,
+              } as any).eq("id", p.id);
+
+              const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+              await finalizePaidPayment(p.id, { source: "reconcile", txnid, mihpayid: reconciled.trackingId || null });
+
+              isPaid = true;
+              linkRow.status = "paid";
+              linkRow.paid_at = new Date().toISOString();
+              linkRow.payment_id = p.id;
+              break;
+            }
+          } catch (e) {
+            console.error("[getPaymentLinkStatus] CCAvenue verify failed for orderId", txnid, e);
+          }
+        }
+      }
+    }
 
     let paidAmount: number | null = null;
     if (isPaid && linkRow.payment_id) {

@@ -70,20 +70,20 @@ function GatewaysPage() {
 
 
 
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="p-3">Gateway</th>
-              <th className="p-3">Webhook secret</th>
-              <th className="p-3 w-32">Priority</th>
-              <th className="p-3 w-28">Enabled</th>
-              <th className="p-3 w-32">Updated</th>
-              <th className="p-3 w-24"></th>
+              <th className="p-3">Gateway Name</th>
+              <th className="p-3">Logo URL</th>
+              <th className="p-3 w-28 text-center">Default</th>
+              <th className="p-3 w-24">Priority</th>
+              <th className="p-3 w-28">Status</th>
+              <th className="p-3 w-28"></th>
             </tr>
           </thead>
           <tbody>
-            {(data?.rows ?? []).map((g) => (
+            {(data?.rows ?? []).map((g: any) => (
               <GatewayRow
                 key={g.id}
                 row={g}
@@ -94,7 +94,7 @@ function GatewaysPage() {
                   try {
                     await updFn({ data: { id: g.id, ...patch } });
                     await qc.invalidateQueries({ queryKey: ["admin.gateways"] });
-                    setMsg(`Saved ${g.display_name}.`);
+                    setMsg(`Saved ${patch.display_name || g.display_name}.`);
                   } catch (e) {
                     setMsg((e as Error).message);
                   } finally {
@@ -109,24 +109,86 @@ function GatewaysPage() {
           </tbody>
         </table>
       </div>
-      {msg && <p className="text-xs text-slate-600">{msg}</p>}
+      {msg && <p className="text-xs text-slate-600 font-medium">{msg}</p>}
     </div>
   );
 }
 
-type Row = { id: string; name: string; display_name: string; is_enabled: boolean; priority: number; webhook_secret_name: string | null; updated_at: string };
+type Row = {
+  id: string;
+  name: string;
+  display_name: string;
+  is_enabled: boolean;
+  priority: number;
+  config?: any;
+  webhook_secret_name: string | null;
+  updated_at: string;
+};
 
-function GatewayRow({ row, busy, onSave }: { row: Row; busy: boolean; onSave: (p: { is_enabled: boolean; priority: number }) => Promise<void> }) {
+function GatewayRow({
+  row,
+  busy,
+  onSave,
+}: {
+  row: Row;
+  busy: boolean;
+  onSave: (p: { display_name: string; logo_url: string | null; is_default: boolean; is_enabled: boolean; priority: number }) => Promise<void>;
+}) {
+  const curConfig = row.config || {};
+  const [displayName, setDisplayName] = useState(row.display_name);
+  const [logoUrl, setLogoUrl] = useState(curConfig.logo_url || "");
+  const [isDefault, setIsDefault] = useState(Boolean(curConfig.is_default));
   const [enabled, setEnabled] = useState(row.is_enabled);
   const [priority, setPriority] = useState(row.priority);
-  const dirty = enabled !== row.is_enabled || priority !== row.priority;
+
+  const dirty =
+    displayName !== row.display_name ||
+    logoUrl !== (curConfig.logo_url || "") ||
+    isDefault !== Boolean(curConfig.is_default) ||
+    enabled !== row.is_enabled ||
+    priority !== row.priority;
+
   return (
     <tr className="border-t">
       <td className="p-3">
-        <div className="font-medium">{row.display_name}</div>
-        <div className="text-xs text-slate-500 font-mono">{row.name}</div>
+        <input
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className="w-full font-medium text-slate-900 border border-slate-300 rounded px-2.5 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-slate-900"
+          placeholder="Display Name"
+        />
+        <div className="text-xs text-slate-400 font-mono mt-1 px-0.5">Code: {row.name}</div>
       </td>
-      <td className="p-3 text-xs font-mono text-slate-500">{row.webhook_secret_name ?? "—"}</td>
+      <td className="p-3">
+        <div className="flex items-center gap-2">
+          {logoUrl ? (
+            <img src={logoUrl} alt={displayName} className="h-6 w-auto max-w-16 object-contain rounded shrink-0 border bg-white px-1" />
+          ) : (
+            <div className="h-6 w-12 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400 shrink-0">No logo</div>
+          )}
+          <input
+            type="text"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            className="w-full text-xs font-mono border border-slate-300 rounded px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            placeholder="Logo image URL (HTTPS / SVG / PNG)"
+          />
+        </div>
+      </td>
+      <td className="p-3 text-center">
+        <label className="inline-flex items-center gap-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isDefault}
+            onChange={(e) => setIsDefault(e.target.checked)}
+            className="rounded text-brand-navy focus:ring-brand-navy"
+          />
+          <span className={`text-xs px-2 py-0.5 rounded font-semibold ${isDefault ? "bg-amber-100 text-amber-900 border border-amber-300" : "text-slate-400"}`}>
+            {isDefault ? "★ Default" : "Set Default"}
+          </span>
+        </label>
+      </td>
       <td className="p-3">
         <input
           type="number"
@@ -134,25 +196,24 @@ function GatewayRow({ row, busy, onSave }: { row: Row; busy: boolean; onSave: (p
           max={999}
           value={priority}
           onChange={(e) => setPriority(Number(e.target.value))}
-          className="w-20 rounded border border-slate-300 px-2 py-1 text-sm"
+          className="w-16 rounded border border-slate-300 px-2 py-1 text-sm font-mono text-center"
         />
       </td>
       <td className="p-3">
-        <label className="inline-flex items-center gap-2">
+        <label className="inline-flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          <span className={`text-xs px-2 py-0.5 rounded ${enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+          <span className={`text-xs px-2 py-0.5 rounded font-medium ${enabled ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
             {enabled ? "Enabled" : "Disabled"}
           </span>
         </label>
       </td>
-      <td className="p-3 text-xs text-slate-500">{new Date(row.updated_at).toLocaleString()}</td>
       <td className="p-3">
         <button
           disabled={!dirty || busy}
-          onClick={() => onSave({ is_enabled: enabled, priority })}
-          className="rounded bg-slate-900 text-white px-3 py-1 text-xs disabled:opacity-40"
+          onClick={() => onSave({ display_name: displayName, logo_url: logoUrl || null, is_default: isDefault, is_enabled: enabled, priority })}
+          className="rounded bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-40 transition-colors"
         >
-          {busy ? "Saving…" : "Save"}
+          {busy ? "Saving…" : "Save Changes"}
         </button>
       </td>
     </tr>

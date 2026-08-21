@@ -164,10 +164,28 @@ export function PaymentLinkPanel(props: Props) {
               </a>
             )}
             <Button
+              size="sm" variant="outline" onClick={async () => {
+                setBusy(true);
+                try {
+                  const res = await refetch();
+                  if (res.data?.paid) {
+                    toast.success("Payment verified & integrated into CRM!");
+                  } else {
+                    toast.info("No completed gateway payment found yet.");
+                  }
+                } finally {
+                  setBusy(false);
+                }
+              }} disabled={busy || isFetching}
+              className="h-8 text-xs font-medium"
+            >
+              <RefreshCw className={`size-3.5 mr-1 ${isFetching ? "animate-spin" : ""}`} /> Sync Status
+            </Button>
+            <Button
               size="sm" variant="outline" onClick={() => setRegenOpen(true)} disabled={busy}
               className="h-8 text-xs"
             >
-              <RefreshCw className="size-3.5 mr-1" /> Regenerate
+              Regenerate
             </Button>
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-500">

@@ -27,12 +27,18 @@ function PaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [order, setOrder] = useState<InitiatePaymentResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [summary, setSummary] = useState<any>(null);
+  const [chosenGateway, setChosenGateway] = useState<string | null>(null);
 
   useEffect(() => {
     trackEvent("payment_page_viewed", { leadCode });
     (async () => {
       try {
         const res = await getSummary({ data: { leadCode } });
+        setSummary(res);
+        if (res?.defaultGateway) {
+          setChosenGateway(res.defaultGateway);
+        }
         const hasPendingLink = (res as any)?.hasPendingLink || (res as any)?.pendingAmount > 0;
         const isPaid = !hasPendingLink && (!!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status));
         if (isPaid) {
@@ -42,12 +48,15 @@ function PaymentPage() {
     })();
   }, [leadCode, getSummary, navigate]);
 
+  const gateways = summary?.gateways ?? [];
+  const activeGateway = chosenGateway || summary?.defaultGateway || gateways[0]?.name || "payu";
+
   async function pay() {
     setBusy(true);
     setError(null);
-    trackEvent("payment_initiated", { leadCode });
+    trackEvent("payment_initiated", { leadCode, gateway: activeGateway });
     try {
-      const res = await createOrder({ data: { leadCode } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
       setOrder(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start payment.");
@@ -85,6 +94,63 @@ function PaymentPage() {
           <p className="text-sm text-muted-foreground">
             You'll be redirected to a secure payment gateway to complete payment by UPI, Card, Net Banking or Wallets.
           </p>
+
+          {/* Gateway Selection */}
+          {gateways.length > 0 && (
+            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                <span className="flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4 text-brand-navy" /> Select Payment Method
+                </span>
+                <span className="text-[11px] text-muted-foreground font-normal">Encrypted &amp; Verified</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {gateways.map((gw: any) => {
+                  const isSelected = activeGateway === gw.name;
+                  const isDefaultGw = summary?.defaultGateway === gw.name || gw.isDefault;
+                  return (
+                    <div
+                      key={gw.id || gw.name}
+                      onClick={() => setChosenGateway(gw.name)}
+                      className={`relative rounded-xl border p-3 cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? "border-brand-navy bg-brand-navy/5 shadow-sm ring-1 ring-brand-navy"
+                          : "border-border hover:border-slate-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-brand-navy bg-brand-navy text-white" : "border-slate-300 bg-white"}`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+
+                        {gw.logoUrl ? (
+                          <img src={gw.logoUrl} alt={gw.displayName} className="h-5 w-auto max-w-16 object-contain shrink-0" />
+                        ) : (
+                          <CreditCard className="w-4 h-4 text-slate-500 shrink-0" />
+                        )}
+
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-foreground truncate">
+                            {gw.displayName || gw.name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {gw.description || "UPI, Cards, NetBanking"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isDefaultGw && (
+                        <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {!order && (
             <>

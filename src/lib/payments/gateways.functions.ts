@@ -96,9 +96,21 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
 
     const { data: gateways } = await supabaseAdmin
       .from("payment_gateways")
-      .select("name, display_name, is_enabled, priority")
+      .select("id, name, display_name, is_enabled, priority, config")
       .eq("is_enabled", true)
       .order("priority", { ascending: true });
+
+    const activeList = (gateways ?? []).map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      displayName: g.display_name,
+      priority: g.priority,
+      logoUrl: g.config?.logo_url || null,
+      isDefault: Boolean(g.config?.is_default),
+      description: g.config?.description || null,
+    }));
+
+    const defaultGw = activeList.find((g) => g.isDefault) || activeList[0] || null;
 
     return {
       lead: {
@@ -117,7 +129,8 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       },
       hasPendingLink,
       pendingAmount,
-      gateways: gateways ?? [],
+      gateways: activeList,
+      defaultGateway: defaultGw?.name || "payu",
     };
   });
 
@@ -128,10 +141,6 @@ const UpdateContact = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
-  // Ownership proof — caller must echo back the email OR mobile already on
-  // the lead. Without this, anyone who guesses a lead_code could repurpose
-  // someone else's application. This is the public customer-facing edit flow
-  // (apply.$leadCode.summary.tsx) so we cannot use requireSupabaseAuth.
   currentEmail: z.string().trim().email().max(160).optional(),
   currentMobile: z.string().trim().regex(/^[6-9]\d{9}$/).optional(),
 }).refine((v) => v.currentEmail || v.currentMobile, {
@@ -142,7 +151,6 @@ export const updateLeadContact = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UpdateContact.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Only allow edits before payment is captured
     const { data: lead } = await supabaseAdmin
       .from("leads")
       .select("id, status, email, mobile")
@@ -153,7 +161,6 @@ export const updateLeadContact = createServerFn({ method: "POST" })
       throw new Error("Details can't be changed after payment.");
     }
 
-    // Verify caller owns this lead by matching one of the existing contact fields.
     const emailMatches = data.currentEmail &&
       lead.email && lead.email.toLowerCase() === data.currentEmail.toLowerCase();
     const mobileMatches = data.currentMobile && lead.mobile === data.currentMobile;
@@ -181,9 +188,9 @@ export const listGateways = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("payment_gateways")
-      .select("id, name, display_name, is_enabled, priority, webhook_secret_name, updated_at")
+      .select("id, name, display_name, is_enabled, priority, config, webhook_secret_name, updated_at")
       .order("priority", { ascending: true });
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
@@ -191,8 +198,12 @@ export const listGateways = createServerFn({ method: "GET" })
 
 const GatewayUpdate = z.object({
   id: z.string().uuid(),
-  is_enabled: z.boolean(),
-  priority: z.number().int().min(0).max(999),
+  display_name: z.string().trim().min(1).optional(),
+  is_enabled: z.boolean().optional(),
+  priority: z.number().int().min(0).max(999).optional(),
+  logo_url: z.string().trim().nullable().optional(),
+  is_default: z.boolean().optional(),
+  description: z.string().trim().nullable().optional(),
 });
 
 export const updateGateway = createServerFn({ method: "POST" })
@@ -200,10 +211,47 @@ export const updateGateway = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => GatewayUpdate.parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    await assertRole(supabase, ["super_admin"]);
-    const { error } = await supabase
+    await assertRole(supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: current } = await supabaseAdmin
       .from("payment_gateways")
-      .update({ is_enabled: data.is_enabled, priority: data.priority })
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!current) throw new Error("Gateway not found");
+
+    const curConfig = (current.config as Record<string, any>) || {};
+    const newConfig = {
+      ...curConfig,
+      ...(data.logo_url !== undefined ? { logo_url: data.logo_url } : {}),
+      ...(data.is_default !== undefined ? { is_default: data.is_default } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+    };
+
+    if (data.is_default === true) {
+      const { data: allGws } = await supabaseAdmin.from("payment_gateways").select("id, config");
+      for (const g of allGws ?? []) {
+        if (g.id !== data.id && (g.config as any)?.is_default) {
+          await supabaseAdmin
+            .from("payment_gateways")
+            .update({ config: { ...(g.config as any), is_default: false } as any })
+            .eq("id", g.id);
+        }
+      }
+    }
+
+    const patch: Record<string, any> = {
+      config: newConfig,
+      updated_at: new Date().toISOString(),
+    };
+    if (data.display_name !== undefined) patch.display_name = data.display_name;
+    if (data.is_enabled !== undefined) patch.is_enabled = data.is_enabled;
+    if (data.priority !== undefined) patch.priority = data.priority;
+
+    const { error } = await supabaseAdmin
+      .from("payment_gateways")
+      .update(patch as any)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

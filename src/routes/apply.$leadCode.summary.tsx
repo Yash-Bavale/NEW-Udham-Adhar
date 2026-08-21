@@ -208,9 +208,11 @@ function SummaryPage() {
 
   const activeGateway = useMemo(() => {
     if (chosen && isSupportedGateway(chosen)) return chosen;
-    const first = gateways.find((g) => isSupportedGateway(g.name));
-    return first?.name ?? null;
-  }, [chosen, gateways]);
+    const def = data?.defaultGateway;
+    if (def && isSupportedGateway(def)) return def;
+    const first = (gateways as any[]).find((g) => isSupportedGateway(g.name));
+    return first?.name ?? "payu";
+  }, [chosen, data?.defaultGateway, gateways]);
 
   const info = lead
     ? SERVICE_INFO[lead.service] ?? SERVICE_INFO.default
@@ -440,6 +442,63 @@ function SummaryPage() {
                 <Info className="w-3 h-3 mt-0.5 shrink-0" />
                 GST invoice (GSTIN-tagged) will be emailed to you instantly after payment.
               </p>
+            </div>
+          </div>
+
+          {/* Payment Gateway Selection */}
+          <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-brand-navy" /> Payment Method
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">Encrypted &amp; Verified</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {(gateways as any[]).map((gw) => {
+                const isSelected = activeGateway === gw.name;
+                const isDefaultGw = data?.defaultGateway === gw.name || gw.isDefault;
+                return (
+                  <div
+                    key={gw.id || gw.name}
+                    onClick={() => setChosen(gw.name)}
+                    className={`relative rounded-xl border p-3 cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                      isSelected
+                        ? "border-brand-navy bg-brand-navy/5 shadow-sm ring-1 ring-brand-navy"
+                        : "border-border hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-brand-navy bg-brand-navy text-white" : "border-slate-300 bg-white"}`}>
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+
+                      {gw.logoUrl ? (
+                        <img src={gw.logoUrl} alt={gw.displayName} className="h-5 w-auto max-w-16 object-contain shrink-0" />
+                      ) : gw.name === "payu" ? (
+                        <img src={payuLogo} alt="PayU" className="h-4 w-auto shrink-0" />
+                      ) : (
+                        <CreditCard className="w-4 h-4 text-slate-500 shrink-0" />
+                      )}
+
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-foreground truncate">
+                          {gw.displayName || gw.name}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {gw.description || "UPI, Cards, NetBanking"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isDefaultGw && (
+                      <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
