@@ -199,7 +199,9 @@ async function ensurePaidOrdersIntegrated(admin: any) {
             }
           }
         }
-      }
+    }
+    }
+
     // 3. Revert leads prematurely marked payment_pending without any payment attempt or payment link
     const { data: pendingLeads } = await admin
       .from("leads")
