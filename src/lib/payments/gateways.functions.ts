@@ -324,7 +324,7 @@ export const checkCcavenueCredentials = createServerFn({ method: "POST" })
         return {
           ok: false,
           message:
-            `CCAvenue blocked the Status/Refund API (${errText}). Checkout is unaffected — this only means CCAvenue has not enabled the Merchant Web API for this account, or this server's outbound IP is not whitelisted.`,
+            `CCAvenue's optional Merchant Web API (Status/Refund) is not enabled for this account (${errText}). Live checkout, callbacks and payment confirmation are unaffected — only admin-side refunds and manual status re-checks need this API.`,
         };
       }
       if (errText.includes("decrypt")) {
