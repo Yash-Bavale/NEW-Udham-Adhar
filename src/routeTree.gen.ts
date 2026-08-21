@@ -75,6 +75,7 @@ import { Route as AdminPipelineRouteImport } from './routes/admin.pipeline'
 import { Route as AdminPermissionsRouteImport } from './routes/admin.permissions'
 import { Route as AdminPerformanceRouteImport } from './routes/admin.performance'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
+import { Route as AdminPaymentAuditRouteImport } from './routes/admin.payment-audit'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
@@ -481,6 +482,11 @@ const AdminPerformanceRoute = AdminPerformanceRouteImport.update({
 const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPaymentAuditRoute = AdminPaymentAuditRouteImport.update({
+  id: '/payment-audit',
+  path: '/payment-audit',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
@@ -933,6 +939,7 @@ export interface FileRoutesByFullPath {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
+  '/admin/payment-audit': typeof AdminPaymentAuditRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
@@ -1069,6 +1076,7 @@ export interface FileRoutesByTo {
   '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/payment-audit': typeof AdminPaymentAuditRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
@@ -1207,6 +1215,7 @@ export interface FileRoutesById {
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/orders': typeof AdminOrdersRouteWithChildren
+  '/admin/payment-audit': typeof AdminPaymentAuditRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/performance': typeof AdminPerformanceRoute
   '/admin/permissions': typeof AdminPermissionsRoute
@@ -1348,6 +1357,7 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
+    | '/admin/payment-audit'
     | '/admin/payments'
     | '/admin/performance'
     | '/admin/permissions'
@@ -1484,6 +1494,7 @@ export interface FileRouteTypes {
     | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
+    | '/admin/payment-audit'
     | '/admin/payments'
     | '/admin/performance'
     | '/admin/permissions'
@@ -1621,6 +1632,7 @@ export interface FileRouteTypes {
     | '/admin/my-work'
     | '/admin/notifications'
     | '/admin/orders'
+    | '/admin/payment-audit'
     | '/admin/payments'
     | '/admin/performance'
     | '/admin/permissions'
@@ -2239,6 +2251,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/admin/payments'
       preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payment-audit': {
+      id: '/admin/payment-audit'
+      path: '/payment-audit'
+      fullPath: '/admin/payment-audit'
+      preLoaderRoute: typeof AdminPaymentAuditRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/orders': {
@@ -2880,6 +2899,7 @@ interface AdminRouteChildren {
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminOrdersRoute: typeof AdminOrdersRouteWithChildren
+  AdminPaymentAuditRoute: typeof AdminPaymentAuditRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPerformanceRoute: typeof AdminPerformanceRoute
   AdminPermissionsRoute: typeof AdminPermissionsRoute
@@ -2927,6 +2947,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
+  AdminPaymentAuditRoute: AdminPaymentAuditRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPerformanceRoute: AdminPerformanceRoute,
   AdminPermissionsRoute: AdminPermissionsRoute,

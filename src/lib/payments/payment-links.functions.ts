@@ -135,18 +135,28 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
     const linkRow: any = link;
     let isPaid = linkRow.status === "paid";
 
-    // 1. If link status is not paid yet, check if there is a paid payment for this lead.
+    // 1. If the link is not paid yet, only a payment that actually settled
+    //    FOR THIS LINK may mark it paid: it must be created after the link was
+    //    issued and match the link amount. Matching any older paid payment
+    //    (the original order fee) marked unpaid top-ups as paid — a real
+    //    financial mis-statement, so never relax this.
     if (!isPaid) {
+      const linkAmount = Number(linkRow.amount ?? 0);
       const { data: paidPayment } = await supabaseAdmin
         .from("payments")
         .select("id, amount, created_at")
         .eq("lead_id", data.leadId)
         .eq("status", "paid")
+        .gte("created_at", linkRow.created_at)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (paidPayment) {
+      const amountMatches =
+        !!paidPayment && linkAmount > 0 &&
+        Math.abs(Number(paidPayment.amount ?? 0) - linkAmount) < 0.01;
+
+      if (paidPayment && amountMatches) {
         await supabaseAdmin
           .from("payment_links" as any)
           .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: paidPayment.id } as any)

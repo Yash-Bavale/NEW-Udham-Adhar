@@ -156,14 +156,34 @@ async function ensurePaidOrdersIntegrated(admin: any) {
         .in("id", appLeadIds)
         .not("status", "in", "(payment_successful,under_process,completed)");
 
-      if (unsyncedLeads && unsyncedLeads.length > 0) {
-        const unsyncedIds = unsyncedLeads.map((l: any) => l.id);
+      // Having an order row is NOT proof of payment. Only sync leads that
+      // really hold a settled payment AND have no money still outstanding
+      // (pending payment link, e.g. a service-change top-up).
+      const candidateIds = (unsyncedLeads ?? []).map((l: any) => l.id);
+      let unsyncedIds: string[] = [];
+      if (candidateIds.length > 0) {
+        const { data: paidRows } = await admin
+          .from("payments")
+          .select("lead_id")
+          .in("lead_id", candidateIds)
+          .eq("status", "paid");
+        const { data: pendingLinks } = await admin
+          .from("payment_links")
+          .select("lead_id")
+          .in("lead_id", candidateIds)
+          .eq("status", "pending");
+        const pendingSet = new Set((pendingLinks ?? []).map((r: any) => r.lead_id));
+        unsyncedIds = Array.from(
+          new Set((paidRows ?? []).map((r: any) => r.lead_id).filter((id: string) => !pendingSet.has(id))),
+        );
+      }
+
+      if (unsyncedIds.length > 0) {
         await admin
           .from("leads")
           .update({
             status: "payment_successful",
             lead_status_v2: "payment_successful",
-            payment_successful_at: new Date().toISOString(),
           } as any)
           .in("id", unsyncedIds);
       }

@@ -115,6 +115,11 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
   const billingTel = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";
   const billingEmail = String(lead.email ?? "customer@example.com").trim().toLowerCase();
 
+  // CCAvenue merchant account enforces billing_address / city / zip as
+  // mandatory. We do not collect them, so send safe non-empty placeholders —
+  // empty values are stripped by buildCcavPayload and trigger 21005/21006/21008
+  // "Required parameter missing" => order_status Invalid.
+  const billingState = String(lead.state ?? "").trim() || "NA";
   const merchantParams = buildCcavPayload({
     merchant_id: merchantId,
     order_id: orderId,
@@ -126,8 +131,11 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     billing_name: billingName,
     billing_email: billingEmail,
     billing_tel: billingTel,
+    billing_address: "NA",
+    billing_city: billingState,
+    billing_zip: "110001",
     billing_country: "India",
-    billing_state: lead.state ?? "",
+    billing_state: billingState,
     merchant_param1: lead.id,
     merchant_param2: application?.id ?? "",
     merchant_param3: lead.lead_code,

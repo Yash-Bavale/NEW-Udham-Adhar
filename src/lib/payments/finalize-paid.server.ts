@@ -27,10 +27,33 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
 
   const { data: payment } = await supabaseAdmin
     .from("payments")
-    .select("id, lead_id, application_id, status, transaction_id, razorpay_payment_id")
+    .select("id, lead_id, application_id, status, transaction_id, razorpay_payment_id, amount, created_at, parent_payment_id")
     .eq("id", paymentId)
     .maybeSingle();
   if (!payment) throw new Error(`Payment ${paymentId} not found`);
+
+  // Is this the order's FIRST settled payment, or a top-up (service-change
+  // delta / balance) on an order that was already paid for earlier?
+  // A top-up must never reset the order stage, re-arm the form timers, or
+  // re-send the order-confirmation email.
+  const { data: earlierPaid } = await supabaseAdmin
+    .from("payments")
+    .select("id, created_at")
+    .eq("lead_id", payment.lead_id)
+    .eq("status", "paid")
+    .neq("id", payment.id)
+    .lte("created_at", (payment as any).created_at)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const isTopUp = !!earlierPaid;
+  if (isTopUp && !(payment as any).parent_payment_id) {
+    await supabaseAdmin
+      .from("payments")
+      .update({ parent_payment_id: earlierPaid!.id } as any)
+      .eq("id", payment.id);
+  }
+
 
   // 1) Application — orders exist only from a successful payment onwards.
   let applicationId = payment.application_id as string | null;
@@ -89,34 +112,49 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   }
 
 
-  // 2) Lead + payment_links
-  const { data: curLeadRaw } = await supabaseAdmin
-    .from("leads")
-    .select("payment_successful_at" as any)
-    .eq("id", payment.lead_id)
-    .maybeSingle();
-  const curLead = curLeadRaw as { payment_successful_at?: string | null } | null;
-
-  const leadPatch: Record<string, any> = {
-    status: "payment_successful",
-    lead_status_v2: "payment_successful",
-  };
-  if (!curLead?.payment_successful_at) {
-    leadPatch.payment_successful_at = new Date().toISOString();
+  // 2) payment_links — settle ONLY the link this payment actually pays for
+  // (issued before the payment, same amount). Marking every pending link paid
+  // is what made unpaid top-ups look settled.
+  const payAmount = Number((payment as any).amount ?? 0);
+  const { data: pendingLinks } = await supabaseAdmin
+    .from("payment_links" as any)
+    .select("id, amount, created_at")
+    .eq("lead_id", payment.lead_id)
+    .eq("status", "pending")
+    .lte("created_at", (payment as any).created_at)
+    .order("created_at", { ascending: false });
+  const matchLink = (pendingLinks ?? []).find(
+    (l: any) => payAmount > 0 && Math.abs(Number(l.amount ?? 0) - payAmount) < 0.01,
+  );
+  if (matchLink) {
+    await supabaseAdmin
+      .from("payment_links" as any)
+      .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: payment.id } as any)
+      .eq("id", (matchLink as any).id);
   }
 
-  await supabaseAdmin.from("leads")
-    .update(leadPatch as any)
-    .eq("id", payment.lead_id);
-
-  await supabaseAdmin
+  // Lead is only "payment successful" when nothing is still outstanding.
+  const { count: stillPending } = await supabaseAdmin
     .from("payment_links" as any)
-    .update({ status: "paid", paid_at: new Date().toISOString(), payment_id: payment.id } as any)
+    .select("id", { count: "exact", head: true })
     .eq("lead_id", payment.lead_id)
     .eq("status", "pending");
+  if (!stillPending) {
+    // NOTE: `leads` has no payment_successful_at column — including it here made
+    // the whole update fail silently, which is why paid leads kept showing
+    // "payment pending" in the admin list.
+    const { error: leadErr } = await supabaseAdmin.from("leads")
+      .update({
+        status: "payment_successful",
+        lead_status_v2: "payment_successful",
+      } as any)
+      .eq("id", payment.lead_id);
+    if (leadErr) console.error("[finalize] lead status update failed", leadErr);
+  }
 
-  // 3) Move application forward
-  if (applicationId) {
+  // 3) Move application forward — first payment only. A top-up must never drag
+  // an in-progress order back to "payment received".
+  if (applicationId && !isTopUp) {
     try {
       const { transitionStatusSystem } = await import("@/lib/applications/transitions.server");
       const tr = await transitionStatusSystem({
@@ -131,6 +169,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     }
   }
 
+
   // 4) Invoice
   let invoiceAttachment: Awaited<ReturnType<typeof loadInvoiceAttachmentByPayment>> = null;
   let invoiceRow: any = null;
@@ -139,7 +178,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
     const { data: inv } = await supabaseAdmin
       .from("invoices")
-      .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
+      .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount, last_emailed_at")
       .eq("payment_id", payment.id)
       .maybeSingle();
     invoiceRow = inv;
@@ -147,14 +186,20 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     console.error("[finalize] invoice generation failed", e);
   }
 
-  // 5) E001 email
+  // 5) E001 email — send ONCE per payment. Reconcile/webhook retries call this
+  // finalizer repeatedly; without this guard the customer gets duplicate
+  // "Order Confirmation & Tax Invoice" mails for the same money.
+  const alreadyEmailed = !!invoiceRow?.last_emailed_at;
+  if (alreadyEmailed) {
+    console.info("[finalize] E001 already sent for payment, skipping", payment.id);
+  }
   try {
     const { data: leadRow } = await supabaseAdmin
       .from("leads")
       .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
       .eq("id", payment.lead_id)
       .maybeSingle();
-    if (leadRow?.email && leadRow.lead_code) {
+    if (!alreadyEmailed && leadRow?.email && leadRow.lead_code) {
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
       const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
@@ -199,9 +244,12 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
           service_fee: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
           support_email: "help@businesshelpservices.com",
         };
+        // First payment → E001 order confirmation. Top-up → E013 supplementary
+        // payment receipt (no second "order confirmed" mail for one order).
+        const templateKey = isTopUp ? "topup_payment_received" : "order_confirmation";
         try {
           await enqueueFromTemplateInternal(
-            "order_confirmation",
+            templateKey,
             leadRow.email,
             commonVars,
             {
@@ -213,7 +261,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
           );
           await markInvoiceEmailedByPayment(payment.id, {
             recipient: leadRow.email,
-            template: "order_confirmation",
+            template: templateKey,
             attachmentFilename: invoiceAttachment?.filename ?? null,
             success: true,
             actorLabel: `payu-${opts.source}`,
@@ -221,7 +269,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         } catch (e) {
           await markInvoiceEmailedByPayment(payment.id, {
             recipient: leadRow.email,
-            template: "order_confirmation",
+            template: templateKey,
             attachmentFilename: invoiceAttachment?.filename ?? null,
             success: false,
             error: e instanceof Error ? e.message : String(e),
@@ -237,7 +285,9 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   // 6) Arm the form-pending lifecycle timers (4h nudge → 8h auto-close).
   // Without this nothing ever becomes "due", so the auto-closure cron has
   // nothing to fire. Cancelled when the onboarding form is submitted.
-  if (applicationId) {
+  // Never re-arm on a top-up: the order is already past the form stage and
+  // would get auto-closed 8h later.
+  if (applicationId && !isTopUp) {
     try {
       const { armTimer } = await import("@/lib/orders/actions/timers.server");
       await armTimer({ applicationId, kind: "form_pending_nudge_4h", firesInMinutes: 4 * 60 });
@@ -246,6 +296,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
       console.error("[finalize] arming form timers failed", e);
     }
   }
+
 
   return { ok: true, applicationId };
 }
