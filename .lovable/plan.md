@@ -1,38 +1,45 @@
 # Switch the CMS from Contentful to Sanity
 
-Goal: both sites (udyamadhar.in and udyamregistrations.in) read their content from Sanity instead of Contentful, with zero change to page structure, SEO output, URLs, forms, or the admin panel. Contentful rate limits stop breaking pages.
+Goal: both sites (udyamadhar.in and udyamregistrations.in) read their content from Sanity instead of Contentful, with zero change to page structure, SEO output, URLs, forms, or the admin panel. The Contentful rate limit stops breaking pages.
+
+You have a blank Sanity project, so I'll do the whole thing: schema, content migration, code switch, verification.
 
 ## What stays exactly the same
 
 - All route files, page components, SEO markup, canonical URLs, sitemap output.
-- The content shapes the app consumes today: `faq`, `servicePage`, `seoArticle`, `landingPage`, `emailTemplate`, with the same field names (`slug`, `metaTitle`, `metaDescription`, `bodySections`, `quickFacts`, `eeat`, `faqs`, `internalLinks`, `howto`, `ctas`, …).
-- The per-website content isolation: two Sanity projects, one per site, chosen by request host — mirroring today's two Contentful spaces.
+- The content types the app consumes today — `faq`, `servicePage`, `seoArticle`, `landingPage`, `emailTemplate` — with identical field names (`slug`, `metaTitle`, `metaDescription`, `bodySections`, `quickFacts`, `eeat`, `faqs`, `internalLinks`, `howto`, `ctas`, …).
+- Per-site content separation, resolved by request host exactly as today.
 
-## Approach
+## Plan
 
-Content is read today through one module (`src/lib/contentful/client.functions.ts`) plus a sitemap helper. Everything else consumes typed results. So the switch is a swap of that data layer, not a rewrite.
+1. **Connect Sanity** through the Sanity connector so I can read the project ID, datasets and schema directly — no manual IDs needed from you.
+2. **Datasets**: use one Sanity project with two datasets, `udyamadhar` and `udyamregistrations`, one per website. (If you'd rather have two separate projects, say so and I'll create the second one instead.)
+3. **Define the schema** in Sanity to match the current models 1:1, same field names, so nothing about content shape changes.
+4. **Migrate the content automatically.** I read every published entry straight out of the two Contentful spaces (slow, paced requests so the rate limit isn't hit) and write them into the matching Sanity dataset. Target counts, which I'll verify after import:
+   - 115 FAQs
+   - 13 service pages
+   - ~131 SEO articles
+   - 1 landing page (`home`)
+   - 16 email templates
+   If any Contentful read is throttled, I fall back to your uploaded exports for the missing entries.
+5. **New data layer** `src/lib/sanity/client.functions.ts` exporting the same functions and return types as the Contentful module (`getFaqs`, `getSeoArticle`, `getServicePage`, `getLandingPage`, `listSeoPages`, `listSeoSlugs`), so page components don't change at all.
+6. **Repoint the call sites**: homepage, `$.tsx` catch-all, the service routes, footer, services grid, sitemap builder, and the admin SEO/sitemap tools.
+7. **Website config**: add `sanity_project_id` / `sanity_dataset` columns to `websites` so host → dataset mapping is data-driven and editable in Admin → Websites, alongside the existing Contentful columns (kept as a rollback path until you're happy).
+8. **Verify**: fetch a sample of live pages on both domains, confirm titles/meta/body/FAQ render from Sanity, confirm `/sitemap.xml` lists the same slugs as before, then publish.
 
-1. **Connect Sanity** through the Sanity connector so I can read project IDs, datasets and schemas directly (no manual project IDs).
-2. **Create the schema in both Sanity projects** to match the current models 1:1, using the same field names, so exported content lands unchanged.
-3. **Import your exports.** Convert the Contentful exports to Sanity NDJSON (documents keyed by `_type` + slug), then import into each project's `production` dataset. I'll report per-type counts: FAQs, service pages, SEO articles, landing page, email templates — and confirm the totals match your CSVs (13 service pages, 115 FAQs, ~130 SEO articles, 1 landing page, 16 email templates).
-4. **New data layer** `src/lib/sanity/client.functions.ts` exporting the same function names and return types as today (`getSanityFaqs`, `getSanitySeoArticle`, `getSanityServicePage`, `getSanityLandingPage`, `listSanitySeoPages`, `listSanitySeoSlugs`). Call sites keep working with a one-line import change each.
-5. **Repoint the ~10 call sites**: homepage, `$.tsx` catch-all, the service routes, footer, sections component, sitemap builder, admin SEO/sitemap tools.
-6. **Website config**: reuse the existing per-website CMS columns (add `sanity_project_id` / `sanity_dataset` alongside the Contentful ones) so the host → project mapping is data-driven and editable in Admin → Websites.
-7. **Verify**, then remove the Contentful code path once both sites render from Sanity.
+## Reliability (the actual outage fix)
 
-## Rate-limit safety (the actual outage fix)
-
-- Sanity reads go through the CDN endpoint (`useCdn`), which is not rate-limited the way the Contentful delivery API was hitting.
-- Keep the existing in-process cache, and make it degrade gracefully: on any CMS error, serve the last good cached value, then the database SEO page, then the bundled HTML — the tiered fallback already used elsewhere. A CMS hiccup will never blank a page again.
+- Sanity reads go through its CDN endpoint, which doesn't have the delivery-API limit that's currently throttling you.
+- The existing 5-minute in-process cache stays, and degrades safely: CMS error → last good cached value → database SEO page → bundled HTML. A CMS hiccup can never blank a page again.
 
 ## Technical notes
 
-- `@sanity/client` server-side only, inside `createServerFn` handlers; project ID/dataset resolved per request host, read token (if the dataset is private) stored as a secret per site.
-- Rich text: current Contentful rich text is converted to HTML/sections by helpers in the existing client module. Those helpers are reused; if the import produces Portable Text instead, I add an equivalent Portable-Text→HTML serializer with the same output shape, so `SeoContentPage` and `RichServicePage` render identically.
-- Sitemap: `src/lib/sitemap/sitemap.server.ts` currently calls the Contentful REST gateway directly per website; it gets an equivalent Sanity query, keeping the sitemap manager, overrides and diff tool untouched.
-- No database schema change beyond the two new nullable website columns.
+- `@sanity/client` installed with bun, used server-side only inside `createServerFn` handlers. A read token is only needed if a dataset is private; a write token is needed for the one-time import and will be stored as a secret.
+- Rich text: the Contentful rich-text → HTML/sections converters already in the codebase are reused during migration, so articles are stored in Sanity in the exact shape the pages already render (`bodySections`, HTML paragraphs). No Portable Text serializer needed and no visual difference.
+- Sitemap: `src/lib/sitemap/sitemap.server.ts` gets an equivalent Sanity query per website; the sitemap manager, overrides and diff tool are untouched.
+- One small migration: two nullable columns on `websites`. No other schema change.
 
 ## What I need from you
 
-- Your Contentful export files (NDJSON/JSON/ZIP) for both spaces, uploaded here.
-- Approval to connect Sanity; if the two projects don't exist yet I'll tell you exactly what to create.
+- Approve connecting Sanity, and confirm one project with two datasets is fine.
+- A Sanity **write token** (Editor role) so I can push the content in — I'll request it through the secure secret prompt, not in chat.
