@@ -244,9 +244,12 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
           service_fee: Number(invoiceRow?.base_amount ?? leadRow.base_amount ?? 0).toFixed(2),
           support_email: "help@businesshelpservices.com",
         };
+        // First payment → E001 order confirmation. Top-up → E013 supplementary
+        // payment receipt (no second "order confirmed" mail for one order).
+        const templateKey = isTopUp ? "topup_payment_received" : "order_confirmation";
         try {
           await enqueueFromTemplateInternal(
-            "order_confirmation",
+            templateKey,
             leadRow.email,
             commonVars,
             {
@@ -258,7 +261,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
           );
           await markInvoiceEmailedByPayment(payment.id, {
             recipient: leadRow.email,
-            template: "order_confirmation",
+            template: templateKey,
             attachmentFilename: invoiceAttachment?.filename ?? null,
             success: true,
             actorLabel: `payu-${opts.source}`,
@@ -266,7 +269,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         } catch (e) {
           await markInvoiceEmailedByPayment(payment.id, {
             recipient: leadRow.email,
-            template: "order_confirmation",
+            template: templateKey,
             attachmentFilename: invoiceAttachment?.filename ?? null,
             success: false,
             error: e instanceof Error ? e.message : String(e),
@@ -282,7 +285,9 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   // 6) Arm the form-pending lifecycle timers (4h nudge → 8h auto-close).
   // Without this nothing ever becomes "due", so the auto-closure cron has
   // nothing to fire. Cancelled when the onboarding form is submitted.
-  if (applicationId) {
+  // Never re-arm on a top-up: the order is already past the form stage and
+  // would get auto-closed 8h later.
+  if (applicationId && !isTopUp) {
     try {
       const { armTimer } = await import("@/lib/orders/actions/timers.server");
       await armTimer({ applicationId, kind: "form_pending_nudge_4h", firesInMinutes: 4 * 60 });
@@ -291,6 +296,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
       console.error("[finalize] arming form timers failed", e);
     }
   }
+
 
   return { ok: true, applicationId };
 }
