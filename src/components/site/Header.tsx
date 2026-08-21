@@ -216,8 +216,8 @@ export function Header() {
             <Link
               to="/"
               className="flex flex-col"
-              aria-label="Udyam Registration"
-              title="Udyam Registration"
+              aria-label="Business Help Services"
+              title="Business Help Services"
               itemScope
               itemType="https://schema.org/Organization"
             >
@@ -225,7 +225,7 @@ export function Header() {
                 itemProp="name"
                 className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose"
               >
-                Udyam Registration
+                Business Help Services
               </span>
               <span className="text-sm text-foreground/80 leading-relaxed">
                 Business Consultancy &amp; Assistance Services
