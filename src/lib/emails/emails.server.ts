@@ -454,12 +454,23 @@ export async function enqueueFromTemplateInternal(
   }
 
 
+  let rawBodyHtml = tpl.body_html ?? "";
+  if (effectiveCode === "E001" || effectiveCode === "order_confirmation") {
+    rawBodyHtml = rawBodyHtml
+      .replace(/You can also access it here\.?/gi, "")
+      .replace(/<a[^>]*\{\{invoice_url\}\}[^>]*>.*?<\/a>/gi, "")
+      .replace(/<a[^>]*\{\{invoice_download_url\}\}[^>]*>.*?<\/a>/gi, "")
+      .replace(/<p[^>]*>\s*\{\{invoice_url\}\}\s*<\/p>/gi, "")
+      .replace(/\{\{invoice_url\}\}/gi, "")
+      .replace(/\{\{invoice_download_url\}\}/gi, "");
+  }
+
   return enqueueEmailInternal({
     templateCode: effectiveCode,
     toEmail,
     toName: opts?.toName ?? null,
     subject,
-    bodyHtml: renderTemplateHtml(tpl.body_html, variables),
+    bodyHtml: renderTemplateHtml(rawBodyHtml, variables),
     bodyText: tpl.body_text ? renderTemplate(tpl.body_text, variables) : null,
     variables: finalVars,
     leadId: opts?.leadId ?? null,
@@ -469,6 +480,36 @@ export async function enqueueFromTemplateInternal(
     requireImmediateSuccess: opts?.requireImmediateSuccess,
   });
 }
+
+/** Asynchronously clean up legacy invoice URL links from database email templates. */
+async function cleanupE001InvoiceLinkInDB() {
+  try {
+    const { data: tpls } = await supabaseAdmin
+      .from("email_templates")
+      .select("id, code, body_html")
+      .in("code", ["E001", "order_confirmation"]);
+
+    for (const t of tpls ?? []) {
+      if (t.body_html && (t.body_html.includes("invoice_url") || t.body_html.includes("You can also access it here"))) {
+        const cleaned = t.body_html
+          .replace(/You can also access it here\.?/gi, "")
+          .replace(/<a[^>]*\{\{invoice_url\}\}[^>]*>.*?<\/a>/gi, "")
+          .replace(/<a[^>]*\{\{invoice_download_url\}\}[^>]*>.*?<\/a>/gi, "")
+          .replace(/<p[^>]*>\s*\{\{invoice_url\}\}\s*<\/p>/gi, "")
+          .replace(/\{\{invoice_url\}\}/gi, "")
+          .replace(/\{\{invoice_download_url\}\}/gi, "");
+
+        await supabaseAdmin
+          .from("email_templates")
+          .update({ body_html: cleaned } as any)
+          .eq("id", t.id);
+      }
+    }
+  } catch (e) {
+    console.error("[emails.server] cleanupE001InvoiceLinkInDB error", e);
+  }
+}
+cleanupE001InvoiceLinkInDB();
 
 
 /**

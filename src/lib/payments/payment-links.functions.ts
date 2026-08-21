@@ -308,51 +308,111 @@ export const sendPaymentLinkEmail = createServerFn({ method: "POST" })
       throw new Error("Lead email not found. Please add a valid email first.");
     }
 
-    const customerName = lead.name || "Valued Customer";
-    const serviceName = lead.service || "Udyam Registration Service";
-    const amount = Number(lead.total_amount || 0).toLocaleString("en-IN");
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const executiveName = profile?.display_name || profile?.email || "Executive";
+
+    const customerName = lead.name || "Customer";
+    const serviceName = lead.service || "Requested Service";
+    const amount = Number(lead.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const leadCode = lead.lead_code || lead.id.slice(0, 8);
 
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
-        <div style="text-align: center; padding-bottom: 20px; border-bottom: 2px solid #0f172a;">
-          <h2 style="color: #0f172a; margin: 0;">Udyam Aadhar Advisory Services</h2>
-          <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Payment Link for Lead ID: <strong>${leadCode}</strong></p>
-        </div>
+    const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Complete Your Payment – Order No. ${leadCode}</title></head>
+<body style="margin:0; padding:0; background:#F2F4F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7; padding:24px 12px;">
+  <tr><td align="center">
+    <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#FFFFFF; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(18,49,92,0.08);">
 
-        <div style="padding: 20px 0;">
-          <p style="font-size: 16px; color: #1e293b;">Dear <strong>${customerName}</strong>,</p>
-          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-            Thank you for choosing Udyam Aadhar Advisory for your <strong>${serviceName}</strong>.
-          </p>
-          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-            Please click the button below to complete your payment of <strong>₹${amount}</strong> securely:
-          </p>
+      <tr><td style="background:#12315C; padding:18px 30px; border-radius:10px 10px 0 0;">
+        <span style="font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:17px; font-weight:700; color:#ffffff;">Complete Your Payment</span>
+      </td></tr>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${paymentUrl}" style="background-color: #0f172a; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 16px; display: inline-block;">
-              Pay Now (₹${amount}) →
-            </a>
-          </div>
+      <tr><td style="padding:28px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14.5px; line-height:1.7; color:#2B2E33;">
+        <p style="margin:0 0 14px 0; font-weight:700; color:#12315C;">Dear ${customerName},</p>
+        <p style="margin:0 0 12px 0;">Greetings from Business Help Services.</p>
+        <p style="margin:0 0 12px 0;">Please find below the secure payment link to complete the payment for your requested service. Kindly complete the payment at the earliest to enable us to proceed further.</p>
+      </td></tr>
 
-          <p style="font-size: 12px; color: #64748b; text-align: center;">
-            Or copy and paste this payment link into your browser:<br />
-            <a href="${paymentUrl}" style="color: #2563eb; word-break: break-all;">${paymentUrl}</a>
-          </p>
-        </div>
+      <tr><td style="padding:26px 30px 8px 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="border-bottom:2px solid #C9A227; padding-bottom:8px;">
+            <span style="font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13px; font-weight:700; letter-spacing:0.8px; color:#12315C; text-transform:uppercase;">Payment Summary</span>
+          </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:14px 30px 0 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7; border:1px solid #E3E6EC; border-radius:6px;">
+          <tr><td style="padding:14px 16px 4px 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#5B6270; width:46%; border-bottom:1px solid #E3E6EC; vertical-align:top;">Order/Application No.</td><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#2B2E33; font-weight:600; border-bottom:1px solid #E3E6EC; vertical-align:top;">${leadCode}</td></tr>
+              <tr><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#5B6270; width:46%; border-bottom:1px solid #E3E6EC; vertical-align:top;">Requested Service</td><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#2B2E33; font-weight:600; border-bottom:1px solid #E3E6EC; vertical-align:top;">${serviceName}</td></tr>
+              <tr><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#5B6270; width:46%; border-bottom:1px solid #E3E6EC; vertical-align:top;">Amount Payable</td><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#2B2E33; font-weight:600; border-bottom:1px solid #E3E6EC; vertical-align:top;">&#8377;${amount}</td></tr>
+              <tr><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#5B6270; width:46%; vertical-align:top;">Payment Status</td><td style="padding:8px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; color:#2B2E33; font-weight:600; vertical-align:top;">Pending</td></tr>
+            </table>
+          </td></tr>
+        </table>
+      </td></tr>
 
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 12px; color: #94a3b8; text-align: center;">
-          <p style="margin: 0;">If you have any questions, feel free to reply directly to this email.</p>
-          <p style="margin: 5px 0 0;">© Udyam Aadhar Advisory · All Rights Reserved</p>
-        </div>
-      </div>
-    `;
+      <tr><td align="center" style="padding:24px 30px 4px 30px;">
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+          <td style="background:#12315C; border-radius:5px;">
+            <a href="${paymentUrl}" style="display:inline-block; padding:14px 36px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14.5px; font-weight:700; color:#ffffff; text-decoration:none; letter-spacing:0.3px;">Pay Now</a>
+          </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:12px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:12.5px; line-height:1.6; color:#5B6270; text-align:center;">If the button above does not work, copy and paste this link into your browser:<br/><a href="${paymentUrl}" style="color:#12315C; text-decoration:underline;">${paymentUrl}</a></td></tr>
+
+      <tr><td style="padding:26px 30px 8px 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="border-bottom:2px solid #C9A227; padding-bottom:8px;">
+            <span style="font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13px; font-weight:700; letter-spacing:0.8px; color:#12315C; text-transform:uppercase;">Important Information</span>
+          </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:10px 30px 0 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:6px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; line-height:1.65; color:#2B2E33; vertical-align:top;"><span style="color:#C9A227; font-weight:700;">&#8226;&nbsp;</span>This payment link is generated specifically for your order and is intended for your use only.</td></tr>
+          <tr><td style="padding:6px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; line-height:1.65; color:#2B2E33; vertical-align:top;"><span style="color:#C9A227; font-weight:700;">&#8226;&nbsp;</span>Please do not share this payment link with anyone else.</td></tr>
+          <tr><td style="padding:6px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; line-height:1.65; color:#2B2E33; vertical-align:top;"><span style="color:#C9A227; font-weight:700;">&#8226;&nbsp;</span>Upon successful payment, you will receive a confirmation email along with the Tax Invoice for your records.</td></tr>
+          <tr><td style="padding:6px 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13.5px; line-height:1.65; color:#2B2E33; vertical-align:top;"><span style="color:#C9A227; font-weight:700;">&#8226;&nbsp;</span>Further processing of your requested service will commence only after successful payment confirmation.</td></tr>
+        </table>
+      </td></tr>
+
+      <tr><td style="padding:24px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14px; line-height:1.7; color:#2B2E33;">
+        <p style="margin:0 0 0 0;">If you have any questions or require assistance, kindly reply to this email or contact our Customer Care Team during business hours.</p>
+      </td></tr>
+      <tr><td style="padding:12px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14.5px; line-height:1.7; color:#2B2E33;">Customer Care Availability<br/>Monday to Saturday<br/>10:00 AM to 6:00 PM (IST)<br/>(Excluding National and Public Holidays)</td></tr>
+
+      <tr><td style="padding:14px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:13px; font-weight:700; color:#12315C;">IMPORTANT LINKS</td></tr>
+      <tr><td style="padding:12px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:12.5px; color:#5B6270; line-height:2;"><a href="https://udyamadhar.in/terms-conditions" style="color:#12315C; text-decoration:none; font-weight:600;">Terms &amp; Conditions</a> &nbsp;|&nbsp; <a href="https://udyamadhar.in/refund-cancellation-policy" style="color:#12315C; text-decoration:none; font-weight:600;">Refund &amp; Cancellation Policy</a> &nbsp;|&nbsp; <a href="https://udyamadhar.in/privacy-policy" style="color:#12315C; text-decoration:none; font-weight:600;">Privacy Policy</a> &nbsp;|&nbsp; <a href="https://udyamadhar.in/disclaimer" style="color:#12315C; text-decoration:none; font-weight:600;">Disclaimer</a> &nbsp;|&nbsp; <a href="https://udyamadhar.in/service-delivery-policy" style="color:#12315C; text-decoration:none; font-weight:600;">Service Delivery Policy</a></td></tr>
+
+      <tr><td style="padding:24px 30px 0 30px; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:14px; line-height:1.7; color:#2B2E33;">
+        <p style="margin:0 0 6px 0;">Regards,<br/>${executiveName}<br/>Customer Care Team</p>
+        <p style="margin:2px 0 0 0; color:#5B6270; font-size:13px;">Private Consultancy &amp; Assistance Services</p>
+        <p style="margin:10px 0 0 0; font-size:13.5px;">&#128222; +91-9767870331 &nbsp;&nbsp; &#128231; help@businesshelpservices.com &nbsp;&nbsp; &#127760; www.udyamadhar.in</p>
+      </td></tr>
+      <tr><td style="padding:22px 30px 0 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7; border-radius:6px; border:1px solid #E3E6EC;">
+          <tr><td style="padding:14px 16px;">
+            <span style="font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:11.5px; font-weight:700; letter-spacing:0.6px; color:#12315C; text-transform:uppercase;">Important Notice</span>
+            <p style="margin:8px 0 0 0; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:12px; line-height:1.6; color:#5B6270;">This is an automatically generated system email containing a secure payment link for your order. This email does not confirm that payment has been received. A separate confirmation email along with the Tax Invoice will be sent once your payment is successfully received and processed. Business Help Services maintains electronic records of payment link generation, customer communications, and transaction activities for operational, compliance, audit, and record-keeping purposes.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:20px 30px 26px 30px; text-align:center; font-family:'Segoe UI', Arial, Helvetica, sans-serif; font-size:11px; color:#5B6270;">&copy; Business Help Services &middot; www.udyamadhar.in</td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 
     await enqueueEmailInternal({
       toEmail: lead.email,
       toName: lead.name ?? null,
-      subject: `Payment Link for ${serviceName} - Lead ID: ${leadCode}`,
-      bodyHtml: htmlBody,
+      subject: `Complete Your Payment – Order No. ${leadCode}`,
+      bodyHtml,
       leadId: lead.id,
       allowWithoutTemplate: true,
       requireImmediateSuccess: true,
