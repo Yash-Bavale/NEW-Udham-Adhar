@@ -109,7 +109,9 @@ export function WpPage({
   /** Content/SEO pages keep the standard enquiry form + sample certificate. */
   withForm?: boolean;
 }) {
-  const branded = useBrandedHtml(stripDuplicateTitle(html, title));
+  const embedded = firstH1Text(html);
+  const heading = embedded && embedded.length > title.length ? embedded : title;
+  const branded = useBrandedHtml(stripH1Blocks(html));
   return (
     <div>
       {withForm ? (
