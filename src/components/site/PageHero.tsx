@@ -1,6 +1,9 @@
 import { type ReactNode } from "react";
 import { LEGAL_FOOTER_LINE, SITE_NAME, LEGAL_ENTITY, COMPANY_NAME, SUPPORT_EMAIL, BASE_URL } from "@/lib/brand";
 import { useOptionalBrand } from "@/lib/websites/brand-context";
+import { LeadForm } from "@/components/site/LeadForm";
+import { TrustBlock } from "@/components/site/TrustBlock";
+import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
 
 const proseClasses =
   "p-6 md:p-10 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
