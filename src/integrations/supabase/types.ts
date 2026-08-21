@@ -4481,6 +4481,7 @@ export type Database = {
       }
       is_finance_viewer: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_workflow_manager: { Args: { _user_id: string }; Returns: boolean }
       list_order_close_reasons: {
         Args: never
         Returns: {
