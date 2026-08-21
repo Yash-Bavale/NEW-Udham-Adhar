@@ -144,7 +144,7 @@ export function WpPage({
       <section className="mx-auto max-w-5xl px-4 py-10">
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="bg-form-header text-white text-center py-5">
-            <h1 className="text-2xl md:text-3xl font-bold font-display">{title}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold font-display">{heading}</h1>
           </div>
           <div className={proseClasses}>
             <div dangerouslySetInnerHTML={{ __html: branded }} />
