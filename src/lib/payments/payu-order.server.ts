@@ -108,9 +108,10 @@ export async function buildPayUOrder(leadCodeInput: string) {
   const paymentId = inserted.id;
 
   const amount = payAmount.toFixed(2);
-  const productinfo = (lead.service ?? "Service").slice(0, 100);
-  const firstname = (lead.name ?? "Customer").slice(0, 60);
-  const email = lead.email;
+  const productinfo = String(lead.service ?? "Service").replace(/[^a-zA-Z0-9\s]/g, " ").trim().slice(0, 100) || "Service";
+  const firstname = String(lead.name ?? "Customer").replace(/[^a-zA-Z0-9\s]/g, " ").trim().slice(0, 60) || "Customer";
+  const phone = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";
+  const email = String(lead.email ?? "customer@example.com").trim().toLowerCase();
 
   const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
     "https://udyamadhar.in";
@@ -131,7 +132,7 @@ export async function buildPayUOrder(leadCodeInput: string) {
       productinfo,
       firstname,
       email,
-      phone: lead.mobile,
+      phone,
       surl,
       furl,
       hash,

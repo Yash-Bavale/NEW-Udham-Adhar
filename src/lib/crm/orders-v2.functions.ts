@@ -140,6 +140,35 @@ async function ensurePaidOrdersIntegrated(admin: any) {
       }
     }
 
+    // 1B. Sync leads that have active (non-deleted) application rows to payment_successful
+    const { data: appsWithLeads } = await admin
+      .from("applications")
+      .select("lead_id")
+      .eq("is_deleted", false)
+      .not("lead_id", "is", null)
+      .limit(200);
+
+    if (appsWithLeads && appsWithLeads.length > 0) {
+      const appLeadIds = Array.from(new Set(appsWithLeads.map((a: any) => a.lead_id)));
+      const { data: unsyncedLeads } = await admin
+        .from("leads")
+        .select("id, status")
+        .in("id", appLeadIds)
+        .not("status", "in", "(payment_successful,under_process,completed)");
+
+      if (unsyncedLeads && unsyncedLeads.length > 0) {
+        const unsyncedIds = unsyncedLeads.map((l: any) => l.id);
+        await admin
+          .from("leads")
+          .update({
+            status: "payment_successful",
+            lead_status_v2: "payment_successful",
+            payment_successful_at: new Date().toISOString(),
+          } as any)
+          .in("id", unsyncedIds);
+      }
+    }
+
     // 2. Find leads marked payment_successful that don't have an application row
     const { data: paidLeads } = await admin
       .from("leads")
@@ -213,10 +242,12 @@ async function ensurePaidOrdersIntegrated(admin: any) {
       const pIds = pendingLeads.map((l: any) => l.id);
       const { data: pmtRows } = await admin.from("payments").select("lead_id").in("lead_id", pIds);
       const { data: linkRows } = await admin.from("payment_links" as any).select("lead_id").in("lead_id", pIds);
+      const { data: appRows } = await admin.from("applications").select("lead_id").in("lead_id", pIds).eq("is_deleted", false);
 
       const activePLeadIds = new Set([
         ...(pmtRows ?? []).map((p: any) => p.lead_id),
         ...(linkRows ?? []).map((l: any) => l.lead_id),
+        ...(appRows ?? []).map((a: any) => a.lead_id),
       ].filter(Boolean));
 
       const orphanedLeadIds = pIds.filter((id: string) => !activePLeadIds.has(id));

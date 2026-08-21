@@ -111,7 +111,10 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
   const redirectUrl = `${origin}/api/public/webhooks/ccavenue`;
   const cancelUrl = `${origin}/api/public/webhooks/ccavenue`;
 
-  const billingName = (lead.name ?? "Customer").slice(0, 60);
+  const billingName = String(lead.name ?? "Customer").replace(/[^a-zA-Z0-9\s]/g, " ").trim().slice(0, 60) || "Customer";
+  const billingTel = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";
+  const billingEmail = String(lead.email ?? "customer@example.com").trim().toLowerCase();
+
   const merchantParams = buildCcavPayload({
     merchant_id: merchantId,
     order_id: orderId,
@@ -121,8 +124,8 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     cancel_url: cancelUrl,
     language: "EN",
     billing_name: billingName,
-    billing_email: lead.email,
-    billing_tel: lead.mobile ?? "",
+    billing_email: billingEmail,
+    billing_tel: billingTel,
     billing_country: "India",
     billing_state: lead.state ?? "",
     merchant_param1: lead.id,

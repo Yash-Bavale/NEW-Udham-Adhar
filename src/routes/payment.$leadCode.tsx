@@ -6,6 +6,10 @@ import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/init
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
 import { trackEvent } from "@/lib/analytics/track";
 
+import payuLogo from "@/assets/gateways/payu.svg";
+import razorpayLogo from "@/assets/gateways/razorpay.svg";
+import cashfreeLogo from "@/assets/gateways/cashfree.png";
+
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
 
 export const Route = createFileRoute("/payment/$leadCode")({
@@ -124,11 +128,7 @@ function PaymentPage() {
                           {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </div>
 
-                        {gw.logoUrl ? (
-                          <img src={gw.logoUrl} alt={gw.displayName} className="h-5 w-auto max-w-16 object-contain shrink-0" />
-                        ) : (
-                          <CreditCard className="w-4 h-4 text-slate-500 shrink-0" />
-                        )}
+                        <GatewayLogo name={gw.name} displayName={gw.displayName || gw.name} logoUrl={gw.logoUrl} />
 
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-foreground truncate">
@@ -206,6 +206,36 @@ function DummyUrgencyTimer() {
     <div className="rounded-xl border border-red-200 bg-red-50/90 py-3.5 px-4 text-center font-bold text-red-600 text-sm md:text-base flex items-center justify-center gap-2 shadow-sm">
       <Clock className="w-5 h-5 text-red-600 animate-pulse shrink-0" />
       <span>Complete Your Payment In: 00:{formatted}</span>
+    </div>
+  );
+}
+
+function GatewayLogo({ name, displayName, logoUrl }: { name: string; displayName: string; logoUrl?: string | null }) {
+  const [imgError, setImgError] = useState(false);
+
+  const fallbackAsset =
+    name === "payu" ? payuLogo :
+    name === "razorpay" ? razorpayLogo :
+    name === "cashfree" ? cashfreeLogo : null;
+
+  if (logoUrl && !imgError) {
+    return (
+      <img
+        src={logoUrl}
+        alt={displayName}
+        onError={() => setImgError(true)}
+        className="h-6 w-auto max-w-20 object-contain shrink-0"
+      />
+    );
+  }
+
+  if (fallbackAsset) {
+    return <img src={fallbackAsset} alt={displayName} className="h-5 w-auto max-w-20 object-contain shrink-0" />;
+  }
+
+  return (
+    <div className="h-6 px-2.5 rounded bg-brand-navy/10 border border-brand-navy/20 flex items-center justify-center font-bold text-xs text-brand-navy shrink-0">
+      {displayName}
     </div>
   );
 }
