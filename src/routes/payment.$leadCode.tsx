@@ -139,12 +139,6 @@ function PaymentPage() {
                           </div>
                         </div>
                       </div>
-
-                      {isDefaultGw && (
-                        <span className="text-[9.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
-                          Default
-                        </span>
-                      )}
                     </div>
                   );
                 })}
