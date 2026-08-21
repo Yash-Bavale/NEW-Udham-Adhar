@@ -27,10 +27,33 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
 
   const { data: payment } = await supabaseAdmin
     .from("payments")
-    .select("id, lead_id, application_id, status, transaction_id, razorpay_payment_id")
+    .select("id, lead_id, application_id, status, transaction_id, razorpay_payment_id, amount, created_at, parent_payment_id")
     .eq("id", paymentId)
     .maybeSingle();
   if (!payment) throw new Error(`Payment ${paymentId} not found`);
+
+  // Is this the order's FIRST settled payment, or a top-up (service-change
+  // delta / balance) on an order that was already paid for earlier?
+  // A top-up must never reset the order stage, re-arm the form timers, or
+  // re-send the order-confirmation email.
+  const { data: earlierPaid } = await supabaseAdmin
+    .from("payments")
+    .select("id, created_at")
+    .eq("lead_id", payment.lead_id)
+    .eq("status", "paid")
+    .neq("id", payment.id)
+    .lte("created_at", (payment as any).created_at)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const isTopUp = !!earlierPaid;
+  if (isTopUp && !(payment as any).parent_payment_id) {
+    await supabaseAdmin
+      .from("payments")
+      .update({ parent_payment_id: earlierPaid!.id } as any)
+      .eq("id", payment.id);
+  }
+
 
   // 1) Application — orders exist only from a successful payment onwards.
   let applicationId = payment.application_id as string | null;
