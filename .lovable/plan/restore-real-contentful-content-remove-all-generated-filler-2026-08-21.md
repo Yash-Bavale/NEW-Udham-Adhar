@@ -12,11 +12,11 @@ Each article carries the original rich-text `body`, `metaTitle`, `metaDescriptio
 ## What I'll do
 
 1. Re-import every article and service page into Sanity from the Contentful export, overwriting the repaired documents.
-   - `body` rich text converted 1:1 (headings, paragraphs, lists, bold/links, embedded entries/assets) — no paraphrasing, no re-splitting into invented "sections".
-   - FAQs come only from the linked Contentful `faq` entries. If a page had none, it shows none.
-   - Titles and meta fields taken verbatim from Contentful.
+  - `body` rich text converted 1:1 (headings, paragraphs, lists, bold/links, embedded entries/assets) — no paraphrasing, no re-splitting into invented "sections".
+  - FAQs come only from the linked Contentful `faq` entries. If a page had none, it shows none.
+  - Titles and meta fields taken verbatim from Contentful.
 2. Delete the generated fields on every migrated document: fabricated `sections`, `faqs`, `quickFacts`, `cta`, `eeat` content that was not in Contentful.
-3. Rendering: the page renders the Contentful body as the article, with one H1 (the Contentful H1 kept, page-level duplicate suppressed), and keeps the enquiry form / trust block, which are app UI, not content.
+3. Rendering: the page renders the Contentful body as the article), and keeps the enquiry form / trust block, which are app UI, not content.
 4. Verify a sample of pages on both domains against the Contentful source (heading order, paragraph count, FAQ count) and report any page where content still doesn't match.
 
 ## Technical notes
