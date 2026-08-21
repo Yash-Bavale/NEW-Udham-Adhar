@@ -672,7 +672,7 @@ export const getLeadCounts = createServerFn({ method: "GET" })
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
     // Use head-only exact counts (no row transfer) to avoid timeouts on large tables.
-    const statuses = LEAD_STATUSES as readonly string[];
+    const statuses = LEAD_STATUS_ENUM as readonly string[];
     const scope = (q: any) => (isAdmin ? q : q.eq("assigned_to", context.userId));
 
     const [allRes, ...perStatus] = await Promise.all([
