@@ -142,10 +142,10 @@ export function Footer() {
   return (
     <footer className="bg-brand-navy-deep text-white mt-12">
       <div className="mx-auto max-w-7xl px-4 py-12 grid gap-10 md:grid-cols-3">
-        {/* Col 1: MSME / Udyam Aadhar Registration — full SEO tree inline (client review mode) */}
+        {/* Col 1: Business Help Services — full SEO tree inline */}
         <div>
           <h4 className="text-2xl font-bold font-display leading-tight">
-            MSME/ Udyam Aadhar Registration
+            Business Help Services
           </h4>
           <SeoTree
             pages={pages}
@@ -179,7 +179,10 @@ export function Footer() {
           <h4 className="text-2xl font-bold font-display leading-tight">
             Get in touch
           </h4>
-          <ul className="mt-6 space-y-5 text-[15px] text-white/90">
+          <p className="mt-3 text-base font-bold text-white">
+            Business Help Services
+          </p>
+          <ul className="mt-4 space-y-4 text-[14.5px] text-white/90">
             <li className="flex items-start gap-3">
               <Briefcase className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
               <span>Working Hours: {brand.businessHours || "10:00 AM to 05:00 PM (IST) ( Sunday & Public Holidays Off)"}</span>
@@ -207,6 +210,9 @@ export function Footer() {
               <span>Address: {address}</span>
             </li>
           </ul>
+          <div className="mt-5 pt-4 border-t border-white/15 text-xs text-white/75 leading-relaxed">
+            <strong>Disclaimer:</strong> {brand.legalFooterLine || "Business Help Services is operated as a private consultancy. We are not affiliated with, authorised by, endorsed by, or associated with any government authority or department."}
+          </div>
         </div>
       </div>
 
