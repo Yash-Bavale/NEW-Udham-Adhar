@@ -13,7 +13,9 @@ import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
 const LEGACY_TEMPLATE_ALIAS: Record<string, string | null> = {
   // Order lifecycle
   order_confirmation: "E001",
+  topup_payment_received: "E013",
   service_changed: "E012",
+
   welcome_and_form_link: "E002",
   "client-info-request": "E002",
   docs_required_reminder: "E002",
