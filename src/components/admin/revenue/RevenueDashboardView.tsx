@@ -6,6 +6,7 @@ import {
   getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
+import { RevenueExportModal } from "./RevenueExportModal";
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
 } from "recharts";
@@ -93,7 +94,7 @@ export function RevenueDashboardView() {
 
   const handleExport = async (format: "csv" | "excel") => {
     setExporting(format);
-    setExportOpen(false);
+    setExportModalOpen(false);
     try {
       const res = await exportFn({
         data: {
@@ -135,8 +136,6 @@ export function RevenueDashboardView() {
     color: GW_COLORS[g.name] || "#64748B",
   }));
 
-  return (
-    <div className="space-y-6">
   const [ledgerTab, setLedgerTab] = useState<"all" | "successful" | "pending" | "failed" | "refunded">("successful");
 
   const filterLedger = (tab: "all" | "successful" | "pending" | "failed" | "refunded") => {
