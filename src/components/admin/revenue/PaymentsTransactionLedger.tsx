@@ -37,8 +37,8 @@ export function PaymentsTransactionLedger({
   const [search, setSearch] = useState("");
   const [gatewayFilter, setGatewayFilter] = useState("");
   const [methodFilter, setMethodFilter] = useState("");
-  const [customDateFrom, setCustomDateFrom] = useState("");
-  const [customDateTo, setCustomDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [minAmount, setMinAmount] = useState<number | undefined>();
   const [maxAmount, setMaxAmount] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
@@ -47,8 +47,8 @@ export function PaymentsTransactionLedger({
   const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
-  const activeDateFrom = customDateFrom || rangeDateFrom;
-  const activeDateTo = customDateTo || rangeDateTo;
+  const activeDateFrom = dateFrom || rangeDateFrom;
+  const activeDateTo = dateTo || rangeDateTo;
 
   const listFn = useServerFn(listPaymentLedger);
   const exportFn = useServerFn(exportRevenueTransactions);
