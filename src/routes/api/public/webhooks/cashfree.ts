@@ -128,17 +128,8 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
           return new Response("Payment not found", { status: 200 }); // 200 so Cashfree doesn't retry endlessly
         }
 
-        // Idempotency: if already paid, finalize again (safe) and return 200
+        // Idempotency: if already paid, return 200 immediately
         if (payment.status === "paid") {
-          try {
-            const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
-            await finalizePaidPayment(payment.id, {
-              source: "webhook",
-              txnid: orderId,
-            });
-          } catch (e) {
-            console.error("[cashfree-webhook] Idempotent finalization retry failed", e);
-          }
           return new Response("OK", { status: 200 });
         }
 

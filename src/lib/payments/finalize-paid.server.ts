@@ -176,6 +176,11 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
   try {
     await generateInvoiceInternal(payment.id);
     invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
+    // Retry once if attachment load was delayed due to storage async upload latency
+    if (!invoiceAttachment) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      invoiceAttachment = await loadInvoiceAttachmentByPayment(payment.id);
+    }
     const { data: inv } = await supabaseAdmin
       .from("invoices")
       .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount, last_emailed_at")
@@ -186,20 +191,28 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
     console.error("[finalize] invoice generation failed", e);
   }
 
-  // 5) E001 email — send ONCE per payment. Reconcile/webhook retries call this
-  // finalizer repeatedly; without this guard the customer gets duplicate
-  // "Order Confirmation & Tax Invoice" mails for the same money.
-  const alreadyEmailed = !!invoiceRow?.last_emailed_at;
+  // 5) E001 email — send ONCE per payment. Check BOTH invoices table AND email_queue
+  // to prevent race conditions when webhooks and browser redirects hit concurrently.
+  const { data: existingEmailQueue } = await supabaseAdmin
+    .from("email_queue")
+    .select("id")
+    .eq("lead_id", payment.lead_id)
+    .in("template_code", ["E001", "order_confirmation"])
+    .maybeSingle();
+
+  const alreadyEmailed = !!invoiceRow?.last_emailed_at || !!existingEmailQueue;
   if (alreadyEmailed) {
-    console.info("[finalize] E001 already sent for payment, skipping", payment.id);
+    console.info("[finalize] E001 already queued or sent for payment, skipping", payment.id);
+    return { ok: true, applicationId };
   }
+
   try {
     const { data: leadRow } = await supabaseAdmin
       .from("leads")
       .select("lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount")
       .eq("id", payment.lead_id)
       .maybeSingle();
-    if (!alreadyEmailed && leadRow?.email && leadRow.lead_code) {
+    if (leadRow?.email && leadRow.lead_code) {
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       const { amountInWordsINR } = await import("@/lib/invoices/amount-in-words");
       const { resolveApplicationCode } = await import("@/lib/orders/resolve-order-number.server");
