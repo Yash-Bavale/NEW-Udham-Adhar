@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -53,9 +53,13 @@ function LeadDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <Link to="/admin/leads" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 transition-colors">
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" /> Back to leads
-        </Link>
+        </button>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="font-mono text-[11px]">{lead.lead_code}</Badge>

@@ -91,6 +91,12 @@ export function Footer() {
   );
   const addressBlock = useBlock<{ text?: string } | null>("footer.address", null);
   const copyrightBlock = useBlock<{ text?: string } | null>("footer.copyright", null);
+  const brandHeadingBlock = useBlock<{ text?: string } | null>("footer.brand_heading", null);
+  const contactNameBlock = useBlock<{ text?: string } | null>("footer.contact_name", null);
+
+  const footerBrandHeading = brandHeadingBlock?.text || brand.companyName || "Business Help Services";
+  const footerContactName = contactNameBlock?.text || brand.companyName || "Business Help Services";
+
   const address =
     addressBlock?.text ||
     [brand.companyName, brand.postalAddress].filter(Boolean).join(" ") ||
@@ -145,7 +151,7 @@ export function Footer() {
         {/* Col 1: Business Help Services — full SEO tree inline */}
         <div>
           <h4 className="text-2xl font-bold font-display leading-tight">
-            Business Help Services
+            {footerBrandHeading}
           </h4>
           <SeoTree
             pages={pages}
@@ -180,7 +186,7 @@ export function Footer() {
             Get in touch
           </h4>
           <p className="mt-3 text-base font-bold text-white">
-            Business Help Services
+            {footerContactName}
           </p>
           <ul className="mt-4 space-y-4 text-[14.5px] text-white/90">
             <li className="flex items-start gap-3">

@@ -355,12 +355,13 @@ export function WorkspaceShell(p: Props) {
       <div className="space-y-5 pb-10 max-w-[1400px] mx-auto">
         {/* Top row */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <Link
-            to="/admin/orders"
+          <button
+            type="button"
+            onClick={() => window.history.back()}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Orders
-          </Link>
+          </button>
           <div className="flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>

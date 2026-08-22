@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
-import { useNav } from "@/lib/websites/site-content-context";
+import { useNav, useBlock } from "@/lib/websites/site-content-context";
 import { useBrand } from "@/lib/websites/brand-context";
 
 declare global {
@@ -57,9 +57,15 @@ function applyLang(lang: string) {
 
 export function Header() {
   const brand = useBrand();
-  const headerBrand = useBlock<{ title?: string; subtitle?: string } | null>("header.brand_info", null);
-  const brandTitle = headerBrand?.title || brand.companyName || "Business Help Services";
-  const brandSubtitle = headerBrand?.subtitle || "Business Consultancy & Assistance Services";
+  const centerTitleBlock = useBlock<{ text?: string } | null>("header.center_title", null);
+  const centerSubtitleBlock = useBlock<{ text?: string } | null>("header.center_subtitle", null);
+  const brandTitleBlock = useBlock<{ text?: string } | null>("header.brand_title", null);
+  const brandSubtitleBlock = useBlock<{ text?: string } | null>("header.brand_subtitle", null);
+
+  const centerTitle = centerTitleBlock?.text || "सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा";
+  const centerSubtitle = centerSubtitleBlock?.text || "REGISTRATION ADVISORY FOR MICRO, SMALL & MEDIUM ENTERPRISES";
+  const brandTitle = brandTitleBlock?.text || brand.companyName || "Business Help Services";
+  const brandSubtitle = brandSubtitleBlock?.text || "Business Consultancy & Assistance Services";
 
   const [open, setOpen] = useState(false);
   const navLinks = useNav(
@@ -200,10 +206,10 @@ export function Header() {
               aria-label="Go to homepage"
             >
               <p className="font-bold text-brand-red font-display leading-snug text-center text-lg">
-                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
+                {centerTitle}
               </p>
               <p className="text-[10px] tracking-wide text-brand-navy font-semibold font-display mt-0.5 leading-tight text-center">
-                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
+                {centerSubtitle}
               </p>
             </button>
             <button
@@ -244,10 +250,10 @@ export function Header() {
               aria-label="Go to homepage"
             >
               <div className="text-2xl font-bold text-brand-red font-display leading-tight">
-                सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा
+                {centerTitle}
               </div>
               <p className="text-xs tracking-wider text-brand-navy font-semibold mt-1">
-                REGISTRATION ADVISORY FOR MICRO, SMALL &amp; MEDIUM ENTERPRISES
+                {centerSubtitle}
               </p>
             </button>
 

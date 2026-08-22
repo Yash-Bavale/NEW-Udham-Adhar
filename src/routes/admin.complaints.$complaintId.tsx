@@ -157,9 +157,9 @@ function ComplaintDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/admin/complaints" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
+      <button type="button" onClick={() => window.history.back()} className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
         <ChevronLeft className="w-4 h-4" /> Back to complaints & contact forms
-      </Link>
+      </button>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

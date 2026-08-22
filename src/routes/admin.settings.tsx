@@ -86,10 +86,7 @@ function SettingsPage() {
 
 function CompanyTab() {
   return (
-    <SectionCard
-      title="Company Information"
-      action={<Link to="/admin/websites" className="text-xs font-semibold text-indigo-600 hover:underline">Edit Header Brand Name & Website Content →</Link>}
-    >
+    <SectionCard title="Company Information">
       <div className="p-4 grid md:grid-cols-2 gap-4 text-sm">
         <Field label="Company Name" value={COMPANY_NAME} />
         <Field label="Brand" value={SITE_NAME} />
@@ -98,11 +95,8 @@ function CompanyTab() {
         <Field label="Address" value="—" />
         <Field label="GST Number" value="—" />
       </div>
-      <div className="px-4 py-3 border-t text-xs flex items-center justify-between" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
-        <span>To change the website header brand name, subtitle, or contact details directly, click <strong>Edit Header Brand Name & Website Content</strong>.</span>
-        <Link to="/admin/websites" className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-          Edit Brand Settings →
-        </Link>
+      <div className="px-4 py-3 border-t text-xs" style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg-muted)" }}>
+        Read-only display. Edit via your account manager.
       </div>
     </SectionCard>
   );

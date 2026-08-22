@@ -27,7 +27,6 @@ type NavRow = {
 };
 
 const BLOCK_HINTS: Record<string, string> = {
-  "header.brand_info": '{ "title": "Business Help Services", "subtitle": "Business Consultancy & Assistance Services" }',
   "checkout.disclaimer_footer": '{ "enabled": true }',
   "home.facts": '{ "items": [{ "label": "Label", "value": "Value" }] }',
   "disclaimer.bar": '{ "text": "Disclaimer marquee text" }',
@@ -69,14 +68,14 @@ function WebsiteContentPage() {
         </h1>
       </div>
 
-      <HeaderBrandCard
+      <CheckoutToggleCard
         websiteId={websiteId}
         blocks={data.blocks as Array<{ block_key: string; content: unknown; is_active: boolean }>}
         onSave={saveBlock}
         onSaved={refresh}
       />
 
-      <CheckoutToggleCard
+      <HeaderFooterTextCard
         websiteId={websiteId}
         blocks={data.blocks as Array<{ block_key: string; content: unknown; is_active: boolean }>}
         onSave={saveBlock}
@@ -111,87 +110,6 @@ function WebsiteContentPage() {
         onSaved={refresh}
       />
     </div>
-  );
-}
-
-function HeaderBrandCard({
-  websiteId,
-  blocks,
-  onSave,
-  onSaved,
-}: {
-  websiteId: string;
-  blocks: Array<{ block_key: string; content: unknown; is_active: boolean }>;
-  onSave: (a: { data: { website_id: string; block_key: string; content: unknown; is_active: boolean } }) => Promise<unknown>;
-  onSaved: () => void;
-}) {
-  const existing = blocks.find((b) => b.block_key === "header.brand_info");
-  const contentObj = (existing?.content as { title?: string; subtitle?: string } | undefined) ?? {};
-  const [title, setTitle] = useState(contentObj.title ?? "Business Help Services");
-  const [subtitle, setSubtitle] = useState(contentObj.subtitle ?? "Business Consultancy & Assistance Services");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const saveHeaderBrand = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await onSave({
-        data: {
-          website_id: websiteId,
-          block_key: "header.brand_info",
-          content: { title: title.trim(), subtitle: subtitle.trim() },
-          is_active: true,
-        },
-      });
-      setMsg("Saved successfully!");
-      onSaved();
-    } catch (e: any) {
-      setMsg(e?.message || "Error saving");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card title="Header Brand Name & Subtitle">
-      <div className="space-y-3">
-        <p className="text-xs text-slate-500">
-          Directly edit the primary Header Brand Title and Subtitle displayed at the top left of the website header.
-        </p>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className="text-sm space-y-1">
-            <span className="font-medium text-slate-700">Header Brand Title</span>
-            <input
-              className={inputCls}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Business Help Services"
-            />
-          </label>
-          <label className="text-sm space-y-1">
-            <span className="font-medium text-slate-700">Header Subtitle</span>
-            <input
-              className={inputCls}
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="e.g. Business Consultancy & Assistance Services"
-            />
-          </label>
-        </div>
-        <div className="flex items-center gap-3 pt-1">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={saveHeaderBrand}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" /> Save Header Brand Name
-          </button>
-          {msg && <span className="text-xs font-medium text-emerald-600">{msg}</span>}
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -256,6 +174,109 @@ function CheckoutToggleCard({
             }`}
           />
         </button>
+      </div>
+    </Card>
+  );
+}
+
+function HeaderFooterTextCard({
+  websiteId,
+  blocks,
+  onSave,
+  onSaved,
+}: {
+  websiteId: string;
+  blocks: Array<{ block_key: string; content: unknown; is_active: boolean }>;
+  onSave: (a: { data: { website_id: string; block_key: string; content: unknown; is_active: boolean } }) => Promise<unknown>;
+  onSaved: () => void;
+}) {
+  const getBlockVal = (key: string, def: string) => {
+    const b = blocks.find((x) => x.block_key === key);
+    return ((b?.content as { text?: string })?.text) ?? def;
+  };
+
+  const [brandTitle, setBrandTitle] = useState(() => getBlockVal("header.brand_title", "Business Help Services"));
+  const [brandSubtitle, setBrandSubtitle] = useState(() => getBlockVal("header.brand_subtitle", "Business Consultancy & Assistance Services"));
+  const [centerTitle, setCenterTitle] = useState(() => getBlockVal("header.center_title", "सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा"));
+  const [centerSubtitle, setCenterSubtitle] = useState(() => getBlockVal("header.center_subtitle", "REGISTRATION ADVISORY FOR MICRO, SMALL & MEDIUM ENTERPRISES"));
+  const [footerBrandHeading, setFooterBrandHeading] = useState(() => getBlockVal("footer.brand_heading", "Business Help Services"));
+  const [footerContactName, setFooterContactName] = useState(() => getBlockVal("footer.contact_name", "Business Help Services"));
+
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const saveAll = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await Promise.all([
+        onSave({ data: { website_id: websiteId, block_key: "header.brand_title", content: { text: brandTitle }, is_active: true } }),
+        onSave({ data: { website_id: websiteId, block_key: "header.brand_subtitle", content: { text: brandSubtitle }, is_active: true } }),
+        onSave({ data: { website_id: websiteId, block_key: "header.center_title", content: { text: centerTitle }, is_active: true } }),
+        onSave({ data: { website_id: websiteId, block_key: "header.center_subtitle", content: { text: centerSubtitle }, is_active: true } }),
+        onSave({ data: { website_id: websiteId, block_key: "footer.brand_heading", content: { text: footerBrandHeading }, is_active: true } }),
+        onSave({ data: { website_id: websiteId, block_key: "footer.contact_name", content: { text: footerContactName }, is_active: true } }),
+      ]);
+      setMsg("Header & footer text settings saved successfully!");
+      onSaved();
+    } catch (e: any) {
+      setMsg(e?.message || "Failed to save text settings");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Header & Footer Dynamic Text Settings">
+      <div className="space-y-4">
+        <div className="border-b border-slate-200 pb-2 font-semibold text-xs text-slate-500 uppercase tracking-wider">
+          Header Brand & Title Texts
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Header Top Left Brand Name</label>
+            <input className={inputCls} value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} placeholder="Business Help Services" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Header Top Left Subtitle</label>
+            <input className={inputCls} value={brandSubtitle} onChange={(e) => setBrandSubtitle(e.target.value)} placeholder="Business Consultancy & Assistance Services" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Header Center Title (Hindi / Primary Text)</label>
+            <input className={inputCls} value={centerTitle} onChange={(e) => setCenterTitle(e.target.value)} placeholder="सूक्ष्म, लघु और मध्यम उद्यम पंजीकरण सहायता सेवा" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Header Center Subtitle (English Subtext)</label>
+            <input className={inputCls} value={centerSubtitle} onChange={(e) => setCenterSubtitle(e.target.value)} placeholder="REGISTRATION ADVISORY FOR MICRO, SMALL & MEDIUM ENTERPRISES" />
+          </div>
+        </div>
+
+        <div className="border-b border-slate-200 pb-2 pt-2 font-semibold text-xs text-slate-500 uppercase tracking-wider">
+          Footer Brand & Contact Section Texts
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Footer Column 1 Heading</label>
+            <input className={inputCls} value={footerBrandHeading} onChange={(e) => setFooterBrandHeading(e.target.value)} placeholder="Business Help Services" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Footer Get In Touch Company Name</label>
+            <input className={inputCls} value={footerContactName} onChange={(e) => setFooterContactName(e.target.value)} placeholder="Business Help Services" />
+          </div>
+        </div>
+
+        {msg && <p className="text-xs text-emerald-600 font-medium">{msg}</p>}
+
+        <div className="pt-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={saveAll}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50"
+          >
+            <Save className="size-3.5" /> {busy ? "Saving…" : "Save Header & Footer Text Settings"}
+          </button>
+        </div>
       </div>
     </Card>
   );
