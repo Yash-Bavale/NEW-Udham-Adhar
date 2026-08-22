@@ -75,20 +75,6 @@ export function PaymentsTransactionLedger({
       }),
     staleTime: 15_000,
   });
-          page,
-          pageSize,
-          tab,
-          search: search || undefined,
-          gateway: gatewayFilter || undefined,
-          paymentMethod: methodFilter || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-          minAmount,
-          maxAmount,
-        },
-      }),
-    staleTime: 15_000,
-  });
 
   const rows = data?.rows ?? [];
   const total = data?.total ?? 0;
