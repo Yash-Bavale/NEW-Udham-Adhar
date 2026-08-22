@@ -378,13 +378,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       admin
         .from("payments")
         .select("application_id")
-        .in("status", ["paid", "success", "successful"])
+        .eq("status", "paid")
         .not("application_id", "is", null),
       admin
         .from("applications")
         .select("id")
         .eq("is_deleted", false)
-        .not("application_status", "eq", "lead")
         .limit(5000),
     ]);
 
@@ -554,7 +553,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     if (duplicateAppIdsToDelete.length > 0) {
-      admin.from("applications").update({ is_deleted: true }).in("id", duplicateAppIdsToDelete).catch((err) => {
+      void Promise.resolve(
+        admin.from("applications").update({ is_deleted: true }).in("id", duplicateAppIdsToDelete),
+      ).catch((err: unknown) => {
         console.error("[listOrdersV2] auto-cleanup duplicate apps error:", err);
       });
     }
