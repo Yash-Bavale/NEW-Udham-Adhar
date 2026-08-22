@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Menu, X, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/constants";
-import { useNav } from "@/lib/websites/site-content-context";
+import { useNav, useBlock } from "@/lib/websites/site-content-context";
 import { useBrand } from "@/lib/websites/brand-context";
 
 declare global {
