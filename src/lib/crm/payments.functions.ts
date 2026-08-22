@@ -297,6 +297,62 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
       return { ok: true, status: newStatus, raw: result.raw as any };
     }
 
+    // ── Cashfree ─────────────────────────────────────────────────────────
+    if (gateway === "cashfree") {
+      const { getOrderStatus } = await import("@/lib/payments/cashfree.server");
+      const orderId = payment.transaction_id || payment.razorpay_order_id;
+      if (!orderId) throw new Error("Payment is missing an order id");
+
+      const cfOrder = await getOrderStatus(orderId);
+      const cfStatus = String(cfOrder?.order_status ?? "").toUpperCase();
+      const newStatus = cfStatus === "PAID" ? "paid"
+        : cfStatus === "EXPIRED" || cfStatus === "TERMINATED" ? "failed"
+        : payment.status;
+
+      if (newStatus === payment.status) {
+        return { ok: true, status: newStatus, raw: cfOrder as any };
+      }
+
+      if (newStatus === "paid") {
+        const paidAmount = Number(cfOrder.order_amount ?? 0);
+        const { data: full } = await (await getAdmin())
+          .from("payments").select("amount").eq("id", payment.id).single();
+        if (Math.abs(paidAmount - Number(full?.amount ?? 0)) > 0.01) {
+          throw new Error(`Amount mismatch at gateway (₹${paidAmount} vs ₹${full?.amount})`);
+        }
+      }
+
+      await (await getAdmin())
+        .from("payments")
+        .update({
+          status: newStatus,
+          payment_date: newStatus === "paid" ? new Date().toISOString() : undefined,
+          webhook_received_at: newStatus === "paid" ? new Date().toISOString() : undefined,
+          raw_response: { api_confirmed: cfOrder, source: "admin-reconcile" } as any,
+        } as any)
+        .eq("id", payment.id);
+
+      if (newStatus === "paid") {
+        const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
+        await finalizePaidPayment(payment.id, { source: "reconcile", txnid: orderId });
+      } else if (newStatus === "failed") {
+        await (await getAdmin()).from("leads")
+          .update({ status: "payment_pending", lead_status_v2: "payment_failed" } as any)
+          .eq("id", payment.lead_id);
+      }
+
+      await writeAudit({
+        supabase: context.supabase,
+        entityType: "payment",
+        entityId: payment.id,
+        action: "status_reconciled",
+        oldValue: { status: payment.status },
+        newValue: { status: newStatus, source: "cashfree.orderStatus" },
+      });
+
+      return { ok: true, status: newStatus, raw: cfOrder as any };
+    }
+
     throw new Error(`Reconciliation for gateway '${payment.gateway_name}' is not wired.`);
   });
 

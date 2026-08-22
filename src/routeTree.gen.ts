@@ -132,6 +132,7 @@ import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/l
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
+import { Route as ApiPublicWebhooksCashfreeRouteImport } from './routes/api/public/webhooks/cashfree'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
 import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public/form-asset.$'
 import { Route as ApiPublicCronZohoDiagnoseRouteImport } from './routes/api/public/cron/zoho-diagnose'
@@ -784,6 +785,12 @@ const ApiPublicWebhooksCcavenueRoute =
     path: '/api/public/webhooks/ccavenue',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWebhooksCashfreeRoute =
+  ApiPublicWebhooksCashfreeRouteImport.update({
+    id: '/api/public/webhooks/cashfree',
+    path: '/api/public/webhooks/cashfree',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInvoiceLeadCodeRoute =
   ApiPublicInvoiceLeadCodeRouteImport.update({
     id: '/api/public/invoice/$leadCode',
@@ -1007,6 +1014,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1142,6 +1150,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1283,6 +1292,7 @@ export interface FileRoutesById {
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
@@ -1425,6 +1435,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -1560,6 +1571,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -1700,6 +1712,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
     | '/lovable/email/queue/process'
@@ -1782,6 +1795,7 @@ export interface RootRouteChildren {
   ApiPublicCronZohoDiagnoseRoute: typeof ApiPublicCronZohoDiagnoseRoute
   ApiPublicFormAssetSplatRoute: typeof ApiPublicFormAssetSplatRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
+  ApiPublicWebhooksCashfreeRoute: typeof ApiPublicWebhooksCashfreeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -2652,6 +2666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksCcavenueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/cashfree': {
+      id: '/api/public/webhooks/cashfree'
+      path: '/api/public/webhooks/cashfree'
+      fullPath: '/api/public/webhooks/cashfree'
+      preLoaderRoute: typeof ApiPublicWebhooksCashfreeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/invoice/$leadCode': {
       id: '/api/public/invoice/$leadCode'
       path: '/api/public/invoice/$leadCode'
@@ -3051,6 +3072,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronZohoDiagnoseRoute: ApiPublicCronZohoDiagnoseRoute,
   ApiPublicFormAssetSplatRoute: ApiPublicFormAssetSplatRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
+  ApiPublicWebhooksCashfreeRoute: ApiPublicWebhooksCashfreeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,

@@ -9,7 +9,6 @@
 export async function buildCashfreeOrder(leadCodeInput: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const {
-    CASHFREE_API_URL,
     buildCashfreeOrderId,
     createCashfreeOrder,
   } = await import("@/lib/payments/cashfree.server");
@@ -152,10 +151,13 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   // Cashfree hosted checkout URL format:
   // Production: https://payments.cashfree.com/pgbillpay/checkout/post/{payment_session_id}
   // Sandbox: https://sandbox.cashfree.com/pgbillpay/checkout/post/{payment_session_id}
-  const checkoutBase =
-    CASHFREE_API_URL.includes("sandbox")
-      ? "https://sandbox.cashfree.com/pgbillpay"
-      : "https://payments.cashfree.com/pgbillpay";
+  // Mode is resolved from the SAME credential source as the API call
+  // (env vars or DB config) so the checkout host can never disagree.
+  const { getCashfreeCreds } = await import("@/lib/payments/cashfree.server");
+  const { isProd } = await getCashfreeCreds();
+  const checkoutBase = isProd
+    ? "https://payments.cashfree.com/pgbillpay"
+    : "https://sandbox.cashfree.com/pgbillpay";
 
   const actionUrl = cfOrder.payment_link
     || `${checkoutBase}/checkout/post/${cfOrder.payment_session_id}`;
