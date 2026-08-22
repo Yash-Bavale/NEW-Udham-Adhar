@@ -27,6 +27,7 @@ type NavRow = {
 };
 
 const BLOCK_HINTS: Record<string, string> = {
+  "header.brand_info": '{ "title": "Business Help Services", "subtitle": "Business Consultancy & Assistance Services" }',
   "checkout.disclaimer_footer": '{ "enabled": true }',
   "home.facts": '{ "items": [{ "label": "Label", "value": "Value" }] }',
   "disclaimer.bar": '{ "text": "Disclaimer marquee text" }',
@@ -68,6 +69,13 @@ function WebsiteContentPage() {
         </h1>
       </div>
 
+      <HeaderBrandCard
+        websiteId={websiteId}
+        blocks={data.blocks as Array<{ block_key: string; content: unknown; is_active: boolean }>}
+        onSave={saveBlock}
+        onSaved={refresh}
+      />
+
       <CheckoutToggleCard
         websiteId={websiteId}
         blocks={data.blocks as Array<{ block_key: string; content: unknown; is_active: boolean }>}
@@ -103,6 +111,87 @@ function WebsiteContentPage() {
         onSaved={refresh}
       />
     </div>
+  );
+}
+
+function HeaderBrandCard({
+  websiteId,
+  blocks,
+  onSave,
+  onSaved,
+}: {
+  websiteId: string;
+  blocks: Array<{ block_key: string; content: unknown; is_active: boolean }>;
+  onSave: (a: { data: { website_id: string; block_key: string; content: unknown; is_active: boolean } }) => Promise<unknown>;
+  onSaved: () => void;
+}) {
+  const existing = blocks.find((b) => b.block_key === "header.brand_info");
+  const contentObj = (existing?.content as { title?: string; subtitle?: string } | undefined) ?? {};
+  const [title, setTitle] = useState(contentObj.title ?? "Business Help Services");
+  const [subtitle, setSubtitle] = useState(contentObj.subtitle ?? "Business Consultancy & Assistance Services");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const saveHeaderBrand = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await onSave({
+        data: {
+          website_id: websiteId,
+          block_key: "header.brand_info",
+          content: { title: title.trim(), subtitle: subtitle.trim() },
+          is_active: true,
+        },
+      });
+      setMsg("Saved successfully!");
+      onSaved();
+    } catch (e: any) {
+      setMsg(e?.message || "Error saving");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Header Brand Name & Subtitle">
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">
+          Directly edit the primary Header Brand Title and Subtitle displayed at the top left of the website header.
+        </p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-sm space-y-1">
+            <span className="font-medium text-slate-700">Header Brand Title</span>
+            <input
+              className={inputCls}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Business Help Services"
+            />
+          </label>
+          <label className="text-sm space-y-1">
+            <span className="font-medium text-slate-700">Header Subtitle</span>
+            <input
+              className={inputCls}
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="e.g. Business Consultancy & Assistance Services"
+            />
+          </label>
+        </div>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={saveHeaderBrand}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5" /> Save Header Brand Name
+          </button>
+          {msg && <span className="text-xs font-medium text-emerald-600">{msg}</span>}
+        </div>
+      </div>
+    </Card>
   );
 }
 

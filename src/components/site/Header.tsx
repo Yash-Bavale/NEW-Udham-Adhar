@@ -56,6 +56,11 @@ function applyLang(lang: string) {
 }
 
 export function Header() {
+  const brand = useBrand();
+  const headerBrand = useBlock<{ title?: string; subtitle?: string } | null>("header.brand_info", null);
+  const brandTitle = headerBrand?.title || brand.companyName || "Business Help Services";
+  const brandSubtitle = headerBrand?.subtitle || "Business Consultancy & Assistance Services";
+
   const [open, setOpen] = useState(false);
   const navLinks = useNav(
     "header",
@@ -216,8 +221,8 @@ export function Header() {
             <Link
               to="/"
               className="flex flex-col"
-              aria-label="Business Help Services"
-              title="Business Help Services"
+              aria-label={brandTitle}
+              title={brandTitle}
               itemScope
               itemType="https://schema.org/Organization"
             >
@@ -225,10 +230,10 @@ export function Header() {
                 itemProp="name"
                 className="text-xl lg:text-2xl font-bold text-brand-red font-display whitespace-nowrap leading-loose"
               >
-                Business Help Services
+                {brandTitle}
               </span>
               <span className="text-sm text-foreground/80 leading-relaxed">
-                Business Consultancy &amp; Assistance Services
+                {brandSubtitle}
               </span>
             </Link>
 
