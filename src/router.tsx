@@ -20,7 +20,10 @@ if (typeof window !== "undefined") {
     !!msg &&
     (msg.includes("Failed to fetch dynamically imported module") ||
       msg.includes("error loading dynamically imported module") ||
-      msg.includes("Importing a module script failed"));
+      msg.includes("Importing a module script failed") ||
+      // Dev-server restart / new deploy invalidates server-function IDs;
+      // open tabs then get 500s on /_serverFn calls until reloaded.
+      msg.includes("Invalid server function ID"));
 
   window.addEventListener("vite:preloadError", () => recover());
   window.addEventListener("error", (e) => {
