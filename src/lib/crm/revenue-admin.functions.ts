@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertRole, logAudit } from "@/lib/audit";
+import { assertRole, writeAudit } from "@/lib/audit";
+import type { Database } from "@/integrations/supabase/types";
 import { formatIST } from "@/lib/datetime";
 
 async function getAdmin() {
@@ -9,7 +10,8 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-const FINANCE_ROLES = ["super_admin", "admin", "finance", "accounts"];
+const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
+type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
 // ── Range Resolution ────────────────────────────────────────────────────────
 export type RevenueRangePreset =
@@ -174,13 +176,13 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     // Fetch active period payments
     let qActive = admin
       .from("payments")
-      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, payment_date, created_at")
+      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at")
       .gte("created_at", r.startIso)
       .lte("created_at", r.endIso);
 
     if (data.gateway) qActive = qActive.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qActive = qActive.eq("status", data.status);
-    if (data.paymentMethod) qActive = qActive.ilike("payment_method", `%${data.paymentMethod}%`);
+    if (data.status) qActive = qActive.eq("status", data.status as PaymentStatus);
+    if (data.paymentMethod) qActive = qActive.ilike("payu_mode", `%${data.paymentMethod}%`);
 
     const { data: activePayments, error: pErr } = await qActive;
     if (pErr) throw new Error(pErr.message);
@@ -193,8 +195,8 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       .lte("created_at", r.prevEndIso);
 
     if (data.gateway) qPrev = qPrev.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qPrev = qPrev.eq("status", data.status);
-    if (data.paymentMethod) qPrev = qPrev.ilike("payment_method", `%${data.paymentMethod}%`);
+    if (data.status) qPrev = qPrev.eq("status", data.status as PaymentStatus);
+    if (data.paymentMethod) qPrev = qPrev.ilike("payu_mode", `%${data.paymentMethod}%`);
 
     const { data: prevPayments } = await qPrev;
 
@@ -436,7 +438,7 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
       .from("payments")
       .select(
         `
-        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at,
+        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at,
         leads:lead_id (id, lead_code, name, email, mobile, service, state),
         applications:application_id (id, application_code, fulfillment_status),
         invoices:id (id, invoice_number, pdf_path)
@@ -449,10 +451,10 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
     else if (data.tab === "pending") q = q.eq("status", "created");
     else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
     else if (data.tab === "refunded") q = q.eq("status", "refunded");
-    else if (data.status) q = q.eq("status", data.status);
+    else if (data.status) q = q.eq("status", data.status as PaymentStatus);
 
     if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.paymentMethod) q = q.ilike("payment_method", `%${data.paymentMethod}%`);
+    if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
     if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
     if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
     if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
@@ -500,7 +502,7 @@ export const getTransactionDetail = createServerFn({ method: "POST" })
     const { data: payment, error } = await admin
       .from("payments")
       .select(`
-        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at, raw_response, parent_payment_id,
+        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at, raw_response, parent_payment_id,
         leads:lead_id (id, lead_code, name, email, mobile, state, service, assigned_to),
         applications:application_id (id, application_code, fulfillment_status, application_status, created_at),
         invoices:id (id, invoice_number, pdf_path, issued_at, last_emailed_at)
@@ -539,7 +541,7 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     let q = admin
       .from("payments")
       .select(`
-        id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_payment_id, payment_date, created_at,
+        id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
         leads:lead_id (lead_code, name, email, mobile, service, state),
         applications:application_id (application_code),
         invoices:id (invoice_number)
@@ -551,7 +553,7 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     else if (data.tab === "pending") q = q.eq("status", "created");
     else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
     else if (data.tab === "refunded") q = q.eq("status", "refunded");
-    else if (data.status) q = q.eq("status", data.status);
+    else if (data.status) q = q.eq("status", data.status as PaymentStatus);
 
     if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
     if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
@@ -577,7 +579,7 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
       r.leads?.service || "",
       Number(r.amount ?? 0),
       (r.gateway_name || "").toUpperCase(),
-      r.payment_method || "Online",
+      r.payu_mode || "Online",
       r.status || "",
       r.invoices?.[0]?.invoice_number || "",
       r.razorpay_payment_id || "",
@@ -610,7 +612,14 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     const bodyXml = formattedRows.map((r) => `<Row>${r.map((val) => typeof val === "number" ? `<Cell ss:StyleID="Num"><Data ss:Type="Number">${val}</Data></Cell>` : `<Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`).join("")}</Row>`).join("\n");
     const excelXmlContent = `${xmlHeader}\n${headerXml}\n${bodyXml}\n</Table></Worksheet></Workbook>`;
 
-    await logAudit(context.userId, "revenue.export", (rows ?? []).map((r) => r.id), { count: rows?.length ?? 0, filter: data });
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "payment",
+      entityId: `${(rows ?? []).length} payments`,
+      action: "revenue.export",
+      newValue: { count: rows?.length ?? 0, filter: data, ids: (rows ?? []).map((r) => r.id).slice(0, 50) },
+      actorId: context.userId,
+    });
 
     return {
       csv: csvContent,
