@@ -136,8 +136,6 @@ export function RevenueDashboardView() {
     color: GW_COLORS[g.name] || "#64748B",
   }));
 
-  return (
-    <div className="space-y-6">
   const [ledgerTab, setLedgerTab] = useState<"all" | "successful" | "pending" | "failed" | "refunded">("successful");
 
   const filterLedger = (tab: "all" | "successful" | "pending" | "failed" | "refunded") => {
