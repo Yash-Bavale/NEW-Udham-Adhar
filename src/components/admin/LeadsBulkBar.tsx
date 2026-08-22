@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "motion/react";
-import { Mail, UserCog, Tag, Trash2, X } from "lucide-react";
+import { Mail, UserCog, Tag, Trash2, X, Download } from "lucide-react";
 import { LEAD_STATUSES } from "@/lib/crm/types";
 import { listAssignableStaff } from "@/lib/crm/leads-bulk.functions";
 import { BulkEmailDialog } from "./BulkEmailDialog";
@@ -14,6 +14,7 @@ export function LeadsBulkBar({
   onStatus,
   onAssign,
   onDelete,
+  onExport,
   busy,
 }: {
   selectedIds: string[];
@@ -21,11 +22,13 @@ export function LeadsBulkBar({
   onStatus: (status: string) => void;
   onAssign: (assignee: string | null) => void;
   onDelete: () => void;
+  onExport?: (format: "csv" | "excel") => void;
   busy?: boolean;
 }) {
   const [emailOpen, setEmailOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const role = useRole();
   const staffFn = useServerFn(listAssignableStaff);
   const { data: staff } = useQuery({
@@ -51,26 +54,29 @@ export function LeadsBulkBar({
             {selectedIds.length} selected
           </span>
           <div className="h-5 w-px" style={{ background: "var(--admin-border)" }} />
-          <PopBtn icon={<Tag className="size-4" />} label="Status" onClick={() => { setStatusOpen(!statusOpen); setAssignOpen(false); }} active={statusOpen} />
-          {isAdmin && <PopBtn icon={<UserCog className="size-4" />} label="Assign" onClick={() => { setAssignOpen(!assignOpen); setStatusOpen(false); }} active={assignOpen} />}
+          <PopBtn icon={<Tag className="size-4" />} label="Status" onClick={() => { setStatusOpen(!statusOpen); setAssignOpen(false); setExportOpen(false); }} active={statusOpen} />
+          {isAdmin && <PopBtn icon={<UserCog className="size-4" />} label="Assign" onClick={() => { setAssignOpen(!assignOpen); setStatusOpen(false); setExportOpen(false); }} active={assignOpen} />}
           <PopBtn icon={<Mail className="size-4" />} label="Email" onClick={() => setEmailOpen(true)} />
+          {onExport && <PopBtn icon={<Download className="size-4 text-emerald-600" />} label="Export" onClick={() => { setExportOpen(!exportOpen); setStatusOpen(false); setAssignOpen(false); }} active={exportOpen} />}
           {isAdmin && <PopBtn icon={<Trash2 className="size-4" />} label="Delete" onClick={onDelete} danger />}
           <button onClick={onClear} className="ml-1 p-1.5 rounded hover:bg-[var(--admin-surface-2)]" aria-label="Clear selection">
             <X className="size-4" />
           </button>
 
-          {statusOpen && (
+          {exportOpen && onExport && (
             <Pop position="up">
-              {LEAD_STATUSES.map((s) => (
-                <button
-                  key={s}
-                  disabled={busy}
-                  onClick={() => { setStatusOpen(false); onStatus(s); }}
-                  className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)] capitalize"
-                >
-                  {s.replace(/_/g, " ")}
-                </button>
-              ))}
+              <button
+                onClick={() => { setExportOpen(false); onExport("csv"); }}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">CSV</span> CSV (.csv)
+              </button>
+              <button
+                onClick={() => { setExportOpen(false); onExport("excel"); }}
+                className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">XLS</span> Excel (.xls)
+              </button>
             </Pop>
           )}
           {assignOpen && (() => {

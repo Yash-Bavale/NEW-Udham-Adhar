@@ -78,7 +78,53 @@ function LeadsPage() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const role = useRole();
+
+  const handleExport = async (format: "csv" | "excel", idsToExport?: string[]) => {
+    setExporting(format);
+    setExportOpen(false);
+    try {
+      const res = await exportFn({
+        data: {
+          ids: idsToExport && idsToExport.length > 0 ? idsToExport : undefined,
+          search: search || undefined,
+          status: status || undefined,
+          service: service || undefined,
+          source: source || undefined,
+          assignedTo: assignee || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        },
+      });
+
+      if (!res.count) {
+        toast.error("No leads match the selected export criteria.");
+        return;
+      }
+
+      const content = format === "excel" ? res.excelXml : res.csv;
+      const mime = format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
+      const ext = format === "excel" ? "xls" : "csv";
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `leads_export_${new Date().toISOString().slice(0, 10)}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${res.count} lead(s) to ${format.toUpperCase()}`);
+    } catch (e: any) {
+      toast.error(e?.message || `Export failed`);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {
@@ -329,6 +375,41 @@ function LeadsPage() {
         >
           <Plus className="size-4" /> Add Lead
         </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setExportOpen(!exportOpen)}
+            disabled={!!exporting}
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
+            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+          >
+            <Download className="size-4 text-emerald-600" />
+            {exporting ? "Exporting…" : "Export"}
+          </button>
+          {exportOpen && (
+            <div
+              className="absolute right-0 mt-1 w-48 rounded-lg border shadow-lg py-1 z-30 text-sm"
+              style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+            >
+              <button
+                type="button"
+                onClick={() => handleExport("csv")}
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                style={{ color: "var(--admin-fg)" }}
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExport("excel")}
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                style={{ color: "var(--admin-fg)" }}
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
+              </button>
+            </div>
+          )}
+        </div>
         {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {
@@ -507,6 +588,7 @@ function LeadsPage() {
         onStatus={handleBulkStatus}
         onAssign={handleBulkAssign}
         onDelete={handleBulkDelete}
+        onExport={(fmt) => handleExport(fmt, Array.from(selected))}
         busy={busy}
       />
 

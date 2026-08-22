@@ -247,18 +247,83 @@ export const bulkEmailLeads = createServerFn({ method: "POST" })
 // ─────────────────────── CSV export ───────────────────────
 
 const ExportInput = z.object({
+  ids: z.array(z.string().uuid()).optional(),
   search: z.string().max(200).optional(),
-  status: z.enum(LEAD_STATUSES as [string, ...string[]]).optional(),
-  assignedTo: z.string().uuid().optional(),
+  status: z.string().optional(),
+  source: z.string().optional(),
+  service: z.string().optional(),
+  assignedTo: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
 }).partial();
 
-function csvEscape(v: unknown): string {
-  if (v == null) return "";
-  const s = String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
+function buildCsvContent(headers: string[], dataRows: (string | number | null | undefined)[][]): string {
+  const csvEscape = (v: unknown): string => {
+    if (v == null) return "";
+    const s = String(v);
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const headerLine = headers.map(csvEscape).join(",");
+  const bodyLines = dataRows.map((r) => r.map(csvEscape).join(","));
+  return "\uFEFF" + [headerLine, ...bodyLines].join("\n");
+}
+
+function buildExcelXmlContent(headers: string[], dataRows: (string | number | null | undefined)[][]): string {
+  const escapeXml = (v: unknown): string => {
+    if (v == null) return "";
+    return String(v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const xmlHeader = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#000000"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#0F172A" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="Number">
+   <NumberFormat ss:Format="#,##0.00"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Leads Export">
+  <Table>`;
+
+  const columns = headers.map(() => `<Column ss:AutoFitWidth="1" ss:Width="140"/>`).join("\n");
+
+  const headerRow = `   <Row ss:Height="24">
+` + headers.map((h) => `    <Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join("\n") + `
+   </Row>`;
+
+  const rowsXml = dataRows.map((r) => {
+    const cells = r.map((val) => {
+      if (typeof val === "number") {
+        return `    <Cell ss:StyleID="Number"><Data ss:Type="Number">${val}</Data></Cell>`;
+      }
+      return `    <Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`;
+    }).join("\n");
+    return `   <Row ss:Height="20">\n${cells}\n   </Row>`;
+  }).join("\n");
+
+  const xmlFooter = `  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  return `${xmlHeader}\n${columns}\n${headerRow}\n${rowsXml}\n${xmlFooter}`;
 }
 
 export const exportLeadsCsv = createServerFn({ method: "POST" })
@@ -277,17 +342,33 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(50000);
 
-    if (data.status) q = q.eq("status", data.status as LeadStatus);
-    if (!isAdmin) {
-      q = q.eq("assigned_to", context.userId);
+    if (data.ids && data.ids.length > 0) {
+      q = q.in("id", data.ids);
     } else {
-      if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
-    }
-    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-    if (data.dateTo) q = q.lte("created_at", data.dateTo);
-    if (data.search) {
-      const s = data.search.replace(/[,()]/g, " ").trim();
-      q = q.or(`lead_code.ilike.%${s}%,name.ilike.%${s}%,email.ilike.%${s}%,mobile.ilike.%${s}%`);
+      if (data.status) q = q.eq("status", data.status as LeadStatus);
+      if (data.service) q = q.eq("service", data.service);
+      if (data.source) {
+        if (data.source.startsWith("__channel:")) {
+          // Channel filter logic handled if needed
+        } else {
+          q = q.eq("lead_source", data.source);
+        }
+      }
+      if (!isAdmin) {
+        q = q.eq("assigned_to", context.userId);
+      } else {
+        if (data.assignedTo === "__unassigned") {
+          q = q.is("assigned_to", null);
+        } else if (data.assignedTo) {
+          q = q.eq("assigned_to", data.assignedTo);
+        }
+      }
+      if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+      if (data.dateTo) q = q.lte("created_at", data.dateTo);
+      if (data.search) {
+        const s = data.search.replace(/[,()]/g, " ").trim();
+        q = q.or(`lead_code.ilike.%${s}%,name.ilike.%${s}%,email.ilike.%${s}%,mobile.ilike.%${s}%`);
+      }
     }
 
     const { data: rows, error } = await q;
@@ -304,27 +385,42 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       (profs ?? []).forEach((p) => nameMap.set(p.id as string, (p.display_name as string) || (p.email as string) || ""));
     }
 
-    const header = [
-      "lead_code","created_at","name","email","mobile","state","language",
-      "service","status","base_amount","gst_amount","total_amount",
-      "assigned_to","lead_source",
+    const headers = [
+      "Lead Code", "Created At", "Name", "Email", "Mobile", "State", "Language",
+      "Service", "Status", "Base Amount", "GST Amount", "Total Amount",
+      "Assigned To", "Lead Source",
     ];
-    const lines = [header.join(",")];
-    for (const r of rows ?? []) {
-      lines.push([
-        r.lead_code, r.created_at, r.name, r.email, r.mobile, r.state, r.language,
-        r.service, r.status, r.base_amount, r.gst_amount, r.total_amount,
-        r.assigned_to ? (nameMap.get(r.assigned_to as string) ?? "") : "",
-        r.lead_source,
-      ].map(csvEscape).join(","));
-    }
 
-    await logAudit(context.userId, "leads.export_csv", (rows ?? []).map((r) => r.id as string), {
+    const formattedRows = (rows ?? []).map((r) => [
+      r.lead_code || "",
+      r.created_at || "",
+      r.name || "",
+      r.email || "",
+      r.mobile || "",
+      r.state || "",
+      r.language || "",
+      r.service || "",
+      (r.status || "").replace(/_/g, " "),
+      Number(r.base_amount ?? 0),
+      Number(r.gst_amount ?? 0),
+      Number(r.total_amount ?? 0),
+      r.assigned_to ? (nameMap.get(r.assigned_to as string) ?? "") : "",
+      r.lead_source || "",
+    ]);
+
+    const csvContent = buildCsvContent(headers, formattedRows);
+    const excelXmlContent = buildExcelXmlContent(headers, formattedRows);
+
+    await logAudit(context.userId, "leads.export", (rows ?? []).map((r) => r.id as string), {
       count: rows?.length ?? 0,
       filter: data,
     });
 
-    return { csv: lines.join("\n"), count: rows?.length ?? 0 };
+    return {
+      csv: csvContent,
+      excelXml: excelXmlContent,
+      count: rows?.length ?? 0,
+    };
   });
 
 // ─────────────────────── template list (for email dialog) ───────────────────────
