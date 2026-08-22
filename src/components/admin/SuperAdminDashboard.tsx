@@ -367,9 +367,10 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
       />
       <ModernKpi
         icon={<Wallet className="size-4" />} label="Revenue (excl. Tax)" value={fmtShortINR(m.revenueExclTax)} tone="emerald" delta={revDelta}
+        href="/admin/finance"
         subs={<>
-          <StatChip label="Incl. Tax" value={fmtShortINR(m.revenueInclTax)} tone="emerald" />
-          <StatChip label="Tax" value={fmtShortINR(m.taxCollected)} tone="slate" />
+          <StatChip label="Incl. Tax" value={fmtShortINR(m.revenueInclTax)} tone="emerald" href="/admin/finance" />
+          <StatChip label="Tax" value={fmtShortINR(m.taxCollected)} tone="slate" href="/admin/finance/gst" />
         </>}
       />
       <ModernKpi

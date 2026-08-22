@@ -1,15 +1,15 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ComingSoon } from "@/components/admin/ComingSoon";
+import { RevenueDashboardView } from "@/components/admin/revenue/RevenueDashboardView";
 
 export const Route = createFileRoute("/admin/finance")({
-  head: () => ({ meta: [{ title: "Finance — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
+  head: () => ({ meta: [{ title: "Revenue & Payments — Business Help CRM" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: FinanceLayout,
 });
 
 function FinanceLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const tabs = [
-    { to: "/admin/finance", label: "Overview", exact: true },
+    { to: "/admin/finance", label: "Revenue & Payments", exact: true },
     { to: "/admin/finance/gst", label: "GST Reports" },
     { to: "/admin/finance/settlements", label: "Settlements" },
   ];
@@ -22,7 +22,7 @@ function FinanceLayout() {
             <Link
               key={t.to}
               to={t.to}
-              className="px-3 py-2 text-sm -mb-px border-b-2 transition-colors"
+              className="px-3 py-2 text-sm -mb-px border-b-2 font-semibold transition-colors"
               style={{
                 borderColor: active ? "var(--admin-accent)" : "transparent",
                 color: active ? "var(--admin-fg)" : "var(--admin-fg-muted)",
@@ -34,13 +34,7 @@ function FinanceLayout() {
         })}
       </div>
       {path === "/admin/finance" ? (
-        <ComingSoon
-          title="Revenue Dashboard"
-          subtitle="Today / MTD revenue, pending, failed, refunds, service revenue, gateway performance, GST and settlement analytics."
-          phase="5.5g"
-          fallbackHref="/admin/finance/gst"
-          fallbackLabel="the existing GST report"
-        />
+        <RevenueDashboardView />
       ) : (
         <Outlet />
       )}

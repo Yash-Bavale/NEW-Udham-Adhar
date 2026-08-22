@@ -1,0 +1,620 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertRole, logAudit } from "@/lib/audit";
+import { formatIST } from "@/lib/datetime";
+
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
+const FINANCE_ROLES = ["super_admin", "admin", "finance", "accounts"];
+
+// ── Range Resolution ────────────────────────────────────────────────────────
+export type RevenueRangePreset =
+  | "today"
+  | "yesterday"
+  | "7d"
+  | "30d"
+  | "this_week"
+  | "last_week"
+  | "this_month"
+  | "last_month"
+  | "this_fy"
+  | "custom";
+
+export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, toIso?: string) {
+  const now = new Date();
+
+  // Helper for IST start-of-day in UTC
+  const istStartOfDay = (d: Date): Date => {
+    const s = new Date(d);
+    // Convert to IST representation string, set 00:00:00, parse back
+    const istStr = s.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+    const parts = istStr.split("/"); // M/D/YYYY
+    const month = parseInt(parts[0], 10) - 1;
+    const day = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    // IST is UTC+5:30. Midnight IST = previous day 18:30:00 UTC
+    return new Date(Date.UTC(year, month, day, 0, 0, 0) - 5.5 * 3600 * 1000);
+  };
+
+  const todayStart = istStartOfDay(now);
+  const msDay = 86400 * 1000;
+
+  let start: Date;
+  let end: Date = now;
+  let label = "Today";
+
+  switch (preset) {
+    case "today":
+      start = todayStart;
+      end = new Date(todayStart.getTime() + msDay - 1);
+      label = "Today";
+      break;
+
+    case "yesterday":
+      start = new Date(todayStart.getTime() - msDay);
+      end = new Date(todayStart.getTime() - 1);
+      label = "Yesterday";
+      break;
+
+    case "7d":
+      start = new Date(todayStart.getTime() - 6 * msDay);
+      label = "Last 7 Days";
+      break;
+
+    case "30d":
+      start = new Date(todayStart.getTime() - 29 * msDay);
+      label = "Last 30 Days";
+      break;
+
+    case "this_week": {
+      const dayOfWeek = now.getUTCDay(); // 0 is Sun
+      const distanceToMon = (dayOfWeek + 6) % 7;
+      start = new Date(todayStart.getTime() - distanceToMon * msDay);
+      label = "This Week";
+      break;
+    }
+
+    case "last_week": {
+      const dayOfWeek = now.getUTCDay();
+      const distanceToMon = (dayOfWeek + 6) % 7;
+      const thisMon = new Date(todayStart.getTime() - distanceToMon * msDay);
+      start = new Date(thisMon.getTime() - 7 * msDay);
+      end = new Date(thisMon.getTime() - 1);
+      label = "Last Week";
+      break;
+    }
+
+    case "this_month": {
+      const istMonthStr = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+      const parts = istMonthStr.split("/");
+      const month = parseInt(parts[0], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      start = new Date(Date.UTC(year, month, 1, 0, 0, 0) - 5.5 * 3600 * 1000);
+      label = "This Month";
+      break;
+    }
+
+    case "last_month": {
+      const istMonthStr = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+      const parts = istMonthStr.split("/");
+      let month = parseInt(parts[0], 10) - 1 - 1;
+      let year = parseInt(parts[2], 10);
+      if (month < 0) {
+        month = 11;
+        year -= 1;
+      }
+      start = new Date(Date.UTC(year, month, 1, 0, 0, 0) - 5.5 * 3600 * 1000);
+      const nextMonth = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0) - 5.5 * 3600 * 1000);
+      end = new Date(nextMonth.getTime() - 1);
+      label = "Last Month";
+      break;
+    }
+
+    case "this_fy": {
+      const istStr = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata" });
+      const parts = istStr.split("/");
+      const month = parseInt(parts[0], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const fyStartYear = month >= 3 ? year : year - 1;
+      start = new Date(Date.UTC(fyStartYear, 3, 1, 0, 0, 0) - 5.5 * 3600 * 1000);
+      label = `FY ${fyStartYear}-${(fyStartYear + 1).toString().slice(-2)}`;
+      break;
+    }
+
+    case "custom":
+      start = fromIso ? new Date(fromIso) : todayStart;
+      end = toIso ? new Date(toIso) : now;
+      label = "Custom Range";
+      break;
+
+    default:
+      start = todayStart;
+  }
+
+  const durationMs = end.getTime() - start.getTime() + 1;
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - durationMs + 1);
+
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    prevStartIso: prevStart.toISOString(),
+    prevEndIso: prevEnd.toISOString(),
+    label,
+    durationMs,
+  };
+}
+
+const FilterSchema = z.object({
+  preset: z.enum(["today", "yesterday", "7d", "30d", "this_week", "last_week", "this_month", "last_month", "this_fy", "custom"]).default("today"),
+  fromIso: z.string().optional(),
+  toIso: z.string().optional(),
+  gateway: z.string().optional(),
+  service: z.string().optional(),
+  status: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  minAmount: z.number().optional(),
+  maxAmount: z.number().optional(),
+  search: z.string().optional(),
+});
+
+// ── 1. Revenue Overview Server Fn ──────────────────────────────────────────
+export const getRevenueOverview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => FilterSchema.parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, FINANCE_ROLES);
+    const admin = await getAdmin();
+    const r = resolveRangeDates(data.preset, data.fromIso, data.toIso);
+
+    // Fetch active period payments
+    let qActive = admin
+      .from("payments")
+      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, payment_date, created_at")
+      .gte("created_at", r.startIso)
+      .lte("created_at", r.endIso);
+
+    if (data.gateway) qActive = qActive.ilike("gateway_name", `%${data.gateway}%`);
+    if (data.status) qActive = qActive.eq("status", data.status);
+    if (data.paymentMethod) qActive = qActive.ilike("payment_method", `%${data.paymentMethod}%`);
+
+    const { data: activePayments, error: pErr } = await qActive;
+    if (pErr) throw new Error(pErr.message);
+
+    // Fetch previous comparative period payments
+    let qPrev = admin
+      .from("payments")
+      .select("id, amount, status, created_at")
+      .gte("created_at", r.prevStartIso)
+      .lte("created_at", r.prevEndIso);
+
+    if (data.gateway) qPrev = qPrev.ilike("gateway_name", `%${data.gateway}%`);
+    if (data.status) qPrev = qPrev.eq("status", data.status);
+    if (data.paymentMethod) qPrev = qPrev.ilike("payment_method", `%${data.paymentMethod}%`);
+
+    const { data: prevPayments } = await qPrev;
+
+    // Fetch active period approved refunds
+    const { data: activeRefunds } = await admin
+      .from("refund_requests")
+      .select("id, refund_amount, status, created_at")
+      .eq("status", "approved")
+      .gte("created_at", r.startIso)
+      .lte("created_at", r.endIso);
+
+    // Fetch previous period approved refunds
+    const { data: prevRefunds } = await admin
+      .from("refund_requests")
+      .select("id, refund_amount, status, created_at")
+      .eq("status", "approved")
+      .gte("created_at", r.prevStartIso)
+      .lte("created_at", r.prevEndIso);
+
+    // Calculate Active Period Metrics
+    const paidRows = (activePayments ?? []).filter((p) => p.status === "paid");
+    const failedRows = (activePayments ?? []).filter((p) => p.status === "failed" || p.status === "attempted");
+    const pendingRows = (activePayments ?? []).filter((p) => p.status === "created");
+
+    const grossRevenue = paidRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+    const grossBase = paidRows.reduce((sum, p) => sum + Number(p.base_amount ?? 0), 0);
+    const grossGst = paidRows.reduce((sum, p) => sum + Number(p.gst_amount ?? 0), 0);
+
+    const refundedAmount = (activeRefunds ?? []).reduce((sum, rf) => sum + Number(rf.refund_amount ?? 0), 0);
+    const refundsCount = activeRefunds?.length ?? 0;
+
+    const netRevenue = Math.max(0, grossRevenue - refundedAmount);
+
+    const successfulPaymentsCount = paidRows.length;
+    const failedPaymentsCount = failedRows.length;
+    const failedPaymentsAmount = failedRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+    const pendingPaymentsCount = pendingRows.length;
+    const pendingPaymentsAmount = pendingRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+    const totalAttempts = (activePayments ?? []).length;
+    const paymentSuccessRate = totalAttempts > 0 ? (successfulPaymentsCount / totalAttempts) * 100 : 0;
+    const averageOrderValue = successfulPaymentsCount > 0 ? Math.round(grossRevenue / successfulPaymentsCount) : 0;
+
+    // Calculate Previous Period Metrics for Comparative Trends
+    const prevPaidRows = (prevPayments ?? []).filter((p) => p.status === "paid");
+    const grossRevenuePrev = prevPaidRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+    const refundedAmountPrev = (prevRefunds ?? []).reduce((sum, rf) => sum + Number(rf.refund_amount ?? 0), 0);
+    const netRevenuePrev = Math.max(0, grossRevenuePrev - refundedAmountPrev);
+    const successfulPaymentsCountPrev = prevPaidRows.length;
+    const averageOrderValuePrev = successfulPaymentsCountPrev > 0 ? Math.round(grossRevenuePrev / successfulPaymentsCountPrev) : 0;
+    const totalAttemptsPrev = (prevPayments ?? []).length;
+    const paymentSuccessRatePrev = totalAttemptsPrev > 0 ? (successfulPaymentsCountPrev / totalAttemptsPrev) * 100 : 0;
+
+    // Gateway-wise breakdown
+    const gatewayMap = new Map<string, {
+      name: string;
+      totalAttempts: number;
+      successfulCount: number;
+      failedCount: number;
+      pendingCount: number;
+      grossRevenue: number;
+      refundedAmount: number;
+      netRevenue: number;
+    }>();
+
+    for (const p of activePayments ?? []) {
+      const gw = (p.gateway_name || "payu").toLowerCase().trim();
+      const cur = gatewayMap.get(gw) ?? {
+        name: gw.toUpperCase(),
+        totalAttempts: 0,
+        successfulCount: 0,
+        failedCount: 0,
+        pendingCount: 0,
+        grossRevenue: 0,
+        refundedAmount: 0,
+        netRevenue: 0,
+      };
+      cur.totalAttempts += 1;
+      if (p.status === "paid") {
+        cur.successfulCount += 1;
+        cur.grossRevenue += Number(p.amount ?? 0);
+      } else if (p.status === "failed" || p.status === "attempted") {
+        cur.failedCount += 1;
+      } else if (p.status === "created") {
+        cur.pendingCount += 1;
+      }
+      cur.netRevenue = cur.grossRevenue;
+      gatewayMap.set(gw, cur);
+    }
+
+    const gateways = Array.from(gatewayMap.values()).map((g) => ({
+      ...g,
+      successRate: g.totalAttempts > 0 ? Math.round((g.successfulCount / g.totalAttempts) * 1000) / 10 : 0,
+      avgTransactionValue: g.successfulCount > 0 ? Math.round(g.grossRevenue / g.successfulCount) : 0,
+    })).sort((a, b) => b.grossRevenue - a.grossRevenue);
+
+    // Service-wise breakdown
+    const leadIds = Array.from(new Set(paidRows.map((p) => p.lead_id).filter(Boolean)));
+    const serviceMap = new Map<string, { serviceName: string; paidOrders: number; grossRevenue: number }>();
+
+    if (leadIds.length > 0) {
+      const { data: leads } = await admin
+        .from("leads")
+        .select("id, service")
+        .in("id", leadIds);
+      const leadSvcMap = new Map<string, string>();
+      (leads ?? []).forEach((l) => leadSvcMap.set(l.id, l.service || "Other Consultancy"));
+
+      for (const p of paidRows) {
+        const svc = leadSvcMap.get(p.lead_id as string) || "Other Consultancy";
+        const cur = serviceMap.get(svc) ?? { serviceName: svc, paidOrders: 0, grossRevenue: 0 };
+        cur.paidOrders += 1;
+        cur.grossRevenue += Number(p.amount ?? 0);
+        serviceMap.set(svc, cur);
+      }
+    }
+
+    const services = Array.from(serviceMap.values()).map((s) => ({
+      ...s,
+      refunds: 0,
+      netRevenue: s.grossRevenue,
+      avgOrderValue: s.paidOrders > 0 ? Math.round(s.grossRevenue / s.paidOrders) : 0,
+      pctTotal: grossRevenue > 0 ? Math.round((s.grossRevenue / grossRevenue) * 1000) / 10 : 0,
+    })).sort((a, b) => b.grossRevenue - a.grossRevenue);
+
+    // Time-series trend data
+    const trendPoints: Array<{ label: string; timestamp: string; grossRevenue: number; netRevenue: number; count: number }> = [];
+    const isShortRange = r.durationMs <= 2 * 86400 * 1000;
+
+    if (isShortRange) {
+      // Hourly trend for Today / Yesterday
+      const hourMap = new Map<string, { gross: number; count: number }>();
+      for (const p of paidRows) {
+        const dt = new Date(p.payment_date ?? p.created_at);
+        const hrStr = dt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: true });
+        const cur = hourMap.get(hrStr) ?? { gross: 0, count: 0 };
+        cur.gross += Number(p.amount ?? 0);
+        cur.count += 1;
+        hourMap.set(hrStr, cur);
+      }
+
+      for (let h = 0; h < 24; h++) {
+        const d = new Date();
+        d.setHours(h, 0, 0, 0);
+        const label = d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: true });
+        const found = hourMap.get(label) ?? { gross: 0, count: 0 };
+        trendPoints.push({
+          label,
+          timestamp: d.toISOString(),
+          grossRevenue: found.gross,
+          netRevenue: found.gross,
+          count: found.count,
+        });
+      }
+    } else {
+      // Daily trend for 7d / 30d / MTD
+      const dayMap = new Map<string, { gross: number; count: number }>();
+      for (const p of paidRows) {
+        const dt = new Date(p.payment_date ?? p.created_at);
+        const dayStr = dt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" });
+        const cur = dayMap.get(dayStr) ?? { gross: 0, count: 0 };
+        cur.gross += Number(p.amount ?? 0);
+        cur.count += 1;
+        dayMap.set(dayStr, cur);
+      }
+      dayMap.forEach((val, key) => {
+        trendPoints.push({
+          label: key,
+          timestamp: key,
+          grossRevenue: val.gross,
+          netRevenue: val.gross,
+          count: val.count,
+        });
+      });
+    }
+
+    return {
+      range: {
+        preset: data.preset,
+        label: r.label,
+        startIso: r.startIso,
+        endIso: r.endIso,
+      },
+      metrics: {
+        grossRevenue,
+        grossBase,
+        grossGst,
+        refundedAmount,
+        refundsCount,
+        netRevenue,
+        successfulPaymentsCount,
+        failedPaymentsCount,
+        failedPaymentsAmount,
+        pendingPaymentsCount,
+        pendingPaymentsAmount,
+        totalAttempts,
+        averageOrderValue,
+        paymentSuccessRate: Math.round(paymentSuccessRate * 10) / 10,
+        // Comparative previous period metrics
+        grossRevenuePrev,
+        netRevenuePrev,
+        successfulPaymentsCountPrev,
+        averageOrderValuePrev,
+        paymentSuccessRatePrev: Math.round(paymentSuccessRatePrev * 10) / 10,
+      },
+      gateways,
+      services,
+      trends: trendPoints,
+    };
+  });
+
+// ── 2. Paginated Payment Transactions Ledger Server Fn ─────────────────────
+const LedgerSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(10).max(100).default(50),
+  tab: z.enum(["all", "successful", "pending", "failed", "refunded"]).default("all"),
+  search: z.string().optional(),
+  gateway: z.string().optional(),
+  status: z.string().optional(),
+  service: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  minAmount: z.number().optional(),
+  maxAmount: z.number().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+
+export const listPaymentLedger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LedgerSchema.parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, FINANCE_ROLES);
+    const admin = await getAdmin();
+
+    const fromIdx = (data.page - 1) * data.pageSize;
+    const toIdx = fromIdx + data.pageSize - 1;
+
+    let q = admin
+      .from("payments")
+      .select(
+        `
+        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at,
+        leads:lead_id (id, lead_code, name, email, mobile, service, state),
+        applications:application_id (id, application_code, fulfillment_status),
+        invoices:id (id, invoice_number, pdf_path)
+      `,
+        { count: "exact" },
+      )
+      .order("created_at", { ascending: false });
+
+    if (data.tab === "successful") q = q.eq("status", "paid");
+    else if (data.tab === "pending") q = q.eq("status", "created");
+    else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
+    else if (data.tab === "refunded") q = q.eq("status", "refunded");
+    else if (data.status) q = q.eq("status", data.status);
+
+    if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+    if (data.paymentMethod) q = q.ilike("payment_method", `%${data.paymentMethod}%`);
+    if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
+    if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
+    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+
+    if (data.search) {
+      const s = data.search.replace(/[,()]/g, " ").trim();
+      q = q.or(`transaction_id.ilike.%${s}%,razorpay_order_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+    }
+
+    q = q.range(fromIdx, toIdx);
+
+    const { data: rows, count, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const { count: countAll } = await admin.from("payments").select("id", { count: "exact", head: true });
+    const { count: countSuccess } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "paid");
+    const { count: countPending } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "created");
+    const { count: countFailed } = await admin.from("payments").select("id", { count: "exact", head: true }).in("status", ["failed", "attempted"]);
+    const { count: countRefunded } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "refunded");
+
+    return {
+      rows: rows ?? [],
+      total: count ?? 0,
+      page: data.page,
+      pageSize: data.pageSize,
+      tabCounts: {
+        all: countAll ?? 0,
+        successful: countSuccess ?? 0,
+        pending: countPending ?? 0,
+        failed: countFailed ?? 0,
+        refunded: countRefunded ?? 0,
+      },
+    };
+  });
+
+// ── 3. Single Transaction Detail + History Server Fn ───────────────────────
+export const getTransactionDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, FINANCE_ROLES);
+    const admin = await getAdmin();
+
+    const { data: payment, error } = await admin
+      .from("payments")
+      .select(`
+        id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at, raw_response, parent_payment_id,
+        leads:lead_id (id, lead_code, name, email, mobile, state, service, assigned_to),
+        applications:application_id (id, application_code, fulfillment_status, application_status, created_at),
+        invoices:id (id, invoice_number, pdf_path, issued_at, last_emailed_at)
+      `)
+      .eq("id", data.paymentId)
+      .single();
+
+    if (error || !payment) throw new Error(error?.message ?? "Transaction not found");
+
+    const { data: attempts } = await admin
+      .from("payments")
+      .select("id, amount, gateway_name, status, transaction_id, created_at, payment_date")
+      .eq("lead_id", payment.lead_id)
+      .order("created_at", { ascending: true });
+
+    const { data: refunds } = await admin
+      .from("refund_requests")
+      .select("id, refund_amount, status, created_at, reason, decision_notes")
+      .eq("application_id", payment.application_id ?? "");
+
+    return {
+      payment,
+      attempts: attempts ?? [],
+      refunds: refunds ?? [],
+    };
+  });
+
+// ── 4. Export Transactions Server Fn ───────────────────────────────────────
+export const exportRevenueTransactions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => LedgerSchema.parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, FINANCE_ROLES);
+    const admin = await getAdmin();
+
+    let q = admin
+      .from("payments")
+      .select(`
+        id, amount, base_amount, gst_amount, gateway_name, payment_method, status, transaction_id, razorpay_payment_id, payment_date, created_at,
+        leads:lead_id (lead_code, name, email, mobile, service, state),
+        applications:application_id (application_code),
+        invoices:id (invoice_number)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(20000);
+
+    if (data.tab === "successful") q = q.eq("status", "paid");
+    else if (data.tab === "pending") q = q.eq("status", "created");
+    else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
+    else if (data.tab === "refunded") q = q.eq("status", "refunded");
+    else if (data.status) q = q.eq("status", data.status);
+
+    if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const headers = [
+      "Sr. No.", "Payment Date & Time (IST)", "Transaction ID", "Order Code",
+      "Customer Name", "Mobile", "Email", "Service", "Amount (₹)", "Gateway",
+      "Payment Method", "Status", "Invoice Number", "Gateway Ref",
+    ];
+
+    const formattedRows = (rows ?? []).map((r: any, idx: number) => [
+      idx + 1,
+      formatIST(r.payment_date || r.created_at),
+      r.transaction_id || "",
+      r.applications?.application_code || r.leads?.lead_code || "",
+      r.leads?.name || "",
+      r.leads?.mobile || "",
+      r.leads?.email || "",
+      r.leads?.service || "",
+      Number(r.amount ?? 0),
+      (r.gateway_name || "").toUpperCase(),
+      r.payment_method || "Online",
+      r.status || "",
+      r.invoices?.[0]?.invoice_number || "",
+      r.razorpay_payment_id || "",
+    ]);
+
+    const csvEscape = (v: unknown): string => {
+      if (v == null) return "";
+      const s = String(v);
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const csvContent = "\uFEFF" + [headers.map(csvEscape).join(","), ...formattedRows.map((r) => r.map(csvEscape).join(","))].join("\n");
+
+    const escapeXml = (v: unknown): string => {
+      if (v == null) return "";
+      return String(v)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+    };
+    const xmlHeader = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Num"><NumberFormat ss:Format="#,##0.00"/></Style>
+ </Styles>
+ <Worksheet ss:Name="Revenue Transactions">
+  <Table>`;
+    const headerXml = `<Row ss:Height="24">${headers.map((h) => `<Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join("")}</Row>`;
+    const bodyXml = formattedRows.map((r) => `<Row>${r.map((val) => typeof val === "number" ? `<Cell ss:StyleID="Num"><Data ss:Type="Number">${val}</Data></Cell>` : `<Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`).join("")}</Row>`).join("\n");
+    const excelXmlContent = `${xmlHeader}\n${headerXml}\n${bodyXml}\n</Table></Worksheet></Workbook>`;
+
+    await logAudit(context.userId, "revenue.export", (rows ?? []).map((r) => r.id), { count: rows?.length ?? 0, filter: data });
+
+    return {
+      csv: csvContent,
+      excelXml: excelXmlContent,
+      count: rows?.length ?? 0,
+    };
+  });

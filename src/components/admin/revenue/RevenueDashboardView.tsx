@@ -1,0 +1,507 @@
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { formatIST } from "@/lib/datetime";
+import {
+  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset
+} from "@/lib/crm/revenue-admin.functions";
+import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
+import {
+  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
+} from "recharts";
+import {
+  TrendingUp, TrendingDown, IndianRupee, CreditCard, CheckCircle2, XCircle, Clock, RotateCcw,
+  RefreshCw, Download, Calendar, Layers, Award, Zap, ShieldCheck, HelpCircle
+} from "lucide-react";
+import { toast } from "sonner";
+
+const fmtN = (n: number) => new Intl.NumberFormat("en-IN").format(n || 0);
+const fmtINR = (n: number) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
+
+function pctDelta(curr: number, prev: number): { pct: number; up: boolean } | null {
+  if (!prev && !curr) return null;
+  if (!prev) return { pct: 100, up: true };
+  const pct = ((curr - prev) / prev) * 100;
+  return { pct: Math.abs(Math.round(pct * 10) / 10), up: pct >= 0 };
+}
+
+function DeltaBadge({ d }: { d: { pct: number; up: boolean } | null }) {
+  if (!d) return null;
+  const Icon = d.up ? TrendingUp : TrendingDown;
+  const cls = d.up ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50";
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${cls}`}>
+      <Icon className="size-3" /> {d.up ? "+" : "-"}{d.pct}%
+    </span>
+  );
+}
+
+const PRESETS: { value: RevenueRangePreset; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7d", label: "7 Days" },
+  { value: "30d", label: "30 Days" },
+  { value: "this_week", label: "This Week" },
+  { value: "last_week", label: "Last Week" },
+  { value: "this_month", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
+  { value: "this_fy", label: "This FY" },
+  { value: "custom", label: "Custom" },
+];
+
+const GW_COLORS: Record<string, string> = {
+  PAYU: "#10B981",
+  CASHFREE: "#6366F1",
+  CCAVENUE: "#3B82F6",
+  RAZORPAY: "#0EA5E9",
+  PHONEPE: "#8B5CF6",
+};
+
+export function RevenueDashboardView() {
+  const [preset, setPreset] = useState<RevenueRangePreset>("today");
+  const [fromIso, setFromIso] = useState<string | undefined>();
+  const [toIso, setToIso] = useState<string | undefined>();
+  const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const getOverviewFn = useServerFn(getRevenueOverview);
+  const exportFn = useServerFn(exportRevenueTransactions);
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["admin.revenueOverview", preset, fromIso, toIso],
+    queryFn: () => getOverviewFn({ data: { preset, fromIso, toIso } }),
+    staleTime: 20_000,
+  });
+
+  const m = data?.metrics;
+  const gateways = data?.gateways ?? [];
+  const services = data?.services ?? [];
+  const trends = data?.trends ?? [];
+
+  const revDelta = pctDelta(m?.grossRevenue ?? 0, m?.grossRevenuePrev ?? 0);
+  const netDelta = pctDelta(m?.netRevenue ?? 0, m?.netRevenuePrev ?? 0);
+  const paidDelta = pctDelta(m?.successfulPaymentsCount ?? 0, m?.successfulPaymentsCountPrev ?? 0);
+  const aovDelta = pctDelta(m?.averageOrderValue ?? 0, m?.averageOrderValuePrev ?? 0);
+  const srDelta = pctDelta(m?.paymentSuccessRate ?? 0, m?.paymentSuccessRatePrev ?? 0);
+
+  const handleExport = async (format: "csv" | "excel") => {
+    setExporting(format);
+    setExportOpen(false);
+    try {
+      const res = await exportFn({
+        data: {
+          dateFrom: data?.range?.startIso,
+          dateTo: data?.range?.endIso,
+        },
+      });
+
+      if (!res.count) {
+        toast.error("No revenue data to export.");
+        return;
+      }
+
+      const content = format === "excel" ? res.excelXml : res.csv;
+      const mime = format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
+      const ext = format === "excel" ? "xls" : "csv";
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `revenue_overview_${preset}_${new Date().toISOString().slice(0, 10)}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${res.count} record(s) to ${format.toUpperCase()}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const donutData = gateways.map((g) => ({
+    name: g.name,
+    value: g.grossRevenue,
+    color: GW_COLORS[g.name] || "#64748B",
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            Live Financial Engine · {formatIST(now, { timeOnly: true })} IST
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">Revenue & Payments</h1>
+          <p className="text-xs text-slate-500">
+            {data?.range?.label ?? "Loading…"} overview · Gross, Net Revenue, Gateway split & Audit ledger
+          </p>
+        </div>
+
+        {/* Date Filter & Export Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5 text-xs font-semibold overflow-x-auto">
+            {PRESETS.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => { setPreset(p.value); setFromIso(undefined); setToIso(undefined); }}
+                className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${preset === p.value ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {preset === "custom" && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <input
+                type="date"
+                onChange={(e) => setFromIso(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+                className="rounded-lg border border-slate-200 bg-white p-1.5"
+              />
+              <span>→</span>
+              <input
+                type="date"
+                onChange={(e) => setToIso(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+                className="rounded-lg border border-slate-200 bg-white p-1.5"
+              />
+            </div>
+          )}
+
+          {/* Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              disabled={!!exporting}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
+            >
+              <Download className="size-4 text-emerald-600" />
+              {exporting ? "Exporting…" : "Export"}
+            </button>
+
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-44 rounded-xl border border-slate-200 bg-white shadow-xl py-1 z-30 text-xs">
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                >
+                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV (.csv)
+                </button>
+                <button
+                  onClick={() => handleExport("excel")}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                >
+                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel (.xls)
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => refetch()}
+            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-xs transition-colors"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Row 1: Primary Financial KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Gross Revenue */}
+        <div className="p-4 rounded-2xl border border-emerald-200/80 bg-linear-to-br from-emerald-50/50 to-white shadow-xs relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Gross Revenue</span>
+            <DeltaBadge d={revDelta} />
+          </div>
+          <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
+            {isLoading ? "…" : fmtINR(m?.grossRevenue ?? 0)}
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-2">
+            <span>Base: {fmtINR(m?.grossBase ?? 0)}</span>
+            <span>·</span>
+            <span>GST: {fmtINR(m?.grossGst ?? 0)}</span>
+          </div>
+        </div>
+
+        {/* Net Revenue */}
+        <div className="p-4 rounded-2xl border border-indigo-200/80 bg-linear-to-br from-indigo-50/50 to-white shadow-xs relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Net Revenue</span>
+            <DeltaBadge d={netDelta} />
+          </div>
+          <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
+            {isLoading ? "…" : fmtINR(m?.netRevenue ?? 0)}
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500">
+            Gross ({fmtINR(m?.grossRevenue ?? 0)}) - Refunds ({fmtINR(m?.refundedAmount ?? 0)})
+          </div>
+        </div>
+
+        {/* Successful Payments */}
+        <div className="p-4 rounded-2xl border border-emerald-200/80 bg-white shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Successful Payments</span>
+            <DeltaBadge d={paidDelta} />
+          </div>
+          <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
+            {isLoading ? "…" : fmtN(m?.successfulPaymentsCount ?? 0)}
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500">
+            {m?.totalAttempts ?? 0} total payment attempt(s)
+          </div>
+        </div>
+
+        {/* Refunds */}
+        <div className="p-4 rounded-2xl border border-purple-200/80 bg-linear-to-br from-purple-50/30 to-white shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-800">Refunded Amount</span>
+            <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+              {m?.refundsCount ?? 0} refund(s)
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
+            {isLoading ? "…" : fmtINR(m?.refundedAmount ?? 0)}
+          </div>
+          <div className="mt-2 text-[11px] text-slate-500">
+            Approved customer refunds
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: Secondary Financial Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
+          <div className="text-slate-500">Failed Payments</div>
+          <div className="text-lg font-bold text-rose-600 font-mono mt-0.5">{m?.failedPaymentsCount ?? 0}</div>
+          <div className="text-[10px] text-slate-400">{fmtINR(m?.failedPaymentsAmount ?? 0)} failed volume</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
+          <div className="text-slate-500">Pending Amount</div>
+          <div className="text-lg font-bold text-amber-600 font-mono mt-0.5">{fmtINR(m?.pendingPaymentsAmount ?? 0)}</div>
+          <div className="text-[10px] text-slate-400">{m?.pendingPaymentsCount ?? 0} pending sessions</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
+          <div className="text-slate-500 flex items-center justify-between">
+            <span>Average Order Value</span>
+            <DeltaBadge d={aovDelta} />
+          </div>
+          <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">{fmtINR(m?.averageOrderValue ?? 0)}</div>
+          <div className="text-[10px] text-slate-400">Gross ÷ Paid Orders</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
+          <div className="text-slate-500 flex items-center justify-between">
+            <span>Payment Success Rate</span>
+            <DeltaBadge d={srDelta} />
+          </div>
+          <div className="text-lg font-bold text-emerald-600 font-mono mt-0.5">{m?.paymentSuccessRate ?? 0}%</div>
+          <div className="text-[10px] text-slate-400">Paid ÷ Total Attempts</div>
+        </div>
+      </div>
+
+      {/* Row 3: Revenue Trend & Gateway Breakdown Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Trend Chart */}
+        <div className="lg:col-span-2 p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Revenue Trend Analysis</h3>
+              <p className="text-xs text-slate-500">Gross vs Net Revenue collection trajectory</p>
+            </div>
+          </div>
+
+          <div className="h-64 w-full">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading chart…</div>
+            ) : trends.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">No revenue data for this range</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={trends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748B" }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} tickLine={false} tickFormatter={(v) => `₹${v}`} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "12px" }}
+                    formatter={(val: any) => [fmtINR(Number(val)), ""]}
+                  />
+                  <Bar dataKey="grossRevenue" name="Gross Revenue" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Line type="monotone" dataKey="netRevenue" name="Net Revenue" stroke="#6366F1" strokeWidth={2.5} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Gateway Revenue Share Chart */}
+        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm">Gateway Revenue Split</h3>
+            <p className="text-xs text-slate-500">Distribution across active gateways</p>
+          </div>
+
+          <div className="h-64 w-full flex items-center justify-center">
+            {isLoading ? (
+              <div className="text-xs text-slate-400">Loading donut…</div>
+            ) : donutData.length === 0 ? (
+              <div className="text-xs text-slate-400">No gateway transactions</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {donutData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: any) => [fmtINR(Number(v)), "Revenue"]} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: "11px" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Row 4: Gateway Analysis Table */}
+      <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm">Gateway Performance Analysis</h3>
+            <p className="text-xs text-slate-500">Detailed metric breakdown by payment gateway</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="px-3.5 py-2.5">Gateway</th>
+                <th className="px-3.5 py-2.5 text-center">Attempts</th>
+                <th className="px-3.5 py-2.5 text-center">Successful</th>
+                <th className="px-3.5 py-2.5 text-center">Failed</th>
+                <th className="px-3.5 py-2.5 text-center">Pending</th>
+                <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
+                <th className="px-3.5 py-2.5 text-center">Success Rate</th>
+                <th className="px-3.5 py-2.5 text-right">Avg Txn Value</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={9} className="px-3.5 py-3 h-10 bg-slate-50/50" />
+                  </tr>
+                ))
+              ) : gateways.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">No gateway data recorded</td>
+                </tr>
+              ) : (
+                gateways.map((g) => (
+                  <tr key={g.name} className="hover:bg-slate-50/80">
+                    <td className="px-3.5 py-3 font-bold text-slate-900 flex items-center gap-2">
+                      <span className="size-2 rounded-full" style={{ background: GW_COLORS[g.name] || "#64748B" }} />
+                      {g.name}
+                    </td>
+                    <td className="px-3.5 py-3 text-center font-mono">{fmtN(g.totalAttempts)}</td>
+                    <td className="px-3.5 py-3 text-center font-mono font-semibold text-emerald-700">{fmtN(g.successfulCount)}</td>
+                    <td className="px-3.5 py-3 text-center font-mono text-rose-600">{fmtN(g.failedCount)}</td>
+                    <td className="px-3.5 py-3 text-center font-mono text-amber-600">{fmtN(g.pendingCount)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900">{fmtINR(g.grossRevenue)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono font-bold text-emerald-700">{fmtINR(g.netRevenue)}</td>
+                    <td className="px-3.5 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${g.successRate}%` }} />
+                        </div>
+                        <span className="font-mono font-bold text-slate-800">{g.successRate}%</span>
+                      </div>
+                    </td>
+                    <td className="px-3.5 py-3 text-right font-mono text-slate-700">{fmtINR(g.avgTransactionValue)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Row 5: Service Revenue Analysis Table */}
+      <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+        <div>
+          <h3 className="font-bold text-slate-900 text-sm">Service-Wise Revenue</h3>
+          <p className="text-xs text-slate-500">Revenue generation breakdown by service offering</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="px-3.5 py-2.5">Service Name</th>
+                <th className="px-3.5 py-2.5 text-center">Paid Orders</th>
+                <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
+                <th className="px-3.5 py-2.5 text-right">Refunds</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
+                <th className="px-3.5 py-2.5 text-right">Avg Order Value</th>
+                <th className="px-3.5 py-2.5 text-right">% of Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={7} className="px-3.5 py-3 h-10 bg-slate-50/50" />
+                  </tr>
+                ))
+              ) : services.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No service revenue data recorded</td>
+                </tr>
+              ) : (
+                services.map((s) => (
+                  <tr key={s.serviceName} className="hover:bg-slate-50/80">
+                    <td className="px-3.5 py-3 font-semibold text-slate-900">{s.serviceName}</td>
+                    <td className="px-3.5 py-3 text-center font-mono font-semibold">{fmtN(s.paidOrders)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono font-bold text-slate-900">{fmtINR(s.grossRevenue)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono text-purple-700">{fmtINR(s.refunds)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono font-bold text-emerald-700">{fmtINR(s.netRevenue)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono text-slate-700">{fmtINR(s.avgOrderValue)}</td>
+                    <td className="px-3.5 py-3 text-right font-mono font-bold text-indigo-600">{s.pctTotal}%</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Row 6: Embedded Detailed Transactions Ledger */}
+      <PaymentsTransactionLedger />
+    </div>
+  );
+}
