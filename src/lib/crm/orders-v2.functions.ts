@@ -382,7 +382,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .not("application_status", "eq", "lead")
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
