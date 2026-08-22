@@ -6,6 +6,7 @@ import {
   getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
+import { RevenueExportModal } from "./RevenueExportModal";
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
 } from "recharts";
@@ -93,7 +94,7 @@ export function RevenueDashboardView() {
 
   const handleExport = async (format: "csv" | "excel") => {
     setExporting(format);
-    setExportOpen(false);
+    setExportModalOpen(false);
     try {
       const res = await exportFn({
         data: {
