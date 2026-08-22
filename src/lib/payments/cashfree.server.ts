@@ -22,16 +22,19 @@ export async function getCashfreeCreds() {
       const { data: gw } = await supabaseAdmin
         .from("payment_gateways")
         .select("config")
-        .eq("name", "cashfree")
+        .ilike("name", "%cashfree%")
         .maybeSingle();
 
       const cfg = (gw?.config as Record<string, any>) || {};
-      clientId = clientId || cfg.client_id || cfg.clientId || cfg.app_id || cfg.appId;
-      clientSecret = clientSecret || cfg.client_secret || cfg.clientSecret || cfg.secret_key || cfg.secretKey;
+      clientId = (clientId || cfg.client_id || cfg.clientId || cfg.app_id || cfg.appId || "").trim();
+      clientSecret = (clientSecret || cfg.client_secret || cfg.clientSecret || cfg.secret_key || cfg.secretKey || "").trim();
       mode = mode || String(cfg.mode || cfg.environment || "").trim().toLowerCase();
     } catch {
       /* ignore DB lookup error */
     }
+  } else {
+    clientId = clientId.trim();
+    clientSecret = clientSecret.trim();
   }
 
   if (!clientId || !clientSecret) {
@@ -40,7 +43,15 @@ export async function getCashfreeCreds() {
     );
   }
 
-  const isProd = mode === "production" || mode === "live";
+  let isProd = mode === "production" || mode === "live" || mode === "prod";
+  if (!mode) {
+    if (clientId.toUpperCase().startsWith("TEST") || clientSecret.toLowerCase().includes("test")) {
+      isProd = false;
+    } else {
+      isProd = true;
+    }
+  }
+
   const apiUrl = isProd ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
 
   return { clientId, clientSecret, isProd, apiUrl };
