@@ -505,6 +505,7 @@ export function RevenueDashboardView() {
           rangeDateTo={data?.range?.endIso}
           rangeLabel={data?.range?.label}
           forcedTab={ledgerTab}
+          onTabChange={setLedgerTab}
         />
       </div>
 

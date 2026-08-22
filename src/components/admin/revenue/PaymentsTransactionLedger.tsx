@@ -22,15 +22,22 @@ export function PaymentsTransactionLedger({
   rangeDateTo,
   rangeLabel = "Selected Range",
   forcedTab,
+  onTabChange,
 }: {
   rangeDateFrom?: string;
   rangeDateTo?: string;
   rangeLabel?: string;
   forcedTab?: TabType;
+  onTabChange?: (t: TabType) => void;
 }) {
   const [tabInternal, setTabInternal] = useState<TabType>("successful");
   const tab = forcedTab ?? tabInternal;
-  const setTab = (t: TabType) => { setTabInternal(t); };
+
+  const handleTabClick = (t: TabType) => {
+    setTabInternal(t);
+    if (onTabChange) onTabChange(t);
+    setPage(1);
+  };
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -294,8 +301,8 @@ export function PaymentsTransactionLedger({
           return (
             <button
               key={t}
-              onClick={() => { setTab(t); setPage(1); }}
-              className={`px-3.5 py-2.5 -mb-px border-b-2 font-semibold capitalize whitespace-nowrap transition-colors flex items-center gap-1.5 ${active ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-900"}`}
+              onClick={() => handleTabClick(t)}
+              className={`px-3.5 py-2.5 -mb-px border-b-2 font-semibold capitalize whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${active ? "border-indigo-600 text-indigo-600 font-bold" : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300"}`}
             >
               {t}
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${active ? "bg-indigo-100 text-indigo-800" : "bg-slate-100 text-slate-600"}`}>
