@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertRole, writeAudit } from "@/lib/audit";
+import type { Database } from "@/integrations/supabase/types";
 import { formatIST } from "@/lib/datetime";
 
 async function getAdmin() {
@@ -9,7 +10,8 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-const FINANCE_ROLES = ["super_admin", "admin", "finance", "accounts"];
+const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
+type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
 // ── Range Resolution ────────────────────────────────────────────────────────
 export type RevenueRangePreset =
