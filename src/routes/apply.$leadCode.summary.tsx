@@ -179,7 +179,9 @@ function SummaryPage() {
 
   // Auto-submit the hidden form once we have order fields → no extra page.
   useEffect(() => {
-    if (order && formRef.current) formRef.current.submit();
+    if (order && formRef.current && order.fields && Object.keys(order.fields).length > 0) {
+      formRef.current.submit();
+    }
   }, [order]);
 
   const lead = data?.lead;
@@ -262,6 +264,10 @@ function SummaryPage() {
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
       const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
+      if (res.actionUrl && (!res.fields || Object.keys(res.fields).length === 0)) {
+        window.location.href = res.actionUrl;
+        return;
+      }
       setOrder(res);
     } catch (e) {
       setPayError(e instanceof Error ? e.message : "Could not start payment.");

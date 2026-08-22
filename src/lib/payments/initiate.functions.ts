@@ -50,8 +50,12 @@ export const initiatePayment = createServerFn({ method: "POST" })
         const order = await buildCcavenueOrderForLead(data.leadCode);
         return { ...order, gateway: "ccavenue" };
       }
+      case "cashfree": {
+        const { buildCashfreeOrder } = await import("@/lib/payments/cashfree-order.server");
+        const order = await buildCashfreeOrder(data.leadCode);
+        return { ...order, gateway: "cashfree" };
+      }
       case "razorpay":
-      case "cashfree":
         throw new Error(`${chosen} is not enabled yet. Please choose another option.`);
       default:
         throw new Error(`Unknown payment gateway: ${chosen}`);

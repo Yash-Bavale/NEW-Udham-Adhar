@@ -61,6 +61,10 @@ function PaymentPage() {
     trackEvent("payment_initiated", { leadCode, gateway: activeGateway });
     try {
       const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
+      if (res.actionUrl && (!res.fields || Object.keys(res.fields).length === 0)) {
+        window.location.href = res.actionUrl;
+        return;
+      }
       setOrder(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start payment.");
@@ -68,9 +72,9 @@ function PaymentPage() {
     }
   }
 
-  // Auto-submit hidden form once we have order fields
+  // Auto-submit hidden form once we have order fields (for form POST gateways like PayU/CCAvenue)
   useEffect(() => {
-    if (order && formRef.current) {
+    if (order && formRef.current && order.fields && Object.keys(order.fields).length > 0) {
       formRef.current.submit();
     }
   }, [order]);
