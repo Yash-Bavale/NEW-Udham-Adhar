@@ -635,10 +635,11 @@ function DummyUrgencyTimer() {
 function GatewayLogo({ name, displayName, logoUrl }: { name: string; displayName: string; logoUrl?: string | null }) {
   const [imgError, setImgError] = useState(false);
 
+  const lowerName = (name || "").toLowerCase();
   const fallbackAsset =
-    name === "payu" ? payuLogo :
-    name === "razorpay" ? razorpayLogo :
-    name === "cashfree" ? cashfreeLogo : null;
+    lowerName.includes("payu") ? payuLogo :
+    lowerName.includes("razorpay") ? razorpayLogo :
+    lowerName.includes("cashfree") ? cashfreeLogo : null;
 
   if (logoUrl && !imgError) {
     return (
@@ -646,13 +647,19 @@ function GatewayLogo({ name, displayName, logoUrl }: { name: string; displayName
         src={logoUrl}
         alt={displayName}
         onError={() => setImgError(true)}
-        className="h-6 w-auto max-w-20 object-contain shrink-0"
+        className="h-6 md:h-7 w-auto max-w-[100px] object-contain shrink-0"
       />
     );
   }
 
   if (fallbackAsset) {
-    return <img src={fallbackAsset} alt={displayName} className="h-5 w-auto max-w-20 object-contain shrink-0" />;
+    return (
+      <img
+        src={fallbackAsset}
+        alt={displayName}
+        className="h-6 md:h-7 w-auto max-w-[100px] object-contain shrink-0"
+      />
+    );
   }
 
   return (
