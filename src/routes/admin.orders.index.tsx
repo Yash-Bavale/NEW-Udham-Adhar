@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2 } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useRole } from "@/hooks/useRole";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 export const Route = createFileRoute("/admin/orders/")({
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -79,8 +80,10 @@ function OrdersListPage() {
   const role = useRole();
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>("all");
   const [serviceId, setServiceId] = useState<string>("all");
   const [assignedTo, setAssignedTo] = useState<string>("all");
@@ -92,7 +95,21 @@ function OrdersListPage() {
   const [pendingAge, setPendingAge] = useState<PendingAge>("any");
   const [customDays, setCustomDays] = useState<string>("");
   const [page, setPage] = useState(1);
-  const pageSize = 100;
+  const pageSize = 50;
+
+  // Debounce search input by 350ms
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page to 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays]);
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {
@@ -118,21 +135,45 @@ function OrdersListPage() {
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin.orders.v2", page, search, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
-    queryFn: () => listFn({
-      data: {
-        page, pageSize,
-        fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
-        serviceId: serviceId === "all" ? undefined : serviceId,
-        assignedTo: assignedTo === "all" ? undefined : assignedTo,
-        paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        search: search || undefined,
-      },
-    }),
+  const queryPayload = useMemo(() => ({
+    page, pageSize,
+    fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
+    serviceId: serviceId === "all" ? undefined : serviceId,
+    assignedTo: assignedTo === "all" ? undefined : assignedTo,
+    paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    search: debouncedSearch || undefined,
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch]);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+    queryFn: () => listFn({ data: queryPayload }),
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
+
+  // Real-time subscription to auto-refresh order cache silently when new orders/payments arrive
+  useRealtimeTable("applications", () => {
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+  });
+  useRealtimeTable("payments", () => {
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+  });
+
+  // Background prefetch for next page
+  useEffect(() => {
+    const totalPages = Math.ceil((data?.total ?? 0) / pageSize);
+    if (page < totalPages) {
+      const nextPagePayload = { ...queryPayload, page: page + 1 };
+      qc.prefetchQuery({
+        queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+        queryFn: () => listFn({ data: nextPagePayload }),
+        staleTime: 30 * 1000,
+      });
+    }
+  }, [page, data?.total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, qc, listFn, pageSize]);
 
   const allRows = (data?.rows ?? []) as any[];
 
@@ -236,7 +277,14 @@ function OrdersListPage() {
       {/* Header & Reset Button */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
+            {isFetching && !isLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
+                <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
             {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
           </p>

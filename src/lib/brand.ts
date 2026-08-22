@@ -2,7 +2,7 @@
 // Use these constants instead of hardcoding strings in components and templates.
 
 export const SITE_NAME = "Udyam Aadhar";
-export const LEGAL_ENTITY = "Udyam Registration Consultancy & Assistance Services";
+export const LEGAL_ENTITY = "Business Help Services";
 export const COMPANY_NAME = "Business Help Services";
 /** Customer-facing support inbox. Used across email templates and footers. */
 export const SUPPORT_EMAIL = "help@businesshelpservices.com";

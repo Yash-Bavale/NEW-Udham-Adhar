@@ -13,7 +13,8 @@ export const orgSchema = (baseUrl: string = SITE) => {
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": `${siteUrl}/#organization`,
-    name,
+    name: "Business Help Services",
+    legalName: "Business Help Services",
     url: `${siteUrl}/`,
     logo: `${siteUrl}/logo.png`,
     description:

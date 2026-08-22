@@ -35,7 +35,7 @@ const FALLBACK: BrandInfo = {
   websiteId: "",
   domain: "udyamadhar.in",
   siteName: "Udyam Aadhar",
-  legalEntity: "Udyam Registration Consultancy & Assistance Services",
+  legalEntity: "Business Help Services",
   companyName: "Business Help Services",
   supportEmail: "help@businesshelpservices.com",
   supportPhone: null,
@@ -48,7 +48,7 @@ const FALLBACK: BrandInfo = {
   postalAddress: null,
   footerUnlockCode: null,
   legalFooterLine:
-    "Udyam Aadhar is operated by Udyam Registration Consultancy & Assistance Services, a private consultancy. We are not affiliated with, authorised by, endorsed by, or associated with any government authority or department.",
+    "Udyam Aadhar is operated by Business Help Services, a private consultancy. We are not affiliated with, authorised by, endorsed by, or associated with any government authority or department.",
   googleSiteVerification: null,
   gtagId: null,
   baseUrl: "https://udyamadhar.in",

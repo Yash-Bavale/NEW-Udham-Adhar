@@ -359,47 +359,30 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
 
-    // Run self-healing check to integrate any paid payments/leads missing application rows
-    await ensurePaidOrdersIntegrated(admin);
+    // Fire self-healing check in background non-blocking so read response is instant
+    ensurePaidOrdersIntegrated(admin).catch((err) => {
+      console.error("[listOrdersV2] background reconciliation error:", err);
+    });
 
-    // Orders surface = applications with at least one successful payment or non-lead application.
-    const { data: paidRows, error: paidErr } = await admin
-      .from("payments")
-      .select("application_id")
-      .in("status", ["paid"])
-      .not("application_id", "is", null);
-    if (paidErr) throw new Error(paidErr.message);
-
-    const paidAppIds = new Set(
-      (paidRows ?? []).map((r: any) => r.application_id).filter(Boolean),
-    );
-
-    // Also include any non-deleted applications whose application_status != 'lead'
-    const { data: nonDeletedApps } = await admin
-      .from("applications")
-      .select("id")
-      .eq("is_deleted", false)
-      .not("application_status", "eq", "lead")
-      .limit(5000);
-
-    for (const a of nonDeletedApps ?? []) {
-      paidAppIds.add(a.id);
-    }
-
-    const appIdsArr = Array.from(paidAppIds);
-
-    if (appIdsArr.length === 0) {
-      return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
+    let matchingLeadIds: string[] | null = null;
+    if (data.search && data.search.trim()) {
+      const s = `%${data.search.trim()}%`;
+      const { data: matchedLeads } = await admin
+        .from("leads")
+        .select("id")
+        .or(`name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}`)
+        .limit(200);
+      matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
     let q = admin
       .from("applications")
       .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status",
+        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code",
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .in("id", appIdsArr)
+      .not("application_status", "eq", "lead")
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
@@ -412,12 +395,25 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
     if (data.dateTo) q = q.lte("created_at", data.dateTo);
 
+    if (data.search && data.search.trim()) {
+      const term = `%${data.search.trim()}%`;
+      if (matchingLeadIds && matchingLeadIds.length > 0) {
+        q = q.or(`application_code.ilike.${term},lead_id.in.(${matchingLeadIds.join(",")})`);
+      } else {
+        q = q.ilike("application_code", term);
+      }
+    }
+
     const { data: apps, count, error } = await q.range(
       (data.page - 1) * data.pageSize,
       data.page * data.pageSize - 1,
     );
     if (error) throw new Error(error.message);
     const appList = apps ?? [];
+
+    if (appList.length === 0) {
+      return { rows: [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+    }
 
     const ids = appList.map((a) => a.id);
     const leadIds = Array.from(new Set(appList.map((a) => a.lead_id).filter(Boolean))) as string[];
@@ -507,18 +503,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     });
 
     if (data.paymentStatus) rows = rows.filter((r) => r.payment_status === data.paymentStatus);
-    if (data.search) {
-      const s = data.search.toLowerCase();
-      rows = rows.filter(
-        (r) =>
-          (r.application_code ?? "").toLowerCase().includes(s) ||
-          (r.customer_name ?? "").toLowerCase().includes(s) ||
-          (r.customer_mobile ?? "").includes(s) ||
-          (r.lead_code ?? "").toLowerCase().includes(s),
-      );
-    }
 
-    return { rows, total: count ?? 0 };
+    return { rows, total: count ?? 0, page: data.page, pageSize: data.pageSize };
   });
 
 /* ----------------------------- getOrderDetail --------------------------- */

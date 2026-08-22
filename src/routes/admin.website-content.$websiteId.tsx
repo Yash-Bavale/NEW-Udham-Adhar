@@ -27,6 +27,7 @@ type NavRow = {
 };
 
 const BLOCK_HINTS: Record<string, string> = {
+  "checkout.disclaimer_footer": '{ "enabled": true }',
   "home.facts": '{ "items": [{ "label": "Label", "value": "Value" }] }',
   "disclaimer.bar": '{ "text": "Disclaimer marquee text" }',
   "footer.address": '{ "text": "Full postal address" }',
@@ -67,6 +68,13 @@ function WebsiteContentPage() {
         </h1>
       </div>
 
+      <CheckoutToggleCard
+        websiteId={websiteId}
+        blocks={data.blocks as Array<{ block_key: string; content: unknown; is_active: boolean }>}
+        onSave={saveBlock}
+        onSaved={refresh}
+      />
+
       <ContactCard website={data.website} onSave={saveContact} onSaved={refresh} />
 
       <NavCard
@@ -95,6 +103,72 @@ function WebsiteContentPage() {
         onSaved={refresh}
       />
     </div>
+  );
+}
+
+function CheckoutToggleCard({
+  websiteId,
+  blocks,
+  onSave,
+  onSaved,
+}: {
+  websiteId: string;
+  blocks: Array<{ block_key: string; content: unknown; is_active: boolean }>;
+  onSave: (a: { data: { website_id: string; block_key: string; content: unknown; is_active: boolean } }) => Promise<unknown>;
+  onSaved: () => void;
+}) {
+  const existing = blocks.find((b) => b.block_key === "checkout.disclaimer_footer");
+  const contentObj = (existing?.content as { enabled?: boolean } | undefined) ?? {};
+  const [enabled, setEnabled] = useState(contentObj.enabled ?? true);
+  const [busy, setBusy] = useState(false);
+
+  const saveToggle = async (val: boolean) => {
+    setEnabled(val);
+    setBusy(true);
+    try {
+      await onSave({
+        data: {
+          website_id: websiteId,
+          block_key: "checkout.disclaimer_footer",
+          content: { enabled: val },
+          is_active: true,
+        },
+      });
+      onSaved();
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Waiting & Payment Page Display Settings">
+      <div className="flex items-center justify-between p-3.5 rounded-lg border border-slate-200 bg-slate-50/70">
+        <div>
+          <div className="font-semibold text-sm text-slate-800">
+            Show Disclaimer & Footer on Lead Waiting & Payment Pages
+          </div>
+          <div className="text-xs text-slate-500 mt-0.5 max-w-2xl">
+            Controls visibility of the Disclaimer Bar and Footer on <code>/apply/</code> summary waiting pages and <code>/payment/</code> pages. Main public pages always display the disclaimer & footer.
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => saveToggle(!enabled)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            enabled ? "bg-indigo-600" : "bg-slate-300"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+    </Card>
   );
 }
 

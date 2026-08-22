@@ -24,8 +24,8 @@ export const Route = createFileRoute("/about")({
           url: "https://udyamadhar.in/about",
           mainEntity: {
             "@type": "Organization",
-            name: "Udyam Registration Consultancy & Assistance Services",
-            alternateName: "Business Help Services",
+            name: "Business Help Services",
+            legalName: "Business Help Services",
             url: "https://udyamadhar.in",
           },
         }),
