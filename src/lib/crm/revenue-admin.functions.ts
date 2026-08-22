@@ -441,7 +441,7 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
         id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at,
         leads:lead_id (id, lead_code, name, email, mobile, service, state),
         applications:application_id (id, application_code, fulfillment_status),
-        invoices:id (id, invoice_number, pdf_path)
+        invoices!fk_invoices_payment (id, invoice_number, pdf_path)
       `,
         { count: "exact" },
       )
@@ -505,7 +505,7 @@ export const getTransactionDetail = createServerFn({ method: "POST" })
         id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_order_id, razorpay_payment_id, payment_date, created_at, raw_response, parent_payment_id,
         leads:lead_id (id, lead_code, name, email, mobile, state, service, assigned_to),
         applications:application_id (id, application_code, fulfillment_status, application_status, created_at),
-        invoices:id (id, invoice_number, pdf_path, issued_at, last_emailed_at)
+        invoices!fk_invoices_payment (id, invoice_number, pdf_path, issued_at, last_emailed_at)
       `)
       .eq("id", data.paymentId)
       .single();
@@ -544,7 +544,7 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
         id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
         leads:lead_id (lead_code, name, email, mobile, service, state),
         applications:application_id (application_code),
-        invoices:id (invoice_number)
+        invoices!fk_invoices_payment (invoice_number)
       `)
       .order("created_at", { ascending: false })
       .limit(20000);
