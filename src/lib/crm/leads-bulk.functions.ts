@@ -346,10 +346,22 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       q = q.in("id", data.ids);
     } else {
       if (data.status) q = q.eq("status", data.status as LeadStatus);
-      if (data.service) q = q.eq("service", data.service);
       if (data.source) {
         if (data.source.startsWith("__channel:")) {
-          // Channel filter logic handled if needed
+          const ch = data.source.slice("__channel:".length);
+          const prefixMap: Record<string, string> = {
+            ads: "Google Ads",
+            website: "Website",
+            whatsapp: "WhatsApp",
+            referral: "Referral",
+            manual: "Manual",
+            instagram: "Instagram",
+            facebook: "Facebook",
+          };
+          const prefix = prefixMap[ch];
+          if (prefix) {
+            q = q.ilike("lead_source", `${prefix}%`);
+          }
         } else {
           q = q.eq("lead_source", data.source);
         }
