@@ -365,9 +365,18 @@ async function backfillCommonVariables(
       if (inv?.invoice_number) out.invoice_number = inv.invoice_number;
     }
 
-    // Closure fields for E010-family templates. Only backfill when the order
-    // is in a closed/rejected fulfillment state so we don't leak stale values
-    // into unrelated templates.
+    // Completion date fields for E007 / order_completed templates.
+    if (missing("order_completed_date") || missing("completed_date") || missing("completed_at")) {
+      const completedAtRaw = (app as any)?.fulfilled_at ?? (app as any)?.certificate_uploaded_at ?? app?.updated_at ?? new Date().toISOString();
+      const formattedCompletedDate = new Date(completedAtRaw).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      });
+      if (missing("order_completed_date")) out.order_completed_date = `${formattedCompletedDate} IST`;
+      if (missing("completed_date")) out.completed_date = `${formattedCompletedDate} IST`;
+      if (missing("completed_at")) out.completed_at = `${formattedCompletedDate} IST`;
+      if (missing("order_completed_at")) out.order_completed_at = `${formattedCompletedDate} IST`;
+    }
     const closedFs = new Set(["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
     if (app && closedFs.has(String(app.fulfillment_status ?? ""))) {
       if (missing("closure_date") && app.updated_at) {

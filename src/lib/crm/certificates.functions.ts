@@ -172,6 +172,16 @@ export const deliverCertificate = createServerFn({ method: "POST" })
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       const subject = `Your Order No. ${orderId} has been completed`;
+      const completedDateFormatted = new Date().toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
       const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Order Completed</title></head>
@@ -184,6 +194,23 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           <p style="margin:0 0 12px 0">Dear ${esc(customerName)},</p>
           <p style="margin:0 0 12px 0">Greetings from Business Help Services.</p>
           <p style="margin:0 0 12px 0">We are pleased to inform you that your <strong>Order/Application No. ${esc(orderId)}</strong> for UDYAM-related consultancy and assistance services has been processed/completed.</p>
+
+          <!-- Order Summary Card -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;font-size:13px;color:#0f172a">
+            <tr>
+              <td style="padding:4px 0;color:#64748b;width:160px">Order Number:</td>
+              <td style="padding:4px 0;font-weight:600;color:#0f172a">${esc(orderId)}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#64748b">Service Selected:</td>
+              <td style="padding:4px 0;font-weight:600;color:#0f172a">${esc(lead.service || "UDYAM Consultancy Service")}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#64748b">Order Completed Date:</td>
+              <td style="padding:4px 0;font-weight:700;color:#0f3460">${completedDateFormatted} IST</td>
+            </tr>
+          </table>
+
           <p style="margin:0 0 12px 0">Please find the relevant document/certificate attached to this email for your reference and records.</p>
           <p style="margin:0 0 12px 0">Kindly review the attached document carefully and contact us through written communication in case any clarification or assistance is required.</p>
           <p style="margin:0 0 6px 0">For any support regarding this order, please contact:</p>
@@ -210,10 +237,13 @@ export const deliverCertificate = createServerFn({ method: "POST" })
       await enqueueFromTemplateInternal("order_completed", lead.email, {
         customer_name: customerName,
         customerName,
-        service_name: "Service",
-        serviceName: "Service",
+        service_name: lead.service || "Service",
+        serviceName: lead.service || "Service",
         order_number: orderId,
         orderNumber: orderId,
+        order_completed_date: completedDateFormatted,
+        completed_date: completedDateFormatted,
+        order_completed_at: completedDateFormatted,
         certificateId: cert.id,
         certificate_number: cert.certificate_number ?? "",
         certificate_url: signed.signedUrl,

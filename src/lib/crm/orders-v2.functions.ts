@@ -1223,6 +1223,16 @@ function buildCertificateEmailHtml(opts: {
        </td></tr>`
     : "";
 
+  const completedDate = new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Order Completed</title></head>
@@ -1241,6 +1251,23 @@ function buildCertificateEmailHtml(opts: {
             We are pleased to inform you that your <strong>Order/Application No. ${orderId}</strong>
             for UDYAM-related consultancy and assistance services has been processed/completed.
           </p>
+
+          <!-- Order Summary Card -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;font-size:13px;color:#0f172a">
+            <tr>
+              <td style="padding:4px 0;color:#64748b;width:160px">Order Number:</td>
+              <td style="padding:4px 0;font-weight:600;color:#0f172a">${orderId}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#64748b">Service Selected:</td>
+              <td style="padding:4px 0;font-weight:600;color:#0f172a">${escapeHtml(opts.serviceName || "UDYAM Consultancy Service")}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#64748b">Order Completed Date:</td>
+              <td style="padding:4px 0;font-weight:700;color:#0f3460">${completedDate} IST</td>
+            </tr>
+          </table>
+
           <p style="margin:0 0 12px 0">
             Please find the relevant document/certificate attached to this email for your reference and records.
           </p>
