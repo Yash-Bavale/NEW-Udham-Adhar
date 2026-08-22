@@ -468,11 +468,41 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
 
-    const { count: countAll } = await admin.from("payments").select("id", { count: "exact", head: true });
-    const { count: countSuccess } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "paid");
-    const { count: countPending } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "created");
-    const { count: countFailed } = await admin.from("payments").select("id", { count: "exact", head: true }).in("status", ["failed", "attempted"]);
-    const { count: countRefunded } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "refunded");
+    let baseCountQ = admin.from("payments").select("id", { count: "exact", head: true });
+    let qSuccess = admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "paid");
+    let qPending = admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "created");
+    let qFailed = admin.from("payments").select("id", { count: "exact", head: true }).in("status", ["failed", "attempted"]);
+    let qRefunded = admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "refunded");
+
+    if (data.dateFrom) {
+      baseCountQ = baseCountQ.gte("created_at", data.dateFrom);
+      qSuccess = qSuccess.gte("created_at", data.dateFrom);
+      qPending = qPending.gte("created_at", data.dateFrom);
+      qFailed = qFailed.gte("created_at", data.dateFrom);
+      qRefunded = qRefunded.gte("created_at", data.dateFrom);
+    }
+    if (data.dateTo) {
+      baseCountQ = baseCountQ.lte("created_at", data.dateTo);
+      qSuccess = qSuccess.lte("created_at", data.dateTo);
+      qPending = qPending.lte("created_at", data.dateTo);
+      qFailed = qFailed.lte("created_at", data.dateTo);
+      qRefunded = qRefunded.lte("created_at", data.dateTo);
+    }
+    if (data.gateway) {
+      baseCountQ = baseCountQ.ilike("gateway_name", `%${data.gateway}%`);
+      qSuccess = qSuccess.ilike("gateway_name", `%${data.gateway}%`);
+      qPending = qPending.ilike("gateway_name", `%${data.gateway}%`);
+      qFailed = qFailed.ilike("gateway_name", `%${data.gateway}%`);
+      qRefunded = qRefunded.ilike("gateway_name", `%${data.gateway}%`);
+    }
+
+    const [
+      { count: countAll },
+      { count: countSuccess },
+      { count: countPending },
+      { count: countFailed },
+      { count: countRefunded }
+    ] = await Promise.all([baseCountQ, qSuccess, qPending, qFailed, qRefunded]);
 
     return {
       rows: rows ?? [],
@@ -528,10 +558,23 @@ export const getTransactionDetail = createServerFn({ method: "POST" })
     };
   });
 
-// ── 4. Export Transactions Server Fn ───────────────────────────────────────
+const ExportSchema = z.object({
+  format: z.enum(["csv", "excel"]).default("csv"),
+  scope: z.enum(["filtered", "range", "all"]).default("filtered"),
+  tab: z.enum(["all", "successful", "pending", "failed", "refunded"]).default("all"),
+  gateway: z.string().optional(),
+  paymentMethod: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  minAmount: z.number().optional(),
+  maxAmount: z.number().optional(),
+  search: z.string().optional(),
+  columns: z.array(z.string()).optional(),
+});
+
 export const exportRevenueTransactions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => LedgerSchema.parse(i ?? {}))
+  .inputValidator((i: unknown) => ExportSchema.parse(i ?? {}))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, FINANCE_ROLES);
     const admin = await getAdmin();
@@ -545,43 +588,58 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
         invoices:id (invoice_number)
       `)
       .order("created_at", { ascending: false })
-      .limit(20000);
+      .limit(50000);
 
-    if (data.tab === "successful") q = q.eq("status", "paid");
-    else if (data.tab === "pending") q = q.eq("status", "created");
-    else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
-    else if (data.tab === "refunded") q = q.eq("status", "refunded");
-    else if (data.status) q = q.eq("status", data.status);
+    if (data.scope !== "all") {
+      if (data.tab === "successful") q = q.eq("status", "paid");
+      else if (data.tab === "pending") q = q.eq("status", "created");
+      else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
+      else if (data.tab === "refunded") q = q.eq("status", "refunded");
 
-    if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+      if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+      if (data.paymentMethod) q = q.ilike("payment_method", `%${data.paymentMethod}%`);
+      if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+      if (data.dateTo) q = q.lte("created_at", data.dateTo);
+      if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
+      if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
+
+      if (data.search) {
+        const s = data.search.replace(/[,()]/g, " ").trim();
+        q = q.or(`transaction_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+      }
+    }
 
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    const headers = [
-      "Sr. No.", "Payment Date & Time (IST)", "Transaction ID", "Order Code",
-      "Customer Name", "Mobile", "Email", "Service", "Amount (₹)", "Gateway",
-      "Payment Method", "Status", "Invoice Number", "Gateway Ref",
-    ];
+    const ALL_COLS: Record<string, { label: string; val: (r: any, idx: number) => any }> = {
+      srNo: { label: "Sr. No.", val: (_, idx) => idx + 1 },
+      date: { label: "Date & Time (IST)", val: (r) => formatIST(r.payment_date || r.created_at) },
+      txnId: { label: "Transaction ID", val: (r) => r.transaction_id || "" },
+      orderCode: { label: "Order Code", val: (r) => r.applications?.application_code || r.leads?.lead_code || "" },
+      customerName: { label: "Customer Name", val: (r) => r.leads?.name || "" },
+      mobile: { label: "Mobile Number", val: (r) => r.leads?.mobile || "" },
+      email: { label: "Email Address", val: (r) => r.leads?.email || "" },
+      state: { label: "Customer State", val: (r) => r.leads?.state || "" },
+      service: { label: "Service Name", val: (r) => r.leads?.service || "" },
+      baseAmount: { label: "Base Amount (₹)", val: (r) => Number(r.base_amount ?? (r.amount * 0.8475).toFixed(2)) },
+      gstAmount: { label: "GST Amount 18% (₹)", val: (r) => Number(r.gst_amount ?? (r.amount * 0.1525).toFixed(2)) },
+      totalAmount: { label: "Total Amount (₹)", val: (r) => Number(r.amount ?? 0) },
+      gateway: { label: "Payment Gateway", val: (r) => (r.gateway_name || "").toUpperCase() },
+      method: { label: "Payment Method", val: (r) => r.payment_method || "Online" },
+      status: { label: "Payment Status", val: (r) => r.status || "" },
+      invoiceNo: { label: "Tax Invoice Number", val: (r) => r.invoices?.[0]?.invoice_number || "" },
+      gatewayRef: { label: "Gateway Reference ID", val: (r) => r.razorpay_payment_id || "" },
+    };
 
-    const formattedRows = (rows ?? []).map((r: any, idx: number) => [
-      idx + 1,
-      formatIST(r.payment_date || r.created_at),
-      r.transaction_id || "",
-      r.applications?.application_code || r.leads?.lead_code || "",
-      r.leads?.name || "",
-      r.leads?.mobile || "",
-      r.leads?.email || "",
-      r.leads?.service || "",
-      Number(r.amount ?? 0),
-      (r.gateway_name || "").toUpperCase(),
-      r.payment_method || "Online",
-      r.status || "",
-      r.invoices?.[0]?.invoice_number || "",
-      r.razorpay_payment_id || "",
-    ]);
+    const selectedColKeys = data.columns && data.columns.length > 0
+      ? data.columns.filter((k) => ALL_COLS[k])
+      : Object.keys(ALL_COLS);
+
+    const headers = selectedColKeys.map((k) => ALL_COLS[k].label);
+    const formattedRows = (rows ?? []).map((r: any, idx: number) =>
+      selectedColKeys.map((k) => ALL_COLS[k].val(r, idx))
+    );
 
     const csvEscape = (v: unknown): string => {
       if (v == null) return "";

@@ -62,8 +62,8 @@ export function RevenueDashboardView() {
   const [preset, setPreset] = useState<RevenueRangePreset>("today");
   const [fromIso, setFromIso] = useState<string | undefined>();
   const [toIso, setToIso] = useState<string | undefined>();
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -137,6 +137,16 @@ export function RevenueDashboardView() {
 
   return (
     <div className="space-y-6">
+  const [ledgerTab, setLedgerTab] = useState<"all" | "successful" | "pending" | "failed" | "refunded">("successful");
+
+  const filterLedger = (tab: "all" | "successful" | "pending" | "failed" | "refunded") => {
+    setLedgerTab(tab);
+    const el = document.getElementById("transaction-ledger");
+    if (el) el.scrollIntoView({ behavior: "smooth" });
+  };
+
+  return (
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
         <div>
@@ -146,7 +156,7 @@ export function RevenueDashboardView() {
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">Revenue & Payments</h1>
           <p className="text-xs text-slate-500">
-            {data?.range?.label ?? "Loading…"} overview · Gross, Net Revenue, Gateway split & Audit ledger
+            {data?.range?.label ?? "Loading…"} overview · Gross, Base Revenue (Excl. Tax), Gateway split & Audit ledger
           </p>
         </div>
 
@@ -180,34 +190,13 @@ export function RevenueDashboardView() {
             </div>
           )}
 
-          {/* Export Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setExportOpen(!exportOpen)}
-              disabled={!!exporting}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors disabled:opacity-50"
-            >
-              <Download className="size-4 text-emerald-600" />
-              {exporting ? "Exporting…" : "Export"}
-            </button>
-
-            {exportOpen && (
-              <div className="absolute right-0 mt-1 w-44 rounded-xl border border-slate-200 bg-white shadow-xl py-1 z-30 text-xs">
-                <button
-                  onClick={() => handleExport("csv")}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                >
-                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV (.csv)
-                </button>
-                <button
-                  onClick={() => handleExport("excel")}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                >
-                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel (.xls)
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Export Button -> opens RevenueExportModal */}
+          <button
+            onClick={() => setExportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors"
+          >
+            <Download className="size-4 text-emerald-600" /> Export
+          </button>
 
           <button
             onClick={() => refetch()}
@@ -222,7 +211,10 @@ export function RevenueDashboardView() {
       {/* Row 1: Primary Financial KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Revenue */}
-        <div className="p-4 rounded-2xl border border-emerald-200/80 bg-linear-to-br from-emerald-50/50 to-white shadow-xs relative overflow-hidden">
+        <div
+          onClick={() => filterLedger("successful")}
+          className="p-4 rounded-2xl border border-emerald-200/80 bg-linear-to-br from-emerald-50/50 to-white shadow-xs relative overflow-hidden cursor-pointer hover:border-emerald-400 transition-all group"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Gross Revenue</span>
             <DeltaBadge d={revDelta} />
@@ -230,29 +222,33 @@ export function RevenueDashboardView() {
           <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
             {isLoading ? "…" : fmtINR(m?.grossRevenue ?? 0)}
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-2">
-            <span>Base: {fmtINR(m?.grossBase ?? 0)}</span>
-            <span>·</span>
-            <span>GST: {fmtINR(m?.grossGst ?? 0)}</span>
+          <div className="mt-2 text-[11px] text-emerald-600 font-medium group-hover:underline">
+            Click to view successful transactions ↓
           </div>
         </div>
 
-        {/* Net Revenue */}
-        <div className="p-4 rounded-2xl border border-indigo-200/80 bg-linear-to-br from-indigo-50/50 to-white shadow-xs relative overflow-hidden">
+        {/* Revenue Excl. Tax (Base Amount) */}
+        <div
+          onClick={() => filterLedger("successful")}
+          className="p-4 rounded-2xl border border-indigo-200/80 bg-linear-to-br from-indigo-50/50 to-white shadow-xs relative overflow-hidden cursor-pointer hover:border-indigo-400 transition-all group"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Net Revenue</span>
-            <DeltaBadge d={netDelta} />
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Revenue (Excl. Tax)</span>
+            <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">BASE AMOUNT</span>
           </div>
           <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
-            {isLoading ? "…" : fmtINR(m?.netRevenue ?? 0)}
+            {isLoading ? "…" : fmtINR(m?.grossBase ?? 0)}
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Gross ({fmtINR(m?.grossRevenue ?? 0)}) - Refunds ({fmtINR(m?.refundedAmount ?? 0)})
+          <div className="mt-2 text-[11px] text-indigo-600 font-medium group-hover:underline">
+            18% GST ({fmtINR(m?.grossGst ?? 0)}) excluded
           </div>
         </div>
 
         {/* Successful Payments */}
-        <div className="p-4 rounded-2xl border border-emerald-200/80 bg-white shadow-xs">
+        <div
+          onClick={() => filterLedger("successful")}
+          className="p-4 rounded-2xl border border-emerald-200/80 bg-white shadow-xs cursor-pointer hover:border-emerald-400 transition-all group"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Successful Payments</span>
             <DeltaBadge d={paidDelta} />
@@ -260,13 +256,16 @@ export function RevenueDashboardView() {
           <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
             {isLoading ? "…" : fmtN(m?.successfulPaymentsCount ?? 0)}
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            {m?.totalAttempts ?? 0} total payment attempt(s)
+          <div className="mt-2 text-[11px] text-slate-500 group-hover:underline">
+            {m?.totalAttempts ?? 0} total attempt(s) in this range
           </div>
         </div>
 
-        {/* Refunds */}
-        <div className="p-4 rounded-2xl border border-purple-200/80 bg-linear-to-br from-purple-50/30 to-white shadow-xs">
+        {/* Refunded Amount */}
+        <div
+          onClick={() => filterLedger("refunded")}
+          className="p-4 rounded-2xl border border-purple-200/80 bg-linear-to-br from-purple-50/30 to-white shadow-xs cursor-pointer hover:border-purple-400 transition-all group"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-purple-800">Refunded Amount</span>
             <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
@@ -276,24 +275,24 @@ export function RevenueDashboardView() {
           <div className="mt-2 text-2xl font-black tracking-tight text-slate-900 font-mono">
             {isLoading ? "…" : fmtINR(m?.refundedAmount ?? 0)}
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            Approved customer refunds
+          <div className="mt-2 text-[11px] text-purple-600 font-medium group-hover:underline">
+            Approved refunds in this range
           </div>
         </div>
       </div>
 
       {/* Row 2: Secondary Financial Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
-          <div className="text-slate-500">Failed Payments</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div
+          onClick={() => filterLedger("failed")}
+          className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs cursor-pointer hover:border-rose-300 transition-all group"
+        >
+          <div className="text-slate-500 flex items-center justify-between">
+            <span>Failed Payments</span>
+            <span className="text-[10px] text-rose-600 font-medium group-hover:underline">Filter ↓</span>
+          </div>
           <div className="text-lg font-bold text-rose-600 font-mono mt-0.5">{m?.failedPaymentsCount ?? 0}</div>
-          <div className="text-[10px] text-slate-400">{fmtINR(m?.failedPaymentsAmount ?? 0)} failed volume</div>
-        </div>
-
-        <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
-          <div className="text-slate-500">Pending Amount</div>
-          <div className="text-lg font-bold text-amber-600 font-mono mt-0.5">{fmtINR(m?.pendingPaymentsAmount ?? 0)}</div>
-          <div className="text-[10px] text-slate-400">{m?.pendingPaymentsCount ?? 0} pending sessions</div>
+          <div className="text-[10px] text-slate-400">{fmtINR(m?.failedPaymentsAmount ?? 0)} failed attempt volume</div>
         </div>
 
         <div className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs">
@@ -501,7 +500,23 @@ export function RevenueDashboardView() {
       </div>
 
       {/* Row 6: Embedded Detailed Transactions Ledger */}
-      <PaymentsTransactionLedger />
+      <div id="transaction-ledger">
+        <PaymentsTransactionLedger
+          rangeDateFrom={data?.range?.startIso}
+          rangeDateTo={data?.range?.endIso}
+          rangeLabel={data?.range?.label}
+          forcedTab={ledgerTab}
+        />
+      </div>
+
+      {/* Export Configuration Modal */}
+      <RevenueExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        defaultDateFrom={data?.range?.startIso}
+        defaultDateTo={data?.range?.endIso}
+        defaultTab={ledgerTab}
+      />
     </div>
   );
 }

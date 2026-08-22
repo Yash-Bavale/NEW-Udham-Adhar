@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { formatIST } from "@/lib/datetime";
 import { listPaymentLedger, exportRevenueTransactions } from "@/lib/crm/revenue-admin.functions";
 import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
+import { RevenueExportModal } from "./RevenueExportModal";
 import {
   Search, Filter, Download, ChevronLeft, ChevronRight, Eye, RefreshCw, FileText, CheckCircle2,
   Clock, XCircle, RotateCcw, X, ExternalLink
@@ -16,21 +17,38 @@ const fmtINR = (n: number) =>
 
 type TabType = "all" | "successful" | "pending" | "failed" | "refunded";
 
-export function PaymentsTransactionLedger() {
-  const [tab, setTab] = useState<TabType>("all");
+export function PaymentsTransactionLedger({
+  rangeDateFrom,
+  rangeDateTo,
+  rangeLabel = "Selected Range",
+  forcedTab,
+}: {
+  rangeDateFrom?: string;
+  rangeDateTo?: string;
+  rangeLabel?: string;
+  forcedTab?: TabType;
+}) {
+  const [tabInternal, setTabInternal] = useState<TabType>("successful");
+  const tab = forcedTab ?? tabInternal;
+  const setTab = (t: TabType) => { setTabInternal(t); };
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [search, setSearch] = useState("");
   const [gatewayFilter, setGatewayFilter] = useState("");
   const [methodFilter, setMethodFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
   const [minAmount, setMinAmount] = useState<number | undefined>();
   const [maxAmount, setMaxAmount] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+
+  const activeDateFrom = customDateFrom || rangeDateFrom;
+  const activeDateTo = customDateTo || rangeDateTo;
 
   const listFn = useServerFn(listPaymentLedger);
   const exportFn = useServerFn(exportRevenueTransactions);
@@ -38,11 +56,25 @@ export function PaymentsTransactionLedger() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [
       "admin.paymentLedger", page, pageSize, tab, search, gatewayFilter, methodFilter,
-      dateFrom, dateTo, minAmount, maxAmount
+      activeDateFrom, activeDateTo, minAmount, maxAmount
     ],
     queryFn: () =>
       listFn({
         data: {
+          page,
+          pageSize,
+          tab,
+          search: search || undefined,
+          gateway: gatewayFilter || undefined,
+          paymentMethod: methodFilter || undefined,
+          dateFrom: activeDateFrom || undefined,
+          dateTo: activeDateTo || undefined,
+          minAmount,
+          maxAmount,
+        },
+      }),
+    staleTime: 15_000,
+  });
           page,
           pageSize,
           tab,
@@ -183,34 +215,13 @@ export function PaymentsTransactionLedger() {
             {hasActiveFilters && <span className="size-2 rounded-full bg-indigo-600" />}
           </button>
 
-          {/* Export Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setExportOpen(!exportOpen)}
-              disabled={!!exporting}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors disabled:opacity-50"
-            >
-              <Download className="size-3.5 text-emerald-600" />
-              {exporting ? "Exporting…" : "Export"}
-            </button>
-
-            {exportOpen && (
-              <div className="absolute right-0 mt-1 w-44 rounded-xl border border-slate-200 bg-white shadow-xl py-1 z-30 text-xs">
-                <button
-                  onClick={() => handleExport("csv")}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                >
-                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV File (.csv)
-                </button>
-                <button
-                  onClick={() => handleExport("excel")}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                >
-                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel File (.xls)
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Export Button -> opens RevenueExportModal */}
+          <button
+            onClick={() => setExportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-medium transition-colors"
+          >
+            <Download className="size-3.5 text-emerald-600" /> Export
+          </button>
 
           <button
             onClick={() => refetch()}
@@ -472,6 +483,17 @@ export function PaymentsTransactionLedger() {
       <TransactionDetailDrawer
         paymentId={selectedPaymentId}
         onClose={() => setSelectedPaymentId(null)}
+      />
+
+      {/* Export Configuration Modal */}
+      <RevenueExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        defaultDateFrom={activeDateFrom}
+        defaultDateTo={activeDateTo}
+        defaultTab={tab}
+        defaultGateway={gatewayFilter}
+        defaultSearch={search}
       />
     </div>
   );
