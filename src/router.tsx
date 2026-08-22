@@ -20,7 +20,10 @@ if (typeof window !== "undefined") {
     !!msg &&
     (msg.includes("Failed to fetch dynamically imported module") ||
       msg.includes("error loading dynamically imported module") ||
-      msg.includes("Importing a module script failed"));
+      msg.includes("Importing a module script failed") ||
+      // Dev-server restart / new deploy invalidates server-function IDs;
+      // open tabs then get 500s on /_serverFn calls until reloaded.
+      msg.includes("Invalid server function ID"));
 
   window.addEventListener("vite:preloadError", () => recover());
   window.addEventListener("error", (e) => {
@@ -32,6 +35,24 @@ if (typeof window !== "undefined") {
       recover();
     }
   });
+
+  // React Query swallows serverFn rejections into error boundaries, so window
+  // listeners never see them. Watch /_serverFn responses directly: a 500 whose
+  // body carries "Invalid server function ID" means this tab is stale — reload.
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const res = await originalFetch(input, init);
+    try {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/_serverFn/") && res.status >= 500) {
+        const body = await res.clone().text();
+        if (body.includes("Invalid server function ID")) recover();
+      }
+    } catch {
+      // never break the app's fetch on guard failures
+    }
+    return res;
+  };
 }
 
 
