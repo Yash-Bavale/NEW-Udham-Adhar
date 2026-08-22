@@ -416,10 +416,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
-<<<<<<< HEAD
       .in("id", appIdsArr)
-=======
->>>>>>> 164bacaeb28125dca64f94a85a322105061f098b
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
