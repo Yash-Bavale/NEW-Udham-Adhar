@@ -227,7 +227,7 @@ function LeadsPage() {
       </div>
 
       {/* Status pills with counts */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap w-full max-w-full items-center">
         <FilterChip active={status === "" && !assignee} onClick={() => { setStatus(""); setAssignee(""); setPage(1); }}>
           All <span className="ml-1 opacity-60">({counts.all ?? 0})</span>
         </FilterChip>
@@ -247,7 +247,7 @@ function LeadsPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap w-full max-w-full">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: "var(--admin-fg-muted)" }} />
           <input

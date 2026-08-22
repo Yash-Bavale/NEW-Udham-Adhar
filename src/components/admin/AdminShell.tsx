@@ -224,10 +224,10 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     !!currentPath && (currentPath === to || (to !== "/admin/dashboard" && currentPath.startsWith(to + "/")));
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex" style={{ background: "var(--admin-bg)", color: "var(--admin-fg)" }}>
-      {/* Desktop sidebar — collapsible & fixed */}
+    <div className="min-h-screen flex w-full" style={{ background: "var(--admin-bg)", color: "var(--admin-fg)" }}>
+      {/* Desktop sidebar — collapsible & sticky fixed */}
       <aside
-        className="hidden md:flex shrink-0 h-full flex-col border-r transition-[width] duration-200"
+        className="hidden md:flex shrink-0 h-screen sticky top-0 flex-col border-r transition-[width] duration-200 z-30"
         style={{
           width: sidebarCollapsed ? 64 : 220,
           background: "var(--admin-sidebar)",
@@ -339,10 +339,10 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       </aside>
 
       {/* Main App Container */}
-      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-        {/* Top bar — fixed */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Top bar — sticky fixed */}
         <header
-          className="shrink-0 z-20 flex items-center gap-3 px-4 md:px-6 h-14 border-b"
+          className="sticky top-0 z-20 flex items-center gap-3 px-4 md:px-6 h-14 border-b shrink-0"
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
         >
           <div className="md:hidden font-medium text-sm" style={{ color: "var(--admin-primary)" }}>
@@ -360,12 +360,10 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           </div>
         </header>
 
-        {/* Scrollable Main Area */}
-        <main id="admin-main-scroll" className="flex-1 overflow-y-auto min-w-0">
-          <div className="p-4 md:p-6 pb-24 md:pb-6 w-full max-w-[1400px] mx-auto space-y-6">
-            <NotificationsOptIn />
-            {children}
-          </div>
+        {/* Content Area */}
+        <main id="admin-main-scroll" className="flex-1 min-w-0 p-4 md:p-6 pb-24 md:pb-6 w-full max-w-[1600px] mx-auto space-y-6">
+          <NotificationsOptIn />
+          {children}
         </main>
       </div>
 
