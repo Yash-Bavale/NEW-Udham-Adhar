@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useRole } from "@/hooks/useRole";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { usePreserveScroll, saveModuleFilterState, getModuleFilterState } from "@/hooks/usePreserveScroll";
 
 export const Route = createFileRoute("/admin/orders/")({
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -82,26 +83,36 @@ function OrdersListPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [fulfillmentStatus, setFulfillmentStatus] = useState<string>("all");
-  const [serviceId, setServiceId] = useState<string>("all");
-  const [assignedTo, setAssignedTo] = useState<string>("all");
-  const [paymentStatus, setPaymentStatus] = useState<string>("all");
-  const [actionStatusFilter, setActionStatusFilter] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
-  const [bucket, setBucket] = useState<Bucket>("all");
-  const [pendingAge, setPendingAge] = useState<PendingAge>("any");
-  const [customDays, setCustomDays] = useState<string>("");
-  const [page, setPage] = useState(1);
+  const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
+
+  const [search, setSearch] = useState<string>(savedState?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedState?.debouncedSearch ?? "");
+  const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
+  const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
+  const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
+  const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
+  const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
+  const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
+  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
+  const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
+  const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
+  const [page, setPage] = useState<number>(savedState?.page ?? 1);
   const pageSize = 50;
+
+  // Persist state across navigation
+  useEffect(() => {
+    saveModuleFilterState("admin.orders", {
+      search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
+      paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge,
+      customDays, page,
+    });
+  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays, page]);
 
   // Debounce search input by 350ms
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1);
     }, 350);
     return () => clearTimeout(t);
   }, [search]);
@@ -153,6 +164,11 @@ function OrdersListPage() {
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+
+  const allRows = (data?.rows ?? []) as any[];
+
+  // Preserve scroll position when navigating back from order detail view
+  usePreserveScroll("admin.orders", !isLoading);
 
   // Real-time subscription to auto-refresh order cache silently when new orders/payments arrive
   useRealtimeTable("applications", () => {
@@ -447,33 +463,6 @@ function OrdersListPage() {
         })}
       </div>
 
-      {/* Pagination bar */}
-      {total > pageSize && (
-        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs">
-          <div>
-            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="size-3.5" /> Prev
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-              disabled={page * pageSize >= total || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next <ChevronRight className="size-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Desktop Table View */}
       <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
         <ScrollableTable>
@@ -539,6 +528,33 @@ function OrdersListPage() {
           </div>
         ))}
       </div>
+
+      {/* Pagination bar (Bottom) */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
+          <div>
+            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+            >
+              <ChevronLeft className="size-3.5" /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+              disabled={page * pageSize >= total || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { formatLeadSource } from "@/lib/crm/format-lead-source";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { usePreserveScroll } from "@/hooks/usePreserveScroll";
 
 function formatAge(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "just now";
@@ -171,6 +172,9 @@ function LeadsPage() {
 
   // All filtering happens server-side now (C3).
   const rows = data?.rows ?? [];
+
+  // Preserve scroll position when navigating back from lead details
+  usePreserveScroll("admin.leads", !isLoading);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["admin.leads"] });

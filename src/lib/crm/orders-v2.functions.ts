@@ -208,6 +208,15 @@ async function ensurePaidOrdersIntegrated(admin: any) {
       const { finalizePaidPayment } = await import("@/lib/payments/finalize-paid.server");
       for (const l of paidLeads) {
         if (!existingLeadIdSet.has(l.id)) {
+          // Double-check atomically right before processing to prevent race condition duplicates
+          const { data: atomicApp } = await admin
+            .from("applications")
+            .select("id")
+            .eq("lead_id", l.id)
+            .eq("is_deleted", false)
+            .limit(1)
+            .maybeSingle();
+          if (atomicApp) continue;
           // Missing application row! Find the paid payment for this lead and run finalizePaidPayment.
           const { data: p } = await admin
             .from("payments")
@@ -407,7 +416,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
+<<<<<<< HEAD
       .in("id", appIdsArr)
+=======
+>>>>>>> 164bacaeb28125dca64f94a85a322105061f098b
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
@@ -527,9 +539,34 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
+    // Deduplicate orders by lead_id so multiple applications created for the same lead never duplicate in UI.
+    // Automatically soft-delete any duplicate application rows in DB.
+    const seenLeadIds = new Set<string>();
+    const uniqueRows: typeof rows = [];
+    const duplicateAppIdsToDelete: string[] = [];
+
+    for (const r of rows) {
+      if (r.lead_id) {
+        if (seenLeadIds.has(r.lead_id)) {
+          duplicateAppIdsToDelete.push(r.id);
+          continue;
+        }
+        seenLeadIds.add(r.lead_id);
+      }
+      uniqueRows.push(r);
+    }
+
+    if (duplicateAppIdsToDelete.length > 0) {
+      admin.from("applications").update({ is_deleted: true }).in("id", duplicateAppIdsToDelete).catch((err) => {
+        console.error("[listOrdersV2] auto-cleanup duplicate apps error:", err);
+      });
+    }
+
+    rows = uniqueRows;
+
     if (data.paymentStatus) rows = rows.filter((r) => r.payment_status === data.paymentStatus);
 
-    return { rows, total: count ?? 0, page: data.page, pageSize: data.pageSize };
+    return { rows, total: count ? Math.max(0, count - duplicateAppIdsToDelete.length) : uniqueRows.length, page: data.page, pageSize: data.pageSize };
   });
 
 /* ----------------------------- getOrderDetail --------------------------- */
