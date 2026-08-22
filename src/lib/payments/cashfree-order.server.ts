@@ -13,14 +13,14 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
     createCashfreeOrder,
   } = await import("@/lib/payments/cashfree.server");
 
-  // 1) Verify gateway is enabled
+  // 1) Verify gateway is enabled (check case-insensitively)
   const { data: gateway } = await supabaseAdmin
     .from("payment_gateways")
     .select("is_enabled")
-    .eq("name", "cashfree")
+    .ilike("name", "%cashfree%")
     .maybeSingle();
-  if (!gateway?.is_enabled) {
-    throw new Error("Cashfree is currently disabled. Please try another option.");
+  if (gateway && gateway.is_enabled === false) {
+    throw new Error("Cashfree is currently disabled. Please enable it in Admin Settings.");
   }
 
   // 2) Look up the lead

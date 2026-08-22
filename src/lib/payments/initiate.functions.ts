@@ -25,7 +25,7 @@ export const initiatePayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<InitiatePaymentResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let chosen = data.gatewayCode?.toLowerCase();
+    let chosen = (data.gatewayCode?.toLowerCase() ?? "").trim();
     if (!chosen) {
       const { data: gw } = await supabaseAdmin
         .from("payment_gateways")
@@ -34,8 +34,12 @@ export const initiatePayment = createServerFn({ method: "POST" })
         .order("priority", { ascending: true })
         .limit(1)
         .maybeSingle();
-      chosen = gw?.name ?? "payu";
+      chosen = (gw?.name ?? "payu").toLowerCase();
     }
+
+    if (chosen.includes("cashfree")) chosen = "cashfree";
+    else if (chosen.includes("payu")) chosen = "payu";
+    else if (chosen.includes("ccavenue")) chosen = "ccavenue";
 
     switch (chosen) {
       case "payu": {
