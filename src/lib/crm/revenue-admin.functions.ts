@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertRole, logAudit } from "@/lib/audit";
+import { assertRole, writeAudit } from "@/lib/audit";
 import { formatIST } from "@/lib/datetime";
 
 async function getAdmin() {
@@ -610,7 +610,14 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     const bodyXml = formattedRows.map((r) => `<Row>${r.map((val) => typeof val === "number" ? `<Cell ss:StyleID="Num"><Data ss:Type="Number">${val}</Data></Cell>` : `<Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`).join("")}</Row>`).join("\n");
     const excelXmlContent = `${xmlHeader}\n${headerXml}\n${bodyXml}\n</Table></Worksheet></Workbook>`;
 
-    await logAudit(context.userId, "revenue.export", (rows ?? []).map((r) => r.id), { count: rows?.length ?? 0, filter: data });
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "payment",
+      entityId: `${(rows ?? []).length} payments`,
+      action: "revenue.export",
+      newValue: { count: rows?.length ?? 0, filter: data, ids: (rows ?? []).map((r) => r.id).slice(0, 50) },
+      actorId: context.userId,
+    });
 
     return {
       csv: csvContent,
