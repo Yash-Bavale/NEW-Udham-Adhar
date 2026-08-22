@@ -19,6 +19,8 @@ export type InitiatePaymentResult = {
   leadCode: string;
   totalAmount: number;
   gateway: string;
+  paymentSessionId?: string;
+  isProd?: boolean;
 };
 
 export const initiatePayment = createServerFn({ method: "POST" })

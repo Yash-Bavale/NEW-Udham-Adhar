@@ -155,18 +155,14 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   // (env vars or DB config) so the checkout host can never disagree.
   const { getCashfreeCreds } = await import("@/lib/payments/cashfree.server");
   const { isProd } = await getCashfreeCreds();
-  const checkoutBase = isProd
-    ? "https://payments.cashfree.com/pgbillpay"
-    : "https://sandbox.cashfree.com/pgbillpay";
-
-  const actionUrl = cfOrder.payment_link
-    || `${checkoutBase}/checkout/post/${cfOrder.payment_session_id}`;
 
   return {
-    actionUrl,
-    fields: {} as Record<string, string>, // No form fields — redirect flow
+    actionUrl: cfOrder.payment_link || "",
+    fields: {} as Record<string, string>,
     paymentId,
     leadCode,
     totalAmount: payAmount,
+    paymentSessionId: cfOrder.payment_session_id,
+    isProd,
   };
 }

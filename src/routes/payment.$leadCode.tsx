@@ -212,6 +212,10 @@ function PaymentPage() {
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
       const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
+      if (res.paymentSessionId) {
+        await loadAndTriggerCashfreeCheckout(res.paymentSessionId, res.isProd);
+        return;
+      }
       if (res.actionUrl && (!res.fields || Object.keys(res.fields).length === 0)) {
         window.location.href = res.actionUrl;
         return;
@@ -606,4 +610,36 @@ function GatewayLogo({ name, displayName, logoUrl }: { name: string; displayName
       {displayName}
     </div>
   );
+}
+
+declare global {
+  interface Window {
+    Cashfree?: any;
+  }
+}
+
+async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?: boolean) {
+  const scriptUrl = isProd
+    ? "https://sdk.cashfree.com/js/v3/cashfree.js"
+    : "https://sdk.cashfree.com/js/v3/cashfree.sandbox.js";
+
+  if (!window.Cashfree) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = scriptUrl;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Cashfree Payment SDK"));
+      document.head.appendChild(script);
+    });
+  }
+
+  if (window.Cashfree) {
+    const cashfree = window.Cashfree({ mode: isProd ? "production" : "sandbox" });
+    cashfree.checkout({
+      paymentSessionId,
+      redirectTarget: "_self",
+    });
+  } else {
+    throw new Error("Cashfree SDK failed to initialize.");
+  }
 }
