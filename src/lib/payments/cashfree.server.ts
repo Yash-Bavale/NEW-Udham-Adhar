@@ -9,16 +9,6 @@ import { createHmac } from "crypto";
 // Environment & credentials
 // ---------------------------------------------------------------------------
 
-export const CASHFREE_MODE: "sandbox" | "production" =
-  String(process.env.CASHFREE_MODE ?? "").trim().toLowerCase() === "production"
-    ? "production"
-    : "sandbox";
-
-export const CASHFREE_API_URL =
-  CASHFREE_MODE === "production"
-    ? "https://api.cashfree.com/pg"
-    : "https://sandbox.cashfree.com/pg";
-
 const CASHFREE_API_VERSION = "2023-08-01";
 
 export async function getCashfreeCreds() {
