@@ -191,7 +191,7 @@ function OrdersListPage() {
     }
   }, [page, data?.total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, qc, listFn, pageSize]);
 
-  const allRows = (data?.rows ?? []) as any[];
+
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
   // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
