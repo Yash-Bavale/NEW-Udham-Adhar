@@ -105,15 +105,12 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
     if (leadWebsiteId) {
       const { data: web } = await supabaseAdmin
         .from("websites")
-        .select("is_primary, metadata")
+        .select("is_primary, description")
         .eq("id", leadWebsiteId)
         .maybeSingle();
       if (web) {
-        const meta = (web as any).metadata ?? {};
-        const defaultEnabled = !!(web as any).is_primary;
-        paymentsEnabled = meta.payments_enabled !== undefined
-          ? Boolean(meta.payments_enabled)
-          : defaultEnabled;
+        const { readPaymentsEnabled } = await import("./website-payments.functions");
+        paymentsEnabled = readPaymentsEnabled((web as any).description, !!(web as any).is_primary);
       }
     }
 
