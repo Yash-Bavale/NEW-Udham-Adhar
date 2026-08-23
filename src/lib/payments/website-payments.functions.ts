@@ -49,25 +49,9 @@ export const getLeadWebsitePaymentStatus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ leadCode: z.string().min(3).max(80) }).parse(i))
   .handler(async ({ data }) => {
     const admin = await getAdmin();
-    const codeUpper = data.leadCode.toUpperCase();
-
-    // Resolve lead → website_id
-    let websiteId: string | null = null;
-    if (codeUpper.startsWith("AP-")) {
-      const { data: app } = await admin
-        .from("applications")
-        .select("lead_id, leads:lead_id (website_id)")
-        .eq("application_code", codeUpper)
-        .maybeSingle();
-      websiteId = (app as any)?.leads?.website_id ?? null;
-    } else {
-      const { data: lead } = await admin
-        .from("leads")
-        .select("website_id")
-        .eq("lead_code", codeUpper)
-        .maybeSingle();
-      websiteId = (lead as any)?.website_id ?? null;
-    }
+    const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
+    const lead = await findLeadByCode(data.leadCode, "website_id");
+    const websiteId: string | null = lead?.website_id ?? null;
 
     if (!websiteId) {
       // Legacy lead with no website_id → always allow payment

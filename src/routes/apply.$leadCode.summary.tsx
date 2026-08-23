@@ -176,7 +176,10 @@ function SummaryPage() {
 
   useEffect(() => {
     trackEvent("summary_viewed", { leadCode });
-  }, [leadCode]);
+    if (data?.lead?.leadCode && data.lead.leadCode !== leadCode) {
+      navigate({ to: "/apply/$leadCode/summary", params: { leadCode: data.lead.leadCode }, replace: true });
+    }
+  }, [leadCode, data?.lead?.leadCode, navigate]);
 
   // Auto-submit the hidden form once we have order fields → no extra page.
   useEffect(() => {

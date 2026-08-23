@@ -23,15 +23,8 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
     throw new Error("Cashfree is currently disabled. Please enable it in Admin Settings.");
   }
 
-  // 2) Look up the lead
-  const { data: lead, error: leadErr } = await supabaseAdmin
-    .from("leads")
-    .select(
-      "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2, website_id",
-    )
-    .eq("lead_code", leadCodeInput)
-    .maybeSingle();
-  if (leadErr) throw new Error(leadErr.message);
+  const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
+  const lead = await findLeadByCode(leadCodeInput, "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2, website_id");
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
   const leadCode: string = lead.lead_code;

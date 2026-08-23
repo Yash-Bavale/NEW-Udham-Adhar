@@ -17,12 +17,8 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     throw new Error("CCAvenue is currently disabled. Please try another option.");
   }
 
-  const { data: lead, error: leadErr } = await supabaseAdmin
-    .from("leads")
-    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2, website_id")
-    .eq("lead_code", leadCodeInput)
-    .maybeSingle();
-  if (leadErr) throw new Error(leadErr.message);
+  const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
+  const lead = await findLeadByCode(leadCodeInput, "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2, website_id");
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
 
