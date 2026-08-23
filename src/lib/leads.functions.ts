@@ -102,13 +102,31 @@ export const createLead = createServerFn({ method: "POST" })
     const raw = data.service;
     const slugFromStatic = SERVICES.find((s) => s.label === raw)?.slug;
     const candidate = slugFromStatic ?? raw;
-    const { data: service, error: svcErr } = await supabaseAdmin
-      .from("services")
-      .select("id, service_code, service_name, base_amount, gst_amount, total_amount, is_active")
-      .or(`service_code.eq.${candidate},service_name.eq.${raw}`)
-      .maybeSingle();
 
-    if (svcErr) throw new Error(svcErr.message);
+    let service: { id: string; service_code: string; service_name: string; base_amount: number; gst_amount: number; total_amount: number; is_active: boolean } | null = null;
+    if (websiteId) {
+      const { data: webSvc } = await supabaseAdmin
+        .from("services")
+        .select("id, service_code, service_name, base_amount, gst_amount, total_amount, is_active")
+        .or(`service_code.eq.${candidate},service_name.eq.${raw}`)
+        .eq("website_id", websiteId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (webSvc) service = webSvc as any;
+    }
+
+    if (!service) {
+      const { data: fallbackSvc, error: svcErr } = await supabaseAdmin
+        .from("services")
+        .select("id, service_code, service_name, base_amount, gst_amount, total_amount, is_active")
+        .or(`service_code.eq.${candidate},service_name.eq.${raw}`)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (svcErr) throw new Error(svcErr.message);
+      service = fallbackSvc as any;
+    }
     if (!service || !service.is_active) {
       throw new Error("Selected service is not currently available.");
     }
