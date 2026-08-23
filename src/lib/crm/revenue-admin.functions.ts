@@ -13,6 +13,76 @@ async function getAdmin() {
 const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
+export interface RevenueGateway {
+  name: string;
+  totalAttempts: number;
+  successfulCount: number;
+  failedCount: number;
+  pendingCount: number;
+  grossRevenue: number;
+  refundedAmount: number;
+  netRevenue: number;
+  successRate: number;
+  avgTransactionValue: number;
+}
+
+export interface RevenueService {
+  serviceName: string;
+  paidOrders: number;
+  grossRevenue: number;
+  refunds: number;
+  netRevenue: number;
+  avgOrderValue: number;
+  pctTotal: number;
+}
+
+export interface RevenueTrendPoint {
+  label: string;
+  timestamp: string;
+  grossRevenue: number;
+  netRevenue: number;
+  count: number;
+}
+
+export interface RevenueMetrics {
+  grossRevenue: number;
+  grossBase: number;
+  grossGst: number;
+  refundedAmount: number;
+  refundsCount: number;
+  netRevenue: number;
+  successfulPaymentsCount: number;
+  failedPaymentsCount: number;
+  failedPaymentsAmount: number;
+  pendingPaymentsCount: number;
+  pendingPaymentsAmount: number;
+  totalAttempts: number;
+  averageOrderValue: number;
+  paymentSuccessRate: number;
+  grossRevenuePrev: number;
+  netRevenuePrev: number;
+  successfulPaymentsCountPrev: number;
+  averageOrderValuePrev: number;
+  paymentSuccessRatePrev: number;
+}
+
+export interface RevenueRangeData {
+  preset: RevenueRangePreset;
+  label: string;
+  startIso: string;
+  endIso: string;
+}
+
+export interface RevenueOverviewData {
+  range: RevenueRangeData;
+  metrics: RevenueMetrics;
+  gateways: RevenueGateway[];
+  services: RevenueService[];
+  trends: RevenueTrendPoint[];
+  isCached: boolean;
+  cachedAt: string;
+}
+
 // ── Range Resolution ────────────────────────────────────────────────────────
 export type RevenueRangePreset =
   | "today"
