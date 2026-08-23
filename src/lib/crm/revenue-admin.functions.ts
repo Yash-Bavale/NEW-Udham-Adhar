@@ -151,6 +151,18 @@ export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, 
   };
 }
 
+// ── Server Memory Cache for Revenue Overview ──────────────────────────────
+interface CachedRevenueOverview {
+  data: any;
+  cachedAt: number;
+}
+const REVENUE_CACHE = new Map<string, CachedRevenueOverview>();
+const REVENUE_CACHE_TTL_MS = 60_000; // 60s TTL
+
+export function invalidateRevenueCache() {
+  REVENUE_CACHE.clear();
+}
+
 const FilterSchema = z.object({
   preset: z.enum(["today", "yesterday", "7d", "30d", "this_week", "last_week", "this_month", "last_month", "this_fy", "custom"]).default("today"),
   fromIso: z.string().optional(),
@@ -162,6 +174,7 @@ const FilterSchema = z.object({
   minAmount: z.number().optional(),
   maxAmount: z.number().optional(),
   search: z.string().optional(),
+  forceRefresh: z.boolean().optional(),
 });
 
 // ── 1. Revenue Overview Server Fn ──────────────────────────────────────────
@@ -170,13 +183,35 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => FilterSchema.parse(i ?? {}))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, FINANCE_ROLES);
+
+    const cacheKey = JSON.stringify({
+      preset: data.preset,
+      fromIso: data.fromIso,
+      toIso: data.toIso,
+      gateway: data.gateway,
+      service: data.service,
+      status: data.status,
+      paymentMethod: data.paymentMethod,
+    });
+
+    if (!data.forceRefresh && REVENUE_CACHE.has(cacheKey)) {
+      const cached = REVENUE_CACHE.get(cacheKey)!;
+      if (Date.now() - cached.cachedAt < REVENUE_CACHE_TTL_MS) {
+        return {
+          ...cached.data,
+          isCached: true,
+          cachedAt: new Date(cached.cachedAt).toISOString(),
+        };
+      }
+    }
+
     const admin = await getAdmin();
     const r = resolveRangeDates(data.preset, data.fromIso, data.toIso);
 
-    // Fetch active period payments
+    // Fetch active period payments with relational lead service
     let qActive = admin
       .from("payments")
-      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at")
+      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
       .gte("created_at", r.startIso)
       .lte("created_at", r.endIso);
 
@@ -293,25 +328,14 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       avgTransactionValue: g.successfulCount > 0 ? Math.round(g.grossRevenue / g.successfulCount) : 0,
     })).sort((a, b) => b.grossRevenue - a.grossRevenue);
 
-    // Service-wise breakdown
-    const leadIds = Array.from(new Set(paidRows.map((p) => p.lead_id).filter(Boolean)));
+    // Service-wise breakdown (directly populated from relational query)
     const serviceMap = new Map<string, { serviceName: string; paidOrders: number; grossRevenue: number }>();
-
-    if (leadIds.length > 0) {
-      const { data: leads } = await admin
-        .from("leads")
-        .select("id, service")
-        .in("id", leadIds);
-      const leadSvcMap = new Map<string, string>();
-      (leads ?? []).forEach((l) => leadSvcMap.set(l.id, l.service || "Other Consultancy"));
-
-      for (const p of paidRows) {
-        const svc = leadSvcMap.get(p.lead_id as string) || "Other Consultancy";
-        const cur = serviceMap.get(svc) ?? { serviceName: svc, paidOrders: 0, grossRevenue: 0 };
-        cur.paidOrders += 1;
-        cur.grossRevenue += Number(p.amount ?? 0);
-        serviceMap.set(svc, cur);
-      }
+    for (const p of paidRows) {
+      const svc = (p as any).leads?.service || "Other Consultancy";
+      const cur = serviceMap.get(svc) ?? { serviceName: svc, paidOrders: 0, grossRevenue: 0 };
+      cur.paidOrders += 1;
+      cur.grossRevenue += Number(p.amount ?? 0);
+      serviceMap.set(svc, cur);
     }
 
     const services = Array.from(serviceMap.values()).map((s) => ({
@@ -322,64 +346,125 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       pctTotal: grossRevenue > 0 ? Math.round((s.grossRevenue / grossRevenue) * 1000) / 10 : 0,
     })).sort((a, b) => b.grossRevenue - a.grossRevenue);
 
-    // Time-series trend data
+    // Time-series trend data strictly ordered chronologically ASCENDING
     const trendPoints: Array<{ label: string; timestamp: string; grossRevenue: number; netRevenue: number; count: number }> = [];
     const isShortRange = r.durationMs <= 2 * 86400 * 1000;
 
+    const getISTKey = (dt: Date) => dt.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    const getISTLabel = (dt: Date) => dt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" });
+
     if (isShortRange) {
-      // Hourly trend for Today / Yesterday
-      const hourMap = new Map<string, { gross: number; count: number }>();
+      // Hourly trend for Today / Yesterday (00:00 to 23:00)
+      const hourBuckets = new Map<number, { label: string; gross: number; count: number }>();
+      for (let h = 0; h < 24; h++) {
+        const d = new Date(2026, 0, 1, h, 0, 0);
+        const label = d.toLocaleString("en-IN", { hour: "numeric", hour12: true });
+        hourBuckets.set(h, { label, gross: 0, count: 0 });
+      }
+
       for (const p of paidRows) {
         const dt = new Date(p.payment_date ?? p.created_at);
-        const hrStr = dt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: true });
-        const cur = hourMap.get(hrStr) ?? { gross: 0, count: 0 };
-        cur.gross += Number(p.amount ?? 0);
-        cur.count += 1;
-        hourMap.set(hrStr, cur);
+        const hrStr = dt.toLocaleString("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: false });
+        const hr = parseInt(hrStr, 10) % 24;
+        const b = hourBuckets.get(hr);
+        if (b) {
+          b.gross += Number(p.amount ?? 0);
+          b.count += 1;
+        }
       }
 
       for (let h = 0; h < 24; h++) {
-        const d = new Date();
-        d.setHours(h, 0, 0, 0);
-        const label = d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: true });
-        const found = hourMap.get(label) ?? { gross: 0, count: 0 };
+        const b = hourBuckets.get(h)!;
         trendPoints.push({
-          label,
-          timestamp: d.toISOString(),
-          grossRevenue: found.gross,
-          netRevenue: found.gross,
-          count: found.count,
+          label: b.label,
+          timestamp: `${h}:00`,
+          grossRevenue: b.gross,
+          netRevenue: b.gross,
+          count: b.count,
         });
       }
     } else {
-      // Daily trend for 7d / 30d / MTD
-      const dayMap = new Map<string, { gross: number; count: number }>();
+      // Daily trend for multi-day ranges (7d, 30d, this_week, etc.)
+      const dayBuckets = new Map<string, { label: string; timestamp: string; gross: number; count: number }>();
+
+      // Generate buckets chronologically from start date to end date
+      const startMs = new Date(r.startIso).getTime();
+      const endMs = new Date(r.endIso).getTime();
+      const msDay = 86400 * 1000;
+
+      for (let currMs = startMs; currMs <= endMs + msDay / 2; currMs += msDay) {
+        const d = new Date(currMs);
+        const key = getISTKey(d);
+        if (!dayBuckets.has(key)) {
+          dayBuckets.set(key, {
+            label: getISTLabel(d),
+            timestamp: key,
+            gross: 0,
+            count: 0,
+          });
+        }
+      }
+
       for (const p of paidRows) {
         const dt = new Date(p.payment_date ?? p.created_at);
-        const dayStr = dt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short" });
-        const cur = dayMap.get(dayStr) ?? { gross: 0, count: 0 };
-        cur.gross += Number(p.amount ?? 0);
-        cur.count += 1;
-        dayMap.set(dayStr, cur);
+        const key = getISTKey(dt);
+        const b = dayBuckets.get(key);
+        if (b) {
+          b.gross += Number(p.amount ?? 0);
+          b.count += 1;
+        }
       }
-      dayMap.forEach((val, key) => {
+
+      dayBuckets.forEach((b) => {
         trendPoints.push({
-          label: key,
-          timestamp: key,
-          grossRevenue: val.gross,
-          netRevenue: val.gross,
-          count: val.count,
+          label: b.label,
+          timestamp: b.timestamp,
+          grossRevenue: b.gross,
+          netRevenue: b.gross,
+          count: b.count,
         });
       });
     }
 
-    return {
+    const output = {
       range: {
         preset: data.preset,
         label: r.label,
         startIso: r.startIso,
         endIso: r.endIso,
       },
+      metrics: {
+        grossRevenue,
+        grossBase,
+        grossGst,
+        refundedAmount,
+        refundsCount,
+        netRevenue,
+        successfulPaymentsCount,
+        failedPaymentsCount,
+        failedPaymentsAmount,
+        pendingPaymentsCount,
+        pendingPaymentsAmount,
+        totalAttempts,
+        averageOrderValue,
+        paymentSuccessRate: Math.round(paymentSuccessRate * 10) / 10,
+        // Comparative previous period metrics
+        grossRevenuePrev,
+        netRevenuePrev,
+        successfulPaymentsCountPrev,
+        averageOrderValuePrev,
+        paymentSuccessRatePrev: Math.round(paymentSuccessRatePrev * 10) / 10,
+      },
+      gateways,
+      services,
+      trends: trendPoints,
+      isCached: false,
+      cachedAt: new Date().toISOString(),
+    };
+
+    REVENUE_CACHE.set(cacheKey, { data: output, cachedAt: Date.now() });
+    return output;
+  });
       metrics: {
         grossRevenue,
         grossBase,

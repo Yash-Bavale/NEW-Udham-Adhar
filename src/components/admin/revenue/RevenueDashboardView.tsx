@@ -78,8 +78,20 @@ export function RevenueDashboardView() {
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["admin.revenueOverview", preset, fromIso, toIso],
     queryFn: () => getOverviewFn({ data: { preset, fromIso, toIso } }),
-    staleTime: 20_000,
+    staleTime: 60_000,
+    gcTime: 300_000,
+    refetchOnWindowFocus: false,
   });
+
+  const handleManualRefresh = async () => {
+    try {
+      await getOverviewFn({ data: { preset, fromIso, toIso, forceRefresh: true } });
+      await refetch();
+      toast.success("Revenue data refreshed from DB");
+    } catch {
+      toast.error("Failed to refresh revenue data");
+    }
+  };
 
   const m = data?.metrics;
   const gateways = data?.gateways ?? [];
@@ -152,6 +164,11 @@ export function RevenueDashboardView() {
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600">
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
             Live Financial Engine · {formatIST(now, { timeOnly: true })} IST
+            {data?.isCached && (
+              <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-[10px] uppercase">
+                ⚡ Cache (Fast)
+              </span>
+            )}
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">Revenue & Payments</h1>
           <p className="text-xs text-slate-500">
@@ -198,11 +215,12 @@ export function RevenueDashboardView() {
           </button>
 
           <button
-            onClick={() => refetch()}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-xs transition-colors"
-            title="Refresh Data"
+            onClick={handleManualRefresh}
+            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-xs transition-colors flex items-center gap-1 text-xs font-semibold"
+            title="Refresh Data from DB"
           >
             <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
