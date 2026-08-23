@@ -36,8 +36,8 @@ export const globalSearch = createServerFn({ method: "POST" })
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
-    // Parallel fetch: leads, customers, applications by code, invoices, certificates, complaints
-    const [l, custs, aByCode, inv, cert, comp] = await Promise.all([
+    // 1. Fetch matching leads, customers, applications by code, applications by lead details, and auxiliary entities in parallel
+    const [l, custs, aByCode, aByLeadJoin, inv, cert, comp] = await Promise.all([
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
@@ -50,35 +50,50 @@ export const globalSearch = createServerFn({ method: "POST" })
         .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .ilike("application_code", like)
         .limit(10),
+      s.from("applications")
+        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads!inner(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
+        .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like}`, { foreignTable: "leads" })
+        .limit(10),
       s.from("invoices").select("id, invoice_number, total_amount, created_at").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name, created_at").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status, created_at").ilike("complaint_number", like).limit(5),
     ]);
 
-    // Gather linked IDs from matching leads & customers
+    // 2. Additional ID-based applications lookup
     const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
     const customerIds = (custs.data || []).map((r: any) => r.id).filter(Boolean);
 
-    let linkedApps: any[] = [];
-    const orClauses: string[] = [];
-    if (leadIds.length > 0) orClauses.push(`lead_id.in.(${leadIds.join(",")})`);
-    if (customerIds.length > 0) orClauses.push(`customer_id.in.(${customerIds.join(",")})`);
-
-    if (orClauses.length > 0) {
-      const { data: linked } = await s
-        .from("applications")
-        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-        .or(orClauses.join(","))
-        .order("created_at", { ascending: false })
-        .limit(15);
-      linkedApps = linked ?? [];
+    const extraQueries: Promise<any>[] = [];
+    if (leadIds.length > 0) {
+      extraQueries.push(
+        s.from("applications")
+          .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
+          .in("lead_id", leadIds)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      );
     }
+    if (customerIds.length > 0) {
+      extraQueries.push(
+        s.from("applications")
+          .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
+          .in("customer_id", customerIds)
+          .order("created_at", { ascending: false })
+          .limit(10)
+      );
+    }
+
+    const extraResults = await Promise.all(extraQueries);
+    const linkedApps: any[] = [];
+    extraResults.forEach((res) => {
+      if (res.data) linkedApps.push(...res.data);
+    });
 
     const leadMap = new Map<string, any>((l.data || []).map((r: any) => [r.id, r]));
     const custMap = new Map<string, any>((custs.data || []).map((r: any) => [r.id, r]));
 
     const seenApp = new Set<string>();
-    const allApps = [...(aByCode.data || []), ...linkedApps].filter((r: any) => {
+    const allApps = [...(aByCode.data || []), ...(aByLeadJoin.data || []), ...linkedApps].filter((r: any) => {
       if (seenApp.has(r.id)) return false;
       seenApp.add(r.id);
       return true;
