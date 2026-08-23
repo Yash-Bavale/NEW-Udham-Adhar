@@ -66,6 +66,7 @@ function LeadsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
+  const [websiteId, setWebsiteId] = useState<string>("");
   const [assignee, setAssignee] = useState<string>("");
   const [service, setService] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -93,6 +94,7 @@ function LeadsPage() {
           status: status || undefined,
           service: service || undefined,
           source: source || undefined,
+          websiteId: websiteId || undefined,
           assignedTo: assignee || undefined,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
@@ -167,6 +169,9 @@ function LeadsPage() {
     staleTime: 60_000,
   });
 
+  const websitesFn = useServerFn(listWebsiteTree);
+  const { data: websitesData } = useQuery({ queryKey: ["admin.websites.tree"], queryFn: () => websitesFn() });
+
   const { data: savedData } = useQuery({ queryKey: ["admin.savedFilters"], queryFn: () => savedFn() });
   useEffect(() => {
     if (defaultApplied || !savedData) return;
@@ -202,12 +207,13 @@ function LeadsPage() {
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
+    queryKey: ["admin.leads", page, search, status, source, websiteId, assignee, service, dateFrom, dateTo],
     queryFn: () => listFn({ data: {
       page, pageSize: 25,
       search: search || undefined,
       status: (status || undefined) as never,
       source: source || undefined,
+      websiteId: websiteId || undefined,
       service: service || undefined,
       assignee: assignee || undefined,
       dateFrom: dateFrom || undefined,
@@ -326,6 +332,19 @@ function LeadsPage() {
           </optgroup>
         </select>
         <select
+          value={websiteId}
+          onChange={(e) => { setWebsiteId(e.target.value); setPage(1); }}
+          className="rounded-lg border px-3 py-2 text-sm font-medium"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <option value="">All Websites</option>
+          <option value="udyam_adhar">🌐 Udyam Aadhar</option>
+          <option value="udyam_registration">🌐 Udyam Registration</option>
+          {(websitesData?.websites ?? []).map((w: any) => (
+            <option key={w.id} value={w.id}>🌐 {w.name}</option>
+          ))}
+        </select>
+        <select
           value={service}
           onChange={(e) => setService(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm max-w-[220px]"
@@ -410,10 +429,11 @@ function LeadsPage() {
             </div>
           )}
         </div>
-        {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
+        {(source || websiteId || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {
               setSource("");
+              setWebsiteId("");
               setService("");
               setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
               setDateFrom("");
@@ -543,8 +563,25 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }} title={l.lead_source || ""}>{formatLeadSource(l.lead_source)}</td>}
-                      <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
+                      {role.hasAny(["super_admin", "admin"]) && (
+                        <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
+                          <div className="space-y-1">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                (l.website_name || "").toLowerCase().includes("registration")
+                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              }`}
+                            >
+                              🌐 {l.website_name || "Udyam Aadhar"}
+                            </span>
+                            <div className="text-[11px] text-slate-500 truncate max-w-[200px]" title={l.lead_source || ""}>
+                              {formatLeadSource(l.lead_source)}
+                            </div>
+                          </div>
+                        </td>
+                      )}
+                      <td className="px-4 py-2.5 text-xs min-w-[200px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       {role.hasAny(["super_admin", "admin"]) && (
                         <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>

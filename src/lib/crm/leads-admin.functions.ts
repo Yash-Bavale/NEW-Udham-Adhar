@@ -447,6 +447,7 @@ export const listLeads = createServerFn({ method: "GET" })
     status: z.enum(LEAD_STATUS_ENUM).optional(),
     source: z.string().optional(),
     service: z.string().optional(),
+    websiteId: z.string().optional(),
     assignee: z.string().optional(), // uuid | "__unassigned" | "__me"
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),
@@ -459,6 +460,15 @@ export const listLeads = createServerFn({ method: "GET" })
     let query = admin.from("leads").select("*", { count: "exact" });
 
     if (data.status) query = query.eq("status", data.status);
+    if (data.websiteId) {
+      if (data.websiteId === "udyam_registration") {
+        query = query.or("lead_source.ilike.%registration%,service.ilike.%registration%");
+      } else if (data.websiteId === "udyam_adhar") {
+        query = query.not("lead_source", "ilike", "%registration%").not("service", "ilike", "%registration%");
+      } else {
+        query = query.eq("website_id", data.websiteId);
+      }
+    }
     if (data.source) {
       if (data.source.startsWith("__channel:")) {
         const ch = data.source.slice("__channel:".length);
@@ -515,6 +525,18 @@ export const listLeads = createServerFn({ method: "GET" })
         .in("id", assigneeIds as string[]);
       profilesById = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
     }
+
+    // Attach website details
+    const websiteIds = Array.from(new Set((rows ?? []).map((r: any) => r.website_id).filter(Boolean)));
+    let websitesById: Record<string, { id: string; name: string; domain: string }> = {};
+    if (websiteIds.length) {
+      const { data: webs } = await admin
+        .from("websites")
+        .select("id, name, domain")
+        .in("id", websiteIds as string[]);
+      websitesById = Object.fromEntries((webs ?? []).map((w: any) => [w.id, w]));
+    }
+
     // Pull latest application + onboarding form status for each lead
     const leadIdsRaw = (rows ?? []).map((r: any) => r.id).filter(Boolean) as string[];
     let appsByLead: Record<string, { form_status: string | null }> = {};
@@ -530,11 +552,20 @@ export const listLeads = createServerFn({ method: "GET" })
       }
     }
 
+    const resolveWebsiteName = (r: any) => {
+      if (r.website_id && websitesById[r.website_id]) return websitesById[r.website_id].name;
+      const s = `${r.lead_source ?? ""} ${r.service ?? ""}`.toLowerCase();
+      if (s.includes("registration")) return "Udyam Registration";
+      return "Udyam Aadhar";
+    };
+
     const enriched = (rows ?? []).map((r: any) => ({
       ...r,
       assignee_name: r.assigned_to
         ? (profilesById[r.assigned_to]?.display_name || profilesById[r.assigned_to]?.email || null)
         : null,
+      website_name: resolveWebsiteName(r),
+      website_domain: r.website_id && websitesById[r.website_id] ? websitesById[r.website_id].domain : null,
       form_status: appsByLead[r.id]?.form_status ?? null,
     }));
 

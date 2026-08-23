@@ -252,6 +252,7 @@ const ExportInput = z.object({
   status: z.string().optional(),
   source: z.string().optional(),
   service: z.string().optional(),
+  websiteId: z.string().optional(),
   assignedTo: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
@@ -337,7 +338,7 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
     let q = admin
       .from("leads")
       .select(
-        "id, lead_code, created_at, name, email, mobile, state, language, service, status, base_amount, gst_amount, total_amount, assigned_to, lead_source",
+        "id, lead_code, created_at, name, email, mobile, state, language, service, status, base_amount, gst_amount, total_amount, assigned_to, lead_source, website_id",
       )
       .order("created_at", { ascending: false })
       .limit(50000);
@@ -346,6 +347,15 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       q = q.in("id", data.ids);
     } else {
       if (data.status) q = q.eq("status", data.status as LeadStatus);
+      if (data.websiteId) {
+        if (data.websiteId === "udyam_registration") {
+          q = q.or("lead_source.ilike.%registration%,service.ilike.%registration%");
+        } else if (data.websiteId === "udyam_adhar") {
+          q = q.not("lead_source", "ilike", "%registration%").not("service", "ilike", "%registration%");
+        } else {
+          q = q.eq("website_id", data.websiteId);
+        }
+      }
       if (data.source) {
         if (data.source.startsWith("__channel:")) {
           const ch = data.source.slice("__channel:".length);
@@ -397,9 +407,27 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       (profs ?? []).forEach((p) => nameMap.set(p.id as string, (p.display_name as string) || (p.email as string) || ""));
     }
 
+    // Resolve website names
+    const websiteIds = Array.from(new Set((rows ?? []).map((r) => r.website_id).filter(Boolean) as string[]));
+    const webMap = new Map<string, string>();
+    if (websiteIds.length) {
+      const { data: webs } = await (await getAdmin())
+        .from("websites")
+        .select("id, name")
+        .in("id", websiteIds);
+      (webs ?? []).forEach((w) => webMap.set(w.id as string, w.name as string));
+    }
+
+    const resolveWeb = (r: any) => {
+      if (r.website_id && webMap.has(r.website_id)) return webMap.get(r.website_id)!;
+      const s = `${r.lead_source ?? ""} ${r.service ?? ""}`.toLowerCase();
+      if (s.includes("registration")) return "Udyam Registration";
+      return "Udyam Aadhar";
+    };
+
     const headers = [
       "Lead Code", "Created At", "Name", "Email", "Mobile", "State", "Language",
-      "Service", "Status", "Base Amount", "GST Amount", "Total Amount",
+      "Service", "Website Source", "Status", "Base Amount", "GST Amount", "Total Amount",
       "Assigned To", "Lead Source",
     ];
 
@@ -412,6 +440,7 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       r.state || "",
       r.language || "",
       r.service || "",
+      resolveWeb(r),
       (r.status || "").replace(/_/g, " "),
       Number(r.base_amount ?? 0),
       Number(r.gst_amount ?? 0),
