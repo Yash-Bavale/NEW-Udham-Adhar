@@ -9,6 +9,23 @@ export type SearchHit = {
   href: string;
 };
 
+function formatSearchDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(iso)).replace(",", "");
+  } catch {
+    return "";
+  }
+}
+
 export const globalSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { q: string }) => d)
@@ -21,16 +38,16 @@ export const globalSearch = createServerFn({ method: "POST" })
 
     const [l, aByCode, inv, cert, comp] = await Promise.all([
       s.from("leads")
-        .select("id, lead_code, name, email, mobile, service")
+        .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
         .limit(10),
       s.from("applications")
-        .select("id, application_code, application_status, lead_id")
+        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .ilike("application_code", like)
         .limit(6),
-      s.from("invoices").select("id, invoice_number, total_amount").ilike("invoice_number", like).limit(5),
-      s.from("certificates").select("id, certificate_number, file_name").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
-      s.from("complaints").select("id, complaint_number, status").ilike("complaint_number", like).limit(5),
+      s.from("invoices").select("id, invoice_number, total_amount, created_at").ilike("invoice_number", like).limit(5),
+      s.from("certificates").select("id, certificate_number, file_name, created_at").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
+      s.from("complaints").select("id, complaint_number, status, created_at").ilike("complaint_number", like).limit(5),
     ]);
 
     // Pull applications linked to matching leads so email/mobile searches surface orders.
@@ -39,13 +56,14 @@ export const globalSearch = createServerFn({ method: "POST" })
     if (leadIds.length) {
       const { data: linked } = await s
         .from("applications")
-        .select("id, application_code, application_status, lead_id")
+        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .in("lead_id", leadIds)
         .order("created_at", { ascending: false })
         .limit(10);
       linkedApps = linked ?? [];
     }
-    const leadNameById = new Map<string, string>((l.data || []).map((r: any) => [r.id, r.name || r.lead_code]));
+
+    const leadMap = new Map<string, any>((l.data || []).map((r: any) => [r.id, r]));
     const seenApp = new Set<string>();
     const allApps = [...(aByCode.data || []), ...linkedApps].filter((r: any) => {
       if (seenApp.has(r.id)) return false;
@@ -54,34 +72,52 @@ export const globalSearch = createServerFn({ method: "POST" })
     });
 
     // 1. SHOW ORDERS (APPLICATIONS) FIRST
-    allApps.forEach((r: any) =>
+    allApps.forEach((r: any) => {
+      const leadInfo = r.leads || (r.lead_id ? leadMap.get(r.lead_id) : null);
+      const custName = leadInfo?.name || r.customers?.name || "Customer";
+      const appCode = r.application_code || r.id;
+      const status = (r.order_status || r.application_status || "Active").toLowerCase().replace(/_/g, " ");
+
+      const mobile = leadInfo?.mobile || r.customers?.primary_mobile || null;
+      const email = leadInfo?.email || r.customers?.primary_email || null;
+      const service = leadInfo?.service || "Service Application";
+      const dateStr = formatSearchDate(r.created_at);
+
       hits.push({
         kind: "application",
         id: r.id,
-        title: r.application_code,
-        subtitle: [r.application_status, r.lead_id ? leadNameById.get(r.lead_id) : null].filter(Boolean).join(" · "),
+        title: `${custName} · ${appCode} (${status})`,
+        subtitle: [mobile, email, service, dateStr].filter(Boolean).join(" · "),
         href: `/admin/orders/${r.id}`,
-      })
-    );
+      });
+    });
 
     // 2. SHOW LEADS SECOND
-    (l.data || []).forEach((r: any) =>
+    (l.data || []).forEach((r: any) => {
+      const custName = r.name || r.lead_code;
+      const leadCode = r.lead_code;
+      const titleText = r.name ? `${r.name} · ${leadCode}` : leadCode;
+      const mobile = r.mobile || null;
+      const email = r.email || null;
+      const service = r.service || null;
+      const dateStr = formatSearchDate(r.created_at);
+
       hits.push({
         kind: "lead",
         id: r.id,
-        title: r.name || r.lead_code,
-        subtitle: [r.lead_code, r.service, r.email, r.mobile].filter(Boolean).join(" · "),
+        title: titleText,
+        subtitle: [mobile, email, service, dateStr].filter(Boolean).join(" · "),
         href: `/admin/leads/${r.id}`,
-      })
-    );
+      });
+    });
 
     // 3. OTHER RESULTS (INVOICES, CERTIFICATES, COMPLAINTS)
     (inv.data || []).forEach((r: any) =>
       hits.push({
         kind: "invoice",
         id: r.id,
-        title: r.invoice_number,
-        subtitle: `₹${r.total_amount}`,
+        title: `Invoice ${r.invoice_number}`,
+        subtitle: [`₹${r.total_amount}`, formatSearchDate(r.created_at)].filter(Boolean).join(" · "),
         href: `/admin/finance/gst`,
       })
     );
@@ -90,6 +126,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         kind: "certificate",
         id: r.id,
         title: r.certificate_number || r.file_name,
+        subtitle: formatSearchDate(r.created_at),
         href: `/admin/certificates`,
       })
     );
@@ -97,8 +134,8 @@ export const globalSearch = createServerFn({ method: "POST" })
       hits.push({
         kind: "complaint",
         id: r.id,
-        title: r.complaint_number || r.id,
-        subtitle: r.status,
+        title: `Complaint ${r.complaint_number || r.id}`,
+        subtitle: [r.status, formatSearchDate(r.created_at)].filter(Boolean).join(" · "),
         href: `/admin/complaints/${r.id}`,
       })
     );
