@@ -32,102 +32,70 @@ export const globalSearch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ hits: SearchHit[] }> => {
     const q = (data.q || "").trim();
     if (q.length < 2) return { hits: [] };
-
-    // Use admin client to bypass RLS restrictions on global search queries
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const s = supabaseAdmin;
+    const s = context.supabase;
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
-    // Step 1: Parallel fetch matching leads, customers, applications by code, and auxiliary entities
-    const [leadsRes, custsRes, appByCodeRes, invRes, certRes, compRes] = await Promise.all([
+    // 1. Fetch matching leads, applications by code, invoices, certificates, and complaints
+    const [l, aByCode, inv, cert, comp] = await Promise.all([
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(20),
-      s.from("customers")
-        .select("id, name, primary_email, primary_mobile")
-        .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like}`)
-        .limit(20),
-      s.from("applications")
-        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-        .ilike("application_code", like)
         .limit(10),
+      s.from("applications")
+        .select("id, application_code, application_status, lead_id, created_at")
+        .ilike("application_code", like)
+        .limit(6),
       s.from("invoices").select("id, invoice_number, total_amount, created_at").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name, created_at").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status, created_at").ilike("complaint_number", like).limit(5),
     ]);
 
-    const matchingLeads = leadsRes.data || [];
-    const matchingCusts = custsRes.data || [];
-    const leadIds = matchingLeads.map((r: any) => r.id).filter(Boolean);
-    const customerIds = matchingCusts.map((r: any) => r.id).filter(Boolean);
-
-    // Step 2: Fetch applications linked to matching lead IDs or customer IDs
+    // 2. Pull applications linked to matching leads so email/mobile/name searches surface orders.
+    const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
     let linkedApps: any[] = [];
-    const appQueries: Promise<any>[] = [];
     if (leadIds.length > 0) {
-      appQueries.push(
-        s.from("applications")
-          .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-          .in("lead_id", leadIds)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      );
-    }
-    if (customerIds.length > 0) {
-      appQueries.push(
-        s.from("applications")
-          .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-          .in("customer_id", customerIds)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      );
+      const { data: linked } = await s
+        .from("applications")
+        .select("id, application_code, application_status, lead_id, created_at")
+        .in("lead_id", leadIds)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      linkedApps = linked ?? [];
     }
 
-    if (appQueries.length > 0) {
-      const appResults = await Promise.all(appQueries);
-      appResults.forEach((res) => {
-        if (res.data) linkedApps.push(...res.data);
-      });
-    }
-
-    const leadMap = new Map<string, any>(matchingLeads.map((r: any) => [r.id, r]));
-    const custMap = new Map<string, any>(matchingCusts.map((r: any) => [r.id, r]));
-
+    const leadMap = new Map<string, any>((l.data || []).map((r: any) => [r.id, r]));
     const seenApp = new Set<string>();
-    const allApps = [...(appByCodeRes.data || []), ...linkedApps].filter((r: any) => {
+    const allApps = [...(aByCode.data || []), ...linkedApps].filter((r: any) => {
       if (seenApp.has(r.id)) return false;
       seenApp.add(r.id);
       return true;
     });
 
-    // Step 3: Ensure lead details exist for any apps whose leads weren't in matchingLeads
+    // 3. Ensure lead details exist for any apps found directly by application_code
     const missingLeadIds = allApps
       .map((a: any) => a.lead_id)
-      .filter((id: string) => id && !leadMap.has(id) && !a?.leads?.name);
+      .filter((id: string) => id && !leadMap.has(id));
 
     if (missingLeadIds.length > 0) {
       const { data: extraLeads } = await s
         .from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .in("id", Array.from(new Set(missingLeadIds)));
-      (extraLeads || []).forEach((l: any) => leadMap.set(l.id, l));
+      (extraLeads || []).forEach((item: any) => leadMap.set(item.id, item));
     }
 
-    // 1. SHOW ORDERS (APPLICATIONS) FIRST
+    // 4. SHOW ORDERS (APPLICATIONS) FIRST
     allApps.forEach((r: any) => {
-      const leadInfo = r.leads || (r.lead_id ? leadMap.get(r.lead_id) : null);
-      const custInfo = r.customers || (r.customer_id ? custMap.get(r.customer_id) : null);
-
-      const custName = leadInfo?.name || custInfo?.name || "Customer";
+      const leadInfo = r.lead_id ? leadMap.get(r.lead_id) : null;
+      const custName = leadInfo?.name || "Customer";
       const appCode = r.application_code || r.id;
-      const status = (r.order_status || r.application_status || "Active").toLowerCase().replace(/_/g, " ");
+      const status = (r.application_status || "Active").toLowerCase().replace(/_/g, " ");
 
-      const mobile = leadInfo?.mobile || custInfo?.primary_mobile || null;
-      const email = leadInfo?.email || custInfo?.primary_email || null;
+      const mobile = leadInfo?.mobile || null;
+      const email = leadInfo?.email || null;
       const service = leadInfo?.service || "Service Application";
-      const dateStr = formatSearchDate(r.created_at);
+      const dateStr = formatSearchDate(r.created_at || leadInfo?.created_at);
 
       hits.push({
         kind: "application",
@@ -138,8 +106,8 @@ export const globalSearch = createServerFn({ method: "POST" })
       });
     });
 
-    // 2. SHOW LEADS SECOND
-    matchingLeads.forEach((r: any) => {
+    // 5. SHOW LEADS SECOND
+    (l.data || []).forEach((r: any) => {
       const custName = r.name || r.lead_code;
       const leadCode = r.lead_code;
       const titleText = r.name ? `${r.name} · ${leadCode}` : leadCode;
@@ -157,8 +125,8 @@ export const globalSearch = createServerFn({ method: "POST" })
       });
     });
 
-    // 3. OTHER RESULTS (INVOICES, CERTIFICATES, COMPLAINTS)
-    (invRes.data || []).forEach((r: any) =>
+    // 6. OTHER RESULTS (INVOICES, CERTIFICATES, COMPLAINTS)
+    (inv.data || []).forEach((r: any) =>
       hits.push({
         kind: "invoice",
         id: r.id,
@@ -167,7 +135,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         href: `/admin/finance/gst`,
       })
     );
-    (certRes.data || []).forEach((r: any) =>
+    (cert.data || []).forEach((r: any) =>
       hits.push({
         kind: "certificate",
         id: r.id,
@@ -176,7 +144,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         href: `/admin/certificates`,
       })
     );
-    (compRes.data || []).forEach((r: any) =>
+    (comp.data || []).forEach((r: any) =>
       hits.push({
         kind: "complaint",
         id: r.id,
