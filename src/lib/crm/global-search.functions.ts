@@ -36,8 +36,8 @@ export const globalSearch = createServerFn({ method: "POST" })
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
-    // 1. Fetch matching leads, customers, applications by code, applications by lead details, and auxiliary entities in parallel
-    const [l, custs, aByCode, aByLeadJoin, inv, cert, comp] = await Promise.all([
+    // Step 1: Parallel fetch matching leads, customers, applications by code, and auxiliary entities
+    const [leadsRes, custsRes, appByCodeRes, invRes, certRes, compRes] = await Promise.all([
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
@@ -50,50 +50,50 @@ export const globalSearch = createServerFn({ method: "POST" })
         .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .ilike("application_code", like)
         .limit(10),
-      s.from("applications")
-        .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads!inner(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-        .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like}`, { foreignTable: "leads" })
-        .limit(10),
       s.from("invoices").select("id, invoice_number, total_amount, created_at").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name, created_at").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status, created_at").ilike("complaint_number", like).limit(5),
     ]);
 
-    // 2. Additional ID-based applications lookup
-    const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
-    const customerIds = (custs.data || []).map((r: any) => r.id).filter(Boolean);
+    const matchingLeads = leadsRes.data || [];
+    const matchingCusts = custsRes.data || [];
+    const leadIds = matchingLeads.map((r: any) => r.id).filter(Boolean);
+    const customerIds = matchingCusts.map((r: any) => r.id).filter(Boolean);
 
-    const extraQueries: Promise<any>[] = [];
+    // Step 2: Fetch applications linked to matching lead IDs or customer IDs
+    let linkedApps: any[] = [];
+    const appQueries: Promise<any>[] = [];
     if (leadIds.length > 0) {
-      extraQueries.push(
+      appQueries.push(
         s.from("applications")
           .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
           .in("lead_id", leadIds)
           .order("created_at", { ascending: false })
-          .limit(10)
+          .limit(15)
       );
     }
     if (customerIds.length > 0) {
-      extraQueries.push(
+      appQueries.push(
         s.from("applications")
           .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
           .in("customer_id", customerIds)
           .order("created_at", { ascending: false })
-          .limit(10)
+          .limit(15)
       );
     }
 
-    const extraResults = await Promise.all(extraQueries);
-    const linkedApps: any[] = [];
-    extraResults.forEach((res) => {
-      if (res.data) linkedApps.push(...res.data);
-    });
+    if (appQueries.length > 0) {
+      const appResults = await Promise.all(appQueries);
+      appResults.forEach((res) => {
+        if (res.data) linkedApps.push(...res.data);
+      });
+    }
 
-    const leadMap = new Map<string, any>((l.data || []).map((r: any) => [r.id, r]));
-    const custMap = new Map<string, any>((custs.data || []).map((r: any) => [r.id, r]));
+    const leadMap = new Map<string, any>(matchingLeads.map((r: any) => [r.id, r]));
+    const custMap = new Map<string, any>(matchingCusts.map((r: any) => [r.id, r]));
 
     const seenApp = new Set<string>();
-    const allApps = [...(aByCode.data || []), ...(aByLeadJoin.data || []), ...linkedApps].filter((r: any) => {
+    const allApps = [...(appByCodeRes.data || []), ...linkedApps].filter((r: any) => {
       if (seenApp.has(r.id)) return false;
       seenApp.add(r.id);
       return true;
@@ -123,7 +123,7 @@ export const globalSearch = createServerFn({ method: "POST" })
     });
 
     // 2. SHOW LEADS SECOND
-    (l.data || []).forEach((r: any) => {
+    matchingLeads.forEach((r: any) => {
       const custName = r.name || r.lead_code;
       const leadCode = r.lead_code;
       const titleText = r.name ? `${r.name} · ${leadCode}` : leadCode;
@@ -142,7 +142,7 @@ export const globalSearch = createServerFn({ method: "POST" })
     });
 
     // 3. OTHER RESULTS (INVOICES, CERTIFICATES, COMPLAINTS)
-    (inv.data || []).forEach((r: any) =>
+    (invRes.data || []).forEach((r: any) =>
       hits.push({
         kind: "invoice",
         id: r.id,
@@ -151,7 +151,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         href: `/admin/finance/gst`,
       })
     );
-    (cert.data || []).forEach((r: any) =>
+    (certRes.data || []).forEach((r: any) =>
       hits.push({
         kind: "certificate",
         id: r.id,
@@ -160,7 +160,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         href: `/admin/certificates`,
       })
     );
-    (comp.data || []).forEach((r: any) =>
+    (compRes.data || []).forEach((r: any) =>
       hits.push({
         kind: "complaint",
         id: r.id,
