@@ -36,34 +36,47 @@ export const globalSearch = createServerFn({ method: "POST" })
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
-    const [l, aByCode, inv, cert, comp] = await Promise.all([
+    // Parallel fetch: leads, customers, applications by code, invoices, certificates, complaints
+    const [l, custs, aByCode, inv, cert, comp] = await Promise.all([
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(10),
+        .limit(15),
+      s.from("customers")
+        .select("id, name, primary_email, primary_mobile")
+        .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like}`)
+        .limit(15),
       s.from("applications")
         .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .ilike("application_code", like)
-        .limit(6),
+        .limit(10),
       s.from("invoices").select("id, invoice_number, total_amount, created_at").ilike("invoice_number", like).limit(5),
       s.from("certificates").select("id, certificate_number, file_name, created_at").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
       s.from("complaints").select("id, complaint_number, status, created_at").ilike("complaint_number", like).limit(5),
     ]);
 
-    // Pull applications linked to matching leads so email/mobile searches surface orders.
+    // Gather linked IDs from matching leads & customers
     const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
+    const customerIds = (custs.data || []).map((r: any) => r.id).filter(Boolean);
+
     let linkedApps: any[] = [];
-    if (leadIds.length) {
+    const orClauses: string[] = [];
+    if (leadIds.length > 0) orClauses.push(`lead_id.in.(${leadIds.join(",")})`);
+    if (customerIds.length > 0) orClauses.push(`customer_id.in.(${customerIds.join(",")})`);
+
+    if (orClauses.length > 0) {
       const { data: linked } = await s
         .from("applications")
         .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
-        .in("lead_id", leadIds)
+        .or(orClauses.join(","))
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(15);
       linkedApps = linked ?? [];
     }
 
     const leadMap = new Map<string, any>((l.data || []).map((r: any) => [r.id, r]));
+    const custMap = new Map<string, any>((custs.data || []).map((r: any) => [r.id, r]));
+
     const seenApp = new Set<string>();
     const allApps = [...(aByCode.data || []), ...linkedApps].filter((r: any) => {
       if (seenApp.has(r.id)) return false;
@@ -74,12 +87,14 @@ export const globalSearch = createServerFn({ method: "POST" })
     // 1. SHOW ORDERS (APPLICATIONS) FIRST
     allApps.forEach((r: any) => {
       const leadInfo = r.leads || (r.lead_id ? leadMap.get(r.lead_id) : null);
-      const custName = leadInfo?.name || r.customers?.name || "Customer";
+      const custInfo = r.customers || (r.customer_id ? custMap.get(r.customer_id) : null);
+
+      const custName = leadInfo?.name || custInfo?.name || "Customer";
       const appCode = r.application_code || r.id;
       const status = (r.order_status || r.application_status || "Active").toLowerCase().replace(/_/g, " ");
 
-      const mobile = leadInfo?.mobile || r.customers?.primary_mobile || null;
-      const email = leadInfo?.email || r.customers?.primary_email || null;
+      const mobile = leadInfo?.mobile || custInfo?.primary_mobile || null;
+      const email = leadInfo?.email || custInfo?.primary_email || null;
       const service = leadInfo?.service || "Service Application";
       const dateStr = formatSearchDate(r.created_at);
 
