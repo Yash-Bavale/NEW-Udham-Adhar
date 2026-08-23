@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { formatIST } from "@/lib/datetime";
 import {
-  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset
+  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset, type RevenueGateway, type RevenueService, type RevenueTrendPoint
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
 import { RevenueExportModal } from "./RevenueExportModal";
@@ -94,9 +94,9 @@ export function RevenueDashboardView() {
   };
 
   const m = data?.metrics;
-  const gateways = data?.gateways ?? [];
-  const services = data?.services ?? [];
-  const trends = data?.trends ?? [];
+  const gateways = (data?.gateways ?? []) as RevenueGateway[];
+  const services = (data?.services ?? []) as RevenueService[];
+  const trends = (data?.trends ?? []) as RevenueTrendPoint[];
 
   const revDelta = pctDelta(m?.grossRevenue ?? 0, m?.grossRevenuePrev ?? 0);
   const netDelta = pctDelta(m?.netRevenue ?? 0, m?.netRevenuePrev ?? 0);

@@ -13,6 +13,76 @@ async function getAdmin() {
 const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
+export interface RevenueGateway {
+  name: string;
+  totalAttempts: number;
+  successfulCount: number;
+  failedCount: number;
+  pendingCount: number;
+  grossRevenue: number;
+  refundedAmount: number;
+  netRevenue: number;
+  successRate: number;
+  avgTransactionValue: number;
+}
+
+export interface RevenueService {
+  serviceName: string;
+  paidOrders: number;
+  grossRevenue: number;
+  refunds: number;
+  netRevenue: number;
+  avgOrderValue: number;
+  pctTotal: number;
+}
+
+export interface RevenueTrendPoint {
+  label: string;
+  timestamp: string;
+  grossRevenue: number;
+  netRevenue: number;
+  count: number;
+}
+
+export interface RevenueMetrics {
+  grossRevenue: number;
+  grossBase: number;
+  grossGst: number;
+  refundedAmount: number;
+  refundsCount: number;
+  netRevenue: number;
+  successfulPaymentsCount: number;
+  failedPaymentsCount: number;
+  failedPaymentsAmount: number;
+  pendingPaymentsCount: number;
+  pendingPaymentsAmount: number;
+  totalAttempts: number;
+  averageOrderValue: number;
+  paymentSuccessRate: number;
+  grossRevenuePrev: number;
+  netRevenuePrev: number;
+  successfulPaymentsCountPrev: number;
+  averageOrderValuePrev: number;
+  paymentSuccessRatePrev: number;
+}
+
+export interface RevenueRangeData {
+  preset: RevenueRangePreset;
+  label: string;
+  startIso: string;
+  endIso: string;
+}
+
+export interface RevenueOverviewData {
+  range: RevenueRangeData;
+  metrics: RevenueMetrics;
+  gateways: RevenueGateway[];
+  services: RevenueService[];
+  trends: RevenueTrendPoint[];
+  isCached: boolean;
+  cachedAt: string;
+}
+
 // ── Range Resolution ────────────────────────────────────────────────────────
 export type RevenueRangePreset =
   | "today"
@@ -153,7 +223,7 @@ export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, 
 
 // ── Server Memory Cache for Revenue Overview ──────────────────────────────
 interface CachedRevenueOverview {
-  data: any;
+  data: RevenueOverviewData;
   cachedAt: number;
 }
 const REVENUE_CACHE = new Map<string, CachedRevenueOverview>();
@@ -426,7 +496,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       });
     }
 
-    const output = {
+    const output: RevenueOverviewData = {
       range: {
         preset: data.preset,
         label: r.label,
@@ -464,33 +534,6 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
 
     REVENUE_CACHE.set(cacheKey, { data: output, cachedAt: Date.now() });
     return output;
-  });
-      metrics: {
-        grossRevenue,
-        grossBase,
-        grossGst,
-        refundedAmount,
-        refundsCount,
-        netRevenue,
-        successfulPaymentsCount,
-        failedPaymentsCount,
-        failedPaymentsAmount,
-        pendingPaymentsCount,
-        pendingPaymentsAmount,
-        totalAttempts,
-        averageOrderValue,
-        paymentSuccessRate: Math.round(paymentSuccessRate * 10) / 10,
-        // Comparative previous period metrics
-        grossRevenuePrev,
-        netRevenuePrev,
-        successfulPaymentsCountPrev,
-        averageOrderValuePrev,
-        paymentSuccessRatePrev: Math.round(paymentSuccessRatePrev * 10) / 10,
-      },
-      gateways,
-      services,
-      trends: trendPoints,
-    };
   });
 
 // ── 2. Paginated Payment Transactions Ledger Server Fn ─────────────────────
