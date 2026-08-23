@@ -41,6 +41,22 @@ type PlantItem = {
   district?: string;
 };
 
+function formatMobile55(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const cleaned = String(raw).trim();
+  const digitsOnly = cleaned.replace(/\D/g, "");
+  if (digitsOnly.length === 10) {
+    return `${digitsOnly.slice(0, 5)} ${digitsOnly.slice(5)}`;
+  }
+  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) {
+    return `+91 ${digitsOnly.slice(2, 7)} ${digitsOnly.slice(7)}`;
+  }
+  if (digitsOnly.length > 5) {
+    return `${digitsOnly.slice(0, 5)} ${digitsOnly.slice(5)}`;
+  }
+  return cleaned;
+}
+
 export function parsePlantsData(raw: unknown): PlantItem[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw as PlantItem[];
@@ -367,7 +383,7 @@ export function FormSubmissionPanel({
               <>
                 <span className="text-slate-300 font-light mx-1">•</span>
                 <span className="text-slate-500 font-medium">Mobile:</span>
-                <span className="text-slate-900 font-bold font-mono">{lead.mobile}</span>
+                <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
           </div>
