@@ -142,7 +142,7 @@ export function RevenueDashboardView() {
     }
   };
 
-  const donutData = gateways.map((g) => ({
+  const donutData = gateways.map((g: any) => ({
     name: g.name,
     value: g.grossRevenue,
     color: GW_COLORS[g.name] || "#64748B",
@@ -389,7 +389,7 @@ export function RevenueDashboardView() {
                     paddingAngle={3}
                     dataKey="value"
                   >
-                    {donutData.map((entry, index) => (
+                    {donutData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -438,7 +438,7 @@ export function RevenueDashboardView() {
                   <td colSpan={9} className="px-4 py-8 text-center text-slate-500">No gateway data recorded</td>
                 </tr>
               ) : (
-                gateways.map((g) => (
+                gateways.map((g: any) => (
                   <tr key={g.name} className="hover:bg-slate-50/80">
                     <td className="px-3.5 py-3 font-bold text-slate-900 flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ background: GW_COLORS[g.name] || "#64748B" }} />
@@ -499,7 +499,7 @@ export function RevenueDashboardView() {
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No service revenue data recorded</td>
                 </tr>
               ) : (
-                services.map((s) => (
+                services.map((s: any) => (
                   <tr key={s.serviceName} className="hover:bg-slate-50/80">
                     <td className="px-3.5 py-3 font-semibold text-slate-900">{s.serviceName}</td>
                     <td className="px-3.5 py-3 text-center font-mono font-semibold">{fmtN(s.paidOrders)}</td>
