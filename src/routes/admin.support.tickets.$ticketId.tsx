@@ -8,6 +8,7 @@ import {
   ArrowLeft, ChevronDown, CornerDownLeft, Loader2, Mail, MoreHorizontal,
   RotateCcw, Send, StickyNote, X, User, Package, Info, History,
   ExternalLink, AlertTriangle, MessageSquare, CheckCircle2, Clock,
+  FileText, Download, UserPlus, Phone, Tag, ShieldCheck, Forward, Trash2,
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import { replyToTicket, updateTicket, type TicketStatus, type TicketPriority } from "@/lib/crm/tickets.functions";
@@ -18,37 +19,34 @@ import {
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { listStaffForAssignment } from "@/lib/crm/tasks.functions";
 import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
-
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
-import { parseEmailReply } from "@/lib/support/emailParser";
+import { parseEmailReply, parseHtmlEmailReply } from "@/lib/support/emailParser";
 import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/admin/support/tickets/$ticketId")({
   head: ({ params }) => ({
     meta: [
-      { title: `Ticket ${params.ticketId.slice(0, 8)} — BHS CRM` },
-      { name: "description", content: "Support ticket conversation." },
+      { title: `Ticket ${params.ticketId.slice(0, 8)} — BHS Helpdesk` },
+      { name: "description", content: "Support ticket workspace." },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
   component: TicketWorkspace,
 });
 
-// ── formatters ─────────────────────────────────────────────
-
 const STATUS_PILL: Record<TicketStatus, { bg: string; fg: string; label: string }> = {
-  open:              { bg: "#dbeafe", fg: "#1d4ed8", label: "Open" },
-  in_progress:       { bg: "#ede9fe", fg: "#6d28d9", label: "In Progress" },
-  waiting_customer:  { bg: "#fef3c7", fg: "#92400e", label: "Waiting Customer" },
-  resolved:          { bg: "#dcfce7", fg: "#15803d", label: "Resolved" },
-  closed:            { bg: "#f1f5f9", fg: "#475569", label: "Closed" },
+  open: { bg: "bg-blue-100 text-blue-800 border-blue-200", fg: "#1d4ed8", label: "Open" },
+  in_progress: { bg: "bg-purple-100 text-purple-800 border-purple-200", fg: "#6d28d9", label: "In Progress" },
+  waiting_customer: { bg: "bg-amber-100 text-amber-800 border-amber-200", fg: "#92400e", label: "Waiting Customer" },
+  resolved: { bg: "bg-emerald-100 text-emerald-800 border-emerald-200", fg: "#15803d", label: "Resolved" },
+  closed: { bg: "bg-slate-200 text-slate-700 border-slate-300", fg: "#475569", label: "Closed" },
 };
 
 const PRIORITY_PILL: Record<TicketPriority, { bg: string; fg: string; label: string }> = {
-  urgent: { bg: "#fee2e2", fg: "#991b1b", label: "Urgent" },
-  high:   { bg: "#ffedd5", fg: "#9a3412", label: "High" },
-  medium: { bg: "#dbeafe", fg: "#1d4ed8", label: "Medium" },
-  low:    { bg: "#f1f5f9", fg: "#475569", label: "Low" },
+  urgent: { bg: "bg-red-100 text-red-800", fg: "#991b1b", label: "Urgent" },
+  high: { bg: "bg-orange-100 text-orange-800", fg: "#9a3412", label: "High" },
+  medium: { bg: "bg-blue-100 text-blue-800", fg: "#1d4ed8", label: "Normal" },
+  low: { bg: "bg-slate-100 text-slate-700", fg: "#475569", label: "Low" },
 };
 
 function ist(iso: string | null | undefined) {
@@ -72,8 +70,7 @@ function rel(iso: string | null | undefined) {
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
-  return `${Math.floor(s / 604800)}w ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
 function initials(name: string | null | undefined) {
@@ -87,8 +84,6 @@ function decodeEntities(s: string) {
     .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
 }
-
-// ── unified message type ───────────────────────────────────
 
 type Msg =
   | {
@@ -120,14 +115,11 @@ type Msg =
       body_text: string;
     };
 
-// Extract likely template code from subject or body ("[E003 – … ]" or "Order Hold Intimation").
 function extractTemplateHint(subject: string | null, bodyHtml: string | null): string | null {
   const src = `${subject ?? ""} ${bodyHtml ?? ""}`;
   const m = src.match(/\b(E0\d{2}|T0\d{2}|TB0\d{2})\b/i);
   return m ? m[1].toUpperCase() : null;
 }
-
-// ── main component ─────────────────────────────────────────
 
 function TicketWorkspace() {
   const { ticketId } = Route.useParams();
@@ -165,7 +157,6 @@ function TicketWorkspace() {
   const invalidate = () =>
     qc.invalidateQueries({ queryKey: ["support-workspace", ticketId] });
 
-  // Realtime — refresh on new inbound emails / replies
   useRealtimeTable("ticket_replies", invalidate, { filter: `ticket_id=eq.${ticketId}` });
   const appId = data?.ticket?.application_id ?? null;
   useRealtimeTable("email_logs", invalidate, appId ? { filter: `application_id=eq.${appId}` } : undefined);
@@ -174,8 +165,6 @@ function TicketWorkspace() {
     if (!data) return [];
     const out: Msg[] = [];
 
-    // Inbound: prefer ticket_replies (matcher already filed them), fall back
-    // to email_logs inbound that didn't sync into replies.
     for (const r of data.replies ?? []) {
       if (r.is_internal) {
         out.push({
@@ -209,7 +198,6 @@ function TicketWorkspace() {
       });
     }
 
-    // Outbound — always use email_logs so we can render the full HTML template.
     for (const e of (data as any).outboundEmails ?? []) {
       out.push({
         kind: "outbound",
@@ -233,8 +221,7 @@ function TicketWorkspace() {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [messages.length]);
 
-  // ── composer state ───────────────────────────────────────
-  const [composeMode, setComposeMode] = useState<"reply" | "note" | null>(null);
+  const [composeMode, setComposeMode] = useState<"reply" | "note">("reply");
   const [body, setBody] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedTemplateName, setSelectedTemplateName] = useState<string | null>(null);
@@ -287,26 +274,26 @@ function TicketWorkspace() {
       setBody("");
       setSelectedTemplateId(null);
       setSelectedTemplateName(null);
-      setComposeMode(null);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // ── ticket-level mutations ───────────────────────────────
   const changeStatus = useMutation({
     mutationFn: (status: TicketStatus) => updateFn({ data: { id: ticketId, status } }),
     onSuccess: () => { toast.success("Status updated"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
   const changePriority = useMutation({
     mutationFn: (priority: TicketPriority) => updateFn({ data: { id: ticketId, priority } }),
     onSuccess: () => { toast.success("Priority updated"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
   const changeAssignee = useMutation({
-    mutationFn: (userId: string | null) =>
-      updateFn({ data: { id: ticketId, assigned_to: userId } }),
+    mutationFn: (assignedTo: string | null) =>
+      updateFn({ data: { id: ticketId, assignedTo: assignedTo ?? undefined } }),
     onSuccess: () => { toast.success("Assignee updated"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -318,12 +305,11 @@ function TicketWorkspace() {
   });
   const doCloseRestart = useMutation({
     mutationFn: () => closeRestart({ data: { ticketId } }),
-    onSuccess: () => { toast.success("Order restarted & ticket closed"); invalidate(); },
+    onSuccess: () => { toast.success("Ticket closed & order restarted"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const doCloseConsult = useMutation({
-    mutationFn: (remarks?: string) =>
-      closeConsult({ data: { ticketId, remarks: remarks || undefined } }),
+    mutationFn: (remarks: string) => closeConsult({ data: { ticketId, remarks } }),
     onSuccess: () => { toast.success("T001 sent & ticket closed"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -334,18 +320,16 @@ function TicketWorkspace() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // ── dialogs ──────────────────────────────────────────────
   const [closeMenuOpen, setCloseMenuOpen] = useState(false);
   const [restartConfirm, setRestartConfirm] = useState(false);
   const [consultOpen, setConsultOpen] = useState(false);
   const [consultNote, setConsultNote] = useState("");
   const [reasonOpen, setReasonOpen] = useState(false);
-  const [tab, setTab] = useState<"details" | "customer" | "order" | "history">("details");
 
   if (isLoading || !data) {
     return (
       <div className="h-full flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
       </div>
     );
   }
@@ -353,11 +337,10 @@ function TicketWorkspace() {
   const ticket = data.ticket as any;
   const cust = ticket.customers ?? {};
   const app = ticket.applications ?? {};
-  const statusPill = STATUS_PILL[ticket.status as TicketStatus];
-  const priorityPill = PRIORITY_PILL[(ticket.priority as TicketPriority) ?? "medium"];
   const isClosed = ["closed", "resolved"].includes(ticket.status);
+  const previousTickets = (data as any).previousTickets ?? [];
+  const previousOrders = (data as any).previousOrders ?? [];
 
-  // date dividers
   const rendered: Array<{ divider?: string; msg?: Msg }> = [];
   let lastDate = "";
   let lastTime = 0;
@@ -373,314 +356,342 @@ function TicketWorkspace() {
   }
 
   return (
-    <div className="h-full flex bg-slate-50 min-w-0">
-      {/* ── Column B — Conversation ───────────────────────── */}
-      <section className="flex-1 min-w-0 flex flex-col bg-white border-r border-slate-200">
-        {/* B1: Sticky header */}
-        <header className="border-b border-slate-200 px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <button
-              onClick={() => navigate({ to: "/admin/support/tickets" })}
-              className="md:hidden inline-flex items-center gap-1 text-slate-500 hover:text-slate-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <span className="font-mono text-slate-500">{ticket.ticket_number}</span>
-            <StatusBadge status={ticket.status} onChange={(s) => changeStatus.mutate(s)} />
-            <PriorityBadge
-              priority={(ticket.priority as TicketPriority) ?? "medium"}
-              onChange={(p) => changePriority.mutate(p)}
-            />
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wide">
-              {ticket.source ?? "internal"}
-            </span>
-            <span className="text-slate-400 inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" /> {ist(ticket.created_at)}
-            </span>
+    <div className="h-full flex bg-slate-50 min-w-0 font-sans text-slate-800">
+      {/* ── Center Column — Conversation Workspace (Reference 2) ── */}
+      <section className="flex-1 min-w-0 flex flex-col bg-white border-r border-slate-200 shadow-2xs">
+        {/* Top Action Toolbar (Reference 2) */}
+        <header className="border-b border-slate-200 px-6 py-3 bg-white shrink-0">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate({ to: "/admin/support/tickets" })}
+                className="lg:hidden p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <h1 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Email Conversation</span>
+                <span className="text-slate-400 font-normal">·</span>
+                <span className="text-indigo-600 text-xs font-semibold">Company Mail</span>
+              </h1>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={openReply}
+                disabled={isClosed}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CornerDownLeft className="w-3.5 h-3.5" /> Reply
+              </button>
+
+              <button
+                onClick={openNote}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow-xs transition-all inline-flex items-center gap-1.5"
+              >
+                <StickyNote className="w-3.5 h-3.5" /> Note
+              </button>
+
+              <AssigneePicker
+                currentId={ticket.assigned_to}
+                currentName={ticket.assigned_name}
+                staff={(((staff as any)?.staff ?? []) as Array<{ id: string; name: string }>).map((s) => ({ id: s.id, full_name: s.name }))}
+                onPick={(id) => changeAssignee.mutate(id)}
+              />
+
+              <StatusBadge status={ticket.status} onChange={(s) => changeStatus.mutate(s)} />
+              <PriorityBadge priority={(ticket.priority as TicketPriority) ?? "medium"} onChange={(p) => changePriority.mutate(p)} />
+
+              {!isClosed && (
+                <div className="relative">
+                  <button
+                    onClick={() => setCloseMenuOpen((v) => !v)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1"
+                  >
+                    Close <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                  {closeMenuOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
+                      onMouseLeave={() => setCloseMenuOpen(false)}
+                    >
+                      <button
+                        onClick={() => { setCloseMenuOpen(false); doCloseNormal.mutate(); }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-2"
+                      >
+                        <X className="w-3.5 h-3.5 text-slate-400" /> Close — No Action
+                      </button>
+                      <button
+                        onClick={() => { setCloseMenuOpen(false); setReasonOpen(true); }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-2"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-slate-400" /> Close with Reply (TB02)
+                      </button>
+                      <button
+                        onClick={() => { setCloseMenuOpen(false); setRestartConfirm(true); }}
+                        className="w-full text-left px-3 py-2 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-2"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-slate-400" /> Close &amp; Restart Order
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <h2 className="mt-2 text-[15px] font-semibold text-slate-900 leading-snug">
-            {ticket.subject || "(no subject)"}
-          </h2>
-          <div className="mt-1 text-xs text-slate-500 flex items-center gap-3 flex-wrap">
-            <span className="font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
-            {ticket.first_response_at && (
-              <span>First reply {rel(ticket.first_response_at)}</span>
-            )}
+
+          {/* Ticket Title Banner Card (Reference 2 Header Sub-Banner) */}
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 leading-snug">
+                {ticket.subject || "(No Subject)"}{" "}
+                <span className="font-mono text-xs font-semibold text-indigo-600 ml-1.5">
+                  #{ticket.ticket_number}
+                </span>
+              </h2>
+              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-3">
+                <span>Via email to: <strong className="text-slate-600 font-mono">{ticket.ticket_email ?? cust.primary_email ?? "support@businesshelpservices.com"}</strong></span>
+                <span>•</span>
+                <span>Created {rel(ticket.created_at)} ({ist(ticket.created_at)})</span>
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* B2: Action bar */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 flex-wrap shrink-0">
-          <button
-            onClick={openReply}
-            disabled={isClosed}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1e3a5f] text-white text-xs font-medium hover:bg-[#152b47] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <CornerDownLeft className="h-3.5 w-3.5" /> Reply
-          </button>
-          <button
-            onClick={openNote}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50"
-          >
-            <StickyNote className="h-3.5 w-3.5" /> Internal Note
-          </button>
-
-          <AssigneePicker
-            currentId={ticket.assigned_to}
-            currentName={ticket.assigned_name}
-            staff={(((staff as any)?.staff ?? []) as Array<{ id: string; name: string }>).map((s) => ({ id: s.id, full_name: s.name }))}
-            onPick={(id) => changeAssignee.mutate(id)}
-          />
-
-          <div className="flex-1" />
-
-          {!isClosed && (
-            <>
-              <div className="relative">
-                <button
-                  onClick={() => setCloseMenuOpen((v) => !v)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Close <ChevronDown className="h-3 w-3" />
-                </button>
-                {closeMenuOpen && (
-                  <div
-                    className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-lg z-20 text-xs"
-                    onMouseLeave={() => setCloseMenuOpen(false)}
-                  >
-                    <button
-                      onClick={() => { setCloseMenuOpen(false); doCloseNormal.mutate(); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
-                    >
-                      <X className="h-3.5 w-3.5 text-slate-500" /> Close — No Action
-                    </button>
-                    <button
-                      onClick={() => { setCloseMenuOpen(false); setReasonOpen(true); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
-                    >
-                      <Mail className="h-3.5 w-3.5 text-slate-500" /> Close with Reply (TB02)
-                    </button>
-                    <button
-                      onClick={() => { setCloseMenuOpen(false); setRestartConfirm(true); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5 text-slate-500" /> Close &amp; Restart Order
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => setRestartConfirm(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700"
-              >
-                <RotateCcw className="h-3.5 w-3.5" /> Restart Order
-              </button>
-              <button
-                onClick={() => setConsultOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-teal-600 text-white text-xs font-medium hover:bg-teal-700"
-              >
-                TB01: Consultation Done
-              </button>
-              <button
-                onClick={() => setReasonOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-medium hover:bg-rose-700"
-              >
-                TB02: Reply w/ Reason (24h)
-              </button>
-              <button
-                title="More actions (coming soon)"
-                className="p-1.5 rounded-md border border-slate-300 text-slate-500 hover:bg-slate-50"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* B3: Thread */}
-        <div ref={threadRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
+        {/* ── Conversation Thread (Reference 2 Middle Area) ── */}
+        <div ref={threadRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
           {rendered.length === 0 && (
-            <div className="text-center py-16 text-sm text-slate-500 flex flex-col items-center gap-2">
-              <MessageSquare className="h-8 w-8 text-slate-300" />
-              No messages yet. Start the conversation by clicking Reply.
+            <div className="text-center py-20 text-sm text-slate-400 flex flex-col items-center gap-2">
+              <MessageSquare className="w-10 h-10 text-slate-300" />
+              <span>No messages in this thread yet.</span>
             </div>
           )}
+
           {rendered.map((r, i) =>
             r.divider ? (
-              <div key={`d-${i}`} className="flex items-center gap-3 my-2">
+              <div key={`d-${i}`} className="flex items-center gap-3 my-4">
                 <div className="flex-1 h-px bg-slate-200" />
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">
                   {r.divider}
                 </span>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
             ) : (
-              <MessageBubble key={r.msg!.id} msg={r.msg!} customerName={cust.name} />
+              <MessageCard key={r.msg!.id} msg={r.msg!} customerName={cust.name} />
             )
           )}
         </div>
 
-        {/* B4: Composer */}
-        <div className="border-t border-slate-200 bg-white shrink-0">
-          {composeMode === null ? (
-            <button
-              onClick={openReply}
-              disabled={isClosed}
-              className="w-full text-left px-4 py-3 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <CornerDownLeft className="h-3.5 w-3.5" />
-              {isClosed ? "Ticket is closed — reopen to reply" : "Reply to customer…"}
-            </button>
-          ) : (
-            <div className="p-3">
-              <div className="flex items-center gap-2 mb-2 text-xs">
-                <button
-                  onClick={() => setComposeMode("reply")}
-                  className={`px-2 py-1 rounded ${composeMode === "reply" ? "bg-[#1e3a5f] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                >
-                  <CornerDownLeft className="h-3 w-3 inline mr-1" /> Reply
-                </button>
-                <button
-                  onClick={() => setComposeMode("note")}
-                  className={`px-2 py-1 rounded ${composeMode === "note" ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                >
-                  <StickyNote className="h-3 w-3 inline mr-1" /> Internal Note
-                </button>
-                {composeMode === "reply" && (
-                  <span className="text-slate-500 ml-2">
-                    To: <span className="font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
-                  </span>
-                )}
-                <button
-                  onClick={() => { setComposeMode(null); setBody(""); setSelectedTemplateId(null); setSelectedTemplateName(null); }}
-                  className="ml-auto text-slate-400 hover:text-slate-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {composeMode === "reply" && (canned?.length ?? 0) > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                  <span className="text-[11px] text-slate-500 font-medium">📌 Templates:</span>
-                  {(canned ?? []).slice(0, 8).map((c: any) => (
-                    <button
-                      key={c.id}
-                      onClick={() => applyTemplate(c.id)}
-                      className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
-                        selectedTemplateId === c.id
-                          ? "bg-blue-100 border-blue-400 text-blue-800"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {c.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {selectedTemplateName && (
-                <div className="mb-2 text-[11px] bg-blue-50 border border-blue-200 text-blue-800 px-2 py-1 rounded flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3 w-3" /> Using template: {selectedTemplateName}
-                </div>
-              )}
-
-              <textarea
-                ref={composerRef}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={composeMode === "note" ? "Add an internal note (only staff can see this)…" : "Reply to customer…"}
-                rows={5}
-                className={`w-full text-sm px-3 py-2 border rounded-md focus:outline-none focus:ring-1 resize-y ${
-                  composeMode === "note"
-                    ? "bg-amber-50 border-amber-200 focus:ring-amber-400 focus:border-amber-400"
-                    : "border-slate-200 focus:ring-blue-500 focus:border-blue-500"
+        {/* ── Composer Toolbar (Reference 2 Bottom Bar) ── */}
+        <div className="border-t border-slate-200 bg-white p-4 shrink-0 shadow-lg">
+          <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setComposeMode("reply")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  composeMode === "reply"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
-                    sendReply.mutate();
-                  }
-                }}
-              />
+              >
+                <CornerDownLeft className="w-3.5 h-3.5 inline mr-1" /> Customer Reply
+              </button>
+              <button
+                type="button"
+                onClick={() => setComposeMode("note")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  composeMode === "note"
+                    ? "bg-amber-500 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <StickyNote className="w-3.5 h-3.5 inline mr-1" /> Internal Note
+              </button>
 
-              {body.includes("[MISSING:") && (
-                <div className="mt-2 text-[11px] bg-red-50 border border-red-200 text-red-700 px-2 py-1 rounded flex items-center gap-1.5">
-                  <AlertTriangle className="h-3 w-3" /> Missing variables — please review before sending.
-                </div>
+              {composeMode === "reply" && (
+                <span className="text-slate-400 text-[11px] ml-2">
+                  To: <strong className="text-slate-700 font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</strong>
+                </span>
               )}
-
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">Ctrl+Enter to send</span>
-                <button
-                  onClick={() => sendReply.mutate()}
-                  disabled={!body.trim() || sendReply.isPending}
-                  title={!body.trim() ? "Type a message first" : ""}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1e3a5f] text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#152b47]"
-                >
-                  {sendReply.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  {composeMode === "note" ? "Add Note" : "Send Reply"}
-                </button>
-              </div>
             </div>
-          )}
+
+            {(canned?.length ?? 0) > 0 && composeMode === "reply" && (
+              <select
+                onChange={(e) => {
+                  if (e.target.value) applyTemplate(e.target.value);
+                }}
+                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-medium focus:outline-none"
+              >
+                <option value="">Insert Canned Response…</option>
+                {(canned ?? []).map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <textarea
+            ref={composerRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={
+              composeMode === "note"
+                ? "Add an internal note for your team (visible to staff only)…"
+                : "Type your reply to the customer…"
+            }
+            rows={4}
+            className={`w-full text-xs p-3 border rounded-xl focus:outline-none focus:ring-2 resize-y font-sans leading-relaxed ${
+              composeMode === "note"
+                ? "bg-amber-50/70 border-amber-200 focus:ring-amber-400 text-amber-950"
+                : "border-slate-200 focus:ring-indigo-500 text-slate-800"
+            }`}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
+                sendReply.mutate();
+              }
+            }}
+          />
+
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 font-mono">Press Ctrl+Enter to submit</span>
+            <button
+              type="button"
+              onClick={() => sendReply.mutate()}
+              disabled={!body.trim() || sendReply.isPending}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                composeMode === "note"
+                  ? "bg-amber-600 hover:bg-amber-700"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
+            >
+              {sendReply.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              {composeMode === "note" ? "Add Internal Note" : "Send Customer Reply"}
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* ── Column C — Info Panel ─────────────────────────── */}
-      <aside className="hidden lg:flex w-[340px] shrink-0 flex-col bg-white">
-        <div className="flex border-b border-slate-200 text-xs shrink-0">
-          {(["details", "customer", "order", "history"] as const).map((t) => {
-            const Icon = t === "details" ? Info : t === "customer" ? User : t === "order" ? Package : History;
-            return (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2.5 flex items-center justify-center gap-1 capitalize font-medium transition-colors ${
-                  tab === t
-                    ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50/50"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" /> {t}
-              </button>
-            );
-          })}
+      {/* ── Right Column — Customer & Order Context Sidebar (Reference 2) ── */}
+      <aside className="hidden lg:flex w-[320px] shrink-0 flex-col bg-white overflow-y-auto border-l border-slate-200 p-5 space-y-6">
+        {/* 1. Customer Card */}
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-11 h-11 rounded-full bg-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-sm shrink-0">
+              {initials(cust.name)}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-slate-900 truncate">{cust.name || "Customer Profile"}</h3>
+              <p className="text-xs text-slate-500 font-mono truncate">{cust.primary_email || ticket.ticket_email || "—"}</p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-200/60">
+            {cust.primary_mobile && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Mobile:</span>
+                <span className="font-mono font-medium text-slate-800">{cust.primary_mobile}</span>
+              </div>
+            )}
+            {cust.state && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">State:</span>
+                <span className="font-medium text-slate-800">{cust.state}</span>
+              </div>
+            )}
+          </div>
+
+          {cust.id && (
+            <Link
+              to="/admin/customers/$customerId"
+              params={{ customerId: cust.id }}
+              className="mt-3 w-full py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-indigo-600 hover:bg-indigo-50 flex items-center justify-center gap-1 transition-colors shadow-2xs"
+            >
+              <User className="w-3.5 h-3.5" /> View Profile
+            </Link>
+          )}
         </div>
-        <div className="flex-1 overflow-y-auto p-4 text-xs">
-          {tab === "details" && (
-            <DetailsTab
-              ticket={ticket}
-              slaHours={Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 3600000)}
-            />
+
+        {/* 2. Previous Conversations Card (Reference 2) */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Previous Conversations</h4>
+            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {previousTickets.length}
+            </span>
+          </div>
+
+          {previousTickets.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No previous tickets</p>
+          ) : (
+            <div className="space-y-2.5">
+              {previousTickets.slice(0, 4).map((pt: any) => (
+                <Link
+                  key={pt.id}
+                  to="/admin/support/tickets/$ticketId"
+                  params={{ ticketId: pt.id }}
+                  className="block p-2.5 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all group"
+                >
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="font-mono font-bold text-indigo-600 group-hover:underline">
+                      #{pt.ticket_number}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{relTime(pt.created_at)}</span>
+                  </div>
+                  <div className="text-xs font-medium text-slate-800 truncate">{pt.subject || "(No Subject)"}</div>
+                </Link>
+              ))}
+            </div>
           )}
-          {tab === "customer" && (
-            <CustomerTab
-              cust={cust}
-              customerStats={(data as any).customerStats}
-              hideFinancial={isSupportOnly}
-            />
-          )}
-          {tab === "order" && <OrderTab app={app} />}
-          {tab === "history" && (
-            <HistoryTab
-              previous={(data as any).previousTickets ?? []}
-              currentId={ticket.id}
-            />
+        </div>
+
+        {/* 3. Customer Orders Card (Reference 2) */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Customer Orders</h4>
+            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+              {previousOrders.length}
+            </span>
+          </div>
+
+          {previousOrders.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">No orders found</p>
+          ) : (
+            <div className="space-y-2.5">
+              {previousOrders.slice(0, 4).map((po: any) => (
+                <Link
+                  key={po.id}
+                  to="/admin/orders/$orderId"
+                  params={{ orderId: po.id }}
+                  className="block p-2.5 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all group"
+                >
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="font-mono font-bold text-slate-900 group-hover:text-indigo-600">
+                      {po.application_code}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {po.order_status || "Active"}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 truncate">{po.services?.service_name || "Service Application"}</div>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       </aside>
 
-      {/* ── Dialogs ─────────────────────────────────────────── */}
+      {/* ── Dialogs ── */}
       {restartConfirm && (
         <ConfirmDialog
           title="Restart Order?"
-          body="This will close the ticket and return the order to Form Submitted stage. Any pending customer-delay closure timer will be cancelled."
+          body="This will close the ticket and return the order to Form Submitted stage."
           confirmLabel="Restart Order"
-          confirmTone="emerald"
           onConfirm={() => { setRestartConfirm(false); doCloseRestart.mutate(); }}
           onClose={() => setRestartConfirm(false)}
         />
@@ -712,26 +723,26 @@ function TicketWorkspace() {
   );
 }
 
-// ── message bubble ─────────────────────────────────────────
+// ── Message Card Renderer (Reference 2 Message Card) ──
 
-function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string | null }) {
+function MessageCard({ msg, customerName }: { msg: Msg; customerName?: string | null }) {
   if (msg.kind === "note") {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div
-          className="rounded-lg p-3 shadow-sm"
-          style={{ background: "#fffbeb", borderLeft: "3px solid #f59e0b" }}
-        >
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-semibold text-amber-900">
-              👁 {msg.author_name}
-              <span className="ml-2 text-[10px] font-medium bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded uppercase">
+      <div className="max-w-3xl mx-auto w-full">
+        <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-amber-200/60">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center">
+                ✍
+              </span>
+              <span className="font-bold text-amber-900">{msg.author_name}</span>
+              <span className="text-[9px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full uppercase">
                 Internal Note
               </span>
-            </span>
-            <span className="text-amber-700/70">{ist(msg.created_at)}</span>
+            </div>
+            <span className="text-amber-700/70 font-mono text-[11px]">{ist(msg.created_at)}</span>
           </div>
-          <div className="text-sm text-amber-950 whitespace-pre-wrap leading-relaxed">
+          <div className="text-xs text-amber-950 whitespace-pre-wrap leading-relaxed">
             {msg.body_text}
           </div>
         </div>
@@ -739,93 +750,64 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
     );
   }
 
-  if (msg.kind === "inbound") {
-    const isHtml = Boolean(msg.body_html && msg.body_html.trim());
-    const parsed = isHtml
-      ? parseHtmlEmailReply(msg.body_html)
-      : parseEmailReply(decodeEntities(msg.body_text || stripHtml(msg.body_html || "")));
+  const isInbound = msg.kind === "inbound";
+  const isHtml = Boolean(msg.body_html && msg.body_html.trim());
+  const parsed = isHtml
+    ? parseHtmlEmailReply(msg.body_html)
+    : parseEmailReply(decodeEntities(msg.body_text || htmlToReadableText(msg.body_html || "")));
 
-    return (
-      <div className="max-w-3xl mr-auto">
-        <div
-          className="bg-white rounded-lg p-3 shadow-sm border border-slate-200"
-          style={{ borderLeft: "4px solid #16a34a" }}
-        >
-          <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-slate-100">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs"
-                style={{ background: "#16a34a" }}
-              >
-                {initials(customerName)}
-              </span>
-              <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-                  {customerName || "Customer"}
-                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full uppercase">
-                    Customer
-                  </span>
-                </div>
-                <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
-              </div>
-            </div>
-            <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">{rel(msg.created_at)}</span>
-          </div>
-
-          {isHtml ? (
-            <EmailIframe html={parsed.newContent} fallback={msg.body_text} />
-          ) : (
-            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-              {parsed.newContent || "(no content)"}
-            </div>
-          )}
-
-          {parsed.hasQuotedContent && (
-            <QuotedToggle text={parsed.quotedContent} isHtml={isHtml} />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // outbound
   return (
-    <div className="max-w-3xl ml-auto">
+    <div className={`max-w-3xl w-full ${isInbound ? "mr-auto" : "ml-auto"}`}>
       <div
-        className="rounded-lg p-3 shadow-sm"
-        style={{ background: "#eff6ff", borderRight: "3px solid #1e3a5f" }}
+        className={`bg-white rounded-2xl p-5 shadow-xs border transition-all ${
+          isInbound
+            ? "border-slate-200 border-l-4 border-l-emerald-500"
+            : "border-indigo-100 border-l-4 border-l-indigo-600"
+        }`}
       >
-        <div className="flex items-center justify-between text-xs mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
-              style={{ background: "#1e3a5f" }}
+        {/* Message Header (Reference 2) */}
+        <div className="flex items-center justify-between text-xs mb-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`w-8 h-8 rounded-full text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs ${
+                isInbound ? "bg-emerald-600" : "bg-indigo-600"
+              }`}
             >
-              BHS
-            </span>
+              {isInbound ? initials(customerName) : "BHS"}
+            </div>
             <div className="min-w-0">
-              <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
-                Business Help Services
-                {msg.template_hint && (
-                  <span className="text-[10px] font-medium bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">
-                    {msg.template_hint}
-                  </span>
-                )}
-                <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase">
-                  Template
+              <div className="font-bold text-slate-900 truncate flex items-center gap-2">
+                <span>{isInbound ? customerName || "Customer" : "Business Help Services"}</span>
+                <span
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    isInbound ? "bg-emerald-100 text-emerald-800" : "bg-indigo-100 text-indigo-800"
+                  }`}
+                >
+                  {isInbound ? "Customer" : "Support Team"}
                 </span>
               </div>
-              <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "help@businesshelpservices.com"}</div>
+              <div className="text-slate-400 font-mono text-[11px] truncate">
+                {msg.from_email || (isInbound ? "customer@email.com" : "help@businesshelpservices.com")}
+              </div>
             </div>
           </div>
-          <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+
+          <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">{rel(msg.created_at)}</span>
         </div>
-        {msg.subject && (
-          <div className="text-xs font-semibold text-slate-700 mb-1.5">
-            {msg.subject}
+
+        {/* Message Content */}
+        {isHtml ? (
+          <EmailIframe html={parsed.newContent} fallback={msg.body_text} />
+        ) : (
+          <div className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-sans">
+            {parsed.newContent || htmlToReadableText(msg.body_text) || "(No message content)"}
           </div>
         )}
-        <EmailIframe html={msg.body_html} fallback={msg.body_text} />
+
+        {/* Quoted Thread Toggle */}
+        {parsed.hasQuotedContent && (
+          <QuotedToggle text={parsed.quotedContent} isHtml={isHtml} />
+        )}
       </div>
     </div>
   );
@@ -852,17 +834,17 @@ function htmlToReadableText(html: string | null | undefined): string {
 function QuotedToggle({ text, isHtml }: { text: string; isHtml?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-2 border-t border-slate-100 pt-2">
+    <div className="mt-3 pt-3 border-t border-slate-100">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
       >
-        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-        {open ? "Hide quoted email history" : "Show quoted email history"}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        {open ? "Hide quoted thread history" : "Show quoted thread history"}
       </button>
       {open && (
-        <div className="mt-2 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500">
+        <div className="mt-2 pl-3 border-l-2 border-slate-200 text-xs text-slate-500">
           {isHtml ? (
             <EmailIframe html={text} fallback={htmlToReadableText(text)} />
           ) : (
@@ -882,7 +864,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
   if (!html || !html.trim()) {
     const textFormatted = htmlToReadableText(fallback) || fallback || "(no body)";
     return (
-      <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+      <div className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-sans">
         {textFormatted}
       </div>
     );
@@ -909,7 +891,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
   const collapsed = !expanded && height > 260;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
       <div style={{ maxHeight: collapsed ? 260 : "none", overflow: "hidden", position: "relative" }}>
         <iframe
           ref={iframeRef}
@@ -929,7 +911,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
         />
         {collapsed && (
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none flex items-end justify-center pb-2">
-            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100/90 backdrop-blur px-2 py-0.5 rounded-full border border-slate-200">
+            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100/90 backdrop-blur px-2.5 py-0.5 rounded-full border border-slate-200 shadow-2xs">
               Email truncated
             </span>
           </div>
@@ -948,30 +930,29 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
   );
 }
 
-// ── header badges with dropdowns ───────────────────────────
-
 function StatusBadge({ status, onChange }: { status: TicketStatus; onChange: (s: TicketStatus) => void }) {
   const [open, setOpen] = useState(false);
-  const pill = STATUS_PILL[status];
+  const pill = STATUS_PILL[status] || STATUS_PILL.open;
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
-        style={{ background: pill.bg, color: pill.fg }}
+        className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg border ${pill.bg}`}
       >
-        ● {pill.label} <ChevronDown className="h-3 w-3" />
+        Status: {pill.label} <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded shadow-lg z-20 text-xs"
+          className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
           onMouseLeave={() => setOpen(false)}
         >
           {(Object.keys(STATUS_PILL) as TicketStatus[]).map((s) => (
             <button
               key={s}
+              type="button"
               onClick={() => { setOpen(false); onChange(s); }}
-              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 whitespace-nowrap"
+              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 font-medium text-slate-700"
             >
               {STATUS_PILL[s].label}
             </button>
@@ -984,26 +965,27 @@ function StatusBadge({ status, onChange }: { status: TicketStatus; onChange: (s:
 
 function PriorityBadge({ priority, onChange }: { priority: TicketPriority; onChange: (p: TicketPriority) => void }) {
   const [open, setOpen] = useState(false);
-  const pill = PRIORITY_PILL[priority];
+  const pill = PRIORITY_PILL[priority] || PRIORITY_PILL.medium;
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
-        style={{ background: pill.bg, color: pill.fg }}
+        className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg ${pill.bg}`}
       >
-        {pill.label} <ChevronDown className="h-3 w-3" />
+        Priority: {pill.label} <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded shadow-lg z-20 text-xs"
+          className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
           onMouseLeave={() => setOpen(false)}
         >
           {(Object.keys(PRIORITY_PILL) as TicketPriority[]).map((p) => (
             <button
               key={p}
+              type="button"
               onClick={() => { setOpen(false); onChange(p); }}
-              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 whitespace-nowrap"
+              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 font-medium text-slate-700"
             >
               {PRIORITY_PILL[p].label}
             </button>
@@ -1026,29 +1008,32 @@ function AssigneePicker({
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors"
       >
-        <User className="h-3 w-3" />
+        <User className="w-3.5 h-3.5 text-slate-500" />
         {currentName || (currentId ? "Assigned" : "Unassigned")}
-        <ChevronDown className="h-3 w-3" />
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
       </button>
       {open && (
         <div
-          className="absolute left-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded shadow-lg z-20 text-xs max-h-64 overflow-y-auto"
+          className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs max-h-64 overflow-y-auto py-1"
           onMouseLeave={() => setOpen(false)}
         >
           <button
+            type="button"
             onClick={() => { setOpen(false); onPick(null); }}
-            className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-500"
+            className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-500 font-medium"
           >
             Unassigned
           </button>
           {(staff ?? []).map((s) => (
             <button
               key={s.id}
+              type="button"
               onClick={() => { setOpen(false); onPick(s.id); }}
-              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 truncate"
+              className="block w-full text-left px-3 py-1.5 hover:bg-slate-50 font-medium text-slate-800 truncate"
             >
               {s.full_name || s.display_name || s.email || "Staff"}
             </button>
@@ -1059,147 +1044,18 @@ function AssigneePicker({
   );
 }
 
-// ── info tabs ──────────────────────────────────────────────
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-slate-100 last:border-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-slate-800 text-right font-medium max-w-[200px] truncate">{value}</span>
-    </div>
-  );
-}
-
-function DetailsTab({ ticket, slaHours }: { ticket: any; slaHours: number }) {
-  const slaColor = slaHours < 24 ? "text-emerald-600" : slaHours < 72 ? "text-amber-600" : "text-rose-600";
-  return (
-    <div className="space-y-4">
-      <section>
-        <h4 className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Ticket</h4>
-        <Row label="ID" value={<span className="font-mono">{ticket.ticket_number}</span>} />
-        <Row label="Status" value={STATUS_PILL[ticket.status as TicketStatus].label} />
-        <Row label="Priority" value={PRIORITY_PILL[(ticket.priority as TicketPriority) ?? "medium"].label} />
-        <Row label="Source" value={ticket.source ?? "—"} />
-        <Row label="Assigned to" value={ticket.assigned_name || "Unassigned"} />
-        <Row label="Category" value={ticket.services?.service_name ?? "—"} />
-        <Row label="Created" value={ist(ticket.created_at)} />
-        <Row label="Updated" value={ist(ticket.updated_at)} />
-        {ticket.first_response_at && <Row label="First response" value={rel(ticket.first_response_at)} />}
-        <Row label="SLA age" value={<span className={slaColor}>{slaHours}h</span>} />
-      </section>
-    </div>
-  );
-}
-
-function CustomerTab({ cust, customerStats, hideFinancial }: {
-  cust: any; customerStats: any; hideFinancial: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <div>
-        <div className="text-base font-semibold text-slate-900">{cust?.name ?? "—"}</div>
-        <div className="text-xs text-slate-600 font-mono">{cust?.primary_email ?? "—"}</div>
-        <div className="text-xs text-slate-600 font-mono">{cust?.primary_mobile ?? "—"}</div>
-      </div>
-      <div className="pt-2">
-        <Row label="State" value={cust?.state ?? "—"} />
-        <Row label="Total orders" value={customerStats?.totalOrders ?? 0} />
-        {!hideFinancial && (
-          <Row
-            label="Lifetime value"
-            value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(customerStats?.lifetimeValue ?? 0)}
-          />
-        )}
-        <Row label="Open tickets" value={customerStats?.openTickets ?? 0} />
-      </div>
-      {cust?.id && (
-        <Link
-          to="/admin/customers/$customerId"
-          params={{ customerId: cust.id }}
-          className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline mt-2"
-        >
-          View customer profile <ExternalLink className="h-3 w-3" />
-        </Link>
-      )}
-    </div>
-  );
-}
-
-function OrderTab({ app }: { app: any }) {
-  if (!app?.id) {
-    return <div className="text-slate-500 italic">No linked order.</div>;
-  }
-  return (
-    <div>
-      <Row label="Order No." value={<span className="font-mono">{app.application_code}</span>} />
-      <Row label="Service" value={app.services?.service_name ?? "—"} />
-      <Row label="Status" value={app.order_status ?? "—"} />
-      <Row label="Stage" value={app.fulfillment_status ?? "—"} />
-      <Row label="Created" value={ist(app.created_at)} />
-      <Link
-        to="/admin/orders/$orderId"
-        params={{ orderId: app.id }}
-        className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline mt-3"
-      >
-        Open order workspace <ExternalLink className="h-3 w-3" />
-      </Link>
-    </div>
-  );
-}
-
-function HistoryTab({ previous, currentId }: { previous: any[]; currentId: string }) {
-  if (!previous || previous.length === 0) {
-    return <div className="text-slate-500 italic">No previous tickets for this customer.</div>;
-  }
-  return (
-    <ul className="space-y-2">
-      {previous.map((t) => {
-        const pill = STATUS_PILL[t.status as TicketStatus];
-        const isCurrent = t.id === currentId;
-        return (
-          <li key={t.id}>
-            <Link
-              to="/admin/support/tickets/$ticketId"
-              params={{ ticketId: t.id }}
-              className={`block p-2 rounded border ${isCurrent ? "bg-blue-50 border-blue-200" : "border-slate-200 hover:bg-slate-50"}`}
-            >
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="font-mono text-slate-600">{t.ticket_number}</span>
-                <span
-                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                  style={{ background: pill.bg, color: pill.fg }}
-                >
-                  {pill.label}
-                </span>
-              </div>
-              <div className="mt-0.5 text-xs text-slate-800 truncate">{t.subject}</div>
-              <div className="mt-0.5 text-[10px] text-slate-400">{istDate(t.created_at)}</div>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-// ── dialogs ────────────────────────────────────────────────
-
-function ConfirmDialog({ title, body, confirmLabel, confirmTone, onConfirm, onClose }: {
+function ConfirmDialog({ title, body, confirmLabel, onConfirm, onClose }: {
   title: string; body: string; confirmLabel: string;
-  confirmTone: "emerald" | "rose";
   onConfirm: () => void; onClose: () => void;
 }) {
-  const tone = confirmTone === "emerald"
-    ? "bg-emerald-600 hover:bg-emerald-700"
-    : "bg-rose-600 hover:bg-rose-700";
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="mt-2 text-sm text-slate-600">{body}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-md text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
-          <button onClick={onConfirm} className={`px-3 py-1.5 rounded-md text-sm text-white ${tone}`}>{confirmLabel}</button>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        <p className="mt-2 text-xs text-slate-600 leading-relaxed">{body}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+          <button type="button" onClick={onConfirm} className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs">{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -1210,23 +1066,22 @@ function ConsultDialog({ value, onChange, onCancel, onSend }: {
   value: string; onChange: (v: string) => void; onCancel: () => void; onSend: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900">Consultation Done (TB01)</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Sends the T001 consultation-completed email to the customer and closes the ticket.
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">Consultation Done (TB01)</h3>
+        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+          Sends T001 consultation email to customer and closes ticket.
         </p>
-        <label className="block mt-3 text-xs font-medium text-slate-700">Employee remarks (optional)</label>
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={4}
-          placeholder="Anything to include in the email…"
-          className="mt-1 w-full text-sm px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-teal-500"
+          placeholder="Employee remarks (optional)…"
+          className="mt-3 w-full text-xs p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onCancel} className="px-3 py-1.5 rounded-md text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
-          <button onClick={onSend} className="px-3 py-1.5 rounded-md text-sm text-white bg-teal-600 hover:bg-teal-700">Send & Close</button>
+          <button type="button" onClick={onCancel} className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+          <button type="button" onClick={onSend} className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs">Send & Close</button>
         </div>
       </div>
     </div>
@@ -1243,12 +1098,11 @@ function ReasonPickerDialog({
   const [reasonLabel, setReasonLabel] = useState<string>("");
   const [reply, setReply] = useState<string>("");
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900">Close with Reply (TB02)</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Pick a reason. The T002 email will be sent to the customer with the reply below and a
-          24-hour auto-close timer will start.
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">Close with Reply (TB02)</h3>
+        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+          Pick a closure reason to send T002 email and arm 24h auto-close timer.
         </p>
         <div className="mt-4">
           <ReasonPicker
@@ -1261,12 +1115,13 @@ function ReasonPickerDialog({
             onReplyChange={setReply}
           />
         </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onCancel} className="px-3 py-1.5 rounded-md text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
           <button
+            type="button"
             onClick={() => onSend({ reasonId, reasonLabel, replyBody: reply })}
             disabled={!reasonId || !reply.trim()}
-            className="px-3 py-1.5 rounded-md text-sm text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 shadow-xs"
           >
             Send & Arm 24h Close
           </button>
@@ -1274,4 +1129,13 @@ function ReasonPickerDialog({
       </div>
     </div>
   );
+}
+
+function relTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
 }
