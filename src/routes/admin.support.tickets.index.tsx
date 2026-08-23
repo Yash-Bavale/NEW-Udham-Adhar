@@ -217,11 +217,10 @@ function HelpdeskInboxPage() {
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px] tracking-wider sticky top-0 z-10">
                 <tr>
                   <th className="py-3 px-4 w-12 text-center">S.No</th>
-                  <th className="py-3 px-4 w-32">Ticket ID</th>
-                  <th className="py-3 px-4 w-44">Name</th>
-                  <th className="py-3 px-4 w-52">Email</th>
-                  <th className="py-3 px-4 min-w-[200px]">Subject</th>
-                  <th className="py-3 px-4 w-36">Category</th>
+                  <th className="py-3 px-4 w-36">Ticket ID</th>
+                  <th className="py-3 px-4 w-48">Name</th>
+                  <th className="py-3 px-4 w-56">Email</th>
+                  <th className="py-3 px-4 min-w-[220px]">Subject</th>
                   <th className="py-3 px-4 w-32">Status</th>
                   <th className="py-3 px-4 w-24">Priority</th>
                   <th className="py-3 px-4 w-28 text-right">Created</th>
@@ -262,17 +261,13 @@ function HelpdeskInboxPage() {
                         {t.customer_email || "—"}
                       </td>
 
-                      <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[280px]">
+                      <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[320px]">
                         <div className="truncate">{t.subject || "(No Subject)"}</div>
                         {t.description && (
                           <div className="text-[11px] text-slate-400 truncate mt-0.5 font-normal">
-                            {t.description.slice(0, 70)}
+                            {t.description.slice(0, 80)}
                           </div>
                         )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-500 text-[11px] truncate">
-                        {t.service_name || "General Support"}
                       </td>
 
                       <td className="py-3.5 px-4">

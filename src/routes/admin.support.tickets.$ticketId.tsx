@@ -831,11 +831,21 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   );
 }
 
-function stripHtml(html: string) {
-  return html.replace(/<style[\s\S]*?<\/style>/gi, "")
+function htmlToReadableText(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/<\/(p|div|tr|h[1-6]|li)>/gi, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -854,7 +864,7 @@ function QuotedToggle({ text, isHtml }: { text: string; isHtml?: boolean }) {
       {open && (
         <div className="mt-2 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500">
           {isHtml ? (
-            <EmailIframe html={text} fallback={stripHtml(text)} />
+            <EmailIframe html={text} fallback={htmlToReadableText(text)} />
           ) : (
             <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
           )}
@@ -869,15 +879,29 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
   const [expanded, setExpanded] = useState(false);
   const [height, setHeight] = useState(0);
 
-  if (!html) {
+  if (!html || !html.trim()) {
+    const textFormatted = htmlToReadableText(fallback) || fallback || "(no body)";
     return (
-      <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-        {fallback || "(no body)"}
+      <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+        {textFormatted}
       </div>
     );
   }
 
-  const safe = DOMPurify.sanitize(html, {
+  const baseStyle = `<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; line-height: 1.6; color: #1e293b; margin: 0; padding: 12px; }
+    p { margin-top: 0; margin-bottom: 12px; }
+    a { color: #2563eb; text-decoration: underline; }
+    blockquote { border-left: 3px solid #cbd5e1; margin: 8px 0; padding-left: 12px; color: #64748b; }
+    img { max-width: 100%; height: auto; }
+    ul, ol { padding-left: 20px; margin-bottom: 12px; }
+  </style>`;
+
+  const htmlWithStyle = html.includes("<head>")
+    ? html.replace("<head>", `<head>${baseStyle}`)
+    : `${baseStyle}${html}`;
+
+  const safe = DOMPurify.sanitize(htmlWithStyle, {
     WHOLE_DOCUMENT: true,
     ADD_ATTR: ["target"],
   });
@@ -885,7 +909,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
   const collapsed = !expanded && height > 260;
 
   return (
-    <div className="rounded border border-slate-200 bg-white overflow-hidden">
+    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
       <div style={{ maxHeight: collapsed ? 260 : "none", overflow: "hidden", position: "relative" }}>
         <iframe
           ref={iframeRef}
@@ -897,20 +921,25 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
             const iframe = e.currentTarget as HTMLIFrameElement;
             try {
               const h = iframe.contentDocument?.body?.scrollHeight ?? 260;
-              setHeight(Math.max(200, h + 16));
+              setHeight(Math.max(120, h + 16));
             } catch {
               /* noop */
             }
           }}
         />
         {collapsed && (
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none flex items-end justify-center pb-2">
+            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100/90 backdrop-blur px-2 py-0.5 rounded-full border border-slate-200">
+              Email truncated
+            </span>
+          </div>
         )}
       </div>
       {height > 260 && (
         <button
+          type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-full text-[11px] text-blue-700 hover:bg-blue-50 py-1.5 border-t border-slate-200"
+          className="w-full text-xs font-semibold text-indigo-600 hover:bg-indigo-50/50 py-1.5 border-t border-slate-200 transition-colors"
         >
           {expanded ? "Show less ↑" : "Show full email ↓"}
         </button>
