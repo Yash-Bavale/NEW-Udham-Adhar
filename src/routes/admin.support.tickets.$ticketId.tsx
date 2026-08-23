@@ -740,38 +740,48 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   }
 
   if (msg.kind === "inbound") {
-    const parsed = parseEmailReply(decodeEntities(msg.body_text || stripHtml(msg.body_html || "")));
+    const isHtml = Boolean(msg.body_html && msg.body_html.trim());
+    const parsed = isHtml
+      ? parseHtmlEmailReply(msg.body_html)
+      : parseEmailReply(decodeEntities(msg.body_text || stripHtml(msg.body_html || "")));
+
     return (
       <div className="max-w-3xl mr-auto">
         <div
-          className="bg-white rounded-lg p-3 shadow-sm"
-          style={{ borderLeft: "3px solid #22c55e" }}
+          className="bg-white rounded-lg p-3 shadow-sm border border-slate-200"
+          style={{ borderLeft: "4px solid #16a34a" }}
         >
-          <div className="flex items-center justify-between text-xs mb-2">
+          <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2 min-w-0">
               <span
-                className="h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
+                className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs"
                 style={{ background: "#16a34a" }}
               >
                 {initials(customerName)}
               </span>
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate">
+                <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
                   {customerName || "Customer"}
-                  <span className="ml-1.5 text-[10px] font-medium bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase">
+                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full uppercase">
                     Customer
                   </span>
                 </div>
                 <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
               </div>
             </div>
-            <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+            <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">{rel(msg.created_at)}</span>
           </div>
-          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-            {parsed.newContent || "(no content)"}
-          </div>
+
+          {isHtml ? (
+            <EmailIframe html={parsed.newContent} fallback={msg.body_text} />
+          ) : (
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+              {parsed.newContent || "(no content)"}
+            </div>
+          )}
+
           {parsed.hasQuotedContent && (
-            <QuotedToggle text={parsed.quotedContent} />
+            <QuotedToggle text={parsed.quotedContent} isHtml={isHtml} />
           )}
         </div>
       </div>
@@ -829,20 +839,25 @@ function stripHtml(html: string) {
     .trim();
 }
 
-function QuotedToggle({ text }: { text: string }) {
+function QuotedToggle({ text, isHtml }: { text: string; isHtml?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2 border-t border-slate-100 pt-2">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+        className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
       >
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-        {open ? "Hide quoted text" : "Show quoted text"}
+        {open ? "Hide quoted email history" : "Show quoted email history"}
       </button>
       {open && (
-        <div className="mt-1.5 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500 whitespace-pre-wrap leading-relaxed">
-          {text}
+        <div className="mt-2 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500">
+          {isHtml ? (
+            <EmailIframe html={text} fallback={stripHtml(text)} />
+          ) : (
+            <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+          )}
         </div>
       )}
     </div>
