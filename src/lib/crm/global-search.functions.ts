@@ -32,7 +32,10 @@ export const globalSearch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ hits: SearchHit[] }> => {
     const q = (data.q || "").trim();
     if (q.length < 2) return { hits: [] };
-    const s = context.supabase;
+
+    // Use admin client to bypass RLS restrictions on global search queries
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const s = supabaseAdmin;
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
@@ -41,11 +44,11 @@ export const globalSearch = createServerFn({ method: "POST" })
       s.from("leads")
         .select("id, lead_code, name, email, mobile, service, created_at")
         .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(15),
+        .limit(20),
       s.from("customers")
         .select("id, name, primary_email, primary_mobile")
         .or(`name.ilike.${like},primary_email.ilike.${like},primary_mobile.ilike.${like}`)
-        .limit(15),
+        .limit(20),
       s.from("applications")
         .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
         .ilike("application_code", like)
@@ -69,7 +72,7 @@ export const globalSearch = createServerFn({ method: "POST" })
           .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
           .in("lead_id", leadIds)
           .order("created_at", { ascending: false })
-          .limit(15)
+          .limit(20)
       );
     }
     if (customerIds.length > 0) {
@@ -78,7 +81,7 @@ export const globalSearch = createServerFn({ method: "POST" })
           .select("id, application_code, application_status, order_status, lead_id, customer_id, created_at, leads(id, name, email, mobile, service, lead_code), customers(id, name, primary_email, primary_mobile)")
           .in("customer_id", customerIds)
           .order("created_at", { ascending: false })
-          .limit(15)
+          .limit(20)
       );
     }
 
@@ -98,6 +101,19 @@ export const globalSearch = createServerFn({ method: "POST" })
       seenApp.add(r.id);
       return true;
     });
+
+    // Step 3: Ensure lead details exist for any apps whose leads weren't in matchingLeads
+    const missingLeadIds = allApps
+      .map((a: any) => a.lead_id)
+      .filter((id: string) => id && !leadMap.has(id) && !a?.leads?.name);
+
+    if (missingLeadIds.length > 0) {
+      const { data: extraLeads } = await s
+        .from("leads")
+        .select("id, lead_code, name, email, mobile, service, created_at")
+        .in("id", Array.from(new Set(missingLeadIds)));
+      (extraLeads || []).forEach((l: any) => leadMap.set(l.id, l));
+    }
 
     // 1. SHOW ORDERS (APPLICATIONS) FIRST
     allApps.forEach((r: any) => {
