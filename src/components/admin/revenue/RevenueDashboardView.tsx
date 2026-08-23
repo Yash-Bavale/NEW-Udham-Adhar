@@ -421,7 +421,7 @@ export function RevenueDashboardView() {
                 <th className="px-3.5 py-2.5 text-center">Failed</th>
                 <th className="px-3.5 py-2.5 text-center">Pending</th>
                 <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
-                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue (Excl. Tax)</th>
                 <th className="px-3.5 py-2.5 text-center">Success Rate</th>
                 <th className="px-3.5 py-2.5 text-right">Avg Txn Value</th>
               </tr>
@@ -471,7 +471,7 @@ export function RevenueDashboardView() {
       <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
         <div>
           <h3 className="font-bold text-slate-900 text-sm">Service-Wise Revenue</h3>
-          <p className="text-xs text-slate-500">Revenue generation breakdown by service offering</p>
+          <p className="text-xs text-slate-500">Revenue generation breakdown by service offering (Net Revenue excludes 18% GST)</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -482,7 +482,7 @@ export function RevenueDashboardView() {
                 <th className="px-3.5 py-2.5 text-center">Paid Orders</th>
                 <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
                 <th className="px-3.5 py-2.5 text-right">Refunds</th>
-                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue (Excl. Tax)</th>
                 <th className="px-3.5 py-2.5 text-right">Avg Order Value</th>
                 <th className="px-3.5 py-2.5 text-right">% of Total</th>
               </tr>

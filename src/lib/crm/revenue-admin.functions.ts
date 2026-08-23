@@ -257,13 +257,18 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     const pendingRows = (activePayments ?? []).filter((p) => p.status === "created");
 
     const grossRevenue = paidRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
-    const grossBase = paidRows.reduce((sum, p) => sum + Number(p.base_amount ?? 0), 0);
-    const grossGst = paidRows.reduce((sum, p) => sum + Number(p.gst_amount ?? 0), 0);
+    const grossBase = paidRows.reduce((sum, p) => {
+      const amt = Number(p.amount ?? 0);
+      const base = Number(p.base_amount ?? 0);
+      return sum + (base > 0 ? base : Math.round(amt / 1.18));
+    }, 0);
+    const grossGst = Math.max(0, grossRevenue - grossBase);
 
     const refundedAmount = (activeRefunds ?? []).reduce((sum, rf) => sum + Number(rf.refund_amount ?? 0), 0);
     const refundsCount = activeRefunds?.length ?? 0;
 
-    const netRevenue = Math.max(0, grossRevenue - refundedAmount);
+    // Net Revenue = WITHOUT TAX (excluding 18% GST and after deducting refunds)
+    const netRevenue = Math.max(0, Math.round((grossRevenue - refundedAmount) / 1.18));
 
     const successfulPaymentsCount = paidRows.length;
     const failedPaymentsCount = failedRows.length;
@@ -279,7 +284,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     const prevPaidRows = (prevPayments ?? []).filter((p) => p.status === "paid");
     const grossRevenuePrev = prevPaidRows.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
     const refundedAmountPrev = (prevRefunds ?? []).reduce((sum, rf) => sum + Number(rf.refund_amount ?? 0), 0);
-    const netRevenuePrev = Math.max(0, grossRevenuePrev - refundedAmountPrev);
+    const netRevenuePrev = Math.max(0, Math.round((grossRevenuePrev - refundedAmountPrev) / 1.18));
     const successfulPaymentsCountPrev = prevPaidRows.length;
     const averageOrderValuePrev = successfulPaymentsCountPrev > 0 ? Math.round(grossRevenuePrev / successfulPaymentsCountPrev) : 0;
     const totalAttemptsPrev = (prevPayments ?? []).length;
@@ -318,7 +323,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       } else if (p.status === "created") {
         cur.pendingCount += 1;
       }
-      cur.netRevenue = cur.grossRevenue;
+      cur.netRevenue = Math.max(0, Math.round((cur.grossRevenue - cur.refundedAmount) / 1.18));
       gatewayMap.set(gw, cur);
     }
 
@@ -341,7 +346,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     const services = Array.from(serviceMap.values()).map((s) => ({
       ...s,
       refunds: 0,
-      netRevenue: s.grossRevenue,
+      netRevenue: Math.max(0, Math.round((s.grossRevenue - 0) / 1.18)),
       avgOrderValue: s.paidOrders > 0 ? Math.round(s.grossRevenue / s.paidOrders) : 0,
       pctTotal: grossRevenue > 0 ? Math.round((s.grossRevenue / grossRevenue) * 1000) / 10 : 0,
     })).sort((a, b) => b.grossRevenue - a.grossRevenue);
@@ -379,7 +384,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
           label: b.label,
           timestamp: `${h}:00`,
           grossRevenue: b.gross,
-          netRevenue: b.gross,
+          netRevenue: Math.round(b.gross / 1.18),
           count: b.count,
         });
       }
@@ -420,7 +425,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
           label: b.label,
           timestamp: b.timestamp,
           grossRevenue: b.gross,
-          netRevenue: b.gross,
+          netRevenue: Math.round(b.gross / 1.18),
           count: b.count,
         });
       });
