@@ -496,7 +496,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
       });
     }
 
-    const output = {
+    const output: RevenueOverviewData = {
       range: {
         preset: data.preset,
         label: r.label,
