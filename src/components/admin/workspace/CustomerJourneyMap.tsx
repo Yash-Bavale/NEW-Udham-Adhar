@@ -41,7 +41,7 @@ import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone
 import { CountdownChip } from "./CountdownChip";
 
 import {
-  sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder,
+  sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder, reopenOrder,
 } from "@/lib/orders/order-actions.functions";
 import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
@@ -62,6 +62,7 @@ interface Props {
   hideAmount?: boolean;
   /** Admin override state — controlled by parent (WorkspaceShell). */
   adminOverride?: boolean;
+  onToggleAdminOverride?: () => void;
 }
 
 /* Icon registry keyed by string keys used in journey-graph */
@@ -283,6 +284,16 @@ export function CustomerJourneyMap(p: Props) {
   const mutTalkExpert = useMutation({
     mutationFn: () => fnComplete({ data: { orderId: p.applicationId } }),
     onSuccess: () => { toast.success("E009 sent — consultation completed"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const fnReopenOrder = useServerFn(reopenOrder);
+  const mutReopenOrder = useMutation({
+    mutationFn: () => fnReopenOrder({ data: { orderId: p.applicationId } }),
+    onSuccess: () => {
+      toast.success("Order reopened — reset status to Form Submitted");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -517,34 +528,71 @@ export function CustomerJourneyMap(p: Props) {
           </div>
         </div>
 
-        {/* Talk-to-expert + Force close */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-700">
+        {/* Bottom Actions Bar: Reopen Order, Admin Override, Force Close */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             {isTalkToExpert && (
               <button
                 type="button"
                 onClick={() => mutTalkExpert.mutate()}
                 disabled={closed || completed || mutTalkExpert.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 disabled:opacity-50 cursor-pointer"
               >
                 <CheckCircle2 className="size-3.5" />
                 Talk-to-Expert Completed (E009)
               </button>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-rose-800">
-            <Mail className="size-3.5 text-rose-600" />
-            <span className="font-bold">Force Close (E010)</span>
-            <span className="text-rose-500 hidden sm:inline">·</span>
-            <span className="hidden sm:inline">Cancels timers · Cat A reason.</span>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Reopen Order */}
             <button
               type="button"
-              onClick={() => setDialog({ kind: "force_close" })}
-              disabled={closed}
-              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              onClick={() => mutReopenOrder.mutate()}
+              disabled={mutReopenOrder.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 cursor-pointer transition-colors"
+              title="Reopen order and reset status to Form Submitted"
             >
-              Force Close
+              <RotateCcw className={`size-3.5 ${mutReopenOrder.isPending ? "animate-spin" : ""}`} />
+              Reopen Order
             </button>
+
+            {/* 2. Admin Override */}
+            <button
+              type="button"
+              onClick={() => {
+                if (p.onToggleAdminOverride) {
+                  p.onToggleAdminOverride();
+                } else {
+                  toast.info(p.adminOverride ? "Admin Override Mode: Active" : "Admin Override Mode enabled");
+                }
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold shadow-xs transition-colors cursor-pointer",
+                p.adminOverride
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : "bg-slate-200 text-slate-800 hover:bg-slate-300 border border-slate-300"
+              )}
+              title="Toggle Admin Override permission mode"
+            >
+              <ShieldCheck className="size-3.5" />
+              Admin Override {p.adminOverride ? "(Active)" : ""}
+            </button>
+
+            {/* 3. Force Close (E010) — ALWAYS WORKING */}
+            <div className="inline-flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1">
+              <div className="hidden sm:flex items-center gap-1 text-[11px] font-semibold text-rose-800">
+                <Mail className="size-3.5 text-rose-600" />
+                <span>Force Close (E010)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "force_close" })}
+                className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-rose-700 cursor-pointer transition-colors"
+              >
+                Force Close
+              </button>
+            </div>
           </div>
         </div>
 
