@@ -223,7 +223,7 @@ export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, 
 
 // ── Server Memory Cache for Revenue Overview ──────────────────────────────
 interface CachedRevenueOverview {
-  data: any;
+  data: RevenueOverviewData;
   cachedAt: number;
 }
 const REVENUE_CACHE = new Map<string, CachedRevenueOverview>();
