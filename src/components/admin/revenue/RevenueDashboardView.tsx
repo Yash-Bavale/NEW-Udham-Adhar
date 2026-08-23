@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { formatIST } from "@/lib/datetime";
 import {
-  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset
+  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset, type RevenueGateway, type RevenueService, type RevenueTrendPoint
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
 import { RevenueExportModal } from "./RevenueExportModal";
