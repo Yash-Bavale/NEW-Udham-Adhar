@@ -461,13 +461,7 @@ export const listLeads = createServerFn({ method: "GET" })
 
     if (data.status) query = query.eq("status", data.status);
     if (data.websiteId) {
-      if (data.websiteId === "udyam_registration") {
-        query = query.or("lead_source.ilike.%registration%,service.ilike.%registration%");
-      } else if (data.websiteId === "udyam_adhar") {
-        query = query.not("lead_source", "ilike", "%registration%").not("service", "ilike", "%registration%");
-      } else {
-        query = query.eq("website_id", data.websiteId);
-      }
+      query = query.eq("website_id", data.websiteId);
     }
     if (data.source) {
       if (data.source.startsWith("__channel:")) {

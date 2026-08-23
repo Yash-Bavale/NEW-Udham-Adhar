@@ -162,18 +162,28 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
           .select("id", { count: "exact", head: true })
           .in("status", ["new_lead", "lead_created"])
       ),
-      safeCount(
-        admin
+      (async () => {
+        const { data: paidApps } = await admin
+          .from("payments")
+          .select("application_id")
+          .eq("status", "paid")
+          .not("application_id", "is", null);
+        const paidAppIds = Array.from(new Set((paidApps ?? []).map((p: any) => p.application_id).filter(Boolean)));
+        if (paidAppIds.length === 0) return 0;
+        const { count } = await admin
           .from("applications")
           .select("id", { count: "exact", head: true })
+          .eq("is_deleted", false)
+          .in("id", paidAppIds)
           .in("fulfillment_status", [
             "order_received",
             "form_submitted",
             "technical_delay",
             "documents_received",
             "verification_pending",
-          ])
-      ),
+          ]);
+        return count ?? 0;
+      })(),
       Promise.resolve(0),
       safeCount(
         admin

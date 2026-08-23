@@ -162,6 +162,20 @@ function LeadsPage() {
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
 
+  const uniqueServices = useMemo(() => {
+    if (!servicesData?.rows) return [];
+    const set = new Set<string>();
+    const list: string[] = [];
+    for (const s of servicesData.rows) {
+      const name = s.service_name?.trim();
+      if (name && !set.has(name)) {
+        set.add(name);
+        list.push(name);
+      }
+    }
+    return list;
+  }, [servicesData?.rows]);
+
   const sourceBreakdownFn = useServerFn(getLeadSourceBreakdown);
   const { data: sourceData } = useQuery<SourceBreakdown>({
     queryKey: ["admin.leads.sourceBreakdown"],
@@ -338,8 +352,6 @@ function LeadsPage() {
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         >
           <option value="">All Websites</option>
-          <option value="udyam_adhar">🌐 Udyam Aadhar</option>
-          <option value="udyam_registration">🌐 Udyam Registration</option>
           {(websitesData?.websites ?? []).map((w: any) => (
             <option key={w.id} value={w.id}>🌐 {w.name}</option>
           ))}
@@ -351,8 +363,8 @@ function LeadsPage() {
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         >
           <option value="">All services</option>
-          {servicesData?.rows.map((s: any) => (
-            <option key={s.id} value={s.service_name}>{s.service_name}</option>
+          {uniqueServices.map((name) => (
+            <option key={name} value={name}>{name}</option>
           ))}
         </select>
         {role.hasAny(["super_admin", "admin"]) && (

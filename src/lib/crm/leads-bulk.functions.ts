@@ -348,13 +348,7 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
     } else {
       if (data.status) q = q.eq("status", data.status as LeadStatus);
       if (data.websiteId) {
-        if (data.websiteId === "udyam_registration") {
-          q = q.or("lead_source.ilike.%registration%,service.ilike.%registration%");
-        } else if (data.websiteId === "udyam_adhar") {
-          q = q.not("lead_source", "ilike", "%registration%").not("service", "ilike", "%registration%");
-        } else {
-          q = q.eq("website_id", data.websiteId);
-        }
+        q = q.eq("website_id", data.websiteId);
       }
       if (data.source) {
         if (data.source.startsWith("__channel:")) {
