@@ -209,7 +209,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     if (visitedPaths.has(to)) return 0;
     if (!sidebarCounts) return 0;
     if (to === "/admin/orders") return sidebarCounts.orders;
-    if (to === "/admin/review") return sidebarCounts.docReview;
+    if (to === "/admin/review") return 0;
     if (to === "/admin/tasks") return sidebarCounts.tasks;
     if (to === "/admin/complaints") return sidebarCounts.complaints;
     if (to === "/admin/tickets") return sidebarCounts.tickets;
@@ -615,6 +615,7 @@ function NotificationsBell() {
     onSuccess: () => {
       refetchList();
       qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
     },
   });
   const markAllMut = useMutation({
@@ -622,6 +623,7 @@ function NotificationsBell() {
     onSuccess: () => {
       refetchList();
       qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
     },
   });
 

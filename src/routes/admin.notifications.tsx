@@ -78,15 +78,24 @@ function NotificationsPage() {
   useRealtimeTable("notifications", () => {
     refetch();
     qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
   });
 
   const markMut = useMutation({
     mutationFn: (id: string) => markRead({ data: { id } }),
-    onSuccess: () => { refetch(); qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] }); },
+    onSuccess: () => {
+      refetch();
+      qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
+    },
   });
   const markAllMut = useMutation({
     mutationFn: () => markAll(),
-    onSuccess: () => { refetch(); qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] }); },
+    onSuccess: () => {
+      refetch();
+      qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
+    },
   });
   const delMut = useMutation({
     mutationFn: (id: string) => del({ data: { id } }),

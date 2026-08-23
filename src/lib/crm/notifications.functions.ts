@@ -166,14 +166,15 @@ export const getSidebarNotificationCounts = createServerFn({ method: "GET" })
         admin
           .from("applications")
           .select("id", { count: "exact", head: true })
-          .not("fulfillment_status", "in", '("completed","cancelled","order_closed")')
+          .in("fulfillment_status", [
+            "order_received",
+            "form_submitted",
+            "technical_delay",
+            "documents_received",
+            "verification_pending",
+          ])
       ),
-      safeCount(
-        admin
-          .from("documents")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending")
-      ),
+      Promise.resolve(0),
       safeCount(
         admin
           .from("tasks")
