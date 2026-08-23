@@ -15,9 +15,28 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     console.log("[getApplicationSummary] code:", data.leadCode);
-    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id, website_id";
-    const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
-    const lead = await findLeadByCode(data.leadCode, cols);
+    const code = data.leadCode.trim();
+    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id";
+
+    // Accept either a lead_code (UA-...) or an application_code (AP-...).
+    let lead: any = null;
+    if (code.toUpperCase().startsWith("AP-")) {
+      const { data: app, error: appErr } = await supabaseAdmin
+        .from("applications")
+        .select(`lead_id, leads:lead_id (${cols})`)
+        .eq("application_code", code)
+        .maybeSingle();
+      if (appErr) throw new Error(appErr.message);
+      lead = (app as any)?.leads ?? null;
+    } else {
+      const { data: byLead, error } = await supabaseAdmin
+        .from("leads")
+        .select(cols)
+        .eq("lead_code", code)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      lead = byLead;
+    }
     if (!lead) throw new Error("Application not found");
 
 
@@ -80,21 +99,6 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
 
     const defaultGw = activeList.find((g) => g.isDefault) || activeList[0] || null;
 
-    // Resolve payments_enabled for this lead's website
-    let paymentsEnabled = true;
-    const leadWebsiteId = lead.website_id ?? null;
-    if (leadWebsiteId) {
-      const { data: web } = await supabaseAdmin
-        .from("websites")
-        .select("is_primary, description")
-        .eq("id", leadWebsiteId)
-        .maybeSingle();
-      if (web) {
-        const { readPaymentsEnabled } = await import("./website-payments.functions");
-        paymentsEnabled = readPaymentsEnabled((web as any).description, !!(web as any).is_primary);
-      }
-    }
-
     return {
       lead: {
         leadCode: lead.lead_code,
@@ -109,13 +113,11 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         status: lead.status,
         leadStatusV2: lead.lead_status_v2,
         payment: successfulPayment,
-        websiteId: leadWebsiteId,
       },
       hasPendingLink,
       pendingAmount,
       gateways: activeList,
       defaultGateway: defaultGw?.name || "payu",
-      paymentsEnabled,
     };
   });
 

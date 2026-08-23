@@ -15,35 +15,6 @@ export type TicketPriority = (typeof PRIORITIES)[number];
 // Re-export the emailing reply from ticket-actions so the UI has a single source of truth.
 export { replyToTicket } from "@/lib/tickets/ticket-actions.functions";
 
-export const getTicketCounts = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const admin = await getAdmin();
-    const userId = context.userId;
-
-    const [all, open, unassigned, mine, waitingCustomer, inProgress, resolved, closed] = await Promise.all([
-      admin.from("support_tickets").select("id", { count: "exact", head: true }),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).is("assigned_to", null),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("assigned_to", userId),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "waiting_customer"),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "resolved"),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "closed"),
-    ]);
-
-    return {
-      all: all.count ?? 0,
-      open: open.count ?? 0,
-      unassigned: unassigned.count ?? 0,
-      mine: mine.count ?? 0,
-      waiting_customer: waitingCustomer.count ?? 0,
-      in_progress: inProgress.count ?? 0,
-      resolved: resolved.count ?? 0,
-      closed: closed.count ?? 0,
-    };
-  });
-
 export const listTickets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -56,7 +27,7 @@ export const listTickets = createServerFn({ method: "POST" })
         statuses: z.array(z.enum(TICKET_STATUSES)).optional(),
         priority: z.enum(PRIORITIES).optional(),
         assignedTo: z.string().uuid().optional(),
-        scope: z.enum(["mine", "all", "unassigned", "waiting_customer", "in_progress", "resolved", "closed"]).default("all"),
+        scope: z.enum(["mine", "all"]).default("all"),
         sort: z.enum(["newest", "oldest", "updated", "unassigned"]).default("newest"),
         unassignedOnly: z.boolean().default(false),
       })
@@ -70,7 +41,7 @@ export const listTickets = createServerFn({ method: "POST" })
     let q = admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, created_at, updated_at, last_customer_message_at, last_staff_message_at, customer_id, application_id, service_id, ticket_email, source, customers(name, primary_email, primary_mobile), applications(application_code), services(service_name)",
+        "id, ticket_number, subject, status, priority, assigned_to, created_at, updated_at, last_customer_message_at, last_staff_message_at, customer_id, application_id, service_id, customers(name, primary_mobile), applications(application_code), services(service_name)",
         { count: "exact" }
       )
       .range(from, to);
@@ -83,23 +54,15 @@ export const listTickets = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false });
     else q = q.order("created_at", { ascending: false });
 
-    // Handle view scopes
-    if (data.scope === "mine") q = q.eq("assigned_to", context.userId);
-    else if (data.scope === "unassigned" || data.unassignedOnly || data.sort === "unassigned") q = q.is("assigned_to", null);
-    else if (data.scope === "waiting_customer") q = q.eq("status", "waiting_customer");
-    else if (data.scope === "in_progress") q = q.eq("status", "in_progress");
-    else if (data.scope === "resolved") q = q.eq("status", "resolved");
-    else if (data.scope === "closed") q = q.eq("status", "closed");
-
+    if (data.unassignedOnly || data.sort === "unassigned") q = q.is("assigned_to", null);
     if (data.status) q = q.eq("status", data.status);
     else if (data.statuses && data.statuses.length) q = q.in("status", data.statuses);
-
     if (data.priority) q = q.eq("priority", data.priority);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
-
+    if (data.scope === "mine") q = q.eq("assigned_to", context.userId);
     if (data.q.trim()) {
       const like = `%${data.q.trim()}%`;
-      q = q.or(`ticket_number.ilike.${like},subject.ilike.${like},ticket_email.ilike.${like}`);
+      q = q.or(`ticket_number.ilike.${like},subject.ilike.${like}`);
     }
 
     const { data: rows, error, count } = await q;
@@ -123,7 +86,6 @@ export const listTickets = createServerFn({ method: "POST" })
       id: r.id,
       ticket_number: r.ticket_number,
       subject: r.subject,
-      description: r.description,
       status: r.status as TicketStatus,
       priority: (r.priority as TicketPriority) ?? "medium",
       assigned_to: r.assigned_to,
@@ -134,12 +96,9 @@ export const listTickets = createServerFn({ method: "POST" })
       last_staff_message_at: r.last_staff_message_at,
       customer_id: r.customer_id,
       customer_name: r.customers?.name ?? null,
-      customer_email: r.customers?.primary_email ?? r.ticket_email ?? null,
-      customer_mobile: r.customers?.primary_mobile ?? null,
       application_id: r.application_id,
       application_code: r.applications?.application_code ?? null,
       service_name: r.services?.service_name ?? null,
-      source: r.source ?? "email",
     }));
 
     return { tickets, total: count ?? 0, page: data.page, pageSize: data.pageSize };

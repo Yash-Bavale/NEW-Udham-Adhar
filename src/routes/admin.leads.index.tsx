@@ -23,7 +23,6 @@ import {
 import { listSavedFilters, type FilterJson } from "@/lib/crm/saved-filters.functions";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ExportModal } from "@/components/admin/ExportModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,7 +66,6 @@ function LeadsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [source, setSource] = useState<string>("");
-  const [websiteId, setWebsiteId] = useState<string>("");
   const [assignee, setAssignee] = useState<string>("");
   const [service, setService] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
@@ -79,36 +77,25 @@ function LeadsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [exporting, setExporting] = useState<boolean>(false);
+  const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const role = useRole();
 
-  // Debounce search input by 300ms so typing immediately searches
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch(searchInput);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  const handleExport = async (opts: import("@/components/admin/ExportModal").ExportModalOptions) => {
-    setExporting(true);
+  const handleExport = async (format: "csv" | "excel", idsToExport?: string[]) => {
+    setExporting(format);
+    setExportOpen(false);
     try {
-      const isSelectedScope = opts.scope === "selected" && selected.size > 0;
-      const isAllScope = opts.scope === "all";
-
       const res = await exportFn({
         data: {
-          ids: isSelectedScope ? Array.from(selected) : undefined,
-          search: !isSelectedScope && !isAllScope ? (search || undefined) : undefined,
-          status: !isSelectedScope && !isAllScope ? (status || undefined) : undefined,
-          service: !isSelectedScope && !isAllScope ? (service || undefined) : undefined,
-          source: !isSelectedScope && !isAllScope ? (source || undefined) : undefined,
-          websiteId: !isSelectedScope && !isAllScope ? (websiteId || undefined) : undefined,
-          assignedTo: !isSelectedScope && !isAllScope ? (assignee || undefined) : undefined,
-          dateFrom: opts.dateFrom || (!isSelectedScope && !isAllScope ? (dateFrom || undefined) : undefined),
-          dateTo: opts.dateTo || (!isSelectedScope && !isAllScope ? (dateTo || undefined) : undefined),
+          ids: idsToExport && idsToExport.length > 0 ? idsToExport : undefined,
+          search: search || undefined,
+          status: status || undefined,
+          service: service || undefined,
+          source: source || undefined,
+          assignedTo: assignee || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
         },
       });
 
@@ -117,9 +104,9 @@ function LeadsPage() {
         return;
       }
 
-      const content = opts.format === "excel" ? res.excelXml : res.csv;
-      const mime = opts.format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
-      const ext = opts.format === "excel" ? "xls" : "csv";
+      const content = format === "excel" ? res.excelXml : res.csv;
+      const mime = format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
+      const ext = format === "excel" ? "xls" : "csv";
 
       const blob = new Blob([content], { type: mime });
       const url = URL.createObjectURL(blob);
@@ -131,11 +118,11 @@ function LeadsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Exported ${res.count} lead(s) to ${opts.format.toUpperCase()}`);
+      toast.success(`Exported ${res.count} lead(s) to ${format.toUpperCase()}`);
     } catch (e: any) {
       toast.error(e?.message || `Export failed`);
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   };
 
@@ -173,29 +160,12 @@ function LeadsPage() {
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
 
-  const uniqueServices = useMemo(() => {
-    if (!servicesData?.rows) return [];
-    const set = new Set<string>();
-    const list: string[] = [];
-    for (const s of servicesData.rows) {
-      const name = s.service_name?.trim();
-      if (name && !set.has(name)) {
-        set.add(name);
-        list.push(name);
-      }
-    }
-    return list;
-  }, [servicesData?.rows]);
-
   const sourceBreakdownFn = useServerFn(getLeadSourceBreakdown);
   const { data: sourceData } = useQuery<SourceBreakdown>({
     queryKey: ["admin.leads.sourceBreakdown"],
     queryFn: () => sourceBreakdownFn(),
     staleTime: 60_000,
   });
-
-  const websitesFn = useServerFn(listWebsiteTree);
-  const { data: websitesData } = useQuery({ queryKey: ["admin.websites.tree"], queryFn: () => websitesFn() });
 
   const { data: savedData } = useQuery({ queryKey: ["admin.savedFilters"], queryFn: () => savedFn() });
   useEffect(() => {
@@ -232,13 +202,12 @@ function LeadsPage() {
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.leads", page, search, status, source, websiteId, assignee, service, dateFrom, dateTo],
+    queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
     queryFn: () => listFn({ data: {
       page, pageSize: 25,
       search: search || undefined,
       status: (status || undefined) as never,
       source: source || undefined,
-      websiteId: websiteId || undefined,
       service: service || undefined,
       assignee: assignee || undefined,
       dateFrom: dateFrom || undefined,
@@ -357,25 +326,14 @@ function LeadsPage() {
           </optgroup>
         </select>
         <select
-          value={websiteId}
-          onChange={(e) => { setWebsiteId(e.target.value); setPage(1); }}
-          className="rounded-lg border px-3 py-2 text-sm font-medium"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <option value="">All Websites</option>
-          {(websitesData?.websites ?? []).map((w: any) => (
-            <option key={w.id} value={w.id}>🌐 {w.name}</option>
-          ))}
-        </select>
-        <select
           value={service}
           onChange={(e) => setService(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm max-w-[220px]"
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         >
           <option value="">All services</option>
-          {uniqueServices.map((name) => (
-            <option key={name} value={name}>{name}</option>
+          {servicesData?.rows.map((s: any) => (
+            <option key={s.id} value={s.service_name}>{s.service_name}</option>
           ))}
         </select>
         {role.hasAny(["super_admin", "admin"]) && (
@@ -417,40 +375,45 @@ function LeadsPage() {
         >
           <Plus className="size-4" /> Add Lead
         </button>
-        <button
-          type="button"
-          onClick={() => setExportOpen(true)}
-          disabled={exporting}
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <Download className="size-4 text-emerald-600" />
-          {exporting ? "Exporting…" : "Export"}
-        </button>
-        <ExportModal
-          title="Export Leads"
-          isOpen={exportOpen}
-          onClose={() => setExportOpen(false)}
-          onExport={handleExport}
-          selectedCount={selected.size}
-          activeFiltersCount={
-            (search ? 1 : 0) +
-            (status ? 1 : 0) +
-            (source ? 1 : 0) +
-            (websiteId ? 1 : 0) +
-            (service ? 1 : 0) +
-            (assignee ? 1 : 0) +
-            (dateFrom ? 1 : 0) +
-            (dateTo ? 1 : 0)
-          }
-          initialDateFrom={dateFrom}
-          initialDateTo={dateTo}
-        />
-        {(source || websiteId || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setExportOpen(!exportOpen)}
+            disabled={!!exporting}
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
+            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+          >
+            <Download className="size-4 text-emerald-600" />
+            {exporting ? "Exporting…" : "Export"}
+          </button>
+          {exportOpen && (
+            <div
+              className="absolute right-0 mt-1 w-48 rounded-lg border shadow-lg py-1 z-30 text-sm"
+              style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+            >
+              <button
+                type="button"
+                onClick={() => handleExport("csv")}
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                style={{ color: "var(--admin-fg)" }}
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExport("excel")}
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                style={{ color: "var(--admin-fg)" }}
+              >
+                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
+              </button>
+            </div>
+          )}
+        </div>
+        {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {
               setSource("");
-              setWebsiteId("");
               setService("");
               setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
               setDateFrom("");
@@ -580,25 +543,8 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      {role.hasAny(["super_admin", "admin"]) && (
-                        <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-                          <div className="space-y-1">
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                (l.website_name || "").toLowerCase().includes("registration")
-                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              }`}
-                            >
-                              🌐 {l.website_name || "Udyam Aadhar"}
-                            </span>
-                            <div className="text-[11px] text-slate-500 truncate max-w-[200px]" title={l.lead_source || ""}>
-                              {formatLeadSource(l.lead_source)}
-                            </div>
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-4 py-2.5 text-xs min-w-[200px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
+                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }} title={l.lead_source || ""}>{formatLeadSource(l.lead_source)}</td>}
+                      <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       {role.hasAny(["super_admin", "admin"]) && (
                         <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{l.assignee_name || (l.assigned_to ? "—" : <span className="italic">Unassigned</span>)}</td>

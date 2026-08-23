@@ -196,12 +196,6 @@ async function sendTicketTemplateEmail(opts: {
       ticketSubject: opts.ticket.subject,
       closure_date: formatTicketDate(),
       closureDate: formatTicketDate(),
-      reply_date: formatTicketDate(),
-      replyDate: formatTicketDate(),
-      reply_date_time: formatTicketDate(),
-      replyDateTime: formatTicketDate(),
-      followup_date: formatTicketDate(),
-      followupDate: formatTicketDate(),
       fromName: `${actorName} · Business Help Services`,
       executive_name: actorName,
       ...(opts.extraVars ?? {}),
@@ -743,7 +737,6 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
     } as never).select("id").single();
     if (replyErr) throw new Error(replyErr.message);
 
-    const replyDateFormatted = formatTicketDate(now);
     await sendTicketTemplateEmail({
       ticket, code: BHS_EMAILS.T002_TICKET_REPLY, actorId: context.userId,
       replyId: (replyRow as { id: string }).id,
@@ -757,12 +750,8 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
         employee_remarks: data.replyBody,
         employeeRemarks: data.replyBody,
         replyMessage: data.replyBody,
-        followup_date: replyDateFormatted,
-        followupDate: replyDateFormatted,
-        reply_date: replyDateFormatted,
-        replyDate: replyDateFormatted,
-        reply_date_time: replyDateFormatted,
-        replyDateTime: replyDateFormatted,
+        followup_date: "8 hours",
+        followupDate: "8 hours",
       },
     });
 

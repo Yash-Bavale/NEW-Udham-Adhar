@@ -17,8 +17,12 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
     throw new Error("CCAvenue is currently disabled. Please try another option.");
   }
 
-  const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
-  const lead = await findLeadByCode(leadCodeInput, "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2, website_id");
+  const { data: lead, error: leadErr } = await supabaseAdmin
+    .from("leads")
+    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2")
+    .eq("lead_code", leadCodeInput)
+    .maybeSingle();
+  if (leadErr) throw new Error(leadErr.message);
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
 
@@ -102,8 +106,8 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
   }
   const paymentId = inserted.id;
 
-  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
-  const origin = await getWebsiteOriginForLead(lead.lead_code, (lead as any).website_id);
+  const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
+    "https://udyamadhar.in";
   const redirectUrl = `${origin}/api/public/webhooks/ccavenue`;
   const cancelUrl = `${origin}/api/public/webhooks/ccavenue`;
 

@@ -142,7 +142,7 @@ export function RevenueDashboardView() {
     }
   };
 
-  const donutData = gateways.map((g: any) => ({
+  const donutData = gateways.map((g) => ({
     name: g.name,
     value: g.grossRevenue,
     color: GW_COLORS[g.name] || "#64748B",
@@ -389,7 +389,7 @@ export function RevenueDashboardView() {
                     paddingAngle={3}
                     dataKey="value"
                   >
-                    {donutData.map((entry: any, index: number) => (
+                    {donutData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -421,7 +421,7 @@ export function RevenueDashboardView() {
                 <th className="px-3.5 py-2.5 text-center">Failed</th>
                 <th className="px-3.5 py-2.5 text-center">Pending</th>
                 <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
-                <th className="px-3.5 py-2.5 text-right">Net Revenue (Excl. Tax)</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
                 <th className="px-3.5 py-2.5 text-center">Success Rate</th>
                 <th className="px-3.5 py-2.5 text-right">Avg Txn Value</th>
               </tr>
@@ -438,7 +438,7 @@ export function RevenueDashboardView() {
                   <td colSpan={9} className="px-4 py-8 text-center text-slate-500">No gateway data recorded</td>
                 </tr>
               ) : (
-                gateways.map((g: any) => (
+                gateways.map((g) => (
                   <tr key={g.name} className="hover:bg-slate-50/80">
                     <td className="px-3.5 py-3 font-bold text-slate-900 flex items-center gap-2">
                       <span className="size-2 rounded-full" style={{ background: GW_COLORS[g.name] || "#64748B" }} />
@@ -471,7 +471,7 @@ export function RevenueDashboardView() {
       <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
         <div>
           <h3 className="font-bold text-slate-900 text-sm">Service-Wise Revenue</h3>
-          <p className="text-xs text-slate-500">Revenue generation breakdown by service offering (Net Revenue excludes 18% GST)</p>
+          <p className="text-xs text-slate-500">Revenue generation breakdown by service offering</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -482,7 +482,7 @@ export function RevenueDashboardView() {
                 <th className="px-3.5 py-2.5 text-center">Paid Orders</th>
                 <th className="px-3.5 py-2.5 text-right">Gross Revenue</th>
                 <th className="px-3.5 py-2.5 text-right">Refunds</th>
-                <th className="px-3.5 py-2.5 text-right">Net Revenue (Excl. Tax)</th>
+                <th className="px-3.5 py-2.5 text-right">Net Revenue</th>
                 <th className="px-3.5 py-2.5 text-right">Avg Order Value</th>
                 <th className="px-3.5 py-2.5 text-right">% of Total</th>
               </tr>
@@ -499,7 +499,7 @@ export function RevenueDashboardView() {
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500">No service revenue data recorded</td>
                 </tr>
               ) : (
-                services.map((s: any) => (
+                services.map((s) => (
                   <tr key={s.serviceName} className="hover:bg-slate-50/80">
                     <td className="px-3.5 py-3 font-semibold text-slate-900">{s.serviceName}</td>
                     <td className="px-3.5 py-3 text-center font-mono font-semibold">{fmtN(s.paidOrders)}</td>

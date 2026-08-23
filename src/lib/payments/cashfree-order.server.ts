@@ -23,8 +23,15 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
     throw new Error("Cashfree is currently disabled. Please enable it in Admin Settings.");
   }
 
-  const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
-  const lead = await findLeadByCode(leadCodeInput, "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2, website_id");
+  // 2) Look up the lead
+  const { data: lead, error: leadErr } = await supabaseAdmin
+    .from("leads")
+    .select(
+      "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2",
+    )
+    .eq("lead_code", leadCodeInput)
+    .maybeSingle();
+  if (leadErr) throw new Error(leadErr.message);
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
   const leadCode: string = lead.lead_code;
@@ -114,8 +121,8 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   const paymentId = inserted.id;
 
   // 10) Build Cashfree order via REST API
-  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
-  const origin = await getWebsiteOriginForLead(leadCode, (lead as any).website_id);
+  const origin =
+    process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
   const returnUrl = `${origin}/api/public/webhooks/cashfree?order_id={order_id}`;
   const notifyUrl = `${origin}/api/public/webhooks/cashfree`;
 

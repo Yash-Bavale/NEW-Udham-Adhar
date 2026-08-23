@@ -18,8 +18,12 @@ export async function buildPayUOrder(leadCodeInput: string) {
     throw new Error("PayU is currently disabled. Please try later.");
   }
 
-  const { findLeadByCode } = await import("@/lib/leads/lead-lookup.server");
-  const lead = await findLeadByCode(leadCodeInput, "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2, website_id");
+  const { data: lead, error: leadErr } = await supabaseAdmin
+    .from("leads")
+    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2")
+    .eq("lead_code", leadCodeInput)
+    .maybeSingle();
+  if (leadErr) throw new Error(leadErr.message);
   if (!lead) throw new Error("Lead not found");
 
   const { data: application } = await supabaseAdmin
@@ -109,8 +113,8 @@ export async function buildPayUOrder(leadCodeInput: string) {
   const phone = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";
   const email = String(lead.email ?? "customer@example.com").trim().toLowerCase();
 
-  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
-  const origin = await getWebsiteOriginForLead(leadCode, (lead as any).website_id);
+  const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
+    "https://udyamadhar.in";
   const surl = `${origin}/api/public/webhooks/payu`;
   const furl = `${origin}/api/public/webhooks/payu`;
 

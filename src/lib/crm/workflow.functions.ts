@@ -204,9 +204,8 @@ export const setExternalDelay = createServerFn({ method: "POST" })
               customer_hold_started_at: holdStartedAt,
             }
           : {
-              order_status: data.kind === "government_portal_pending" ? "TECHNICAL_HOLD_EXTERNAL" : "TECHNICAL_HOLD_INTERNAL",
+              order_status: "TECHNICAL_HOLD",
               fulfillment_status: "technical_delay",
-              technical_hold_started_at: holdStartedAt,
             }),
       } as never)
       .eq("id", app.id);

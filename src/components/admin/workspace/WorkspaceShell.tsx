@@ -59,22 +59,6 @@ import {
 import { formatIST, relativeIST } from "@/lib/datetime";
 import { useRole } from "@/hooks/useRole";
 
-function formatMobile55(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const cleaned = raw.trim();
-  const digitsOnly = cleaned.replace(/\D/g, "");
-  if (digitsOnly.length === 10) {
-    return `${digitsOnly.slice(0, 5)} ${digitsOnly.slice(5)}`;
-  }
-  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) {
-    return `+91 ${digitsOnly.slice(2, 7)} ${digitsOnly.slice(7)}`;
-  }
-  if (digitsOnly.length > 5) {
-    return `${digitsOnly.slice(0, 5)} ${digitsOnly.slice(5)}`;
-  }
-  return cleaned;
-}
-
 interface Props {
   orderId: string;
   data: any;
@@ -513,7 +497,7 @@ export function WorkspaceShell(p: Props) {
             {/* Customer fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
               <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
-              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{formatMobile55(cMobile)}</a> : "—"} />
+              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
               <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
               <InfoRow label="State" value={cState} />
               <InfoRow label="Language" value={cLanguage} />
@@ -597,7 +581,6 @@ export function WorkspaceShell(p: Props) {
           payments={payments}
           hideAmount={p.hideAmount}
           adminOverride={adminOverride}
-          onToggleAdminOverride={() => setAdminOverride((v) => !v)}
         />
 
 

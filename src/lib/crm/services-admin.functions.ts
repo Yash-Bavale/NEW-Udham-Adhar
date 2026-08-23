@@ -26,46 +26,19 @@ export const listActiveServiceCodes = createServerFn({ method: "GET" }).handler(
   } catch {
     websiteId = null;
   }
-
-  // 1. Try website-specific active services
-  if (websiteId) {
-    const { data: webSpecific } = await supabaseAdmin
-      .from("services")
-      .select("service_code, service_name, sort_order")
-      .eq("is_active", true)
-      .eq("website_id", websiteId)
-      .order("sort_order", { ascending: true });
-
-    if (webSpecific && webSpecific.length > 0) {
-      return {
-        codes: webSpecific.map((r) => r.service_code as string),
-        services: webSpecific.map((r) => ({ code: r.service_code as string, name: r.service_name as string })),
-      };
-    }
-  }
-
-  // 2. Fallback to all active services (deduplicated)
-  const { data: fallback, error } = await supabaseAdmin
+  let q = supabaseAdmin
     .from("services")
     .select("service_code, service_name, sort_order")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
+    .eq("is_active", true);
+  if (websiteId) q = q.eq("website_id", websiteId);
+  const { data, error } = await q.order("sort_order", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const seen = new Set<string>();
-  const services: Array<{ code: string; name: string }> = [];
-  const codes: string[] = [];
-  for (const r of fallback ?? []) {
-    const code = r.service_code as string;
-    if (code && !seen.has(code)) {
-      seen.add(code);
-      codes.push(code);
-      services.push({ code, name: r.service_name as string });
-    }
-  }
-
-  return { codes, services };
+  const rows = data ?? [];
+  return {
+    codes: rows.map((r) => r.service_code as string),
+    services: rows.map((r) => ({ code: r.service_code as string, name: r.service_name as string })),
+  };
 });
 
 const ServiceInput = z.object({
