@@ -348,7 +348,22 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
     } else {
       if (data.status) q = q.eq("status", data.status as LeadStatus);
       if (data.websiteId) {
-        q = q.eq("website_id", data.websiteId);
+        const { data: targetWeb } = await (await getAdmin())
+          .from("websites")
+          .select("id, name, domain")
+          .eq("id", data.websiteId)
+          .maybeSingle();
+
+        if (targetWeb) {
+          const isReg = targetWeb.name.toLowerCase().includes("registration") || targetWeb.domain.toLowerCase().includes("registration");
+          if (isReg) {
+            q = q.or(`website_id.eq.${data.websiteId},lead_source.ilike.%registration%,service.ilike.%registration%,lead_source.ilike.%udyamreg%`);
+          } else {
+            q = q.or(`website_id.eq.${data.websiteId},and(website_id.is.null,not(lead_source.ilike.%registration%),not(service.ilike.%registration%))`);
+          }
+        } else {
+          q = q.eq("website_id", data.websiteId);
+        }
       }
       if (data.source) {
         if (data.source.startsWith("__channel:")) {

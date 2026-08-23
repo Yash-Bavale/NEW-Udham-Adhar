@@ -461,7 +461,22 @@ export const listLeads = createServerFn({ method: "GET" })
 
     if (data.status) query = query.eq("status", data.status);
     if (data.websiteId) {
-      query = query.eq("website_id", data.websiteId);
+      const { data: targetWeb } = await admin
+        .from("websites")
+        .select("id, name, domain")
+        .eq("id", data.websiteId)
+        .maybeSingle();
+
+      if (targetWeb) {
+        const isReg = targetWeb.name.toLowerCase().includes("registration") || targetWeb.domain.toLowerCase().includes("registration");
+        if (isReg) {
+          query = query.or(`website_id.eq.${data.websiteId},lead_source.ilike.%registration%,service.ilike.%registration%,lead_source.ilike.%udyamreg%`);
+        } else {
+          query = query.or(`website_id.eq.${data.websiteId},and(website_id.is.null,not(lead_source.ilike.%registration%),not(service.ilike.%registration%))`);
+        }
+      } else {
+        query = query.eq("website_id", data.websiteId);
+      }
     }
     if (data.source) {
       if (data.source.startsWith("__channel:")) {

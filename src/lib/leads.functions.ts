@@ -82,8 +82,21 @@ export const createLead = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LeadInput.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { getDefaultWebsiteId } = await import("./websites/default-website.server");
-    const websiteId = await getDefaultWebsiteId();
+    let websiteId: string | null = null;
+    const srcPage = (data.source_page ?? "").toLowerCase();
+    if (srcPage.includes("registration") || srcPage.includes("udyamregistration") || srcPage.includes("udyam-registration")) {
+      const { data: regWeb } = await supabaseAdmin
+        .from("websites")
+        .select("id")
+        .or("name.ilike.%registration%,domain.ilike.%registration%")
+        .limit(1)
+        .maybeSingle();
+      if (regWeb?.id) websiteId = regWeb.id;
+    }
+    if (!websiteId) {
+      const { getDefaultWebsiteId } = await import("./websites/default-website.server");
+      websiteId = await getDefaultWebsiteId();
+    }
     // 1. Map form label -> internal slug -> DB service row
     // 1. Resolve service by code (slug) OR by legacy label — supports admin-renamed services.
     const raw = data.service;
