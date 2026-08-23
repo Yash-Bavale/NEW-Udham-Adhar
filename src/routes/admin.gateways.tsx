@@ -3,8 +3,118 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo } from "@/lib/payments/gateways.functions";
+import { listWebsitePaymentStatuses, setWebsitePaymentsEnabled } from "@/lib/payments/website-payments.functions";
+import { Globe, Power, PowerOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
+
+/** ─── Website Payment Control Panel ──────────────────────────────────────── */
+function WebsitePaymentControl() {
+  const listStatusesFn = useServerFn(listWebsitePaymentStatuses);
+  const setEnabledFn = useServerFn(setWebsitePaymentsEnabled);
+  const qc = useQueryClient();
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin.website.payment.statuses"],
+    queryFn: () => listStatusesFn(),
+    refetchInterval: 15_000,
+  });
+
+  const websites = data?.websites ?? [];
+
+  async function toggle(websiteId: string, current: boolean) {
+    setToggling(websiteId);
+    setErr(null);
+    try {
+      await setEnabledFn({ data: { websiteId, enabled: !current } });
+      await qc.invalidateQueries({ queryKey: ["admin.website.payment.statuses"] });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setToggling(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 bg-slate-50">
+        <Globe className="w-5 h-5 text-slate-600" />
+        <div>
+          <div className="font-semibold text-slate-900 text-sm">Website Payment Control</div>
+          <div className="text-xs text-slate-500 mt-0.5">
+            Start or stop payment collection per website. When stopped, users see an infinite processing spinner and cannot proceed to pay.
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 px-5 py-4 text-sm text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {websites.map((w) => (
+            <div key={w.id} className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${w.paymentsEnabled ? "bg-emerald-500" : "bg-red-400"}`} />
+                <div>
+                  <div className="font-semibold text-sm text-slate-900">{w.name}</div>
+                  <div className="text-xs text-slate-400 font-mono">{w.domain}</div>
+                </div>
+                {w.isPrimary && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">PRIMARY</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  w.paymentsEnabled
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                    : "bg-red-100 text-red-700 border border-red-200"
+                }`}>
+                  {w.paymentsEnabled ? "✓ Payments ON" : "✗ Payments OFF"}
+                </span>
+
+                <button
+                  onClick={() => toggle(w.id, w.paymentsEnabled)}
+                  disabled={toggling === w.id}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shadow-sm disabled:opacity-50 ${
+                    w.paymentsEnabled
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  }`}
+                >
+                  {toggling === w.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : w.paymentsEnabled ? (
+                    <PowerOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Power className="w-3.5 h-3.5" />
+                  )}
+                  {toggling === w.id
+                    ? "Updating…"
+                    : w.paymentsEnabled
+                    ? "Stop Payments"
+                    : "Start Payments"}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {websites.length === 0 && (
+            <div className="px-5 py-4 text-sm text-slate-400">No active websites found.</div>
+          )}
+        </div>
+      )}
+
+      {err && (
+        <div className="px-5 pb-3 text-xs text-red-600 font-medium">{err}</div>
+      )}
+    </div>
+  );
+}
 
 function GatewaysPage() {
   const listFn = useServerFn(listGateways);
@@ -21,13 +131,16 @@ function GatewaysPage() {
   if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Payment Gateways</h1>
         <p className="text-sm text-slate-500 mt-1">
           Toggle gateways, upload custom gateway logos, and set default gateway priority.
         </p>
       </div>
+
+      {/* ─── Per-website payment on/off ─── */}
+      <WebsitePaymentControl />
 
       <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <div className="font-semibold">How CCAvenue callbacks are verified</div>

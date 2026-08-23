@@ -16,7 +16,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     console.log("[getApplicationSummary] code:", data.leadCode);
     const code = data.leadCode.trim();
-    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id";
+    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id, website_id";
 
     // Accept either a lead_code (UA-...) or an application_code (AP-...).
     let lead: any = null;
@@ -99,6 +99,24 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
 
     const defaultGw = activeList.find((g) => g.isDefault) || activeList[0] || null;
 
+    // Resolve payments_enabled for this lead's website
+    let paymentsEnabled = true;
+    const leadWebsiteId = lead.website_id ?? null;
+    if (leadWebsiteId) {
+      const { data: web } = await supabaseAdmin
+        .from("websites")
+        .select("is_primary, metadata")
+        .eq("id", leadWebsiteId)
+        .maybeSingle();
+      if (web) {
+        const meta = (web as any).metadata ?? {};
+        const defaultEnabled = !!(web as any).is_primary;
+        paymentsEnabled = meta.payments_enabled !== undefined
+          ? Boolean(meta.payments_enabled)
+          : defaultEnabled;
+      }
+    }
+
     return {
       lead: {
         leadCode: lead.lead_code,
@@ -113,11 +131,13 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
         status: lead.status,
         leadStatusV2: lead.lead_status_v2,
         payment: successfulPayment,
+        websiteId: leadWebsiteId,
       },
       hasPendingLink,
       pendingAmount,
       gateways: activeList,
       defaultGateway: defaultGw?.name || "payu",
+      paymentsEnabled,
     };
   });
 

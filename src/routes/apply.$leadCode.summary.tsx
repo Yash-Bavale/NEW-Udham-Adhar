@@ -9,6 +9,7 @@ import {
   Pencil,
   ShieldCheck,
   FileText,
+  FileCheck2,
   Receipt,
   BadgeCheck,
   Info,
@@ -186,6 +187,7 @@ function SummaryPage() {
 
   const lead = data?.lead;
   const gateways = data?.gateways ?? [];
+  const paymentsEnabled = data?.paymentsEnabled !== false; // default true
 
   const isPaid = !!lead && (!!lead.payment || PAID_STATUSES.has(lead.status as string));
 
@@ -234,6 +236,40 @@ function SummaryPage() {
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error instanceof Error ? error.message : "Could not load your application."}
         </div>
+      </div>
+    );
+  }
+
+  // When payments are disabled for this website: show infinite processing spinner
+  // (keeps rotating, never advances to payment). Also lock the page to prevent scrolling up.
+  const [infiniteElapsed, setInfiniteElapsed] = useState(0);
+  useEffect(() => {
+    if (paymentsEnabled || isPaid || isLoading) return;
+    // Lock scroll to top so user can't go back up
+    document.body.style.overflow = "hidden";
+    const t = setInterval(() => setInfiniteElapsed((s) => (s + 1) % 28), 1000);
+    return () => {
+      clearInterval(t);
+      document.body.style.overflow = "";
+    };
+  }, [paymentsEnabled, isPaid, isLoading]);
+
+  if (!isLoading && !isPaid && !paymentsEnabled) {
+    const DISABLED_STEPS: readonly CountdownStep[] = [
+      { at: 0,  icon: ShieldCheck,    label: "Securing your details",        sub: "Encrypting personal information" },
+      { at: 7,  icon: FileCheck2,     label: "Validating application data",  sub: "Cross-checking required fields" },
+      { at: 14, icon: Sparkles,       label: "Running compliance checks",    sub: "Aligning with MSME guidelines" },
+      { at: 21, icon: CheckCircle2,   label: "Finalising your application",  sub: "Almost done…" },
+    ] as const;
+    return (
+      <div>
+        <CountdownCard
+          totalSeconds={28}
+          elapsed={infiniteElapsed}
+          steps={DISABLED_STEPS}
+          leadCode={leadCode}
+        />
+        <TrustBlock />
       </div>
     );
   }
