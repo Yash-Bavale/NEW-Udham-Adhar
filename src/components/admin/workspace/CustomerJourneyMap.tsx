@@ -11,7 +11,7 @@ import {
   Check, Inbox, FileText, FileCheck2, Landmark, Search, Flag,
   Clock, XCircle, CheckCircle2, ClipboardCheck,
   Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
-  ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag,
+  ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag, ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
