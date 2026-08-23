@@ -465,33 +465,6 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     REVENUE_CACHE.set(cacheKey, { data: output, cachedAt: Date.now() });
     return output;
   });
-      metrics: {
-        grossRevenue,
-        grossBase,
-        grossGst,
-        refundedAmount,
-        refundsCount,
-        netRevenue,
-        successfulPaymentsCount,
-        failedPaymentsCount,
-        failedPaymentsAmount,
-        pendingPaymentsCount,
-        pendingPaymentsAmount,
-        totalAttempts,
-        averageOrderValue,
-        paymentSuccessRate: Math.round(paymentSuccessRate * 10) / 10,
-        // Comparative previous period metrics
-        grossRevenuePrev,
-        netRevenuePrev,
-        successfulPaymentsCountPrev,
-        averageOrderValuePrev,
-        paymentSuccessRatePrev: Math.round(paymentSuccessRatePrev * 10) / 10,
-      },
-      gateways,
-      services,
-      trends: trendPoints,
-    };
-  });
 
 // ── 2. Paginated Payment Transactions Ledger Server Fn ─────────────────────
 const LedgerSchema = z.object({
