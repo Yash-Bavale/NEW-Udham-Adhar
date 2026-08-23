@@ -11,9 +11,19 @@ import { SERVICES, INDIAN_STATES, LANGUAGES } from "./constants";
 function parseLeadSource(sourcePage?: string): string {
   if (!sourcePage) return "Website";
   try {
-    // sourcePage is stored as pathname + search, e.g. "/Download-Udyam-Certificate?Gad_source=1&..."
-    const url = new URL(sourcePage, "https://placeholder.invalid");
+    // sourcePage may now be a full URL (origin + path + search) or just path + search.
+    const isFullUrl = sourcePage.startsWith("http://") || sourcePage.startsWith("https://");
+    const baseUrl = isFullUrl ? sourcePage : `https://placeholder.invalid${sourcePage}`;
+    const url = new URL(baseUrl);
     const params = url.searchParams;
+
+    // Extract hostname hint (empty for placeholder/localhost)
+    const hostname = isFullUrl ? url.hostname.toLowerCase().replace(/^www\./, "") : "";
+    // Build a short domain tag shown in the label only when it differs from default
+    const domainTag =
+      hostname && hostname !== "udyamadhar.in" && hostname !== "placeholder.invalid"
+        ? ` [${hostname}]`
+        : "";
 
     // Detect Google Ads: Gad_source, gclid, gbraid, or wbraid are all Google Ads signals
     const isGoogleAds =
@@ -40,7 +50,7 @@ function parseLeadSource(sourcePage?: string): string {
         params.get("utm_content") ||
         null;
 
-      let label = "Google Ads";
+      let label = `Google Ads${domainTag}`;
       if (campaignId) label += ` | Campaign: ${campaignId}`;
       if (keyword) label += ` | kw: ${keyword}`;
       if (adGroup) label += ` | adg: ${adGroup}`;
@@ -52,7 +62,7 @@ function parseLeadSource(sourcePage?: string): string {
 
     // Organic / direct — store just the clean path (no query string noise)
     const cleanPath = url.pathname || "/";
-    return `Website | ${cleanPath}`;
+    return `Website${domainTag} | ${cleanPath}`;
   } catch {
     // Fallback for malformed URLs
     return `Website | ${sourcePage.split("?")[0].slice(0, 120)}`;
@@ -68,7 +78,7 @@ const LeadInput = z.object({
   language: z.enum(LANGUAGES as [string, ...string[]]),
   service: z.string().trim().min(1).max(200),
   consent: z.literal(true, { message: "You must accept the terms to proceed" }),
-  source_page: z.string().trim().max(300).optional(),
+  source_page: z.string().trim().max(400).optional(),
 });
 
 /**
@@ -82,17 +92,55 @@ export const createLead = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LeadInput.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { resolveWebsiteIdFromRequest } = await import("./websites/default-website.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+
+    // ── Website resolution (3-tier, most-reliable first) ────────────────────
+    // 1. Server Request Host header — works correctly for all real production domains.
+    //    (The form always runs on the domain the user is visiting.)
     let websiteId: string | null = null;
-    const srcPage = (data.source_page ?? "").toLowerCase();
-    if (srcPage.includes("registration") || srcPage.includes("udyamregistration") || srcPage.includes("udyam-registration")) {
-      const { data: regWeb } = await supabaseAdmin
-        .from("websites")
-        .select("id")
-        .or("name.ilike.%registration%,domain.ilike.%registration%")
-        .limit(1)
-        .maybeSingle();
-      if (regWeb?.id) websiteId = regWeb.id;
+    try {
+      websiteId = await resolveWebsiteIdFromRequest(getRequest());
+    } catch { websiteId = null; }
+
+    // 2. Full URL sent by the client (includes origin hostname since the last fix).
+    //    Handles cases where the SSR request host is a proxy/CDN address.
+    if (!websiteId || websiteId === await import("./websites/default-website.server").then(m => m.getDefaultWebsiteId()).catch(() => null)) {
+      const srcUrl = (data.source_page ?? "").trim();
+      if (srcUrl.startsWith("http")) {
+        try {
+          const parsed = new URL(srcUrl);
+          const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+          const { data: hostnameWeb } = await supabaseAdmin
+            .from("websites")
+            .select("id")
+            .eq("is_active", true)
+            .in("domain", [hostname, `www.${hostname}`])
+            .maybeSingle();
+          if (hostnameWeb?.id) websiteId = hostnameWeb.id;
+        } catch { /* malformed URL — skip */ }
+      }
     }
+
+    // 3. Last resort: keyword heuristic on path if still unresolved.
+    if (!websiteId) {
+      const pathLower = (data.source_page ?? "").toLowerCase();
+      const looksLikeReg =
+        pathLower.includes("udyamregistration") ||
+        pathLower.includes("udyam-registration") ||
+        pathLower.includes("new-udyam");
+      if (looksLikeReg) {
+        const { data: regWeb } = await supabaseAdmin
+          .from("websites")
+          .select("id")
+          .or("name.ilike.%registration%,domain.ilike.%registration%")
+          .limit(1)
+          .maybeSingle();
+        if (regWeb?.id) websiteId = regWeb.id;
+      }
+    }
+
+    // 4. Absolute fallback — udyamadhar.in (primary site).
     if (!websiteId) {
       const { getDefaultWebsiteId } = await import("./websites/default-website.server");
       websiteId = await getDefaultWebsiteId();

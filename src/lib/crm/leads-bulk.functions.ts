@@ -350,18 +350,15 @@ export const exportLeadsCsv = createServerFn({ method: "POST" })
       if (data.websiteId) {
         const { data: targetWeb } = await (await getAdmin())
           .from("websites")
-          .select("id, name, domain")
+          .select("id, is_primary")
           .eq("id", data.websiteId)
           .maybeSingle();
 
-        if (targetWeb) {
-          const isReg = targetWeb.name.toLowerCase().includes("registration") || targetWeb.domain.toLowerCase().includes("registration");
-          if (isReg) {
-            q = q.or(`website_id.eq.${data.websiteId},lead_source.ilike.%registration%,service.ilike.%registration%,lead_source.ilike.%udyamreg%`);
-          } else {
-            q = q.or(`website_id.eq.${data.websiteId},and(website_id.is.null,not(lead_source.ilike.%registration%),not(service.ilike.%registration%))`);
-          }
+        if (targetWeb?.is_primary) {
+          // Primary site: include leads that match OR have no website_id (legacy rows)
+          q = q.or(`website_id.eq.${data.websiteId},website_id.is.null`);
         } else {
+          // Non-primary site: strict match only
           q = q.eq("website_id", data.websiteId);
         }
       }

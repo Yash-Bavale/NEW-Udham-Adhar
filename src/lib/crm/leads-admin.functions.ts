@@ -461,20 +461,22 @@ export const listLeads = createServerFn({ method: "GET" })
 
     if (data.status) query = query.eq("status", data.status);
     if (data.websiteId) {
+      // Always use the exact website_id stored on the lead.
+      // Leads submitted from udyamregistrations.in will have that website's id;
+      // leads from udyamadhar.in will have udyamadhar.in's id.
+      // Historical leads (before website_id was introduced) have NULL — those
+      // are shown only when the user selects the primary website filter.
       const { data: targetWeb } = await admin
         .from("websites")
-        .select("id, name, domain")
+        .select("id, is_primary")
         .eq("id", data.websiteId)
         .maybeSingle();
 
-      if (targetWeb) {
-        const isReg = targetWeb.name.toLowerCase().includes("registration") || targetWeb.domain.toLowerCase().includes("registration");
-        if (isReg) {
-          query = query.or(`website_id.eq.${data.websiteId},lead_source.ilike.%registration%,service.ilike.%registration%,lead_source.ilike.%udyamreg%`);
-        } else {
-          query = query.or(`website_id.eq.${data.websiteId},and(website_id.is.null,not(lead_source.ilike.%registration%),not(service.ilike.%registration%))`);
-        }
+      if (targetWeb?.is_primary) {
+        // Primary site: include leads that match OR have no website_id (legacy rows)
+        query = query.or(`website_id.eq.${data.websiteId},website_id.is.null`);
       } else {
+        // Non-primary site: strict match only
         query = query.eq("website_id", data.websiteId);
       }
     }
@@ -562,10 +564,11 @@ export const listLeads = createServerFn({ method: "GET" })
     }
 
     const resolveWebsiteName = (r: any) => {
-      if (r.website_id && websitesById[r.website_id]) return websitesById[r.website_id].name;
-      const s = `${r.lead_source ?? ""} ${r.service ?? ""}`.toLowerCase();
-      if (s.includes("registration")) return "Udyam Registration";
-      return "Udyam Aadhar";
+      if (r.website_id && websitesById[r.website_id]) {
+        return websitesById[r.website_id].name || websitesById[r.website_id].domain;
+      }
+      // Legacy leads (no website_id): mark as unknown rather than guessing
+      return "(Unknown)";
     };
 
     const enriched = (rows ?? []).map((r: any) => ({

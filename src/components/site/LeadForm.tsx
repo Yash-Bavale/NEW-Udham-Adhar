@@ -45,9 +45,11 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     setBusy(true);
 
     const fd = new FormData(e.currentTarget);
+    // Include the full URL (origin + path + search) so the server can reliably
+    // detect which website the lead came from (udyamadhar.in vs udyamregistrations.in).
     const sourcePage =
       typeof window !== "undefined"
-        ? (window.location.pathname + window.location.search).slice(0, 240)
+        ? (window.location.origin + window.location.pathname + window.location.search).slice(0, 400)
         : undefined;
     const payload = {
       name: String(fd.get("name") ?? "").trim(),
