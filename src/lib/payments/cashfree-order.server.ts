@@ -27,7 +27,7 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from("leads")
     .select(
-      "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2",
+      "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2, website_id",
     )
     .eq("lead_code", leadCodeInput)
     .maybeSingle();
@@ -121,8 +121,8 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   const paymentId = inserted.id;
 
   // 10) Build Cashfree order via REST API
-  const origin =
-    process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
+  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
+  const origin = await getWebsiteOriginForLead(leadCode, (lead as any).website_id);
   const returnUrl = `${origin}/api/public/webhooks/cashfree?order_id={order_id}`;
   const notifyUrl = `${origin}/api/public/webhooks/cashfree`;
 

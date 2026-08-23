@@ -158,7 +158,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         if (paymentUpdateError) {
           console.error("[ccavenue] payment update failed", { orderId, error: paymentUpdateError });
           return isBrowser
-            ? redirectToPending(leadCodeFromParam || orderId)
+            ? await redirectToPending(leadCodeFromParam || orderId, request)
             : new Response("payment-update-failed", { status: 200 });
         }
 
@@ -175,7 +175,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           }
 
           return isBrowser
-            ? redirectToSuccess(leadCodeFromParam || orderId)
+            ? await redirectToSuccess(leadCodeFromParam || orderId, request)
             : new Response("OK", { status: 200 });
         }
 
@@ -184,39 +184,43 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             .update({ status: "payment_pending" })
             .eq("id", payment.lead_id);
           return isBrowser
-            ? redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed")
+            ? await redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed", request)
             : new Response("OK", { status: 200 });
         }
 
         return isBrowser
-          ? redirectToPending(leadCodeFromParam || orderId)
+          ? await redirectToPending(leadCodeFromParam || orderId, request)
           : new Response("OK", { status: 200 });
       },
     },
   },
 });
 
-const APP_ORIGIN = process.env.APP_BASE_URL ||
-  process.env.PUBLIC_SITE_URL ||
-  "https://udyamadhar.in";
+async function getRedirectOrigin(leadCode: string, request: Request): Promise<string> {
+  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
+  return getWebsiteOriginForLead(leadCode, null, request);
+}
 
-function redirectToSuccess(leadCode: string) {
+async function redirectToSuccess(leadCode: string, request: Request) {
+  const origin = await getRedirectOrigin(leadCode, request);
   return new Response(null, {
     status: 303,
-    headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
+    headers: { Location: `${origin}/success/${encodeURIComponent(leadCode)}` },
   });
 }
-function redirectToPending(leadCode: string) {
+async function redirectToPending(leadCode: string, request: Request) {
+  const origin = await getRedirectOrigin(leadCode, request);
   return new Response(null, {
     status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
+    headers: { Location: `${origin}/payment-pending/${encodeURIComponent(leadCode)}` },
   });
 }
-function redirectToFailure(leadCode: string, reason: string) {
+async function redirectToFailure(leadCode: string, reason: string, request: Request) {
+  const origin = await getRedirectOrigin(leadCode, request);
   const q = new URLSearchParams({ reason }).toString();
   return new Response(null, {
     status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
+    headers: { Location: `${origin}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
   });
 }
 

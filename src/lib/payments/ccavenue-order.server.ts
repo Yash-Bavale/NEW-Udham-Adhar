@@ -19,7 +19,7 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
 
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from("leads")
-    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2")
+    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2, website_id")
     .eq("lead_code", leadCodeInput)
     .maybeSingle();
   if (leadErr) throw new Error(leadErr.message);
@@ -106,8 +106,8 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
   }
   const paymentId = inserted.id;
 
-  const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
-    "https://udyamadhar.in";
+  const { getWebsiteOriginForLead } = await import("@/lib/websites/default-website.server");
+  const origin = await getWebsiteOriginForLead(lead.lead_code, (lead as any).website_id);
   const redirectUrl = `${origin}/api/public/webhooks/ccavenue`;
   const cancelUrl = `${origin}/api/public/webhooks/ccavenue`;
 
