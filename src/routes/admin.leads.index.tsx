@@ -23,6 +23,7 @@ import {
 import { listSavedFilters, type FilterJson } from "@/lib/crm/saved-filters.functions";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ExportModal } from "@/components/admin/ExportModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,26 +79,36 @@ function LeadsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
-  const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
+  const [exporting, setExporting] = useState<boolean>(false);
   const [exportOpen, setExportOpen] = useState(false);
   const role = useRole();
 
-  const handleExport = async (format: "csv" | "excel", idsToExport?: string[]) => {
-    setExporting(format);
-    setExportOpen(false);
+  // Debounce search input by 300ms so typing immediately searches
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const handleExport = async (opts: import("@/components/admin/ExportModal").ExportModalOptions) => {
+    setExporting(true);
     try {
+      const isSelectedScope = opts.scope === "selected" && selected.size > 0;
+      const isAllScope = opts.scope === "all";
+
       const res = await exportFn({
         data: {
-          ids: idsToExport && idsToExport.length > 0 ? idsToExport : undefined,
-          search: search || undefined,
-          status: status || undefined,
-          service: service || undefined,
-          source: source || undefined,
-          websiteId: websiteId || undefined,
-          assignedTo: assignee || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
+          ids: isSelectedScope ? Array.from(selected) : undefined,
+          search: !isSelectedScope && !isAllScope ? (search || undefined) : undefined,
+          status: !isSelectedScope && !isAllScope ? (status || undefined) : undefined,
+          service: !isSelectedScope && !isAllScope ? (service || undefined) : undefined,
+          source: !isSelectedScope && !isAllScope ? (source || undefined) : undefined,
+          websiteId: !isSelectedScope && !isAllScope ? (websiteId || undefined) : undefined,
+          assignedTo: !isSelectedScope && !isAllScope ? (assignee || undefined) : undefined,
+          dateFrom: opts.dateFrom || (!isSelectedScope && !isAllScope ? (dateFrom || undefined) : undefined),
+          dateTo: opts.dateTo || (!isSelectedScope && !isAllScope ? (dateTo || undefined) : undefined),
         },
       });
 
@@ -106,9 +117,9 @@ function LeadsPage() {
         return;
       }
 
-      const content = format === "excel" ? res.excelXml : res.csv;
-      const mime = format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
-      const ext = format === "excel" ? "xls" : "csv";
+      const content = opts.format === "excel" ? res.excelXml : res.csv;
+      const mime = opts.format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
+      const ext = opts.format === "excel" ? "xls" : "csv";
 
       const blob = new Blob([content], { type: mime });
       const url = URL.createObjectURL(blob);
@@ -120,11 +131,11 @@ function LeadsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Exported ${res.count} lead(s) to ${format.toUpperCase()}`);
+      toast.success(`Exported ${res.count} lead(s) to ${opts.format.toUpperCase()}`);
     } catch (e: any) {
       toast.error(e?.message || `Export failed`);
     } finally {
-      setExporting(null);
+      setExporting(false);
     }
   };
 
@@ -406,41 +417,35 @@ function LeadsPage() {
         >
           <Plus className="size-4" /> Add Lead
         </button>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setExportOpen(!exportOpen)}
-            disabled={!!exporting}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
-            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-          >
-            <Download className="size-4 text-emerald-600" />
-            {exporting ? "Exporting…" : "Export"}
-          </button>
-          {exportOpen && (
-            <div
-              className="absolute right-0 mt-1 w-48 rounded-lg border shadow-lg py-1 z-30 text-sm"
-              style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
-            >
-              <button
-                type="button"
-                onClick={() => handleExport("csv")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
-                style={{ color: "var(--admin-fg)" }}
-              >
-                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleExport("excel")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
-                style={{ color: "var(--admin-fg)" }}
-              >
-                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setExportOpen(true)}
+          disabled={exporting}
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <Download className="size-4 text-emerald-600" />
+          {exporting ? "Exporting…" : "Export"}
+        </button>
+        <ExportModal
+          title="Export Leads"
+          isOpen={exportOpen}
+          onClose={() => setExportOpen(false)}
+          onExport={handleExport}
+          selectedCount={selected.size}
+          activeFiltersCount={
+            (search ? 1 : 0) +
+            (status ? 1 : 0) +
+            (source ? 1 : 0) +
+            (websiteId ? 1 : 0) +
+            (service ? 1 : 0) +
+            (assignee ? 1 : 0) +
+            (dateFrom ? 1 : 0) +
+            (dateTo ? 1 : 0)
+          }
+          initialDateFrom={dateFrom}
+          initialDateTo={dateTo}
+        />
         {(source || websiteId || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {

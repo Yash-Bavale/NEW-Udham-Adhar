@@ -397,15 +397,23 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
     }
 
-    let matchingLeadIds: string[] | null = null;
+    let matchingLeadIds: string[] = [];
+    let matchingCustomerIds: string[] = [];
     if (data.search && data.search.trim()) {
-      const s = `%${data.search.trim()}%`;
-      const { data: matchedLeads } = await admin
-        .from("leads")
-        .select("id")
-        .or(`name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}`)
-        .limit(200);
+      const rawTerm = data.search.trim();
+      const s = `%${rawTerm}%`;
+      const cleanDigits = rawTerm.replace(/\D/g, "");
+      const digitTerm = cleanDigits.length >= 4 ? `%${cleanDigits}%` : null;
+
+      const leadOrClause = `name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}` + (digitTerm ? `,mobile.ilike.${digitTerm}` : "");
+      const custOrClause = `name.ilike.${s},primary_mobile.ilike.${s},primary_email.ilike.${s}` + (digitTerm ? `,primary_mobile.ilike.${digitTerm}` : "");
+
+      const [{ data: matchedLeads }, { data: matchedCusts }] = await Promise.all([
+        admin.from("leads").select("id").or(leadOrClause).limit(500),
+        admin.from("customers").select("id").or(custOrClause).limit(500),
+      ]);
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
+      matchingCustomerIds = (matchedCusts ?? []).map((c: any) => c.id);
     }
 
     let q = admin
@@ -430,11 +438,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     if (data.search && data.search.trim()) {
       const term = `%${data.search.trim()}%`;
-      if (matchingLeadIds && matchingLeadIds.length > 0) {
-        q = q.or(`application_code.ilike.${term},lead_id.in.(${matchingLeadIds.join(",")})`);
-      } else {
-        q = q.ilike("application_code", term);
-      }
+      const parts: string[] = [`application_code.ilike.${term}`];
+      if (matchingLeadIds.length > 0) parts.push(`lead_id.in.(${matchingLeadIds.join(",")})`);
+      if (matchingCustomerIds.length > 0) parts.push(`customer_id.in.(${matchingCustomerIds.join(",")})`);
+      q = q.or(parts.join(","));
     }
 
     const { data: apps, count, error } = await q.range(
@@ -1844,4 +1851,220 @@ export const resendServiceChangeEmail = createServerFn({ method: "POST" })
     });
 
     return { ok: true, recipient: lead.email };
+  });
+
+// ─────────────────────── Export Orders ───────────────────────
+
+const ExportOrdersInput = z.object({
+  ids: z.array(z.string().uuid()).optional(),
+  search: z.string().max(200).optional(),
+  fulfillmentStatus: z.string().optional(),
+  serviceId: z.string().optional(),
+  assignedTo: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+}).partial();
+
+function buildCsvContent(headers: string[], dataRows: (string | number | null | undefined)[][]): string {
+  const csvEscape = (v: unknown): string => {
+    if (v == null) return "";
+    const s = String(v);
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const headerLine = headers.map(csvEscape).join(",");
+  const bodyLines = dataRows.map((r) => r.map(csvEscape).join(","));
+  return "\uFEFF" + [headerLine, ...bodyLines].join("\n");
+}
+
+function buildExcelXmlContent(headers: string[], dataRows: (string | number | null | undefined)[][]): string {
+  const escapeXml = (v: unknown): string => {
+    if (v == null) return "";
+    return String(v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const xmlHeader = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#000000"/>
+  </Style>
+  <Style ss:ID="Header">
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#0F172A" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="Number">
+   <NumberFormat ss:Format="#,##0.00"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Orders Export">
+  <Table>`;
+
+  const columns = headers.map(() => `<Column ss:AutoFitWidth="1" ss:Width="140"/>`).join("\n");
+  const headerRow = `   <Row ss:Height="24">\n` + headers.map((h) => `    <Cell ss:StyleID="Header"><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`).join("\n") + `\n   </Row>`;
+
+  const rowsXml = dataRows.map((r) => {
+    const cells = r.map((val) => {
+      if (typeof val === "number") {
+        return `    <Cell ss:StyleID="Number"><Data ss:Type="Number">${val}</Data></Cell>`;
+      }
+      return `    <Cell><Data ss:Type="String">${escapeXml(val)}</Data></Cell>`;
+    }).join("\n");
+    return `   <Row ss:Height="20">\n${cells}\n   </Row>`;
+  }).join("\n");
+
+  const xmlFooter = `  </Table>\n </Worksheet>\n</Workbook>`;
+  return `${xmlHeader}\n${columns}\n${headerRow}\n${rowsXml}\n${xmlFooter}`;
+}
+
+export const exportOrdersCsv = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ExportOrdersInput.parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+
+    let q = admin
+      .from("applications")
+      .select("id, application_code, created_at, fulfillment_status, application_status, form_status, document_status, lead_id, customer_id, service_id, assigned_to, website_id")
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(50000);
+
+    if (data.ids && data.ids.length > 0) {
+      q = q.in("id", data.ids);
+    } else {
+      if (data.fulfillmentStatus && data.fulfillmentStatus !== "all") {
+        q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
+      }
+      if (data.serviceId && data.serviceId !== "all") {
+        q = q.eq("service_id", data.serviceId);
+      }
+      if (!isAdmin) {
+        q = q.eq("assigned_to", context.userId);
+      } else if (data.assignedTo && data.assignedTo !== "all") {
+        q = q.eq("assigned_to", data.assignedTo);
+      }
+      if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+      if (data.dateTo) q = q.lte("created_at", data.dateTo);
+
+      if (data.search && data.search.trim()) {
+        const rawTerm = data.search.trim();
+        const s = `%${rawTerm}%`;
+        const cleanDigits = rawTerm.replace(/\D/g, "");
+        const digitTerm = cleanDigits.length >= 4 ? `%${cleanDigits}%` : null;
+
+        const leadOrClause = `name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}` + (digitTerm ? `,mobile.ilike.${digitTerm}` : "");
+        const custOrClause = `name.ilike.${s},primary_mobile.ilike.${s},primary_email.ilike.${s}` + (digitTerm ? `,primary_mobile.ilike.${digitTerm}` : "");
+
+        const [{ data: matchedLeads }, { data: matchedCusts }] = await Promise.all([
+          admin.from("leads").select("id").or(leadOrClause).limit(500),
+          admin.from("customers").select("id").or(custOrClause).limit(500),
+        ]);
+        const mLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
+        const mCustIds = (matchedCusts ?? []).map((c: any) => c.id);
+
+        const parts: string[] = [`application_code.ilike.${s}`];
+        if (mLeadIds.length > 0) parts.push(`lead_id.in.(${mLeadIds.join(",")})`);
+        if (mCustIds.length > 0) parts.push(`customer_id.in.(${mCustIds.join(",")})`);
+        q = q.or(parts.join(","));
+      }
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    // Resolve leads
+    const leadIds = Array.from(new Set((rows ?? []).map((r) => r.lead_id).filter(Boolean) as string[]));
+    const leadMap = new Map<string, any>();
+    if (leadIds.length > 0) {
+      const { data: leads } = await admin.from("leads").select("id, name, email, mobile, service, total_amount").in("id", leadIds);
+      (leads ?? []).forEach((l) => leadMap.set(l.id, l));
+    }
+
+    // Resolve customers
+    const custIds = Array.from(new Set((rows ?? []).map((r) => r.customer_id).filter(Boolean) as string[]));
+    const custMap = new Map<string, any>();
+    if (custIds.length > 0) {
+      const { data: custs } = await admin.from("customers").select("id, name, primary_email, primary_mobile").in("id", custIds);
+      (custs ?? []).forEach((c) => custMap.set(c.id, c));
+    }
+
+    // Resolve services
+    const svcIds = Array.from(new Set((rows ?? []).map((r) => r.service_id).filter(Boolean) as string[]));
+    const svcMap = new Map<string, string>();
+    if (svcIds.length > 0) {
+      const { data: svcs } = await admin.from("services").select("id, service_name").in("id", svcIds);
+      (svcs ?? []).forEach((s) => svcMap.set(s.id, s.service_name));
+    }
+
+    // Resolve websites
+    const webIds = Array.from(new Set((rows ?? []).map((r) => r.website_id).filter(Boolean) as string[]));
+    const webMap = new Map<string, string>();
+    if (webIds.length > 0) {
+      const { data: webs } = await admin.from("websites").select("id, name").in("id", webIds);
+      (webs ?? []).forEach((w) => webMap.set(w.id, w.name));
+    }
+
+    // Resolve assignees
+    const assigneeIds = Array.from(new Set((rows ?? []).map((r) => r.assigned_to).filter(Boolean) as string[]));
+    const assigneeMap = new Map<string, string>();
+    if (assigneeIds.length > 0) {
+      const { data: profs } = await admin.from("profiles").select("id, display_name, email").in("id", assigneeIds);
+      (profs ?? []).forEach((p) => assigneeMap.set(p.id, p.display_name || p.email || ""));
+    }
+
+    const headers = [
+      "Application Code", "Created At", "Customer Name", "Email", "Mobile",
+      "Service", "Website", "Fulfillment Status", "Application Status",
+      "Total Amount", "Assigned Staff", "Form Status", "Document Status"
+    ];
+
+    const formattedRows = (rows ?? []).map((r) => {
+      const l = leadMap.get(r.lead_id) ?? {};
+      const c = custMap.get(r.customer_id) ?? {};
+      const name = l.name || c.name || "";
+      const email = l.email || c.primary_email || "";
+      const mobile = l.mobile || c.primary_mobile || "";
+      const svcName = svcMap.get(r.service_id) || l.service || "";
+      const webName = webMap.get(r.website_id) || "";
+      const staffName = assigneeMap.get(r.assigned_to) || "";
+
+      return [
+        r.application_code || "",
+        r.created_at || "",
+        name,
+        email,
+        mobile,
+        svcName,
+        webName,
+        (r.fulfillment_status || "").replace(/_/g, " "),
+        (r.application_status || "").replace(/_/g, " "),
+        Number(l.total_amount ?? 0),
+        staffName,
+        r.form_status || "",
+        r.document_status || "",
+      ];
+    });
+
+    const csvContent = buildCsvContent(headers, formattedRows);
+    const excelXmlContent = buildExcelXmlContent(headers, formattedRows);
+
+    return {
+      csv: csvContent,
+      excelXml: excelXmlContent,
+      count: rows?.length ?? 0,
+    };
   });

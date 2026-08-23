@@ -2,12 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, Download } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
+import { toast } from "sonner";
 
-import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
+import { listOrdersV2, exportOrdersCsv } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
+import { ExportModal } from "@/components/admin/ExportModal";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Input } from "@/components/ui/input";
@@ -109,6 +111,10 @@ function OrdersListPage() {
     });
   }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays, page]);
 
+  const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportFn = useServerFn(exportOrdersCsv);
+
   // Debounce search input by 350ms
   useEffect(() => {
     const t = setTimeout(() => {
@@ -120,7 +126,50 @@ function OrdersListPage() {
   // Reset page to 1 whenever filters change
   useEffect(() => {
     setPage(1);
-  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays]);
+  }, [debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays]);
+
+  const handleExport = async (opts: import("@/components/admin/ExportModal").ExportModalOptions) => {
+    setExporting(true);
+    try {
+      const isAllScope = opts.scope === "all";
+
+      const res = await exportFn({
+        data: {
+          search: !isAllScope ? (debouncedSearch || undefined) : undefined,
+          fulfillmentStatus: !isAllScope ? (fulfillmentStatus !== "all" ? fulfillmentStatus : undefined) : undefined,
+          serviceId: !isAllScope ? (serviceId !== "all" ? serviceId : undefined) : undefined,
+          assignedTo: !isAllScope ? (assignedTo !== "all" ? assignedTo : undefined) : undefined,
+          dateFrom: opts.dateFrom || (!isAllScope ? (dateFrom || undefined) : undefined),
+          dateTo: opts.dateTo || (!isAllScope ? (dateTo || undefined) : undefined),
+        },
+      });
+
+      if (!res.count) {
+        toast.error("No orders match the selected export criteria.");
+        return;
+      }
+
+      const content = opts.format === "excel" ? res.excelXml : res.csv;
+      const mime = opts.format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8";
+      const ext = opts.format === "excel" ? "xls" : "csv";
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders_export_${new Date().toISOString().slice(0, 10)}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${res.count} order(s) to ${opts.format.toUpperCase()}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {
@@ -305,15 +354,42 @@ function OrdersListPage() {
             {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
           </p>
         </div>
-        {isFilterActive && (
+        <div className="flex items-center gap-2">
+          {isFilterActive && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+            >
+              <RotateCcw className="size-3.5" /> Reset Filters
+            </button>
+          )}
           <button
             type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+            onClick={() => setExportOpen(true)}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
           >
-            <RotateCcw className="size-3.5" /> Reset Filters
+            <Download className="size-3.5" />
+            {exporting ? "Exporting…" : "Export Orders"}
           </button>
-        )}
+          <ExportModal
+            title="Export Orders"
+            isOpen={exportOpen}
+            onClose={() => setExportOpen(false)}
+            onExport={handleExport}
+            activeFiltersCount={
+              (debouncedSearch ? 1 : 0) +
+              (fulfillmentStatus !== "all" ? 1 : 0) +
+              (serviceId !== "all" ? 1 : 0) +
+              (assignedTo !== "all" ? 1 : 0) +
+              (dateFrom ? 1 : 0) +
+              (dateTo ? 1 : 0)
+            }
+            initialDateFrom={dateFrom}
+            initialDateTo={dateTo}
+          />
+        </div>
       </div>
 
       {/* Modern Filter Card */}
