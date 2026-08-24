@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getUserModulePermission } from "@/lib/crm/permissions.functions";
 
 export type SearchHit = {
   kind: "application" | "lead" | "invoice" | "certificate" | "complaint";
@@ -23,27 +24,43 @@ export const globalSearch = createServerFn({ method: "POST" })
     const q = (data.q || "").trim();
     if (q.length < 2) return { hits: [] };
     const s = context.supabase;
+    const userId = context.userId;
     const like = `%${q}%`;
     const hits: SearchHit[] = [];
 
+    const [leadsPerm, ordersPerm, invoicesPerm, complaintsPerm] = await Promise.all([
+      getUserModulePermission(s, userId, "leads"),
+      getUserModulePermission(s, userId, "orders"),
+      getUserModulePermission(s, userId, "invoices"),
+      getUserModulePermission(s, userId, "complaints"),
+    ]);
+
     const [l, aByCode, inv, cert, comp] = await Promise.all([
-      s.from("leads")
-        .select("id, lead_code, name, email, mobile, service, created_at")
-        .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
-        .limit(10),
-      s.from("applications")
-        .select("id, application_code, application_status, lead_id, created_at, services(service_name)")
-        .ilike("application_code", like)
-        .limit(6),
-      s.from("invoices").select("id, invoice_number, total_amount").ilike("invoice_number", like).limit(5),
+      leadsPerm.canView
+        ? s.from("leads")
+            .select("id, lead_code, name, email, mobile, service, created_at")
+            .or(`name.ilike.${like},email.ilike.${like},mobile.ilike.${like},lead_code.ilike.${like}`)
+            .limit(10)
+        : Promise.resolve({ data: [] }),
+      ordersPerm.canView
+        ? s.from("applications")
+            .select("id, application_code, application_status, lead_id, created_at, services(service_name)")
+            .ilike("application_code", like)
+            .limit(6)
+        : Promise.resolve({ data: [] }),
+      invoicesPerm.canView
+        ? s.from("invoices").select("id, invoice_number, total_amount").ilike("invoice_number", like).limit(5)
+        : Promise.resolve({ data: [] }),
       s.from("certificates").select("id, certificate_number, file_name").or(`certificate_number.ilike.${like},file_name.ilike.${like}`).limit(5),
-      s.from("complaints").select("id, complaint_number, status").ilike("complaint_number", like).limit(5),
+      complaintsPerm.canView
+        ? s.from("complaints").select("id, complaint_number, status").ilike("complaint_number", like).limit(5)
+        : Promise.resolve({ data: [] }),
     ]);
 
     // Pull applications linked to matching leads so email/mobile searches surface orders.
     const leadIds = (l.data || []).map((r: any) => r.id).filter(Boolean);
     let linkedApps: any[] = [];
-    if (leadIds.length) {
+    if (ordersPerm.canView && leadIds.length) {
       const { data: linked } = await s
         .from("applications")
         .select("id, application_code, application_status, lead_id, created_at, services(service_name)")

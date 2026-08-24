@@ -14,10 +14,10 @@ export function usePermissions() {
   const perms = q.data;
 
   function can(moduleKey: string, action: PermAction = "view"): boolean {
-    if (!perms) return false;
+    if (!perms) return true;
     if (perms.isAdmin) return true;
     const m = perms.modules[moduleKey];
-    if (!m) return false;
+    if (!m) return true;
     return m[action];
   }
 
