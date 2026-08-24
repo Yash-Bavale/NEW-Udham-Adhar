@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"];
+const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"] as const;
 
 export async function autoAssignLeadOrOrder(opts: {
   leadId?: string | null;
