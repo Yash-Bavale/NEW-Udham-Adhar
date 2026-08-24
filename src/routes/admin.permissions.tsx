@@ -131,6 +131,7 @@ function PermissionsPage() {
             {selectedUser && (
               <PermissionMatrix
                 userId={selectedUser}
+                userRoles={(staffList.find((u) => u.id === selectedUser)?.roles ?? []) as string[]}
                 modules={modulesQ.data ?? []}
                 tree={treeQ.data}
                 onSaved={() => qc.invalidateQueries({ queryKey: ["user-permissions", selectedUser] })}
@@ -142,13 +143,23 @@ function PermissionsPage() {
   );
 }
 
+function defaultViewForUser(roles: string[], moduleKey: string): boolean {
+  const isOps = roles.some((r) => ["admin", "super_admin", "manager", "operations", "executive"].includes(r));
+  const isFinance = roles.some((r) => ["admin", "super_admin", "finance", "accounts"].includes(r));
+  if (["leads", "orders", "documents", "tasks"].includes(moduleKey)) return isOps;
+  if (["invoices", "payments"].includes(moduleKey)) return isFinance;
+  return roles.some((r) => ["admin", "super_admin"].includes(r));
+}
+
 function PermissionMatrix({
   userId,
+  userRoles,
   modules,
   tree,
   onSaved,
 }: {
   userId: string;
+  userRoles: string[];
   modules: Array<{ key: string; label: string; description: string | null }>;
   tree: any;
   onSaved: () => void;
@@ -231,11 +242,12 @@ function PermissionMatrix({
           </thead>
           <tbody>
             {modules.map((m) => {
+              const defaultView = defaultViewForUser(userRoles, m.key);
               const p = permsByModule.get(m.key) ?? {
                 module_key: m.key,
-                can_view: false,
-                can_create: false,
-                can_edit: false,
+                can_view: defaultView,
+                can_create: defaultView,
+                can_edit: defaultView,
                 can_delete: false,
                 scope_all: true,
               };
@@ -299,30 +311,56 @@ function ModuleRow({
 
   return (
     <>
-      <tr className="border-b">
+      <tr className={`border-b ${!perm.can_view ? "opacity-60 bg-rose-50/20" : ""}`}>
         <td className="py-2 pr-2">
-          <div className="font-medium">{module.label}</div>
+          <div className="font-medium flex items-center gap-1.5">
+            {module.label}
+            {!perm.can_view && (
+              <span className="text-[10px] uppercase font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded">
+                Disabled
+              </span>
+            )}
+          </div>
           {module.description && (
             <div className="text-xs text-muted-foreground">{module.description}</div>
           )}
         </td>
         <td className="text-center">
-          <Checkbox checked={perm.can_view} onCheckedChange={(v) => onChange({ can_view: !!v })} />
+          <Checkbox
+            checked={perm.can_view}
+            onCheckedChange={(v) =>
+              onChange({
+                can_view: !!v,
+                can_create: !!v ? perm.can_create : false,
+                can_edit: !!v ? perm.can_edit : false,
+                can_delete: !!v ? perm.can_delete : false,
+              })
+            }
+          />
         </td>
         <td className="text-center">
-          <Checkbox checked={perm.can_create} onCheckedChange={(v) => onChange({ can_create: !!v })} />
+          <Checkbox
+            checked={perm.can_create}
+            onCheckedChange={(v) => onChange({ can_create: !!v, can_view: !!v ? true : perm.can_view })}
+          />
         </td>
         <td className="text-center">
-          <Checkbox checked={perm.can_edit} onCheckedChange={(v) => onChange({ can_edit: !!v })} />
+          <Checkbox
+            checked={perm.can_edit}
+            onCheckedChange={(v) => onChange({ can_edit: !!v, can_view: !!v ? true : perm.can_view })}
+          />
         </td>
         <td className="text-center">
-          <Checkbox checked={perm.can_delete} onCheckedChange={(v) => onChange({ can_delete: !!v })} />
+          <Checkbox
+            checked={perm.can_delete}
+            onCheckedChange={(v) => onChange({ can_delete: !!v, can_view: !!v ? true : perm.can_view })}
+          />
         </td>
         <td className="pl-2">
           <div className="flex items-center gap-2">
             <Switch
               checked={perm.scope_all}
-              onCheckedChange={(v) => onChange({ scope_all: v })}
+              onCheckedChange={(v) => onChange({ scope_all: v, can_view: v ? true : perm.can_view })}
               aria-label="Scope all"
             />
             <span className="text-xs text-muted-foreground">{perm.scope_all ? "All" : "Custom"}</span>
