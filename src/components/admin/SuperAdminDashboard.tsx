@@ -294,6 +294,7 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
           <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" href="/admin/leads?filter=not_contacted" />
           <StatChip label="Contacted" value={m.leadsContacted} tone="sky" href="/admin/leads?status=contacted" />
           <StatChip label="Converted" value={m.leadsConverted} tone="emerald" href="/admin/leads?filter=converted" />
+          <StatChip label="Repeated" value={m.repeatedLeads} tone="amber" href="/admin/leads?filter=repeated" />
         </>}
       />
       <ModernKpi

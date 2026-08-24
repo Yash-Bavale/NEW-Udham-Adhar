@@ -128,6 +128,7 @@ export type SuperAdminOverview = {
   metrics: {
     uniqueLeads: number;
     uniqueLeadsPrev: number;
+    repeatedLeads: number;
     leadsNotContacted: number;
     leadsContacted: number;
     leadsConverted: number;
@@ -573,6 +574,7 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       metrics: {
         uniqueLeads,
         uniqueLeadsPrev,
+        repeatedLeads,
         leadsNotContacted,
         leadsContacted,
         leadsConverted,
