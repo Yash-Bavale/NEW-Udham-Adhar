@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AdminShell } from "@/components/admin/AdminShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,8 +72,7 @@ function PermissionsPage() {
   }, [staffList, search]);
 
   return (
-    <AdminShell>
-      <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-primary" />
           <h1 className="text-xl font-semibold">Permissions</h1>
@@ -141,7 +139,6 @@ function PermissionsPage() {
           </Card>
         </div>
       </div>
-    </AdminShell>
   );
 }
 
