@@ -145,28 +145,13 @@ function StatusList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+import { AppSettingsCard } from "@/components/admin/AppSettingsCard";
+
 function NotificationsTab() {
-  const prefs = [
-    { label: "Email — new lead arrived", on: true },
-    { label: "Email — payment received", on: true },
-    { label: "Email — complaint filed", on: true },
-    { label: "In-app — daily summary", on: false },
-    { label: "WhatsApp — service updates", on: false },
-  ];
   return (
-    <SectionCard title="Notification Preferences">
-      <ul className="divide-y" style={{ borderColor: "var(--admin-border)" }}>
-        {prefs.map((p) => (
-          <li key={p.label} className="flex items-center justify-between px-4 py-3 text-sm">
-            <span style={{ color: "var(--admin-fg)" }}>{p.label}</span>
-            <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: p.on ? "var(--admin-success)" : "var(--admin-fg-muted)" }}>
-              <span className="size-1.5 rounded-full" style={{ background: p.on ? "var(--admin-success)" : "var(--admin-fg-subtle)" }} />
-              {p.on ? "Enabled" : "Disabled"}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </SectionCard>
+    <div className="space-y-6">
+      <AppSettingsCard />
+    </div>
   );
 }
 
