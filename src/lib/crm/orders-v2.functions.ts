@@ -373,30 +373,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       console.error("[listOrdersV2] background reconciliation error:", err);
     });
 
-    // Fetch paid application IDs from payments table & non-lead applications
-    const [{ data: paidRows }, { data: nonLeadApps }] = await Promise.all([
-      admin
-        .from("payments")
-        .select("application_id")
-        .eq("status", "paid")
-        .not("application_id", "is", null),
-      admin
-        .from("applications")
-        .select("id")
-        .eq("is_deleted", false)
-        .limit(5000),
-    ]);
-
-    const paidAppIds = new Set((paidRows ?? []).map((r: any) => r.application_id).filter(Boolean));
-    for (const a of nonLeadApps ?? []) {
-      paidAppIds.add(a.id);
-    }
-
-    const appIdsArr = Array.from(paidAppIds);
-    if (appIdsArr.length === 0) {
-      return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
-    }
-
     let matchingLeadIds: string[] | null = null;
     if (data.search && data.search.trim()) {
       const s = `%${data.search.trim()}%`;
@@ -415,7 +391,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .in("id", appIdsArr)
       .order("created_at", { ascending: false });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
