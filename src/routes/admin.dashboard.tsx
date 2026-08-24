@@ -7,7 +7,7 @@ import { WorkflowStatusWidgets } from "@/components/admin/WorkflowStatusWidgets"
 import type { RangePreset } from "@/lib/crm/super-admin.functions";
 
 const searchSchema = z.object({
-  preset: fallback(z.enum(["today", "yesterday", "7d", "30d", "mtd", "custom"]), "today").default("today"),
+  preset: fallback(z.enum(["today", "yesterday", "7d", "15d", "30d", "mtd", "custom"]), "today").default("today"),
   from: fallback(z.string().optional(), undefined).optional(),
   to: fallback(z.string().optional(), undefined).optional(),
 });
