@@ -4,10 +4,16 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertRole } from "@/lib/audit";
 
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 export const listPermissionModules = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const admin = await getAdmin();
+    const { data, error } = await admin
       .from("permission_modules")
       .select("*")
       .order("sort_order", { ascending: true });
@@ -20,12 +26,13 @@ export const listUserPermissions = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ userId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
+    const admin = await getAdmin();
     const [perms, scopes] = await Promise.all([
-      context.supabase
+      admin
         .from("user_permissions")
         .select("*")
         .eq("user_id", data.userId),
-      context.supabase
+      admin
         .from("user_permission_scopes")
         .select("*")
         .eq("user_id", data.userId),
@@ -50,7 +57,8 @@ export const upsertUserPermission = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => UpsertPermInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
-    const { error } = await context.supabase.from("user_permissions").upsert(
+    const admin = await getAdmin();
+    const { error } = await admin.from("user_permissions").upsert(
       {
         user_id: data.userId,
         module_key: data.moduleKey,
@@ -83,7 +91,8 @@ export const setUserPermissionScopes = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SetScopesInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
-    const { error: dErr } = await context.supabase
+    const admin = await getAdmin();
+    const { error: dErr } = await admin
       .from("user_permission_scopes")
       .delete()
       .eq("user_id", data.userId)
@@ -97,7 +106,7 @@ export const setUserPermissionScopes = createServerFn({ method: "POST" })
         category_id: s.categoryId ?? null,
         service_id: s.serviceId ?? null,
       }));
-      const { error } = await context.supabase.from("user_permission_scopes").insert(rows);
+      const { error } = await admin.from("user_permission_scopes").insert(rows);
       if (error) throw new Error(error.message);
     }
     return { ok: true };
@@ -113,7 +122,8 @@ export const bulkResetUserPermissions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
-    const { data: modules, error: mErr } = await context.supabase
+    const admin = await getAdmin();
+    const { data: modules, error: mErr } = await admin
       .from("permission_modules")
       .select("key");
     if (mErr) throw new Error(mErr.message);
@@ -126,7 +136,7 @@ export const bulkResetUserPermissions = createServerFn({ method: "POST" })
       can_delete: false,
       scope_all: true,
     }));
-    const { error } = await context.supabase
+    const { error } = await admin
       .from("user_permissions")
       .upsert(rows, { onConflict: "user_id,module_key" });
     if (error) throw new Error(error.message);
