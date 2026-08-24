@@ -80,6 +80,13 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
           leadId = lead.id;
           leadCode = lead.lead_code ?? null;
 
+          try {
+            const { autoAssignLeadOrOrder } = await import("@/lib/crm/auto-assign.server");
+            await autoAssignLeadOrOrder({ leadId });
+          } catch (assignErr) {
+            console.error("[talk-to-expert] Auto-assign error:", assignErr);
+          }
+
           await supabaseAdmin.from("activity_logs").insert({
             lead_id: leadId,
             activity_type: "lead_created",

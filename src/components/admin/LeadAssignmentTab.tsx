@@ -64,10 +64,10 @@ export function LeadAssignmentTab() {
         <div className="p-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-medium flex items-center gap-2">
-              <Shuffle className="size-4" /> Round-Robin Auto-Assignment
+              <Shuffle className="size-4 text-indigo-600" /> Round-Robin Auto-Assignment for Orders & Leads
             </div>
             <p className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>
-              When ON, every new lead is auto-assigned to the next eligible employee in the pool.
+              When ON, every new lead and paid order is automatically assigned to a dedicated active employee with order access.
             </p>
           </div>
           <div className="flex items-center gap-3">

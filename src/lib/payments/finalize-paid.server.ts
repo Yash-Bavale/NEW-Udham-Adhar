@@ -104,7 +104,20 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         .select("id")
         .single();
       if (appErr) console.error("[finalize] app create failed", appErr);
-      if (createdApp) applicationId = createdApp.id;
+      if (createdApp) {
+        applicationId = createdApp.id;
+        // Auto-assign order (and sync to lead) if unassigned
+        try {
+          const { autoAssignLeadOrOrder } = await import("@/lib/crm/auto-assign.server");
+          await autoAssignLeadOrOrder({
+            leadId: payment.lead_id,
+            applicationId: createdApp.id,
+            serviceId: targetServiceId,
+          });
+        } catch (assignErr) {
+          console.error("[finalize] Auto-assignment failed:", assignErr);
+        }
+      }
     }
     if (applicationId) {
       await supabaseAdmin.from("payments").update({ application_id: applicationId } as any).eq("id", payment.id);

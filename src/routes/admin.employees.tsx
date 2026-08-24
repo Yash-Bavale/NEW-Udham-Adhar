@@ -156,7 +156,7 @@ function EmployeesPage() {
         <TabsList>
           <TabsTrigger value="directory">Directory</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="assignment">Lead Assignment</TabsTrigger>
+          <TabsTrigger value="assignment">Auto-Assignment Pool</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory" className="space-y-4 mt-4">

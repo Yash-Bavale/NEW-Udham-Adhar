@@ -824,6 +824,16 @@ export const addLead = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
+    // Auto-assign lead if assigned_to was not explicitly passed
+    if (!rest.assigned_to) {
+      try {
+        const { autoAssignLeadOrOrder } = await import("@/lib/crm/auto-assign.server");
+        await autoAssignLeadOrOrder({ leadId: inserted.id, serviceId });
+      } catch (assignErr) {
+        console.error("[addLead] Auto-assignment failed:", assignErr);
+      }
+    }
+
     // Log lead_created to application_events (canonical Phase 1 timeline).
     const [{ data: profile }, { data: roleRows }] = await Promise.all([
       admin.from("profiles").select("display_name, email").eq("id", context.userId).maybeSingle(),

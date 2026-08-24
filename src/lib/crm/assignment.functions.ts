@@ -101,10 +101,11 @@ export const listEligibleEmployees = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const admin = await getAdmin();
+    const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"];
     const { data: roleRows, error } = await admin
       .from("user_roles")
       .select("user_id, role")
-      .in("role", ["executive", "manager"]);
+      .in("role", ORDER_ACCESS_ROLES);
     if (error) throw new Error(error.message);
     const ids = Array.from(new Set((roleRows ?? []).map((r: any) => r.user_id)));
     if (!ids.length) return { rows: [] as { id: string; name: string; role: string }[] };
@@ -151,10 +152,11 @@ export const addToPool = createServerFn({ method: "POST" })
       .from("user_roles")
       .select("role")
       .eq("user_id", data.userId);
+    const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"];
     const okRoles = (roles ?? []).some((r: any) =>
-      ["executive", "manager"].includes(r.role)
+      ORDER_ACCESS_ROLES.includes(r.role)
     );
-    if (!okRoles) throw new Error("Only executives or managers can be added to the pool.");
+    if (!okRoles) throw new Error("Only employees with order access roles can be added to the pool.");
     const { error } = await admin
       .from("assignment_pool")
       .insert({

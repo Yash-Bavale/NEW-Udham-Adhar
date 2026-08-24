@@ -173,6 +173,14 @@ export const createLead = createServerFn({ method: "POST" })
       leadCode = row.lead_code as string;
     }
 
+    // Auto-assign lead to employee from assignment_pool if enabled
+    try {
+      const { autoAssignLeadOrOrder } = await import("@/lib/crm/auto-assign.server");
+      await autoAssignLeadOrOrder({ leadId, serviceId: service.id });
+    } catch (assignErr) {
+      console.error("[createLead] Auto-assignment failed:", assignErr);
+    }
+
     // If this was a duplicate, bump the original's counter.
     if (duplicateOf) {
       const { data: orig } = await supabaseAdmin
