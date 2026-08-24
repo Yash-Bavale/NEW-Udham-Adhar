@@ -258,3 +258,105 @@
 body { top: 0 !important; }
 .skiptranslate iframe.goog-te-banner-frame { display: none !important; }
 
+/* react-day-picker v9 layout fix */
+.rdp-months {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+}
+@media (max-width: 640px) {
+  .rdp-months {
+    flex-direction: column;
+  }
+}
+.rdp-month {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 260px;
+}
+.rdp-month_caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 2.25rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #0f172a;
+}
+.rdp-nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  padding: 0 0.25rem;
+}
+.rdp-button_next, .rdp-button_previous {
+  pointer-events: auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  transition: all 0.15s ease;
+}
+.rdp-button_next:hover, .rdp-button_previous:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.rdp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rdp-weekdays {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  margin-bottom: 0.25rem;
+}
+.rdp-weekday {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  height: 2rem;
+  text-transform: uppercase;
+}
+.rdp-week {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr) !important;
+  margin-top: 0.25rem;
+}
+.rdp-day {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  margin: 0 auto;
+}
+.rdp-day_button {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  transition: all 0.15s ease;
+}
+
+

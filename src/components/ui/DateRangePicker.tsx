@@ -3,9 +3,10 @@
 import * as React from "react";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Calendar as CalendarIcon, X, Check } from "lucide-react";
-import { DateRange, DayPicker } from "react-day-picker";
+import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export type DateRangePresetKey =
@@ -257,44 +258,13 @@ export function DateRangePicker({
 
           {/* Dual Month Calendar View */}
           <div className="p-3 bg-white flex justify-center">
-            <DayPicker
+            <Calendar
               mode="range"
               selected={draftRange}
               onSelect={handleRangeSelect}
               numberOfMonths={2}
               showOutsideDays={false}
-              className="p-1"
-              classNames={{
-                months: "flex flex-col md:flex-row gap-6",
-                month: "space-y-3",
-                caption: "flex justify-center pt-1 relative items-center text-sm font-bold text-slate-800",
-                caption_label: "text-sm font-bold text-slate-800",
-                nav: "space-x-1 flex items-center",
-                nav_button: cn(
-                  "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100 border border-slate-200 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-all",
-                ),
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
-                table: "w-full border-collapse space-y-1",
-                head_row: "flex w-full mt-2",
-                head_cell: "text-slate-400 rounded-md w-9 font-semibold text-[11px] uppercase text-center",
-                row: "flex w-full mt-1",
-                cell: cn(
-                  "relative p-0 text-center text-xs focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-blue-50/80 [&:has([aria-selected].day-range-end)]:rounded-r-lg [&:has([aria-selected].day-range-start)]:rounded-l-lg",
-                  "first:[&:has([aria-selected])]:rounded-l-lg last:[&:has([aria-selected])]:rounded-r-lg",
-                ),
-                day: cn(
-                  "h-9 w-9 p-0 font-medium text-slate-700 aria-selected:opacity-100 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center justify-center text-xs",
-                ),
-                day_range_start: "bg-blue-600 text-white hover:bg-blue-700 hover:text-white rounded-lg shadow-xs font-bold",
-                day_range_end: "bg-blue-600 text-white hover:bg-blue-700 hover:text-white rounded-lg shadow-xs font-bold",
-                day_selected: "bg-blue-600 text-white hover:bg-blue-700 hover:text-white font-bold",
-                day_today: "border border-blue-400 font-bold text-blue-600",
-                day_outside: "text-slate-300 opacity-40",
-                day_disabled: "text-slate-300 opacity-30",
-                day_range_middle: "aria-selected:bg-blue-50 aria-selected:text-blue-900 rounded-none font-medium",
-                day_hidden: "invisible",
-              }}
+              className="p-1 font-sans"
             />
           </div>
 
