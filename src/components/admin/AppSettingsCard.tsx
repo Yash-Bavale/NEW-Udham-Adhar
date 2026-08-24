@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getAppSettings, updateCustomerDelayAutocloseMinutes, updateSoundSettings } from "@/lib/settings/app-settings.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Timer, Volume2, VolumeX, Bell, Play } from "lucide-react";
+import { Timer, Volume2, VolumeX, Bell, Play, Upload, Music, Check } from "lucide-react";
 import { playNotificationSound, type RingtoneTone } from "@/hooks/useNotifications";
 
 function minutesToHHMM(min: number): string {
@@ -30,12 +30,42 @@ export function AppSettingsCard() {
   const saveSound = useServerFn(updateSoundSettings);
 
   const [value, setValue] = useState("08:00");
-  const [leadsSound, setLeadsSound] = useState(true);
-  const [ordersSound, setOrdersSound] = useState(true);
-  const [leadsRingtone, setLeadsRingtone] = useState<RingtoneTone>("chime");
-  const [leadsCustomUrl, setLeadsCustomUrl] = useState("");
-  const [ordersRingtone, setOrdersRingtone] = useState<RingtoneTone>("bell");
-  const [ordersCustomUrl, setOrdersCustomUrl] = useState("");
+  const [leadsSound, setLeadsSound] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("udyam.sound.leads") !== "false";
+  });
+  const [ordersSound, setOrdersSound] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("udyam.sound.orders") !== "false";
+  });
+  const [leadsRingtone, setLeadsRingtone] = useState<RingtoneTone>(() => {
+    if (typeof window === "undefined") return "chime";
+    return (localStorage.getItem("udyam.sound.leads_ringtone") as RingtoneTone) || "chime";
+  });
+  const [leadsCustomUrl, setLeadsCustomUrl] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("udyam.sound.leads_custom_url") || "";
+  });
+  const [ordersRingtone, setOrdersRingtone] = useState<RingtoneTone>(() => {
+    if (typeof window === "undefined") return "bell";
+    return (localStorage.getItem("udyam.sound.orders_ringtone") as RingtoneTone) || "bell";
+  });
+  const [ordersCustomUrl, setOrdersCustomUrl] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("udyam.sound.orders_custom_url") || "";
+  });
+
+  const [leadFileName, setLeadFileName] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("udyam.sound.leads_file_name") || "";
+  });
+  const [orderFileName, setOrderFileName] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("udyam.sound.orders_file_name") || "";
+  });
+
+  const leadFileRef = useRef<HTMLInputElement>(null);
+  const orderFileRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,20 +77,6 @@ export function AppSettingsCard() {
       .then((s) => {
         if (cancelled) return;
         setValue(minutesToHHMM(s.customerDelayAutocloseMinutes));
-        setLeadsSound(s.leadsSoundEnabled);
-        setOrdersSound(s.ordersSoundEnabled);
-        setLeadsRingtone((s.leadsRingtone as RingtoneTone) || "chime");
-        setLeadsCustomUrl(s.leadsCustomUrl || "");
-        setOrdersRingtone((s.ordersRingtone as RingtoneTone) || "bell");
-        setOrdersCustomUrl(s.ordersCustomUrl || "");
-
-        // Sync local storage for active browser session
-        localStorage.setItem("udyam.sound.leads", String(s.leadsSoundEnabled));
-        localStorage.setItem("udyam.sound.orders", String(s.ordersSoundEnabled));
-        localStorage.setItem("udyam.sound.leads_ringtone", s.leadsRingtone || "chime");
-        localStorage.setItem("udyam.sound.leads_custom_url", s.leadsCustomUrl || "");
-        localStorage.setItem("udyam.sound.orders_ringtone", s.ordersRingtone || "bell");
-        localStorage.setItem("udyam.sound.orders_custom_url", s.ordersCustomUrl || "");
       })
       .catch(() => toast.error("Failed to load settings"))
       .finally(() => !cancelled && setLoading(false));
@@ -108,13 +124,65 @@ export function AppSettingsCard() {
       localStorage.setItem("udyam.sound.orders_ringtone", ordersRingtone);
       localStorage.setItem("udyam.sound.orders_custom_url", ordersCustomUrl);
 
-      toast.success("Notification sound & custom ringtones saved for employees!");
+      toast.success("Notification sound & MP3 ringtones saved!");
     } catch (e) {
       toast.error((e as Error).message || "Failed to save sound settings");
     } finally {
       setSavingSound(false);
     }
   }
+
+  const handleLeadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Audio file size should be less than 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      if (dataUrl) {
+        setLeadsCustomUrl(dataUrl);
+        setLeadsRingtone("custom");
+        setLeadFileName(file.name);
+        localStorage.setItem("udyam.sound.leads_custom_url", dataUrl);
+        localStorage.setItem("udyam.sound.leads_ringtone", "custom");
+        localStorage.setItem("udyam.sound.leads_file_name", file.name);
+        toast.success(`Uploaded Lead MP3 ringtone: ${file.name}`);
+        playNotificationSound("preview", "custom", dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleOrderFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Audio file size should be less than 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string;
+      if (dataUrl) {
+        setOrdersCustomUrl(dataUrl);
+        setOrdersRingtone("custom");
+        setOrderFileName(file.name);
+        localStorage.setItem("udyam.sound.orders_custom_url", dataUrl);
+        localStorage.setItem("udyam.sound.orders_ringtone", "custom");
+        localStorage.setItem("udyam.sound.orders_file_name", file.name);
+        toast.success(`Uploaded Order MP3 ringtone: ${file.name}`);
+        playNotificationSound("preview", "custom", dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleTestLeadSound = () => {
     playNotificationSound("preview", leadsRingtone, leadsCustomUrl);
@@ -154,41 +222,71 @@ export function AppSettingsCard() {
             </div>
 
             {leadsSound && (
-              <div className="pt-2 grid grid-cols-1 md:grid-cols-12 gap-3 items-end border-t border-slate-200/80">
-                <div className="md:col-span-4 space-y-1">
-                  <Label className="text-xs font-medium text-slate-700">Lead Ringtone Tone</Label>
-                  <Select value={leadsRingtone} onValueChange={(v) => setLeadsRingtone(v as RingtoneTone)} disabled={loading}>
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Select tone..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="chime">🎵 Standard Double Chime</SelectItem>
-                      <SelectItem value="bell">🔔 Resonant Bell Ring</SelectItem>
-                      <SelectItem value="alert">🚨 High Alert Alarm</SelectItem>
-                      <SelectItem value="ding">🎶 Soft Marimba Ding</SelectItem>
-                      <SelectItem value="soft">🔉 Gentle Double Pulse</SelectItem>
-                      <SelectItem value="custom">🎼 Custom MP3 File / URL</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="pt-3 space-y-3 border-t border-slate-200/80">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                  <div className="md:col-span-5 space-y-1">
+                    <Label className="text-xs font-medium text-slate-700">Lead Ringtone Tone</Label>
+                    <Select value={leadsRingtone} onValueChange={(v) => setLeadsRingtone(v as RingtoneTone)} disabled={loading}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Select tone..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="chime">🎵 Standard Double Chime</SelectItem>
+                        <SelectItem value="bell">🔔 Resonant Bell Ring</SelectItem>
+                        <SelectItem value="alert">🚨 High Alert Alarm</SelectItem>
+                        <SelectItem value="ding">🎶 Soft Marimba Ding</SelectItem>
+                        <SelectItem value="soft">🔉 Gentle Double Pulse</SelectItem>
+                        <SelectItem value="custom">🎼 Custom MP3 File / Audio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-4 flex gap-2">
+                    <input
+                      type="file"
+                      ref={leadFileRef}
+                      onChange={handleLeadFileUpload}
+                      accept="audio/mp3,audio/mpeg,audio/wav,audio/*"
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => leadFileRef.current?.click()}
+                      className="w-full gap-1.5 bg-white text-xs"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-slate-600" /> Upload Lead MP3 File
+                    </Button>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <Button type="button" variant="outline" size="sm" onClick={handleTestLeadSound} className="w-full gap-1.5 bg-white text-xs">
+                      <Play className="h-3.5 w-3.5 fill-current text-amber-500" /> Test Lead Sound
+                    </Button>
+                  </div>
                 </div>
 
                 {leadsRingtone === "custom" && (
-                  <div className="md:col-span-5 space-y-1">
-                    <Label className="text-xs font-medium text-slate-700">Lead Custom MP3 Audio File URL</Label>
+                  <div className="space-y-1.5 bg-white p-2.5 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-700 flex items-center gap-1.5">
+                        <Music className="h-3.5 w-3.5 text-amber-500" />
+                        {leadFileName ? `MP3 File: ${leadFileName}` : "Direct MP3 Data URL / Link"}
+                      </span>
+                      {leadsCustomUrl && <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> Ready</span>}
+                    </div>
                     <Input
                       value={leadsCustomUrl}
-                      onChange={(e) => setLeadsCustomUrl(e.target.value)}
-                      placeholder="https://.../lead-alert.mp3 or /sounds/lead.mp3"
-                      className="bg-white text-xs font-mono"
+                      onChange={(e) => {
+                        setLeadsCustomUrl(e.target.value);
+                        localStorage.setItem("udyam.sound.leads_custom_url", e.target.value);
+                      }}
+                      placeholder="Upload MP3 file above or paste MP3 URL here (https://.../lead.mp3)"
+                      className="text-xs font-mono bg-slate-50"
                     />
                   </div>
                 )}
-
-                <div className={leadsRingtone === "custom" ? "md:col-span-3" : "md:col-span-8"}>
-                  <Button type="button" variant="outline" size="sm" onClick={handleTestLeadSound} className="w-full gap-1.5 bg-white">
-                    <Play className="h-3.5 w-3.5 fill-current text-amber-500" /> Test Lead Ringtone
-                  </Button>
-                </div>
               </div>
             )}
           </div>
@@ -206,47 +304,77 @@ export function AppSettingsCard() {
             </div>
 
             {ordersSound && (
-              <div className="pt-2 grid grid-cols-1 md:grid-cols-12 gap-3 items-end border-t border-slate-200/80">
-                <div className="md:col-span-4 space-y-1">
-                  <Label className="text-xs font-medium text-slate-700">Order Ringtone Tone</Label>
-                  <Select value={ordersRingtone} onValueChange={(v) => setOrdersRingtone(v as RingtoneTone)} disabled={loading}>
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Select tone..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="chime">🎵 Standard Double Chime</SelectItem>
-                      <SelectItem value="bell">🔔 Resonant Bell Ring</SelectItem>
-                      <SelectItem value="alert">🚨 High Alert Alarm</SelectItem>
-                      <SelectItem value="ding">🎶 Soft Marimba Ding</SelectItem>
-                      <SelectItem value="soft">🔉 Gentle Double Pulse</SelectItem>
-                      <SelectItem value="custom">🎼 Custom MP3 File / URL</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="pt-3 space-y-3 border-t border-slate-200/80">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                  <div className="md:col-span-5 space-y-1">
+                    <Label className="text-xs font-medium text-slate-700">Order Ringtone Tone</Label>
+                    <Select value={ordersRingtone} onValueChange={(v) => setOrdersRingtone(v as RingtoneTone)} disabled={loading}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Select tone..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="chime">🎵 Standard Double Chime</SelectItem>
+                        <SelectItem value="bell">🔔 Resonant Bell Ring</SelectItem>
+                        <SelectItem value="alert">🚨 High Alert Alarm</SelectItem>
+                        <SelectItem value="ding">🎶 Soft Marimba Ding</SelectItem>
+                        <SelectItem value="soft">🔉 Gentle Double Pulse</SelectItem>
+                        <SelectItem value="custom">🎼 Custom MP3 File / Audio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-4 flex gap-2">
+                    <input
+                      type="file"
+                      ref={orderFileRef}
+                      onChange={handleOrderFileUpload}
+                      accept="audio/mp3,audio/mpeg,audio/wav,audio/*"
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => orderFileRef.current?.click()}
+                      className="w-full gap-1.5 bg-white text-xs"
+                    >
+                      <Upload className="h-3.5 w-3.5 text-slate-600" /> Upload Order MP3 File
+                    </Button>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <Button type="button" variant="outline" size="sm" onClick={handleTestOrderSound} className="w-full gap-1.5 bg-white text-xs">
+                      <Play className="h-3.5 w-3.5 fill-current text-indigo-500" /> Test Order Sound
+                    </Button>
+                  </div>
                 </div>
 
                 {ordersRingtone === "custom" && (
-                  <div className="md:col-span-5 space-y-1">
-                    <Label className="text-xs font-medium text-slate-700">Order Custom MP3 Audio File URL</Label>
+                  <div className="space-y-1.5 bg-white p-2.5 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-700 flex items-center gap-1.5">
+                        <Music className="h-3.5 w-3.5 text-indigo-500" />
+                        {orderFileName ? `MP3 File: ${orderFileName}` : "Direct MP3 Data URL / Link"}
+                      </span>
+                      {ordersCustomUrl && <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1"><Check className="h-3 w-3" /> Ready</span>}
+                    </div>
                     <Input
                       value={ordersCustomUrl}
-                      onChange={(e) => setOrdersCustomUrl(e.target.value)}
-                      placeholder="https://.../order-alert.mp3 or /sounds/order.mp3"
-                      className="bg-white text-xs font-mono"
+                      onChange={(e) => {
+                        setOrdersCustomUrl(e.target.value);
+                        localStorage.setItem("udyam.sound.orders_custom_url", e.target.value);
+                      }}
+                      placeholder="Upload MP3 file above or paste MP3 URL here (https://.../order.mp3)"
+                      className="text-xs font-mono bg-slate-50"
                     />
                   </div>
                 )}
-
-                <div className={ordersRingtone === "custom" ? "md:col-span-3" : "md:col-span-8"}>
-                  <Button type="button" variant="outline" size="sm" onClick={handleTestOrderSound} className="w-full gap-1.5 bg-white">
-                    <Play className="h-3.5 w-3.5 fill-current text-indigo-500" /> Test Order Ringtone
-                  </Button>
-                </div>
               </div>
             )}
           </div>
 
           <p className="text-xs text-slate-500">
-            Super Admin can set distinct ringtones for leads and orders or input custom MP3 audio links for employee notification chimes.
+            Upload any MP3 audio file directly from your computer or choose built-in ringtone chimes for lead & order alerts.
           </p>
         </CardContent>
       </Card>

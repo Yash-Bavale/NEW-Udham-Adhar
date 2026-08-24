@@ -10,19 +10,12 @@ export const getAppSettings = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("app_settings")
-      .select("*")
+      .select("customer_delay_autoclose_minutes, updated_at, updated_by")
       .eq("id", 1)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    const d = (data as any) ?? {};
     return {
       customerDelayAutocloseMinutes: (data?.customer_delay_autoclose_minutes as number | undefined) ?? 480,
-      leadsSoundEnabled: d.leads_sound_enabled ?? true,
-      ordersSoundEnabled: d.orders_sound_enabled ?? true,
-      leadsRingtone: (d.leads_ringtone as string) || (d.ringtone as string) || "chime",
-      leadsCustomUrl: (d.leads_custom_url as string) || "",
-      ordersRingtone: (d.orders_ringtone as string) || (d.ringtone as string) || "bell",
-      ordersCustomUrl: (d.orders_custom_url as string) || "",
       updatedAt: (data?.updated_at as string | undefined) ?? null,
       updatedBy: (data?.updated_by as string | undefined) ?? null,
     };
@@ -69,24 +62,6 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
       ordersCustomUrl: z.string().optional(),
     }).parse(raw),
   )
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert(
-        {
-          id: 1,
-          leads_sound_enabled: data.leadsSoundEnabled,
-          orders_sound_enabled: data.ordersSoundEnabled,
-          leads_ringtone: data.leadsRingtone,
-          leads_custom_url: data.leadsCustomUrl ?? "",
-          orders_ringtone: data.ordersRingtone,
-          orders_custom_url: data.ordersCustomUrl ?? "",
-          updated_at: new Date().toISOString(),
-          updated_by: context.userId,
-        } as never,
-        { onConflict: "id" },
-      );
-    if (error) throw new Error(error.message);
+  .handler(async ({ data }) => {
     return { ok: true, ...data };
   });

@@ -16,6 +16,7 @@ import {
   upsertUserPermission,
   setUserPermissionScopes,
   bulkResetUserPermissions,
+  deleteUserPermissions,
 } from "@/lib/crm/permissions-admin.functions";
 import { listWebsiteTree } from "@/lib/crm/websites-admin.functions";
 
@@ -169,6 +170,7 @@ function PermissionMatrix({
   const upsertFn = useServerFn(upsertUserPermission);
   const scopesFn = useServerFn(setUserPermissionScopes);
   const resetFn = useServerFn(bulkResetUserPermissions);
+  const deleteFn = useServerFn(deleteUserPermissions);
 
   const q = useQuery({
     queryKey: ["user-permissions", userId],
@@ -195,6 +197,7 @@ function PermissionMatrix({
     }) => upsertFn({ data: { userId, ...input } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-permissions", userId] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
       onSaved();
     },
     onError: (e) => toast.error((e as Error).message),
@@ -204,7 +207,18 @@ function PermissionMatrix({
     mutationFn: (grantAll: boolean) => resetFn({ data: { userId, grantAll } }),
     onSuccess: (_r, grantAll) => {
       qc.invalidateQueries({ queryKey: ["user-permissions", userId] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
       toast.success(grantAll ? "Granted full access to all modules" : "Revoked all access");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const clearDefaults = useMutation({
+    mutationFn: () => deleteFn({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user-permissions", userId] });
+      qc.invalidateQueries({ queryKey: ["my-permissions"] });
+      toast.success("Restored standard role defaults");
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -223,6 +237,11 @@ function PermissionMatrix({
         <Button size="sm" variant="outline" onClick={() => bulkReset.mutate(true)} disabled={bulkReset.isPending}>
           Grant full access
         </Button>
+
+        <Button size="sm" variant="outline" onClick={() => clearDefaults.mutate()} disabled={clearDefaults.isPending}>
+          Restore role defaults
+        </Button>
+
         <Button size="sm" variant="outline" onClick={() => bulkReset.mutate(false)} disabled={bulkReset.isPending}>
           Revoke all
         </Button>

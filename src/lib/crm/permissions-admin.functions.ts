@@ -58,11 +58,12 @@ export const upsertUserPermission = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
     const admin = await getAdmin();
+    const effectiveCanView = data.canView || data.scopeAll || data.canCreate || data.canEdit;
     const { error } = await admin.from("user_permissions").upsert(
       {
         user_id: data.userId,
         module_key: data.moduleKey,
-        can_view: data.canView,
+        can_view: effectiveCanView,
         can_create: data.canCreate,
         can_edit: data.canEdit,
         can_delete: data.canDelete,
@@ -140,5 +141,18 @@ export const bulkResetUserPermissions = createServerFn({ method: "POST" })
       .from("user_permissions")
       .upsert(rows, { onConflict: "user_id,module_key" });
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteUserPermissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ userId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const admin = await getAdmin();
+    await Promise.all([
+      admin.from("user_permissions").delete().eq("user_id", data.userId),
+      admin.from("user_permission_scopes").delete().eq("user_id", data.userId),
+    ]);
     return { ok: true };
   });
