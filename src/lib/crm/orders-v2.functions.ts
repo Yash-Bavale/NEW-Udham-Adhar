@@ -360,6 +360,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
         search: z.string().max(120).optional(),
+        sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
       })
       .parse(i ?? {}),
   )
@@ -391,7 +392,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .eq("is_deleted", false)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: data.sortOrder === "asc" });
 
     if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
     if (data.serviceId) q = q.eq("service_id", data.serviceId);

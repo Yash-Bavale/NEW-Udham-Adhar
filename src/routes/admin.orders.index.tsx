@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -98,6 +98,7 @@ function OrdersListPage() {
   const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(savedState?.sortOrder ?? "desc");
   const [page, setPage] = useState<number>(savedState?.page ?? 1);
   const pageSize = 50;
   const isInitialMount = useRef(true);
@@ -107,9 +108,9 @@ function OrdersListPage() {
     saveModuleFilterState("admin.orders", {
       search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
       paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge,
-      customDays, page,
+      customDays, sortOrder, page,
     });
-  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays, page]);
+  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortOrder, page]);
 
   // Debounce search input by 350ms
   useEffect(() => {
@@ -144,6 +145,7 @@ function OrdersListPage() {
       setBucket("all");
       setPendingAge("any");
       setCustomDays("");
+      setSortOrder("desc");
       setPage(1);
       const container = document.getElementById("admin-main-scroll");
       if (container) container.scrollTop = 0;
@@ -186,10 +188,11 @@ function OrdersListPage() {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     search: debouncedSearch || undefined,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch]);
+    sortOrder,
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, sortOrder]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, sortOrder],
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
@@ -448,7 +451,17 @@ function OrdersListPage() {
               placeholder="Days"
               className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
             />
-          )}
+          {/* Sort Order */}
+          <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "asc" | "desc")}>
+            <SelectTrigger className="h-9 w-[145px] text-xs bg-slate-50/50 border-slate-200">
+              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+              <SelectValue placeholder="Sort order" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Latest First (Newest)</SelectItem>
+              <SelectItem value="asc">Older First (Oldest)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -495,7 +508,20 @@ function OrdersListPage() {
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
                 <th className="text-left font-semibold px-3 py-2.5">Order #</th>
-                <th className="text-left font-semibold px-3 py-2.5">Created</th>
+                <th
+                  onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                  className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  title="Click to toggle sorting (Latest vs Older orders)"
+                >
+                  <div className="inline-flex items-center gap-1">
+                    <span>Created</span>
+                    {sortOrder === "desc" ? (
+                      <ArrowDown className="w-3 h-3 text-indigo-600" />
+                    ) : (
+                      <ArrowUp className="w-3 h-3 text-indigo-600" />
+                    )}
+                  </div>
+                </th>
                 <th className="text-left font-semibold px-3 py-2.5">Customer</th>
                 <th className="text-left font-semibold px-3 py-2.5">Service</th>
                 <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
