@@ -27,8 +27,14 @@ export function CloseOrderDialog({
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (open && data?.reasons.length && !code) setCode(data.reasons[0].code);
-  }, [open, data, code]);
+    if (open) {
+      if (data?.reasons?.length) {
+        setCode((prev) => (prev && data.reasons.some(r => r.code === prev) ? prev : data.reasons[0].code));
+      } else if (!code) {
+        setCode("E010");
+      }
+    }
+  }, [open, data]);
 
   const mut = useMutation({
     mutationFn: async () => {

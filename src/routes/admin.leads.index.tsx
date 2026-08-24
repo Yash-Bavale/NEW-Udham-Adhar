@@ -69,6 +69,7 @@ function LeadsPage() {
   const [source, setSource] = useState<string>("");
   const [assignee, setAssignee] = useState<string>("");
   const [service, setService] = useState<string>("");
+  const [websiteId, setWebsiteId] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -160,6 +161,8 @@ function LeadsPage() {
   }, [role.roles.join(",")]);
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
+  const websiteTreeFn = useServerFn(listWebsiteTree);
+  const { data: websiteTreeData } = useQuery({ queryKey: ["admin.websiteTree"], queryFn: () => websiteTreeFn() });
 
   const sourceBreakdownFn = useServerFn(getLeadSourceBreakdown);
   const { data: sourceData } = useQuery<SourceBreakdown>({
@@ -203,7 +206,7 @@ function LeadsPage() {
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin.leads", page, search, status, source, assignee, service, dateFrom, dateTo],
+    queryKey: ["admin.leads", page, search, status, source, assignee, service, websiteId, dateFrom, dateTo],
     queryFn: () => listFn({ data: {
       page, pageSize: 25,
       search: search || undefined,
@@ -211,6 +214,7 @@ function LeadsPage() {
       source: source || undefined,
       service: service || undefined,
       assignee: assignee || undefined,
+      websiteId: websiteId || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     } }),
@@ -306,6 +310,17 @@ function LeadsPage() {
           />
         </div>
         <select
+          value={websiteId}
+          onChange={(e) => { setWebsiteId(e.target.value); setPage(1); }}
+          className="rounded-lg border px-3 py-2 text-sm"
+          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        >
+          <option value="">All websites</option>
+          {(websiteTreeData?.websites ?? []).map((w: any) => (
+            <option key={w.id} value={w.id}>{w.name}</option>
+          ))}
+        </select>
+        <select
           value={source}
           onChange={(e) => { setSource(e.target.value); setPage(1); expandedChannel && setExpandedChannel(null); }}
           className="rounded-lg border px-3 py-2 text-sm"
@@ -363,7 +378,7 @@ function LeadsPage() {
         />
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90 cursor-pointer"
           style={{ background: "var(--admin-primary)" }}
         >
           <Plus className="size-4" /> Add Lead
@@ -373,7 +388,7 @@ function LeadsPage() {
             type="button"
             onClick={() => setExportOpen(!exportOpen)}
             disabled={!!exporting}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50 cursor-pointer"
             style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
           >
             <Download className="size-4 text-emerald-600" />
@@ -387,7 +402,7 @@ function LeadsPage() {
               <button
                 type="button"
                 onClick={() => handleExport("csv")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2 cursor-pointer"
                 style={{ color: "var(--admin-fg)" }}
               >
                 <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
@@ -395,7 +410,7 @@ function LeadsPage() {
               <button
                 type="button"
                 onClick={() => handleExport("excel")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2"
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2 cursor-pointer"
                 style={{ color: "var(--admin-fg)" }}
               >
                 <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
@@ -403,16 +418,17 @@ function LeadsPage() {
             </div>
           )}
         </div>
-        {(source || service || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
+        {(source || service || websiteId || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
           <button
             onClick={() => {
               setSource("");
               setService("");
+              setWebsiteId("");
               setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
               setDateFrom("");
               setDateTo("");
             }}
-            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)]"
+            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)] cursor-pointer"
             style={{ color: "var(--admin-fg-muted)" }}
           >
             <X className="size-3" /> Clear
@@ -536,7 +552,27 @@ function LeadsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-sm font-semibold text-slate-900 whitespace-nowrap tracking-wide">{l.mobile || "—"}</td>
-                      {role.hasAny(["super_admin", "admin"]) && <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }} title={l.lead_source || ""}>{formatLeadSource(l.lead_source)}</td>}
+                      {role.hasAny(["super_admin", "admin"]) && (
+                        <td className="px-4 py-2.5 text-xs max-w-[260px]" style={{ color: "var(--admin-fg-muted)" }}>
+                          <div className="flex flex-col gap-1 items-start">
+                            {l.website_name && (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                                  l.website_name.toLowerCase().includes("registration")
+                                    ? "bg-sky-50 text-sky-700 border-sky-200"
+                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                }`}
+                              >
+                                <span className="size-1.5 rounded-full bg-current" />
+                                {l.website_name}
+                              </span>
+                            )}
+                            <span className="text-[11px] leading-tight break-words text-slate-600" title={l.lead_source || ""}>
+                              {formatLeadSource(l.lead_source)}
+                            </span>
+                          </div>
+                        </td>
+                      )}
                       <td className="px-4 py-2.5 text-xs min-w-[240px] whitespace-normal break-words" style={{ color: "var(--admin-fg-muted)" }} title={l.service || ""}>{l.service || "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={l.status} /></td>
                       {role.hasAny(["super_admin", "admin"]) && (

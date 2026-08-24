@@ -581,6 +581,7 @@ export function WorkspaceShell(p: Props) {
           payments={payments}
           hideAmount={p.hideAmount}
           adminOverride={adminOverride}
+          onAdminOverrideChange={setAdminOverride}
         />
 
 

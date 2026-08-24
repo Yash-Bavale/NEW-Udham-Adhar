@@ -33,7 +33,7 @@ export const closeOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, [...ADMIN_ONLY]);
+    await assertRole(context.supabase, [...STAFF]);
     const admin = await getAdmin();
     const name = await actorName(context.supabase, context.userId);
 

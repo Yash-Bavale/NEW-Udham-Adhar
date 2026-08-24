@@ -83,9 +83,15 @@ export const listClosureReasons = createServerFn({ method: "GET" })
       .from("workflow_closure_reasons")
       .select("code,label,description")
       .eq("is_active", true)
-      .order("sort_order");
-    if (error) throw new Error(error.message);
-    return { reasons: data ?? [] };
+    const DEFAULT_REASONS = [
+      { code: "E010", label: "Customer Non-Responsive (Auto/Force Close)", description: "Customer did not respond within expected SLA timeframe" },
+      { code: "FORCE_CLOSE", label: "Force Close (Admin Override)", description: "Administrative force closure" },
+      { code: "GOVT_REJECTED", label: "Government Portal Rejection", description: "Application rejected by government portal" },
+      { code: "CUSTOMER_CANCELLED", label: "Customer Requested Cancellation", description: "Customer requested order cancellation" },
+      { code: "DUPLICATE_ORDER", label: "Duplicate / Invalid Order", description: "Duplicate or invalid application submission" },
+    ];
+    const reasons = (data && data.length > 0) ? data : DEFAULT_REASONS;
+    return { reasons };
   });
 
 // ───────────────────────── Writes ─────────────────────────

@@ -62,6 +62,7 @@ interface Props {
   hideAmount?: boolean;
   /** Admin override state — controlled by parent (WorkspaceShell). */
   adminOverride?: boolean;
+  onAdminOverrideChange?: (v: boolean) => void;
 }
 
 /* Icon registry keyed by string keys used in journey-graph */
@@ -517,18 +518,44 @@ export function CustomerJourneyMap(p: Props) {
           </div>
         </div>
 
-        {/* Talk-to-expert + Force close */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-700">
+        {/* 3-Button Control Bar: Resume Order, Admin Override, Force Close */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isTalkToExpert && (
               <button
                 type="button"
                 onClick={() => mutTalkExpert.mutate()}
                 disabled={closed || completed || mutTalkExpert.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-violet-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
               >
                 <CheckCircle2 className="size-3.5" />
                 Talk-to-Expert Completed (E009)
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => mutResumeCustomer.mutate()}
+              disabled={closed || completed || mutResumeCustomer.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              title="Resume order to Form Submitted state"
+            >
+              <RotateCcw className="size-3.5" />
+              Resume Order
+            </button>
+            {p.onAdminOverrideChange && (
+              <button
+                type="button"
+                onClick={() => p.onAdminOverrideChange?.(!p.adminOverride)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs cursor-pointer transition",
+                  p.adminOverride
+                    ? "bg-orange-600 text-white hover:bg-orange-700"
+                    : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                )}
+                title="Toggle Admin Override to unlock all stage actions B01–B08"
+              >
+                <ShieldAlert className="size-3.5" />
+                Admin Override: {p.adminOverride ? "ON" : "OFF"}
               </button>
             )}
           </div>
@@ -541,7 +568,7 @@ export function CustomerJourneyMap(p: Props) {
               type="button"
               onClick={() => setDialog({ kind: "force_close" })}
               disabled={closed}
-              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
               Force Close
             </button>

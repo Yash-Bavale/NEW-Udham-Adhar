@@ -448,6 +448,7 @@ export const listLeads = createServerFn({ method: "GET" })
     source: z.string().optional(),
     service: z.string().optional(),
     assignee: z.string().optional(), // uuid | "__unassigned" | "__me"
+    websiteId: z.string().uuid().optional(),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),
   }))
@@ -459,6 +460,7 @@ export const listLeads = createServerFn({ method: "GET" })
     let query = admin.from("leads").select("*", { count: "exact" });
 
     if (data.status) query = query.eq("status", data.status);
+    if (data.websiteId) query = query.eq("website_id", data.websiteId);
     if (data.source) {
       if (data.source.startsWith("__channel:")) {
         const ch = data.source.slice("__channel:".length);
@@ -505,6 +507,12 @@ export const listLeads = createServerFn({ method: "GET" })
 
     if (error) throw new Error(error.message);
 
+    // Fetch websites map
+    const { data: websites } = await admin.from("websites").select("id, name, domain");
+    const websitesById: Record<string, { name: string; domain: string }> = Object.fromEntries(
+      (websites ?? []).map((w: any) => [w.id, { name: w.name, domain: w.domain }])
+    );
+
     // C6 — attach assignee profile so the table can show a name, not a UUID.
     const assigneeIds = Array.from(new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean)));
     let profilesById: Record<string, { display_name: string | null; email: string | null }> = {};
@@ -530,13 +538,27 @@ export const listLeads = createServerFn({ method: "GET" })
       }
     }
 
-    const enriched = (rows ?? []).map((r: any) => ({
-      ...r,
-      assignee_name: r.assigned_to
-        ? (profilesById[r.assigned_to]?.display_name || profilesById[r.assigned_to]?.email || null)
-        : null,
-      form_status: appsByLead[r.id]?.form_status ?? null,
-    }));
+    const enriched = (rows ?? []).map((r: any) => {
+      const wsMeta = r.website_id ? websitesById[r.website_id] : null;
+      let website_name = wsMeta?.name ?? null;
+      if (!website_name) {
+        // Fallback inference based on lead service / code / lead_source
+        if (/registration|registration/i.test(r.service ?? "") || /udyamregistration/i.test(r.lead_source ?? "")) {
+          website_name = "Udyam Registrations";
+        } else {
+          website_name = "Udyam Aadhar";
+        }
+      }
+      return {
+        ...r,
+        website_name,
+        website_domain: wsMeta?.domain ?? null,
+        assignee_name: r.assigned_to
+          ? (profilesById[r.assigned_to]?.display_name || profilesById[r.assigned_to]?.email || null)
+          : null,
+        form_status: appsByLead[r.id]?.form_status ?? null,
+      };
+    });
 
     return { rows: enriched, total: count || 0 };
   });
