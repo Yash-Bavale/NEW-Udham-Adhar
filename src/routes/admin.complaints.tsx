@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -62,7 +62,12 @@ const CONTACT_STATUS_PILLS = [
 const SEVERITY_PILLS = ["low", "normal", "high", "critical"] as const;
 
 function ComplaintsAndContactPage() {
+  const childMatches = useChildMatches();
   const [activeTab, setActiveTab] = useState<"complaints" | "contact_forms">("complaints");
+
+  if (childMatches.length > 0) {
+    return <Outlet />;
+  }
 
   return (
     <div className="space-y-6">

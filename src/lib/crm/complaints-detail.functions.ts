@@ -21,17 +21,37 @@ export const getComplaintDetail = createServerFn({ method: "GET" })
       .single();
     if (error || !complaint) throw new Error("Complaint not found");
 
-    const [{ data: lead }, { data: app }, { data: audits }] = await Promise.all([
+    const admin = await getAdmin();
+    const [{ data: lead }, { data: app }, { data: cust }, { data: assignee }, { data: audits }] = await Promise.all([
       complaint.lead_id
-        ? (await getAdmin()).from("leads").select("*").eq("id", complaint.lead_id).single()
+        ? admin.from("leads").select("*").eq("id", complaint.lead_id).maybeSingle()
         : Promise.resolve({ data: null as any }),
       complaint.application_id
-        ? (await getAdmin()).from("applications").select("id, application_code, application_status").eq("id", complaint.application_id).single()
+        ? admin.from("applications").select("id, application_code, application_status, service_id, services(service_name)").eq("id", complaint.application_id).maybeSingle()
         : Promise.resolve({ data: null as any }),
-      (await getAdmin()).from("audit_logs").select("*").eq("entity_type", "complaint").eq("entity_id", data.id).order("created_at", { ascending: false }),
+      (complaint.customer_id || complaint.lead_id)
+        ? complaint.customer_id
+          ? admin.from("customers").select("*").eq("id", complaint.customer_id).maybeSingle()
+          : Promise.resolve({ data: null as any })
+        : Promise.resolve({ data: null as any }),
+      complaint.assigned_to
+        ? admin.from("profiles").select("id, full_name, display_name, email").eq("id", complaint.assigned_to).maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      admin.from("audit_logs").select("*").eq("entity_type", "complaint").eq("entity_id", data.id).order("created_at", { ascending: false }),
     ]);
 
-    return { complaint: { ...complaint, lead, application: app }, audits: audits ?? [] };
+    const customerObj = cust || (lead?.customer_id ? (await admin.from("customers").select("*").eq("id", lead.customer_id).maybeSingle()).data : null);
+
+    return {
+      complaint: {
+        ...complaint,
+        lead,
+        application: app ? { ...app, service_name: (app as any).services?.service_name ?? null } : null,
+        customer: customerObj,
+        assigned_name: assignee ? (assignee.full_name || assignee.display_name || assignee.email) : null,
+      },
+      audits: audits ?? [],
+    };
   });
 
 export const updateComplaintNotes = createServerFn({ method: "POST" })
