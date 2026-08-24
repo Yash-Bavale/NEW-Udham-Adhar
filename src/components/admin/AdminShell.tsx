@@ -461,31 +461,94 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
             </div>
           ) : (
             <ul className="py-1">
-              {hits.map((h) => (
-                <li key={`${h.kind}-${h.id}`}>
-                  <button
-                    onClick={() => {
-                      setOpen(false);
-                      setQ("");
-                      navigate({ to: h.href });
-                    }}
-                    className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-start gap-2"
-                  >
-                    <span
-                      className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-medium"
-                      style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
+              {hits.map((h) => {
+                const isApp = h.kind === "application";
+                const isLead = h.kind === "lead";
+                const formattedDate = h.created_at
+                  ? new Intl.DateTimeFormat("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
+                      .format(new Date(h.created_at))
+                      .replace(",", "")
+                  : null;
+
+                if (isApp || isLead) {
+                  return (
+                    <li key={`${h.kind}-${h.id}`}>
+                      <button
+                        onClick={() => {
+                          setOpen(false);
+                          setQ("");
+                          navigate({ to: h.href });
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-[var(--admin-surface-2)] flex items-start gap-2.5 transition-colors border-b border-slate-100/80 last:border-0"
+                      >
+                        <span
+                          className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-bold"
+                          style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
+                        >
+                          {isApp ? "ORDER" : "LEAD"}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {/* Header: Name · ID · Date & Time */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-sm truncate" style={{ color: "var(--admin-fg)" }}>
+                              {h.name || h.code}
+                            </span>
+                            <div className="flex items-center gap-1.5 text-xs shrink-0 font-mono" style={{ color: "var(--admin-fg-muted)" }}>
+                              <span className="font-semibold">{h.code}</span>
+                              {formattedDate && <span>· {formattedDate}</span>}
+                            </div>
+                          </div>
+                          {/* Below Line: Mobile · Email · Service Selected · Stage (if order) */}
+                          <div className="text-[11px] truncate mt-0.5" style={{ color: "var(--admin-fg-muted)" }}>
+                            {[
+                              h.mobile ? `+91 ${h.mobile}` : null,
+                              h.email || null,
+                              h.service || null,
+                              isApp && h.stage ? `Stage: ${h.stage}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={`${h.kind}-${h.id}`}>
+                    <button
+                      onClick={() => {
+                        setOpen(false);
+                        setQ("");
+                        navigate({ to: h.href });
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-start gap-2"
                     >
-                      {h.kind === "application" ? "order" : h.kind}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm truncate" style={{ color: "var(--admin-fg)" }}>{h.title}</span>
-                      {h.subtitle && (
-                        <span className="block text-[11px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{h.subtitle}</span>
-                      )}
-                    </span>
-                  </button>
-                </li>
-              ))}
+                      <span
+                        className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-medium"
+                        style={{ background: "var(--admin-surface-2)", color: "var(--admin-fg-muted)" }}
+                      >
+                        {h.kind}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm truncate" style={{ color: "var(--admin-fg)" }}>{h.title}</span>
+                        {h.subtitle && (
+                          <span className="block text-[11px] truncate" style={{ color: "var(--admin-fg-muted)" }}>{h.subtitle}</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
