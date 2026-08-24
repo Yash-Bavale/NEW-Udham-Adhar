@@ -25,6 +25,7 @@ import { getSchema } from "@/lib/onboarding/schemas";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { formatMobile55 } from "@/lib/utils";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
@@ -367,7 +368,7 @@ export function FormSubmissionPanel({
               <>
                 <span className="text-slate-300 font-light mx-1">•</span>
                 <span className="text-slate-500 font-medium">Mobile:</span>
-                <span className="text-slate-900 font-bold font-mono">{lead.mobile}</span>
+                <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
           </div>

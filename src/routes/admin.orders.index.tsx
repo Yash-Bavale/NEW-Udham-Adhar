@@ -18,6 +18,7 @@ import {
 import { useRole } from "@/hooks/useRole";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
+import { formatMobile55 } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/orders/")({
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -830,7 +831,7 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
         {order.customer_mobile && (
-          <div className="text-[11px] text-slate-500 mt-0.5">{order.customer_mobile}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{formatMobile55(order.customer_mobile)}</div>
         )}
       </td>
 

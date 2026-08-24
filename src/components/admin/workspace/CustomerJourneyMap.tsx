@@ -288,6 +288,7 @@ export function CustomerJourneyMap(p: Props) {
   });
 
   const inCustomerDelay = phase === "customer_delay";
+  const canResume = !closed && !completed && (inCustomerDelay || phase === "technical_delay" || phase === "form_not_submitted" || phase === "form_link_sent" || Boolean(p.adminOverride));
 
   const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean; label?: string }> = {
     B01: { onClick: () => mutFormLink.mutate(), pending: mutFormLink.isPending },
@@ -532,22 +533,41 @@ export function CustomerJourneyMap(p: Props) {
                 Talk-to-Expert Completed (E009)
               </button>
             )}
+
+            {/* Resume Order */}
             <button
               type="button"
-              onClick={() => mutResumeCustomer.mutate()}
-              disabled={closed || completed || mutResumeCustomer.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-              title="Resume order to Form Submitted state"
+              onClick={() => {
+                if (phase === "technical_delay") {
+                  mutResume.mutate();
+                } else {
+                  mutResumeCustomer.mutate();
+                }
+              }}
+              disabled={!canResume || mutResumeCustomer.isPending || mutResume.isPending}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs transition select-none",
+                canResume
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                  : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60"
+              )}
+              title={
+                canResume
+                  ? "Resume order to active workflow processing"
+                  : "Resume Order is active when an order is in Customer Delay, Technical Delay, or On Hold (or when Admin Override is ON)"
+              }
             >
               <RotateCcw className="size-3.5" />
               Resume Order
             </button>
+
+            {/* Admin Override */}
             {p.onAdminOverrideChange && (
               <button
                 type="button"
                 onClick={() => p.onAdminOverrideChange?.(!p.adminOverride)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs cursor-pointer transition",
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs cursor-pointer transition select-none",
                   p.adminOverride
                     ? "bg-orange-600 text-white hover:bg-orange-700"
                     : "bg-slate-200 text-slate-700 hover:bg-slate-300"
@@ -558,18 +578,16 @@ export function CustomerJourneyMap(p: Props) {
                 Admin Override: {p.adminOverride ? "ON" : "OFF"}
               </button>
             )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-rose-800">
-            <Mail className="size-3.5 text-rose-600" />
-            <span className="font-bold">Force Close (E010)</span>
-            <span className="text-rose-500 hidden sm:inline">·</span>
-            <span className="hidden sm:inline">Cancels timers · Cat A reason.</span>
+
+            {/* Force Close */}
             <button
               type="button"
               onClick={() => setDialog({ kind: "force_close" })}
               disabled={closed}
-              className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed select-none"
+              title="Force close order with closure reason and send E010 notification"
             >
+              <XCircle className="size-3.5" />
               Force Close
             </button>
           </div>
