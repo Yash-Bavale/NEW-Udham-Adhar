@@ -8,9 +8,12 @@ import { formatIST } from "@/lib/datetime";
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
+import { bulkAssignOrders } from "@/lib/crm/orders.functions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,6 +23,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import { formatMobile55 } from "@/lib/utils";
+import { UserCheck } from "lucide-react";
 
 export const Route = createFileRoute("/admin/orders/")({
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -238,9 +242,31 @@ function OrdersListPage() {
   }, [page, data?.total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, qc, listFn, pageSize]);
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
+  const bulkAssignFn = useServerFn(bulkAssignOrders);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [assigningBusy, setAssigningBusy] = useState(false);
+
+  async function handleBulkReassign(targetStaffId: string) {
+    if (!selectedOrderIds.length) return;
+    setAssigningBusy(true);
+    try {
+      const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
+      await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
+      const staffObj = (staffData as any[])?.find((s) => s.id === targetStaffId);
+      const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.email || "staff");
+      toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
+      setSelectedOrderIds([]);
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to reassign orders");
+    } finally {
+      setAssigningBusy(false);
+    }
+  }
+
   // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
-  // Plus Amount (1) and Assigned (1) = 8 total columns
-  const colCount = 6 + (isAdmin ? 1 : 0) + (hideMoney ? 0 : 1);
+  // Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
+  const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
   // Compute pending-age threshold in days from filter selection.
   const minDays: number | null = useMemo(() => {
@@ -523,12 +549,61 @@ function OrdersListPage() {
         })}
       </div>
 
+      {/* Bulk Action Bar (SuperAdmin & Admin) */}
+      {isAdmin && selectedOrderIds.length > 0 && (
+        <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 text-sm font-medium">
+            <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+              {selectedOrderIds.length}
+            </span>
+            <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
+                <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
+                <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassign">❌ Unassign Order</SelectItem>
+                {(staffData as any[])?.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    👤 {s.display_name || s.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedOrderIds([])}
+              className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
+            >
+              Clear Selection
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop Table View */}
       <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
         <ScrollableTable>
           <table className="w-full text-sm min-w-[950px]">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
+                {isAdmin && (
+                  <th className="w-10 px-3 py-2.5 text-center">
+                    <Checkbox
+                      checked={sortedRows.length > 0 && selectedOrderIds.length === sortedRows.length}
+                      onCheckedChange={(checked) =>
+                        setSelectedOrderIds(checked ? sortedRows.map((r) => r.id) : [])
+                      }
+                      aria-label="Select all orders"
+                    />
+                  </th>
+                )}
                 <th className="text-left font-semibold px-3 py-2.5">Order #</th>
                 <th
                   onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
@@ -567,7 +642,19 @@ function OrdersListPage() {
                     </td>
                   </tr>
                   {items.map((r) => (
-                    <OrderRow key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />
+                    <OrderRow
+                      key={r.id}
+                      order={r}
+                      hideMoney={hideMoney}
+                      isAdmin={isAdmin}
+                      selected={selectedOrderIds.includes(r.id)}
+                      onToggleSelect={(id, checked) =>
+                        setSelectedOrderIds((prev) =>
+                          checked ? [...prev, id] : prev.filter((x) => x !== id),
+                        )
+                      }
+                      onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })}
+                    />
                   ))}
                 </Fragment>
               ))}
@@ -595,7 +682,19 @@ function OrdersListPage() {
             </div>
             <div className="space-y-2.5">
               {items.map((r) => (
-                <OrderCardMobile key={r.id} order={r} hideMoney={hideMoney} isAdmin={isAdmin} onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })} />
+                <OrderCardMobile
+                  key={r.id}
+                  order={r}
+                  hideMoney={hideMoney}
+                  isAdmin={isAdmin}
+                  selected={selectedOrderIds.includes(r.id)}
+                  onToggleSelect={(id, checked) =>
+                    setSelectedOrderIds((prev) =>
+                      checked ? [...prev, id] : prev.filter((x) => x !== id),
+                    )
+                  }
+                  onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })}
+                />
               ))}
             </div>
           </div>
@@ -632,7 +731,21 @@ function OrdersListPage() {
   );
 }
 
-function OrderCardMobile({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney: boolean; isAdmin: boolean; onOpen: (id: string) => void }) {
+function OrderCardMobile({
+  order,
+  hideMoney,
+  isAdmin,
+  selected,
+  onToggleSelect,
+  onOpen,
+}: {
+  order: any;
+  hideMoney: boolean;
+  isAdmin: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, checked: boolean) => void;
+  onOpen: (id: string) => void;
+}) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const actionStatus = getOrderActionStatus(order);
@@ -650,11 +763,24 @@ function OrderCardMobile({ order, hideMoney, isAdmin, onOpen }: { order: any; hi
 
   return (
     <div
-      onClick={() => onOpen(order.id)}
-      className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all space-y-2.5 active:bg-slate-50 cursor-pointer"
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+        onOpen(order.id);
+      }}
+      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${
+        selected ? "border-indigo-500 bg-indigo-50/40" : "border-slate-200 hover:border-slate-300"
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          {isAdmin && (
+            <div data-no-row-click onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={!!selected}
+                onCheckedChange={(v) => onToggleSelect?.(order.id, !!v)}
+              />
+            </div>
+          )}
           <span className="font-mono text-xs font-semibold text-slate-800">{order.application_code}</span>
           {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
@@ -801,10 +927,24 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
   return { label: "Action Required", tone: "red" };
 }
 
-function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney: boolean; isAdmin: boolean; onOpen: (id: string) => void }) {
+function OrderRow({
+  order,
+  hideMoney,
+  isAdmin,
+  selected,
+  onToggleSelect,
+  onOpen,
+}: {
+  order: any;
+  hideMoney: boolean;
+  isAdmin: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string, checked: boolean) => void;
+  onOpen: (id: string) => void;
+}) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
-  
+
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
     amber:   "bg-amber-50 text-amber-700",
@@ -819,7 +959,9 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
 
   return (
     <tr
-      className="border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer"
+      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${
+        selected ? "bg-indigo-50/40" : ""
+      }`}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
@@ -827,6 +969,17 @@ function OrderRow({ order, hideMoney, isAdmin, onOpen }: { order: any; hideMoney
         onOpen(order.id);
       }}
     >
+      {/* Checkbox Column */}
+      {isAdmin && (
+        <td className="w-10 px-3 py-2.5 text-center" data-no-row-click>
+          <Checkbox
+            checked={!!selected}
+            onCheckedChange={(v) => onToggleSelect?.(order.id, !!v)}
+            aria-label={`Select order ${order.application_code}`}
+          />
+        </td>
+      )}
+
       {/* 1. Order # */}
       <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
 

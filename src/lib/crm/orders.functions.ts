@@ -287,3 +287,48 @@ export const addOrderNote = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+const BulkAssignInput = z.object({
+  applicationIds: z.array(z.string().uuid()).min(1),
+  assignedTo: z.string().uuid().nullable(),
+});
+
+export const bulkAssignOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => BulkAssignInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const admin = await getAdmin();
+
+    // 1. Update assigned_to on applications
+    const { error: appErr } = await admin
+      .from("applications")
+      .update({ assigned_to: data.assignedTo, updated_at: new Date().toISOString() } as never)
+      .in("id", data.applicationIds);
+    if (appErr) throw new Error(appErr.message);
+
+    // 2. Also update assigned_to on corresponding leads
+    const { data: apps } = await admin
+      .from("applications")
+      .select("lead_id")
+      .in("id", data.applicationIds);
+    const leadIds = Array.from(new Set((apps ?? []).map((a: any) => a.lead_id).filter(Boolean))) as string[];
+    if (leadIds.length) {
+      await admin
+        .from("leads")
+        .update({ assigned_to: data.assignedTo, updated_at: new Date().toISOString() } as never)
+        .in("id", leadIds);
+    }
+
+    // 3. Write audit log
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "application",
+      entityId: data.applicationIds[0],
+      action: "bulk_reassign",
+      newValue: { application_ids: data.applicationIds, assigned_to: data.assignedTo },
+      actorId: context.userId,
+    });
+
+    return { ok: true, count: data.applicationIds.length };
+  });
