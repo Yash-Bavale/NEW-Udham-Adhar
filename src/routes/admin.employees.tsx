@@ -6,7 +6,7 @@ import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff, Shield
 import { toast } from "sonner";
 import {
   listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
-  getEmployeeWorkAccess, setEmployeeWorkAccess,
+  getEmployeeWorkAccess, setEmployeeWorkAccess, deleteEmployee,
 } from "@/lib/crm/users-admin.functions";
 
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
@@ -23,13 +23,15 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { LeadAssignmentTab } from "@/components/admin/LeadAssignmentTab";
+import { Trash2, Copy, Check } from "lucide-react";
 
 export const Route = createFileRoute("/admin/employees")({
   head: () => ({ meta: [{ title: "Employees — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: EmployeesPage,
 });
 
-const ROLE_COLOR: Record<string, string> = {
+type RoleColorMap = Record<string, string>;
+const ROLE_COLOR: RoleColorMap = {
   super_admin: "#b91c1c",
   admin: "#1d4ed8",
   manager: "#7c3aed",
@@ -117,6 +119,7 @@ function EmployeesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
+  const [deleteRow, setDeleteRow] = useState<Row | null>(null);
   const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
   const [accessRow, setAccessRow] = useState<Row | null>(null);
 
@@ -243,7 +246,7 @@ function EmployeesPage() {
                         <Button size="sm" variant="ghost" className="h-7 gap-1"
                           style={{ color: "#1d4ed8" }}
                           onClick={() => setResetPwRow(u)}>
-                          <KeyRound className="size-3.5" /> Reset Password
+                          <KeyRound className="size-3.5" /> Password
                         </Button>
                       )}
                       {canManage && (
@@ -251,6 +254,12 @@ function EmployeesPage() {
                           style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
                           onClick={() => setDeactivateRow(u)}>
                           <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                      )}
+                      {canManage && (
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setDeleteRow(u)}>
+                          <Trash2 className="size-3.5" /> Delete
                         </Button>
                       )}
                       {!canManage && !isSuper && (
@@ -265,18 +274,33 @@ function EmployeesPage() {
         </div>
           </SectionCard>
 
-          <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
-            onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          {addOpen && (
+            <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
+              onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          )}
 
-          <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
-            onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          {editRow && (
+            <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
+              onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          )}
 
-          <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
-            onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          {deactivateRow && (
+            <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
+              onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          )}
 
-          <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
+          {deleteRow && (
+            <DeleteEmployeeDialog row={deleteRow} onClose={() => setDeleteRow(null)}
+              onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
+          )}
 
-          <WorkAccessDialog row={accessRow} onClose={() => setAccessRow(null)} />
+          {resetPwRow && (
+            <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
+          )}
+
+          {accessRow && (
+            <WorkAccessDialog row={accessRow} onClose={() => setAccessRow(null)} />
+          )}
 
         </TabsContent>
 
@@ -409,61 +433,124 @@ function AddEmployeeDialog({ open, onOpenChange, onCreated }:
   const [full_name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [role, setRoleVal] = useState<Role>("executive");
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [createdInfo, setCreatedInfo] = useState<{ email: string; temp_password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  function reset() { setName(""); setEmail(""); setMobile(""); setRoleVal("executive"); setErrs({}); }
+  function reset() {
+    setName(""); setEmail(""); setMobile(""); setPassword(""); setShowPw(false);
+    setRoleVal("executive"); setErrs({}); setCreatedInfo(null); setCopied(false);
+  }
 
   async function submit() {
     const e: Record<string, string> = {};
     if (!full_name.trim()) e.full_name = "Full name is required.";
     if (!/^\S+@\S+\.\S+$/.test(email)) e.email = "Valid email is required.";
+    if (password && password.length < 8) e.password = "Password must be at least 8 characters.";
     setErrs(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
-      await inviteFn({ data: { full_name, email, mobile: mobile || null, role } });
-      toast.success(`Invitation sent to ${email}`);
-      reset();
-      onOpenChange(false);
+      const res = await inviteFn({ data: { full_name, email, mobile: mobile || null, role, password: password || undefined } });
+      toast.success(`Employee account created for ${email}`);
+      setCreatedInfo({ email, temp_password: res.temp_password });
       onCreated();
     } catch (err) {
       toast.error((err as Error).message);
     } finally { setBusy(false); }
   }
 
+  const handleCopy = () => {
+    if (!createdInfo) return;
+    const text = `Udyam Ops Login Credentials:\nEmail: ${createdInfo.email}\nPassword: ${createdInfo.temp_password}\nLogin URL: ${window.location.origin}/login`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Login credentials copied to clipboard!");
+    setTimeout(() => setCopied(false), 3000);
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Add Employee</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <Field label="Full Name" error={errs.full_name}>
-            <Input value={full_name} onChange={(e) => setName(e.target.value)} placeholder="Asha Sharma" />
-          </Field>
-          <Field label="Email" error={errs.email}>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="asha@udyamadhar.in" type="email" />
-          </Field>
-          <Field label="Mobile">
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="9876543210" />
-          </Field>
-          <Field label="Role">
-            <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-            An invite email will be sent. The employee sets their own password on first login.
-          </p>
-        </div>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{createdInfo ? "Employee Account Created" : "Add Employee"}</DialogTitle>
+        </DialogHeader>
+
+        {createdInfo ? (
+          <div className="space-y-4 py-2">
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs space-y-1">
+              <div className="font-semibold text-emerald-900">✔ Account Activated Instantly</div>
+              <p>Email verification is bypassed. The employee can sign in right now with the credentials below:</p>
+            </div>
+
+            <div className="space-y-2 bg-slate-50 p-3 rounded-lg border text-sm font-mono">
+              <div><span className="text-xs text-slate-500 font-sans uppercase">Email:</span> <span className="font-bold">{createdInfo.email}</span></div>
+              <div><span className="text-xs text-slate-500 font-sans uppercase">Password:</span> <span className="font-bold text-indigo-600">{createdInfo.temp_password}</span></div>
+            </div>
+
+            <Button onClick={handleCopy} className="w-full gap-2">
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? "Copied to Clipboard!" : "Copy Login Credentials"}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <Field label="Full Name" error={errs.full_name}>
+              <Input value={full_name} onChange={(e) => setName(e.target.value)} placeholder="Asha Sharma" />
+            </Field>
+            <Field label="Email" error={errs.email}>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="asha@udyamadhar.in" type="email" />
+            </Field>
+            <Field label="Password (Manual)" error={errs.password}>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Set custom password (or leave blank for auto)"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                >
+                  {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </Field>
+            <Field label="Mobile">
+              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="9876543210" />
+            </Field>
+            <Field label="Role">
+              <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <p className="text-xs text-muted-foreground">
+              Account will be created directly without email verification required.
+            </p>
+          </div>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? "Sending…" : "Send Invite"}</Button>
+          {createdInfo ? (
+            <Button onClick={() => { reset(); onOpenChange(false); }}>Done</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create Employee Account"}</Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -471,25 +558,14 @@ function AddEmployeeDialog({ open, onOpenChange, onCreated }:
 }
 
 function EditEmployeeDialog({ row, onClose, onSaved }:
-  { row: Row | null; onClose: () => void; onSaved: () => void }) {
+  { row: Row; onClose: () => void; onSaved: () => void }) {
   const updateFn = useServerFn(updateEmployee);
-  const [full_name, setName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [role, setRoleVal] = useState<Role>("executive");
-  const [department, setDepartment] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
+  const [full_name, setName] = useState(row.full_name ?? "");
+  const [mobile, setMobile] = useState(row.mobile ?? "");
+  const [role, setRoleVal] = useState<Role>((row.roles[0] as Role) ?? "executive");
+  const [department, setDepartment] = useState(row.department ?? "");
+  const [joiningDate, setJoiningDate] = useState(row.joining_date ?? "");
   const [busy, setBusy] = useState(false);
-
-  // Reset when row changes
-  useMemoOnRow(row, (r) => {
-    setName(r.full_name ?? "");
-    setMobile(r.mobile ?? "");
-    setRoleVal((r.roles[0] as Role) ?? "executive");
-    setDepartment(r.department ?? "");
-    setJoiningDate(r.joining_date ?? "");
-  });
-
-  if (!row) return null;
 
   async function submit() {
     if (!row) return;
@@ -588,6 +664,44 @@ function DeactivateDialog({ row, onClose, onDone }:
           <AlertDialogAction onClick={go} disabled={busy}
             style={willActivate ? undefined : { background: "#b91c1c" }}>
             {busy ? "Working…" : willActivate ? "Activate" : "Deactivate"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DeleteEmployeeDialog({ row, onClose, onDone }:
+  { row: Row | null; onClose: () => void; onDone: () => void }) {
+  const deleteFn = useServerFn(deleteEmployee);
+  const [busy, setBusy] = useState(false);
+  if (!row) return null;
+
+  async function go() {
+    if (!row) return;
+    setBusy(true);
+    try {
+      await deleteFn({ data: { user_id: row.id } });
+      toast.success(`Employee ${row.full_name ?? row.email} permanently deleted.`);
+      onDone();
+      onClose();
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <AlertDialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {row.full_name ?? row.email} permanently?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the user account for <b>{row.email}</b>, including their profile, assigned roles, and module permissions. <b>This action cannot be undone.</b>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={go} disabled={busy} className="bg-red-600 hover:bg-red-700">
+            {busy ? "Deleting…" : "Delete Employee"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

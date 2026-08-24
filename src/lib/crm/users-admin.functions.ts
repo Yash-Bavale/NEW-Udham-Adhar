@@ -461,3 +461,44 @@ export const resetEmployeePassword = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+const DeleteEmployeeInput = z.object({
+  user_id: z.string().uuid(),
+});
+
+/** Admin / Super-admin: permanently delete an employee user, profile, roles and permissions. */
+export const deleteEmployee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => DeleteEmployeeInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const admin = await getAdmin();
+
+    if (data.user_id === context.userId) {
+      throw new Error("You cannot delete your own account.");
+    }
+
+    // Delete permissions, scopes, roles & profile
+    await Promise.all([
+      admin.from("user_permissions").delete().eq("user_id", data.user_id),
+      admin.from("user_permission_scopes").delete().eq("user_id", data.user_id),
+      admin.from("user_roles").delete().eq("user_id", data.user_id),
+      admin.from("profiles").delete().eq("id", data.user_id),
+    ]);
+
+    // Delete auth user account
+    const { error: dErr } = await admin.auth.admin.deleteUser(data.user_id);
+    if (dErr) throw new Error(dErr.message);
+
+    try {
+      await admin.from("audit_logs").insert({
+        entity_type: "user",
+        entity_id: data.user_id,
+        action: "delete_employee",
+        actor_id: context.userId,
+        new_value: { status: "deleted" },
+      } as never);
+    } catch { /* audit best-effort */ }
+
+    return { ok: true };
+  });
