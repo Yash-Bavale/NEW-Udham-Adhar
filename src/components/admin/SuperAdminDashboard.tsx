@@ -413,7 +413,11 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
             : "All webhooks healthy"
         }
       />
-    </div>/* ---------------- Custom Tooltip for Chart ---------------- */
+    </div>
+  );
+}
+
+/* ---------------- Custom Tooltip for Chart ---------------- */
 
 function CustomTrendTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null;
