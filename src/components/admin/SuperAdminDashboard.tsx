@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { formatIST } from "@/lib/datetime";
 import { DateRangePicker } from "./DateRangePicker";
+import { cn } from "@/lib/utils";
 
 const fmtN = (n: number) => new Intl.NumberFormat("en-IN").format(n || 0);
 const fmtINR = (n: number) =>
@@ -138,6 +139,8 @@ export function SuperAdminDashboard({
       </div>
 
       <KpiGrid data={data} loading={isLoading} />
+
+      <GatewaysCard data={data} loading={isLoading} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <TrendCard data={data} loading={isLoading} className="lg:col-span-2" />
@@ -397,29 +400,129 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
   );
 }
 
-/* ---------------- Trend ---------------- */
+/* ---------------- Gateway Collection Breakdown ---------------- */
+
+function GatewaysCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
+  const list = data?.gatewaysCollected ?? [];
+  return (
+    <Card className="col-span-full">
+      <CardHeader className="pb-2.5 flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-sm flex items-center gap-2 font-semibold">
+            <Globe className="size-4 text-indigo-600" /> Gateway Collection Breakdown
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground">Amount collected per payment gateway in selected date range</p>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+          </div>
+        ) : list.length === 0 ? (
+          <div className="text-xs text-muted-foreground py-2">No gateway data in range</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {list.map((gw) => (
+              <div key={gw.code} className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3 flex flex-col justify-between transition hover:border-slate-300">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className={cn("size-2 rounded-full", gw.revenue > 0 ? "bg-emerald-500" : "bg-slate-300")} />
+                    {gw.name}
+                  </span>
+                  <span className={cn(
+                    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider",
+                    gw.isEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
+                  )}>
+                    {gw.isEnabled ? "LIVE" : "OFF"}
+                  </span>
+                </div>
+                <div className="mt-2.5 flex items-baseline justify-between">
+                  <span className="text-base font-extrabold text-slate-900 font-mono">
+                    {fmtShortINR(gw.revenue)}
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {fmtN(gw.count)} orders
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------------- Trend (Day-wise & Hourly Time-wise) ---------------- */
 
 function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; loading: boolean; className?: string }) {
+  const rangePreset = data?.range.preset ?? "today";
+  const isSingleDay = rangePreset === "today" || rangePreset === "yesterday";
+  const [viewMode, setViewMode] = useState<"days" | "hourly">("days");
+
+  useEffect(() => {
+    if (isSingleDay) {
+      setViewMode("hourly");
+    } else {
+      setViewMode("days");
+    }
+  }, [isSingleDay, rangePreset]);
+
   const chartData = useMemo(() => {
     if (!data) return [];
+    if (viewMode === "hourly" && data.trend.hourly) {
+      return data.trend.hourly.hours.map((h, i) => ({
+        label: h,
+        Leads: data.trend.hourly.leads[i] ?? 0,
+        Revenue: data.trend.revenueInr[i] ?? 0,
+      }));
+    }
     return data.trend.days.map((d, i) => ({
-      day: d.slice(5), // MM-DD
+      label: d.slice(5), // MM-DD
       Leads: data.trend.leads[i] ?? 0,
       Revenue: data.trend.revenueInr[i] ?? 0,
     }));
-  }, [data]);
+  }, [data, viewMode]);
 
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-sm">Revenue & Leads</CardTitle>
-            <p className="text-[11px] text-muted-foreground">All times in IST · paid payments only</p>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp className="size-4 text-emerald-600" /> Revenue & Leads ({viewMode === "hourly" ? "Hourly Time-wise" : "Day-wise"})
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">All times in IST · paid payments only · uncapped count</p>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-indigo-500" /> Leads</span>
-            <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> Revenue</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px]">
+              <button
+                type="button"
+                onClick={() => setViewMode("days")}
+                className={cn(
+                  "px-2 py-0.5 rounded-md font-semibold transition cursor-pointer",
+                  viewMode === "days" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Day-wise
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("hourly")}
+                className={cn(
+                  "px-2 py-0.5 rounded-md font-semibold transition cursor-pointer",
+                  viewMode === "hourly" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Time-wise (Hourly)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-indigo-500" /> Leads</span>
+              <span className="flex items-center gap-1"><span className="size-2.5 rounded-full bg-emerald-500" /> Revenue</span>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -431,16 +534,23 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
         ) : (
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+              <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis
+                  yAxisId="left"
+                  tick={{ fontSize: 11 }}
+                  stroke="hsl(var(--muted-foreground))"
+                  tickFormatter={(v) => fmtN(Number(v))}
+                  domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 10))]}
+                />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
                   tick={{ fontSize: 11 }}
                   stroke="hsl(var(--muted-foreground))"
                   tickFormatter={(v) => fmtShortINR(Number(v))}
+                  domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 1000))]}
                 />
                 <Tooltip
                   contentStyle={{
@@ -453,8 +563,8 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
                     name === "Revenue" ? [fmtINR(Number(value)), name] : [fmtN(Number(value)), name]
                   }
                 />
-                <Bar yAxisId="left" dataKey="Leads" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2} dot={false} />
+                <Bar yAxisId="left" dataKey="Leads" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2.5} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

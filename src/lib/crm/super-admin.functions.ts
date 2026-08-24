@@ -106,6 +106,14 @@ function resolveRange(input?: RangeInput): { start: Date; end: Date; prevStart: 
 
 /* -------------------- Output type -------------------- */
 
+export type GatewayCollectItem = {
+  code: string;
+  name: string;
+  revenue: number;
+  count: number;
+  isEnabled: boolean;
+};
+
 export type SuperAdminOverview = {
   range: { preset: RangePreset; startIso: string; endIso: string; label: string };
   kpis: {
@@ -167,10 +175,16 @@ export type SuperAdminOverview = {
     payuLive: boolean;
     payuRevenue: number;
   };
+  gatewaysCollected: GatewayCollectItem[];
   trend: {
     days: string[];
     leads: number[];
     revenueInr: number[];
+    hourly: {
+      hours: string[];
+      leads: number[];
+      revenueInr: number[];
+    };
   };
   topServices: { name: string; orders: number; revenueInr: number }[];
   emailQueue: { queued: number; processing: number; failed: number; sent: number };
@@ -224,13 +238,14 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       paidLeadsInRange,
       topServicesRes,
       wfExternalDelay, wfOnHold, wfRefundPending, wfRemindersDue, wfClosedInRange,
+      gatewaysRes,
     ] = await Promise.all([
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("payments").select("amount, created_at").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("leads").select("id, created_at").gte("created_at", startIso).lt("created_at", endIso),
+      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
+      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).limit(100000),
+      admin.from("payments").select("amount, created_at, gateway_name").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
+      admin.from("leads").select("id, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
       admin.from("applications").select("id", { count: "exact", head: true })
         .in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]),
       admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"),
@@ -241,12 +256,13 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       admin.from("customers").select("id", { count: "exact", head: true }),
       admin.from("user_roles").select("user_id"),
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso).eq("status", "payment_successful"),
-      admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).limit(2000),
+      admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).limit(5000),
       admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["external_dependency", "government_portal_pending"]),
       admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["waiting_for_customer", "waiting_for_documents", "customer_non_responsive"]),
       admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
       admin.from("workflow_reminders").select("id", { count: "exact", head: true }).eq("status", "pending").lte("due_at", new Date().toISOString()),
       admin.from("applications").select("id", { count: "exact", head: true }).in("workflow_status", ["closed", "cancelled", "refund_closed"]).gte("updated_at", startIso).lt("updated_at", endIso),
+      admin.from("payment_gateways").select("id, gateway_name, display_name, is_enabled"),
     ]);
 
     const sumPaid = (rows: any[] | null | undefined) =>
@@ -255,7 +271,34 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     const revenuePrev = sumPaid(payPrev.data);
     const paidPayments = (payCur.data ?? []).length;
 
-    // ---- Build daily trend buckets between start and end (IST days) ----
+    // ---- Gateways Collection Breakdown ----
+    const gwMap = new Map<string, GatewayCollectItem>();
+    (gatewaysRes.data ?? []).forEach((gw: any) => {
+      const code = String(gw.gateway_name ?? "").toLowerCase();
+      const name = gw.display_name || (code === "payu" ? "PayU" : code === "ccavenue" ? "CCAvenue" : code === "cashfree" ? "Cashfree" : code === "razorpay" ? "Razorpay" : code.toUpperCase());
+      gwMap.set(code, {
+        code,
+        name,
+        revenue: 0,
+        count: 0,
+        isEnabled: Boolean(gw.is_enabled),
+      });
+    });
+
+    for (const r of (payTrend.data ?? []) as Array<{ amount: number; gateway_name?: string | null }>) {
+      const code = String(r.gateway_name ?? "payu").toLowerCase();
+      let item = gwMap.get(code);
+      if (!item) {
+        const name = code === "payu" ? "PayU" : code === "ccavenue" ? "CCAvenue" : code === "cashfree" ? "Cashfree" : code === "razorpay" ? "Razorpay" : code.toUpperCase();
+        item = { code, name, revenue: 0, count: 0, isEnabled: true };
+        gwMap.set(code, item);
+      }
+      item.revenue += Number(r.amount ?? 0);
+      item.count += 1;
+    }
+    const gatewaysCollected = Array.from(gwMap.values()).sort((a, b) => b.revenue - a.revenue);
+
+    // ---- Build daily & hourly trend buckets (IST) ----
     const days: string[] = [];
     const leadsByDay: Record<string, number> = {};
     const revByDay: Record<string, number> = {};
@@ -268,16 +311,44 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
         leadsByDay[key] = 0;
         revByDay[key] = 0;
       }
-      // safety cap
       if (days.length > 366) days.length = 366;
     }
+
+    const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+    const leadsByHour: Record<string, number> = {};
+    const revByHour: Record<string, number> = {};
+    hours.forEach((h) => {
+      leadsByHour[h] = 0;
+      revByHour[h] = 0;
+    });
+
+    function getIstHour(isoStr: string): string {
+      try {
+        const d = new Date(isoStr);
+        const fmt = new Intl.DateTimeFormat("en-IN", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          hour12: false,
+        }).formatToParts(d);
+        const h = fmt.find((p) => p.type === "hour")?.value ?? "00";
+        return `${h.padStart(2, "0")}:00`;
+      } catch {
+        return "00:00";
+      }
+    }
+
     for (const r of (leadsTrend.data ?? []) as Array<{ created_at: string }>) {
       const k = istDayKey(new Date(r.created_at));
       if (k in leadsByDay) leadsByDay[k]! += 1;
+      const hk = getIstHour(r.created_at);
+      if (hk in leadsByHour) leadsByHour[hk]! += 1;
     }
+
     for (const r of (payTrend.data ?? []) as Array<{ amount: number; created_at: string }>) {
       const k = istDayKey(new Date(r.created_at));
       if (k in revByDay) revByDay[k]! += Number(r.amount ?? 0);
+      const hk = getIstHour(r.created_at);
+      if (hk in revByHour) revByHour[hk]! += Number(r.amount ?? 0);
     }
 
     // ---- Top services ----
@@ -614,10 +685,16 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
         payuLive,
         payuRevenue,
       },
+      gatewaysCollected,
       trend: {
         days,
         leads: days.map((k) => leadsByDay[k] ?? 0),
         revenueInr: days.map((k) => revByDay[k] ?? 0),
+        hourly: {
+          hours,
+          leads: hours.map((hk) => leadsByHour[hk] ?? 0),
+          revenueInr: hours.map((hk) => revByHour[hk] ?? 0),
+        },
       },
       topServices: topServicesArr,
       emailQueue: queue,
