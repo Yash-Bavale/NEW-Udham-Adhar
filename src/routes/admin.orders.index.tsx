@@ -451,6 +451,7 @@ function OrdersListPage() {
               placeholder="Days"
               className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
             />
+          )}
           {/* Sort Order */}
           <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "asc" | "desc")}>
             <SelectTrigger className="h-9 w-[145px] text-xs bg-slate-50/50 border-slate-200">
