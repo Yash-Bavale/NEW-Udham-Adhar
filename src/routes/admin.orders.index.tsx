@@ -178,9 +178,7 @@ function OrdersListPage() {
   }, []);
 
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
-  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
-
-  const queryPayload = useMemo(() => ({
+  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });  const queryPayload = useMemo(() => ({
     page, pageSize,
     fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
     serviceId: serviceId === "all" ? undefined : serviceId,
@@ -189,11 +187,10 @@ function OrdersListPage() {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     search: debouncedSearch || undefined,
-    sortOrder,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, sortOrder]);
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, sortOrder],
+    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
@@ -225,8 +222,6 @@ function OrdersListPage() {
       });
     }
   }, [page, data?.total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, qc, listFn, pageSize]);
-
-
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
   // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
@@ -283,11 +278,22 @@ function OrdersListPage() {
     });
   }, [bucketRows, actionStatusFilter]);
 
+  // Frontend in-memory sorting for current page of orders (instant without backend request)
+  const sortedRows = useMemo(() => {
+    const list = [...rows];
+    if (sortOrder === "asc") {
+      list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    } else {
+      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    return list;
+  }, [rows, sortOrder]);
+
   const total = data?.total ?? 0;
 
   const groups = useMemo(() => {
     const g = new Map<string, any[]>();
-    for (const r of rows) {
+    for (const r of sortedRows) {
       const d = new Date(r.created_at);
       const key = d.toDateString();
       const arr = g.get(key) ?? [];
@@ -295,7 +301,7 @@ function OrdersListPage() {
       g.set(key, arr);
     }
     return Array.from(g.entries());
-  }, [rows]);
+  }, [sortedRows]);
 
   const isFilterActive =
     search !== "" ||
