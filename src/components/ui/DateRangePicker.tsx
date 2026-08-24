@@ -13,6 +13,7 @@ export type DateRangePresetKey =
   | "today"
   | "yesterday"
   | "7d"
+  | "15d"
   | "30d"
   | "this_week"
   | "last_week"
@@ -30,6 +31,7 @@ export const DEFAULT_DATE_PRESETS: PresetOption[] = [
   { key: "today", label: "Today" },
   { key: "yesterday", label: "Yesterday" },
   { key: "7d", label: "Last 7 Days" },
+  { key: "15d", label: "Last 15 Days" },
   { key: "30d", label: "Last 30 Days" },
   { key: "this_week", label: "This Week" },
   { key: "last_week", label: "Last Week" },
@@ -54,6 +56,9 @@ export function getPresetRange(key: DateRangePresetKey): { from: Date; to: Date 
 
     case "7d":
       return { from: subDays(today, 6), to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
+
+    case "15d":
+      return { from: subDays(today, 14), to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
 
     case "30d":
       return { from: subDays(today, 29), to: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59) };
@@ -160,6 +165,13 @@ export function DateRangePicker({
     setDraftRange(range);
     setActivePreset("custom");
     onPresetChange?.("custom");
+    if (range?.from && range?.to) {
+      const from = range.from;
+      const to = range.to;
+      const toEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
+      onChange?.({ from, to: toEnd }, "custom");
+      setOpen(false);
+    }
   };
 
   const displayLabel = React.useMemo(() => {
@@ -264,6 +276,7 @@ export function DateRangePicker({
               onSelect={handleRangeSelect}
               numberOfMonths={2}
               showOutsideDays={false}
+              disabled={{ after: new Date() }}
               className="p-1 font-sans"
             />
           </div>

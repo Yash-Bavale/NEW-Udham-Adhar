@@ -43,7 +43,7 @@ function istDayKey(d: Date): string {
   return ist.toISOString().slice(0, 10);
 }
 
-export type RangePreset = "today" | "yesterday" | "7d" | "30d" | "mtd" | "custom";
+export type RangePreset = "today" | "yesterday" | "7d" | "15d" | "30d" | "mtd" | "custom";
 
 export type RangeInput = {
   preset: RangePreset;
@@ -69,6 +69,10 @@ function resolveRange(input?: RangeInput): { start: Date; end: Date; prevStart: 
       break;
     case "7d":
       start = addDays(todayStart, -6);
+      end = now;
+      break;
+    case "15d":
+      start = addDays(todayStart, -14);
       end = now;
       break;
     case "30d":

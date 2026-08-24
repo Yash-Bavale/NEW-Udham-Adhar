@@ -8,6 +8,7 @@ import {
   Briefcase,
   Mail,
   Phone,
+  MessageCircle,
   MapPin,
 } from "lucide-react";
 import { listPublicSeoPages } from "@/lib/seo-pages.functions";
@@ -98,6 +99,7 @@ export function Footer() {
   const footerContactName = contactNameBlock?.text || brand.companyName || "Business Help Services";
 
   const address =
+    brand.postalAddress ||
     addressBlock?.text ||
     [brand.companyName, brand.postalAddress].filter(Boolean).join(" ") ||
     "Koregaon Bk, Taluka-Khed, Pune, Maharashtra – 410505, India";
@@ -202,12 +204,23 @@ export function Footer() {
                 </a>
               </span>
             </li>
-            {brand.supportPhone && (
+            <li className="flex items-start gap-3">
+              <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+              <span>
+                Phone:{" "}
+                <a href={`tel:${(brand.supportPhone || "+91-9767870331").replace(/\s+/g, "")}`} className="hover:underline">
+                  {brand.supportPhone || "+91-9767870331"}
+                </a>
+              </span>
+            </li>
+            {brand.whatsappNumber && (
               <li className="flex items-start gap-3">
-                <Phone className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
+                <MessageCircle className="h-5 w-5 mt-0.5 shrink-0 text-white/80" />
                 <span>
-                  Phone:{" "}
-                  <a href={`tel:${brand.supportPhone.replace(/\s+/g, "")}`} className="hover:underline">{brand.supportPhone}</a>
+                  WhatsApp:{" "}
+                  <a href={`https://wa.me/${brand.whatsappNumber.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    {brand.whatsappNumber}
+                  </a>
                 </span>
               </li>
             )}

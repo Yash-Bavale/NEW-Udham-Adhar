@@ -116,6 +116,8 @@ const ContactInput = z.object({
   legal_footer_line: z.string().trim().max(1000).nullable(),
 });
 
+import { clearWebsiteCache } from "@/lib/websites/current-website.server";
+
 export const updateWebsiteContact = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => ContactInput.parse(i))
@@ -125,5 +127,6 @@ export const updateWebsiteContact = createServerFn({ method: "POST" })
     const { websiteId, ...patch } = data;
     const { error } = await supabase.from("websites").update(patch).eq("id", websiteId);
     if (error) throw new Error(error.message);
+    clearWebsiteCache();
     return { ok: true };
   });

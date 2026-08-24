@@ -34,6 +34,11 @@ const BRAND_COLUMNS =
 const cache = new Map<string, WebsiteRow>();
 let primaryCache: WebsiteRow | null = null;
 
+export function clearWebsiteCache() {
+  cache.clear();
+  primaryCache = null;
+}
+
 /**
  * Retry transient upstream failures (DNS/network blips reaching the database)
  * before giving up — otherwise a brief outage silently renders fallback brand

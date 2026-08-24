@@ -48,6 +48,7 @@ const PRESETS: { value: RangePreset; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
   { value: "30d", label: "30 days" },
   { value: "mtd", label: "This month" },
   { value: "custom", label: "Custom" },

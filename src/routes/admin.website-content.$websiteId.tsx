@@ -314,6 +314,18 @@ function ContactCard({
     footer_unlock_code: (website.footer_unlock_code as string) ?? "",
     legal_footer_line: (website.legal_footer_line as string) ?? "",
   }));
+
+  useEffect(() => {
+    setForm({
+      support_email: (website.support_email as string) ?? "",
+      support_phone: (website.support_phone as string) ?? "",
+      whatsapp_number: (website.whatsapp_number as string) ?? "",
+      business_hours: (website.business_hours as string) ?? "",
+      postal_address: (website.postal_address as string) ?? "",
+      footer_unlock_code: (website.footer_unlock_code as string) ?? "",
+      legal_footer_line: (website.legal_footer_line as string) ?? "",
+    });
+  }, [website]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
