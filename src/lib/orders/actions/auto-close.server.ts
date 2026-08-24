@@ -75,7 +75,7 @@ export async function autoCloseOverdueOrder(
 
   const { data: app } = await supabaseAdmin
     .from("applications")
-    .select("order_status, fulfillment_status, form_status, customer_hold_started_at, closure_remarks")
+    .select("order_status, fulfillment_status, form_status, customer_hold_started_at, closure_remarks, workflow_delay_reason, active_reason_text")
     .eq("id", appId)
     .maybeSingle();
   const row = app as any;
@@ -95,7 +95,35 @@ export async function autoCloseOverdueOrder(
     return { ok: false, skipped: "no_reason" };
   }
 
-  const remarks = `${opts?.remarkPrefix ?? ""}${STAGE_REMARKS[stage]}`;
+  // Resolve specific closure reason label and delay description (from Reason Library if set)
+  let closureReasonText = STAGE_REMARKS[stage];
+  let delayDescriptionText = STAGE_REMARKS[stage];
+
+  if (stage === "form_pending") {
+    closureReasonText = "Form not received within 8 hours of payment";
+    delayDescriptionText = "Form not received within 8 hours of payment";
+  } else if (stage === "customer_delay") {
+    const delayReasonCode = row?.workflow_delay_reason as string | null | undefined;
+    if (delayReasonCode) {
+      const { data: reasonRow } = await supabaseAdmin
+        .from("workflow_delay_reasons")
+        .select("label, description")
+        .eq("code", delayReasonCode)
+        .maybeSingle();
+      if (reasonRow) {
+        closureReasonText = (reasonRow as any).label || STAGE_REMARKS.customer_delay;
+        delayDescriptionText = (reasonRow as any).description || (reasonRow as any).label || STAGE_REMARKS.customer_delay;
+      } else if (row?.active_reason_text) {
+        closureReasonText = row.active_reason_text;
+        delayDescriptionText = row.active_reason_text;
+      }
+    } else if (row?.active_reason_text) {
+      closureReasonText = row.active_reason_text;
+      delayDescriptionText = row.active_reason_text;
+    }
+  }
+
+  const remarks = `${opts?.remarkPrefix ?? ""}${delayDescriptionText}`;
   if (!alreadyAutoClosed) {
     const { error } = await supabaseAdmin
       .from("applications")
@@ -122,7 +150,7 @@ export async function autoCloseOverdueOrder(
       event_type: "order_status_change",
       old_value: String(row.order_status ?? ""),
       new_value: "CLOSED",
-      note: `${AUTO_CLOSE_REASON_LABEL} — ${remarks}`,
+      note: closureReasonText === remarks ? closureReasonText : `${closureReasonText} — ${remarks}`,
       staff_name: opts?.staffName ?? "System",
       staff_role: "system",
     } as never);
@@ -180,15 +208,16 @@ export async function autoCloseOverdueOrder(
       import("@/lib/emails/emails.server"),
       import("@/lib/emails/bhs-templates"),
     ]);
+    const fullReasonString = closureReasonText === remarks ? closureReasonText : `${closureReasonText} — ${remarks}`;
     await enqueueFromTemplateInternal(
       BHS_EMAILS.E010_ORDER_CLOSED,
       email,
       {
         customerName: name || "Customer",
         orderNumber: (c?.application_code as string) || appId.slice(0, 8),
-        closure_reason: AUTO_CLOSE_REASON_LABEL,
+        closure_reason: closureReasonText,
         employee_remarks: remarks,
-        reason: `${AUTO_CLOSE_REASON_LABEL} — ${remarks}`,
+        reason: fullReasonString,
         fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
       },
       { applicationId: appId, leadId: (c?.lead_id as string) ?? undefined, trigger: "auto" },
