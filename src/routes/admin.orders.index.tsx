@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useRole } from "@/hooks/useRole";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
-import { usePreserveScroll, saveModuleFilterState, getModuleFilterState } from "@/hooks/usePreserveScroll";
+import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
 
 export const Route = createFileRoute("/admin/orders/")({
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -100,6 +100,7 @@ function OrdersListPage() {
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
   const [page, setPage] = useState<number>(savedState?.page ?? 1);
   const pageSize = 50;
+  const isInitialMount = useRef(true);
 
   // Persist state across navigation
   useEffect(() => {
@@ -118,10 +119,39 @@ function OrdersListPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Reset page to 1 whenever filters change
+  // Reset page to 1 whenever filters change (skip on initial mount to preserve Page 2/3 when returning via Back button)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setPage(1);
   }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays]);
+
+  // Listener to reset all filters when clicking "Orders" in leftbar
+  useEffect(() => {
+    const handleReset = () => {
+      clearModuleFilterState("admin.orders");
+      setSearch("");
+      setDebouncedSearch("");
+      setFulfillmentStatus("all");
+      setServiceId("all");
+      setAssignedTo("all");
+      setPaymentStatus("all");
+      setActionStatusFilter("all");
+      setDateFrom("");
+      setDateTo("");
+      setBucket("all");
+      setPendingAge("any");
+      setCustomDays("");
+      setPage(1);
+      const container = document.getElementById("admin-main-scroll");
+      if (container) container.scrollTop = 0;
+    };
+
+    window.addEventListener("reset-orders-filters", handleReset);
+    return () => window.removeEventListener("reset-orders-filters", handleReset);
+  }, []);
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {

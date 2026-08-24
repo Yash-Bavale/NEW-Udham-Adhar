@@ -55,3 +55,8 @@ export function saveModuleFilterState(key: string, state: Record<string, any>) {
 export function getModuleFilterState(key: string): Record<string, any> | undefined {
   return moduleStates.get(key);
 }
+
+export function clearModuleFilterState(key: string) {
+  moduleStates.delete(key);
+  scrollPositions.delete(key);
+}

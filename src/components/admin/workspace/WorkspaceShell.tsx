@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -85,6 +85,7 @@ const TAB_DEFS = [
 type TabId = WorkspaceTabId;
 
 export function WorkspaceShell(p: Props) {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
@@ -357,8 +358,14 @@ export function WorkspaceShell(p: Props) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <button
             type="button"
-            onClick={() => window.history.back()}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                navigate({ to: "/admin/orders" });
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Orders
           </button>

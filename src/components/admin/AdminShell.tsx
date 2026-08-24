@@ -31,6 +31,7 @@ import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
 import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
+import { clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import type { Module } from "@/lib/roles";
 
 type NavItem = {
@@ -284,6 +285,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                     <Link
                       key={n.to}
                       to={n.to}
+                      onClick={() => {
+                        if (n.to === "/admin/orders") {
+                          clearModuleFilterState("admin.orders");
+                          if (typeof window !== "undefined") {
+                            window.dispatchEvent(new CustomEvent("reset-orders-filters"));
+                          }
+                        }
+                      }}
                       title={sidebarCollapsed ? `${n.label}${badge > 0 ? ` (${badge} new)` : ""}` : undefined}
                       className={cn(
                         "relative flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
