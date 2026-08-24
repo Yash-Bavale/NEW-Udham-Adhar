@@ -45,21 +45,125 @@ function playSingleRing(ctx: AudioContext, startOffset: number) {
   osc2.stop(now2 + 0.51);
 }
 
-export function playLeadRingSound() {
+export type RingtoneTone = "chime" | "bell" | "alert" | "ding" | "soft";
+
+export function playRingtonePattern(tone: RingtoneTone, ctx: AudioContext, offset: number) {
+  const now = ctx.currentTime + offset;
+  
+  if (tone === "bell") {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(783.99, now);
+    osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.3);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(1.0, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.71);
+  } else if (tone === "alert") {
+    [523.25, 659.25, 783.99].forEach((freq, idx) => {
+      const t = now + idx * 0.12;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.8, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.26);
+    });
+  } else if (tone === "ding") {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, now);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.7, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.51);
+  } else if (tone === "soft") {
+    [440, 554.37].forEach((freq, idx) => {
+      const t = now + idx * 0.2;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.5, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.36);
+    });
+  } else {
+    playSingleRing(ctx, offset);
+  }
+}
+
+export type RingtoneTone = "chime" | "bell" | "alert" | "ding" | "soft" | "custom";
+
+export function playNotificationSound(
+  kind: "lead" | "order" | "preview",
+  forceRingtone?: string,
+  forceCustomUrl?: string
+) {
   try {
     if (typeof window === "undefined") return;
+
+    if (kind === "lead") {
+      const leadsEnabled = localStorage.getItem("udyam.sound.leads") !== "false";
+      if (!leadsEnabled) return;
+    } else if (kind === "order") {
+      const ordersEnabled = localStorage.getItem("udyam.sound.orders") !== "false";
+      if (!ordersEnabled) return;
+    }
+
+    const ringtoneKey = kind === "order" ? "udyam.sound.orders_ringtone" : "udyam.sound.leads_ringtone";
+    const customUrlKey = kind === "order" ? "udyam.sound.orders_custom_url" : "udyam.sound.leads_custom_url";
+
+    const ringtone = (forceRingtone || localStorage.getItem(ringtoneKey) || localStorage.getItem("udyam.sound.ringtone") || (kind === "order" ? "bell" : "chime")) as RingtoneTone;
+    const customUrl = forceCustomUrl !== undefined ? forceCustomUrl : (localStorage.getItem(customUrlKey) || "");
+
+    if (ringtone === "custom" && customUrl.trim()) {
+      const audio = new Audio(customUrl.trim());
+      audio.play().catch((err) => {
+        console.warn("[playNotificationSound] Custom MP3 audio play error:", err);
+      });
+      return;
+    }
+
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    // Loud ring, repeats 3x (~1.45s per ring).
-    const CYCLE = 1.45;
-    playSingleRing(ctx, 0);
-    playSingleRing(ctx, CYCLE);
-    playSingleRing(ctx, CYCLE * 2);
-    setTimeout(() => { ctx.close().catch(() => {}); }, CYCLE * 3 * 1000 + 200);
+
+    if (kind === "preview") {
+      playRingtonePattern(ringtone === "custom" ? "chime" : ringtone, ctx, 0);
+      setTimeout(() => { ctx.close().catch(() => {}); }, 1200);
+      return;
+    }
+
+    const CYCLE = 1.0;
+    const toneToPlay = ringtone === "custom" ? "chime" : ringtone;
+    playRingtonePattern(toneToPlay, ctx, 0);
+    playRingtonePattern(toneToPlay, ctx, CYCLE);
+    setTimeout(() => { ctx.close().catch(() => {}); }, CYCLE * 2 * 1000 + 400);
   } catch {
-    // Ignore audio autoplay restrictions if user hasn't interacted yet
+    // Ignore audio autoplay restrictions
   }
+}
+
+export function playLeadRingSound() {
+  playNotificationSound("lead");
 }
 
 export function useNotifications() {

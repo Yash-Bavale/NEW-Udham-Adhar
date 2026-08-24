@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useNotifications, playLeadRingSound } from "@/hooks/useNotifications";
+import { useNotifications, playNotificationSound } from "@/hooks/useNotifications";
 import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 
@@ -35,7 +35,7 @@ export function useNewLeadsWatcher() {
       qc.invalidateQueries({ queryKey: ["my-work"] });
     };
 
-    const triggerNotification = (dedupeKey: string, title: string, body: string, url: string) => {
+    const triggerNotification = (dedupeKey: string, title: string, body: string, url: string, kind: "lead" | "order" = "lead") => {
       const now = Date.now();
       const lastTime = notifiedKeysRef.current.get(dedupeKey) ?? 0;
       if (now - lastTime < 10000) return; // Skip if notified within last 10s
@@ -48,7 +48,7 @@ export function useNewLeadsWatcher() {
 
       setUnseen((n) => n + 1);
       invalidateLeadsData();
-      playLeadRingSound();
+      playNotificationSound(kind);
 
       notify({ title, body, url, tag: dedupeKey });
       toast.info(title, {
@@ -133,7 +133,7 @@ export function useNewLeadsWatcher() {
             const body = notif.body || "A new update or task has arrived in your queue.";
             const url = notif.href || "/admin/leads";
 
-            triggerNotification(dedupeKey, title, body, url);
+            triggerNotification(dedupeKey, title, body, url, "order");
           },
         )
 
