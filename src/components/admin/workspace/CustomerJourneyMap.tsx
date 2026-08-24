@@ -41,7 +41,7 @@ import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone
 import { CountdownChip } from "./CountdownChip";
 
 import {
-  sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder,
+  sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder, reopenOrder,
 } from "@/lib/orders/order-actions.functions";
 import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
@@ -248,6 +248,12 @@ export function CustomerJourneyMap(p: Props) {
   const mutResumeCustomer = useMutation({
     mutationFn: () => fnResumeCustomer({ data: { orderId: p.applicationId } }),
     onSuccess: () => { toast.success("Order resumed — moved to Form Submitted"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const fnReopen = useServerFn(reopenOrder);
+  const mutReopen = useMutation({
+    mutationFn: () => fnReopen({ data: { orderId: p.applicationId } }),
+    onSuccess: () => { toast.success("E09 sent — order reopened successfully"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutFormLink = useMutation({
@@ -519,22 +525,33 @@ export function CustomerJourneyMap(p: Props) {
           </div>
         </div>
 
-        {/* 3-Button Control Bar: Resume Order, Admin Override, Force Close */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {isTalkToExpert && (
-              <button
-                type="button"
-                onClick={() => mutTalkExpert.mutate()}
-                disabled={closed || completed || mutTalkExpert.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-violet-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-              >
-                <CheckCircle2 className="size-3.5" />
-                Talk-to-Expert Completed (E009)
-              </button>
-            )}
+        {/* 3-Button Control Bar: Resume/Reopen Order, Admin Override, Force Close */}
+        <div className="mt-3 flex flex-wrap items-center justify-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5">
+          {isTalkToExpert && (
+            <button
+              type="button"
+              onClick={() => mutTalkExpert.mutate()}
+              disabled={closed || completed || mutTalkExpert.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed select-none"
+            >
+              <CheckCircle2 className="size-3.5" />
+              Talk-to-Expert Completed (E009)
+            </button>
+          )}
 
-            {/* Resume Order */}
+          {/* Resume / Reopen Order */}
+          {closed || (completed && p.adminOverride) ? (
+            <button
+              type="button"
+              onClick={() => mutReopen.mutate()}
+              disabled={mutReopen.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 cursor-pointer transition select-none"
+              title="Reopen closed order back to Form Submitted (E09 / B09)"
+            >
+              <RotateCcw className="size-3.5" />
+              {mutReopen.isPending ? "Reopening…" : "Reopen Order (B09)"}
+            </button>
+          ) : (
             <button
               type="button"
               onClick={() => {
@@ -546,7 +563,7 @@ export function CustomerJourneyMap(p: Props) {
               }}
               disabled={!canResume || mutResumeCustomer.isPending || mutResume.isPending}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs transition select-none",
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold shadow-xs transition select-none",
                 canResume
                   ? "bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
                   : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed opacity-60"
@@ -558,39 +575,39 @@ export function CustomerJourneyMap(p: Props) {
               }
             >
               <RotateCcw className="size-3.5" />
-              Resume Order
+              {(mutResumeCustomer.isPending || mutResume.isPending) ? "Resuming…" : "Resume Order"}
             </button>
+          )}
 
-            {/* Admin Override */}
-            {p.onAdminOverrideChange && (
-              <button
-                type="button"
-                onClick={() => p.onAdminOverrideChange?.(!p.adminOverride)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-xs cursor-pointer transition select-none",
-                  p.adminOverride
-                    ? "bg-orange-600 text-white hover:bg-orange-700"
-                    : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                )}
-                title="Toggle Admin Override to unlock all stage actions B01–B08"
-              >
-                <ShieldAlert className="size-3.5" />
-                Admin Override: {p.adminOverride ? "ON" : "OFF"}
-              </button>
-            )}
-
-            {/* Force Close */}
+          {/* Admin Override */}
+          {p.onAdminOverrideChange && (
             <button
               type="button"
-              onClick={() => setDialog({ kind: "force_close" })}
-              disabled={closed}
-              className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed select-none"
-              title="Force close order with closure reason and send E010 notification"
+              onClick={() => p.onAdminOverrideChange?.(!p.adminOverride)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold shadow-xs cursor-pointer transition select-none",
+                p.adminOverride
+                  ? "bg-orange-600 text-white hover:bg-orange-700"
+                  : "bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300"
+              )}
+              title="Toggle Admin Override to unlock all stage actions B01–B08"
             >
-              <XCircle className="size-3.5" />
-              Force Close
+              <ShieldAlert className="size-3.5" />
+              Admin Override: {p.adminOverride ? "ON" : "OFF"}
             </button>
-          </div>
+          )}
+
+          {/* Force Close */}
+          <button
+            type="button"
+            onClick={() => setDialog({ kind: "force_close" })}
+            disabled={closed}
+            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed select-none"
+            title="Force close order with closure reason and send E010 notification"
+          >
+            <XCircle className="size-3.5" />
+            Force Close (B10)
+          </button>
         </div>
 
         {(view.hasEngine && view.nextTimer && !closed) || closureArmed || closed ? (
