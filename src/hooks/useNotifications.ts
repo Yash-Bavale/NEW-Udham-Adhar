@@ -45,7 +45,7 @@ function playSingleRing(ctx: AudioContext, startOffset: number) {
   osc2.stop(now2 + 0.51);
 }
 
-export type RingtoneTone = "chime" | "bell" | "alert" | "ding" | "soft";
+export type RingtoneTone = "chime" | "bell" | "alert" | "ding" | "soft" | "custom";
 
 export function playRingtonePattern(tone: RingtoneTone, ctx: AudioContext, offset: number) {
   const now = ctx.currentTime + offset;
@@ -110,7 +110,6 @@ export function playRingtonePattern(tone: RingtoneTone, ctx: AudioContext, offse
   }
 }
 
-export type RingtoneTone = "chime" | "bell" | "alert" | "ding" | "soft" | "custom";
 
 export function playNotificationSound(
   kind: "lead" | "order" | "preview",
