@@ -35,12 +35,44 @@ function istDayStartUtc(d: Date): Date {
   ist.setUTCHours(0, 0, 0, 0);
   return new Date(ist.getTime() - IST_OFFSET_MS);
 }
+function getIstDateKey(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "";
+  try {
+    const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
+function getIstHourKey(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "00:00";
+  try {
+    const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return "00:00";
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      hour12: false,
+    }).format(d);
+    const h = parseInt(fmt, 10) % 24;
+    return `${String(h).padStart(2, "0")}:00`;
+  } catch {
+    return "00:00";
+  }
+}
+
 function addDays(d: Date, n: number): Date {
   return new Date(d.getTime() + n * 86_400_000);
 }
 function istDayKey(d: Date): string {
-  const ist = new Date(d.getTime() + IST_OFFSET_MS);
-  return ist.toISOString().slice(0, 10);
+  return getIstDateKey(d);
 }
 
 export type RangePreset = "today" | "yesterday" | "7d" | "15d" | "30d" | "mtd" | "custom";
@@ -179,10 +211,12 @@ export type SuperAdminOverview = {
   trend: {
     days: string[];
     leads: number[];
+    orders: number[];
     revenueInr: number[];
     hourly: {
       hours: string[];
       leads: number[];
+      orders: number[];
       revenueInr: number[];
     };
   };
@@ -232,7 +266,7 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     const [
       leadsCur, leadsPrevRes,
       payCur, payPrev,
-      payTrend, leadsTrend,
+      payTrend, leadsTrend, ordersTrend,
       openApps, docsPending, certsInRange, emailCounts, activity, webhookErrs,
       totalCustomers, staffRoles,
       paidLeadsInRange,
@@ -244,8 +278,9 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
       admin.from("payments").select("amount").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
       admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).limit(100000),
-      admin.from("payments").select("amount, created_at, gateway_name").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
+      admin.from("payments").select("amount, created_at, gateway_name, payment_date").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
       admin.from("leads").select("id, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(100000),
+      admin.from("applications").select("id, created_at").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).limit(100000),
       admin.from("applications").select("id", { count: "exact", head: true })
         .in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]),
       admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"),
@@ -301,53 +336,52 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
     // ---- Build daily & hourly trend buckets (IST) ----
     const days: string[] = [];
     const leadsByDay: Record<string, number> = {};
+    const ordersByDay: Record<string, number> = {};
     const revByDay: Record<string, number> = {};
     {
       const firstDay = istDayStartUtc(start);
       const lastDay = istDayStartUtc(end);
       for (let cur = firstDay; cur.getTime() <= lastDay.getTime(); cur = addDays(cur, 1)) {
-        const key = istDayKey(cur);
-        days.push(key);
-        leadsByDay[key] = 0;
-        revByDay[key] = 0;
+        const key = getIstDateKey(cur);
+        if (key && !days.includes(key)) {
+          days.push(key);
+          leadsByDay[key] = 0;
+          ordersByDay[key] = 0;
+          revByDay[key] = 0;
+        }
       }
       if (days.length > 366) days.length = 366;
     }
 
     const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
     const leadsByHour: Record<string, number> = {};
+    const ordersByHour: Record<string, number> = {};
     const revByHour: Record<string, number> = {};
     hours.forEach((h) => {
       leadsByHour[h] = 0;
+      ordersByHour[h] = 0;
       revByHour[h] = 0;
     });
 
-    function getIstHour(isoStr: string): string {
-      try {
-        const d = new Date(isoStr);
-        const fmt = new Intl.DateTimeFormat("en-IN", {
-          timeZone: "Asia/Kolkata",
-          hour: "2-digit",
-          hour12: false,
-        }).formatToParts(d);
-        const h = fmt.find((p) => p.type === "hour")?.value ?? "00";
-        return `${h.padStart(2, "0")}:00`;
-      } catch {
-        return "00:00";
-      }
-    }
-
     for (const r of (leadsTrend.data ?? []) as Array<{ created_at: string }>) {
-      const k = istDayKey(new Date(r.created_at));
-      if (k in leadsByDay) leadsByDay[k]! += 1;
-      const hk = getIstHour(r.created_at);
+      const dk = getIstDateKey(r.created_at);
+      if (dk in leadsByDay) leadsByDay[dk]! += 1;
+      const hk = getIstHourKey(r.created_at);
       if (hk in leadsByHour) leadsByHour[hk]! += 1;
     }
 
-    for (const r of (payTrend.data ?? []) as Array<{ amount: number; created_at: string }>) {
-      const k = istDayKey(new Date(r.created_at));
-      if (k in revByDay) revByDay[k]! += Number(r.amount ?? 0);
-      const hk = getIstHour(r.created_at);
+    for (const r of (ordersTrend.data ?? []) as Array<{ created_at: string }>) {
+      const dk = getIstDateKey(r.created_at);
+      if (dk in ordersByDay) ordersByDay[dk]! += 1;
+      const hk = getIstHourKey(r.created_at);
+      if (hk in ordersByHour) ordersByHour[hk]! += 1;
+    }
+
+    for (const r of (payTrend.data ?? []) as Array<{ amount: number; created_at: string; payment_date?: string | null }>) {
+      const dateVal = r.payment_date || r.created_at;
+      const dk = getIstDateKey(dateVal);
+      if (dk in revByDay) revByDay[dk]! += Number(r.amount ?? 0);
+      const hk = getIstHourKey(dateVal);
       if (hk in revByHour) revByHour[hk]! += Number(r.amount ?? 0);
     }
 
@@ -689,10 +723,12 @@ export const getSuperAdminOverview = createServerFn({ method: "POST" })
       trend: {
         days,
         leads: days.map((k) => leadsByDay[k] ?? 0),
+        orders: days.map((k) => ordersByDay[k] ?? 0),
         revenueInr: days.map((k) => revByDay[k] ?? 0),
         hourly: {
           hours,
           leads: hours.map((hk) => leadsByHour[hk] ?? 0),
+          orders: hours.map((hk) => ordersByHour[hk] ?? 0),
           revenueInr: hours.map((hk) => revByHour[hk] ?? 0),
         },
       },

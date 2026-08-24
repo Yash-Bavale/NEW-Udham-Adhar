@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import {
   Activity, AlertTriangle, Award, Bell, Briefcase, Database, FileText, Globe, Mail,
@@ -139,8 +139,6 @@ export function SuperAdminDashboard({
       </div>
 
       <KpiGrid data={data} loading={isLoading} />
-
-      <GatewaysCard data={data} loading={isLoading} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <TrendCard data={data} loading={isLoading} className="lg:col-span-2" />
@@ -389,68 +387,68 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
         footer={m.webhookErrors24h > 0 ? "Investigate failures" : "All webhooks healthy"}
       />
       <ModernKpi
-        icon={<Globe className="size-4" />} label="Gateway Status" value="PayU"
-        tone={m.payuLive && data.payu.isProduction ? "emerald" : "amber"}
+        icon={<Globe className="size-4" />}
+        label="Gateway Status"
+        value={
+          (data?.gatewaysCollected ?? []).length > 0
+            ? (data?.gatewaysCollected ?? []).filter((g) => g.isEnabled || g.revenue > 0).map((g) => g.name).join(" / ")
+            : "PayU"
+        }
+        tone={data?.payu.isProduction ? "emerald" : "amber"}
+        href="/admin/settings?tab=gateways"
         subs={<>
-          <StatChip label={data.payu.isProduction ? "LIVE" : data.payu.mode.toUpperCase()} value={m.payuLive ? "●" : "○"} tone={data.payu.isProduction ? "emerald" : "amber"} />
-          <StatChip label="Collected" value={fmtShortINR(m.payuRevenue)} tone="slate" />
+          {(data?.gatewaysCollected ?? []).map((gw) => (
+            <StatChip
+              key={gw.code}
+              label={`${gw.name} (${gw.isEnabled ? "LIVE" : "OFF"})`}
+              value={`Collected ${fmtShortINR(gw.revenue)}`}
+              tone={gw.revenue > 0 ? "emerald" : "slate"}
+              href="/admin/settings?tab=gateways"
+            />
+          ))}
         </>}
+        footer={
+          (data?.gatewaysCollected ?? []).length > 0
+            ? (data?.gatewaysCollected ?? []).map((g) => `${g.name}: ${fmtShortINR(g.revenue)}`).join(" · ")
+            : "All webhooks healthy"
+        }
       />
-    </div>
-  );
-}
+    </div>/* ---------------- Custom Tooltip for Chart ---------------- */
 
-/* ---------------- Gateway Collection Breakdown ---------------- */
+function CustomTrendTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
 
-function GatewaysCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
-  const list = data?.gatewaysCollected ?? [];
+  const leads = payload.find((p: any) => p.dataKey === "Leads")?.value ?? 0;
+  const orders = payload.find((p: any) => p.dataKey === "Orders")?.value ?? 0;
+  const revenue = payload.find((p: any) => p.dataKey === "Revenue")?.value ?? 0;
+
   return (
-    <Card className="col-span-full">
-      <CardHeader className="pb-2.5 flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-sm flex items-center gap-2 font-semibold">
-            <Globe className="size-4 text-indigo-600" /> Gateway Collection Breakdown
-          </CardTitle>
-          <p className="text-[11px] text-muted-foreground">Amount collected per payment gateway in selected date range</p>
+    <div className="rounded-xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-md min-w-[175px] text-xs">
+      <div className="font-bold text-slate-800 border-b border-slate-100 pb-1.5 mb-2 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="text-[10px] text-slate-400 font-medium">IST</span>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-1.5 text-slate-600">
+            <span className="size-2 rounded-sm bg-indigo-500" /> Leads
+          </span>
+          <span className="font-bold font-mono text-indigo-600">{fmtN(leads)}</span>
         </div>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
-          </div>
-        ) : list.length === 0 ? (
-          <div className="text-xs text-muted-foreground py-2">No gateway data in range</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {list.map((gw) => (
-              <div key={gw.code} className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3 flex flex-col justify-between transition hover:border-slate-300">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span className={cn("size-2 rounded-full", gw.revenue > 0 ? "bg-emerald-500" : "bg-slate-300")} />
-                    {gw.name}
-                  </span>
-                  <span className={cn(
-                    "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider",
-                    gw.isEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
-                  )}>
-                    {gw.isEnabled ? "LIVE" : "OFF"}
-                  </span>
-                </div>
-                <div className="mt-2.5 flex items-baseline justify-between">
-                  <span className="text-base font-extrabold text-slate-900 font-mono">
-                    {fmtShortINR(gw.revenue)}
-                  </span>
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {fmtN(gw.count)} orders
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-1.5 text-slate-600">
+            <span className="size-2 rounded-sm bg-sky-500" /> Orders
+          </span>
+          <span className="font-bold font-mono text-sky-600">{fmtN(orders)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
+          <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
+            <span className="size-2 rounded-full bg-emerald-500" /> Revenue
+          </span>
+          <span className="font-extrabold font-mono text-emerald-600">{fmtINR(revenue)}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -475,12 +473,14 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
       return data.trend.hourly.hours.map((h, i) => ({
         label: h,
         Leads: data.trend.hourly.leads[i] ?? 0,
-        Revenue: data.trend.revenueInr[i] ?? 0,
+        Orders: data.trend.hourly.orders?.[i] ?? 0,
+        Revenue: data.trend.hourly.revenueInr[i] ?? 0,
       }));
     }
     return data.trend.days.map((d, i) => ({
       label: d.slice(5), // MM-DD
       Leads: data.trend.leads[i] ?? 0,
+      Orders: data.trend.orders?.[i] ?? 0,
       Revenue: data.trend.revenueInr[i] ?? 0,
     }));
   }, [data, viewMode]);
@@ -491,9 +491,9 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="size-4 text-emerald-600" /> Revenue & Leads ({viewMode === "hourly" ? "Hourly Time-wise" : "Day-wise"})
+              <TrendingUp className="size-4 text-emerald-600" /> Revenue, Leads & Orders ({viewMode === "hourly" ? "Hourly Time-wise" : "Day-wise"})
             </CardTitle>
-            <p className="text-[11px] text-muted-foreground">All times in IST · paid payments only · uncapped count</p>
+            <p className="text-[11px] text-muted-foreground">All times in IST · paid payments only · exact counts</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[11px]">
@@ -519,9 +519,10 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
               </button>
             </div>
 
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="size-2.5 rounded-sm bg-indigo-500" /> Leads</span>
-              <span className="flex items-center gap-1"><span className="size-2.5 rounded-full bg-emerald-500" /> Revenue</span>
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-medium">
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-indigo-500" /> Leads</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-sky-500" /> Orders</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-emerald-500" /> Revenue</span>
             </div>
           </div>
         </div>
@@ -534,37 +535,34 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
         ) : (
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: -4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+              <ComposedChart data={chartData} margin={{ top: 12, right: 14, left: -4, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-100" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} stroke="#cbd5e1" />
                 <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  stroke="#cbd5e1"
                   tickFormatter={(v) => fmtN(Number(v))}
                   domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 10))]}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  stroke="#cbd5e1"
                   tickFormatter={(v) => fmtShortINR(Number(v))}
                   domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 1000))]}
                 />
-                <Tooltip
-                  contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value: any, name: any) =>
-                    name === "Revenue" ? [fmtINR(Number(value)), name] : [fmtN(Number(value)), name]
-                  }
-                />
-                <Bar yAxisId="left" dataKey="Leads" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Line yAxisId="right" type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2.5} dot={false} />
+                <Tooltip content={<CustomTrendTooltip />} />
+                <Bar yAxisId="left" dataKey="Leads" fill="#6366F1" radius={[3, 3, 0, 0]} maxBarSize={18} name="Leads" />
+                <Bar yAxisId="left" dataKey="Orders" fill="#0EA5E9" radius={[3, 3, 0, 0]} maxBarSize={18} name="Orders" />
+                <Area yAxisId="right" type="monotone" dataKey="Revenue" stroke="#10B981" fill="url(#revenueGrad)" strokeWidth={2.5} name="Revenue" dot={false} activeDot={{ r: 5, fill: "#10B981", stroke: "#fff", strokeWidth: 2 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
