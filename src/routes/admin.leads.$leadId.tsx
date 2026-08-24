@@ -88,7 +88,7 @@ function LeadDetailPage() {
           <LeadWorkspacePanel
             lead={lead as any}
             applications={applications}
-            staff={Array.isArray(staffData) ? staffData : (staffData?.profiles ?? (staffData?.staff ?? []))}
+            staff={Array.isArray(staffData) ? staffData : (staffData?.profiles ?? [])}
           />
         </TabsContent>
 

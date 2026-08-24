@@ -101,7 +101,7 @@ export const listEligibleEmployees = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const admin = await getAdmin();
-    const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"];
+    const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"] as const;
     const { data: roleRows, error } = await admin
       .from("user_roles")
       .select("user_id, role")
