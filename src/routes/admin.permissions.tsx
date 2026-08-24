@@ -59,7 +59,7 @@ function PermissionsPage() {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const staffList = (staffQ.data ?? []) as any[];
+  const staffList = (Array.isArray(staffQ.data) ? staffQ.data : (staffQ.data as any)?.rows ?? []) as any[];
   const filteredStaff = useMemo(() => {
     const q = search.trim().toLowerCase();
     return staffList.filter((u) => {
