@@ -390,28 +390,24 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
         icon={<Globe className="size-4" />}
         label="Gateway Status"
         value={
-          (data?.gatewaysCollected ?? []).length > 0
-            ? (data?.gatewaysCollected ?? []).filter((g) => g.isEnabled || g.revenue > 0).map((g) => g.name).join(" / ")
-            : "PayU"
+          (data?.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length > 1
+            ? `${(data?.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length} Gateways`
+            : (data?.gatewaysCollected?.[0]?.name ?? "PayU")
         }
         tone={data?.payu.isProduction ? "emerald" : "amber"}
         href="/admin/settings?tab=gateways"
         subs={<>
-          {(data?.gatewaysCollected ?? []).map((gw) => (
+          {(data?.gatewaysCollected ?? []).slice(0, 3).map((gw) => (
             <StatChip
               key={gw.code}
-              label={`${gw.name} (${gw.isEnabled ? "LIVE" : "OFF"})`}
-              value={`Collected ${fmtShortINR(gw.revenue)}`}
+              label={gw.name}
+              value={fmtShortINR(gw.revenue)}
               tone={gw.revenue > 0 ? "emerald" : "slate"}
               href="/admin/settings?tab=gateways"
             />
           ))}
         </>}
-        footer={
-          (data?.gatewaysCollected ?? []).length > 0
-            ? (data?.gatewaysCollected ?? []).map((g) => `${g.name}: ${fmtShortINR(g.revenue)}`).join(" · ")
-            : "All webhooks healthy"
-        }
+        footer={data?.payu.isProduction ? "Live production mode" : "All webhooks healthy"}
       />
     </div>
   );
