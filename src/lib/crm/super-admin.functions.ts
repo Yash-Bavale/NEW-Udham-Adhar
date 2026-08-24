@@ -192,6 +192,7 @@ function presetLabel(p: RangePreset): string {
     case "today": return "Today";
     case "yesterday": return "Yesterday";
     case "7d": return "Last 7 days";
+    case "15d": return "Last 15 days";
     case "30d": return "Last 30 days";
     case "mtd": return "Month to date";
     case "custom": return "Custom range";

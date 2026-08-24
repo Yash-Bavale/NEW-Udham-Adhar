@@ -437,15 +437,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: apps, count, error } = await q.range(
-      (data.page - 1) * data.pageSize,
-      data.page * data.pageSize - 1,
-    );
+    // Fetch the exact count first so we never send a .range() past the
+    // end of the result set (PostgREST replies 416 "range not satisfiable").
+    const countQ = q.range(0, 0);
+    const { count, error: countErr } = await countQ;
+    if (countErr) throw new Error(countErr.message);
+    const total = count ?? 0;
+    if (total === 0) {
+      return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
+    }
+    const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
+    const page = Math.min(Math.max(1, data.page), maxPage);
+    const from = (page - 1) * data.pageSize;
+    const { data: apps, error } = await q.range(from, Math.min(from + data.pageSize, total) - 1);
     if (error) throw new Error(error.message);
     const appList = apps ?? [];
 
     if (appList.length === 0) {
-      return { rows: [], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+      return { rows: [], total, page, pageSize: data.pageSize };
     }
 
     const ids = appList.map((a) => a.id);
