@@ -16,6 +16,7 @@ import {
   RefreshCw, Download, Calendar, Layers, Award, Zap, ShieldCheck, HelpCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const fmtN = (n: number) => new Intl.NumberFormat("en-IN").format(n || 0);
 const fmtINR = (n: number) =>
@@ -159,56 +160,97 @@ export function RevenueDashboardView() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live Financial Engine · {formatIST(now, { timeOnly: true })} IST
-            {data?.isCached && (
-              <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-[10px] uppercase">
-                ⚡ Cache (Fast)
-              </span>
-            )}
+      {/* Top Header & Date Controls */}
+      <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600">
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live Financial Engine · {formatIST(now, { timeOnly: true })} IST
+              {data?.isCached && (
+                <span className="bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full text-[10px] uppercase">
+                  ⚡ Cache (Fast)
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">Revenue & Payments</h1>
+            <p className="text-xs text-slate-500">
+              {data?.range?.label ?? "Loading…"} overview · Gross, Base Revenue (Excl. Tax), Gateway split & Audit ledger
+            </p>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">Revenue & Payments</h1>
-          <p className="text-xs text-slate-500">
-            {data?.range?.label ?? "Loading…"} overview · Gross, Base Revenue (Excl. Tax), Gateway split & Audit ledger
-          </p>
+
+          {/* Date Filter & Export Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker
+              preset={preset as DateRangePresetKey}
+              onPresetChange={(p) => {
+                setPreset(p as RevenueRangePreset);
+                setFromIso(undefined);
+                setToIso(undefined);
+              }}
+              value={{
+                from: fromIso ? new Date(fromIso) : undefined,
+                to: toIso ? new Date(toIso) : undefined,
+              }}
+              onChange={(range, pKey) => {
+                if (pKey) setPreset(pKey as RevenueRangePreset);
+                setFromIso(range.from ? range.from.toISOString() : undefined);
+                setToIso(range.to ? range.to.toISOString() : undefined);
+              }}
+            />
+
+            {/* Export Button -> opens RevenueExportModal */}
+            <button
+              onClick={() => setExportModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Download className="size-4 text-emerald-600" /> Export
+            </button>
+
+            <button
+              onClick={handleManualRefresh}
+              className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-xs transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
+              title="Refresh Data from DB"
+            >
+              <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
         </div>
 
-        {/* Date Filter & Export Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <DateRangePicker
-            preset={preset as DateRangePresetKey}
-            onPresetChange={(p) => setPreset(p as RevenueRangePreset)}
-            value={{
-              from: fromIso ? new Date(fromIso) : undefined,
-              to: toIso ? new Date(toIso) : undefined,
-            }}
-            onChange={(range, pKey) => {
-              if (pKey) setPreset(pKey as RevenueRangePreset);
-              setFromIso(range.from ? range.from.toISOString() : undefined);
-              setToIso(range.to ? range.to.toISOString() : undefined);
-            }}
-          />
-
-          {/* Export Button -> opens RevenueExportModal */}
-          <button
-            onClick={() => setExportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-colors"
-          >
-            <Download className="size-4 text-emerald-600" /> Export
-          </button>
-
-          <button
-            onClick={handleManualRefresh}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-xs transition-colors flex items-center gap-1 text-xs font-semibold"
-            title="Refresh Data from DB"
-          >
-            <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+        {/* Quick Date Range Preset Strip */}
+        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick Range:</span>
+          {[
+            { key: "today", label: "Today" },
+            { key: "yesterday", label: "Yesterday" },
+            { key: "7d", label: "Last 7 Days" },
+            { key: "30d", label: "Last 30 Days" },
+            { key: "this_month", label: "This Month" },
+            { key: "last_month", label: "Last Month" },
+            { key: "this_fy", label: "This FY" },
+          ].map((item) => {
+            const isActive = preset === item.key && !fromIso && !toIso;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  setPreset(item.key as RevenueRangePreset);
+                  setFromIso(undefined);
+                  setToIso(undefined);
+                }}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none border",
+                  isActive
+                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
