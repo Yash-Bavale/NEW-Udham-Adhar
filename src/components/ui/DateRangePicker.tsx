@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { Calendar as CalendarIcon, X, Check } from "lucide-react";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, differenceInDays } from "date-fns";
+import { Calendar as CalendarIcon, X, Check, RotateCcw } from "lucide-react";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -193,6 +193,19 @@ export function DateRangePicker({
     return placeholder;
   }, [activePreset, presets, value?.from, value?.to, draftRange?.from, draftRange?.to, placeholder]);
 
+  const daysCount = React.useMemo(() => {
+    if (draftRange?.from && draftRange?.to) {
+      return differenceInDays(draftRange.to, draftRange.from) + 1;
+    }
+    return 0;
+  }, [draftRange?.from, draftRange?.to]);
+
+  // Default left month to previous month when showing past date range filter
+  const initialMonth = React.useMemo(() => {
+    const targetDate = draftRange?.to ?? value?.to ?? new Date();
+    return subMonths(targetDate, 1);
+  }, [draftRange?.to, value?.to]);
+
   return (
     <div className={cn("inline-flex items-center", className)}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -207,100 +220,122 @@ export function DateRangePicker({
             )}
           >
             <CalendarIcon className="size-3.5 text-slate-500" />
-            <span className="truncate max-w-[260px]">{displayLabel}</span>
+            <span className="truncate max-w-[280px]">{displayLabel}</span>
           </Button>
         </PopoverTrigger>
 
         <PopoverContent
           align={align}
-          className="w-auto p-0 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden z-50 min-w-[340px] md:min-w-[620px]"
+          className="w-auto p-0 rounded-2xl border border-slate-200/80 bg-white shadow-2xl overflow-hidden z-50 min-w-[340px] md:min-w-[700px]"
         >
-          {/* Preset Tabs Bar at Top (Matching Image 2 Mockup) */}
-          <div className="border-b border-slate-100 bg-slate-50/70 p-2.5">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-              {presets.map((p) => {
-                const isActive = activePreset === p.key;
-                return (
+          <div className="flex flex-col md:flex-row">
+            {/* Left Sidebar: Presets (Enterprise UX Standard) */}
+            <div className="w-full md:w-48 bg-slate-50/70 border-b md:border-b-0 md:border-r border-slate-100 p-3 flex flex-col justify-between shrink-0">
+              <div>
+                <div className="px-2.5 py-1 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Quick Presets
+                </div>
+                <div className="flex flex-row md:flex-col gap-1 overflow-x-auto no-scrollbar md:overflow-visible pb-1 md:pb-0">
+                  {presets.map((p) => {
+                    const isActive = activePreset === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => handleSelectPreset(p.key)}
+                        className={cn(
+                          "w-full text-left px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center justify-between",
+                          isActive
+                            ? "bg-blue-600 text-white shadow-xs font-bold"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                        )}
+                      >
+                        <span>{p.label}</span>
+                        {isActive && <Check className="size-3 shrink-0 hidden md:block" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Main Content */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Header: Date Readout & Status */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200/60">
+                      {draftRange?.from ? format(draftRange.from, "MMM d, yyyy") : "Start Date"}
+                    </span>
+                    <span className="text-slate-400 font-medium">to</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200/60">
+                      {draftRange?.to ? format(draftRange.to, "MMM d, yyyy") : "End Date"}
+                    </span>
+                  </div>
+
+                  {daysCount > 0 && (
+                    <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                      {daysCount} {daysCount === 1 ? "day" : "days"}
+                    </span>
+                  )}
+                </div>
+
+                {draftRange?.from && (
                   <button
-                    key={p.key}
                     type="button"
-                    onClick={() => handleSelectPreset(p.key)}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap",
-                      isActive
-                        ? "bg-blue-600 text-white shadow-xs font-bold"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/80",
-                    )}
+                    onClick={() => {
+                      setDraftRange(undefined);
+                      setActivePreset("custom");
+                    }}
+                    className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 hover:bg-slate-100 px-2 py-1 rounded-md transition-colors font-medium"
                   >
-                    {p.label}
+                    <RotateCcw className="size-3" /> Reset
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Date Readout Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
-            <div className="flex items-center gap-4 text-xs">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">From</span>
-                <span className="font-semibold text-slate-800 text-sm">
-                  {draftRange?.from ? format(draftRange.from, "MMM d, yyyy") : "Select start"}
-                </span>
+                )}
               </div>
-              <span className="text-slate-300 font-light text-lg">—</span>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">To</span>
-                <span className="font-semibold text-slate-800 text-sm">
-                  {draftRange?.to ? format(draftRange.to, "MMM d, yyyy") : "Select end"}
+
+              {/* Dual Month Calendar View */}
+              <div className="p-4 bg-white flex justify-center">
+                <Calendar
+                  mode="range"
+                  selected={draftRange}
+                  onSelect={handleRangeSelect}
+                  numberOfMonths={2}
+                  defaultMonth={initialMonth}
+                  showOutsideDays={false}
+                  disabled={{ after: new Date() }}
+                  className="p-0 font-sans"
+                />
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                  Click start date then end date to set custom range
                 </span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setOpen(false)}
+                    className="text-xs font-semibold text-slate-600 hover:text-slate-900 h-8 px-3 rounded-lg"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleApply}
+                    disabled={!draftRange?.from}
+                    className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 rounded-lg shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Check className="size-3.5" /> Apply Filter
+                  </Button>
+                </div>
               </div>
             </div>
-
-            {draftRange?.from && (
-              <button
-                type="button"
-                onClick={() => setDraftRange(undefined)}
-                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
-              >
-                <X className="size-3.5" /> Clear
-              </button>
-            )}
-          </div>
-
-          {/* Dual Month Calendar View */}
-          <div className="p-3 bg-white flex justify-center">
-            <Calendar
-              mode="range"
-              selected={draftRange}
-              onSelect={handleRangeSelect}
-              numberOfMonths={2}
-              showOutsideDays={false}
-              disabled={{ after: new Date() }}
-              className="p-1 font-sans"
-            />
-          </div>
-
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setOpen(false)}
-              className="text-xs text-slate-600 hover:text-slate-900 h-8 px-3 rounded-lg"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleApply}
-              disabled={!draftRange?.from}
-              className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 rounded-lg shadow-xs flex items-center gap-1.5"
-            >
-              <Check className="size-3.5" /> Apply
-            </Button>
           </div>
         </PopoverContent>
       </Popover>
