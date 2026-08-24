@@ -205,15 +205,18 @@ function SummaryPage() {
     if (isPaid) trackEvent("post_payment_inline_countdown", { leadCode });
   }, [isPaid, leadCode]);
 
-  const SUPPORTED_GATEWAYS = ["payu", "ccavenue"] as const;
-  const isSupportedGateway = (name: string) => (SUPPORTED_GATEWAYS as readonly string[]).includes(name);
+  const isSupportedGateway = (name: string | null | undefined) => {
+    if (!name) return false;
+    const n = name.toLowerCase();
+    return n.includes("payu") || n.includes("ccavenue") || n.includes("cashfree") || n.includes("razorpay");
+  };
 
   const activeGateway = useMemo(() => {
     if (chosen && isSupportedGateway(chosen)) return chosen;
     const def = data?.defaultGateway;
     if (def && isSupportedGateway(def)) return def;
     const first = (gateways as any[]).find((g) => isSupportedGateway(g.name));
-    return first?.name ?? "payu";
+    return first?.name ?? (gateways[0]?.name || "");
   }, [chosen, data?.defaultGateway, gateways]);
 
   const info = lead

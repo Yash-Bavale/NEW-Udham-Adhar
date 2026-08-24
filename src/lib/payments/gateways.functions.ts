@@ -117,7 +117,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       hasPendingLink,
       pendingAmount,
       gateways: activeList,
-      defaultGateway: defaultGw?.name || "payu",
+      defaultGateway: defaultGw?.name || (activeList.length > 0 ? activeList[0].name : ""),
     };
   });
 

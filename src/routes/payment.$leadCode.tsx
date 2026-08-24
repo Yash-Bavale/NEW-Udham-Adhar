@@ -103,9 +103,10 @@ const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
   },
 };
 
-function isSupportedGateway(name: string) {
-  const n = (name || "").toLowerCase();
-  return n === "payu" || n === "ccavenue" || n === "cashfree" || n.includes("cashfree");
+function isSupportedGateway(name: string | null | undefined) {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return n.includes("payu") || n.includes("ccavenue") || n.includes("cashfree") || n.includes("razorpay");
 }
 
 function PaymentPage() {
@@ -158,7 +159,7 @@ function PaymentPage() {
     if (chosen && isSupportedGateway(chosen)) return chosen;
     if (data?.defaultGateway && isSupportedGateway(data.defaultGateway)) return data.defaultGateway;
     const first = (gateways as any[]).find((g) => isSupportedGateway(g.name));
-    return first?.name || "payu";
+    return first?.name || (gateways[0]?.name ?? "");
   }, [chosen, data?.defaultGateway, gateways]);
 
   const info = useMemo(() => {

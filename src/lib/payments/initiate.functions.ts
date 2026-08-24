@@ -36,7 +36,10 @@ export const initiatePayment = createServerFn({ method: "POST" })
         .order("priority", { ascending: true })
         .limit(1)
         .maybeSingle();
-      chosen = (gw?.name ?? "payu").toLowerCase();
+      if (!gw?.name) {
+        throw new Error("No active payment gateway is currently enabled. Please contact support.");
+      }
+      chosen = gw.name.toLowerCase();
     }
 
     if (chosen.includes("cashfree")) chosen = "cashfree";
