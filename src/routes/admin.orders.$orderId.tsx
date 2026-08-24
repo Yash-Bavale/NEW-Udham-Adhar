@@ -85,7 +85,7 @@ function OrderDetailPage() {
       orderId={orderId}
       data={data}
       hideAmount={hideAmount}
-      staff={staffData?.profiles ?? []}
+      staff={Array.isArray(staffData) ? staffData : (staffData?.profiles ?? (staffData?.staff ?? []))}
       onAssign={setAssignee}
       stage={stage}
       timestamps={timestamps}

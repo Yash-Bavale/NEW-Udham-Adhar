@@ -206,6 +206,12 @@ function LeadsPage() {
     queryKey: ["admin.staff"],
     queryFn: () => staffFn(),
   });
+  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    if (Array.isArray(staffData)) return staffData;
+    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
+    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
+    return [];
+  }, [staffData]);
 
   const filter: FilterJson = useMemo(() => ({
     search: search || undefined,
@@ -375,8 +381,8 @@ function LeadsPage() {
           >
             <option value="">All assignees</option>
             <option value="__unassigned">Unassigned</option>
-            {staffData?.profiles.map((p: any) => (
-              <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
+            {staffProfiles.map((p: any) => (
+              <option key={p.id} value={p.id}>{p.display_name || p.name || p.email}</option>
             ))}
           </select>
         )}
@@ -639,7 +645,7 @@ function LeadsPage() {
       <AddLeadDialog
         open={showAdd}
         onOpenChange={setShowAdd}
-        staff={staffData?.profiles ?? []}
+        staff={staffProfiles}
         onCreated={refresh}
       />
 

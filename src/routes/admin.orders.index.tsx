@@ -196,6 +196,12 @@ function OrdersListPage() {
   }, []);
 
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
+  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    if (Array.isArray(staffData)) return staffData;
+    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
+    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
+    return [];
+  }, [staffData]);
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });  const queryPayload = useMemo(() => ({
     page, pageSize,
     fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
@@ -252,8 +258,8 @@ function OrdersListPage() {
     try {
       const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
       await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-      const staffObj = (staffData as any[])?.find((s) => s.id === targetStaffId);
-      const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.email || "staff");
+      const staffObj = staffProfiles.find((s) => s.id === targetStaffId);
+      const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
       toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
       setSelectedOrderIds([]);
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
@@ -447,8 +453,8 @@ function OrdersListPage() {
               <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All assignees</SelectItem>
-                {(staffData?.profiles ?? []).map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>{s.display_name || s.email}</SelectItem>
+                {staffProfiles.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -567,9 +573,9 @@ function OrdersListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassign">❌ Unassign Order</SelectItem>
-                {(staffData as any[])?.map((s: any) => (
+                {staffProfiles.map((s: any) => (
                   <SelectItem key={s.id} value={s.id}>
-                    👤 {s.display_name || s.email}
+                    👤 {s.display_name || s.name || s.email}
                   </SelectItem>
                 ))}
               </SelectContent>

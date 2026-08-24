@@ -520,7 +520,9 @@ export function WorkspaceShell(p: Props) {
                     className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
                     <option value="">Unassigned</option>
-                    {p.staff.map((s: any) => <option key={s.id} value={s.id}>{s.display_name || s.email}</option>)}
+                    {(Array.isArray(p.staff) ? p.staff : []).map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.email}</option>
+                    ))}
                   </select>
                 }
               />
