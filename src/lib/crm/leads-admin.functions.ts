@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { writeAudit, assertRole, isUserAdmin } from "@/lib/audit";
+import { getUserModulePermission } from "@/lib/crm/permissions.functions";
 import { Database } from "@/integrations/supabase/types";
 
 
@@ -456,6 +457,11 @@ export const listLeads = createServerFn({ method: "GET" })
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
+    const perm = await getUserModulePermission(context.supabase, context.userId, "leads");
+
+    if (!perm.canView) {
+      return { rows: [], count: 0 };
+    }
 
     let query = admin.from("leads").select("*", { count: "exact" });
 
@@ -484,7 +490,17 @@ export const listLeads = createServerFn({ method: "GET" })
     }
     if (data.service) query = query.eq("service", data.service);
     if (!isAdmin) {
-      query = query.eq("assigned_to", context.userId);
+      if (!perm.scopeAll) {
+        const allowedWebsites = perm.scopes.map((s) => s.websiteId).filter(Boolean) as string[];
+        const allowedServices = perm.scopes.map((s) => s.serviceId).filter(Boolean) as string[];
+        if (allowedWebsites.length > 0) {
+          query = query.in("website_id", allowedWebsites);
+        } else if (allowedServices.length > 0) {
+          query = query.in("service", allowedServices);
+        } else {
+          query = query.eq("assigned_to", context.userId);
+        }
+      }
     } else {
       if (data.assignee === "__unassigned") query = query.is("assigned_to", null);
       else if (data.assignee === "__me") query = query.eq("assigned_to", context.userId);

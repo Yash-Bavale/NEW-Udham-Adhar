@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isUserAdmin } from "@/lib/audit";
+import { getUserModulePermission } from "./permissions.functions";
 import {
   FULFILLMENT_STAGES,
   FULFILLMENT_LABEL,
@@ -368,6 +369,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
+    const perm = await getUserModulePermission(context.supabase, context.userId, "orders");
+
+    if (!perm.canView) {
+      return { rows: [], total: 0 };
+    }
 
     // Fire self-healing check in background non-blocking so read response is instant
     ensurePaidOrdersIntegrated(admin).catch((err) => {

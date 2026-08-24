@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import { formatMobile55 } from "@/lib/utils";
@@ -81,6 +82,19 @@ function OrdersListPage() {
   const staffFn = useServerFn(listStaff);
   const svcFn = useServerFn(listServices);
   const role = useRole();
+  const userPerms = usePermissions();
+
+  if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You do not have permission to view the Orders module. Please contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
   const qc = useQueryClient();

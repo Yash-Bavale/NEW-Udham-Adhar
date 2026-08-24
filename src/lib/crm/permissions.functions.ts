@@ -61,3 +61,57 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     }
     return { isAdmin: false, modules };
   });
+
+export async function getUserModulePermission(
+  supabase: any,
+  userId: string,
+  moduleKey: string
+): Promise<{
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  scopeAll: boolean;
+  scopes: Array<{ websiteId: string | null; categoryId: string | null; serviceId: string | null }>;
+}> {
+  const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const isAdmin = !!roles?.some((r: { role: string }) => r.role === "admin" || r.role === "super_admin");
+
+  if (isAdmin) {
+    return { canView: true, canCreate: true, canEdit: true, canDelete: true, scopeAll: true, scopes: [] };
+  }
+
+  const [permRes, scopesRes] = await Promise.all([
+    supabase
+      .from("user_permissions")
+      .select("can_view, can_create, can_edit, can_delete, scope_all")
+      .eq("user_id", userId)
+      .eq("module_key", moduleKey)
+      .maybeSingle(),
+    supabase
+      .from("user_permission_scopes")
+      .select("website_id, category_id, service_id")
+      .eq("user_id", userId)
+      .eq("module_key", moduleKey),
+  ]);
+
+  const perm = permRes.data;
+  if (!perm) {
+    return { canView: true, canCreate: true, canEdit: true, canDelete: false, scopeAll: true, scopes: [] };
+  }
+
+  const scopes = (scopesRes.data ?? []).map((s: any) => ({
+    websiteId: s.website_id ?? null,
+    categoryId: s.category_id ?? null,
+    serviceId: s.service_id ?? null,
+  }));
+
+  return {
+    canView: !!perm.can_view,
+    canCreate: !!perm.can_create,
+    canEdit: !!perm.can_edit,
+    canDelete: !!perm.can_delete,
+    scopeAll: !!perm.scope_all,
+    scopes,
+  };
+}

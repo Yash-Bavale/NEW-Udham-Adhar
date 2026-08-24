@@ -29,6 +29,7 @@ import { useMutation } from "@tanstack/react-query";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import { clearModuleFilterState } from "@/hooks/usePreserveScroll";
@@ -141,11 +142,12 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const role = useRole();
+  const userPerms = usePermissions();
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({
       ...g,
       items: g.items.filter((it) =>
-        (!it.module || role.can(it.module)) &&
+        (!it.module || (role.can(it.module) && userPerms.can(it.module, "view"))) &&
         (!it.requireRole || role.has(it.requireRole)) &&
         (!it.requireAnyRole || it.requireAnyRole.some((r) => role.has(r))),
       ),

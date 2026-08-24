@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon, ShieldAlert } from "lucide-react";
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePermissions";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
@@ -83,6 +84,19 @@ function LeadsPage() {
   const [exporting, setExporting] = useState<"csv" | "excel" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const role = useRole();
+  const userPerms = usePermissions();
+
+  if (!userPerms.isLoading && !userPerms.can("leads", "view")) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You do not have permission to view the Leads module. Please contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
 
   const handleExport = async (format: "csv" | "excel", idsToExport?: string[]) => {
     setExporting(format);
