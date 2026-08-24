@@ -41,8 +41,9 @@ export const getMyPermissions = createServerFn({ method: "GET" })
 
     const modules: Record<string, ModulePerm> = {};
     for (const p of permsRes.data ?? []) {
+      const effectiveView = !!p.can_view || !!p.scope_all;
       modules[p.module_key] = {
-        view: !!p.can_view,
+        view: effectiveView,
         create: !!p.can_create,
         edit: !!p.can_edit,
         delete: !!p.can_delete,
@@ -106,8 +107,9 @@ export async function getUserModulePermission(
     serviceId: s.service_id ?? null,
   }));
 
+  const effectiveView = !!perm.can_view || !!perm.scope_all;
   return {
-    canView: !!perm.can_view,
+    canView: effectiveView,
     canCreate: !!perm.can_create,
     canEdit: !!perm.can_edit,
     canDelete: !!perm.can_delete,
