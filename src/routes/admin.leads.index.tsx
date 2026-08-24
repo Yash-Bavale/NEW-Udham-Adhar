@@ -5,6 +5,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon } from "lucide-react";
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
   getLeadSourceBreakdown, type SourceBreakdown,
@@ -350,24 +351,16 @@ function LeadsPage() {
             ))}
           </select>
         )}
-        <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs" style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}>
-          <Calendar className="size-3.5" style={{ color: "var(--admin-fg-muted)" }} />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-transparent outline-none text-xs"
-            style={{ color: "var(--admin-fg)" }}
-          />
-          <span style={{ color: "var(--admin-fg-muted)" }}>→</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="bg-transparent outline-none text-xs"
-            style={{ color: "var(--admin-fg)" }}
-          />
-        </div>
+        <DateRangePicker
+          value={{
+            from: dateFrom ? new Date(dateFrom) : undefined,
+            to: dateTo ? new Date(dateTo) : undefined,
+          }}
+          onChange={(range) => {
+            setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
+            setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+          }}
+        />
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90"

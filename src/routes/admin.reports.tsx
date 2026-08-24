@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   Activity,
   Calendar,
@@ -520,21 +521,15 @@ function FinanceTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Calendar className="size-4" style={{ color: "var(--admin-fg-muted)" }} />
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="rounded-md border bg-transparent px-2 py-1 text-sm"
-          style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        />
-        <span style={{ color: "var(--admin-fg-muted)" }}>to</span>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="rounded-md border bg-transparent px-2 py-1 text-sm"
-          style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+        <DateRangePicker
+          value={{
+            from: from ? new Date(from) : undefined,
+            to: to ? new Date(to) : undefined,
+          }}
+          onChange={(range) => {
+            setFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
+            setTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+          }}
         />
       </div>
 
@@ -668,26 +663,16 @@ function AuditTab() {
             </option>
           ))}
         </select>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => {
-            setFrom(e.target.value);
+        <DateRangePicker
+          value={{
+            from: from ? new Date(from) : undefined,
+            to: to ? new Date(to) : undefined,
+          }}
+          onChange={(range) => {
+            setFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
+            setTo(range.to ? range.to.toISOString().slice(0, 10) : "");
             setPage(1);
           }}
-          className="rounded-md border bg-transparent px-2 py-1 text-sm"
-          style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        />
-        <span style={{ color: "var(--admin-fg-muted)" }}>to</span>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => {
-            setTo(e.target.value);
-            setPage(1);
-          }}
-          className="rounded-md border bg-transparent px-2 py-1 text-sm"
-          style={{ borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         />
       </div>
 

@@ -7,6 +7,7 @@ import {
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
 import { RevenueExportModal } from "./RevenueExportModal";
+import { DateRangePicker, type DateRangePresetKey } from "@/components/ui/DateRangePicker";
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend
 } from "recharts";
@@ -178,33 +179,19 @@ export function RevenueDashboardView() {
 
         {/* Date Filter & Export Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5 text-xs font-semibold overflow-x-auto">
-            {PRESETS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => { setPreset(p.value); setFromIso(undefined); setToIso(undefined); }}
-                className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${preset === p.value ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {preset === "custom" && (
-            <div className="flex items-center gap-1.5 text-xs">
-              <input
-                type="date"
-                onChange={(e) => setFromIso(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
-                className="rounded-lg border border-slate-200 bg-white p-1.5"
-              />
-              <span>→</span>
-              <input
-                type="date"
-                onChange={(e) => setToIso(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
-                className="rounded-lg border border-slate-200 bg-white p-1.5"
-              />
-            </div>
-          )}
+          <DateRangePicker
+            preset={preset as DateRangePresetKey}
+            onPresetChange={(p) => setPreset(p as RevenueRangePreset)}
+            value={{
+              from: fromIso ? new Date(fromIso) : undefined,
+              to: toIso ? new Date(toIso) : undefined,
+            }}
+            onChange={(range, pKey) => {
+              if (pKey) setPreset(pKey as RevenueRangePreset);
+              setFromIso(range.from ? range.from.toISOString() : undefined);
+              setToIso(range.to ? range.to.toISOString() : undefined);
+            }}
+          />
 
           {/* Export Button -> opens RevenueExportModal */}
           <button

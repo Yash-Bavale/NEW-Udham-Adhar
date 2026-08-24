@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   listInvoicesAdmin,
   getInvoiceSignedUrl,
@@ -110,8 +111,20 @@ function InvoicesPage() {
             <option value="">All services</option>
             {meta.data?.services.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
           </select>
-          <Input type="date" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value, page: 1 })} className="text-xs" />
-          <Input type="date" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value, page: 1 })} className="text-xs" />
+          <DateRangePicker
+            value={{
+              from: filters.from ? new Date(filters.from) : undefined,
+              to: filters.to ? new Date(filters.to) : undefined,
+            }}
+            onChange={(range) =>
+              setFilters({
+                ...filters,
+                from: range.from ? range.from.toISOString().slice(0, 10) : "",
+                to: range.to ? range.to.toISOString().slice(0, 10) : "",
+                page: 1,
+              })
+            }
+          />
         </div>
       </div>
 

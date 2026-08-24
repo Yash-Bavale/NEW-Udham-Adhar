@@ -11,6 +11,7 @@ import { listServices } from "@/lib/crm/services-admin.functions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -386,22 +387,16 @@ function OrdersListPage() {
             </SelectContent>
           </Select>
 
-          {/* Date range */}
-          <div className="flex items-center gap-1">
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"
-            />
-            <span className="text-slate-300 text-xs">–</span>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"
-            />
-          </div>
+          <DateRangePicker
+            value={{
+              from: dateFrom ? new Date(dateFrom) : undefined,
+              to: dateTo ? new Date(dateTo) : undefined,
+            }}
+            onChange={(range) => {
+              setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
+              setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+            }}
+          />
 
           {/* Pending Age */}
           <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>

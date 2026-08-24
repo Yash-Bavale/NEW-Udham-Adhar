@@ -6,6 +6,7 @@ import { formatIST } from "@/lib/datetime";
 import { listPaymentLedger, exportRevenueTransactions } from "@/lib/crm/revenue-admin.functions";
 import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
 import { RevenueExportModal } from "./RevenueExportModal";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   Search, Filter, Download, ChevronLeft, ChevronRight, Eye, RefreshCw, FileText, CheckCircle2,
   Clock, XCircle, RotateCcw, X, ExternalLink
@@ -272,23 +273,18 @@ export function PaymentsTransactionLedger({
               </select>
             </div>
 
-            <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Date From</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                className="w-full rounded-lg border border-slate-200 bg-white p-1.5"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Date To</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                className="w-full rounded-lg border border-slate-200 bg-white p-1.5"
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] text-slate-500 mb-1">Date Range</label>
+              <DateRangePicker
+                value={{
+                  from: dateFrom ? new Date(dateFrom) : undefined,
+                  to: dateTo ? new Date(dateTo) : undefined,
+                }}
+                onChange={(range) => {
+                  setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
+                  setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+                  setPage(1);
+                }}
               />
             </div>
           </div>
