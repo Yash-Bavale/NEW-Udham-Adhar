@@ -25,6 +25,22 @@ async function fetchAllPaged<T>(build: () => any, maxRows = 200_000): Promise<T[
   return out;
 }
 
+type PayRow = {
+  id: string;
+  lead_id?: string | null;
+  application_id?: string | null;
+  amount: number | null;
+  base_amount?: number | null;
+  gst_amount?: number | null;
+  gateway_name?: string | null;
+  payu_mode?: string | null;
+  status: string;
+  payment_date?: string | null;
+  created_at: string;
+  leads?: { service?: string | null } | null;
+};
+type RefundRow = { id: string; refund_amount: number | null; status: string; created_at: string };
+
 const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
@@ -310,7 +326,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     };
 
     // Fetch active period payments with relational lead service
-    const activePayments = await fetchAllPaged<any>(() =>
+    const activePayments = await fetchAllPaged<PayRow>(() =>
       applyPaymentFilters(
         admin
           .from("payments")
@@ -322,7 +338,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     );
 
     // Fetch previous comparative period payments
-    const prevPayments = await fetchAllPaged<any>(() =>
+    const prevPayments = await fetchAllPaged<PayRow>(() =>
       applyPaymentFilters(
         admin
           .from("payments")
@@ -334,7 +350,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     );
 
     // Fetch active period approved refunds
-    const activeRefunds = await fetchAllPaged<any>(() =>
+    const activeRefunds = await fetchAllPaged<RefundRow>(() =>
       admin
         .from("refund_requests")
         .select("id, refund_amount, status, created_at")
@@ -345,7 +361,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     );
 
     // Fetch previous period approved refunds
-    const prevRefunds = await fetchAllPaged<any>(() =>
+    const prevRefunds = await fetchAllPaged<RefundRow>(() =>
       admin
         .from("refund_requests")
         .select("id, refund_amount, status, created_at")
