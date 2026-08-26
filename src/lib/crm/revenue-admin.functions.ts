@@ -158,16 +158,15 @@ export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, 
       break;
 
     case "this_week": {
-      const dayOfWeek = now.getUTCDay(); // 0 is Sun
-      const distanceToMon = (dayOfWeek + 6) % 7;
+      // Weekday must be read in IST, not UTC, or the week flips a day early.
+      const distanceToMon = (istWeekday(now) + 6) % 7;
       start = new Date(todayStart.getTime() - distanceToMon * msDay);
       label = "This Week";
       break;
     }
 
     case "last_week": {
-      const dayOfWeek = now.getUTCDay();
-      const distanceToMon = (dayOfWeek + 6) % 7;
+      const distanceToMon = (istWeekday(now) + 6) % 7;
       const thisMon = new Date(todayStart.getTime() - distanceToMon * msDay);
       start = new Date(thisMon.getTime() - 7 * msDay);
       end = new Date(thisMon.getTime() - 1);
