@@ -10,6 +10,37 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
+// The Data API returns at most 1000 rows per request. Any aggregate computed in
+// JS must therefore page through the full result set.
+const API_PAGE_SIZE = 1000;
+async function fetchAllPaged<T>(build: () => any, maxRows = 200_000): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < maxRows; from += API_PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + API_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < API_PAGE_SIZE) break;
+  }
+  return out;
+}
+
+type PayRow = {
+  id: string;
+  lead_id?: string | null;
+  application_id?: string | null;
+  amount: number | null;
+  base_amount?: number | null;
+  gst_amount?: number | null;
+  gateway_name?: string | null;
+  payu_mode?: string | null;
+  status: string;
+  payment_date?: string | null;
+  created_at: string;
+  leads?: { service?: string | null } | null;
+};
+type RefundRow = { id: string; refund_amount: number | null; status: string; created_at: string };
+
 const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
@@ -96,6 +127,13 @@ export type RevenueRangePreset =
   | "this_fy"
   | "custom";
 
+const IST_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function istWeekday(d: Date): number {
+  const s = d.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", weekday: "short" });
+  const i = IST_WEEKDAYS.indexOf(s);
+  return i < 0 ? d.getUTCDay() : i;
+}
+
 export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, toIso?: string) {
   const now = new Date();
 
@@ -143,16 +181,15 @@ export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, 
       break;
 
     case "this_week": {
-      const dayOfWeek = now.getUTCDay(); // 0 is Sun
-      const distanceToMon = (dayOfWeek + 6) % 7;
+      // Weekday must be read in IST, not UTC, or the week flips a day early.
+      const distanceToMon = (istWeekday(now) + 6) % 7;
       start = new Date(todayStart.getTime() - distanceToMon * msDay);
       label = "This Week";
       break;
     }
 
     case "last_week": {
-      const dayOfWeek = now.getUTCDay();
-      const distanceToMon = (dayOfWeek + 6) % 7;
+      const distanceToMon = (istWeekday(now) + 6) % 7;
       const thisMon = new Date(todayStart.getTime() - distanceToMon * msDay);
       start = new Date(thisMon.getTime() - 7 * msDay);
       end = new Date(thisMon.getTime() - 1);
@@ -278,48 +315,62 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const r = resolveRangeDates(data.preset, data.fromIso, data.toIso);
 
+    // NOTE: the Data API caps every response at 1000 rows, so all revenue reads
+    // below are paged — otherwise long ranges (30d / month / FY) silently
+    // under-report totals.
+    const applyPaymentFilters = (q: any) => {
+      if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+      if (data.status) q = q.eq("status", data.status as PaymentStatus);
+      if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
+      return q;
+    };
+
     // Fetch active period payments with relational lead service
-    let qActive = admin
-      .from("payments")
-      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
-      .gte("created_at", r.startIso)
-      .lte("created_at", r.endIso);
-
-    if (data.gateway) qActive = qActive.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qActive = qActive.eq("status", data.status as PaymentStatus);
-    if (data.paymentMethod) qActive = qActive.ilike("payu_mode", `%${data.paymentMethod}%`);
-
-    const { data: activePayments, error: pErr } = await qActive;
-    if (pErr) throw new Error(pErr.message);
+    const activePayments = await fetchAllPaged<PayRow>(() =>
+      applyPaymentFilters(
+        admin
+          .from("payments")
+          .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
+          .gte("created_at", r.startIso)
+          .lte("created_at", r.endIso)
+          .order("created_at", { ascending: true }),
+      ),
+    );
 
     // Fetch previous comparative period payments
-    let qPrev = admin
-      .from("payments")
-      .select("id, amount, status, created_at")
-      .gte("created_at", r.prevStartIso)
-      .lte("created_at", r.prevEndIso);
-
-    if (data.gateway) qPrev = qPrev.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qPrev = qPrev.eq("status", data.status as PaymentStatus);
-    if (data.paymentMethod) qPrev = qPrev.ilike("payu_mode", `%${data.paymentMethod}%`);
-
-    const { data: prevPayments } = await qPrev;
+    const prevPayments = await fetchAllPaged<PayRow>(() =>
+      applyPaymentFilters(
+        admin
+          .from("payments")
+          .select("id, amount, status, created_at")
+          .gte("created_at", r.prevStartIso)
+          .lte("created_at", r.prevEndIso)
+          .order("created_at", { ascending: true }),
+      ),
+    );
 
     // Fetch active period approved refunds
-    const { data: activeRefunds } = await admin
-      .from("refund_requests")
-      .select("id, refund_amount, status, created_at")
-      .eq("status", "approved")
-      .gte("created_at", r.startIso)
-      .lte("created_at", r.endIso);
+    const activeRefunds = await fetchAllPaged<RefundRow>(() =>
+      admin
+        .from("refund_requests")
+        .select("id, refund_amount, status, created_at")
+        .eq("status", "approved")
+        .gte("created_at", r.startIso)
+        .lte("created_at", r.endIso)
+        .order("created_at", { ascending: true }),
+    );
 
     // Fetch previous period approved refunds
-    const { data: prevRefunds } = await admin
-      .from("refund_requests")
-      .select("id, refund_amount, status, created_at")
-      .eq("status", "approved")
-      .gte("created_at", r.prevStartIso)
-      .lte("created_at", r.prevEndIso);
+    const prevRefunds = await fetchAllPaged<RefundRow>(() =>
+      admin
+        .from("refund_requests")
+        .select("id, refund_amount, status, created_at")
+        .eq("status", "approved")
+        .gte("created_at", r.prevStartIso)
+        .lte("created_at", r.prevEndIso)
+        .order("created_at", { ascending: true }),
+    );
+
 
     // Calculate Active Period Metrics
     const paidRows = (activePayments ?? []).filter((p) => p.status === "paid");
@@ -709,38 +760,40 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     await assertRole(context.supabase, FINANCE_ROLES);
     const admin = await getAdmin();
 
-    let q = admin
-      .from("payments")
-      .select(`
-        id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
-        leads:lead_id (lead_code, name, email, mobile, service, state),
-        applications:application_id (application_code),
-        invoices!fk_invoices_payment (invoice_number)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(50000);
+    const buildExportQuery = () => {
+      let q = admin
+        .from("payments")
+        .select(`
+          id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
+          leads:lead_id (lead_code, name, email, mobile, service, state),
+          applications:application_id (application_code),
+          invoices!fk_invoices_payment (invoice_number)
+        `)
+        .order("created_at", { ascending: false });
 
-    if (data.scope !== "all") {
-      if (data.tab === "successful") q = q.eq("status", "paid");
-      else if (data.tab === "pending") q = q.eq("status", "created");
-      else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
-      else if (data.tab === "refunded") q = q.eq("status", "refunded");
+      if (data.scope !== "all") {
+        if (data.tab === "successful") q = q.eq("status", "paid");
+        else if (data.tab === "pending") q = q.eq("status", "created");
+        else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
+        else if (data.tab === "refunded") q = q.eq("status", "refunded");
 
-      if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
-      if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
-      if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-      if (data.dateTo) q = q.lte("created_at", data.dateTo);
-      if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
-      if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
+        if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+        if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
+        if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+        if (data.dateTo) q = q.lte("created_at", data.dateTo);
+        if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
+        if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
 
-      if (data.search) {
-        const s = data.search.replace(/[,()]/g, " ").trim();
-        q = q.or(`transaction_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+        if (data.search) {
+          const s = data.search.replace(/[,()]/g, " ").trim();
+          q = q.or(`transaction_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+        }
       }
-    }
+      return q;
+    };
 
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    // Paged: the Data API caps each response at 1000 rows.
+    const rows = await fetchAllPaged<any>(buildExportQuery, 50_000);
 
     const ALL_COLS: Record<string, { label: string; val: (r: any, idx: number) => any }> = {
       srNo: { label: "Sr. No.", val: (_, idx) => idx + 1 },
