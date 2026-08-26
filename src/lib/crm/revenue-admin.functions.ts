@@ -278,48 +278,62 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const r = resolveRangeDates(data.preset, data.fromIso, data.toIso);
 
+    // NOTE: the Data API caps every response at 1000 rows, so all revenue reads
+    // below are paged — otherwise long ranges (30d / month / FY) silently
+    // under-report totals.
+    const applyPaymentFilters = (q: any) => {
+      if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+      if (data.status) q = q.eq("status", data.status as PaymentStatus);
+      if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
+      return q;
+    };
+
     // Fetch active period payments with relational lead service
-    let qActive = admin
-      .from("payments")
-      .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
-      .gte("created_at", r.startIso)
-      .lte("created_at", r.endIso);
-
-    if (data.gateway) qActive = qActive.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qActive = qActive.eq("status", data.status as PaymentStatus);
-    if (data.paymentMethod) qActive = qActive.ilike("payu_mode", `%${data.paymentMethod}%`);
-
-    const { data: activePayments, error: pErr } = await qActive;
-    if (pErr) throw new Error(pErr.message);
+    const activePayments = await fetchAllPaged<any>(() =>
+      applyPaymentFilters(
+        admin
+          .from("payments")
+          .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
+          .gte("created_at", r.startIso)
+          .lte("created_at", r.endIso)
+          .order("created_at", { ascending: true }),
+      ),
+    );
 
     // Fetch previous comparative period payments
-    let qPrev = admin
-      .from("payments")
-      .select("id, amount, status, created_at")
-      .gte("created_at", r.prevStartIso)
-      .lte("created_at", r.prevEndIso);
-
-    if (data.gateway) qPrev = qPrev.ilike("gateway_name", `%${data.gateway}%`);
-    if (data.status) qPrev = qPrev.eq("status", data.status as PaymentStatus);
-    if (data.paymentMethod) qPrev = qPrev.ilike("payu_mode", `%${data.paymentMethod}%`);
-
-    const { data: prevPayments } = await qPrev;
+    const prevPayments = await fetchAllPaged<any>(() =>
+      applyPaymentFilters(
+        admin
+          .from("payments")
+          .select("id, amount, status, created_at")
+          .gte("created_at", r.prevStartIso)
+          .lte("created_at", r.prevEndIso)
+          .order("created_at", { ascending: true }),
+      ),
+    );
 
     // Fetch active period approved refunds
-    const { data: activeRefunds } = await admin
-      .from("refund_requests")
-      .select("id, refund_amount, status, created_at")
-      .eq("status", "approved")
-      .gte("created_at", r.startIso)
-      .lte("created_at", r.endIso);
+    const activeRefunds = await fetchAllPaged<any>(() =>
+      admin
+        .from("refund_requests")
+        .select("id, refund_amount, status, created_at")
+        .eq("status", "approved")
+        .gte("created_at", r.startIso)
+        .lte("created_at", r.endIso)
+        .order("created_at", { ascending: true }),
+    );
 
     // Fetch previous period approved refunds
-    const { data: prevRefunds } = await admin
-      .from("refund_requests")
-      .select("id, refund_amount, status, created_at")
-      .eq("status", "approved")
-      .gte("created_at", r.prevStartIso)
-      .lte("created_at", r.prevEndIso);
+    const prevRefunds = await fetchAllPaged<any>(() =>
+      admin
+        .from("refund_requests")
+        .select("id, refund_amount, status, created_at")
+        .eq("status", "approved")
+        .gte("created_at", r.prevStartIso)
+        .lte("created_at", r.prevEndIso)
+        .order("created_at", { ascending: true }),
+    );
+
 
     // Calculate Active Period Metrics
     const paidRows = (activePayments ?? []).filter((p) => p.status === "paid");
