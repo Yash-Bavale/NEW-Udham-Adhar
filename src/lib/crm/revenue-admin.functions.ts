@@ -744,38 +744,40 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
     await assertRole(context.supabase, FINANCE_ROLES);
     const admin = await getAdmin();
 
-    let q = admin
-      .from("payments")
-      .select(`
-        id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
-        leads:lead_id (lead_code, name, email, mobile, service, state),
-        applications:application_id (application_code),
-        invoices!fk_invoices_payment (invoice_number)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(50000);
+    const buildExportQuery = () => {
+      let q = admin
+        .from("payments")
+        .select(`
+          id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, transaction_id, razorpay_payment_id, payment_date, created_at,
+          leads:lead_id (lead_code, name, email, mobile, service, state),
+          applications:application_id (application_code),
+          invoices!fk_invoices_payment (invoice_number)
+        `)
+        .order("created_at", { ascending: false });
 
-    if (data.scope !== "all") {
-      if (data.tab === "successful") q = q.eq("status", "paid");
-      else if (data.tab === "pending") q = q.eq("status", "created");
-      else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
-      else if (data.tab === "refunded") q = q.eq("status", "refunded");
+      if (data.scope !== "all") {
+        if (data.tab === "successful") q = q.eq("status", "paid");
+        else if (data.tab === "pending") q = q.eq("status", "created");
+        else if (data.tab === "failed") q = q.in("status", ["failed", "attempted"]);
+        else if (data.tab === "refunded") q = q.eq("status", "refunded");
 
-      if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
-      if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
-      if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-      if (data.dateTo) q = q.lte("created_at", data.dateTo);
-      if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
-      if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
+        if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
+        if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
+        if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
+        if (data.dateTo) q = q.lte("created_at", data.dateTo);
+        if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
+        if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
 
-      if (data.search) {
-        const s = data.search.replace(/[,()]/g, " ").trim();
-        q = q.or(`transaction_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+        if (data.search) {
+          const s = data.search.replace(/[,()]/g, " ").trim();
+          q = q.or(`transaction_id.ilike.%${s}%,razorpay_payment_id.ilike.%${s}%`);
+        }
       }
-    }
+      return q;
+    };
 
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    // Paged: the Data API caps each response at 1000 rows.
+    const rows = await fetchAllPaged<any>(buildExportQuery, 50_000);
 
     const ALL_COLS: Record<string, { label: string; val: (r: any, idx: number) => any }> = {
       srNo: { label: "Sr. No.", val: (_, idx) => idx + 1 },
