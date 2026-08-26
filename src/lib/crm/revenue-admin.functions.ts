@@ -111,6 +111,13 @@ export type RevenueRangePreset =
   | "this_fy"
   | "custom";
 
+const IST_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function istWeekday(d: Date): number {
+  const s = d.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", weekday: "short" });
+  const i = IST_WEEKDAYS.indexOf(s);
+  return i < 0 ? d.getUTCDay() : i;
+}
+
 export function resolveRangeDates(preset: RevenueRangePreset, fromIso?: string, toIso?: string) {
   const now = new Date();
 
