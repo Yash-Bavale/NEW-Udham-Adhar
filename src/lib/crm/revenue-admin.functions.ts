@@ -10,6 +10,21 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
+// The Data API returns at most 1000 rows per request. Any aggregate computed in
+// JS must therefore page through the full result set.
+const API_PAGE_SIZE = 1000;
+async function fetchAllPaged<T>(build: () => any, maxRows = 200_000): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < maxRows; from += API_PAGE_SIZE) {
+    const { data, error } = await build().range(from, from + API_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < API_PAGE_SIZE) break;
+  }
+  return out;
+}
+
 const FINANCE_ROLES: Database["public"]["Enums"]["app_role"][] = ["super_admin", "admin", "finance", "accounts"];
 type PaymentStatus = Database["public"]["Enums"]["payment_status"];
 
