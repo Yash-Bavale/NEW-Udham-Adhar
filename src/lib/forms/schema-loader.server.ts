@@ -43,13 +43,31 @@ function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSche
     };
   });
 
+  const sampleUrl = row.schema?.meta?.sample_form_url ?? fallback.sample_form_url;
+  const sampleLabel =
+    row.schema?.meta?.sample_form_label ?? fallback.sample_form_label ?? "Download Standard Form";
+
+  // Keep the red instruction block (and its download button) working when the
+  // schema comes from the DB: carry over the registry lines and attach the
+  // sample-form URL configured in the form builder.
+  const baseInstructions = fallback.documentsInstructions;
+  const documentsInstructions =
+    baseInstructions || sampleUrl
+      ? {
+          lines: baseInstructions?.lines ?? [],
+          downloadUrl: sampleUrl ?? baseInstructions?.downloadUrl,
+          downloadLabel: sampleLabel ?? baseInstructions?.downloadLabel,
+        }
+      : undefined;
+
   return {
     title: row.title || fallback.title,
     description: row.description ?? fallback.description,
     fields: normalizedFields,
     documents: row.documents ?? fallback.documents,
-    sample_form_url: row.schema?.meta?.sample_form_url ?? undefined,
-    sample_form_label: row.schema?.meta?.sample_form_label ?? undefined,
+    documentsInstructions,
+    sample_form_url: sampleUrl,
+    sample_form_label: sampleLabel,
   };
 }
 
