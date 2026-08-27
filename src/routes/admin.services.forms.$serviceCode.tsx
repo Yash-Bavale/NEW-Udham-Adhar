@@ -118,7 +118,7 @@ function FormBuilderPage() {
       setDescription(fb.description);
       setSampleFormUrl(fb.sample_form_url ?? "");
       setSampleFormLabel(fb.sample_form_label ?? "");
-      setDocuments(fb.documents.map((d) => ({ key: d.key, label: d.label, required: d.required, help: d.help })));
+      setDocuments(fb.documents.map((d) => ({ key: d.key, label: d.label, required: d.required, help: d.help, sample_url: d.sample_url, sample_label: d.sample_label })));
       setSections(flatFieldsToSections(fb.fields as unknown as Field[]));
     }
     setActiveSection(0);
