@@ -523,12 +523,20 @@ export const getDocumentSignedUrl = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { supabase } = context;
-    const { data: doc, error } = await supabase
+    // Staff-only: verify the caller is signed-in staff, then read with the
+    // admin client. Reading through RLS returned 0 rows for some staff roles,
+    // which surfaced as "Cannot coerce the result to a single JSON object".
+    const { data: isStaff } = await supabase.rpc("has_any_staff_role", {
+      _user_id: context.userId,
+    });
+    if (!isStaff) throw new Error("Not authorized.");
+    const { data: doc, error } = await supabaseAdmin
       .from("documents")
       .select("file_path")
       .eq("id", data.id)
-      .single();
-    if (error || !doc) throw new Error(error?.message ?? "Document not found.");
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!doc) throw new Error("Document not found.");
     const { data: signed, error: sErr } = await supabaseAdmin
       .storage
       .from("documents")
