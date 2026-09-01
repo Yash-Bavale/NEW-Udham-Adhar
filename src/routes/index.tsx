@@ -28,7 +28,7 @@ import { FAQS as FALLBACK_FAQS } from "@/lib/faqs-data";
 const HOMEPAGE_TITLE =
   "Udyam Registration Online | MSME Portal";
 const HOMEPAGE_DESC =
-  "Udyam Registration portal for MSME services. New Udyam Registration, Udyam Certificate Download, Forgot Udyam Certificate, Forgot Udyog Aadhaar, Udyog Aadhaar to Udyam Migration and Udyam Update";
+  "Apply for Udyam Registration online — new MSME registration, certificate download, Udyog Aadhaar migration and Udyam updates, with expert help.";
 
 
 const STEPS = [
