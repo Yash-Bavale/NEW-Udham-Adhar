@@ -53,6 +53,7 @@ const ALLOWED_PREFIXES = [
   "/payment-failed/",
   "/payment-pending/",
   "/processing/",
+  "/resume/",
   "/success/",
 ];
 
