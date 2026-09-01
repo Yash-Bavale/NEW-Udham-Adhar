@@ -52,6 +52,7 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuccessLeadCodeRouteImport } from './routes/success.$leadCode'
+import { Route as ResumeOrderIdRouteImport } from './routes/resume.$orderId'
 import { Route as ProcessingLeadCodeRouteImport } from './routes/processing.$leadCode'
 import { Route as PaymentLeadCodeRouteImport } from './routes/payment.$leadCode'
 import { Route as PaymentPendingLeadCodeRouteImport } from './routes/payment-pending.$leadCode'
@@ -368,6 +369,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const SuccessLeadCodeRoute = SuccessLeadCodeRouteImport.update({
   id: '/success/$leadCode',
   path: '/success/$leadCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResumeOrderIdRoute = ResumeOrderIdRouteImport.update({
+  id: '/resume/$orderId',
+  path: '/resume/$orderId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProcessingLeadCodeRoute = ProcessingLeadCodeRouteImport.update({
@@ -970,6 +976,7 @@ export interface FileRoutesByFullPath {
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
+  '/resume/$orderId': typeof ResumeOrderIdRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -1107,6 +1114,7 @@ export interface FileRoutesByTo {
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
+  '/resume/$orderId': typeof ResumeOrderIdRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -1248,6 +1256,7 @@ export interface FileRoutesById {
   '/payment-pending/$leadCode': typeof PaymentPendingLeadCodeRoute
   '/payment/$leadCode': typeof PaymentLeadCodeRoute
   '/processing/$leadCode': typeof ProcessingLeadCodeRoute
+  '/resume/$orderId': typeof ResumeOrderIdRoute
   '/success/$leadCode': typeof SuccessLeadCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -1391,6 +1400,7 @@ export interface FileRouteTypes {
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
+    | '/resume/$orderId'
     | '/success/$leadCode'
     | '/admin/'
     | '/.lovable/oauth/consent'
@@ -1528,6 +1538,7 @@ export interface FileRouteTypes {
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
+    | '/resume/$orderId'
     | '/success/$leadCode'
     | '/admin'
     | '/.lovable/oauth/consent'
@@ -1668,6 +1679,7 @@ export interface FileRouteTypes {
     | '/payment-pending/$leadCode'
     | '/payment/$leadCode'
     | '/processing/$leadCode'
+    | '/resume/$orderId'
     | '/success/$leadCode'
     | '/admin/'
     | '/.lovable/oauth/consent'
@@ -1771,6 +1783,7 @@ export interface RootRouteChildren {
   PaymentPendingLeadCodeRoute: typeof PaymentPendingLeadCodeRoute
   PaymentLeadCodeRoute: typeof PaymentLeadCodeRoute
   ProcessingLeadCodeRoute: typeof ProcessingLeadCodeRoute
+  ResumeOrderIdRoute: typeof ResumeOrderIdRoute
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -2104,6 +2117,13 @@ declare module '@tanstack/react-router' {
       path: '/success/$leadCode'
       fullPath: '/success/$leadCode'
       preLoaderRoute: typeof SuccessLeadCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resume/$orderId': {
+      id: '/resume/$orderId'
+      path: '/resume/$orderId'
+      fullPath: '/resume/$orderId'
+      preLoaderRoute: typeof ResumeOrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/processing/$leadCode': {
@@ -3048,6 +3068,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentPendingLeadCodeRoute: PaymentPendingLeadCodeRoute,
   PaymentLeadCodeRoute: PaymentLeadCodeRoute,
   ProcessingLeadCodeRoute: ProcessingLeadCodeRoute,
+  ResumeOrderIdRoute: ResumeOrderIdRoute,
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
