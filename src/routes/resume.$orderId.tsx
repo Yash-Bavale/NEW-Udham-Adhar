@@ -16,14 +16,22 @@ export const Route = createFileRoute("/resume/$orderId")({
 
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { data: app } = await supabaseAdmin
+          const { data: app, error } = await supabaseAdmin
             .from("applications")
-            .select("lead_id, leads:lead_id(lead_code)")
+            .select("lead_id")
             .eq("id", orderId)
             .maybeSingle();
+          if (error) console.error("[resume] order lookup failed", error.message);
 
-          const leadCode =
-            (app as { leads?: { lead_code?: string | null } | null } | null)?.leads?.lead_code ?? null;
+          const leadId = (app as { lead_id: string | null } | null)?.lead_id ?? null;
+          if (!leadId) return home;
+
+          const { data: lead } = await supabaseAdmin
+            .from("leads")
+            .select("lead_code")
+            .eq("id", leadId)
+            .maybeSingle();
+          const leadCode = (lead as { lead_code: string | null } | null)?.lead_code ?? null;
           if (!leadCode) return home;
 
           return new Response(null, {
