@@ -366,16 +366,36 @@ async function backfillCommonVariables(
     }
 
     // Completion date fields for E007 / order_completed templates.
-    if (missing("order_completed_date") || missing("completed_date") || missing("completed_at")) {
-      const completedAtRaw = (app as any)?.fulfilled_at ?? (app as any)?.certificate_uploaded_at ?? app?.updated_at ?? new Date().toISOString();
-      const formattedCompletedDate = new Date(completedAtRaw).toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: true,
-      });
-      if (missing("order_completed_date")) out.order_completed_date = `${formattedCompletedDate} IST`;
-      if (missing("completed_date")) out.completed_date = `${formattedCompletedDate} IST`;
-      if (missing("completed_at")) out.completed_at = `${formattedCompletedDate} IST`;
-      if (missing("order_completed_at")) out.order_completed_at = `${formattedCompletedDate} IST`;
+    const completedAtRaw = (app as any)?.fulfilled_at ?? (app as any)?.certificate_uploaded_at ?? new Date().toISOString();
+    const formattedCompletedDate = new Date(completedAtRaw).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+    const completionKeys = [
+      "order_completion_date_time",
+      "order_completion_date",
+      "order_completion_time",
+      "order_completion_date_and_time",
+      "order_completed_date_time",
+      "order_completed_date_and_time",
+      "order_completed_date",
+      "order_completed_time",
+      "order_completed_at",
+      "completed_date_time",
+      "completed_date_and_time",
+      "completed_date",
+      "completed_time",
+      "completed_at",
+      "completion_date_time",
+      "completion_date_and_time",
+      "completion_date",
+      "completion_time",
+      "completion_at",
+      "order_completion_at",
+    ];
+    for (const key of completionKeys) {
+      if (missing(key)) out[key] = formattedCompletedDate;
+      if (missing(`${key}_ist`)) out[`${key}_ist`] = `${formattedCompletedDate} IST`;
     }
     const closedFs = new Set(["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
     if (app && closedFs.has(String(app.fulfillment_status ?? ""))) {

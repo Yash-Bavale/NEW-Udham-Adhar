@@ -974,6 +974,10 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
       if (recipientEmail && certificateUrl) {
+        const completedDateFormatted = new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hour12: true,
+        });
         const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
         await enqueueFromTemplateInternal("order_completed", recipientEmail, {
             customer_name: recipientName,
@@ -984,6 +988,17 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
             completion_notes: completionNotes ?? "",
             document_name: certAttachment?.filename ?? "Certificate",
             order_code: app.application_code ?? "",
+            order_completion_date_time: completedDateFormatted,
+            order_completion_date: completedDateFormatted,
+            order_completed_date_time: completedDateFormatted,
+            order_completed_date: completedDateFormatted,
+            order_completed_at: completedDateFormatted,
+            completed_date_time: completedDateFormatted,
+            completed_date: completedDateFormatted,
+            completed_at: completedDateFormatted,
+            completion_date_time: completedDateFormatted,
+            completion_date: completedDateFormatted,
+            completion_at: completedDateFormatted,
           }, {
             toName: recipientName,
             leadId: app.lead_id,
@@ -1147,6 +1162,10 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     }
 
     {
+      const completedDateFormatted = new Date(app?.fulfilled_at ?? app?.updated_at ?? new Date()).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: true,
+      });
       const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
       await enqueueFromTemplateInternal("order_completed", recipientEmail, {
           customer_name: recipientName,
@@ -1156,6 +1175,18 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
           certificate_url: signed.signedUrl,
           document_name: resendAttachment?.filename ?? "Certificate",
           resend: true,
+          order_completion_date_time: completedDateFormatted,
+          order_completion_date: completedDateFormatted,
+          order_completion_time: completedDateFormatted,
+          order_completed_date_time: completedDateFormatted,
+          order_completed_date: completedDateFormatted,
+          order_completed_at: completedDateFormatted,
+          completed_date_time: completedDateFormatted,
+          completed_date: completedDateFormatted,
+          completed_at: completedDateFormatted,
+          completion_date_time: completedDateFormatted,
+          completion_date: completedDateFormatted,
+          completion_at: completedDateFormatted,
         }, {
           toName: recipientName,
           leadId: cert.lead_id,
