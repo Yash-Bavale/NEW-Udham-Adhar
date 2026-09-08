@@ -89,6 +89,7 @@ export function WorkspaceShell(p: Props) {
   const qc = useQueryClient();
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
+  const hideForEmployee = p.hideAmount || role.hideMoney();
   const [tab, setTab] = useState<TabId>("form");
   const [refundOpen, setRefundOpen] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
@@ -508,7 +509,7 @@ export function WorkspaceShell(p: Props) {
               <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
               <InfoRow label="State" value={cState} />
               <InfoRow label="Language" value={cLanguage} />
-              <InfoRow label="Source" value={cSource} />
+              {!hideForEmployee && <InfoRow label="Source" value={cSource} />}
               <InfoRow label="Selected Service" value={svcName} />
               <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
               <InfoRow
@@ -650,7 +651,7 @@ export function WorkspaceShell(p: Props) {
         {/* Tabs */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)} className="w-full">
           <TabsList className="w-full justify-start bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 h-auto gap-1.5 overflow-x-auto flex-nowrap shadow-inner">
-            {TAB_DEFS.filter((t) => !(t as any).moneyOnly || !p.hideAmount).map((t) => {
+            {TAB_DEFS.filter((t) => !(t as any).moneyOnly || !hideForEmployee).map((t) => {
               const Icon = t.icon;
               const state = availability[t.id];
               const tip = !state.enabled && state.reason ? state.reason : t.tooltip;
@@ -970,7 +971,7 @@ export function WorkspaceShell(p: Props) {
               />
             </TabsContent>
 
-            {!p.hideAmount && (
+            {!hideForEmployee && (
               <TabsContent value="invoices" className="space-y-4 mt-0 animate-fade-in">
                 <OrderPaymentsPanel payments={payments ?? []} />
               </TabsContent>
