@@ -910,7 +910,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
 
   return (
     <div className="rounded border border-slate-200 bg-white overflow-hidden">
-      <div style={{ maxHeight: collapsed ? 260 : "none", overflow: "hidden", position: "relative" }}>
+      <div style={{ maxHeight: collapsed ? 360 : "none", overflow: "hidden", position: "relative" }}>
         <iframe
           ref={iframeRef}
           title="email-preview"
@@ -931,7 +931,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
         )}
       </div>
-      {height > 260 && (
+      {height > 360 && (
         <button
           onClick={() => setExpanded((v) => !v)}
           className="w-full text-[11px] text-blue-700 hover:bg-blue-50 py-1.5 border-t border-slate-200"
