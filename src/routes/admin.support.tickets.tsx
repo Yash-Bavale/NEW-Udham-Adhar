@@ -92,7 +92,7 @@ function SupportTicketsLayout() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search TKT-… or subject"
+              placeholder="Search email, name, mobile, TKT-… or AP-…"
               className="w-full pl-7 pr-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>

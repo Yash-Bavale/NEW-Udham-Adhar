@@ -1162,7 +1162,8 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     }
 
     {
-      const completedDateFormatted = new Date(app?.fulfilled_at ?? app?.updated_at ?? new Date()).toLocaleString("en-IN", {
+      const appAny = app as any;
+      const completedDateFormatted = new Date(appAny?.fulfilled_at ?? appAny?.updated_at ?? new Date()).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit", hour12: true,
       });

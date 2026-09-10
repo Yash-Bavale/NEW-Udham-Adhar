@@ -49,14 +49,25 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         .select("id, reply_text, is_internal, created_by, created_at, direction, emailed_at, email_message_id")
         .eq("ticket_id", data.ticketId)
         .order("created_at", { ascending: true }),
-      applicationId
-        ? admin
-            .from("email_logs")
-            .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id")
-            .eq("application_id", applicationId)
-            .order("created_at", { ascending: true })
-            .limit(200)
-        : Promise.resolve({ data: [] as any[], error: null }),
+      (() => {
+        // Emails belonging to this conversation: matched by order, by customer,
+        // or by the ticket's own email address (tickets without an order).
+        const ors: string[] = [];
+        if (applicationId) ors.push(`application_id.eq.${applicationId}`);
+        if (customerId) ors.push(`customer_id.eq.${customerId}`);
+        const addr = (t.ticket_email ?? t.customers?.primary_email ?? "").trim();
+        if (addr) {
+          ors.push(`to_email.ilike.%${addr}%`);
+          ors.push(`from_email.ilike.%${addr}%`);
+        }
+        if (!ors.length) return Promise.resolve({ data: [] as any[], error: null });
+        return admin
+          .from("email_logs")
+          .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code")
+          .or(ors.join(","))
+          .order("created_at", { ascending: true })
+          .limit(200);
+      })(),
       applicationId
         ? admin
             .from("application_events")
@@ -149,10 +160,19 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       author_name: r.created_by ? nameMap.get(r.created_by) ?? "Staff" : "System",
     }));
 
+    // email_logs stores direction as incoming/outgoing (older rows) — normalise
+    // to inbound/outbound so the thread renders every mail.
+    const emails = (emailsRes.data ?? []).map((e: any) => ({
+      ...e,
+      direction: ["inbound", "incoming", "in"].includes(String(e.direction ?? "").toLowerCase())
+        ? "inbound"
+        : "outbound",
+    }));
+
     // Merge inbound emails that landed on this order but aren't in ticket_replies yet.
     const seenMessageIds = new Set(replies.map((r) => r.email_message_id).filter(Boolean));
-    const emailOnly = (emailsRes.data ?? []).filter(
-      (e: any) => e.direction === "inbound" && e.message_id && !seenMessageIds.has(e.message_id)
+    const emailOnly = emails.filter(
+      (e: any) => e.direction === "inbound" && (!e.message_id || !seenMessageIds.has(e.message_id))
     );
 
     // Compute lifetime value from payments (fallback to customers.lifetime_value if empty).
@@ -183,7 +203,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       },
       replies,
       inboundEmails: emailOnly,
-      outboundEmails: (emailsRes.data ?? []).filter((e: any) => e.direction === "outbound"),
+      outboundEmails: emails.filter((e: any) => e.direction === "outbound"),
       events: (eventsRes.data ?? []).map((r: any) => ({
         ...r,
         actor_name: r.created_by ? nameMap.get(r.created_by) ?? r.staff_name ?? "System" : r.staff_name ?? "System",
