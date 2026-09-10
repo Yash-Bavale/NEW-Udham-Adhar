@@ -60,9 +60,48 @@ export const listTickets = createServerFn({ method: "POST" })
     if (data.priority) q = q.eq("priority", data.priority);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
     if (data.scope === "mine") q = q.eq("assigned_to", context.userId);
-    if (data.q.trim()) {
-      const like = `%${data.q.trim()}%`;
-      q = q.or(`ticket_number.ilike.${like},subject.ilike.${like}`);
+    const term = data.q.trim();
+    if (term) {
+      const like = `%${term}%`;
+      const ors = [
+        `ticket_number.ilike.${like}`,
+        `subject.ilike.${like}`,
+        `description.ilike.${like}`,
+        `ticket_email.ilike.${like}`,
+      ];
+
+      // Resolve customers (email / name / mobile) and orders (code) separately —
+      // PostgREST can't OR across embedded tables.
+      const [custRes, appRes, mailRes] = await Promise.all([
+        admin
+          .from("customers")
+          .select("id")
+          .or(`primary_email.ilike.${like},name.ilike.${like},primary_mobile.ilike.${like}`)
+          .limit(300),
+        admin
+          .from("applications")
+          .select("id")
+          .ilike("application_code", like)
+          .limit(300),
+        // Tickets whose conversation contains this email address.
+        admin
+          .from("email_logs")
+          .select("customer_id, application_id")
+          .or(`to_email.ilike.${like},from_email.ilike.${like}`)
+          .limit(300),
+      ]);
+
+      const custIds = new Set<string>((custRes.data ?? []).map((r: any) => r.id));
+      const appIds = new Set<string>((appRes.data ?? []).map((r: any) => r.id));
+      (mailRes.data ?? []).forEach((r: any) => {
+        if (r.customer_id) custIds.add(r.customer_id);
+        if (r.application_id) appIds.add(r.application_id);
+      });
+
+      if (custIds.size) ors.push(`customer_id.in.(${Array.from(custIds).join(",")})`);
+      if (appIds.size) ors.push(`application_id.in.(${Array.from(appIds).join(",")})`);
+
+      q = q.or(ors.join(","));
     }
 
     const { data: rows, error, count } = await q;
