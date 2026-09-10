@@ -762,7 +762,9 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   }
 
   if (msg.kind === "inbound") {
-    const parsed = parseEmailReply(decodeEntities(msg.body_text || stripHtml(msg.body_html || "")));
+    const plain = decodeEntities(msg.body_text || "");
+    const parsed = parseEmailReply(plain || stripHtml(msg.body_html || ""));
+    const richOnly = !plain.trim() && !!msg.body_html;
     return (
       <div className="max-w-3xl mr-auto">
         <div
