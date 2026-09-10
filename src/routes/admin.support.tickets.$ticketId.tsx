@@ -889,12 +889,24 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
     );
   }
 
-  const safe = DOMPurify.sanitize(html, {
+  const clean = DOMPurify.sanitize(html, {
     WHOLE_DOCUMENT: true,
     ADD_ATTR: ["target"],
   });
 
-  const collapsed = !expanded && height > 260;
+  // Give bare-HTML mails a readable base style so previews don't collapse into
+  // unstyled walls of text.
+  const safe = /<html[\s>]/i.test(clean)
+    ? clean
+    : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+        html,body{margin:0;padding:0;background:#fff}
+        body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0f172a;padding:14px}
+        img{max-width:100%;height:auto}
+        table{max-width:100%}
+        a{color:#1d4ed8}
+      </style></head><body>${clean}</body></html>`;
+
+  const collapsed = !expanded && height > 360;
 
   return (
     <div className="rounded border border-slate-200 bg-white overflow-hidden">
