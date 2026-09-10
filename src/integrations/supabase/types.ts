@@ -4452,6 +4452,14 @@ export type Database = {
         Args: { _from: Database["public"]["Enums"]["order_status_enum"] }
         Returns: Database["public"]["Enums"]["order_status_enum"][]
       }
+      assign_pool_pick: {
+        Args: { _module: string; _service_id: string; _website_id: string }
+        Returns: string
+      }
+      assign_pool_touch: {
+        Args: { _service_id: string; _user_id: string }
+        Returns: undefined
+      }
       current_user_is_admin: { Args: never; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
