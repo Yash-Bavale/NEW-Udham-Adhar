@@ -789,13 +789,20 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
                 <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
               </div>
             </div>
-            <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+            <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
           </div>
-          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-            {parsed.newContent || "(no content)"}
-          </div>
-          {parsed.hasQuotedContent && (
-            <QuotedToggle text={parsed.quotedContent} />
+          {msg.subject && (
+            <div className="text-xs font-semibold text-slate-700 mb-1.5">{msg.subject}</div>
+          )}
+          {richOnly ? (
+            <EmailIframe html={msg.body_html} fallback={parsed.newContent} />
+          ) : (
+            <>
+              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                {parsed.newContent || "(no content)"}
+              </div>
+              {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
+            </>
           )}
         </div>
       </div>
