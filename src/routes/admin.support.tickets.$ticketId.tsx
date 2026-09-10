@@ -209,8 +209,11 @@ function TicketWorkspace() {
       });
     }
 
-    // Outbound — always use email_logs so we can render the full HTML template.
+    // Outbound emails (templates + agent replies delivered by mail) — email_logs
+    // carries the full HTML so we can preview exactly what the customer got.
+    const outboundLogIds = new Set<string>();
     for (const e of (data as any).outboundEmails ?? []) {
+      outboundLogIds.add(e.id);
       out.push({
         kind: "outbound",
         id: `oe-${e.id}`,
@@ -219,8 +222,27 @@ function TicketWorkspace() {
         subject: e.subject,
         body_html: e.body_html,
         body_text: e.body_text ?? "",
-        template_hint: extractTemplateHint(e.subject, e.body_html),
+        template_hint: e.template_code ?? extractTemplateHint(e.subject, e.body_html),
         status: e.status,
+      });
+    }
+
+    // Agent replies that have no matching mail record — still show what we wrote.
+    for (const r of data.replies ?? []) {
+      if (r.is_internal || r.direction !== "outbound") continue;
+      const linked = (r as any).email_send_log_id as string | null;
+      if (linked && outboundLogIds.has(linked)) continue;
+      out.push({
+        kind: "outbound",
+        id: `ro-${r.id}`,
+        created_at: r.created_at,
+        from_email: null,
+        subject: null,
+        body_html: null,
+        body_text: r.reply_text ?? "",
+        template_hint: null,
+        status: (r as any).emailed_at ? "sent" : null,
+        author_name: (r as any).author_name ?? "Staff",
       });
     }
 
