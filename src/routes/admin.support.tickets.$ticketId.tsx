@@ -817,20 +817,25 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
             </span>
             <div className="min-w-0">
               <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
-                Business Help Services
+                {msg.author_name || "Business Help Services"}
                 {msg.template_hint && (
                   <span className="text-[10px] font-medium bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">
                     {msg.template_hint}
                   </span>
                 )}
                 <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase">
-                  Template
+                  {msg.body_html ? "Email" : "Reply"}
                 </span>
+                {msg.status && (
+                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded capitalize">
+                    {msg.status}
+                  </span>
+                )}
               </div>
               <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "help@businesshelpservices.com"}</div>
             </div>
           </div>
-          <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+          <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
         </div>
         {msg.subject && (
           <div className="text-xs font-semibold text-slate-700 mb-1.5">
