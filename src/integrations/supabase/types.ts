@@ -534,8 +534,12 @@ export type Database = {
           id: string
           is_active: boolean
           last_assigned_at: string | null
+          last_lead_assigned_at: string | null
+          last_order_assigned_at: string | null
           service_id: string | null
           total_assigned: number
+          total_leads_assigned: number
+          total_orders_assigned: number
           user_id: string
         }
         Insert: {
@@ -543,8 +547,12 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_assigned_at?: string | null
+          last_lead_assigned_at?: string | null
+          last_order_assigned_at?: string | null
           service_id?: string | null
           total_assigned?: number
+          total_leads_assigned?: number
+          total_orders_assigned?: number
           user_id: string
         }
         Update: {
@@ -552,8 +560,12 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_assigned_at?: string | null
+          last_lead_assigned_at?: string | null
+          last_order_assigned_at?: string | null
           service_id?: string | null
           total_assigned?: number
+          total_leads_assigned?: number
+          total_orders_assigned?: number
           user_id?: string
         }
         Relationships: [
