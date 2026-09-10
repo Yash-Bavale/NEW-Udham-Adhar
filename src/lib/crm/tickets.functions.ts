@@ -60,7 +60,8 @@ export const listTickets = createServerFn({ method: "POST" })
     if (data.priority) q = q.eq("priority", data.priority);
     if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
     if (data.scope === "mine") q = q.eq("assigned_to", context.userId);
-    const term = data.q.trim();
+    // Strip characters that would break PostgREST's or() filter syntax.
+    const term = data.q.trim().replace(/[(),*]/g, " ").trim();
     if (term) {
       const like = `%${term}%`;
       const ors = [
