@@ -106,7 +106,22 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         } as any)
         .select("id")
         .single();
-      if (appErr) console.error("[finalize] app create failed", appErr);
+      if (appErr?.code === "23505") {
+        // A second payment callback may reach this insert before the first one
+        // has linked its application to the payment. The database uniqueness
+        // rule makes one callback win; reuse that order instead of creating a
+        // second order and consuming another round-robin turn.
+        const { data: concurrentApp, error: concurrentAppErr } = await supabaseAdmin
+          .from("applications")
+          .select("id")
+          .eq("lead_id", payment.lead_id)
+          .eq("is_deleted", false)
+          .maybeSingle();
+        if (concurrentAppErr) console.error("[finalize] concurrent app lookup failed", concurrentAppErr);
+        applicationId = concurrentApp?.id ?? null;
+      } else if (appErr) {
+        console.error("[finalize] app create failed", appErr);
+      }
       if (createdApp) {
         applicationId = createdApp.id;
         // Auto-assign order (and sync to lead) if unassigned
