@@ -694,12 +694,12 @@ export const listStaff = createServerFn({ method: "GET" })
 
     const { data: profiles, error: profilesErr } = await (await getAdmin())
       .from("profiles")
-      .select("id, display_name, email")
+      .select("id, display_name, email, is_active")
       .in("id", userIds);
 
     if (profilesErr) throw new Error(profilesErr.message);
 
-    return { profiles };
+    return { profiles: (profiles ?? []).filter((p: any) => p.is_active !== false) };
   });
 
 export const getLeadCounts = createServerFn({ method: "GET" })
