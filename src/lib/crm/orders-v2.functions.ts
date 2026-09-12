@@ -1504,7 +1504,9 @@ export const changeOrderService = createServerFn({ method: "POST" })
     if (!isAdmin) {
       const { data: roleRows } = await context.supabase
         .from("user_roles").select("role").eq("user_id", context.userId);
-      const ok = (roleRows ?? []).some((r: any) => ["manager", "operations"].includes(r.role));
+      // Staff roles with full order access may change the service too
+      // (matches roles.ts ACCESS_MATRIX: manager/executive/operations have orders: "full").
+      const ok = (roleRows ?? []).some((r: any) => ["manager", "operations", "executive", "support"].includes(r.role));
       if (!ok) throw new Error("Forbidden");
     }
 
