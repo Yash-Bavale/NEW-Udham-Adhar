@@ -35,14 +35,28 @@ export async function autoAssignLeadOrOrder(opts: {
       query = query.is("service_id", null);
     }
 
-    const { data: poolRow } = await query
-      .order("service_id", { ascending: true, nullsFirst: false })
-      .order("last_assigned_at", { ascending: true, nullsFirst: true })
-      .order("total_assigned", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const { data: poolRows } = await query;
 
-    const p = poolRow as { id: string; user_id: string; total_assigned?: number } | null;
+    const sortedPool = (poolRows ?? []).sort((a: any, b: any) => {
+      // 1. Specific service match preferred over generalist (service_id is null)
+      const aSpecific = a.service_id ? 0 : 1;
+      const bSpecific = b.service_id ? 0 : 1;
+      if (aSpecific !== bSpecific) return aSpecific - bSpecific;
+
+      // 2. Least recently assigned (nulls first, then oldest date)
+      if (!a.last_assigned_at && b.last_assigned_at) return -1;
+      if (a.last_assigned_at && !b.last_assigned_at) return 1;
+      if (a.last_assigned_at && b.last_assigned_at) {
+        const tA = new Date(a.last_assigned_at).getTime();
+        const tB = new Date(b.last_assigned_at).getTime();
+        if (tA !== tB) return tA - tB;
+      }
+
+      // 3. Total assigned count ascending
+      return (a.total_assigned ?? 0) - (b.total_assigned ?? 0);
+    });
+
+    const p = sortedPool[0] as { id: string; user_id: string; total_assigned?: number } | undefined;
     if (p && p.user_id) {
       staffUserId = p.user_id;
       poolIdToUpdate = p.id;

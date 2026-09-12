@@ -404,15 +404,13 @@ export function WorkspaceShell(p: Props) {
                 <TooltipContent>Copy customer payment link ({cLeadCode}) to clipboard</TooltipContent>
               </Tooltip>
             )}
-            {isAdmin && (
-              <ChangeServiceButton
-                orderId={p.orderId}
-                currentServiceId={(service as any)?.id ?? null}
-                currentServiceName={(service as any)?.service_name ?? "—"}
-                fulfillmentStatus={String(current)}
-                formSubmittedAt={application?.form_submitted_at ?? null}
-              />
-            )}
+            <ChangeServiceButton
+              orderId={p.orderId}
+              currentServiceId={(service as any)?.id ?? null}
+              currentServiceName={(service as any)?.service_name ?? "—"}
+              fulfillmentStatus={String(current)}
+              formSubmittedAt={application?.form_submitted_at ?? null}
+            />
             {hasServiceChanged && (
               <Tooltip>
                 <TooltipTrigger asChild>

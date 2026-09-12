@@ -33,11 +33,7 @@ function AdminLoginPage() {
 
   const goAfterAuth = () => {
     const target = safeNext(next);
-    if (target) {
-      window.location.href = target;
-      return;
-    }
-    navigate({ to: "/admin/dashboard", replace: true });
+    window.location.href = target || "/admin";
   };
 
   // Redirect away if already signed in. Use getUser() so we await session
