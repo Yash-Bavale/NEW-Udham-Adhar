@@ -397,6 +397,11 @@ async function backfillCommonVariables(
       if (missing(key)) out[key] = formattedCompletedDate;
       if (missing(`${key}_ist`)) out[`${key}_ist`] = `${formattedCompletedDate} IST`;
     }
+    // Completed orders: {{closure_date}} is the completion date & time (E007).
+    const completedFs = new Set(["completed", "certificate_delivered", "order_completed", "service_completed"]);
+    if (app && completedFs.has(String(app.fulfillment_status ?? "")) && missing("closure_date")) {
+      out.closure_date = formattedCompletedDate;
+    }
     const closedFs = new Set(["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
     if (app && closedFs.has(String(app.fulfillment_status ?? ""))) {
       if (missing("closure_date") && app.updated_at) {
