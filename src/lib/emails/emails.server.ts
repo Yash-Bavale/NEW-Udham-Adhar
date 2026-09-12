@@ -293,7 +293,7 @@ async function backfillCommonVariables(
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status")
+        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
