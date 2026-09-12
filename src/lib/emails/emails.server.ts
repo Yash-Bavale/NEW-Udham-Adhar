@@ -426,6 +426,8 @@ async function backfillCommonVariables(
         out.closure_reason = label || (app.closure_remarks ? String(app.closure_remarks) : "Order closed");
       }
     }
+    // Never leave the date row blank in templates that print {{closure_date}}.
+    if (app && missing("closure_date")) out.closure_date = formattedCompletedDate;
 
   } catch (e) {
     console.warn("[emails] backfillCommonVariables failed (non-fatal)", e);
