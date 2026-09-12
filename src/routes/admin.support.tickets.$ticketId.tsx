@@ -209,8 +209,11 @@ function TicketWorkspace() {
       });
     }
 
-    // Outbound — always use email_logs so we can render the full HTML template.
+    // Outbound emails (templates + agent replies delivered by mail) — email_logs
+    // carries the full HTML so we can preview exactly what the customer got.
+    const outboundLogIds = new Set<string>();
     for (const e of (data as any).outboundEmails ?? []) {
+      outboundLogIds.add(e.id);
       out.push({
         kind: "outbound",
         id: `oe-${e.id}`,
@@ -219,8 +222,27 @@ function TicketWorkspace() {
         subject: e.subject,
         body_html: e.body_html,
         body_text: e.body_text ?? "",
-        template_hint: extractTemplateHint(e.subject, e.body_html),
+        template_hint: e.template_code ?? extractTemplateHint(e.subject, e.body_html),
         status: e.status,
+      });
+    }
+
+    // Agent replies that have no matching mail record — still show what we wrote.
+    for (const r of data.replies ?? []) {
+      if (r.is_internal || r.direction !== "outbound") continue;
+      const linked = (r as any).email_send_log_id as string | null;
+      if (linked && outboundLogIds.has(linked)) continue;
+      out.push({
+        kind: "outbound",
+        id: `ro-${r.id}`,
+        created_at: r.created_at,
+        from_email: null,
+        subject: null,
+        body_html: null,
+        body_text: r.reply_text ?? "",
+        template_hint: null,
+        status: (r as any).emailed_at ? "sent" : null,
+        author_name: (r as any).author_name ?? "Staff",
       });
     }
 
@@ -740,7 +762,9 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   }
 
   if (msg.kind === "inbound") {
-    const parsed = parseEmailReply(decodeEntities(msg.body_text || stripHtml(msg.body_html || "")));
+    const plain = decodeEntities(msg.body_text || "");
+    const parsed = parseEmailReply(plain || stripHtml(msg.body_html || ""));
+    const richOnly = !plain.trim() && !!msg.body_html;
     return (
       <div className="max-w-3xl mr-auto">
         <div
@@ -765,13 +789,20 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
                 <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
               </div>
             </div>
-            <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+            <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
           </div>
-          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-            {parsed.newContent || "(no content)"}
-          </div>
-          {parsed.hasQuotedContent && (
-            <QuotedToggle text={parsed.quotedContent} />
+          {msg.subject && (
+            <div className="text-xs font-semibold text-slate-700 mb-1.5">{msg.subject}</div>
+          )}
+          {richOnly ? (
+            <EmailIframe html={msg.body_html} fallback={parsed.newContent} />
+          ) : (
+            <>
+              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                {parsed.newContent || "(no content)"}
+              </div>
+              {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
+            </>
           )}
         </div>
       </div>
@@ -795,20 +826,25 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
             </span>
             <div className="min-w-0">
               <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
-                Business Help Services
+                {msg.author_name || "Business Help Services"}
                 {msg.template_hint && (
                   <span className="text-[10px] font-medium bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">
                     {msg.template_hint}
                   </span>
                 )}
                 <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase">
-                  Template
+                  {msg.body_html ? "Email" : "Reply"}
                 </span>
+                {msg.status && (
+                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded capitalize">
+                    {msg.status}
+                  </span>
+                )}
               </div>
               <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "help@businesshelpservices.com"}</div>
             </div>
           </div>
-          <span className="text-slate-400 shrink-0 ml-2">{rel(msg.created_at)}</span>
+          <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
         </div>
         {msg.subject && (
           <div className="text-xs font-semibold text-slate-700 mb-1.5">
@@ -862,16 +898,28 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
     );
   }
 
-  const safe = DOMPurify.sanitize(html, {
+  const clean = DOMPurify.sanitize(html, {
     WHOLE_DOCUMENT: true,
     ADD_ATTR: ["target"],
   });
 
-  const collapsed = !expanded && height > 260;
+  // Give bare-HTML mails a readable base style so previews don't collapse into
+  // unstyled walls of text.
+  const safe = /<html[\s>]/i.test(clean)
+    ? clean
+    : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+        html,body{margin:0;padding:0;background:#fff}
+        body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0f172a;padding:14px}
+        img{max-width:100%;height:auto}
+        table{max-width:100%}
+        a{color:#1d4ed8}
+      </style></head><body>${clean}</body></html>`;
+
+  const collapsed = !expanded && height > 360;
 
   return (
     <div className="rounded border border-slate-200 bg-white overflow-hidden">
-      <div style={{ maxHeight: collapsed ? 260 : "none", overflow: "hidden", position: "relative" }}>
+      <div style={{ maxHeight: collapsed ? 360 : "none", overflow: "hidden", position: "relative" }}>
         <iframe
           ref={iframeRef}
           title="email-preview"
@@ -892,7 +940,7 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
           <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
         )}
       </div>
-      {height > 260 && (
+      {height > 360 && (
         <button
           onClick={() => setExpanded((v) => !v)}
           className="w-full text-[11px] text-blue-700 hover:bg-blue-50 py-1.5 border-t border-slate-200"

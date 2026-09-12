@@ -96,14 +96,32 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
           lead_id: payment.lead_id,
           customer_id: lead?.customer_id ?? null,
           service_id: targetServiceId,
-          assigned_to: lead?.assigned_to ?? null,
+          // Orders have their own round-robin queue. Do not inherit the lead
+          // owner here, otherwise the application trigger cannot pick the next
+          // employee and consecutive orders follow the lead rotation instead.
+          assigned_to: null,
           website_id: (lead as any)?.website_id ?? null,
           application_status: "payment_received" as any,
           fulfillment_status: "order_received" as any,
         } as any)
         .select("id")
         .single();
-      if (appErr) console.error("[finalize] app create failed", appErr);
+      if (appErr?.code === "23505") {
+        // A second payment callback may reach this insert before the first one
+        // has linked its application to the payment. The database uniqueness
+        // rule makes one callback win; reuse that order instead of creating a
+        // second order and consuming another round-robin turn.
+        const { data: concurrentApp, error: concurrentAppErr } = await supabaseAdmin
+          .from("applications")
+          .select("id")
+          .eq("lead_id", payment.lead_id)
+          .eq("is_deleted", false)
+          .maybeSingle();
+        if (concurrentAppErr) console.error("[finalize] concurrent app lookup failed", concurrentAppErr);
+        applicationId = concurrentApp?.id ?? null;
+      } else if (appErr) {
+        console.error("[finalize] app create failed", appErr);
+      }
       if (createdApp) {
         applicationId = createdApp.id;
         // Auto-assign order (and sync to lead) if unassigned

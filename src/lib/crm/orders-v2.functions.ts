@@ -236,13 +236,16 @@ async function ensurePaidOrdersIntegrated(admin: any) {
             }
           } else {
             // If no payment row exists, create the application row directly.
-            const { data: createdApp } = await admin
+            const { data: createdApp, error: createAppError } = await admin
               .from("applications")
               .insert({
                 lead_id: l.id,
                 customer_id: l.customer_id ?? null,
                 service_id: l.service_id ?? null,
-                assigned_to: l.assigned_to ?? null,
+                // Paid orders rotate independently from leads. Leaving this
+                // empty lets the order assignment trigger choose the next
+                // employee instead of copying the lead owner.
+                assigned_to: null,
                 website_id: l.website_id ?? null,
                 application_status: "payment_received",
                 fulfillment_status: "order_received",
@@ -255,6 +258,8 @@ async function ensurePaidOrdersIntegrated(admin: any) {
                 .from("payments")
                 .update({ application_id: createdApp.id, status: "paid" })
                 .eq("lead_id", l.id);
+            } else if (createAppError?.code !== "23505") {
+              console.error(`[self-heal] order create failed for lead ${l.id}:`, createAppError);
             }
           }
         }
@@ -1162,7 +1167,8 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     }
 
     {
-      const completedDateFormatted = new Date(app?.fulfilled_at ?? app?.updated_at ?? new Date()).toLocaleString("en-IN", {
+      const appAny = app as any;
+      const completedDateFormatted = new Date(appAny?.fulfilled_at ?? appAny?.updated_at ?? new Date()).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit", hour12: true,
       });
