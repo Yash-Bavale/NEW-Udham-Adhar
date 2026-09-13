@@ -293,7 +293,7 @@ async function backfillCommonVariables(
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status")
+        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
@@ -397,6 +397,11 @@ async function backfillCommonVariables(
       if (missing(key)) out[key] = formattedCompletedDate;
       if (missing(`${key}_ist`)) out[`${key}_ist`] = `${formattedCompletedDate} IST`;
     }
+    // Completed orders: {{closure_date}} is the completion date & time (E007).
+    const completedFs = new Set(["completed", "certificate_delivered", "order_completed", "service_completed"]);
+    if (app && completedFs.has(String(app.fulfillment_status ?? "")) && missing("closure_date")) {
+      out.closure_date = formattedCompletedDate;
+    }
     const closedFs = new Set(["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
     if (app && closedFs.has(String(app.fulfillment_status ?? ""))) {
       if (missing("closure_date") && app.updated_at) {
@@ -421,6 +426,8 @@ async function backfillCommonVariables(
         out.closure_reason = label || (app.closure_remarks ? String(app.closure_remarks) : "Order closed");
       }
     }
+    // Never leave the date row blank in templates that print {{closure_date}}.
+    if (app && missing("closure_date")) out.closure_date = formattedCompletedDate;
 
   } catch (e) {
     console.warn("[emails] backfillCommonVariables failed (non-fatal)", e);

@@ -814,7 +814,7 @@ function AddLeadDialog({
 
   // Filter services by selected website; show all if no website selected
   const filteredServices = useMemo(() => {
-    const rows = (servicesData?.rows ?? []) as any[];
+    const rows = ((servicesData?.rows ?? []) as any[]).filter((s: any) => s.is_active !== false);
     if (!form.website_id) return rows;
     return rows.filter((s: any) => s.website_id === form.website_id);
   }, [servicesData, form.website_id]);
