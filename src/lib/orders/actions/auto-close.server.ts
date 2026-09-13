@@ -10,7 +10,7 @@ export type AutoCloseStage = "form_pending" | "customer_delay";
 export const AUTO_CLOSE_REASON_LABEL = "Customer unresponsive after multiple attempts";
 
 export const STAGE_REMARKS: Record<AutoCloseStage, string> = {
-  form_pending: "Form not received within 8 hours of payment",
+  form_pending: "Incomplete/Incorrect information",
   customer_delay: "No response from customer within 8 hours of request",
 };
 
@@ -83,7 +83,8 @@ export async function autoCloseOverdueOrder(
   if (!row) return { ok: false, skipped: "not_found" };
   const alreadyAutoClosed =
     String(row?.order_status ?? "") === "CLOSED" &&
-    String(row?.closure_remarks ?? "").includes(STAGE_REMARKS[stage]);
+    (String(row?.closure_remarks ?? "").includes(STAGE_REMARKS[stage]) ||
+     String(row?.closure_remarks ?? "").includes("Form not received within 8 hours of payment"));
   if (!alreadyAutoClosed && isResolved(stage, row)) {
     await cancelTimers(appId, ["form_pending_nudge_4h", "form_pending_autoclose_8h", "customer_hold_reminder"]);
     return { ok: false, skipped: "resolved" };
@@ -100,8 +101,8 @@ export async function autoCloseOverdueOrder(
   let delayDescriptionText = STAGE_REMARKS[stage];
 
   if (stage === "form_pending") {
-    closureReasonText = "Form not received within 8 hours of payment";
-    delayDescriptionText = "Form not received within 8 hours of payment";
+    closureReasonText = "Incomplete/Incorrect information";
+    delayDescriptionText = "Incomplete/Incorrect information";
   } else if (stage === "customer_delay") {
     const delayReasonCode = row?.workflow_delay_reason as string | null | undefined;
     if (delayReasonCode) {
