@@ -138,6 +138,7 @@ function DashboardTab() {
 
   return (
     <div className="space-y-4">
+      <ProviderSwitcher />
       <div className="grid md:grid-cols-4 lg:grid-cols-8 gap-3">
         <Stat label="Queued" value={c?.queued ?? 0} tone="default" />
         <Stat label="Sending" value={c?.sending ?? 0} tone="info" />
