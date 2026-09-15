@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate, renderTemplateHtml } from "./smtp.server";
-import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
+import { sendViaActiveProvider, activeSenderEmail, isProviderThrottleError } from "./transport.server";
 
 /**
  * Legacy → canonical template alias.
@@ -728,7 +728,7 @@ async function sendQueueRow(row: QueueRow) {
         ? ((variables as { __message_id?: string }).__message_id as string)
         : undefined;
 
-    const res = await sendViaZoho({
+    const res = await sendViaActiveProvider({
       to: recipient,
       subject: row.subject,
       html: row.body_html,
@@ -759,7 +759,7 @@ async function sendQueueRow(row: QueueRow) {
       sentInReplyTo = parentMessageId;
       sentReferences = referencesHeader ?? null;
       sentCustomerId = customerId;
-      sentFromEmail = "help@businesshelpservices.com";
+      sentFromEmail = activeSenderEmail();
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
@@ -853,7 +853,9 @@ async function sendQueueRow(row: QueueRow) {
   }
 
   const errMsg = (lastError ?? "Unknown error").slice(0, 1000);
-  if (isZohoAuthOrRateLimitError(errMsg)) {
+  if (isProviderThrottleError(errMsg)) {
+    // Provider-side block: defer WITHOUT consuming a retry attempt so the email
+    // is never dead-lettered because the mail service was throttling us.
     const next = new Date(Date.now() + 30 * 60_000).toISOString();
     await Promise.all([
       supabaseAdmin
