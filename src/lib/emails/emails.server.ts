@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate, renderTemplateHtml } from "./smtp.server";
-import { activeMailProvider, sendViaActiveProvider, activeSenderEmail, isProviderThrottleError } from "./transport.server";
+import { resolveMailProvider, sendViaActiveProvider, senderEmailFor, isProviderThrottleError } from "./transport.server";
 
 /**
  * Legacy → canonical template alias.
@@ -702,7 +702,7 @@ async function sendQueueRow(row: QueueRow) {
   let sentReferences: string | null = null;
   let sentCustomerId: string | null = null;
   let sentFromEmail: string | null = null;
-  const provider = activeMailProvider();
+  const provider = await resolveMailProvider();
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
@@ -771,7 +771,7 @@ async function sendQueueRow(row: QueueRow) {
       sentInReplyTo = parentMessageId;
       sentReferences = referencesHeader ?? null;
       sentCustomerId = customerId;
-      sentFromEmail = activeSenderEmail();
+      sentFromEmail = senderEmailFor(provider);
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
