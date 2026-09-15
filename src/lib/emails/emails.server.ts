@@ -199,7 +199,14 @@ export async function enqueueEmailInternal(input: {
     .insert(row as never)
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Unique index caught a simultaneous duplicate enqueue — treat as skipped.
+    if ((error as { code?: string }).code === "23505") {
+      console.warn(`[emails] duplicate suppressed (db): ${templateCode} -> ${row.to_email}`);
+      return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+    }
+    throw new Error(error.message);
+  }
 
   const baseResult = {
     queueId: (inserted?.id as string | undefined) ?? null,
