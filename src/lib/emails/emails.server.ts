@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate, renderTemplateHtml } from "./smtp.server";
-import { sendViaActiveProvider, activeSenderEmail, isProviderThrottleError } from "./transport.server";
+import { activeMailProvider, sendViaActiveProvider, activeSenderEmail, isProviderThrottleError } from "./transport.server";
 
 /**
  * Legacy → canonical template alias.
@@ -702,6 +702,7 @@ async function sendQueueRow(row: QueueRow) {
   let sentReferences: string | null = null;
   let sentCustomerId: string | null = null;
   let sentFromEmail: string | null = null;
+  const provider = activeMailProvider();
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
@@ -764,7 +765,7 @@ async function sendQueueRow(row: QueueRow) {
     });
 
     if (res.ok) {
-      smtpResponse = `[zoho] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
+      smtpResponse = `[${provider}] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
       ok = true;
       sentMessageId = res.messageId ?? null;
       sentInReplyTo = parentMessageId;
@@ -789,7 +790,9 @@ async function sendQueueRow(row: QueueRow) {
         } as never);
       } catch { /* non-fatal */ }
     } else {
-      lastError = `[zoho] ${res.error ?? "unknown"}`;
+      lastError = res.error?.startsWith(`[${provider}]`)
+        ? res.error
+        : `[${provider}] ${res.error ?? "unknown"}`;
       try {
         await supabaseAdmin.from("email_send_log").insert({
           message_id: `bhs-${row.id}-${attempt}`,
@@ -879,7 +882,7 @@ async function sendQueueRow(row: QueueRow) {
         to_email: row.to_email,
         subject: row.subject,
         status: "failed",
-        smtp_response: `[zoho] deferred`,
+        smtp_response: `[${provider}] deferred`,
         error_message: errMsg,
         attempt,
         lead_id: row.lead_id,
@@ -903,7 +906,7 @@ async function sendQueueRow(row: QueueRow) {
       to_email: row.to_email,
       subject: row.subject,
       status: "failed",
-          smtp_response: `[zoho] failed`,
+      smtp_response: `[${provider}] failed`,
       error_message: errMsg,
       attempt,
       lead_id: row.lead_id,
