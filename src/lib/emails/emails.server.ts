@@ -118,6 +118,8 @@ export async function enqueueEmailInternal(input: {
   attachments?: EmailAttachment[];
   requireImmediateSuccess?: boolean;
   allowWithoutTemplate?: boolean;
+  /** Set true for genuinely repeatable sends (manual resend, support replies). */
+  allowDuplicate?: boolean;
 }) {
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
@@ -163,12 +165,48 @@ export async function enqueueEmailInternal(input: {
     row.scheduled_at = scheduled;
     row.next_attempt_at = scheduled;
   }
+
+  // ── Duplicate guard ──
+  // Same template + same recipient + same order must not be queued twice.
+  // One-time-per-order templates (order confirmation, completion) are blocked
+  // forever; everything else is blocked inside a short window so that a retry,
+  // a double webhook, or a double click can't deliver the same mail twice.
+  if (!input.allowDuplicate && templateCode) {
+    const ONCE_PER_ORDER = new Set(["E001", "E007"]);
+    const forever = ONCE_PER_ORDER.has(templateCode);
+    let q = supabaseAdmin
+      .from("email_queue")
+      .select("id")
+      .eq("template_code", templateCode)
+      .eq("to_email", row.to_email as string)
+      .in("status", ["queued", "sending", "sent", "failed"])
+      .limit(1);
+    q = input.applicationId
+      ? q.eq("application_id", input.applicationId)
+      : input.leadId
+        ? q.eq("lead_id", input.leadId)
+        : q.eq("subject", input.subject);
+    if (!forever) q = q.gte("created_at", new Date(Date.now() - 10 * 60_000).toISOString());
+    const { data: dupe } = await q;
+    if (dupe && dupe.length > 0) {
+      console.warn(`[emails] duplicate suppressed: ${templateCode} -> ${row.to_email}`);
+      return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+    }
+  }
+
   const { data: inserted, error } = await supabaseAdmin
     .from("email_queue")
     .insert(row as never)
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Unique index caught a simultaneous duplicate enqueue — treat as skipped.
+    if ((error as { code?: string }).code === "23505") {
+      console.warn(`[emails] duplicate suppressed (db): ${templateCode} -> ${row.to_email}`);
+      return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+    }
+    throw new Error(error.message);
+  }
 
   const baseResult = {
     queueId: (inserted?.id as string | undefined) ?? null,
