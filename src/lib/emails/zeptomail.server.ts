@@ -65,8 +65,16 @@ export async function sendViaZepto(input: ZeptoSendInput): Promise<ZeptoSendResu
       to: [{ email_address: { address: input.to } }],
       subject: input.subject,
       htmlbody: input.html,
-      headers,
     };
+    // ZeptoMail only accepts custom headers under `mime_headers`, and it sets
+    // Message-ID itself, so that one must not be sent.
+    const mimeHeaders: Record<string, string> = {};
+    for (const [k, v] of Object.entries(headers)) {
+      if (!v) continue;
+      if (k.toLowerCase() === "message-id") continue;
+      mimeHeaders[k] = String(v);
+    }
+    if (Object.keys(mimeHeaders).length) body.mime_headers = mimeHeaders;
     if (input.text) body.textbody = input.text;
     if (input.replyTo) body.reply_to = [{ address: input.replyTo }];
     if (input.attachments?.length) {
