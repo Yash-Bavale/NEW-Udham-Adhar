@@ -179,7 +179,7 @@ export async function enqueueEmailInternal(input: {
       .select("id")
       .eq("template_code", templateCode)
       .eq("to_email", row.to_email as string)
-      .in("status", ["queued", "scheduled", "sending", "sent", "failed"])
+      .in("status", ["queued", "sending", "sent", "failed"])
       .limit(1);
     q = input.applicationId
       ? q.eq("application_id", input.applicationId)
