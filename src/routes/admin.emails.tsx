@@ -8,6 +8,7 @@ import {
   saveSmtpSettings,
   sendTestEmail,
   processEmailQueueNow,
+  retryFailedEmailsNow,
   listEmailTemplates,
   saveEmailTemplate,
   duplicateEmailTemplate,
@@ -55,27 +56,31 @@ function EmailsPage() {
 function DashboardTab() {
   const fn = useServerFn(getEmailDashboard);
   const process = useServerFn(processEmailQueueNow);
+  const retryFailed = useServerFn(retryFailedEmailsNow);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin.emails.dash"], queryFn: () => fn({ data: {} as never }) });
   const [busy, setBusy] = useState(false);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [retryMsg, setRetryMsg] = useState<string | null>(null);
 
   if (isLoading) return <div className="text-sm text-slate-500">Loading…</div>;
   const c = data?.counts;
+  const failedRows = data?.failedRows ?? [];
 
   return (
     <div className="space-y-4">
       <div className="grid md:grid-cols-4 lg:grid-cols-8 gap-3">
         <Stat label="Queued" value={c?.queued ?? 0} tone="default" />
         <Stat label="Sending" value={c?.sending ?? 0} tone="info" />
+        <Stat label="Failed (retrying)" value={c?.failed ?? 0} tone="danger" />
         <Stat label="Sent (24h)" value={c?.sent24h ?? 0} tone="success" />
         <Stat label="Sent (7d)" value={c?.sent7d ?? 0} tone="success" />
         <Stat label="Dead-letter" value={c?.dlq ?? 0} tone="danger" />
         <Stat label="Queue Unmatched" value={c?.queueUnmatched ?? 0} tone="danger" />
         <Stat label="Sent Unmatched" value={c?.sentLogsUnmatched ?? 0} tone="danger" />
-        <Stat label="All Unmatched" value={c?.allLogsUnmatched ?? 0} tone="danger" />
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           disabled={busy}
           onClick={async () => {
@@ -87,7 +92,54 @@ function DashboardTab() {
         >
           {busy ? "Processing…" : "Process queue now"}
         </button>
+        <button
+          disabled={retryBusy}
+          onClick={async () => {
+            setRetryBusy(true);
+            setRetryMsg(null);
+            try {
+              const r = await retryFailed({ data: { limit: 50 } });
+              setRetryMsg(`Tried ${r.processed} held email(s) — ${r.sent} sent, ${r.failed} still failing.`);
+              await qc.invalidateQueries({ queryKey: ["admin.emails.dash"] });
+            } catch (e) {
+              setRetryMsg(e instanceof Error ? e.message : "Retry failed");
+            } finally { setRetryBusy(false); }
+          }}
+          className="rounded border border-red-300 bg-red-50 text-red-700 px-3 py-1.5 text-sm disabled:opacity-60"
+        >
+          {retryBusy ? "Retrying…" : `Retry failed emails (${c?.failed ?? 0})`}
+        </button>
+        {retryMsg && <span className="text-xs text-slate-600">{retryMsg}</span>}
       </div>
+
+      <Section title={`Failed queue (${c?.failed ?? 0}) — held, will be retried`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <tr>
+                <th className="p-2">Created</th><th className="p-2">To</th><th className="p-2">Subject</th>
+                <th className="p-2">Attempts</th><th className="p-2">Next try</th><th className="p-2">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failedRows.map((r) => (
+                <tr key={r.id} className="border-t align-top">
+                  <td className="p-2 text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
+                  <td className="p-2">{r.to_email}</td>
+                  <td className="p-2">{r.subject}</td>
+                  <td className="p-2 text-xs">{r.attempts}/{r.max_attempts}</td>
+                  <td className="p-2 text-xs whitespace-nowrap">{new Date(r.next_attempt_at).toLocaleString()}</td>
+                  <td className="p-2 text-xs text-red-600 max-w-md break-words">{r.last_error ?? ""}</td>
+                </tr>
+              ))}
+              {failedRows.length === 0 && (
+                <tr><td colSpan={6} className="p-4 text-center text-slate-400 text-sm">No failed emails.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
 
       <Section title="Recent send attempts">
         <div className="mb-2 text-xs text-slate-500">

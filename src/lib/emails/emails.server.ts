@@ -679,7 +679,18 @@ async function sendQueueRow(row: QueueRow) {
     .maybeSingle();
   if (!settings?.is_enabled) return { ok: false, error: "smtp_disabled" };
 
-  await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
+  // Atomic claim — only one worker may move a row out of queued/failed into
+  // `sending`. Without this, the cron worker and a manual "process now" can both
+  // pick the same row and deliver the same email twice.
+  const { data: claimed } = await supabaseAdmin
+    .from("email_queue")
+    .update({ status: "sending" })
+    .eq("id", row.id)
+    .in("status", ["queued", "failed"])
+    .select("id");
+  if (!claimed || claimed.length === 0) {
+    return { ok: true, skipped: true, error: "already_claimed" };
+  }
 
   const attempt = (row.attempts ?? 0) + 1;
   const fromName = settings.from_name || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services";
