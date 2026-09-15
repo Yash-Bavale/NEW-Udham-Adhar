@@ -15,7 +15,76 @@ import {
   deleteEmailTemplate,
   listEmailLogs,
   sendTestTemplateEmail,
+  getMailProviderSetting,
+  setMailProviderSetting,
 } from "@/lib/emails/emails.functions";
+
+// ───────────────── Sending service switcher ─────────────────
+function ProviderSwitcher() {
+  const getFn = useServerFn(getMailProviderSetting);
+  const setFn = useServerFn(setMailProviderSetting);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["admin.emails.provider"], queryFn: () => getFn() });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const choose = async (choice: "auto" | "zoho" | "zeptomail") => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await setFn({ data: { choice } });
+      setMsg(`Saved. Emails now send through ${r.active === "zeptomail" ? "ZeptoMail" : "Zoho Mail API"}.`);
+      await qc.invalidateQueries({ queryKey: ["admin.emails.provider"] });
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const options: { key: "auto" | "zoho" | "zeptomail"; label: string; hint: string }[] = [
+    { key: "zeptomail", label: "ZeptoMail", hint: "Zoho ZeptoMail transactional API" },
+    { key: "zoho", label: "Zoho Mail API", hint: "Regular Zoho mailbox sending" },
+    { key: "auto", label: "Automatic", hint: "ZeptoMail when available, else Zoho" },
+  ];
+
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="font-medium">Sending service</div>
+          <div className="text-sm text-slate-500">
+            {isLoading
+              ? "Loading…"
+              : `Currently sending via ${data?.active === "zeptomail" ? "ZeptoMail" : "Zoho Mail API"}${
+                  data?.senderEmail ? ` from ${data.senderEmail}` : ""
+                }`}
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {options.map((o) => {
+            const selected = data?.choice === o.key;
+            const disabled = busy || (o.key === "zeptomail" && data?.zeptoConfigured === false);
+            return (
+              <button
+                key={o.key}
+                title={disabled && o.key === "zeptomail" ? "ZeptoMail token not configured" : o.hint}
+                disabled={disabled}
+                onClick={() => choose(o.key)}
+                className={`rounded-md border px-3 py-2 text-sm ${
+                  selected ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 hover:bg-slate-50"
+                } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {msg && <div className="mt-2 text-sm text-slate-600">{msg}</div>}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/admin/emails")({ component: EmailsPage });
 
@@ -69,6 +138,7 @@ function DashboardTab() {
 
   return (
     <div className="space-y-4">
+      <ProviderSwitcher />
       <div className="grid md:grid-cols-4 lg:grid-cols-8 gap-3">
         <Stat label="Queued" value={c?.queued ?? 0} tone="default" />
         <Stat label="Sending" value={c?.sending ?? 0} tone="info" />
