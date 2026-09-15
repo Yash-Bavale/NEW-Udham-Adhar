@@ -97,6 +97,39 @@ export const saveSmtpSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ── Outgoing mail provider switcher (Zoho Mail API ⇄ ZeptoMail) ──
+export const getMailProviderSetting = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { mailProviderChoice, resolveMailProvider, senderEmailFor } = await import("./transport.server");
+    const { zeptoConfigured } = await import("./zeptomail.server");
+    const active = await resolveMailProvider();
+    return {
+      choice: await mailProviderChoice(),
+      active,
+      senderEmail: senderEmailFor(active),
+      zeptoConfigured: zeptoConfigured(),
+      zohoConfigured: Boolean(process.env.ZOHO_SMTP_USER || process.env.ZOHO_FROM_EMAIL),
+    };
+  });
+
+export const setMailProviderSetting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ choice: z.enum(["auto", "zoho", "zeptomail"]) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert(
+        { id: 1, email_provider: data.choice, updated_at: new Date().toISOString(), updated_by: context.userId } as never,
+        { onConflict: "id" },
+      );
+    if (error) throw new Error(error.message);
+    const { clearMailProviderCache, resolveMailProvider } = await import("./transport.server");
+    clearMailProviderCache();
+    return { ok: true, choice: data.choice, active: await resolveMailProvider() };
+  });
+
 export const sendTestEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
