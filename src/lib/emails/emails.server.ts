@@ -118,6 +118,8 @@ export async function enqueueEmailInternal(input: {
   attachments?: EmailAttachment[];
   requireImmediateSuccess?: boolean;
   allowWithoutTemplate?: boolean;
+  /** Set true for genuinely repeatable sends (manual resend, support replies). */
+  allowDuplicate?: boolean;
 }) {
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
