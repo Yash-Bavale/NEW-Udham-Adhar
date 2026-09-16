@@ -213,9 +213,9 @@ function OrdersListPage() {
         case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
         case "not_contacted": setBucket("needs_action"); break;
         case "not_contacted_5h": setBucket("needs_action"); break;
-        case "technical_delay": setFulfillmentStatus("technical_delay"); setStageFilter("technical_delay"); break;
-        case "customer_delay": setFulfillmentStatus("customer_delay"); setStageFilter("customer_delay"); break;
-        case "form_not_submitted": setFulfillmentStatus("form_pending"); setStageFilter("form_not_submitted"); break;
+        case "technical_delay": setStageFilter("technical_delay"); break;
+        case "customer_delay": setStageFilter("customer_delay"); break;
+        case "form_not_submitted": setStageFilter("form_not_submitted"); break;
       }
     }
     if (routeSearch.preset) {
@@ -849,6 +849,7 @@ function OrderCardMobile({
     rose:    "bg-rose-50 text-rose-700 border-rose-200",
     slate:   "bg-slate-100 text-slate-700 border-slate-200",
     blue:    "bg-sky-50 text-sky-700 border-sky-200",
+    sky:     "bg-sky-50 text-sky-700 border-sky-200",
     indigo:  "bg-indigo-50 text-indigo-700 border-indigo-200",
     violet:  "bg-violet-50 text-violet-700 border-violet-200",
   };
@@ -1044,6 +1045,7 @@ function OrderRow({
     rose:    "bg-rose-50 text-rose-700",
     slate:   "bg-slate-100 text-slate-700",
     blue:    "bg-sky-50 text-sky-700",
+    sky:     "bg-sky-50 text-sky-700",
     indigo:  "bg-indigo-50 text-indigo-700",
     violet:  "bg-violet-50 text-violet-700",
   };

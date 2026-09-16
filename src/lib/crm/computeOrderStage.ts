@@ -73,7 +73,7 @@ export function computeOrderStage(
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
-  if (fs === "order_closed" || fs === "cancelled") return "closed";
+  if (fs === "order_closed" || fs === "cancelled" || ws === "closed" || ws === "refund_closed") return "closed";
 
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";
@@ -87,8 +87,8 @@ export function computeOrderStage(
   if (fs === "verification_pending") return "under_review";
   if (fs === "documents_received") return "in_progress";
 
-  if (fs === "customer_delay") return "customer_delay";
-  if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold") return "technical_delay";
+  if (fs === "customer_delay" || ws === "waiting_for_customer" || ws === "waiting_for_documents" || ws === "customer_non_responsive" || ws === "customer_delay") return "customer_delay";
+  if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold" || ws === "external_dependency") return "technical_delay";
 
   if (fs === "consultation_completed") return "consultation_completed";
 
@@ -96,7 +96,7 @@ export function computeOrderStage(
     return "consultation_pending";
   }
   if (fs === "form_submitted") return "form_submitted";
-  if (["waiting_for_customer_submission", "awaiting_customer_form", "form_not_submitted"].includes(fs)) return "form_not_submitted";
+  if (["waiting_for_customer_submission", "awaiting_customer_form", "form_not_submitted", "form_pending", "waiting_customer", "customer_form_pending"].includes(fs)) return "form_not_submitted";
   if (!application.form_submitted_at) return "payment_done";
 
   return "form_submitted";
