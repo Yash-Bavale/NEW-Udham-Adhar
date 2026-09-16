@@ -512,52 +512,199 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .from("leads")
         .select("id")
         .or(`name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}`)
-        .limit(300);
+        .limit(200);
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
-    let q = admin
-      .from("applications")
-      .select(
-        "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code",
-      )
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: data.sortOrder === "asc" });
+    // Helper to build base query with common filters
+    function buildBaseQuery() {
+      let query = admin
+        .from("applications")
+        .select(
+          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code",
+          { count: "exact" },
+        )
+        .eq("is_deleted", false);
 
-    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all") {
+      if (data.serviceId && data.serviceId !== "all") {
+        query = query.eq("service_id", data.serviceId);
+      }
+      if (!isAdmin) {
+        query = query.eq("assigned_to", context.userId);
+      } else if (data.assignedTo && data.assignedTo !== "all") {
+        query = query.eq("assigned_to", data.assignedTo);
+      }
+      if (fromIso) query = query.gte("created_at", fromIso);
+      if (toIso) query = query.lte("created_at", toIso);
+
+      if (data.search && data.search.trim()) {
+        const term = `%${data.search.trim()}%`;
+        if (matchingLeadIds && matchingLeadIds.length > 0) {
+          query = query.or(`application_code.ilike.${term},lead_id.in.(${matchingLeadIds.join(",")})`);
+        } else {
+          query = query.ilike("application_code", term);
+        }
+      }
+      return query;
+    }
+
+    let q = buildBaseQuery();
+
+    // Stage filter mapping
+    if (data.stage && data.stage !== "all") {
+      switch (data.stage) {
+        case "payment_done":
+          q = q.eq("fulfillment_status", "order_received").is("form_submitted_at", null);
+          break;
+        case "form_not_submitted":
+          q = q.in("fulfillment_status", ["waiting_for_customer_submission", "awaiting_customer_form", "form_not_submitted", "form_pending"]);
+          break;
+        case "form_submitted":
+          q = q.eq("fulfillment_status", "form_submitted");
+          break;
+        case "technical_delay":
+          q = q.in("fulfillment_status", ["technical_delay", "technical_hold"]);
+          break;
+        case "customer_delay":
+          q = q.eq("fulfillment_status", "customer_delay");
+          break;
+        case "under_review":
+          q = q.eq("fulfillment_status", "verification_pending");
+          break;
+        case "in_progress":
+          q = q.eq("fulfillment_status", "documents_received");
+          break;
+        case "submitted_to_govt":
+          q = q.in("fulfillment_status", ["government_processing", "application_submitted", "under_processing", "awaiting_govt"]);
+          break;
+        case "certificate_ready":
+          q = q.eq("fulfillment_status", "application_approved");
+          break;
+        case "completed":
+          q = q.in("fulfillment_status", ["completed", "order_completed"]);
+          break;
+        case "closed":
+          q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
+          break;
+        case "consultation_pending":
+          q = q.in("application_status", ["consultation_pending", "consultation_scheduled"]);
+          break;
+        case "consultation_completed":
+          q = q.eq("fulfillment_status", "consultation_completed");
+          break;
+        default:
+          q = q.eq("fulfillment_status", data.stage as never);
+          break;
+      }
+    } else if (data.fulfillmentStatus && data.fulfillmentStatus !== "all") {
       q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
     }
-    if (data.serviceId && data.serviceId !== "all") {
-      q = q.eq("service_id", data.serviceId);
-    }
-    if (!isAdmin) {
-      q = q.eq("assigned_to", context.userId);
-    } else if (data.assignedTo && data.assignedTo !== "all") {
-      q = q.eq("assigned_to", data.assignedTo);
-    }
-    if (fromIso) q = q.gte("created_at", fromIso);
-    if (toIso) q = q.lte("created_at", toIso);
 
-    if (data.search && data.search.trim()) {
-      const term = `%${data.search.trim()}%`;
-      if (matchingLeadIds && matchingLeadIds.length > 0) {
-        q = q.or(`application_code.ilike.${term},lead_id.in.(${matchingLeadIds.join(",")})`);
-      } else {
-        q = q.ilike("application_code", term);
+    // Bucket filter mapping
+    if (data.bucket && data.bucket !== "all") {
+      switch (data.bucket) {
+        case "needs_action":
+          q = q.in("fulfillment_status", ["order_received", "form_submitted"]);
+          break;
+        case "completed":
+          q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
+          break;
+        case "closed":
+          q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
+          break;
+        case "pending":
+          q = q.not("fulfillment_status", "in", '("completed","order_completed","consultation_completed","order_closed","cancelled","application_rejected","certificate_rejected")');
+          break;
       }
     }
 
-    const { data: apps, error } = await q.limit(5000);
+    // Action Status filter mapping
+    if (data.actionStatus && data.actionStatus !== "all") {
+      if (data.actionStatus === "action_required") {
+        q = q.in("fulfillment_status", ["order_received", "form_submitted"]);
+      } else if (data.actionStatus === "processed") {
+        q = q.not("fulfillment_status", "in", '("order_received","form_submitted")');
+      }
+    }
+
+    // Pending Age filter mapping
+    if (data.pendingAge && data.pendingAge !== "any") {
+      let days = 0;
+      if (data.pendingAge === "custom" && data.customDays) {
+        days = parseInt(data.customDays, 10) || 0;
+      } else {
+        days = parseInt(data.pendingAge, 10) || 0;
+      }
+      if (days > 0) {
+        const threshold = new Date(Date.now() - days * 86_400_000).toISOString();
+        q = q.lte("created_at", threshold);
+      }
+    }
+
+    if (data.sortField === "stage") {
+      q = q.order("fulfillment_status", { ascending: data.sortOrder === "asc" }).order("created_at", { ascending: false });
+    } else {
+      q = q.order("created_at", { ascending: data.sortOrder === "asc" });
+    }
+
+    // Parallel global count queries for buckets across all matching data
+    const [
+      totalRes,
+      needsActionRes,
+      completedRes,
+      closedRes,
+    ] = await Promise.all([
+      buildBaseQuery().range(0, 0),
+      buildBaseQuery().in("fulfillment_status", ["order_received", "form_submitted"]).range(0, 0),
+      buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]).range(0, 0),
+      buildBaseQuery().in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]).range(0, 0),
+    ]);
+
+    const totalOrders = totalRes.count ?? 0;
+    const needsActionCount = needsActionRes.count ?? 0;
+    const completedCount = completedRes.count ?? 0;
+    const closedCount = closedRes.count ?? 0;
+    const pendingCount = Math.max(0, totalOrders - completedCount - closedCount);
+
+    const counts = {
+      all: totalOrders,
+      needs_action: needsActionCount,
+      pending: pendingCount,
+      completed: completedCount,
+      closed: closedCount,
+      exception: 0,
+      actionRequired: needsActionCount,
+      processed: completedCount + closedCount,
+    };
+
+    // Exact count of items matching the active filter/bucket/stage
+    const { count: filteredCount, error: countErr } = await q.range(0, 0);
+    if (countErr) throw new Error(countErr.message);
+    const total = filteredCount ?? 0;
+
+    if (total === 0) {
+      return {
+        rows: [],
+        total: 0,
+        counts,
+        page: data.page,
+        pageSize: data.pageSize,
+      };
+    }
+
+    const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
+    const page = Math.min(Math.max(1, data.page), maxPage);
+    const from = (page - 1) * data.pageSize;
+    const { data: apps, error } = await q.range(from, Math.min(from + data.pageSize, total) - 1);
     if (error) throw new Error(error.message);
     const appList = apps ?? [];
 
     if (appList.length === 0) {
       return {
         rows: [],
-        total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
-        ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
-        page: data.page,
+        total,
+        counts,
+        page,
         pageSize: data.pageSize,
       };
     }
@@ -613,7 +760,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    let allOrderRows = appList.map((a) => {
+    let rows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
       const effectiveSvcId = a.service_id || lead?.service_id || null;
@@ -624,10 +771,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
-      const stage = computeOrderStage(
-        { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-        { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
-      );
       return {
         id: a.id,
         application_code: a.application_code,
@@ -646,170 +789,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         payment_status: rollupPaymentStatus(payments, total),
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
-        stage,
+        stage: computeOrderStage(
+          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
+          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
+        ),
       };
     });
 
-    // Deduplicate orders by lead_id
-    const seenLeadIds = new Set<string>();
-    const uniqueRows: typeof allOrderRows = [];
-    const duplicateAppIdsToDelete: string[] = [];
-
-    for (const r of allOrderRows) {
-      if (r.lead_id) {
-        if (seenLeadIds.has(r.lead_id)) {
-          duplicateAppIdsToDelete.push(r.id);
-          continue;
-        }
-        seenLeadIds.add(r.lead_id);
-      }
-      uniqueRows.push(r);
-    }
-
-    if (duplicateAppIdsToDelete.length > 0) {
-      void Promise.resolve(
-        admin.from("applications").update({ is_deleted: true }).in("id", duplicateAppIdsToDelete),
-      ).catch((err: unknown) => {
-        console.error("[listOrdersV2] auto-cleanup duplicate apps error:", err);
-      });
-    }
-
-    // Compute GLOBAL counts across all deduplicated rows matching base filters
-    const counts: Record<Bucket, number> & { actionRequired: number; processed: number } = {
-      all: uniqueRows.length,
-      needs_action: 0,
-      pending: 0,
-      completed: 0,
-      closed: 0,
-      exception: 0,
-      actionRequired: 0,
-      processed: 0,
-    };
-    const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
-
-    for (const r of uniqueRows) {
-      const b = bucketOfRow(r);
-      counts[b]++;
-      const act = getOrderActionStatus(r);
-      if (act.tone === "red") counts.actionRequired++;
-      else counts.processed++;
-
-      if (isPendingRow(r)) {
-        const d = daysSince(r.created_at);
-        if (d >= 7) ageBuckets.older++;
-        else if (d >= 3) ageBuckets.d7++;
-        else if (d >= 2) ageBuckets.d3++;
-        else if (d >= 1) ageBuckets.d2++;
-        else ageBuckets.d1++;
-      }
-    }
-
-    // Compute minDays for pendingAge
-    let minDays: number | null = null;
-    if (data.pendingAge && data.pendingAge !== "any") {
-      if (data.pendingAge === "custom" && data.customDays) {
-        const n = parseInt(data.customDays, 10);
-        if (Number.isFinite(n) && n > 0) minDays = n;
-      } else {
-        const n = parseInt(data.pendingAge, 10);
-        if (Number.isFinite(n) && n > 0) minDays = n;
-      }
-    }
-
-    // Filter by view criteria
-    let filtered = uniqueRows;
-
-    // 1. Bucket filter
-    if (data.bucket && data.bucket !== "all") {
-      filtered = filtered.filter((r) => bucketOfRow(r) === data.bucket);
-    }
-
-    // 2. Stage filter
-    if (data.stage && data.stage !== "all") {
-      filtered = filtered.filter((r) => r.stage === data.stage);
-    }
-
-    // 3. Action Status filter
-    if (data.actionStatus && data.actionStatus !== "all") {
-      filtered = filtered.filter((r) => {
-        const st = getOrderActionStatus(r);
-        if (data.actionStatus === "action_required") return st.tone === "red";
-        if (data.actionStatus === "processed") return st.tone === "green" || st.tone === "blue";
-        return true;
-      });
-    }
-
-    // 4. Payment status filter
     if (data.paymentStatus && data.paymentStatus !== "all") {
-      filtered = filtered.filter((r) => r.payment_status === data.paymentStatus);
+      rows = rows.filter((r) => r.payment_status === data.paymentStatus);
     }
-
-    // 5. Pending age filter
-    if (minDays != null) {
-      filtered = filtered.filter((r) => {
-        if (!isPendingRow(r)) return true;
-        return daysSince(r.created_at) >= minDays!;
-      });
-    }
-
-    // 6. Search stage matching (if user searches a stage label directly like "Payment Done")
-    if (data.search && data.search.trim()) {
-      const qLower = data.search.trim().toLowerCase();
-      filtered = filtered.filter((r) => {
-        const code = (r.application_code ?? "").toLowerCase();
-        const cName = (r.customer_name ?? "").toLowerCase();
-        const cMob = (r.customer_mobile ?? "").toLowerCase();
-        const cEmail = (r.customer_email ?? "").toLowerCase();
-        const lCode = (r.lead_code ?? "").toLowerCase();
-        const sName = (r.service_name ?? "").toLowerCase();
-        const stageKey = (r.stage ?? "").toLowerCase();
-        const stageLabel = (STAGE_META[r.stage as OrderStage]?.label ?? "").toLowerCase();
-        return (
-          code.includes(qLower) ||
-          cName.includes(qLower) ||
-          cMob.includes(qLower) ||
-          cEmail.includes(qLower) ||
-          lCode.includes(qLower) ||
-          sName.includes(qLower) ||
-          stageKey.includes(qLower) ||
-          stageLabel.includes(qLower)
-        );
-      });
-    }
-
-    // Sort
-    const sortOrder = data.sortOrder === "asc" ? "asc" : "desc";
-    const sortField = data.sortField ?? "created_at";
-
-    filtered.sort((a, b) => {
-      if (sortField === "stage") {
-        const labelA = STAGE_META[a.stage as OrderStage]?.label ?? a.stage;
-        const labelB = STAGE_META[b.stage as OrderStage]?.label ?? b.stage;
-        const cmp = labelA.localeCompare(labelB);
-        return sortOrder === "asc" ? cmp : -cmp;
-      }
-      if (sortField === "stage_journey") {
-        const orderA = STAGE_META[a.stage as OrderStage]?.order ?? 99;
-        const orderB = STAGE_META[b.stage as OrderStage]?.order ?? 99;
-        const cmp = orderA - orderB;
-        return sortOrder === "asc" ? cmp : -cmp;
-      }
-      // default: created_at
-      const timeA = new Date(a.created_at).getTime();
-      const timeB = new Date(b.created_at).getTime();
-      return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
-    });
-
-    const total = filtered.length;
-    const from = (data.page - 1) * data.pageSize;
-    const paginatedRows = filtered.slice(from, from + data.pageSize);
 
     return {
-      rows: paginatedRows,
+      rows,
       total,
       counts,
-      ageBuckets,
-      page: data.page,
+      page,
       pageSize: data.pageSize,
     };
   });

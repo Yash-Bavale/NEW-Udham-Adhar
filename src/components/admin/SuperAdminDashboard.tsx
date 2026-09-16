@@ -200,41 +200,66 @@ function StatChip({
   tone: "emerald" | "rose" | "amber" | "sky" | "slate" | "indigo" | "violet" | "teal";
   href?: string;
 }) {
-  const t = TONE_STYLES[tone];
-  const inner = (
-    <div
-      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 transition ${t.chip} ${t.ring} ${
-        href ? "hover:brightness-95 cursor-pointer" : ""
-      }`}
-    >
-      <span className="text-slate-500">{label}</span>
-      <span className="tabular-nums font-bold text-slate-900">{value}</span>
-    </div>
+  const navigate = useNavigate();
+  const cls: Record<string, string> = {
+    emerald: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
+    rose: "text-rose-700 bg-rose-50 hover:bg-rose-100",
+    amber: "text-amber-700 bg-amber-50 hover:bg-amber-100",
+    sky: "text-sky-700 bg-sky-50 hover:bg-sky-100",
+    slate: "text-slate-600 bg-slate-100 hover:bg-slate-200",
+    indigo: "text-indigo-700 bg-indigo-50 hover:bg-indigo-100",
+    violet: "text-violet-700 bg-violet-50 hover:bg-violet-100",
+    teal: "text-teal-700 bg-teal-50 hover:bg-teal-100",
+  };
+  const body = (
+    <>
+      <span className="opacity-70">{label}</span>
+      <span className="font-semibold tabular-nums">{typeof value === "number" ? fmtN(value) : value}</span>
+    </>
   );
+  const base = `inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`;
   if (href) {
-    const { path, search } = parseHref(href);
+    const [path, qs] = href.split("?");
+    const search: Record<string, string> = {};
+    if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
     return (
-      <Link to={path as never} search={search as never} className="inline-block">{inner}</Link>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate({ to: path as never, search: search as never }); }}
+        className={`${base} transition-colors cursor-pointer`}
+      >
+        {body}
+      </button>
     );
   }
-  return inner;
+  return <span className={base}>{body}</span>;
 }
 
 function ModernKpi({
-  icon, label, value, tone, delta, href, subs, footer,
+  icon, label, value, tone, delta, subs, footer, href,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string | number;
+  value: string;
   tone: Tone;
   delta?: { pct: number; up: boolean } | null;
-  href?: string;
   subs?: React.ReactNode;
-  footer?: string;
+  footer?: React.ReactNode;
+  href?: string;
 }) {
+  const navigate = useNavigate();
   const t = TONE_STYLES[tone];
-  const inner = (
-    <div className={`group relative flex h-full flex-col rounded-xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ring-1 ${t.ring} ${href ? "hover:shadow-md hover:border-slate-300 cursor-pointer" : ""}`}>
+  const body = (
+    <div
+      onClick={() => {
+        if (!href) return;
+        const [path, qs] = href.split("?");
+        const search: Record<string, string> = {};
+        if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
+        navigate({ to: path as never, search: search as never });
+      }}
+      className={`group relative flex h-full flex-col rounded-xl border border-slate-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ring-1 ${t.ring} ${href ? "hover:shadow-md hover:border-slate-300 cursor-pointer" : ""}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
         {delta !== undefined && <DeltaPill d={delta ?? null} />}
@@ -247,18 +272,10 @@ function ModernKpi({
       {footer && <div className="mt-auto pt-2 text-[10px] text-slate-500">{footer}</div>}
     </div>
   );
-  if (href) {
-    const [path, qs] = href.split("?");
-    const search: Record<string, string> = {};
-    if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
-    return (
-      <Link to={path as never} search={search as never} className="block h-full">{inner}</Link>
-    );
-  }
-  return inner;
+  return body;
 }
 
-function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading: boolean; range?: DashboardRange }) {
+function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -272,12 +289,6 @@ function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading:
   const ticketsDelta = pctDelta(m.ticketsRaised, m.ticketsRaisedPrev);
   const revDelta = pctDelta(m.revenueInclTax, m.revenueInclTaxPrev);
   const convDelta = pctDelta(m.conversionRate, m.conversionRatePrev);
-
-  const rangeParam = range?.preset ? `preset=${range.preset}` : "";
-  const ordersBaseHref = rangeParam ? `/admin/orders?${rangeParam}` : "/admin/orders";
-  const orderHrefWithFilter = (flt: string) => {
-    return rangeParam ? `/admin/orders?filter=${flt}&${rangeParam}` : `/admin/orders?filter=${flt}`;
-  };
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -293,28 +304,28 @@ function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading:
       />
       <ModernKpi
         icon={<ShoppingBag className="size-4" />} label="Orders" value={fmtN(m.paidOrders)} tone="emerald" delta={paidDelta}
-        href={ordersBaseHref}
+        href="/admin/orders"
         subs={<>
-          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" href={orderHrefWithFilter("pending")} />
-          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" href={orderHrefWithFilter("closed")} />
+          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" href="/admin/orders?filter=pending" />
+          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" href="/admin/orders?filter=closed" />
         </>}
       />
       <ModernKpi
         icon={<AlertTriangle className="size-4" />} label="Technical Delay" value={fmtN(m.technicalDelay)}
         tone={m.technicalDelay > 0 ? "amber" : "slate"}
-        href={orderHrefWithFilter("technical_delay")}
+        href="/admin/orders?filter=technical_delay"
         subs={<>
-          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href={orderHrefWithFilter("customer_delay")} />
-          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href={orderHrefWithFilter("form_not_submitted")} />
+          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href="/admin/orders?filter=customer_delay" />
+          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href="/admin/orders?filter=form_not_submitted" />
         </>}
       />
       <ModernKpi
         icon={<Bell className="size-4" />} label="Order Alerts" value={fmtN(m.ordersDelayed3d)}
         tone={m.ordersDelayed7d > 0 ? "rose" : m.ordersDelayed3d > 0 ? "amber" : "slate"}
-        href={orderHrefWithFilter("delayed_3d")}
+        href="/admin/orders?filter=delayed_3d"
         subs={<>
-          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" href={orderHrefWithFilter("delayed_3d")} />
-          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" href={orderHrefWithFilter("delayed_7d")} />
+          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" href="/admin/orders?filter=delayed_3d" />
+          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" href="/admin/orders?filter=delayed_7d" />
         </>}
       />
       <ModernKpi
@@ -355,10 +366,10 @@ function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading:
       <ModernKpi
         icon={<UserCheck className="size-4" />} label="Orders Not Contacted" value={fmtN(m.ordersNotContacted3h)}
         tone={m.ordersNotContacted5h > 0 ? "rose" : m.ordersNotContacted3h > 0 ? "amber" : "slate"}
-        href={orderHrefWithFilter("not_contacted")}
+        href="/admin/orders?filter=not_contacted"
         subs={<>
-          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" href={orderHrefWithFilter("not_contacted")} />
-          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" href={orderHrefWithFilter("not_contacted_5h")} />
+          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" href="/admin/orders?filter=not_contacted" />
+          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" href="/admin/orders?filter=not_contacted_5h" />
         </>}
       />
       <ModernKpi
