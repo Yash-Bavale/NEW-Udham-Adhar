@@ -20,14 +20,21 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
       return count ?? 0;
     };
 
-    const [queued, sending, dlq, sent24h, sent7d, recentLogs, topErrors, queueRows, logRows, templates] = await Promise.all([
+    const [queued, sending, failed, dlq, sent24h, sent7d, recentLogs, topErrors, failedRows, queueRows, logRows, templates] = await Promise.all([
       counts("queued"),
       counts("sending"),
+      counts("failed"),
       counts("dlq"),
       supabase.from("email_logs").select("*", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since24h).then((r) => r.count ?? 0),
       supabase.from("email_logs").select("*", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since7d).then((r) => r.count ?? 0),
       supabase.from("email_logs").select("id, to_email, subject, status, error_message, smtp_response, sent_at, template_code").order("sent_at", { ascending: false }).limit(20),
       supabase.from("email_queue").select("id, to_email, subject, last_error, attempts").eq("status", "dlq").order("updated_at", { ascending: false }).limit(10),
+      supabase
+        .from("email_queue")
+        .select("id, to_email, subject, template_code, attempts, max_attempts, next_attempt_at, last_error, created_at")
+        .eq("status", "failed")
+        .order("created_at", { ascending: false })
+        .limit(100),
       supabase.from("email_queue").select("template_code"),
       supabase.from("email_logs").select("template_code, status"),
       supabase.from("email_templates").select("code"),
@@ -38,9 +45,10 @@ export const getEmailDashboard = createServerFn({ method: "POST" })
     const allLogsUnmatched = (logRows.data ?? []).filter((r) => !r.template_code || !templateSet.has(r.template_code)).length;
 
     return {
-      counts: { queued, sending, dlq, sent24h, sent7d, queueUnmatched, sentLogsUnmatched, allLogsUnmatched },
+      counts: { queued, sending, failed, dlq, sent24h, sent7d, queueUnmatched, sentLogsUnmatched, allLogsUnmatched },
       recentLogs: recentLogs.data ?? [],
       dlqRows: topErrors.data ?? [],
+      failedRows: failedRows.data ?? [],
     };
   });
 
@@ -89,6 +97,39 @@ export const saveSmtpSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ── Outgoing mail provider switcher (Zoho Mail API ⇄ ZeptoMail) ──
+export const getMailProviderSetting = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { mailProviderChoice, resolveMailProvider, senderEmailFor } = await import("./transport.server");
+    const { zeptoConfigured } = await import("./zeptomail.server");
+    const active = await resolveMailProvider();
+    return {
+      choice: await mailProviderChoice(),
+      active,
+      senderEmail: senderEmailFor(active),
+      zeptoConfigured: zeptoConfigured(),
+      zohoConfigured: Boolean(process.env.ZOHO_SMTP_USER || process.env.ZOHO_FROM_EMAIL),
+    };
+  });
+
+export const setMailProviderSetting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ choice: z.enum(["auto", "zoho", "zeptomail"]) }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert(
+        { id: 1, email_provider: data.choice, updated_at: new Date().toISOString(), updated_by: context.userId } as never,
+        { onConflict: "id" },
+      );
+    if (error) throw new Error(error.message);
+    const { clearMailProviderCache, resolveMailProvider } = await import("./transport.server");
+    clearMailProviderCache();
+    return { ok: true, choice: data.choice, active: await resolveMailProvider() };
+  });
+
 export const sendTestEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -116,6 +157,29 @@ export const processEmailQueueNow = createServerFn({ method: "POST" })
   .handler(async () => {
     const { processQueueInternal } = await import("./emails.server");
     return await processQueueInternal(50);
+  });
+
+/**
+ * Release held/parked failed emails and try them again right now.
+ * Only rows still in `failed` are touched, and the send path claims each row
+ * atomically, so an email that already went out can never be sent twice.
+ */
+export const retryFailedEmailsNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ limit: z.number().int().min(1).max(200).optional() }).parse(i ?? {}))
+  .handler(async ({ data }) => {
+    const { processQueueInternal } = await import("./emails.server");
+    const m = await import("@/integrations/supabase/client.server");
+    const admin = m.supabaseAdmin;
+
+    const { data: released } = await admin
+      .from("email_queue")
+      .update({ next_attempt_at: new Date().toISOString() })
+      .eq("status", "failed")
+      .select("id");
+
+    const result = await processQueueInternal(data.limit ?? 50);
+    return { released: released?.length ?? 0, ...result };
   });
 
 // ── Template management ──

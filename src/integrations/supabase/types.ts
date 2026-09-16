@@ -101,18 +101,21 @@ export type Database = {
       app_settings: {
         Row: {
           customer_delay_autoclose_minutes: number
+          email_provider: string
           id: number
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           customer_delay_autoclose_minutes?: number
+          email_provider?: string
           id?: number
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           customer_delay_autoclose_minutes?: number
+          email_provider?: string
           id?: number
           updated_at?: string
           updated_by?: string | null

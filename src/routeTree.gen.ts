@@ -135,6 +135,8 @@ import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/w
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
 import { Route as ApiPublicWebhooksCashfreeRouteImport } from './routes/api/public/webhooks/cashfree'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
+import { Route as ApiPublicGstServicesRouteImport } from './routes/api/public/gst/services'
+import { Route as ApiPublicGstLeadRouteImport } from './routes/api/public/gst/lead'
 import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public/form-asset.$'
 import { Route as ApiPublicCronZohoDiagnoseRouteImport } from './routes/api/public/cron/zoho-diagnose'
 import { Route as ApiPublicCronWorkflowTickRouteImport } from './routes/api/public/cron/workflow-tick'
@@ -803,6 +805,16 @@ const ApiPublicInvoiceLeadCodeRoute =
     path: '/api/public/invoice/$leadCode',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicGstServicesRoute = ApiPublicGstServicesRouteImport.update({
+  id: '/api/public/gst/services',
+  path: '/api/public/gst/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGstLeadRoute = ApiPublicGstLeadRouteImport.update({
+  id: '/api/public/gst/lead',
+  path: '/api/public/gst/lead',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicFormAssetSplatRoute = ApiPublicFormAssetSplatRouteImport.update({
   id: '/api/public/form-asset/$',
   path: '/api/public/form-asset/$',
@@ -1020,6 +1032,8 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
+  '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -1157,6 +1171,8 @@ export interface FileRoutesByTo {
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
+  '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -1300,6 +1316,8 @@ export interface FileRoutesById {
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
+  '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
@@ -1444,6 +1462,8 @@ export interface FileRouteTypes {
     | '/api/public/cron/workflow-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gst/lead'
+    | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
@@ -1581,6 +1601,8 @@ export interface FileRouteTypes {
     | '/api/public/cron/workflow-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gst/lead'
+    | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
@@ -1723,6 +1745,8 @@ export interface FileRouteTypes {
     | '/api/public/cron/workflow-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gst/lead'
+    | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
@@ -1807,6 +1831,8 @@ export interface RootRouteChildren {
   ApiPublicCronWorkflowTickRoute: typeof ApiPublicCronWorkflowTickRoute
   ApiPublicCronZohoDiagnoseRoute: typeof ApiPublicCronZohoDiagnoseRoute
   ApiPublicFormAssetSplatRoute: typeof ApiPublicFormAssetSplatRoute
+  ApiPublicGstLeadRoute: typeof ApiPublicGstLeadRoute
+  ApiPublicGstServicesRoute: typeof ApiPublicGstServicesRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
   ApiPublicWebhooksCashfreeRoute: typeof ApiPublicWebhooksCashfreeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
@@ -2700,6 +2726,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInvoiceLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/gst/services': {
+      id: '/api/public/gst/services'
+      path: '/api/public/gst/services'
+      fullPath: '/api/public/gst/services'
+      preLoaderRoute: typeof ApiPublicGstServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gst/lead': {
+      id: '/api/public/gst/lead'
+      path: '/api/public/gst/lead'
+      fullPath: '/api/public/gst/lead'
+      preLoaderRoute: typeof ApiPublicGstLeadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/form-asset/$': {
       id: '/api/public/form-asset/$'
       path: '/api/public/form-asset/$'
@@ -3092,6 +3132,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronWorkflowTickRoute: ApiPublicCronWorkflowTickRoute,
   ApiPublicCronZohoDiagnoseRoute: ApiPublicCronZohoDiagnoseRoute,
   ApiPublicFormAssetSplatRoute: ApiPublicFormAssetSplatRoute,
+  ApiPublicGstLeadRoute: ApiPublicGstLeadRoute,
+  ApiPublicGstServicesRoute: ApiPublicGstServicesRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
   ApiPublicWebhooksCashfreeRoute: ApiPublicWebhooksCashfreeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,

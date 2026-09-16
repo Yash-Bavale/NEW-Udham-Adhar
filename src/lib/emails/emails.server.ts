@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { renderTemplate, renderTemplateHtml } from "./smtp.server";
-import { isZohoAuthOrRateLimitError, sendViaZoho } from "./zoho-smtp.server";
+import { resolveMailProvider, sendViaActiveProvider, senderEmailFor, isProviderThrottleError } from "./transport.server";
 
 /**
  * Legacy → canonical template alias.
@@ -118,6 +118,8 @@ export async function enqueueEmailInternal(input: {
   attachments?: EmailAttachment[];
   requireImmediateSuccess?: boolean;
   allowWithoutTemplate?: boolean;
+  /** Set true for genuinely repeatable sends (manual resend, support replies). */
+  allowDuplicate?: boolean;
 }) {
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
@@ -163,12 +165,48 @@ export async function enqueueEmailInternal(input: {
     row.scheduled_at = scheduled;
     row.next_attempt_at = scheduled;
   }
+
+  // ── Duplicate guard ──
+  // Same template + same recipient + same order must not be queued twice.
+  // One-time-per-order templates (order confirmation, completion) are blocked
+  // forever; everything else is blocked inside a short window so that a retry,
+  // a double webhook, or a double click can't deliver the same mail twice.
+  if (!input.allowDuplicate && templateCode) {
+    const ONCE_PER_ORDER = new Set(["E001", "E007"]);
+    const forever = ONCE_PER_ORDER.has(templateCode);
+    let q = supabaseAdmin
+      .from("email_queue")
+      .select("id")
+      .eq("template_code", templateCode)
+      .eq("to_email", row.to_email as string)
+      .in("status", ["queued", "sending", "sent", "failed"])
+      .limit(1);
+    q = input.applicationId
+      ? q.eq("application_id", input.applicationId)
+      : input.leadId
+        ? q.eq("lead_id", input.leadId)
+        : q.eq("subject", input.subject);
+    if (!forever) q = q.gte("created_at", new Date(Date.now() - 10 * 60_000).toISOString());
+    const { data: dupe } = await q;
+    if (dupe && dupe.length > 0) {
+      console.warn(`[emails] duplicate suppressed: ${templateCode} -> ${row.to_email}`);
+      return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+    }
+  }
+
   const { data: inserted, error } = await supabaseAdmin
     .from("email_queue")
     .insert(row as never)
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Unique index caught a simultaneous duplicate enqueue — treat as skipped.
+    if ((error as { code?: string }).code === "23505") {
+      console.warn(`[emails] duplicate suppressed (db): ${templateCode} -> ${row.to_email}`);
+      return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
+    }
+    throw new Error(error.message);
+  }
 
   const baseResult = {
     queueId: (inserted?.id as string | undefined) ?? null,
@@ -679,7 +717,18 @@ async function sendQueueRow(row: QueueRow) {
     .maybeSingle();
   if (!settings?.is_enabled) return { ok: false, error: "smtp_disabled" };
 
-  await supabaseAdmin.from("email_queue").update({ status: "sending" }).eq("id", row.id);
+  // Atomic claim — only one worker may move a row out of queued/failed into
+  // `sending`. Without this, the cron worker and a manual "process now" can both
+  // pick the same row and deliver the same email twice.
+  const { data: claimed } = await supabaseAdmin
+    .from("email_queue")
+    .update({ status: "sending" })
+    .eq("id", row.id)
+    .in("status", ["queued", "failed"])
+    .select("id");
+  if (!claimed || claimed.length === 0) {
+    return { ok: true, skipped: true, error: "already_claimed" };
+  }
 
   const attempt = (row.attempts ?? 0) + 1;
   const fromName = settings.from_name || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services";
@@ -691,6 +740,7 @@ async function sendQueueRow(row: QueueRow) {
   let sentReferences: string | null = null;
   let sentCustomerId: string | null = null;
   let sentFromEmail: string | null = null;
+  const provider = await resolveMailProvider();
 
   try {
     const recipient = row.to_email.toLowerCase().trim();
@@ -728,7 +778,7 @@ async function sendQueueRow(row: QueueRow) {
         ? ((variables as { __message_id?: string }).__message_id as string)
         : undefined;
 
-    const res = await sendViaZoho({
+    const res = await sendViaActiveProvider({
       to: recipient,
       subject: row.subject,
       html: row.body_html,
@@ -753,13 +803,13 @@ async function sendQueueRow(row: QueueRow) {
     });
 
     if (res.ok) {
-      smtpResponse = `[zoho] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
+      smtpResponse = `[${provider}] ${res.messageId ?? "ok"} :: ${(res.response ?? "").slice(0, 200)}`;
       ok = true;
       sentMessageId = res.messageId ?? null;
       sentInReplyTo = parentMessageId;
       sentReferences = referencesHeader ?? null;
       sentCustomerId = customerId;
-      sentFromEmail = "help@businesshelpservices.com";
+      sentFromEmail = senderEmailFor(provider);
 
       // Mirror to email_send_log (canonical dashboard table).
       try {
@@ -778,7 +828,9 @@ async function sendQueueRow(row: QueueRow) {
         } as never);
       } catch { /* non-fatal */ }
     } else {
-      lastError = `[zoho] ${res.error ?? "unknown"}`;
+      lastError = res.error?.startsWith(`[${provider}]`)
+        ? res.error
+        : `[${provider}] ${res.error ?? "unknown"}`;
       try {
         await supabaseAdmin.from("email_send_log").insert({
           message_id: `bhs-${row.id}-${attempt}`,
@@ -853,7 +905,9 @@ async function sendQueueRow(row: QueueRow) {
   }
 
   const errMsg = (lastError ?? "Unknown error").slice(0, 1000);
-  if (isZohoAuthOrRateLimitError(errMsg)) {
+  if (isProviderThrottleError(errMsg)) {
+    // Provider-side block: defer WITHOUT consuming a retry attempt so the email
+    // is never dead-lettered because the mail service was throttling us.
     const next = new Date(Date.now() + 30 * 60_000).toISOString();
     await Promise.all([
       supabaseAdmin
@@ -866,7 +920,7 @@ async function sendQueueRow(row: QueueRow) {
         to_email: row.to_email,
         subject: row.subject,
         status: "failed",
-        smtp_response: `[zoho] deferred`,
+        smtp_response: `[${provider}] deferred`,
         error_message: errMsg,
         attempt,
         lead_id: row.lead_id,
@@ -890,7 +944,7 @@ async function sendQueueRow(row: QueueRow) {
       to_email: row.to_email,
       subject: row.subject,
       status: "failed",
-          smtp_response: `[zoho] failed`,
+      smtp_response: `[${provider}] failed`,
       error_message: errMsg,
       attempt,
       lead_id: row.lead_id,

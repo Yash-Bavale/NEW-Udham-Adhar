@@ -43,18 +43,33 @@ export const listMyNotifications = createServerFn({ method: "GET" })
     return { rows: (rows ?? []) as Notification[] };
   });
 
-export const getUnreadNotificationCount = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { count, error } = await supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .is("read_at", null);
-    if (error) throw new Error(error.message);
-    return { count: count ?? 0 };
+// Polled by the admin bell; must never 500 when the caller has no session
+// (sign-out, expired token, SSR) — it simply reports zero unread.
+export const getUnreadNotificationCount = createServerFn({ method: "GET" }).handler(async () => {
+  const { getRequest } = await import("@tanstack/react-start/server");
+  const authHeader = getRequest()?.headers?.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
+  if (!token || !url || !key) return { count: 0 };
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
   });
+  const { data, error: claimsError } = await supabase.auth.getClaims(token);
+  const userId = data?.claims?.sub;
+  if (claimsError || !userId) return { count: 0 };
+
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+  if (error) return { count: 0 };
+  return { count: count ?? 0 };
+});
 
 export const markNotificationRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
