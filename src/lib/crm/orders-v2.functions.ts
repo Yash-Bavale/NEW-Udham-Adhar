@@ -465,8 +465,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(50),
         fulfillmentStatus: z.string().optional(),
-        serviceId: z.string().uuid().optional(),
-        assignedTo: z.string().uuid().optional(),
+        serviceId: z.string().optional(),
+        assignedTo: z.string().optional(),
         paymentStatus: z.string().optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
@@ -526,13 +526,17 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         )
         .eq("is_deleted", false);
 
-      if (data.serviceId && data.serviceId !== "all") {
+      if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
         query = query.eq("service_id", data.serviceId);
       }
       if (!isAdmin) {
         query = query.eq("assigned_to", context.userId);
-      } else if (data.assignedTo && data.assignedTo !== "all") {
-        query = query.eq("assigned_to", data.assignedTo);
+      } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
+        if (data.assignedTo === "unassigned") {
+          query = query.is("assigned_to", null);
+        } else {
+          query = query.eq("assigned_to", data.assignedTo);
+        }
       }
       if (fromIso) query = query.gte("created_at", fromIso);
       if (toIso) query = query.lte("created_at", toIso);
@@ -551,7 +555,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     let q = buildBaseQuery();
 
     // Stage filter mapping
-    if (data.stage && data.stage !== "all") {
+    if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
       switch (data.stage) {
         case "payment_done":
           q = q.eq("fulfillment_status", "order_received").is("form_submitted_at", null);
@@ -563,7 +567,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.eq("fulfillment_status", "form_submitted");
           break;
         case "technical_delay":
-          q = q.in("fulfillment_status", ["technical_delay", "technical_hold"]);
+          q = q.or("fulfillment_status.in.(technical_delay,technical_hold),workflow_status.in.(government_portal_pending,technical_hold)");
           break;
         case "customer_delay":
           q = q.eq("fulfillment_status", "customer_delay");
@@ -578,25 +582,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.in("fulfillment_status", ["government_processing", "application_submitted", "under_processing", "awaiting_govt"]);
           break;
         case "certificate_ready":
-          q = q.eq("fulfillment_status", "application_approved");
+          q = q.or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
           break;
         case "completed":
-          q = q.in("fulfillment_status", ["completed", "order_completed"]);
+          q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
           break;
         case "closed":
           q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
-          break;
-        case "consultation_pending":
-          q = q.in("application_status", ["consultation_pending", "consultation_scheduled"]);
-          break;
-        case "consultation_completed":
-          q = q.eq("fulfillment_status", "consultation_completed");
           break;
         default:
           q = q.eq("fulfillment_status", data.stage as never);
           break;
       }
-    } else if (data.fulfillmentStatus && data.fulfillmentStatus !== "all") {
+    } else if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
       q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
     }
 

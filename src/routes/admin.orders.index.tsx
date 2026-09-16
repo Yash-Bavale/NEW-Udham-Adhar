@@ -83,15 +83,9 @@ const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> =
   { id: "under_review", label: "Under Review", tone: "violet" },
   { id: "in_progress", label: "In Progress", tone: "violet" },
   { id: "submitted_to_govt", label: "Submitted to Govt", tone: "indigo" },
-  { id: "under_processing", label: "Under Processing", tone: "violet" },
   { id: "certificate_ready", label: "Certificate Ready", tone: "emerald" },
   { id: "completed", label: "Completed", tone: "emerald" },
   { id: "closed", label: "Order Closed", tone: "rose" },
-  { id: "consultation_pending", label: "Consultation Pending", tone: "amber" },
-  { id: "consultation_completed", label: "Consultation Completed", tone: "emerald" },
-  { id: "refund_requested", label: "Refund Requested", tone: "rose" },
-  { id: "refunded", label: "Refunded", tone: "slate" },
-  { id: "uninterested", label: "Uninterested", tone: "rose" },
 ];
 
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
