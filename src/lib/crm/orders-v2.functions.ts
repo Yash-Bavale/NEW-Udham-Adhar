@@ -350,6 +350,111 @@ async function ensurePaidOrdersIntegrated(admin: any) {
   }
 }
 
+export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
+
+const CLOSED_FS = new Set<string>([
+  "application_rejected", "certificate_rejected", "order_closed", "cancelled",
+]);
+const COMPLETED_FS = new Set<string>([
+  "consultation_completed", "order_completed", "completed",
+]);
+const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
+
+export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
+  const fs = row.fulfillment_status ?? "";
+  if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
+  if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
+  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
+  if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
+  return "pending";
+}
+
+export function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage }): boolean {
+  const b = bucketOfRow(row);
+  return b === "pending" || b === "needs_action";
+}
+
+export function getOrderActionStatus(order: { fulfillment_status?: string | null; stage: OrderStage; form_link_sent_at?: string | null }): { label: string; tone: "red" | "green" | "blue" } {
+  const fs = order.fulfillment_status ?? "order_received";
+  const stage = order.stage;
+
+  if (fs === "order_closed" || fs === "cancelled" || stage === "closed") {
+    return { label: "Order Closed", tone: "green" };
+  }
+
+  const greenStatuses = new Set([
+    "application_approved",
+    "consultation_completed",
+    "order_completed",
+    "completed",
+  ]);
+  if (greenStatuses.has(fs) || stage === "completed") {
+    return { label: "Completed", tone: "green" };
+  }
+
+  const blueStatuses = new Set([
+    "government_processing",
+    "technical_delay",
+    "customer_delay",
+    "application_rejected",
+    "certificate_rejected",
+    "under_processing",
+    "application_submitted",
+    "verification_pending",
+    "documents_received",
+    "waiting_for_customer_submission",
+    "awaiting_customer_form",
+    "form_link_sent",
+    "form_pending",
+  ]);
+  const blueStages = new Set([
+    "technical_delay",
+    "customer_delay",
+    "consultation_completed",
+    "under_review",
+    "in_progress",
+    "submitted_to_govt",
+    "under_processing",
+    "certificate_ready",
+    "refunded",
+    "refund_requested",
+  ]);
+
+  if (blueStatuses.has(fs) || blueStages.has(stage) || Boolean(order.form_link_sent_at)) {
+    return { label: "Action Taken", tone: "blue" };
+  }
+
+  return { label: "Action Required", tone: "red" };
+}
+
+export function daysSince(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return 0;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+function parseDateBounds(dateFrom?: string, dateTo?: string) {
+  let fromIso: string | undefined;
+  let toIso: string | undefined;
+  if (dateFrom) {
+    if (dateFrom.includes("T")) {
+      fromIso = new Date(dateFrom).toISOString();
+    } else {
+      fromIso = new Date(`${dateFrom}T00:00:00+05:30`).toISOString();
+    }
+  }
+  if (dateTo) {
+    if (dateTo.includes("T")) {
+      toIso = new Date(dateTo).toISOString();
+    } else {
+      toIso = new Date(`${dateTo}T23:59:59.999+05:30`).toISOString();
+    }
+  }
+  return { fromIso, toIso };
+}
+
 /* ----------------------------- listOrders ------------------------------- */
 
 export const listOrdersV2 = createServerFn({ method: "POST" })
@@ -358,7 +463,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     z
       .object({
         page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(100).default(25),
+        pageSize: z.number().int().min(1).max(100).default(50),
         fulfillmentStatus: z.string().optional(),
         serviceId: z.string().uuid().optional(),
         assignedTo: z.string().uuid().optional(),
@@ -366,6 +471,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
         search: z.string().max(120).optional(),
+        bucket: z.string().optional().default("all"),
+        stage: z.string().optional(),
+        actionStatus: z.string().optional().default("all"),
+        pendingAge: z.string().optional(),
+        customDays: z.string().optional(),
+        sortField: z.enum(["created_at", "stage", "stage_journey"]).optional().default("created_at"),
         sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
       })
       .parse(i ?? {}),
@@ -377,13 +488,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const perm = await getUserModulePermission(context.supabase, context.userId, "orders");
 
     if (!perm.canView) {
-      return { rows: [], total: 0 };
+      return {
+        rows: [],
+        total: 0,
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
+        ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
+        page: data.page,
+        pageSize: data.pageSize,
+      };
     }
 
     // Fire self-healing check in background non-blocking so read response is instant
     ensurePaidOrdersIntegrated(admin).catch((err) => {
       console.error("[listOrdersV2] background reconciliation error:", err);
     });
+
+    const { fromIso, toIso } = parseDateBounds(data.dateFrom, data.dateTo);
 
     let matchingLeadIds: string[] | null = null;
     if (data.search && data.search.trim()) {
@@ -392,7 +512,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .from("leads")
         .select("id")
         .or(`name.ilike.${s},mobile.ilike.${s},email.ilike.${s},lead_code.ilike.${s}`)
-        .limit(200);
+        .limit(300);
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
@@ -400,20 +520,23 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       .from("applications")
       .select(
         "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code",
-        { count: "exact" },
       )
       .eq("is_deleted", false)
       .order("created_at", { ascending: data.sortOrder === "asc" });
 
-    if (data.fulfillmentStatus) q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
-    if (data.serviceId) q = q.eq("service_id", data.serviceId);
+    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all") {
+      q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
+    }
+    if (data.serviceId && data.serviceId !== "all") {
+      q = q.eq("service_id", data.serviceId);
+    }
     if (!isAdmin) {
       q = q.eq("assigned_to", context.userId);
-    } else if (data.assignedTo) {
+    } else if (data.assignedTo && data.assignedTo !== "all") {
       q = q.eq("assigned_to", data.assignedTo);
     }
-    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+    if (fromIso) q = q.gte("created_at", fromIso);
+    if (toIso) q = q.lte("created_at", toIso);
 
     if (data.search && data.search.trim()) {
       const term = `%${data.search.trim()}%`;
@@ -424,24 +547,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Fetch the exact count first so we never send a .range() past the
-    // end of the result set (PostgREST replies 416 "range not satisfiable").
-    const countQ = q.range(0, 0);
-    const { count, error: countErr } = await countQ;
-    if (countErr) throw new Error(countErr.message);
-    const total = count ?? 0;
-    if (total === 0) {
-      return { rows: [], total: 0, page: data.page, pageSize: data.pageSize };
-    }
-    const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
-    const page = Math.min(Math.max(1, data.page), maxPage);
-    const from = (page - 1) * data.pageSize;
-    const { data: apps, error } = await q.range(from, Math.min(from + data.pageSize, total) - 1);
+    const { data: apps, error } = await q.limit(5000);
     if (error) throw new Error(error.message);
     const appList = apps ?? [];
 
     if (appList.length === 0) {
-      return { rows: [], total, page, pageSize: data.pageSize };
+      return {
+        rows: [],
+        total: 0,
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
+        ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
+        page: data.page,
+        pageSize: data.pageSize,
+      };
     }
 
     const ids = appList.map((a) => a.id);
@@ -495,7 +613,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    let rows = appList.map((a) => {
+    let allOrderRows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
       const effectiveSvcId = a.service_id || lead?.service_id || null;
@@ -506,6 +624,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
+      const stage = computeOrderStage(
+        { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
+        { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
+      );
       return {
         id: a.id,
         application_code: a.application_code,
@@ -524,20 +646,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         payment_status: rollupPaymentStatus(payments, total),
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
-        stage: computeOrderStage(
-          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
-        ),
+        stage,
       };
     });
 
-    // Deduplicate orders by lead_id so multiple applications created for the same lead never duplicate in UI.
-    // Automatically soft-delete any duplicate application rows in DB.
+    // Deduplicate orders by lead_id
     const seenLeadIds = new Set<string>();
-    const uniqueRows: typeof rows = [];
+    const uniqueRows: typeof allOrderRows = [];
     const duplicateAppIdsToDelete: string[] = [];
 
-    for (const r of rows) {
+    for (const r of allOrderRows) {
       if (r.lead_id) {
         if (seenLeadIds.has(r.lead_id)) {
           duplicateAppIdsToDelete.push(r.id);
@@ -556,11 +674,144 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       });
     }
 
-    rows = uniqueRows;
+    // Compute GLOBAL counts across all deduplicated rows matching base filters
+    const counts: Record<Bucket, number> & { actionRequired: number; processed: number } = {
+      all: uniqueRows.length,
+      needs_action: 0,
+      pending: 0,
+      completed: 0,
+      closed: 0,
+      exception: 0,
+      actionRequired: 0,
+      processed: 0,
+    };
+    const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
-    if (data.paymentStatus) rows = rows.filter((r) => r.payment_status === data.paymentStatus);
+    for (const r of uniqueRows) {
+      const b = bucketOfRow(r);
+      counts[b]++;
+      const act = getOrderActionStatus(r);
+      if (act.tone === "red") counts.actionRequired++;
+      else counts.processed++;
 
-    return { rows, total: count ? Math.max(0, count - duplicateAppIdsToDelete.length) : uniqueRows.length, page: data.page, pageSize: data.pageSize };
+      if (isPendingRow(r)) {
+        const d = daysSince(r.created_at);
+        if (d >= 7) ageBuckets.older++;
+        else if (d >= 3) ageBuckets.d7++;
+        else if (d >= 2) ageBuckets.d3++;
+        else if (d >= 1) ageBuckets.d2++;
+        else ageBuckets.d1++;
+      }
+    }
+
+    // Compute minDays for pendingAge
+    let minDays: number | null = null;
+    if (data.pendingAge && data.pendingAge !== "any") {
+      if (data.pendingAge === "custom" && data.customDays) {
+        const n = parseInt(data.customDays, 10);
+        if (Number.isFinite(n) && n > 0) minDays = n;
+      } else {
+        const n = parseInt(data.pendingAge, 10);
+        if (Number.isFinite(n) && n > 0) minDays = n;
+      }
+    }
+
+    // Filter by view criteria
+    let filtered = uniqueRows;
+
+    // 1. Bucket filter
+    if (data.bucket && data.bucket !== "all") {
+      filtered = filtered.filter((r) => bucketOfRow(r) === data.bucket);
+    }
+
+    // 2. Stage filter
+    if (data.stage && data.stage !== "all") {
+      filtered = filtered.filter((r) => r.stage === data.stage);
+    }
+
+    // 3. Action Status filter
+    if (data.actionStatus && data.actionStatus !== "all") {
+      filtered = filtered.filter((r) => {
+        const st = getOrderActionStatus(r);
+        if (data.actionStatus === "action_required") return st.tone === "red";
+        if (data.actionStatus === "processed") return st.tone === "green" || st.tone === "blue";
+        return true;
+      });
+    }
+
+    // 4. Payment status filter
+    if (data.paymentStatus && data.paymentStatus !== "all") {
+      filtered = filtered.filter((r) => r.payment_status === data.paymentStatus);
+    }
+
+    // 5. Pending age filter
+    if (minDays != null) {
+      filtered = filtered.filter((r) => {
+        if (!isPendingRow(r)) return true;
+        return daysSince(r.created_at) >= minDays!;
+      });
+    }
+
+    // 6. Search stage matching (if user searches a stage label directly like "Payment Done")
+    if (data.search && data.search.trim()) {
+      const qLower = data.search.trim().toLowerCase();
+      filtered = filtered.filter((r) => {
+        const code = (r.application_code ?? "").toLowerCase();
+        const cName = (r.customer_name ?? "").toLowerCase();
+        const cMob = (r.customer_mobile ?? "").toLowerCase();
+        const cEmail = (r.customer_email ?? "").toLowerCase();
+        const lCode = (r.lead_code ?? "").toLowerCase();
+        const sName = (r.service_name ?? "").toLowerCase();
+        const stageKey = (r.stage ?? "").toLowerCase();
+        const stageLabel = (STAGE_META[r.stage as OrderStage]?.label ?? "").toLowerCase();
+        return (
+          code.includes(qLower) ||
+          cName.includes(qLower) ||
+          cMob.includes(qLower) ||
+          cEmail.includes(qLower) ||
+          lCode.includes(qLower) ||
+          sName.includes(qLower) ||
+          stageKey.includes(qLower) ||
+          stageLabel.includes(qLower)
+        );
+      });
+    }
+
+    // Sort
+    const sortOrder = data.sortOrder === "asc" ? "asc" : "desc";
+    const sortField = data.sortField ?? "created_at";
+
+    filtered.sort((a, b) => {
+      if (sortField === "stage") {
+        const labelA = STAGE_META[a.stage as OrderStage]?.label ?? a.stage;
+        const labelB = STAGE_META[b.stage as OrderStage]?.label ?? b.stage;
+        const cmp = labelA.localeCompare(labelB);
+        return sortOrder === "asc" ? cmp : -cmp;
+      }
+      if (sortField === "stage_journey") {
+        const orderA = STAGE_META[a.stage as OrderStage]?.order ?? 99;
+        const orderB = STAGE_META[b.stage as OrderStage]?.order ?? 99;
+        const cmp = orderA - orderB;
+        return sortOrder === "asc" ? cmp : -cmp;
+      }
+      // default: created_at
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
+    });
+
+    const total = filtered.length;
+    const from = (data.page - 1) * data.pageSize;
+    const paginatedRows = filtered.slice(from, from + data.pageSize);
+
+    return {
+      rows: paginatedRows,
+      total,
+      counts,
+      ageBuckets,
+      page: data.page,
+      pageSize: data.pageSize,
+    };
   });
 
 /* ----------------------------- getOrderDetail --------------------------- */

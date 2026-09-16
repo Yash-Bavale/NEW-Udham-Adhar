@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert } from "lucide-react";
-import { formatIST } from "@/lib/datetime";
+import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
@@ -65,6 +65,27 @@ const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "exception",    label: "Exception" },
 ];
 
+const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> = [
+  { id: "all", label: "All Stages", tone: "slate" },
+  { id: "payment_done", label: "Payment Done", tone: "emerald" },
+  { id: "form_not_submitted", label: "Form Not Submitted", tone: "amber" },
+  { id: "form_submitted", label: "Form Submitted", tone: "indigo" },
+  { id: "technical_delay", label: "Technical Delay", tone: "sky" },
+  { id: "customer_delay", label: "Customer Delay", tone: "amber" },
+  { id: "under_review", label: "Under Review", tone: "violet" },
+  { id: "in_progress", label: "In Progress", tone: "violet" },
+  { id: "submitted_to_govt", label: "Submitted to Govt", tone: "indigo" },
+  { id: "under_processing", label: "Under Processing", tone: "violet" },
+  { id: "certificate_ready", label: "Certificate Ready", tone: "emerald" },
+  { id: "completed", label: "Completed", tone: "emerald" },
+  { id: "closed", label: "Order Closed", tone: "rose" },
+  { id: "consultation_pending", label: "Consultation Pending", tone: "amber" },
+  { id: "consultation_completed", label: "Consultation Completed", tone: "emerald" },
+  { id: "refund_requested", label: "Refund Requested", tone: "rose" },
+  { id: "refunded", label: "Refunded", tone: "slate" },
+  { id: "uninterested", label: "Uninterested", tone: "rose" },
+];
+
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
 const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
   { id: "any",    label: "Any age" },
@@ -113,11 +134,13 @@ function OrdersListPage() {
   const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
   const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
   const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
+  const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
   const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
+  const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(savedState?.sortOrder ?? "desc");
   const [page, setPage] = useState<number>(savedState?.page ?? 1);
   const pageSize = 50;
@@ -127,10 +150,10 @@ function OrdersListPage() {
   useEffect(() => {
     saveModuleFilterState("admin.orders", {
       search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
-      paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge,
-      customDays, sortOrder, page,
+      paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge,
+      customDays, sortField, sortOrder, page,
     });
-  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortOrder, page]);
+  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
 
   // Debounce search input by 350ms
   useEffect(() => {
@@ -147,7 +170,7 @@ function OrdersListPage() {
       return;
     }
     setPage(1);
-  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, dateFrom, dateTo, bucket, pendingAge, customDays]);
+  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
 
   // Listener to reset all filters when clicking "Orders" in leftbar
   useEffect(() => {
@@ -160,11 +183,13 @@ function OrdersListPage() {
       setAssignedTo("all");
       setPaymentStatus("all");
       setActionStatusFilter("all");
+      setStageFilter("all");
       setDateFrom("");
       setDateTo("");
       setBucket("all");
       setPendingAge("any");
       setCustomDays("");
+      setSortField("created_at");
       setSortOrder("desc");
       setPage(1);
       const container = document.getElementById("admin-main-scroll");
@@ -180,19 +205,39 @@ function OrdersListPage() {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     const flt = sp.get("filter");
-    if (!flt) return;
-    switch (flt) {
-      case "pending": setBucket("pending"); break;
-      case "closed": setBucket("closed"); break;
-      case "completed": setBucket("completed"); break;
-      case "delayed_3d": setBucket("pending"); setPendingAge("3"); break;
-      case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
-      case "not_contacted": setBucket("needs_action"); break;
-      case "not_contacted_5h": setBucket("needs_action"); break;
-      case "technical_delay": setFulfillmentStatus("technical_delay"); break;
-      case "customer_delay": setFulfillmentStatus("customer_delay"); break;
-      case "form_not_submitted": setFulfillmentStatus("form_pending"); break;
+    if (flt) {
+      switch (flt) {
+        case "pending": setBucket("pending"); break;
+        case "closed": setBucket("closed"); break;
+        case "completed": setBucket("completed"); break;
+        case "delayed_3d": setBucket("pending"); setPendingAge("3"); break;
+        case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
+        case "not_contacted": setBucket("needs_action"); break;
+        case "not_contacted_5h": setBucket("needs_action"); break;
+        case "technical_delay": setFulfillmentStatus("technical_delay"); setStageFilter("technical_delay"); break;
+        case "customer_delay": setFulfillmentStatus("customer_delay"); setStageFilter("customer_delay"); break;
+        case "form_not_submitted": setFulfillmentStatus("form_pending"); setStageFilter("form_not_submitted"); break;
+      }
     }
+    const presetParam = sp.get("preset");
+    if (presetParam) {
+      const now = new Date();
+      if (presetParam === "today") {
+        const todayKey = istDateKey(now);
+        setDateFrom(todayKey);
+        setDateTo(todayKey);
+      } else if (presetParam === "yesterday") {
+        const yestKey = istDateKey(new Date(now.getTime() - 86400000));
+        setDateFrom(yestKey);
+        setDateTo(yestKey);
+      }
+    }
+    const df = sp.get("dateFrom");
+    const dt = sp.get("dateTo");
+    if (df) setDateFrom(df);
+    if (dt) setDateTo(dt);
+    const stg = sp.get("stage");
+    if (stg) setStageFilter(stg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -203,8 +248,11 @@ function OrdersListPage() {
     if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
     return [];
   }, [staffData]);
-  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });  const queryPayload = useMemo(() => ({
-    page, pageSize,
+  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
+
+  const queryPayload = useMemo(() => ({
+    page,
+    pageSize,
     fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
     serviceId: serviceId === "all" ? undefined : serviceId,
     assignedTo: assignedTo === "all" ? undefined : assignedTo,
@@ -212,17 +260,36 @@ function OrdersListPage() {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     search: debouncedSearch || undefined,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch]);
+    bucket: bucket || "all",
+    stage: stageFilter === "all" ? undefined : stageFilter,
+    actionStatus: actionStatusFilter || "all",
+    pendingAge: pendingAge === "any" ? undefined : pendingAge,
+    customDays: customDays || undefined,
+    sortField,
+    sortOrder,
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
-  const allRows = (data?.rows ?? []) as any[];
+  const rows = (data?.rows ?? []) as any[];
+  const total = data?.total ?? 0;
+  const counts = data?.counts ?? {
+    all: 0,
+    needs_action: 0,
+    pending: 0,
+    completed: 0,
+    closed: 0,
+    exception: 0,
+    actionRequired: 0,
+    processed: 0,
+  };
+  const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
   // Preserve scroll position when navigating back from order detail view
   usePreserveScroll("admin.orders", !isLoading);
@@ -237,16 +304,16 @@ function OrdersListPage() {
 
   // Background prefetch for next page
   useEffect(() => {
-    const totalPages = Math.ceil((data?.total ?? 0) / pageSize);
+    const totalPages = Math.ceil(total / pageSize);
     if (page < totalPages) {
       const nextPagePayload = { ...queryPayload, page: page + 1 };
       qc.prefetchQuery({
-        queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo],
+        queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
         queryFn: () => listFn({ data: nextPagePayload }),
         staleTime: 30 * 1000,
       });
     }
-  }, [page, data?.total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, qc, listFn, pageSize]);
+  }, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
 
   const isAdmin = role.hasAny(["admin", "super_admin"]);
   const bulkAssignFn = useServerFn(bulkAssignOrders);
@@ -275,72 +342,9 @@ function OrdersListPage() {
   // Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
   const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
-  // Compute pending-age threshold in days from filter selection.
-  const minDays: number | null = useMemo(() => {
-    if (pendingAge === "any") return null;
-    if (pendingAge === "custom") {
-      const n = parseInt(customDays, 10);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    }
-    return parseInt(pendingAge, 10);
-  }, [pendingAge, customDays]);
-
-  const ageFiltered = useMemo(() => {
-    if (minDays == null) return allRows;
-    return allRows.filter((r) => {
-      if (!isPendingRow(r)) return true;
-      return daysSince(r.created_at) >= minDays;
-    });
-  }, [allRows, minDays]);
-
-  const counts = useMemo(() => {
-    const c: Record<Bucket, number> = { all: ageFiltered.length, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0 };
-    for (const r of ageFiltered) c[bucketOfRow(r)]++;
-    return c;
-  }, [ageFiltered]);
-
-  const ageBuckets = useMemo(() => {
-    const b = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
-    for (const r of ageFiltered) {
-      if (!isPendingRow(r)) continue;
-      const d = daysSince(r.created_at);
-      if (d >= 7) b.older++;
-      else if (d >= 3) b.d7++;
-      else if (d >= 2) b.d3++;
-      else if (d >= 1) b.d2++;
-      else b.d1++;
-    }
-    return b;
-  }, [ageFiltered]);
-
-  const bucketRows = bucket === "all" ? ageFiltered : ageFiltered.filter((r) => bucketOfRow(r) === bucket);
-
-  const rows = useMemo(() => {
-    if (actionStatusFilter === "all") return bucketRows;
-    return bucketRows.filter((r) => {
-      const st = getOrderActionStatus(r);
-      if (actionStatusFilter === "action_required") return st.tone === "red";
-      if (actionStatusFilter === "processed") return st.tone === "green" || st.tone === "blue";
-      return true;
-    });
-  }, [bucketRows, actionStatusFilter]);
-
-  // Frontend in-memory sorting for current page of orders (instant without backend request)
-  const sortedRows = useMemo(() => {
-    const list = [...rows];
-    if (sortOrder === "asc") {
-      list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    } else {
-      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    return list;
-  }, [rows, sortOrder]);
-
-  const total = data?.total ?? 0;
-
   const groups = useMemo(() => {
     const g = new Map<string, any[]>();
-    for (const r of sortedRows) {
+    for (const r of rows) {
       const d = new Date(r.created_at);
       const key = d.toDateString();
       const arr = g.get(key) ?? [];
@@ -348,7 +352,7 @@ function OrdersListPage() {
       g.set(key, arr);
     }
     return Array.from(g.entries());
-  }, [sortedRows]);
+  }, [rows]);
 
   const isFilterActive =
     search !== "" ||
@@ -357,6 +361,7 @@ function OrdersListPage() {
     assignedTo !== "all" ||
     paymentStatus !== "all" ||
     actionStatusFilter !== "all" ||
+    stageFilter !== "all" ||
     dateFrom !== "" ||
     dateTo !== "" ||
     pendingAge !== "any" ||
@@ -364,16 +369,30 @@ function OrdersListPage() {
 
   const resetFilters = () => {
     setSearch("");
+    setDebouncedSearch("");
     setFulfillmentStatus("all");
     setServiceId("all");
     setAssignedTo("all");
     setPaymentStatus("all");
     setActionStatusFilter("all");
+    setStageFilter("all");
     setDateFrom("");
     setDateTo("");
     setPendingAge("any");
     setCustomDays("");
+    setSortField("created_at");
+    setSortOrder("desc");
     setBucket("all");
+    setPage(1);
+  };
+
+  const handleSortToggle = (field: "created_at" | "stage") => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+    } else {
+      setSortField(field);
+      setSortOrder(field === "created_at" ? "desc" : "asc");
+    }
   };
 
   return (
@@ -427,6 +446,32 @@ function OrdersListPage() {
             )}
           </div>
 
+          {/* Stage Filter */}
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="All Stages" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {STAGE_FILTER_OPTIONS.map((st) => (
+                <SelectItem key={st.id} value={st.id}>
+                  <div className="flex items-center gap-1.5">
+                    {st.id !== "all" && (
+                      <span className={`size-2 rounded-full ${
+                        st.tone === "emerald" ? "bg-emerald-500" :
+                        st.tone === "amber" ? "bg-amber-500" :
+                        st.tone === "indigo" ? "bg-indigo-500" :
+                        st.tone === "violet" ? "bg-violet-500" :
+                        st.tone === "sky" ? "bg-sky-500" :
+                        st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
+                      }`} />
+                    )}
+                    <span>{st.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {/* Action Status Filter */}
           <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
             <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
@@ -476,12 +521,17 @@ function OrdersListPage() {
 
           <DateRangePicker
             value={{
-              from: dateFrom ? new Date(dateFrom) : undefined,
-              to: dateTo ? new Date(dateTo) : undefined,
+              from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+              to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
             }}
             onChange={(range) => {
-              setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
-              setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+              if (!range.from) {
+                setDateFrom("");
+                setDateTo("");
+              } else {
+                setDateFrom(istDateKey(range.from));
+                setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+              }
             }}
           />
 
@@ -506,22 +556,40 @@ function OrdersListPage() {
               className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
             />
           )}
-          {/* Sort Order */}
-          <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as "asc" | "desc")}>
-            <SelectTrigger className="h-9 w-[145px] text-xs bg-slate-50/50 border-slate-200">
+          {/* Sort Selector */}
+          <Select
+            value={
+              sortField === "created_at"
+                ? sortOrder === "desc" ? "created_desc" : "created_asc"
+                : sortField === "stage"
+                ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
+                : "stage_journey_asc"
+            }
+            onValueChange={(v) => {
+              if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
+              else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
+              else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
+              else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
+              else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
+            }}
+          >
+            <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200">
               <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
               <SelectValue placeholder="Sort order" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="desc">Latest First (Newest)</SelectItem>
-              <SelectItem value="asc">Older First (Oldest)</SelectItem>
+              <SelectItem value="created_desc">Latest First (Newest)</SelectItem>
+              <SelectItem value="created_asc">Older First (Oldest)</SelectItem>
+              <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
+              <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
+              <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       {/* Pending ageing summary */}
-      {(bucket === "pending" || minDays != null) && (
+      {(bucket === "pending" || pendingAge !== "any") && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
           <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
           <AgeChip label="< 1d" n={ageBuckets.d1} />
@@ -549,7 +617,7 @@ function OrdersListPage() {
             >
               <span>{b.label}</span>
               <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
-                {counts[b.id]}
+                {counts[b.id] ?? 0}
               </span>
             </button>
           );
@@ -603,9 +671,9 @@ function OrdersListPage() {
                 {isAdmin && (
                   <th className="w-10 px-3 py-2.5 text-center">
                     <Checkbox
-                      checked={sortedRows.length > 0 && selectedOrderIds.length === sortedRows.length}
+                      checked={rows.length > 0 && selectedOrderIds.length === rows.length}
                       onCheckedChange={(checked) =>
-                        setSelectedOrderIds(checked ? sortedRows.map((r) => r.id) : [])
+                        setSelectedOrderIds(checked ? rows.map((r) => r.id) : [])
                       }
                       aria-label="Select all orders"
                     />
@@ -613,23 +681,46 @@ function OrdersListPage() {
                 )}
                 <th className="text-left font-semibold px-3 py-2.5">Order #</th>
                 <th
-                  onClick={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                  onClick={() => handleSortToggle("created_at")}
                   className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                  title="Click to toggle sorting (Latest vs Older orders)"
+                  title="Click to toggle sorting by Created time"
                 >
                   <div className="inline-flex items-center gap-1">
                     <span>Created</span>
-                    {sortOrder === "desc" ? (
-                      <ArrowDown className="w-3 h-3 text-indigo-600" />
+                    {sortField === "created_at" ? (
+                      sortOrder === "desc" ? (
+                        <ArrowDown className="w-3 h-3 text-indigo-600" />
+                      ) : (
+                        <ArrowUp className="w-3 h-3 text-indigo-600" />
+                      )
                     ) : (
-                      <ArrowUp className="w-3 h-3 text-indigo-600" />
+                      <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th className="text-left font-semibold px-3 py-2.5">Customer</th>
                 <th className="text-left font-semibold px-3 py-2.5">Service</th>
                 <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
-                <th className="text-left font-semibold px-3 py-2.5">Stage</th>
+                <th
+                  onClick={() => handleSortToggle("stage")}
+                  className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                  title="Click to toggle sorting by Stage"
+                >
+                  <div className="inline-flex items-center gap-1">
+                    <span>Stage</span>
+                    {sortField === "stage" ? (
+                      sortOrder === "desc" ? (
+                        <ArrowDown className="w-3 h-3 text-indigo-600" />
+                      ) : (
+                        <ArrowUp className="w-3 h-3 text-indigo-600" />
+                      )
+                    ) : sortField === "stage_journey" ? (
+                      <ArrowDown className="w-3 h-3 text-indigo-600" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                    )}
+                  </div>
+                </th>
                 {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
                 {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
               </tr>
@@ -660,7 +751,7 @@ function OrdersListPage() {
                           checked ? [...prev, id] : prev.filter((x) => x !== id),
                         )
                       }
-                      onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })}
+                      onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
                     />
                   ))}
                 </Fragment>
@@ -700,7 +791,7 @@ function OrdersListPage() {
                       checked ? [...prev, id] : prev.filter((x) => x !== id),
                     )
                   }
-                  onOpen={(id) => navigate({ to: "/admin/orders/$orderId", params: { orderId: id } })}
+                  onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
                 />
               ))}
             </div>
