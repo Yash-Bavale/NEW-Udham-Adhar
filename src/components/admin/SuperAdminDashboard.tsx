@@ -275,7 +275,7 @@ function ModernKpi({
   return body;
 }
 
-function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
+function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading: boolean; range: DashboardRange }) {
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -290,64 +290,73 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
   const revDelta = pctDelta(m.revenueInclTax, m.revenueInclTaxPrev);
   const convDelta = pctDelta(m.conversionRate, m.conversionRatePrev);
 
+  const rangeQuery = range.preset === "custom"
+    ? (range.fromIso && range.toIso ? `dateFrom=${range.fromIso.slice(0, 10)}&dateTo=${range.toIso.slice(0, 10)}` : "")
+    : `preset=${range.preset}`;
+
+  const withRange = (url: string) => {
+    if (!rangeQuery) return url;
+    return url.includes("?") ? `${url}&${rangeQuery}` : `${url}?${rangeQuery}`;
+  };
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
       <ModernKpi
         icon={<Users className="size-4" />} label="Unique Leads" value={fmtN(m.uniqueLeads)} tone="indigo" delta={leadsDelta}
-        href="/admin/leads"
+        href={withRange("/admin/leads")}
         subs={<>
-          <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" href="/admin/leads?filter=not_contacted" />
-          <StatChip label="Contacted" value={m.leadsContacted} tone="sky" href="/admin/leads?status=contacted" />
-          <StatChip label="Converted" value={m.leadsConverted} tone="emerald" href="/admin/leads?filter=converted" />
-          <StatChip label="Repeated" value={m.repeatedLeads} tone="amber" href="/admin/leads?filter=repeated" />
+          <StatChip label="Not Contacted" value={m.leadsNotContacted} tone="rose" href={withRange("/admin/leads?filter=not_contacted")} />
+          <StatChip label="Contacted" value={m.leadsContacted} tone="sky" href={withRange("/admin/leads?status=contacted")} />
+          <StatChip label="Converted" value={m.leadsConverted} tone="emerald" href={withRange("/admin/leads?filter=converted")} />
+          <StatChip label="Repeated" value={m.repeatedLeads} tone="amber" href={withRange("/admin/leads?filter=repeated")} />
         </>}
       />
       <ModernKpi
         icon={<ShoppingBag className="size-4" />} label="Orders" value={fmtN(m.paidOrders)} tone="emerald" delta={paidDelta}
-        href="/admin/orders"
+        href={withRange("/admin/orders")}
         subs={<>
-          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" href="/admin/orders?filter=pending" />
-          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" href="/admin/orders?filter=closed" />
+          <StatChip label="Pending" value={m.paidOrdersPending} tone="amber" href={withRange("/admin/orders?filter=pending")} />
+          <StatChip label="Closed" value={m.paidOrdersClosed} tone="emerald" href={withRange("/admin/orders?filter=closed")} />
         </>}
       />
       <ModernKpi
         icon={<AlertTriangle className="size-4" />} label="Technical Delay" value={fmtN(m.technicalDelay)}
         tone={m.technicalDelay > 0 ? "amber" : "slate"}
-        href="/admin/orders?filter=technical_delay"
+        href={withRange("/admin/orders?filter=technical_delay")}
         subs={<>
-          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href="/admin/orders?filter=customer_delay" />
-          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href="/admin/orders?filter=form_not_submitted" />
+          <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href={withRange("/admin/orders?filter=customer_delay")} />
+          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href={withRange("/admin/orders?filter=form_not_submitted")} />
         </>}
       />
       <ModernKpi
         icon={<Bell className="size-4" />} label="Order Alerts" value={fmtN(m.ordersDelayed3d)}
         tone={m.ordersDelayed7d > 0 ? "rose" : m.ordersDelayed3d > 0 ? "amber" : "slate"}
-        href="/admin/orders?filter=delayed_3d"
+        href={withRange("/admin/orders?filter=delayed_3d")}
         subs={<>
-          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" href="/admin/orders?filter=delayed_3d" />
-          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" href="/admin/orders?filter=delayed_7d" />
+          <StatChip label="3+ Days" value={m.ordersDelayed3d} tone="amber" href={withRange("/admin/orders?filter=delayed_3d")} />
+          <StatChip label="7+ Days" value={m.ordersDelayed7d} tone="rose" href={withRange("/admin/orders?filter=delayed_7d")} />
         </>}
       />
       <ModernKpi
         icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsActive)} tone={m.ticketsActive > 0 ? "sky" : "slate"} delta={ticketsDelta}
-        href="/admin/support/tickets"
+        href={withRange("/admin/support/tickets")}
         subs={<>
-          <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" href="/admin/support/tickets?status=closed" />
-          <StatChip label="Pending 3+d" value={m.ticketsPending3d} tone="rose" href="/admin/support/tickets?status=open" />
+          <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" href={withRange("/admin/support/tickets?status=closed")} />
+          <StatChip label="Pending 3+d" value={m.ticketsPending3d} tone="rose" href={withRange("/admin/support/tickets?status=open")} />
         </>}
       />
       <ModernKpi
         icon={<RefreshCw className="size-4" />} label="Refund Requests" value={fmtN(m.refundAccepted + m.refundRejected)} tone="violet"
-        href="/admin/refunds"
+        href={withRange("/admin/refunds")}
         subs={<>
-          <StatChip label="Accepted" value={m.refundAccepted} tone="emerald" href="/admin/refunds?status=approved" />
-          <StatChip label="Rejected" value={m.refundRejected} tone="rose" href="/admin/refunds?status=rejected" />
+          <StatChip label="Accepted" value={m.refundAccepted} tone="emerald" href={withRange("/admin/refunds?status=approved")} />
+          <StatChip label="Rejected" value={m.refundRejected} tone="rose" href={withRange("/admin/refunds?status=rejected")} />
         </>}
       />
       <ModernKpi
         icon={<Mail className="size-4" />} label="Email Delivery" value={fmtN(m.emailSent + m.emailQueued + m.emailFailed)}
         tone={m.emailFailed > 0 ? "rose" : "teal"}
-        href="/admin/help/email-matrix"
+        href={withRange("/admin/help/email-matrix")}
         subs={<>
           <StatChip label="Sent" value={m.emailSent} tone="emerald" />
           <StatChip label="Queued" value={m.emailQueued} tone="amber" />
@@ -366,10 +375,10 @@ function KpiGrid({ data, loading }: { data?: SuperAdminOverview; loading: boolea
       <ModernKpi
         icon={<UserCheck className="size-4" />} label="Orders Not Contacted" value={fmtN(m.ordersNotContacted3h)}
         tone={m.ordersNotContacted5h > 0 ? "rose" : m.ordersNotContacted3h > 0 ? "amber" : "slate"}
-        href="/admin/orders?filter=not_contacted"
+        href={withRange("/admin/orders?filter=not_contacted")}
         subs={<>
-          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" href="/admin/orders?filter=not_contacted" />
-          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" href="/admin/orders?filter=not_contacted_5h" />
+          <StatChip label="3+ hrs" value={m.ordersNotContacted3h} tone="amber" href={withRange("/admin/orders?filter=not_contacted")} />
+          <StatChip label="5+ hrs" value={m.ordersNotContacted5h} tone="rose" href={withRange("/admin/orders?filter=not_contacted_5h")} />
         </>}
       />
       <ModernKpi

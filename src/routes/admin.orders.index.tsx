@@ -27,6 +27,14 @@ import { formatMobile55 } from "@/lib/utils";
 import { UserCheck } from "lucide-react";
 
 export const Route = createFileRoute("/admin/orders/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    filter: typeof search.filter === "string" ? search.filter : undefined,
+    preset: typeof search.preset === "string" ? search.preset : undefined,
+    dateFrom: typeof search.dateFrom === "string" ? search.dateFrom : undefined,
+    dateTo: typeof search.dateTo === "string" ? search.dateTo : undefined,
+    stage: typeof search.stage === "string" ? search.stage : undefined,
+    search: typeof search.search === "string" ? search.search : undefined,
+  }),
   head: () => ({ meta: [{ title: "Orders — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: OrdersListPage,
 });
@@ -200,13 +208,12 @@ function OrdersListPage() {
     return () => window.removeEventListener("reset-orders-filters", handleReset);
   }, []);
 
+  const routeSearch = Route.useSearch();
+
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    const flt = sp.get("filter");
-    if (flt) {
-      switch (flt) {
+    if (routeSearch.filter) {
+      switch (routeSearch.filter) {
         case "pending": setBucket("pending"); break;
         case "closed": setBucket("closed"); break;
         case "completed": setBucket("completed"); break;
@@ -219,27 +226,23 @@ function OrdersListPage() {
         case "form_not_submitted": setFulfillmentStatus("form_pending"); setStageFilter("form_not_submitted"); break;
       }
     }
-    const presetParam = sp.get("preset");
-    if (presetParam) {
+    if (routeSearch.preset) {
       const now = new Date();
-      if (presetParam === "today") {
+      if (routeSearch.preset === "today") {
         const todayKey = istDateKey(now);
         setDateFrom(todayKey);
         setDateTo(todayKey);
-      } else if (presetParam === "yesterday") {
+      } else if (routeSearch.preset === "yesterday") {
         const yestKey = istDateKey(new Date(now.getTime() - 86400000));
         setDateFrom(yestKey);
         setDateTo(yestKey);
       }
     }
-    const df = sp.get("dateFrom");
-    const dt = sp.get("dateTo");
-    if (df) setDateFrom(df);
-    if (dt) setDateTo(dt);
-    const stg = sp.get("stage");
-    if (stg) setStageFilter(stg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (routeSearch.dateFrom) setDateFrom(routeSearch.dateFrom);
+    if (routeSearch.dateTo) setDateTo(routeSearch.dateTo);
+    if (routeSearch.stage) setStageFilter(routeSearch.stage);
+    if (routeSearch.search) setSearch(routeSearch.search);
+  }, [routeSearch]);
 
   const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
   const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
