@@ -80,8 +80,6 @@ const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> =
   { id: "form_submitted", label: "Form Submitted", tone: "indigo" },
   { id: "technical_delay", label: "Technical Delay", tone: "sky" },
   { id: "customer_delay", label: "Customer Delay", tone: "amber" },
-  { id: "under_review", label: "Under Review", tone: "violet" },
-  { id: "in_progress", label: "In Progress", tone: "violet" },
   { id: "submitted_to_govt", label: "Submitted to Govt", tone: "indigo" },
   { id: "certificate_ready", label: "Certificate Ready", tone: "emerald" },
   { id: "completed", label: "Completed", tone: "emerald" },

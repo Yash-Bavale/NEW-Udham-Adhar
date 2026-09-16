@@ -558,7 +558,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
       switch (data.stage) {
         case "payment_done":
-          q = q.eq("fulfillment_status", "order_received").is("form_submitted_at", null);
+          q = q.in("fulfillment_status", ["order_received", "payment_received"]).is("form_submitted_at", null);
           break;
         case "form_not_submitted":
           q = q.in("fulfillment_status", ["waiting_for_customer_submission", "awaiting_customer_form", "form_not_submitted", "form_pending"]);
@@ -567,19 +567,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.eq("fulfillment_status", "form_submitted");
           break;
         case "technical_delay":
-          q = q.or("fulfillment_status.in.(technical_delay,technical_hold),workflow_status.in.(government_portal_pending,technical_hold)");
+          q = q.or("fulfillment_status.eq.technical_delay,fulfillment_status.eq.technical_hold,workflow_status.eq.government_portal_pending,workflow_status.eq.technical_hold");
           break;
         case "customer_delay":
           q = q.eq("fulfillment_status", "customer_delay");
           break;
-        case "under_review":
-          q = q.eq("fulfillment_status", "verification_pending");
-          break;
-        case "in_progress":
-          q = q.eq("fulfillment_status", "documents_received");
-          break;
         case "submitted_to_govt":
-          q = q.in("fulfillment_status", ["government_processing", "application_submitted", "under_processing", "awaiting_govt"]);
+          q = q.in("fulfillment_status", ["government_processing", "application_submitted", "under_processing", "awaiting_govt", "application_rejected", "certificate_rejected"]);
           break;
         case "certificate_ready":
           q = q.or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
@@ -588,7 +582,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
           break;
         case "closed":
-          q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
+          q = q.in("fulfillment_status", ["order_closed", "cancelled"]);
           break;
         default:
           q = q.eq("fulfillment_status", data.stage as never);
