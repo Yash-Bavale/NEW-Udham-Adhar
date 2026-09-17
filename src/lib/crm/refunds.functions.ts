@@ -157,6 +157,26 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       console.error("delete-order-documents invocation failed:", e);
     }
 
+    // Update refund_requests row status to processed
+    await admin
+      .from("refund_requests")
+      .update({
+        status: "processed",
+        gateway_ref: data.gatewayRef,
+        gateway_name: origPayment.gateway_name,
+        processed_at: new Date().toISOString(),
+        processed_by: context.userId,
+      } as never)
+      .eq("application_id", app.id);
+
+    // Invalidate revenue cache so revenue sheets & dashboards reflect minus entry instantly
+    try {
+      const { invalidateRevenueCache } = await import("@/lib/crm/revenue-admin.functions");
+      invalidateRevenueCache();
+    } catch (err) {
+      console.error("[markRefundProcessed] invalidateRevenueCache failed:", err);
+    }
+
     const { staff_name, staff_role } = await getStaff(context.userId);
     await admin.from("application_events").insert({
       application_id: app.id,

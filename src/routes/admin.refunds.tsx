@@ -380,9 +380,12 @@ function RefundDetailDrawer({
       setDeductionReason(req.deduction_reason ?? "");
       setNotes(req.admin_notes ?? "");
       setPaymentRef(req.gateway_ref ?? "");
-      setGatewayName(req.gateway_name ?? "");
+      
+      const paidPayment = payments.find((p) => p.status === "paid" || p.status === "success" || Number(p.amount) > 0);
+      const gw = (req.gateway_name || paidPayment?.gateway_name || "").toLowerCase().trim();
+      setGatewayName(gw);
     }
-  }, [req, refundable]);
+  }, [req, refundable, payments]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["refund-detail", id] });
@@ -719,9 +722,9 @@ function RefundDetailDrawer({
                     <div>
                       <label className="text-[10px] text-muted-foreground uppercase">Gateway</label>
                       <select
-                        value={gatewayName}
+                        value={(gatewayName || "").toLowerCase()}
                         onChange={(e) => setGatewayName(e.target.value)}
-                        className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                        className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm font-medium"
                       >
                         <option value="">Select gateway</option>
                         <option value="payu">PayU</option>

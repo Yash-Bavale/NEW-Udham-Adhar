@@ -558,41 +558,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
       switch (data.stage) {
         case "payment_done":
-          q = q
-            .is("form_submitted_at", null)
-            .is("certificate_uploaded_at", null)
-            .not("fulfillment_status", "in", [
-              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
-              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
-              "technical_hold", "customer_delay", "government_processing", "application_submitted",
-              "under_processing", "awaiting_govt", "waiting_for_customer_submission", "awaiting_customer_form",
-              "form_not_submitted", "form_pending", "waiting_customer", "customer_form_pending",
-              "form_submitted", "verification_pending", "documents_received",
-            ]);
+          q = q.is("form_submitted_at", null);
           break;
         case "form_not_submitted":
-          q = q
-            .is("form_submitted_at", null)
-            .is("certificate_uploaded_at", null)
-            .not("fulfillment_status", "in", [
-              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
-              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
-              "technical_hold", "customer_delay", "government_processing", "application_submitted",
-              "under_processing", "awaiting_govt",
-            ]);
+          q = q.is("form_submitted_at", null);
           break;
         case "form_submitted":
-          q = q
-            .not("form_submitted_at", "is", null)
-            .is("certificate_uploaded_at", null)
-            .not("fulfillment_status", "in", [
-              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
-              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
-              "technical_hold", "customer_delay", "government_processing", "application_submitted",
-              "under_processing", "awaiting_govt", "waiting_for_customer_submission", "awaiting_customer_form",
-              "form_not_submitted", "form_pending", "waiting_customer", "customer_form_pending",
-              "verification_pending", "documents_received",
-            ]);
+          q = q.not("form_submitted_at", "is", null);
           break;
         case "technical_delay":
           q = q.in("fulfillment_status", ["technical_delay", "technical_hold"]);
@@ -606,9 +578,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           ]);
           break;
         case "certificate_ready":
-          q = q
-            .not("fulfillment_status", "in", ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled"])
-            .or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
+          q = q.or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
           break;
         case "completed":
           q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
@@ -667,7 +637,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
           break;
         case "pending":
-          q = q.not("fulfillment_status", "in", '("completed","order_completed","consultation_completed","order_closed","cancelled","application_rejected","certificate_rejected")');
+          q = q.not("fulfillment_status", "in", ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
           break;
       }
     }
@@ -677,7 +647,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (data.actionStatus === "action_required") {
         q = q.in("fulfillment_status", ["order_received", "form_submitted"]);
       } else if (data.actionStatus === "processed") {
-        q = q.not("fulfillment_status", "in", '("order_received","form_submitted")');
+        q = q.not("fulfillment_status", "in", ["order_received", "form_submitted"]);
       }
     }
 

@@ -764,23 +764,91 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const processedAt = data.processedOn ?? new Date().toISOString();
+
+    // 1. Find original successful payment
+    const { data: origPayment } = await supabaseAdmin
+      .from("payments")
+      .select("id, amount, currency, gateway_name, customer_id, lead_id")
+      .or(`application_id.eq.${data.orderId},lead_id.eq.${order.lead_id ?? "00000000-0000-0000-0000-000000000000"}`)
+      .in("status", ["paid", "success", "successful"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const resolvedGateway = data.gatewayName || origPayment?.gateway_name || "manual";
+    const refundAmountNeg = -Math.abs(Number(data.amount));
+
+    // 2. Insert minus revenue entry into payments table
+    await supabaseAdmin.from("payments").insert({
+      lead_id: order.lead_id ?? origPayment?.lead_id ?? null,
+      application_id: data.orderId,
+      customer_id: origPayment?.customer_id ?? order.customer_id ?? null,
+      parent_payment_id: origPayment?.id ?? null,
+      amount: refundAmountNeg,
+      base_amount: refundAmountNeg,
+      gst_amount: 0,
+      currency: origPayment?.currency ?? "INR",
+      status: "refunded",
+      gateway_name: resolvedGateway,
+      transaction_id: data.paymentReference,
+      refund_reason: "refund_processed",
+      payment_date: processedAt,
+    } as never);
+
+    // 3. Flip original payment status to refunded
+    if (origPayment?.id) {
+      await supabaseAdmin
+        .from("payments")
+        .update({ status: "refunded" } as never)
+        .eq("id", origPayment.id);
+    }
+
+    // 4. Update refund_requests row status to processed
     await supabaseAdmin
       .from("refund_requests")
       .update({
+        status: "processed",
         admin_notes: `PROCESSED @ ${processedAt} | Ref: ${data.paymentReference} | Amount: ₹${data.amount}`,
         refund_amount: data.amount,
         gateway_ref: data.paymentReference,
-        gateway_name: data.gatewayName ?? null,
+        gateway_name: resolvedGateway,
         processed_at: processedAt,
         processed_by: context.userId,
       } as never)
-      .eq("application_id", data.orderId)
-      .in("status", ["approved", "info_needed", "escalated"]);
+      .eq("application_id", data.orderId);
+
+    // 5. Stamp applications table
+    await supabaseAdmin
+      .from("applications")
+      .update({
+        refund_processed_at: processedAt,
+        refund_gateway_ref: data.paymentReference,
+        documents_deleted_reason: "refund",
+      } as never)
+      .eq("id", data.orderId);
 
     await writeRefundEvent(data.orderId, "processed", context.userId, {
       note: `Ref ${data.paymentReference}`,
-      meta: { amount: data.amount, gateway_ref: data.paymentReference, gateway_name: data.gatewayName ?? null },
+      meta: { amount: data.amount, gateway_ref: data.paymentReference, gateway_name: resolvedGateway },
     });
+
+    // 6. Transition lead status to refunded
+    if (order.lead_id) {
+      try {
+        const { transitionLeadStatus } = await import("@/lib/crm/lead-status.functions");
+        await transitionLeadStatus({ data: { leadId: order.lead_id, toStatus: "refunded" } });
+      } catch (err) {
+        console.error("[markRefundProcessed] lead transition to refunded failed:", err);
+      }
+    }
+
+    // 7. Invalidate revenue cache so revenue sheets & dashboards reflect minus entry instantly
+    try {
+      const { invalidateRevenueCache } = await import("@/lib/crm/revenue-admin.functions");
+      invalidateRevenueCache();
+    } catch (err) {
+      console.error("[markRefundProcessed] invalidateRevenueCache failed:", err);
+    }
 
     let emailQueued = false;
     if (to) {
@@ -809,7 +877,6 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[markRefundProcessed] auto-close failed", e);
     }
-
 
     return { ok: true, order: updated, emailQueued };
   });
