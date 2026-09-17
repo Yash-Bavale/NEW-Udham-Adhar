@@ -27,7 +27,16 @@ import { formatMobile55 } from "@/lib/utils";
 import { UserCheck } from "lucide-react";
 
 export const Route = createFileRoute("/admin/orders/")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (
+    search: Record<string, unknown>
+  ): {
+    filter?: string;
+    preset?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    stage?: string;
+    search?: string;
+  } => ({
     filter: typeof search.filter === "string" ? search.filter : undefined,
     preset: typeof search.preset === "string" ? search.preset : undefined,
     dateFrom: typeof search.dateFrom === "string" ? search.dateFrom : undefined,

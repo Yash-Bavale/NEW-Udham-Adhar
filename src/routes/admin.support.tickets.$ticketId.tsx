@@ -403,30 +403,41 @@ function TicketWorkspace() {
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <button
               onClick={() => navigate({ to: "/admin/support/tickets" })}
-              className="md:hidden inline-flex items-center gap-1 text-slate-500 hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors mr-1"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Tickets
             </button>
-            <span className="font-mono text-slate-500">{ticket.ticket_number}</span>
+            <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-xs">{ticket.ticket_number}</span>
             <StatusBadge status={ticket.status} onChange={(s) => changeStatus.mutate(s)} />
             <PriorityBadge
               priority={(ticket.priority as TicketPriority) ?? "medium"}
               onChange={(p) => changePriority.mutate(p)}
             />
+            {app.application_code && (
+              <Link
+                to="/admin/orders/$orderId"
+                params={{ orderId: app.id }}
+                className="font-mono text-xs font-semibold text-indigo-600 hover:underline bg-slate-100 hover:bg-indigo-50 px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1"
+              >
+                <Package className="h-3 w-3" /> {app.application_code}
+              </Link>
+            )}
             <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wide">
               {ticket.source ?? "internal"}
             </span>
-            <span className="text-slate-400 inline-flex items-center gap-1">
+            <span className="text-slate-400 inline-flex items-center gap-1 ml-auto">
               <Clock className="h-3 w-3" /> {ist(ticket.created_at)}
             </span>
           </div>
-          <h2 className="mt-2 text-[15px] font-semibold text-slate-900 leading-snug">
+          <h2 className="mt-2 text-base font-semibold text-slate-900 leading-snug">
             {ticket.subject || "(no subject)"}
           </h2>
           <div className="mt-1 text-xs text-slate-500 flex items-center gap-3 flex-wrap">
+            <span className="font-medium text-slate-800">{cust.name ?? "Customer"}</span>
             <span className="font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
+            {cust.primary_mobile && <span>{cust.primary_mobile}</span>}
             {ticket.first_response_at && (
-              <span>First reply {rel(ticket.first_response_at)}</span>
+              <span className="text-slate-400">First reply {rel(ticket.first_response_at)}</span>
             )}
           </div>
         </header>

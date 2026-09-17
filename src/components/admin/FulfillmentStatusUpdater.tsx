@@ -189,9 +189,14 @@ function CompletionGateDialog({
 
   const MAX_BYTES = 10 * 1024 * 1024;
   const tooBig = file ? file.size > MAX_BYTES : false;
+  const isEmpty = file ? file.size === 0 : false;
 
   const submit = async () => {
     if (!file) { toast.error("Upload the certificate file."); return; }
+    if (file.size === 0) {
+      toast.error("The selected file is empty (0 bytes). Please re-download or select a valid certificate file.");
+      return;
+    }
     if (tooBig) { toast.error("File exceeds 10 MB limit."); return; }
     if (!certNumber.trim()) { toast.error("Certificate / document number is required."); return; }
     if (!recipientEmail) {
@@ -231,7 +236,18 @@ function CompletionGateDialog({
         completionNotes: completionNotes.trim() || undefined,
       });
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
+      let msg = e?.message ?? "Upload failed";
+      try {
+        const parsed = JSON.parse(msg);
+        if (Array.isArray(parsed) && parsed[0]) {
+          if (parsed[0]?.path?.includes("sizeBytes")) {
+            msg = "The selected file is empty (0 bytes). Please upload a valid certificate file.";
+          } else if (parsed[0]?.message) {
+            msg = parsed[0].message;
+          }
+        }
+      } catch {}
+      toast.error(msg);
     } finally {
       setUploading(false);
     }
@@ -282,8 +298,9 @@ function CompletionGateDialog({
               />
             </label>
             {file && (
-              <div className={`text-xs ${tooBig ? "text-red-600" : "text-slate-600"}`}>
-                {file.name} · {(file.size / 1024).toFixed(0)} KB{tooBig ? " — exceeds 10 MB" : ""}
+              <div className={`text-xs ${tooBig || isEmpty ? "text-red-600 font-medium" : "text-slate-600"}`}>
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+                {tooBig ? " — exceeds 10 MB" : isEmpty ? " — empty file (0 KB), please choose a valid file" : ""}
               </div>
             )}
           </div>

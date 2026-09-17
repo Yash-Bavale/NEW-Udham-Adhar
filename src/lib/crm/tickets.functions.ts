@@ -1,19 +1,53 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { computeOrderStage, type OrderStage } from "./computeOrderStage";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
   return m.supabaseAdmin;
 }
 
-const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "resolved", "closed"] as const;
-const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
+export const TICKET_STATUSES = ["open", "in_progress", "waiting_customer", "resolved", "closed"] as const;
+export const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
+export const RESPONSE_STATES = ["all", "new", "unread", "awaiting_action", "awaiting_customer", "replied", "closed"] as const;
+
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 export type TicketPriority = (typeof PRIORITIES)[number];
+export type ResponseState = (typeof RESPONSE_STATES)[number];
 
 // Re-export the emailing reply from ticket-actions so the UI has a single source of truth.
 export { replyToTicket } from "@/lib/tickets/ticket-actions.functions";
+
+export type TicketResponseState = "new" | "awaiting_action" | "awaiting_customer" | "replied" | "closed";
+
+export function computeTicketResponseState(ticket: {
+  status: string | null;
+  first_response_at?: string | null;
+  last_customer_message_at?: string | null;
+  last_staff_message_at?: string | null;
+}): TicketResponseState {
+  if (ticket.status === "resolved" || ticket.status === "closed") {
+    return "closed";
+  }
+  if (!ticket.first_response_at) {
+    return "new";
+  }
+  if (
+    ticket.last_customer_message_at &&
+    (!ticket.last_staff_message_at ||
+      new Date(ticket.last_customer_message_at) > new Date(ticket.last_staff_message_at))
+  ) {
+    return "awaiting_action";
+  }
+  if (ticket.status === "waiting_customer") {
+    return "awaiting_customer";
+  }
+  if (ticket.last_staff_message_at) {
+    return "replied";
+  }
+  return "new";
+}
 
 export const listTickets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -21,14 +55,19 @@ export const listTickets = createServerFn({ method: "POST" })
     z
       .object({
         page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(100).default(25),
+        pageSize: z.number().int().min(1).max(100).default(50),
         q: z.string().default(""),
         status: z.enum(TICKET_STATUSES).optional(),
         statuses: z.array(z.enum(TICKET_STATUSES)).optional(),
+        responseState: z.enum(RESPONSE_STATES).optional().default("all"),
         priority: z.enum(PRIORITIES).optional(),
-        assignedTo: z.string().uuid().optional(),
+        assignedTo: z.string().optional(), // uuid or "unassigned"
+        serviceId: z.string().uuid().optional(),
+        stage: z.string().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
         scope: z.enum(["mine", "all"]).default("all"),
-        sort: z.enum(["newest", "oldest", "updated", "unassigned"]).default("newest"),
+        sort: z.enum(["newest", "oldest", "updated", "last_activity", "highest_priority", "unassigned"]).default("last_activity"),
         unassignedOnly: z.boolean().default(false),
       })
       .parse(i ?? {})
@@ -41,26 +80,86 @@ export const listTickets = createServerFn({ method: "POST" })
     let q = admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, status, priority, assigned_to, created_at, updated_at, last_customer_message_at, last_staff_message_at, customer_id, application_id, service_id, customers(name, primary_mobile), applications(application_code), services(service_name)",
+        `id, ticket_number, subject, description, status, priority, assigned_to, created_at, updated_at, 
+         first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source,
+         customer_id, application_id, service_id,
+         customers(id, name, primary_email, primary_mobile),
+         applications(id, application_code, fulfillment_status, application_status, workflow_status, form_submitted_at, certificate_uploaded_at, total_amount, service_id, leads(id, status, lead_status_v2, payment_successful_at)),
+         services(id, service_name)`,
         { count: "exact" }
-      )
-      .range(from, to);
+      );
 
-    if (data.sort === "oldest") q = q.order("created_at", { ascending: true });
-    else if (data.sort === "updated") q = q.order("updated_at", { ascending: false });
-    else if (data.sort === "unassigned")
+    // Sorting
+    if (data.sort === "oldest") {
+      q = q.order("created_at", { ascending: true });
+    } else if (data.sort === "updated") {
+      q = q.order("updated_at", { ascending: false });
+    } else if (data.sort === "highest_priority") {
+      // Urgent, High, Medium, Low
+      q = q
+        .order("priority", { ascending: false })
+        .order("created_at", { ascending: false });
+    } else if (data.sort === "unassigned") {
       q = q
         .order("assigned_to", { ascending: true, nullsFirst: true })
         .order("created_at", { ascending: false });
-    else q = q.order("created_at", { ascending: false });
+    } else if (data.sort === "last_activity") {
+      q = q
+        .order("last_customer_message_at", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false });
+    } else {
+      q = q.order("created_at", { ascending: false });
+    }
 
-    if (data.unassignedOnly || data.sort === "unassigned") q = q.is("assigned_to", null);
-    if (data.status) q = q.eq("status", data.status);
-    else if (data.statuses && data.statuses.length) q = q.in("status", data.statuses);
-    if (data.priority) q = q.eq("priority", data.priority);
-    if (data.assignedTo) q = q.eq("assigned_to", data.assignedTo);
-    if (data.scope === "mine") q = q.eq("assigned_to", context.userId);
-    // Strip characters that would break PostgREST's or() filter syntax.
+    // Assignment filters
+    if (data.unassignedOnly || data.assignedTo === "unassigned") {
+      q = q.is("assigned_to", null);
+    } else if (data.assignedTo && data.assignedTo !== "all") {
+      q = q.eq("assigned_to", data.assignedTo);
+    }
+
+    // Status filter
+    if (data.status) {
+      q = q.eq("status", data.status);
+    } else if (data.statuses && data.statuses.length) {
+      q = q.in("status", data.statuses);
+    }
+
+    // Priority filter
+    if (data.priority) {
+      q = q.eq("priority", data.priority);
+    }
+
+    // Service filter
+    if (data.serviceId) {
+      q = q.eq("service_id", data.serviceId);
+    }
+
+    // Date range filter
+    if (data.dateFrom) {
+      const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
+      q = q.gte("created_at", new Date(fromIso).toISOString());
+    }
+    if (data.dateTo) {
+      const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
+      q = q.lte("created_at", new Date(toIso).toISOString());
+    }
+
+    // Scope filter
+    if (data.scope === "mine") {
+      q = q.eq("assigned_to", context.userId);
+    }
+
+    // Response State Filter (Direct DB conditions where possible)
+    if (data.responseState === "closed") {
+      q = q.in("status", ["resolved", "closed"]);
+    } else if (data.responseState === "new") {
+      q = q.is("first_response_at", null).not("status", "in", '("resolved","closed")');
+    } else if (data.responseState === "awaiting_customer") {
+      q = q.eq("status", "waiting_customer");
+    }
+
+    // Search query
     const term = data.q.trim().replace(/[(),*]/g, " ").trim();
     if (term) {
       const like = `%${term}%`;
@@ -71,8 +170,7 @@ export const listTickets = createServerFn({ method: "POST" })
         `ticket_email.ilike.${like}`,
       ];
 
-      // Resolve customers (email / name / mobile) and orders (code) separately —
-      // PostgREST can't OR across embedded tables.
+      // Resolve customers (email / name / mobile) and orders (code) separately
       const [custRes, appRes, mailRes] = await Promise.all([
         admin
           .from("customers")
@@ -84,7 +182,6 @@ export const listTickets = createServerFn({ method: "POST" })
           .select("id")
           .ilike("application_code", like)
           .limit(300),
-        // Tickets whose conversation contains this email address.
         admin
           .from("email_logs")
           .select("customer_id, application_id")
@@ -105,6 +202,9 @@ export const listTickets = createServerFn({ method: "POST" })
       q = q.or(ors.join(","));
     }
 
+    // Apply pagination range
+    q = q.range(from, to);
+
     const { data: rows, error, count } = await q;
     if (error) throw new Error(error.message);
 
@@ -122,26 +222,222 @@ export const listTickets = createServerFn({ method: "POST" })
       );
     }
 
-    const tickets = (rows ?? []).map((r: any) => ({
-      id: r.id,
-      ticket_number: r.ticket_number,
-      subject: r.subject,
-      status: r.status as TicketStatus,
-      priority: (r.priority as TicketPriority) ?? "medium",
-      assigned_to: r.assigned_to,
-      assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) ?? null : null,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      last_customer_message_at: r.last_customer_message_at,
-      last_staff_message_at: r.last_staff_message_at,
-      customer_id: r.customer_id,
-      customer_name: r.customers?.name ?? null,
-      application_id: r.application_id,
-      application_code: r.applications?.application_code ?? null,
-      service_name: r.services?.service_name ?? null,
-    }));
+    let tickets = (rows ?? []).map((r: any) => {
+      const isUnread = Boolean(
+        r.last_customer_message_at &&
+          (!r.last_staff_message_at ||
+            new Date(r.last_customer_message_at) > new Date(r.last_staff_message_at))
+      );
+      const isNew = !r.first_response_at && !["resolved", "closed"].includes(r.status);
+      const responseState = computeTicketResponseState(r);
+
+      const orderApp = r.applications;
+      const orderLead = Array.isArray(orderApp?.leads) ? orderApp?.leads[0] : orderApp?.leads;
+      const orderStage: OrderStage | null = orderApp ? computeOrderStage(orderLead, orderApp) : null;
+
+      const lastCustomerTime = r.last_customer_message_at ? new Date(r.last_customer_message_at).getTime() : 0;
+      const lastStaffTime = r.last_staff_message_at ? new Date(r.last_staff_message_at).getTime() : 0;
+      const lastActivityAt = r.last_customer_message_at || r.last_staff_message_at || r.updated_at || r.created_at;
+      const lastActivityActor: "customer" | "staff" = lastCustomerTime >= lastStaffTime && lastCustomerTime > 0 ? "customer" : "staff";
+
+      return {
+        id: r.id,
+        ticket_number: r.ticket_number,
+        subject: r.subject,
+        description: r.description,
+        status: r.status as TicketStatus,
+        priority: (r.priority as TicketPriority) ?? "medium",
+        response_state: responseState,
+        is_unread: isUnread,
+        is_new: isNew,
+        assigned_to: r.assigned_to,
+        assigned_name: r.assigned_to ? nameMap.get(r.assigned_to) ?? null : null,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        first_response_at: r.first_response_at,
+        last_customer_message_at: r.last_customer_message_at,
+        last_staff_message_at: r.last_staff_message_at,
+        last_activity_at: lastActivityAt,
+        last_activity_actor: lastActivityActor,
+        ticket_email: r.ticket_email,
+        source: r.source,
+        customer_id: r.customer_id,
+        customer_name: r.customers?.name ?? null,
+        customer_email: r.customers?.primary_email ?? r.ticket_email ?? null,
+        customer_mobile: r.customers?.primary_mobile ?? null,
+        application_id: r.application_id,
+        application_code: r.applications?.application_code ?? null,
+        service_id: r.service_id,
+        service_name: r.services?.service_name ?? null,
+        order_stage: orderStage,
+      };
+    });
+
+    // In-memory filter for response states that depend on timestamps if needed
+    if (data.responseState === "unread") {
+      tickets = tickets.filter((t) => t.is_unread);
+    } else if (data.responseState === "awaiting_action") {
+      tickets = tickets.filter((t) => t.response_state === "awaiting_action");
+    } else if (data.responseState === "replied") {
+      tickets = tickets.filter((t) => t.response_state === "replied");
+    }
+
+    if (data.stage && data.stage !== "all") {
+      tickets = tickets.filter((t) => t.order_stage === data.stage);
+    }
 
     return { tickets, total: count ?? 0, page: data.page, pageSize: data.pageSize };
+  });
+
+export const getTicketStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const admin = await getAdmin();
+    const { data: rows, error } = await admin
+      .from("support_tickets")
+      .select("id, status, first_response_at, last_customer_message_at, last_staff_message_at");
+
+    if (error) throw new Error(error.message);
+
+    let total = 0;
+    let newCount = 0;
+    let unreadCount = 0;
+    let awaitingActionCount = 0;
+    let awaitingCustomerCount = 0;
+    let repliedCount = 0;
+    let openCount = 0;
+    let closedCount = 0;
+
+    for (const r of rows ?? []) {
+      total++;
+      const isClosed = r.status === "resolved" || r.status === "closed";
+      if (isClosed) {
+        closedCount++;
+        continue;
+      }
+
+      openCount++;
+
+      const isUnread = Boolean(
+        r.last_customer_message_at &&
+          (!r.last_staff_message_at ||
+            new Date(r.last_customer_message_at) > new Date(r.last_staff_message_at))
+      );
+      if (isUnread) unreadCount++;
+
+      const isNew = !r.first_response_at;
+      if (isNew) newCount++;
+
+      const respState = computeTicketResponseState(r);
+      if (respState === "awaiting_action") awaitingActionCount++;
+      else if (respState === "awaiting_customer") awaitingCustomerCount++;
+      else if (respState === "replied") repliedCount++;
+    }
+
+    return {
+      total,
+      new: newCount,
+      unread: unreadCount,
+      awaiting_action: awaitingActionCount,
+      awaiting_customer: awaitingCustomerCount,
+      replied: repliedCount,
+      open: openCount,
+      closed: closedCount,
+    };
+  });
+
+export const bulkAssignTickets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketIds: z.array(z.string().uuid()).min(1),
+        assignedTo: z.string().uuid().nullable(),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { error } = await admin
+      .from("support_tickets")
+      .update({ assigned_to: data.assignedTo } as never)
+      .in("id", data.ticketIds);
+    if (error) throw new Error(error.message);
+    return { ok: true, count: data.ticketIds.length };
+  });
+
+export const bulkUpdateTicketStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketIds: z.array(z.string().uuid()).min(1),
+        status: z.enum(TICKET_STATUSES),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = { status: data.status };
+
+    if (data.status === "resolved") {
+      patch.resolved_at = now;
+      patch.resolved_by = context.userId;
+    } else if (data.status === "closed") {
+      patch.closed_at = now;
+    } else {
+      patch.resolved_at = null;
+      patch.resolved_by = null;
+      patch.closed_at = null;
+    }
+
+    const { error } = await admin
+      .from("support_tickets")
+      .update(patch as never)
+      .in("id", data.ticketIds);
+    if (error) throw new Error(error.message);
+    return { ok: true, count: data.ticketIds.length };
+  });
+
+export const bulkUpdateTicketPriority = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketIds: z.array(z.string().uuid()).min(1),
+        priority: z.enum(PRIORITIES),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { error } = await admin
+      .from("support_tickets")
+      .update({ priority: data.priority } as never)
+      .in("id", data.ticketIds);
+    if (error) throw new Error(error.message);
+    return { ok: true, count: data.ticketIds.length };
+  });
+
+export const bulkMarkTicketsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketIds: z.array(z.string().uuid()).min(1),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const now = new Date().toISOString();
+    const { error } = await admin
+      .from("support_tickets")
+      .update({ last_staff_message_at: now } as never)
+      .in("id", data.ticketIds);
+    if (error) throw new Error(error.message);
+    return { ok: true, count: data.ticketIds.length };
   });
 
 export const getTicket = createServerFn({ method: "POST" })
@@ -249,7 +545,6 @@ export const createTicket = createServerFn({ method: "POST" })
       }
     }
 
-
     // Enforce "registered email only" — resolve and snapshot the customer's email up-front.
     const { data: cust } = await admin
       .from("customers")
@@ -344,7 +639,6 @@ export const createTicket = createServerFn({ method: "POST" })
 
     return { id: ins!.id, ticket_number: ins!.ticket_number, reused: false as const };
   });
-
 
 export const updateTicket = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -441,13 +735,8 @@ export const updateTicket = createServerFn({ method: "POST" })
       }
     }
 
-
     return { ok: true };
   });
-
-
-// replyToTicket now lives in `@/lib/tickets/ticket-actions.functions` and is re-exported at the top of this file.
-
 
 export const searchCustomerOptions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

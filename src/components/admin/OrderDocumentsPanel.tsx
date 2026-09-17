@@ -105,6 +105,10 @@ function UploadDialog({
 
   const submit = async () => {
     if (!file) { toast.error("Pick a file"); return; }
+    if (file.size === 0) {
+      toast.error("The selected file is empty (0 bytes). Please select a valid file.");
+      return;
+    }
     if (!docType.trim()) { toast.error("Doc type required"); return; }
     setBusy(true);
     try {
@@ -128,7 +132,18 @@ function UploadDialog({
       toast.success("Document uploaded");
       onDone(); onOpenChange(false); setFile(null);
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
+      let msg = e?.message ?? "Upload failed";
+      try {
+        const parsed = JSON.parse(msg);
+        if (Array.isArray(parsed) && parsed[0]) {
+          if (parsed[0]?.path?.includes("sizeBytes")) {
+            msg = "The selected file is empty (0 bytes). Please upload a valid document.";
+          } else if (parsed[0]?.message) {
+            msg = parsed[0].message;
+          }
+        }
+      } catch {}
+      toast.error(msg);
     } finally { setBusy(false); }
   };
 

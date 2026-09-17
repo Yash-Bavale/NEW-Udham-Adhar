@@ -1,27 +1,1227 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2,
+  ArrowUpDown, ArrowUp, ArrowDown, Inbox, Plus, UserCheck, CheckCircle2,
+  AlertCircle, Clock, ShieldAlert, Sparkles, MessageSquare, Tag, Flag
+} from "lucide-react";
+import { formatIST, istDateKey } from "@/lib/datetime";
+import { toast } from "sonner";
+
+import {
+  listTickets,
+  getTicketStats,
+  bulkAssignTickets,
+  bulkUpdateTicketStatus,
+  bulkUpdateTicketPriority,
+  bulkMarkTicketsRead,
+  type TicketStatus,
+  type TicketPriority,
+  type ResponseState,
+  TICKET_STATUSES,
+  PRIORITIES,
+} from "@/lib/crm/tickets.functions";
+import { listStaff } from "@/lib/crm/leads-admin.functions";
+import { listServices } from "@/lib/crm/services-admin.functions";
+import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
+
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { AddTicketDialog } from "@/components/admin/AddTicketDialog";
+import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
+import { formatMobile55 } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/support/tickets/")({
+  validateSearch: (
+    search: Record<string, unknown>
+  ): {
+    status?: string;
+    responseState?: string;
+    priority?: string;
+    assignedTo?: string;
+    serviceId?: string;
+    stage?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    preset?: string;
+  } => ({
+    status: typeof search.status === "string" ? search.status : undefined,
+    responseState: typeof search.responseState === "string" ? search.responseState : undefined,
+    priority: typeof search.priority === "string" ? search.priority : undefined,
+    assignedTo: typeof search.assignedTo === "string" ? search.assignedTo : undefined,
+    serviceId: typeof search.serviceId === "string" ? search.serviceId : undefined,
+    stage: typeof search.stage === "string" ? search.stage : undefined,
+    search: typeof search.search === "string" ? search.search : undefined,
+    dateFrom: typeof search.dateFrom === "string" ? search.dateFrom : undefined,
+    dateTo: typeof search.dateTo === "string" ? search.dateTo : undefined,
+    preset: typeof search.preset === "string" ? search.preset : undefined,
+  }),
   head: () => ({
     meta: [
-      { title: "Support Inbox — BHS CRM" },
-      { name: "description", content: "Pick a ticket from the list to open the conversation." },
+      { title: "Support Tickets Operations — BHS CRM" },
+      { name: "description", content: "Dense operational support ticket management." },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
-  component: EmptyState,
+  component: SupportTicketsOperationsPage,
 });
 
-function EmptyState() {
+type Bucket = "all" | "new" | "unread" | "awaiting_action" | "awaiting_customer" | "replied" | "open" | "closed";
+
+const BUCKETS: { id: Bucket; label: string }[] = [
+  { id: "all",               label: "All Tickets" },
+  { id: "new",               label: "New" },
+  { id: "unread",            label: "Unread" },
+  { id: "awaiting_action",    label: "Awaiting Action" },
+  { id: "awaiting_customer",  label: "Awaiting Customer" },
+  { id: "replied",           label: "Replied" },
+  { id: "open",              label: "Open" },
+  { id: "closed",            label: "Closed" },
+];
+
+const STATUS_PILL: Record<TicketStatus, { bg: string; fg: string; border: string; label: string }> = {
+  open:             { bg: "bg-blue-50", fg: "text-blue-700", border: "border-blue-200", label: "Open" },
+  in_progress:      { bg: "bg-purple-50", fg: "text-purple-700", border: "border-purple-200", label: "In Progress" },
+  waiting_customer: { bg: "bg-amber-50", fg: "text-amber-800", border: "border-amber-200", label: "Waiting Customer" },
+  resolved:         { bg: "bg-emerald-50", fg: "text-emerald-700", border: "border-emerald-200", label: "Resolved" },
+  closed:           { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Closed" },
+};
+
+const PRIORITY_PILL: Record<TicketPriority, { bg: string; fg: string; border: string; label: string }> = {
+  urgent: { bg: "bg-rose-100", fg: "text-rose-800", border: "border-rose-300", label: "Urgent" },
+  high:   { bg: "bg-orange-50", fg: "text-orange-800", border: "border-orange-200", label: "High" },
+  medium: { bg: "bg-blue-50", fg: "text-blue-700", border: "border-blue-200", label: "Medium" },
+  low:    { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Low" },
+};
+
+function formatDayHeader(day: string): string {
+  const d = new Date(day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yest = new Date(today);
+  yest.setDate(today.getDate() - 1);
+  const target = new Date(d);
+  target.setHours(0, 0, 0, 0);
+  const base = d.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).toUpperCase();
+  if (target.getTime() === today.getTime()) return `${base} · TODAY`;
+  if (target.getTime() === yest.getTime()) return `${base} · YESTERDAY`;
+  return base;
+}
+
+function formatAge(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "just now";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function getResponseStateBadge(ticket: {
+  response_state: string;
+  is_new: boolean;
+  is_unread: boolean;
+  status: string;
+}) {
+  if (ticket.status === "closed" || ticket.status === "resolved") {
+    return {
+      label: "Closed",
+      tone: "slate",
+      pillClass: "bg-slate-100 text-slate-600 border-slate-200",
+      dotClass: "bg-slate-400",
+    };
+  }
+
+  if (ticket.is_new) {
+    return {
+      label: "NEW",
+      tone: "rose",
+      pillClass: "bg-rose-50 text-rose-700 border-rose-200 font-bold",
+      dotClass: "bg-rose-600 animate-pulse",
+    };
+  }
+
+  if (ticket.response_state === "awaiting_action" || ticket.is_unread) {
+    return {
+      label: "Action Required",
+      tone: "rose",
+      pillClass: "bg-rose-50 text-rose-700 border-rose-200 font-semibold",
+      dotClass: "bg-rose-600 animate-pulse",
+    };
+  }
+
+  if (ticket.response_state === "awaiting_customer") {
+    return {
+      label: "Awaiting Customer",
+      tone: "amber",
+      pillClass: "bg-amber-50 text-amber-800 border-amber-200 font-medium",
+      dotClass: "bg-amber-500",
+    };
+  }
+
+  if (ticket.response_state === "replied") {
+    return {
+      label: "Replied",
+      tone: "emerald",
+      pillClass: "bg-emerald-50 text-emerald-700 border-emerald-200 font-medium",
+      dotClass: "bg-emerald-500",
+    };
+  }
+
+  return {
+    label: "Open",
+    tone: "blue",
+    pillClass: "bg-blue-50 text-blue-700 border-blue-200 font-medium",
+    dotClass: "bg-blue-500",
+  };
+}
+
+function SupportTicketsOperationsPage() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const role = useRole();
+  const userPerms = usePermissions();
+  const isAdmin = role.hasAny(["admin", "super_admin"]);
+
+  const listFn = useServerFn(listTickets);
+  const statsFn = useServerFn(getTicketStats);
+  const staffFn = useServerFn(listStaff);
+  const svcFn = useServerFn(listServices);
+  const bulkAssignFn = useServerFn(bulkAssignTickets);
+  const bulkStatusFn = useServerFn(bulkUpdateTicketStatus);
+  const bulkPriorityFn = useServerFn(bulkUpdateTicketPriority);
+  const bulkReadFn = useServerFn(bulkMarkTicketsRead);
+
+  const routeSearch = Route.useSearch();
+
+  const [bucket, setBucket] = useState<Bucket>("all");
+  const [search, setSearch] = useState<string>(routeSearch.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(routeSearch.search ?? "");
+  const [statusFilter, setStatusFilter] = useState<string>(routeSearch.status ?? "all");
+  const [responseStateFilter, setResponseStateFilter] = useState<string>(routeSearch.responseState ?? "all");
+  const [priorityFilter, setPriorityFilter] = useState<string>(routeSearch.priority ?? "all");
+  const [assignedTo, setAssignedTo] = useState<string>(routeSearch.assignedTo ?? "all");
+  const [serviceId, setServiceId] = useState<string>(routeSearch.serviceId ?? "all");
+  const [stageFilter, setStageFilter] = useState<string>(routeSearch.stage ?? "all");
+  const [dateFrom, setDateFrom] = useState<string>(routeSearch.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState<string>(routeSearch.dateTo ?? "");
+  const [sortField, setSortField] = useState<"last_activity" | "newest" | "oldest" | "highest_priority" | "unassigned" | "updated">("last_activity");
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 50;
+
+  const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
+  const [addTicketOpen, setAddTicketOpen] = useState(false);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Sync route params
+  useEffect(() => {
+    if (routeSearch.status) {
+      if (routeSearch.status === "closed") setBucket("closed");
+      else if (routeSearch.status === "open") setBucket("open");
+      else setStatusFilter(routeSearch.status);
+    }
+    if (routeSearch.responseState) setResponseStateFilter(routeSearch.responseState);
+    if (routeSearch.priority) setPriorityFilter(routeSearch.priority);
+    if (routeSearch.assignedTo) setAssignedTo(routeSearch.assignedTo);
+    if (routeSearch.serviceId) setServiceId(routeSearch.serviceId);
+    if (routeSearch.stage) setStageFilter(routeSearch.stage);
+    if (routeSearch.search) setSearch(routeSearch.search);
+    if (routeSearch.preset === "today") {
+      const todayKey = istDateKey(new Date());
+      setDateFrom(todayKey);
+      setDateTo(todayKey);
+    }
+  }, [routeSearch]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+    setSelectedTicketIds([]);
+  }, [bucket, debouncedSearch, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, sortField]);
+
+  // Realtime updates
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["support-tickets-ops"] });
+    qc.invalidateQueries({ queryKey: ["support-ticket-stats"] });
+  };
+  useRealtimeTable("support_tickets", invalidate);
+  useRealtimeTable("ticket_replies", invalidate);
+
+  // Queries
+  const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
+  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    if (Array.isArray(staffData)) return staffData;
+    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
+    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
+    return [];
+  }, [staffData]);
+
+  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
+  const servicesList = useMemo(() => {
+    if (Array.isArray(svcData)) return svcData;
+    if (Array.isArray((svcData as any)?.services)) return (svcData as any).services;
+    return [];
+  }, [svcData]);
+
+  const { data: statsData } = useQuery({
+    queryKey: ["support-ticket-stats"],
+    queryFn: () => statsFn(),
+    refetchInterval: 15000,
+  });
+
+  const queryPayload = useMemo(() => {
+    let effectiveStatus: TicketStatus | undefined = undefined;
+    let effectiveStatuses: TicketStatus[] | undefined = undefined;
+    let effectiveRespState: ResponseState = "all";
+
+    if (bucket === "open") {
+      effectiveStatuses = ["open", "in_progress", "waiting_customer"];
+    } else if (bucket === "closed") {
+      effectiveStatuses = ["resolved", "closed"];
+    } else if (bucket === "new") {
+      effectiveRespState = "new";
+    } else if (bucket === "unread") {
+      effectiveRespState = "unread";
+    } else if (bucket === "awaiting_action") {
+      effectiveRespState = "awaiting_action";
+    } else if (bucket === "awaiting_customer") {
+      effectiveRespState = "awaiting_customer";
+    } else if (bucket === "replied") {
+      effectiveRespState = "replied";
+    }
+
+    if (statusFilter !== "all") {
+      effectiveStatus = statusFilter as TicketStatus;
+      effectiveStatuses = undefined;
+    }
+    if (responseStateFilter !== "all") {
+      effectiveRespState = responseStateFilter as ResponseState;
+    }
+
+    return {
+      page,
+      pageSize,
+      q: debouncedSearch,
+      status: effectiveStatus,
+      statuses: effectiveStatuses,
+      responseState: effectiveRespState,
+      priority: priorityFilter === "all" ? undefined : (priorityFilter as TicketPriority),
+      assignedTo: assignedTo === "all" ? undefined : assignedTo,
+      serviceId: serviceId === "all" ? undefined : serviceId,
+      stage: stageFilter === "all" ? undefined : stageFilter,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      sort: sortField,
+      scope: "all" as const,
+    };
+  }, [page, pageSize, debouncedSearch, bucket, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, sortField]);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["support-tickets-ops", queryPayload],
+    queryFn: () => listFn({ data: queryPayload }),
+  });
+
+  const tickets = data?.tickets ?? [];
+  const total = data?.total ?? 0;
+
+  // Day grouping (similar to orders)
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof tickets>();
+    for (const t of tickets) {
+      const key = istDateKey(new Date(t.created_at));
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [tickets]);
+
+  // Bulk mutations
+  const assignMutation = useMutation({
+    mutationFn: (assignedTo: string | null) => bulkAssignFn({ data: { ticketIds: selectedTicketIds, assignedTo } }),
+    onSuccess: (r) => {
+      toast.success(`${r.count} tickets assigned successfully`);
+      setSelectedTicketIds([]);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: TicketStatus) => bulkStatusFn({ data: { ticketIds: selectedTicketIds, status } }),
+    onSuccess: (r) => {
+      toast.success(`${r.count} tickets status updated`);
+      setSelectedTicketIds([]);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const priorityMutation = useMutation({
+    mutationFn: (priority: TicketPriority) => bulkPriorityFn({ data: { ticketIds: selectedTicketIds, priority } }),
+    onSuccess: (r) => {
+      toast.success(`${r.count} tickets priority updated`);
+      setSelectedTicketIds([]);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const readMutation = useMutation({
+    mutationFn: () => bulkReadFn({ data: { ticketIds: selectedTicketIds } }),
+    onSuccess: (r) => {
+      toast.success(`${r.count} tickets marked as read`);
+      setSelectedTicketIds([]);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleResetFilters = () => {
+    setBucket("all");
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("all");
+    setResponseStateFilter("all");
+    setPriorityFilter("all");
+    setAssignedTo("all");
+    setServiceId("all");
+    setStageFilter("all");
+    setDateFrom("");
+    setDateTo("");
+    setSortField("last_activity");
+    setPage(1);
+    setSelectedTicketIds([]);
+  };
+
+  const isFiltering =
+    bucket !== "all" ||
+    search !== "" ||
+    statusFilter !== "all" ||
+    responseStateFilter !== "all" ||
+    priorityFilter !== "all" ||
+    assignedTo !== "all" ||
+    serviceId !== "all" ||
+    stageFilter !== "all" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    sortField !== "last_activity";
+
+  const colCount = 12;
+
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6 bg-slate-50">
-      <div className="w-16 h-16 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
-        <MessageSquare className="h-7 w-7 text-slate-400" />
+    <div className="p-4 md:p-6 space-y-4 max-w-[1700px] mx-auto min-w-0">
+      {/* ── 1. Top Header ───────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-[#1e3a5f] text-white shadow-xs">
+              <Inbox className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                Support / Tickets
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  {total.toLocaleString("en-IN")} Total
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Dense operational ticket management with real-time customer conversation sync.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => invalidate()}
+            disabled={isFetching}
+            className="h-8 text-xs text-slate-700 bg-white border-slate-200 hover:bg-slate-50"
+          >
+            <RotateCcw className={`size-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => setAddTicketOpen(true)}
+            className="h-8 text-xs font-medium bg-[#1e3a5f] hover:bg-[#152b47] text-white shadow-xs"
+          >
+            <Plus className="size-3.5 mr-1.5" />
+            New Ticket
+          </Button>
+        </div>
       </div>
-      <h2 className="text-base font-semibold text-slate-800">Select a ticket to view the conversation</h2>
-      <p className="mt-1 text-sm text-slate-500 max-w-sm">
-        Pick a ticket from the list on the left. New inbound customer emails will land here automatically.
-      </p>
+
+      {/* ── 2. Clickable KPI / Bucket Chips ─────────────────── */}
+      <div className="flex flex-wrap gap-2 pt-1">
+        {BUCKETS.map((b) => {
+          const active = bucket === b.id;
+          let count = statsData?.total ?? 0;
+          if (b.id === "new") count = statsData?.new ?? 0;
+          else if (b.id === "unread") count = statsData?.unread ?? 0;
+          else if (b.id === "awaiting_action") count = statsData?.awaiting_action ?? 0;
+          else if (b.id === "awaiting_customer") count = statsData?.awaiting_customer ?? 0;
+          else if (b.id === "replied") count = statsData?.replied ?? 0;
+          else if (b.id === "open") count = statsData?.open ?? 0;
+          else if (b.id === "closed") count = statsData?.closed ?? 0;
+
+          const isUrgentTone = (b.id === "new" || b.id === "unread" || b.id === "awaiting_action") && count > 0;
+
+          return (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => {
+                setBucket(b.id);
+                setStatusFilter("all");
+                setResponseStateFilter("all");
+              }}
+              className={`inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-medium transition-all border shadow-xs ${
+                active
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : isUrgentTone
+                  ? "bg-white text-slate-800 border-rose-200 hover:bg-rose-50/50"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              }`}
+            >
+              <span>{b.label}</span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                  active
+                    ? "bg-slate-800 text-white"
+                    : isUrgentTone
+                    ? "bg-rose-100 text-rose-800"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {count.toLocaleString("en-IN")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── 3. Filters Toolbar ──────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[260px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ticket, customer, email, mobile, order number, subject…"
+              className="h-9 pl-8 pr-8 text-xs bg-slate-50/50 border-slate-200 focus:bg-white"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Response State Filter */}
+          <Select value={responseStateFilter} onValueChange={setResponseStateFilter}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Response State" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Responses</SelectItem>
+              <SelectItem value="new">NEW (Unreplied)</SelectItem>
+              <SelectItem value="unread">Unread by Staff</SelectItem>
+              <SelectItem value="awaiting_action">Awaiting Action</SelectItem>
+              <SelectItem value="awaiting_customer">Awaiting Customer</SelectItem>
+              <SelectItem value="replied">Staff Replied</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Ticket Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Ticket Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {TICKET_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {STATUS_PILL[s].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Priority Filter */}
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="h-9 w-[125px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              {PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {PRIORITY_PILL[p].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Assigned Staff Filter */}
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Assigned Staff" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Staff</SelectItem>
+              <SelectItem value="unassigned">❌ Unassigned</SelectItem>
+              {staffProfiles.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  👤 {s.display_name || s.name || s.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Service Filter */}
+          <Select value={serviceId} onValueChange={setServiceId}>
+            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="All Services" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Services</SelectItem>
+              {servicesList.map((svc: any) => (
+                <SelectItem key={svc.id} value={svc.id}>
+                  {svc.service_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Order Stage Filter */}
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="Order Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Order Stages</SelectItem>
+              {Object.keys(STAGE_META).map((st) => (
+                <SelectItem key={st} value={st}>
+                  {STAGE_META[st as OrderStage]?.label ?? st}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Date Range Picker */}
+          <DateRangePicker
+            value={{
+              from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+              to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
+            }}
+            onChange={(range) => {
+              if (!range.from) {
+                setDateFrom("");
+                setDateTo("");
+              } else {
+                setDateFrom(istDateKey(range.from));
+                setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+              }
+            }}
+          />
+
+          {/* Sort Selector */}
+          <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
+            <SelectTrigger className="h-9 w-[165px] text-xs bg-slate-50/50 border-slate-200">
+              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+              <SelectValue placeholder="Sort order" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="last_activity">Latest Activity First</SelectItem>
+              <SelectItem value="newest">Created (Newest)</SelectItem>
+              <SelectItem value="oldest">Created (Oldest)</SelectItem>
+              <SelectItem value="highest_priority">Highest Priority</SelectItem>
+              <SelectItem value="unassigned">Unassigned First</SelectItem>
+              <SelectItem value="updated">Recently Updated</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Reset button */}
+          {isFiltering && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleResetFilters}
+              className="h-9 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+            >
+              <X className="size-3.5 mr-1" /> Reset
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4. Bulk Action Bar (Sticky when selected) ──────── */}
+      {selectedTicketIds.length > 0 && (
+        <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 text-sm font-medium">
+            <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+              {selectedTicketIds.length}
+            </span>
+            <span>{selectedTicketIds.length === 1 ? "Ticket Selected" : "Tickets Selected"}</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Bulk Assign */}
+            <Select onValueChange={(val) => assignMutation.mutate(val === "unassign" ? null : val)} disabled={assignMutation.isPending}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[170px]">
+                <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
+                <SelectValue placeholder={assignMutation.isPending ? "Assigning…" : "Assign Staff…"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassign">❌ Unassign</SelectItem>
+                {staffProfiles.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    👤 {s.display_name || s.name || s.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Bulk Status */}
+            <Select onValueChange={(val: any) => statusMutation.mutate(val)} disabled={statusMutation.isPending}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[150px]">
+                <Tag className="size-3.5 mr-1.5 text-emerald-400" />
+                <SelectValue placeholder={statusMutation.isPending ? "Updating…" : "Set Status…"} />
+              </SelectTrigger>
+              <SelectContent>
+                {TICKET_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {STATUS_PILL[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Bulk Priority */}
+            <Select onValueChange={(val: any) => priorityMutation.mutate(val)} disabled={priorityMutation.isPending}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[140px]">
+                <Flag className="size-3.5 mr-1.5 text-amber-400" />
+                <SelectValue placeholder={priorityMutation.isPending ? "Updating…" : "Set Priority…"} />
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PRIORITY_PILL[p].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Bulk Mark Read */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => readMutation.mutate()}
+              disabled={readMutation.isPending}
+              className="h-8 text-xs bg-slate-800 border-slate-700 text-white hover:bg-slate-700 hover:text-white"
+            >
+              <CheckCircle2 className="size-3.5 mr-1 text-sky-400" />
+              Mark Read
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedTicketIds([])}
+              className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. Operations Table (Desktop) ───────────────────── */}
+      <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[1250px]">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
+                <th className="w-10 px-3 py-2.5 text-center">
+                  <Checkbox
+                    checked={tickets.length > 0 && selectedTicketIds.length === tickets.length}
+                    onCheckedChange={(checked) =>
+                      setSelectedTicketIds(checked ? tickets.map((r) => r.id) : [])
+                    }
+                    aria-label="Select all tickets"
+                  />
+                </th>
+                <th className="text-left font-semibold px-3 py-2.5">Ticket #</th>
+                <th className="text-left font-semibold px-3 py-2.5">Created</th>
+                <th className="text-left font-semibold px-3 py-2.5">Customer</th>
+                <th className="text-left font-semibold px-3 py-2.5 min-w-[220px]">Subject</th>
+                <th className="text-left font-semibold px-3 py-2.5">Order & Service</th>
+                <th className="text-left font-semibold px-3 py-2.5">Stage</th>
+                <th className="text-left font-semibold px-3 py-2.5">Ticket Status</th>
+                <th className="text-left font-semibold px-3 py-2.5">Response State</th>
+                <th className="text-left font-semibold px-3 py-2.5">Priority</th>
+                <th className="text-left font-semibold px-3 py-2.5">Assigned</th>
+                <th className="text-left font-semibold px-3 py-2.5">Last Activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={colCount} className="px-4 py-16 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="size-6 animate-spin text-slate-400" />
+                      <span className="text-xs font-medium">Loading support tickets…</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && tickets.length === 0 && (
+                <tr>
+                  <td colSpan={colCount} className="px-4 py-16 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Inbox className="size-6" />
+                      </div>
+                      <h3 className="text-sm font-semibold text-slate-800">No tickets found</h3>
+                      <p className="text-xs text-slate-500">
+                        There are no support tickets matching your current filters.
+                      </p>
+                      {isFiltering && (
+                        <Button size="sm" variant="outline" onClick={handleResetFilters} className="mt-2 text-xs">
+                          Clear Filters
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading &&
+                groups.map(([day, items]) => (
+                  <Fragment key={`g-${day}`}>
+                    <tr className="bg-slate-900 text-white border-b border-slate-800">
+                      <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
+                        {formatDayHeader(day)}
+                      </td>
+                    </tr>
+                    {items.map((t) => (
+                      <TicketTableRow
+                        key={t.id}
+                        ticket={t}
+                        selected={selectedTicketIds.includes(t.id)}
+                        onToggleSelect={(id, checked) =>
+                          setSelectedTicketIds((prev) =>
+                            checked ? [...prev, id] : prev.filter((x) => x !== id)
+                          )
+                        }
+                        onOpen={(id) => navigate({ to: `/admin/support/tickets/${id}` as any })}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── 6. Mobile Card View ─────────────────────────────── */}
+      <div className="block md:hidden space-y-3">
+        {isLoading && (
+          <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+            <Loader2 className="size-5 animate-spin mx-auto mb-2 text-slate-400" />
+            Loading tickets…
+          </div>
+        )}
+        {!isLoading && tickets.length === 0 && (
+          <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+            No tickets match your filters.
+          </div>
+        )}
+        {!isLoading &&
+          groups.map(([day, items]) => (
+            <div key={`m-g-${day}`} className="space-y-2">
+              <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+                {formatDayHeader(day)}
+              </div>
+              <div className="space-y-2">
+                {items.map((t) => (
+                  <TicketMobileCard
+                    key={t.id}
+                    ticket={t}
+                    selected={selectedTicketIds.includes(t.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedTicketIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id)
+                      )
+                    }
+                    onOpen={(id) => navigate({ to: `/admin/support/tickets/${id}` as any })}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {/* ── 7. Pagination Bar ───────────────────────────────── */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs">
+          <div>
+            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–
+            {Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+            >
+              <ChevronLeft className="size-3.5" /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+              disabled={page * pageSize >= total || isLoading}
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Ticket Dialog */}
+      <AddTicketDialog
+        open={addTicketOpen}
+        onOpenChange={setAddTicketOpen}
+        onCreated={(id) => {
+          invalidate();
+          navigate({ to: `/admin/support/tickets/${id}` as any });
+        }}
+      />
+    </div>
+  );
+}
+
+function TicketTableRow({
+  ticket,
+  selected,
+  onToggleSelect,
+  onOpen,
+}: {
+  ticket: any;
+  selected?: boolean;
+  onToggleSelect?: (id: string, checked: boolean) => void;
+  onOpen: (id: string) => void;
+}) {
+  const statusPill = STATUS_PILL[ticket.status as TicketStatus] ?? STATUS_PILL.open;
+  const priorityPill = PRIORITY_PILL[ticket.priority as TicketPriority] ?? PRIORITY_PILL.medium;
+  const responseBadge = getResponseStateBadge(ticket);
+
+  const stage: OrderStage | null = ticket.order_stage;
+  const stageMeta = stage ? STAGE_META[stage] : null;
+
+  const stageToneMap: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    amber:   "bg-amber-50 text-amber-800 border-amber-200",
+    rose:    "bg-rose-50 text-rose-700 border-rose-200",
+    slate:   "bg-slate-100 text-slate-700 border-slate-200",
+    blue:    "bg-sky-50 text-sky-700 border-sky-200",
+    sky:     "bg-sky-50 text-sky-700 border-sky-200",
+    indigo:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+    violet:  "bg-violet-50 text-violet-700 border-violet-200",
+  };
+  const stageTone = stageToneMap[stageMeta?.tone ?? "emerald"] ?? "bg-slate-100 text-slate-700 border-slate-200";
+
+  const isUnreadOrNew = ticket.is_unread || ticket.is_new;
+
+  return (
+    <tr
+      className={`border-t border-slate-100 hover:bg-slate-50/70 cursor-pointer transition-colors ${
+        selected ? "bg-indigo-50/40" : isUnreadOrNew ? "bg-blue-50/20" : ""
+      }`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+        const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
+        if (sel && sel.toString().trim().length > 0) return;
+        onOpen(ticket.id);
+      }}
+    >
+      {/* Checkbox */}
+      <td className="w-10 px-3 py-2.5 text-center" data-no-row-click onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={!!selected}
+          onCheckedChange={(v) => onToggleSelect?.(ticket.id, !!v)}
+          aria-label={`Select ticket ${ticket.ticket_number}`}
+        />
+      </td>
+
+      {/* Ticket # */}
+      <td className="px-3 py-2.5 font-mono text-[12px] whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          {ticket.is_unread && (
+            <span className="size-2 rounded-full bg-blue-600 shrink-0" title="Unread customer message" />
+          )}
+          <Link
+            to="/admin/support/tickets/$ticketId"
+            params={{ ticketId: ticket.id }}
+            className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+          >
+            {ticket.ticket_number}
+          </Link>
+          {ticket.is_new && (
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase tracking-wide bg-rose-600 text-white">
+              NEW
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Created */}
+      <td className="px-3 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
+        <div className="flex items-center gap-1.5">
+          <div>
+            <div>{formatIST(ticket.created_at, { dateOnly: true })}</div>
+            <div className="text-slate-400">{formatIST(ticket.created_at, { timeOnly: true })} IST</div>
+          </div>
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
+            title="Time since ticket created"
+          >
+            {formatAge(Date.now() - new Date(ticket.created_at).getTime())}
+          </span>
+        </div>
+      </td>
+
+      {/* Customer */}
+      <td className="px-3 py-2.5 min-w-[170px]">
+        <div className="font-semibold text-slate-900 leading-tight text-[13px]">
+          {ticket.customer_name ?? "—"}
+        </div>
+        <div className="text-[11px] text-slate-500 font-mono mt-0.5 truncate max-w-[190px]">
+          {ticket.customer_email ?? ticket.ticket_email ?? "—"}
+        </div>
+        {ticket.customer_mobile && (
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            {formatMobile55(ticket.customer_mobile)}
+          </div>
+        )}
+      </td>
+
+      {/* Subject */}
+      <td className="px-3 py-2.5 max-w-[280px]">
+        <div
+          className={`text-[13px] leading-snug truncate ${
+            isUnreadOrNew ? "font-bold text-slate-950" : "font-normal text-slate-700"
+          }`}
+          title={ticket.subject || "(no subject)"}
+        >
+          {ticket.subject || "(no subject)"}
+        </div>
+        {ticket.description && (
+          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+            {ticket.description}
+          </div>
+        )}
+      </td>
+
+      {/* Order & Service */}
+      <td className="px-3 py-2.5 min-w-[150px] whitespace-nowrap">
+        {ticket.application_code ? (
+          <div>
+            <Link
+              to="/admin/orders/$orderId"
+              params={{ orderId: ticket.application_id }}
+              className="font-mono text-xs font-semibold text-indigo-600 hover:underline inline-flex items-center gap-1"
+              data-no-row-click
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ticket.application_code}
+            </Link>
+            <div className="text-[11px] text-slate-500 truncate max-w-[170px] mt-0.5">
+              {ticket.service_name ?? "—"}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-slate-400 italic">No linked order</div>
+        )}
+      </td>
+
+      {/* Order Stage */}
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        {stageMeta ? (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${stageTone}`}>
+            {stageMeta.label}
+          </span>
+        ) : (
+          <span className="text-slate-400 text-xs">—</span>
+        )}
+      </td>
+
+      {/* Ticket Status */}
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${statusPill.bg} ${statusPill.fg} ${statusPill.border}`}
+        >
+          {statusPill.label}
+        </span>
+      </td>
+
+      {/* Response State */}
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span
+          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] border ${responseBadge.pillClass}`}
+        >
+          <span className={`size-1.5 rounded-full ${responseBadge.dotClass}`} />
+          {responseBadge.label}
+        </span>
+      </td>
+
+      {/* Priority */}
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${priorityPill.bg} ${priorityPill.fg} ${priorityPill.border}`}
+        >
+          {priorityPill.label}
+        </span>
+      </td>
+
+      {/* Assigned */}
+      <td className="px-3 py-2.5 whitespace-nowrap text-[12px]">
+        {ticket.assigned_name ? (
+          <span className="font-medium text-slate-800">{ticket.assigned_name}</span>
+        ) : (
+          <span className="text-slate-400 italic">Unassigned</span>
+        )}
+      </td>
+
+      {/* Last Activity */}
+      <td className="px-3 py-2.5 whitespace-nowrap text-[11px] text-slate-500">
+        <div className="flex items-center gap-1">
+          <Clock className="size-3 text-slate-400" />
+          <span>
+            {ticket.last_activity_actor === "customer" ? "Customer " : "Staff "}
+            {formatAge(Date.now() - new Date(ticket.last_activity_at).getTime())}
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function TicketMobileCard({
+  ticket,
+  selected,
+  onToggleSelect,
+  onOpen,
+}: {
+  ticket: any;
+  selected?: boolean;
+  onToggleSelect?: (id: string, checked: boolean) => void;
+  onOpen: (id: string) => void;
+}) {
+  const statusPill = STATUS_PILL[ticket.status as TicketStatus] ?? STATUS_PILL.open;
+  const priorityPill = PRIORITY_PILL[ticket.priority as TicketPriority] ?? PRIORITY_PILL.medium;
+  const responseBadge = getResponseStateBadge(ticket);
+
+  return (
+    <div
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
+        onOpen(ticket.id);
+      }}
+      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${
+        selected ? "border-indigo-500 bg-indigo-50/40" : "border-slate-200 hover:border-slate-300"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div data-no-row-click onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={!!selected}
+              onCheckedChange={(v) => onToggleSelect?.(ticket.id, !!v)}
+            />
+          </div>
+          <span className="font-mono text-xs font-bold text-indigo-600">{ticket.ticket_number}</span>
+          {ticket.is_new && (
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-rose-600 text-white">
+              NEW
+            </span>
+          )}
+        </div>
+        <span className="text-[11px] text-slate-400">
+          {formatAge(Date.now() - new Date(ticket.created_at).getTime())}
+        </span>
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold text-slate-900">{ticket.customer_name ?? "—"}</div>
+        <div className="text-[11px] text-slate-500 font-mono">{ticket.customer_email ?? ticket.ticket_email}</div>
+      </div>
+
+      <div className="text-xs text-slate-800 font-medium leading-snug line-clamp-2">
+        {ticket.subject || "(no subject)"}
+      </div>
+
+      {ticket.application_code && (
+        <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
+          <span className="font-mono font-medium text-indigo-600">{ticket.application_code}</span>
+          <span className="truncate max-w-[150px]">{ticket.service_name}</span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border ${responseBadge.pillClass}`}>
+            <span className={`size-1.5 rounded-full ${responseBadge.dotClass}`} />
+            {responseBadge.label}
+          </span>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusPill.bg} ${statusPill.fg} ${statusPill.border}`}>
+            {statusPill.label}
+          </span>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${priorityPill.bg} ${priorityPill.fg} ${priorityPill.border}`}>
+            {priorityPill.label}
+          </span>
+        </div>
+
+        <span className="text-[11px] text-slate-500 font-medium">
+          {ticket.assigned_name ? `Assigned: ${ticket.assigned_name}` : "Unassigned"}
+        </span>
+      </div>
     </div>
   );
 }

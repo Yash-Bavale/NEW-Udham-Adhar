@@ -13,7 +13,7 @@ import {
   type FulfillmentStatus,
   getAllowedFulfillmentTransitions,
 } from "./fulfillment-transitions";
-import { computeOrderStage } from "./computeOrderStage";
+import { computeOrderStage, type OrderStage } from "./computeOrderStage";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
