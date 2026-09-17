@@ -76,7 +76,7 @@ export const getCustomer360 = createServerFn({ method: "POST" })
 
     const [cust, leads, apps, pays, invs, certs, comps, emails, notes, acts] = await Promise.all([
       s.from("customers").select("*").eq("id", id).maybeSingle(),
-      s.from("leads").select("id, lead_code, service, status, lead_status_v2, created_at, total_amount, payment_successful_at").eq("customer_id", id).order("created_at", { ascending: false }),
+      s.from("leads").select("id, lead_code, service, status, lead_status_v2, created_at, total_amount").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("applications").select("id, application_code, application_status, fulfillment_status, form_status, document_status, created_at, updated_at, service_id, lead_id, documents_deleted_at, form_submitted_at, certificate_uploaded_at").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("payments").select("id, amount, status, gateway_name, created_at, payment_date, razorpay_payment_id").eq("customer_id", id).order("created_at", { ascending: false }),
       s.from("invoices").select("id, invoice_number, total_amount, issued_at, pdf_path, payment_id").eq("customer_id", id).order("issued_at", { ascending: false }),
