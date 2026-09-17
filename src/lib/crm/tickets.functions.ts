@@ -84,7 +84,7 @@ export const listTickets = createServerFn({ method: "POST" })
          first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source,
          customer_id, application_id, service_id,
          customers(id, name, primary_email, primary_mobile),
-         applications(id, application_code, fulfillment_status, application_status, workflow_status, form_submitted_at, certificate_uploaded_at, total_amount, service_id, leads!applications_lead_id_fkey(id, status, lead_status_v2, payment_successful_at)),
+         applications(id, application_code, fulfillment_status, application_status, workflow_status, form_submitted_at, certificate_uploaded_at, total_amount, service_id, leads!applications_lead_id_fkey(id, status, lead_status_v2)),
          services(id, service_name)`,
         { count: "exact" }
       );
