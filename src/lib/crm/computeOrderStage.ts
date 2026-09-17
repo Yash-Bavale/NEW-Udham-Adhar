@@ -44,6 +44,9 @@ export interface ComputeStageApplication {
   fulfillment_status?: string | null;
   application_status?: string | null;
   workflow_status?: string | null;
+  refund_approved_at?: string | null;
+  refund_processed_at?: string | null;
+  closure_stage?: string | null;
 }
 
 export function computeOrderStage(
@@ -52,9 +55,26 @@ export function computeOrderStage(
 ): OrderStage {
   const leadStatus = lead?.lead_status_v2 ?? lead?.status ?? null;
 
-  // Exception stages take precedence
-  if (leadStatus === "refunded" || leadStatus === "closed_refunded") return "refunded";
-  if (leadStatus === "refund_requested" || leadStatus === "refund_approved") return "refund_requested";
+  // Exception / Refund stages take precedence
+  if (
+    leadStatus === "refunded" ||
+    leadStatus === "closed_refunded" ||
+    application?.fulfillment_status === "refunded" ||
+    Boolean(application?.refund_processed_at)
+  ) {
+    return "refunded";
+  }
+
+  if (
+    leadStatus === "refund_requested" ||
+    leadStatus === "refund_approved" ||
+    application?.closure_stage === "refund_approved" ||
+    Boolean(application?.refund_approved_at) ||
+    application?.workflow_status === "refund_closed"
+  ) {
+    return "refund_requested";
+  }
+
   if (leadStatus === "uninterested") return "uninterested";
 
   // Customer-side

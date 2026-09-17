@@ -61,9 +61,9 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 
 function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
   const fs = row.fulfillment_status ?? "";
+  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
-  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
   return "pending";
 }

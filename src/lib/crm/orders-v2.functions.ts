@@ -363,9 +363,9 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 
 export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
   const fs = row.fulfillment_status ?? "";
+  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
-  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
   return "pending";
 }
@@ -815,7 +815,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_name: staff?.display_name ?? staff?.email ?? null,
         stage: computeOrderStage(
           { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-          { form_submitted_at: a.form_submitted_at, certificate_uploaded_at: a.certificate_uploaded_at, fulfillment_status: a.fulfillment_status, application_status: a.application_status, workflow_status: (a as any).workflow_status },
+          {
+            form_submitted_at: a.form_submitted_at,
+            certificate_uploaded_at: a.certificate_uploaded_at,
+            fulfillment_status: a.fulfillment_status,
+            application_status: a.application_status,
+            workflow_status: (a as any).workflow_status,
+            closure_stage: (a as any).closure_stage,
+            refund_approved_at: (a as any).refund_approved_at,
+            refund_processed_at: (a as any).refund_processed_at,
+          },
         ),
       };
     });
