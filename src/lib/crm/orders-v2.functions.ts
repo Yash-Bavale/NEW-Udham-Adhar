@@ -561,60 +561,60 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q
             .is("form_submitted_at", null)
             .is("certificate_uploaded_at", null)
-            .not(
-              "fulfillment_status",
-              "in",
-              "(completed,order_completed,consultation_completed,order_closed,cancelled,application_approved,application_rejected,certificate_rejected,technical_delay,technical_hold,customer_delay,government_processing,application_submitted,under_processing,awaiting_govt,waiting_for_customer_submission,awaiting_customer_form,form_not_submitted,form_pending,waiting_customer,customer_form_pending,form_submitted,verification_pending,documents_received)",
-            );
+            .not("fulfillment_status", "in", [
+              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
+              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
+              "technical_hold", "customer_delay", "government_processing", "application_submitted",
+              "under_processing", "awaiting_govt", "waiting_for_customer_submission", "awaiting_customer_form",
+              "form_not_submitted", "form_pending", "waiting_customer", "customer_form_pending",
+              "form_submitted", "verification_pending", "documents_received",
+            ]);
           break;
         case "form_not_submitted":
-          q = q.or(
-            "fulfillment_status.in.(waiting_for_customer_submission,awaiting_customer_form,form_not_submitted,form_pending,waiting_customer,customer_form_pending),workflow_status.in.(waiting_for_customer,waiting_for_documents,customer_non_responsive)",
-          );
+          q = q
+            .is("form_submitted_at", null)
+            .is("certificate_uploaded_at", null)
+            .not("fulfillment_status", "in", [
+              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
+              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
+              "technical_hold", "customer_delay", "government_processing", "application_submitted",
+              "under_processing", "awaiting_govt",
+            ]);
           break;
         case "form_submitted":
           q = q
-            .or("fulfillment_status.eq.form_submitted,form_submitted_at.is.not.null")
+            .not("form_submitted_at", "is", null)
             .is("certificate_uploaded_at", null)
-            .not(
-              "fulfillment_status",
-              "in",
-              "(completed,order_completed,consultation_completed,order_closed,cancelled,application_approved,application_rejected,certificate_rejected,technical_delay,technical_hold,customer_delay,government_processing,application_submitted,under_processing,awaiting_govt,waiting_for_customer_submission,awaiting_customer_form,form_not_submitted,form_pending,waiting_customer,customer_form_pending,verification_pending,documents_received)",
-            );
+            .not("fulfillment_status", "in", [
+              "completed", "order_completed", "consultation_completed", "order_closed", "cancelled",
+              "application_approved", "application_rejected", "certificate_rejected", "technical_delay",
+              "technical_hold", "customer_delay", "government_processing", "application_submitted",
+              "under_processing", "awaiting_govt", "waiting_for_customer_submission", "awaiting_customer_form",
+              "form_not_submitted", "form_pending", "waiting_customer", "customer_form_pending",
+              "verification_pending", "documents_received",
+            ]);
           break;
         case "technical_delay":
-          q = q.or(
-            "fulfillment_status.in.(technical_delay,technical_hold),workflow_status.in.(government_portal_pending,technical_hold,external_dependency)",
-          );
+          q = q.in("fulfillment_status", ["technical_delay", "technical_hold"]);
           break;
         case "customer_delay":
-          q = q.or(
-            "fulfillment_status.in.(customer_delay),workflow_status.in.(customer_delay,waiting_for_customer,waiting_for_documents,customer_non_responsive)",
-          );
+          q = q.in("fulfillment_status", ["customer_delay"]);
           break;
         case "submitted_to_govt":
-          q = q.or(
-            "fulfillment_status.in.(government_processing,application_submitted,under_processing,awaiting_govt,application_rejected,certificate_rejected)",
-          );
+          q = q.in("fulfillment_status", [
+            "government_processing", "application_submitted", "under_processing", "awaiting_govt", "application_rejected", "certificate_rejected",
+          ]);
           break;
         case "certificate_ready":
           q = q
-            .or("fulfillment_status.eq.application_approved,certificate_uploaded_at.is.not.null")
-            .not(
-              "fulfillment_status",
-              "in",
-              "(completed,order_completed,consultation_completed,order_closed,cancelled)",
-            );
+            .not("fulfillment_status", "in", ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled"])
+            .or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
           break;
         case "completed":
-          q = q.or(
-            "fulfillment_status.in.(completed,order_completed,consultation_completed),application_status.eq.completed",
-          );
+          q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
           break;
         case "closed":
-          q = q.or(
-            "fulfillment_status.in.(order_closed,cancelled),workflow_status.in.(closed,refund_closed)",
-          );
+          q = q.in("fulfillment_status", ["order_closed", "cancelled"]);
           break;
         case "under_review":
           q = q.eq("fulfillment_status", "verification_pending");
@@ -626,7 +626,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           q = q.eq("fulfillment_status", "consultation_completed");
           break;
         case "consultation_pending":
-          q = q.or("application_status.in.(consultation_pending,consultation_scheduled)");
+          q = q.in("application_status", ["consultation_pending", "consultation_scheduled"]);
           break;
         case "refunded": {
           const { data: excLeads } = await admin.from("leads").select("id").in("lead_status_v2", ["refunded", "closed_refunded"]);
@@ -851,7 +851,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     });
 
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
-      rows = rows.filter((r) => r.stage === data.stage);
+      rows = rows.filter((r) => {
+        if (data.stage === "form_not_submitted") {
+          return r.stage === "form_not_submitted" || r.stage === "payment_done";
+        }
+        return r.stage === data.stage;
+      });
     }
 
     if (data.paymentStatus && data.paymentStatus !== "all") {
