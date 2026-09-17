@@ -33,7 +33,6 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     // Fire the remaining queries in parallel.
     const [
       repliesRes,
-      emailsRes,
       eventsRes,
       docsRes,
       prevTicketsRes,
@@ -42,32 +41,12 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       refundsRes,
       paymentsRes,
       invoicesRes,
-      assigneeProfilesRes,
     ] = await Promise.all([
       admin
         .from("ticket_replies")
-        .select("id, reply_text, is_internal, created_by, created_at, direction, emailed_at, email_message_id")
+        .select("id, reply_text, is_internal, created_by, created_at, direction, emailed_at, email_message_id, email_send_log_id")
         .eq("ticket_id", data.ticketId)
         .order("created_at", { ascending: true }),
-      (() => {
-        // Emails belonging to this conversation: matched by order, by customer,
-        // or by the ticket's own email address (tickets without an order).
-        const ors: string[] = [];
-        if (applicationId) ors.push(`application_id.eq.${applicationId}`);
-        if (customerId) ors.push(`customer_id.eq.${customerId}`);
-        const addr = (t.ticket_email ?? t.customers?.primary_email ?? "").trim();
-        if (addr) {
-          ors.push(`to_email.ilike.%${addr}%`);
-          ors.push(`from_email.ilike.%${addr}%`);
-        }
-        if (!ors.length) return Promise.resolve({ data: [] as any[], error: null });
-        return admin
-          .from("email_logs")
-          .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code")
-          .or(ors.join(","))
-          .order("created_at", { ascending: true })
-          .limit(200);
-      })(),
       applicationId
         ? admin
             .from("application_events")
@@ -132,7 +111,6 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(5)
         : Promise.resolve({ data: [] as any[], error: null }),
-      Promise.resolve(null),
     ]);
 
     // Resolve profile names for authors/assignees.
@@ -155,25 +133,46 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       );
     }
 
-    const replies = (repliesRes.data ?? []).map((r: any) => ({
-      ...r,
-      author_name: r.created_by ? nameMap.get(r.created_by) ?? "Staff" : "System",
-    }));
+    // Hydrate email details for replies linked to email_logs
+    const replyRows = repliesRes.data ?? [];
+    const sendLogIds = Array.from(new Set(replyRows.map((r: any) => r.email_send_log_id).filter(Boolean)));
+    const messageIds = Array.from(new Set(replyRows.map((r: any) => r.email_message_id).filter(Boolean)));
 
-    // email_logs stores direction as incoming/outgoing (older rows) — normalise
-    // to inbound/outbound so the thread renders every mail.
-    const emails = (emailsRes.data ?? []).map((e: any) => ({
-      ...e,
-      direction: ["inbound", "incoming", "in"].includes(String(e.direction ?? "").toLowerCase())
-        ? "inbound"
-        : "outbound",
-    }));
+    const emailById = new Map<string, any>();
+    const emailByMsgId = new Map<string, any>();
 
-    // Merge inbound emails that landed on this order but aren't in ticket_replies yet.
-    const seenMessageIds = new Set(replies.map((r) => r.email_message_id).filter(Boolean));
-    const emailOnly = emails.filter(
-      (e: any) => e.direction === "inbound" && (!e.message_id || !seenMessageIds.has(e.message_id))
-    );
+    const mailOrs: string[] = [];
+    if (sendLogIds.length) mailOrs.push(`id.in.(${sendLogIds.join(",")})`);
+    if (messageIds.length) mailOrs.push(`message_id.in.(${messageIds.join(",")})`);
+
+    if (mailOrs.length) {
+      const { data: matchedEmails } = await admin
+        .from("email_logs")
+        .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code")
+        .or(mailOrs.join(","));
+
+      (matchedEmails ?? []).forEach((e: any) => {
+        if (e.id) emailById.set(e.id, e);
+        if (e.message_id) emailByMsgId.set(e.message_id, e);
+      });
+    }
+
+    const replies = replyRows.map((r: any) => {
+      const linkedEmail = (r.email_send_log_id ? emailById.get(r.email_send_log_id) : null) ??
+                          (r.email_message_id ? emailByMsgId.get(r.email_message_id) : null) ??
+                          null;
+      return {
+        ...r,
+        author_name: r.created_by
+          ? nameMap.get(r.created_by) ?? "Staff"
+          : (r.direction === "inbound" ? (t.customers?.name ?? "Customer") : "System"),
+        subject: linkedEmail?.subject ?? null,
+        body_html: linkedEmail?.body_html ?? null,
+        from_email: linkedEmail?.from_email ?? null,
+        template_code: linkedEmail?.template_code ?? null,
+        email_status: linkedEmail?.status ?? (r.emailed_at ? "sent" : null),
+      };
+    });
 
     // Compute lifetime value from payments (fallback to customers.lifetime_value if empty).
     let lifetimeValue = Number(t.customers?.lifetime_value ?? 0);
@@ -202,8 +201,6 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
           : null,
       },
       replies,
-      inboundEmails: emailOnly,
-      outboundEmails: emails.filter((e: any) => e.direction === "outbound"),
       events: (eventsRes.data ?? []).map((r: any) => ({
         ...r,
         actor_name: r.created_by ? nameMap.get(r.created_by) ?? r.staff_name ?? "System" : r.staff_name ?? "System",

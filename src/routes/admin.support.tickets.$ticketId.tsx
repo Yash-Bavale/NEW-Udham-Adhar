@@ -173,16 +173,47 @@ function TicketWorkspace() {
   const messages: Msg[] = useMemo(() => {
     if (!data) return [];
     const out: Msg[] = [];
+    const t = data.ticket as any;
+    const cust = t?.customers ?? {};
 
-    // Inbound: prefer ticket_replies (matcher already filed them), fall back
-    // to email_logs inbound that didn't sync into replies.
-    for (const r of data.replies ?? []) {
-      if (r.is_internal) {
+    // 1. Initial ticket description (if present and not duplicated by the first reply)
+    const desc = (t?.description ?? "").trim();
+    const firstReply = data.replies?.[0];
+    const firstReplyText = (firstReply?.reply_text ?? "").trim();
+    const isFirstReplySameAsDesc =
+      Boolean(desc && firstReplyText && (firstReplyText === desc || firstReplyText.includes(desc)));
+
+    if (desc && !isFirstReplySameAsDesc) {
+      const isStaffCreated = t.source === "staff";
+      if (isStaffCreated) {
+        out.push({
+          kind: "note",
+          id: `ticket-desc-${t.id}`,
+          created_at: t.created_at,
+          author_name: t.assigned_name || "Staff",
+          body_text: desc,
+        });
+      } else {
+        out.push({
+          kind: "inbound",
+          id: `ticket-desc-${t.id}`,
+          created_at: t.created_at,
+          from_email: t.ticket_email ?? cust.primary_email ?? null,
+          subject: t.subject ?? null,
+          body_text: desc,
+          body_html: null,
+        });
+      }
+    }
+
+    // 2. All ticket replies
+    for (const r of (data.replies ?? []) as any[]) {
+      if (r.is_internal || r.direction === "note") {
         out.push({
           kind: "note",
           id: `n-${r.id}`,
           created_at: r.created_at,
-          author_name: (r as any).author_name ?? "Staff",
+          author_name: r.author_name ?? "Staff",
           body_text: r.reply_text ?? "",
         });
       } else if (r.direction === "inbound") {
@@ -190,60 +221,25 @@ function TicketWorkspace() {
           kind: "inbound",
           id: `ri-${r.id}`,
           created_at: r.created_at,
-          from_email: (data.ticket as any)?.customers?.primary_email ?? null,
-          subject: null,
+          from_email: r.from_email ?? t.ticket_email ?? cust.primary_email ?? null,
+          subject: r.subject ?? null,
           body_text: r.reply_text ?? "",
-          body_html: null,
+          body_html: r.body_html ?? null,
+        });
+      } else {
+        out.push({
+          kind: "outbound",
+          id: `ro-${r.id}`,
+          created_at: r.emailed_at ?? r.created_at,
+          from_email: r.from_email ?? "help@businesshelpservices.com",
+          subject: r.subject ?? null,
+          body_html: r.body_html ?? null,
+          body_text: r.reply_text ?? "",
+          template_hint: r.template_code ?? extractTemplateHint(r.subject, r.body_html),
+          status: r.email_status ?? (r.emailed_at ? "sent" : null),
+          author_name: r.author_name ?? "Business Help Services",
         });
       }
-    }
-    for (const e of (data as any).inboundEmails ?? []) {
-      out.push({
-        kind: "inbound",
-        id: `ie-${e.id}`,
-        created_at: e.created_at,
-        from_email: e.from_email,
-        subject: e.subject,
-        body_text: e.body_text ?? "",
-        body_html: e.body_html ?? null,
-      });
-    }
-
-    // Outbound emails (templates + agent replies delivered by mail) — email_logs
-    // carries the full HTML so we can preview exactly what the customer got.
-    const outboundLogIds = new Set<string>();
-    for (const e of (data as any).outboundEmails ?? []) {
-      outboundLogIds.add(e.id);
-      out.push({
-        kind: "outbound",
-        id: `oe-${e.id}`,
-        created_at: e.sent_at ?? e.created_at,
-        from_email: e.from_email,
-        subject: e.subject,
-        body_html: e.body_html,
-        body_text: e.body_text ?? "",
-        template_hint: e.template_code ?? extractTemplateHint(e.subject, e.body_html),
-        status: e.status,
-      });
-    }
-
-    // Agent replies that have no matching mail record — still show what we wrote.
-    for (const r of data.replies ?? []) {
-      if (r.is_internal || r.direction !== "outbound") continue;
-      const linked = (r as any).email_send_log_id as string | null;
-      if (linked && outboundLogIds.has(linked)) continue;
-      out.push({
-        kind: "outbound",
-        id: `ro-${r.id}`,
-        created_at: r.created_at,
-        from_email: null,
-        subject: null,
-        body_html: null,
-        body_text: r.reply_text ?? "",
-        template_hint: null,
-        status: (r as any).emailed_at ? "sent" : null,
-        author_name: (r as any).author_name ?? "Staff",
-      });
     }
 
     out.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -366,7 +362,7 @@ function TicketWorkspace() {
 
   if (isLoading || !data) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50">
+      <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex items-center justify-center bg-slate-50">
         <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
       </div>
     );
@@ -395,11 +391,11 @@ function TicketWorkspace() {
   }
 
   return (
-    <div className="h-full flex bg-slate-50 min-w-0">
+    <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex bg-slate-50 min-w-0 overflow-hidden">
       {/* ── Column B — Conversation ───────────────────────── */}
-      <section className="flex-1 min-w-0 flex flex-col bg-white border-r border-slate-200">
+      <section className="flex-1 min-w-0 flex flex-col h-full bg-white border-r border-slate-200 overflow-hidden">
         {/* B1: Sticky header */}
-        <header className="border-b border-slate-200 px-4 py-3 shrink-0">
+        <header className="border-b border-slate-200 px-4 py-3 shrink-0 bg-white">
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <button
               onClick={() => navigate({ to: "/admin/support/tickets" })}
@@ -532,7 +528,7 @@ function TicketWorkspace() {
         </div>
 
         {/* B3: Thread */}
-        <div ref={threadRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
+        <div ref={threadRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
           {rendered.length === 0 && (
             <div className="text-center py-16 text-sm text-slate-500 flex flex-col items-center gap-2">
               <MessageSquare className="h-8 w-8 text-slate-300" />
@@ -664,8 +660,8 @@ function TicketWorkspace() {
       </section>
 
       {/* ── Column C — Info Panel ─────────────────────────── */}
-      <aside className="hidden lg:flex w-[340px] shrink-0 flex-col bg-white">
-        <div className="flex border-b border-slate-200 text-xs shrink-0">
+      <aside className="hidden lg:flex w-[340px] shrink-0 flex-col h-full bg-white border-l border-slate-200 overflow-hidden">
+        <div className="flex border-b border-slate-200 text-xs shrink-0 bg-white">
           {(["details", "customer", "order", "history"] as const).map((t) => {
             const Icon = t === "details" ? Info : t === "customer" ? User : t === "order" ? Package : History;
             return (
@@ -683,7 +679,7 @@ function TicketWorkspace() {
             );
           })}
         </div>
-        <div className="flex-1 overflow-y-auto p-4 text-xs">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 text-xs">
           {tab === "details" && (
             <DetailsTab
               ticket={ticket}

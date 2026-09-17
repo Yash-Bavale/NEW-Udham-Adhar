@@ -104,6 +104,19 @@ const PRIORITY_PILL: Record<TicketPriority, { bg: string; fg: string; border: st
   low:    { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Low" },
 };
 
+const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "all", label: "All Order Stages" },
+  { id: "payment_done", label: "Payment Done" },
+  { id: "form_not_submitted", label: "Form Not Submitted" },
+  { id: "form_submitted", label: "Form Submitted" },
+  { id: "technical_delay", label: "Technical Delay" },
+  { id: "customer_delay", label: "Customer Delay" },
+  { id: "submitted_to_govt", label: "Submitted to Govt" },
+  { id: "certificate_ready", label: "Certificate Ready" },
+  { id: "completed", label: "Completed" },
+  { id: "closed", label: "Order Closed" },
+];
+
 function formatDayHeader(day: string): string {
   const d = new Date(day);
   const today = new Date();
@@ -628,14 +641,13 @@ function SupportTicketsOperationsPage() {
 
           {/* Order Stage Filter */}
           <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
               <SelectValue placeholder="Order Stage" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Order Stages</SelectItem>
-              {Object.keys(STAGE_META).map((st) => (
-                <SelectItem key={st} value={st}>
-                  {STAGE_META[st as OrderStage]?.label ?? st}
+              {STAGE_FILTER_OPTIONS.map((st) => (
+                <SelectItem key={st.id} value={st.id}>
+                  {st.label}
                 </SelectItem>
               ))}
             </SelectContent>
