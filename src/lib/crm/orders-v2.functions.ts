@@ -559,49 +559,61 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       switch (data.stage) {
         case "payment_done":
           q = q
-            .or("fulfillment_status.in.(order_received,payment_received,payment_successful,new,assigned,pending),fulfillment_status.is.null")
-            .is("form_submitted_at", null);
+            .is("form_submitted_at", null)
+            .is("certificate_uploaded_at", null)
+            .not(
+              "fulfillment_status",
+              "in",
+              '("completed","order_completed","consultation_completed","order_closed","cancelled","application_approved","application_rejected","certificate_rejected","technical_delay","technical_hold","customer_delay","government_processing","application_submitted","under_processing","awaiting_govt","waiting_for_customer_submission","awaiting_customer_form","form_not_submitted","form_pending","waiting_customer","customer_form_pending","form_submitted")',
+            );
           break;
         case "form_not_submitted":
           q = q.or(
-            "fulfillment_status.eq.waiting_for_customer_submission,fulfillment_status.eq.awaiting_customer_form,fulfillment_status.eq.form_not_submitted,fulfillment_status.eq.form_pending,fulfillment_status.eq.waiting_customer,fulfillment_status.eq.customer_form_pending,workflow_status.eq.waiting_for_customer,workflow_status.eq.waiting_for_documents,workflow_status.eq.customer_non_responsive,workflow_status.eq.customer_delay",
+            "fulfillment_status.in.(waiting_for_customer_submission,awaiting_customer_form,form_not_submitted,form_pending,waiting_customer,customer_form_pending),workflow_status.in.(waiting_for_customer,waiting_for_documents,customer_non_responsive)",
           );
           break;
         case "form_submitted":
           q = q
             .or("fulfillment_status.eq.form_submitted,form_submitted_at.not.is.null")
+            .is("certificate_uploaded_at", null)
             .not(
               "fulfillment_status",
               "in",
-              '("completed","order_completed","consultation_completed","order_closed","cancelled","application_approved","application_rejected","certificate_rejected","technical_delay","technical_hold","customer_delay","government_processing","application_submitted","under_processing","awaiting_govt")',
+              '("completed","order_completed","consultation_completed","order_closed","cancelled","application_approved","application_rejected","certificate_rejected","technical_delay","technical_hold","customer_delay","government_processing","application_submitted","under_processing","awaiting_govt","waiting_for_customer_submission","awaiting_customer_form","form_not_submitted","form_pending","waiting_customer","customer_form_pending")',
             );
           break;
         case "technical_delay":
           q = q.or(
-            "fulfillment_status.eq.technical_delay,fulfillment_status.eq.technical_hold,workflow_status.eq.government_portal_pending,workflow_status.eq.technical_hold,workflow_status.eq.external_dependency",
+            "fulfillment_status.in.(technical_delay,technical_hold),workflow_status.in.(government_portal_pending,technical_hold,external_dependency)",
           );
           break;
         case "customer_delay":
           q = q.or(
-            "fulfillment_status.eq.customer_delay,workflow_status.eq.customer_delay,workflow_status.eq.waiting_for_customer,workflow_status.eq.waiting_for_documents,workflow_status.eq.customer_non_responsive",
+            "fulfillment_status.eq.customer_delay,workflow_status.in.(customer_delay,waiting_for_customer,waiting_for_documents,customer_non_responsive)",
           );
           break;
         case "submitted_to_govt":
           q = q.or(
-            "fulfillment_status.eq.government_processing,fulfillment_status.eq.application_submitted,fulfillment_status.eq.under_processing,fulfillment_status.eq.awaiting_govt,fulfillment_status.eq.application_rejected,fulfillment_status.eq.certificate_rejected",
+            "fulfillment_status.in.(government_processing,application_submitted,under_processing,awaiting_govt,application_rejected,certificate_rejected)",
           );
           break;
         case "certificate_ready":
-          q = q.or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
+          q = q
+            .or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null")
+            .not(
+              "fulfillment_status",
+              "in",
+              '("completed","order_completed","consultation_completed","order_closed","cancelled")',
+            );
           break;
         case "completed":
           q = q.or(
-            "fulfillment_status.eq.completed,fulfillment_status.eq.order_completed,fulfillment_status.eq.consultation_completed,application_status.eq.completed",
+            "fulfillment_status.in.(completed,order_completed,consultation_completed),application_status.eq.completed",
           );
           break;
         case "closed":
           q = q.or(
-            "fulfillment_status.eq.order_closed,fulfillment_status.eq.cancelled,workflow_status.eq.closed,workflow_status.eq.refund_closed",
+            "fulfillment_status.in.(order_closed,cancelled),workflow_status.in.(closed,refund_closed)",
           );
           break;
         default:
@@ -807,6 +819,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ),
       };
     });
+
+    if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
+      rows = rows.filter((r) => r.stage === data.stage);
+    }
 
     if (data.paymentStatus && data.paymentStatus !== "all") {
       rows = rows.filter((r) => r.payment_status === data.paymentStatus);
