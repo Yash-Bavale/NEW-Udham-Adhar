@@ -37,6 +37,7 @@ import {
   escalateRefund,
   addRefundNote,
 } from "@/lib/orders/order-actions.functions";
+import { listGateways } from "@/lib/payments/gateways.functions";
 import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 
@@ -333,12 +334,53 @@ function RefundDetailDrawer({
   const [tab, setTab] = useState<DetailTab>("activity");
 
   const fnDetail = useServerFn(getRefundDetail);
+  const fnGateways = useServerFn(listGateways);
   const fnApprove = useServerFn(approveRefund);
   const fnReject = useServerFn(rejectRefund);
   const fnProcess = useServerFn(markRefundProcessed);
   const fnInfo = useServerFn(requestRefundInfo);
   const fnEsc = useServerFn(escalateRefund);
   const fnNote = useServerFn(addRefundNote);
+
+  const qGw = useQuery({
+    queryKey: ["admin.gateways.list"],
+    queryFn: () => fnGateways(),
+  });
+
+  const gatewayOptions = useMemo(() => {
+    const rows = (qGw.data?.rows ?? []) as Array<{ id: string; name: string; display_name: string; is_enabled?: boolean }>;
+    const set = new Set<string>();
+    const list: Array<{ value: string; label: string }> = [];
+
+    // All configured gateways from Gateways module
+    for (const g of rows) {
+      const val = (g.name || "").toLowerCase().trim();
+      if (!val || set.has(val)) continue;
+      set.add(val);
+      list.push({
+        value: val,
+        label: g.display_name || g.name,
+      });
+    }
+
+    // Default fallbacks if not in DB
+    const fallbacks = [
+      { value: "payu", label: "PayU" },
+      { value: "ccavenue", label: "CCAvenue" },
+      { value: "razorpay", label: "Razorpay" },
+      { value: "cashfree", label: "Cashfree" },
+      { value: "manual", label: "Manual / Bank Transfer" },
+    ];
+
+    for (const fb of fallbacks) {
+      if (!set.has(fb.value)) {
+        set.add(fb.value);
+        list.push(fb);
+      }
+    }
+
+    return list;
+  }, [qGw.data]);
 
   const q = useQuery({
     queryKey: ["refund-detail", id],
@@ -727,10 +769,11 @@ function RefundDetailDrawer({
                         className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm font-medium"
                       >
                         <option value="">Select gateway</option>
-                        <option value="payu">PayU</option>
-                        <option value="ccavenue">CCAvenue</option>
-                        <option value="razorpay">Razorpay</option>
-                        <option value="manual">Manual / Bank Transfer</option>
+                        {gatewayOptions.map((gw) => (
+                          <option key={gw.value} value={gw.value}>
+                            {gw.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
