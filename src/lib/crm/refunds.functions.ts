@@ -53,6 +53,9 @@ export const approveRefund = createServerFn({ method: "POST" })
     const { error: upErr } = await admin
       .from("applications")
       .update({
+        fulfillment_status: "order_closed",
+        workflow_status: "refund_closed",
+        closure_stage: "refund_approved",
         refund_approved_at: new Date().toISOString(),
         refund_approved_by: context.userId,
       } as never)

@@ -592,6 +592,20 @@ export const approveRefund = createServerFn({ method: "POST" })
       remarks: data.adminNotes ?? null,
     });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Close application & mark closure stage
+    await supabaseAdmin
+      .from("applications")
+      .update({
+        fulfillment_status: "order_closed",
+        workflow_status: "refund_closed",
+        closure_stage: "refund_approved",
+        refund_approved_at: new Date().toISOString(),
+        refund_approved_by: context.userId,
+      } as never)
+      .eq("id", data.orderId);
+
+    // Update refund_requests record
     await supabaseAdmin
       .from("refund_requests")
       .update({
@@ -606,6 +620,19 @@ export const approveRefund = createServerFn({ method: "POST" })
       } as never)
       .eq("application_id", data.orderId)
       .in("status", ["pending", "info_needed", "escalated"]);
+
+    // Transition lead to refund_approved stage
+    const app2 = updated as Record<string, unknown> | null;
+    const leadId = (app2?.lead_id as string | null) ?? null;
+    if (leadId) {
+      try {
+        const { transitionLeadStatus } = await import("@/lib/crm/lead-status.functions");
+        await transitionLeadStatus({ data: { leadId, toStatus: "refund_approved" } });
+      } catch (err) {
+        console.error("[approveRefund] lead transition to refund_approved failed:", err);
+      }
+    }
+
     await writeRefundEvent(data.orderId, "approved", context.userId, {
       note: data.adminNotes ?? null,
       meta: {
@@ -615,7 +642,7 @@ export const approveRefund = createServerFn({ method: "POST" })
         deduction_reason: data.deductionReason ?? null,
       },
     });
-    const app2 = updated as Record<string, unknown> | null;
+
     await notifyOrderEvent({
       order: {
         id: data.orderId,
