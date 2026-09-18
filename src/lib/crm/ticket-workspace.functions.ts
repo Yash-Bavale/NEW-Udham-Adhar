@@ -140,27 +140,45 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
 
     const emailById = new Map<string, any>();
     const emailByMsgId = new Map<string, any>();
+    let allMatchedEmails: any[] = [];
 
     const mailOrs: string[] = [];
     if (sendLogIds.length) mailOrs.push(`id.in.(${sendLogIds.join(",")})`);
     if (messageIds.length) mailOrs.push(`message_id.in.(${messageIds.join(",")})`);
+    if (applicationId) mailOrs.push(`application_id.eq.${applicationId}`);
+    else if (customerId) mailOrs.push(`customer_id.eq.${customerId}`);
 
     if (mailOrs.length) {
       const { data: matchedEmails } = await admin
         .from("email_logs")
-        .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code")
+        .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code, application_id")
         .or(mailOrs.join(","));
 
-      (matchedEmails ?? []).forEach((e: any) => {
+      allMatchedEmails = matchedEmails ?? [];
+      allMatchedEmails.forEach((e: any) => {
         if (e.id) emailById.set(e.id, e);
         if (e.message_id) emailByMsgId.set(e.message_id, e);
       });
     }
 
     const replies = replyRows.map((r: any) => {
-      const linkedEmail = (r.email_send_log_id ? emailById.get(r.email_send_log_id) : null) ??
-                          (r.email_message_id ? emailByMsgId.get(r.email_message_id) : null) ??
-                          null;
+      let linkedEmail = (r.email_send_log_id ? emailById.get(r.email_send_log_id) : null) ??
+                        (r.email_message_id ? emailByMsgId.get(r.email_message_id) : null) ??
+                        null;
+
+      // Fallback matching by direction and timestamp proximity (within 5 minutes)
+      if (!linkedEmail && allMatchedEmails.length > 0) {
+        const replyTime = new Date(r.created_at).getTime();
+        linkedEmail = allMatchedEmails.find((e: any) => {
+          const isDirMatch = r.direction === "inbound"
+            ? (e.direction === "incoming" || e.direction === "inbound")
+            : (e.direction === "outgoing" || e.direction === "outbound");
+          if (!isDirMatch) return false;
+          const eTime = new Date(e.sent_at || e.created_at).getTime();
+          return Math.abs(eTime - replyTime) < 300_000;
+        }) ?? null;
+      }
+
       return {
         ...r,
         author_name: r.created_by

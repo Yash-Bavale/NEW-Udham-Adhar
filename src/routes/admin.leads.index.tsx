@@ -771,6 +771,28 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
+function parseFormattedError(e: any): string {
+  if (!e) return "An error occurred";
+  const msg = typeof e === "string" ? e : e?.message ?? String(e);
+  if (typeof msg === "string") {
+    const trimmed = msg.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const first = parsed[0];
+          if (first?.message) return first.message;
+        } else if (parsed?.message) {
+          return parsed.message;
+        }
+      } catch {
+        /* noop */
+      }
+    }
+  }
+  return msg;
+}
+
 function AddLeadDialog({
   open, onOpenChange, staff, onCreated,
 }: {
@@ -790,11 +812,13 @@ function AddLeadDialog({
     setFetching(true);
     try {
       const { lead } = await findFn({ data: { query: q } });
+      const rawMobile = (lead.mobile ?? "").replace(/\D/g, "");
+      const cleanMobile = rawMobile.length > 10 && rawMobile.startsWith("91") ? rawMobile.slice(-10) : rawMobile.slice(0, 10);
       setForm((f) => ({
         ...f,
         name: lead.name ?? f.name,
         email: lead.email ?? f.email,
-        mobile: lead.mobile ?? f.mobile,
+        mobile: cleanMobile || f.mobile,
         state: lead.state ?? f.state,
         district: lead.district ?? f.district,
         language: lead.language ?? f.language,
@@ -807,7 +831,7 @@ function AddLeadDialog({
       }));
       toast.success(`Prefilled from ${lead.lead_code ?? lead.id.slice(0, 8)}`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Lead not found");
+      toast.error(parseFormattedError(e) || "Lead not found");
     } finally {
       setFetching(false);
     }
@@ -857,7 +881,13 @@ function AddLeadDialog({
     }
   };
 
+  const isMobileValid = /^[6-9]\d{9}$/.test(form.mobile);
+
   const submit = async () => {
+    if (!isMobileValid) {
+      toast.error("Please enter a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)");
+      return;
+    }
     setBusy(true);
     try {
       const res = await addFn({
@@ -882,7 +912,7 @@ function AddLeadDialog({
         base_amount: 0, gst_amount: 0, total_amount: 0, notes: "", assigned_to: "", website_id: "",
       });
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to create lead");
+      toast.error(parseFormattedError(e) || "Failed to create lead");
     } finally {
       setBusy(false);
     }
@@ -892,32 +922,68 @@ function AddLeadDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Lead</DialogTitle>
+          <DialogTitle className="text-base font-semibold">Add Lead</DialogTitle>
         </DialogHeader>
-        <div className="mb-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2">
-          <Label className="text-[11px] uppercase tracking-wider text-slate-500">Prefill from existing lead</Label>
+        <div className="mb-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2.5">
+          <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Prefill from existing lead</Label>
           <div className="mt-1 flex gap-2">
             <Input
               value={fetchId}
               onChange={(e) => setFetchId(e.target.value)}
               placeholder="Lead code (LD-1234), UUID, mobile, or email"
+              className="text-xs"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); doFetch(); } }}
             />
-            <Button type="button" variant="outline" onClick={doFetch} disabled={fetching || !fetchId.trim()}>
+            <Button type="button" variant="outline" size="sm" onClick={doFetch} disabled={fetching || !fetchId.trim()}>
               {fetching ? "Fetching…" : "Fetch"}
             </Button>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 py-2">
           <Row label="Full Name" required>
-            <Input value={form.name} onChange={(e) => setField("name", e.target.value)} />
+            <Input
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              placeholder="e.g. Rahul Sharma"
+            />
           </Row>
+
           <Row label="Mobile" required>
-            <Input value={form.mobile} onChange={(e) => setField("mobile", e.target.value)} />
+            <div className="space-y-1">
+              <div className="flex rounded-md border border-input bg-background text-sm focus-within:ring-1 focus-within:ring-ring focus-within:border-ring">
+                <span className="inline-flex items-center px-2.5 rounded-l-md border-r bg-slate-100 text-xs text-slate-600 font-mono select-none">
+                  🇮🇳 +91
+                </span>
+                <Input
+                  type="tel"
+                  maxLength={10}
+                  value={form.mobile}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    const clean = raw.length > 10 && raw.startsWith("91") ? raw.slice(-10) : raw.slice(0, 10);
+                    setField("mobile", clean);
+                  }}
+                  placeholder="9876543210"
+                  className="rounded-l-none border-0 focus-visible:ring-0 shadow-none font-mono"
+                />
+              </div>
+              {form.mobile.length > 0 && !isMobileValid && (
+                <p className="text-[11px] font-medium text-red-500">
+                  Must be 10 digits starting with 6-9
+                </p>
+              )}
+            </div>
           </Row>
+
           <Row label="Email" required full>
-            <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setField("email", e.target.value)}
+              placeholder="customer@domain.com"
+            />
           </Row>
+
           <Row label="State" required>
             <select
               value={form.state}
@@ -930,9 +996,15 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
+
           <Row label="District">
-            <Input value={form.district} onChange={(e) => setField("district", e.target.value)} placeholder="(optional)" />
+            <Input
+              value={form.district}
+              onChange={(e) => setField("district", e.target.value)}
+              placeholder="(optional)"
+            />
           </Row>
+
           <Row label="Source" required>
             <select
               value={form.lead_source}
@@ -947,6 +1019,7 @@ function AddLeadDialog({
               <option value="Other">Other</option>
             </select>
           </Row>
+
           <Row label="Website" required full>
             <select
               value={form.website_id}
@@ -963,6 +1036,7 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
+
           <Row label="Interested Service" required full>
             <select
               value={form.service}
@@ -975,6 +1049,7 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
+
           <Row label="Total ₹ (inclusive 18% GST)" full>
             <Input
               type="number"
@@ -985,6 +1060,7 @@ function AddLeadDialog({
               }}
             />
           </Row>
+
           <Row label="Base ₹ (auto)">
             <Input
               type="number"
@@ -995,9 +1071,11 @@ function AddLeadDialog({
               }}
             />
           </Row>
+
           <Row label="GST 18% ₹ (auto)">
-            <Input type="number" value={form.gst_amount} readOnly />
+            <Input type="number" value={form.gst_amount} readOnly className="bg-slate-50" />
           </Row>
+
           <Row label="Assign to" full>
             <select
               value={form.assigned_to}
@@ -1010,13 +1088,22 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
+
           <Row label="Notes" full>
-            <Textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} placeholder="Any initial notes about this lead…" />
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setField("notes", e.target.value)}
+              rows={2}
+              placeholder="Any initial notes about this lead…"
+            />
           </Row>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || !form.name || !form.email || !form.mobile || !form.state || !form.service}>
+          <Button
+            onClick={submit}
+            disabled={busy || !form.name.trim() || !form.email.trim() || !isMobileValid || !form.state || !form.service}
+          >
             {busy ? "Creating…" : "Create Lead"}
           </Button>
         </DialogFooter>

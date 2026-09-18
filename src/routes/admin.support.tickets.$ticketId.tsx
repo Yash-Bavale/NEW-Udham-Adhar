@@ -743,7 +743,12 @@ function TicketWorkspace() {
 
 // ── message bubble ─────────────────────────────────────────
 
+// ── message bubble ─────────────────────────────────────────
+
 function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string | null }) {
+  const hasHtml = Boolean(msg.body_html && msg.body_html.trim());
+  const [viewMode, setViewMode] = useState<"html" | "text">(hasHtml ? "html" : "text");
+
   if (msg.kind === "note") {
     return (
       <div className="max-w-3xl mx-auto">
@@ -752,9 +757,9 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
           style={{ background: "#fffbeb", borderLeft: "3px solid #f59e0b" }}
         >
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-semibold text-amber-900">
-              👁 {msg.author_name}
-              <span className="ml-2 text-[10px] font-medium bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded uppercase">
+            <span className="font-semibold text-amber-900 flex items-center gap-1.5">
+              <span>👁</span> {msg.author_name}
+              <span className="ml-1 text-[10px] font-medium bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded uppercase tracking-wide">
                 Internal Note
               </span>
             </span>
@@ -770,42 +775,69 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
 
   if (msg.kind === "inbound") {
     const plain = decodeEntities(msg.body_text || "");
-    const parsed = parseEmailReply(plain || stripHtml(msg.body_html || ""));
-    const richOnly = !plain.trim() && !!msg.body_html;
+    const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
+
     return (
-      <div className="max-w-3xl mr-auto">
+      <div className="max-w-3xl mr-auto w-full">
         <div
-          className="bg-white rounded-lg p-3 shadow-sm"
-          style={{ borderLeft: "3px solid #22c55e" }}
+          className="bg-white rounded-lg p-3.5 shadow-sm border border-slate-200"
+          style={{ borderLeft: "4px solid #22c55e" }}
         >
-          <div className="flex items-center justify-between text-xs mb-2">
+          <div className="flex items-center justify-between text-xs mb-2.5 flex-wrap gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span
-                className="h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
+                className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs"
                 style={{ background: "#16a34a" }}
               >
                 {initials(customerName)}
               </span>
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate">
+                <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
                   {customerName || "Customer"}
-                  <span className="ml-1.5 text-[10px] font-medium bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase">
-                    Customer
+                  <span className="text-[10px] font-medium bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                    Received Email
                   </span>
                 </div>
                 <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
               </div>
             </div>
-            <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+
+            <div className="flex items-center gap-2">
+              {hasHtml && (
+                <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded border border-slate-200 text-[10px]">
+                  <button
+                    onClick={() => setViewMode("html")}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      viewMode === "html" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    🌐 Rich Email
+                  </button>
+                  <button
+                    onClick={() => setViewMode("text")}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      viewMode === "text" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    📝 Text
+                  </button>
+                </div>
+              )}
+              <span className="text-slate-400 shrink-0 text-[11px]" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+            </div>
           </div>
+
           {msg.subject && (
-            <div className="text-xs font-semibold text-slate-700 mb-1.5">{msg.subject}</div>
+            <div className="text-xs font-semibold text-slate-800 mb-2 pb-1 border-b border-slate-100">
+              Subject: {msg.subject}
+            </div>
           )}
-          {richOnly ? (
+
+          {viewMode === "html" && hasHtml ? (
             <EmailIframe html={msg.body_html} fallback={parsed.newContent} />
           ) : (
             <>
-              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50/50 p-2.5 rounded border border-slate-100">
                 {parsed.newContent || "(no content)"}
               </div>
               {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
@@ -817,16 +849,19 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   }
 
   // outbound
+  const plain = decodeEntities(msg.body_text || "");
+  const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
+
   return (
-    <div className="max-w-3xl ml-auto">
+    <div className="max-w-3xl ml-auto w-full">
       <div
-        className="rounded-lg p-3 shadow-sm"
-        style={{ background: "#eff6ff", borderRight: "3px solid #1e3a5f" }}
+        className="rounded-lg p-3.5 shadow-sm border border-slate-200"
+        style={{ background: "#f8fafc", borderRight: "4px solid #1e3a5f" }}
       >
-        <div className="flex items-center justify-between text-xs mb-2">
+        <div className="flex items-center justify-between text-xs mb-2.5 flex-wrap gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className="h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold shrink-0"
+              className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-xs"
               style={{ background: "#1e3a5f" }}
             >
               BHS
@@ -839,8 +874,8 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
                     {msg.template_hint}
                   </span>
                 )}
-                <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase">
-                  {msg.body_html ? "Email" : "Reply"}
+                <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                  Sent Email
                 </span>
                 {msg.status && (
                   <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded capitalize">
@@ -851,14 +886,48 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
               <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "help@businesshelpservices.com"}</div>
             </div>
           </div>
-          <span className="text-slate-400 shrink-0 ml-2" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+
+          <div className="flex items-center gap-2">
+            {hasHtml && (
+              <div className="flex items-center gap-0.5 bg-slate-200/70 p-0.5 rounded text-[10px]">
+                <button
+                  onClick={() => setViewMode("html")}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    viewMode === "html" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🌐 Rich Email
+                </button>
+                <button
+                  onClick={() => setViewMode("text")}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    viewMode === "text" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  📝 Text
+                </button>
+              </div>
+            )}
+            <span className="text-slate-400 shrink-0 text-[11px]" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+          </div>
         </div>
+
         {msg.subject && (
-          <div className="text-xs font-semibold text-slate-700 mb-1.5">
-            {msg.subject}
+          <div className="text-xs font-semibold text-slate-800 mb-2 pb-1 border-b border-slate-200/60">
+            Subject: {msg.subject}
           </div>
         )}
-        <EmailIframe html={msg.body_html} fallback={msg.body_text} />
+
+        {viewMode === "html" && hasHtml ? (
+          <EmailIframe html={msg.body_html} fallback={msg.body_text} />
+        ) : (
+          <>
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed bg-white p-2.5 rounded border border-slate-200/60 shadow-2xs">
+              {parsed.newContent || msg.body_text || "(no content)"}
+            </div>
+            {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
+          </>
+        )}
       </div>
     </div>
   );
@@ -878,13 +947,13 @@ function QuotedToggle({ text }: { text: string }) {
     <div className="mt-2 border-t border-slate-100 pt-2">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+        className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium"
       >
         <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
         {open ? "Hide quoted text" : "Show quoted text"}
       </button>
       {open && (
-        <div className="mt-1.5 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500 whitespace-pre-wrap leading-relaxed">
+        <div className="mt-1.5 pl-2 border-l-2 border-slate-200 text-[12px] text-slate-500 whitespace-pre-wrap leading-relaxed font-sans">
           {text}
         </div>
       )}
@@ -916,41 +985,41 @@ function EmailIframe({ html, fallback }: { html: string | null; fallback: string
     ? clean
     : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
         html,body{margin:0;padding:0;background:#fff}
-        body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0f172a;padding:14px}
+        body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0f172a;padding:14px}
         img{max-width:100%;height:auto}
         table{max-width:100%}
         a{color:#1d4ed8}
       </style></head><body>${clean}</body></html>`;
 
-  const collapsed = !expanded && height > 360;
+  const collapsed = !expanded && height > 380;
 
   return (
-    <div className="rounded border border-slate-200 bg-white overflow-hidden">
-      <div style={{ maxHeight: collapsed ? 360 : "none", overflow: "hidden", position: "relative" }}>
+    <div className="rounded border border-slate-200 bg-white overflow-hidden shadow-2xs">
+      <div style={{ maxHeight: collapsed ? 380 : "none", overflow: "hidden", position: "relative" }}>
         <iframe
           ref={iframeRef}
           title="email-preview"
           srcDoc={safe}
-          sandbox="allow-same-origin"
+          sandbox="allow-same-origin allow-popups"
           style={{ width: "100%", border: "none", height: height ? `${height}px` : "260px", display: "block" }}
           onLoad={(e) => {
             const iframe = e.currentTarget as HTMLIFrameElement;
             try {
               const h = iframe.contentDocument?.body?.scrollHeight ?? 260;
-              setHeight(Math.max(200, h + 16));
+              setHeight(Math.max(180, h + 20));
             } catch {
               /* noop */
             }
           }}
         />
         {collapsed && (
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
         )}
       </div>
-      {height > 360 && (
+      {height > 380 && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="w-full text-[11px] text-blue-700 hover:bg-blue-50 py-1.5 border-t border-slate-200"
+          className="w-full text-xs font-medium text-blue-700 hover:bg-blue-50 py-2 border-t border-slate-200 transition-colors flex items-center justify-center gap-1 bg-slate-50/50"
         >
           {expanded ? "Show less ↑" : "Show full email ↓"}
         </button>
