@@ -112,6 +112,201 @@ function daysSince(iso: string | null | undefined): number {
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
+function OrdersListPage() {
+  const listFn = useServerFn(listOrdersV2);
+  const staffFn = useServerFn(listStaff);
+  const svcFn = useServerFn(listServices);
+  const role = useRole();
+  const userPerms = usePermissions();
+
+  const hideMoney = role.hideMoney();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
+
+  const [search, setSearch] = useState<string>(savedState?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedState?.debouncedSearch ?? "");
+  const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
+  const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
+  const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
+  const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
+  const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
+  const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
+  const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
+  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
+  const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
+  const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
+  const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(savedState?.sortOrder ?? "desc");
+  const [page, setPage] = useState<number>(savedState?.page ?? 1);
+  const pageSize = 50;
+  const isInitialMount = useRef(true);
+
+  // Persist state across navigation
+  useEffect(() => {
+    saveModuleFilterState("admin.orders", {
+      search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
+      paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge,
+      customDays, sortField, sortOrder, page,
+    });
+  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
+
+  // Debounce search input by 350ms
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page to 1 whenever filters change (skip on initial mount to preserve Page 2/3 when returning via Back button)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    setPage(1);
+  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
+
+  // Listener to reset all filters when clicking "Orders" in leftbar
+  useEffect(() => {
+    const handleReset = () => {
+      clearModuleFilterState("admin.orders");
+      setSearch("");
+      setDebouncedSearch("");
+      setFulfillmentStatus("all");
+      setServiceId("all");
+      setAssignedTo("all");
+      setPaymentStatus("all");
+      setActionStatusFilter("all");
+      setStageFilter("all");
+      setDateFrom("");
+      setDateTo("");
+      setBucket("all");
+      setPendingAge("any");
+      setCustomDays("");
+      setSortField("created_at");
+      setSortOrder("desc");
+      setPage(1);
+      const container = document.getElementById("admin-main-scroll");
+      if (container) container.scrollTop = 0;
+    };
+
+    window.addEventListener("reset-orders-filters", handleReset);
+    return () => window.removeEventListener("reset-orders-filters", handleReset);
+  }, []);
+
+  const routeSearch = Route.useSearch();
+
+  // Hydrate filters from URL query params (deep-links from dashboard KPIs).
+  useEffect(() => {
+    if (routeSearch.filter) {
+      switch (routeSearch.filter) {
+        case "pending": setBucket("pending"); break;
+        case "closed": setBucket("closed"); break;
+        case "completed": setBucket("completed"); break;
+        case "delayed_3d": setBucket("pending"); setPendingAge("3"); break;
+        case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
+        case "not_contacted": setBucket("needs_action"); break;
+        case "not_contacted_5h": setBucket("needs_action"); break;
+        case "technical_delay": setStageFilter("technical_delay"); break;
+        case "customer_delay": setStageFilter("customer_delay"); break;
+        case "form_not_submitted": setStageFilter("form_not_submitted"); break;
+      }
+    }
+    if (routeSearch.preset) {
+      const now = new Date();
+      if (routeSearch.preset === "today") {
+        const todayKey = istDateKey(now);
+        setDateFrom(todayKey);
+        setDateTo(todayKey);
+      } else if (routeSearch.preset === "yesterday") {
+        const yestKey = istDateKey(new Date(now.getTime() - 86400000));
+        setDateFrom(yestKey);
+        setDateTo(yestKey);
+      }
+    }
+    if (routeSearch.dateFrom) setDateFrom(routeSearch.dateFrom);
+    if (routeSearch.dateTo) setDateTo(routeSearch.dateTo);
+    if (routeSearch.stage) setStageFilter(routeSearch.stage);
+    if (routeSearch.search) setSearch(routeSearch.search);
+  }, [routeSearch]);
+
+  const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
+  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    if (Array.isArray(staffData)) return staffData;
+    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
+    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
+    return [];
+  }, [staffData]);
+  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
+
+  // Group active services website-wise
+  const groupedServices = useMemo(() => {
+    const raw = (svcData?.rows ?? []) as any[];
+    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
+
+    for (const s of activeOnly) {
+      const webId = s.website_id || s.website?.id || "main";
+      const webName = s.website?.name || s.website?.domain || "Main Website";
+      const domain = s.website?.domain || "";
+
+      if (!map.has(webId)) {
+        map.set(webId, { websiteName: webName, domain, services: [] });
+      }
+      map.get(webId)!.services.push(s);
+    }
+
+    return Array.from(map.entries()).map(([id, group]) => ({
+      id,
+      ...group,
+    }));
+  }, [svcData]);
+
+  const queryPayload = useMemo(() => ({
+    page,
+    pageSize,
+    fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
+    serviceId: serviceId === "all" ? undefined : serviceId,
+    assignedTo: assignedTo === "all" ? undefined : assignedTo,
+    paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    search: debouncedSearch || undefined,
+    bucket: bucket || "all",
+    stage: stageFilter === "all" ? undefined : stageFilter,
+    actionStatus: actionStatusFilter || "all",
+    pendingAge: pendingAge === "any" ? undefined : pendingAge,
+    customDays: customDays || undefined,
+    sortField,
+    sortOrder,
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
+    queryFn: () => listFn({ data: queryPayload }),
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const rows = (data?.rows ?? []) as any[];
+  const total = data?.total ?? 0;
+  const counts = data?.counts ?? {
+    all: 0,
+    needs_action: 0,
+    pending: 0,
+    completed: 0,
+    closed: 0,
+    exception: 0,
+    actionRequired: 0,
+    processed: 0,
+  };
+  const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
+
 
 // Preserve scroll position when navigating back from order detail view
 usePreserveScroll("admin.orders", !isLoading);
