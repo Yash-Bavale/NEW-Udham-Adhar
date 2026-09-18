@@ -93,7 +93,14 @@ export function computeOrderStage(
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
-  if (fs === "order_closed" || fs === "cancelled" || ws === "closed" || ws === "refund_closed") return "closed";
+  if (
+    fs === "order_closed" ||
+    fs === "cancelled" ||
+    ws === "closed" ||
+    ws === "refund_closed" ||
+    application.application_status === "closed" ||
+    Boolean(application.closure_stage)
+  ) return "closed";
 
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";

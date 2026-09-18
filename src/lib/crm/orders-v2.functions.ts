@@ -721,13 +721,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
-    // Compute global tab counts
+    // Compute global tab counts using bucketOfRow for 100% consistency
     const totalOrders = allRows.length;
-    const needsActionCount = allRows.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status)).length;
-    const completedCount = allRows.filter((r) => ["completed", "order_completed", "consultation_completed"].includes(r.fulfillment_status)).length;
-    const closedCount = allRows.filter((r) => ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status)).length;
-    const exceptionCount = allRows.filter((r) => ["uninterested", "refund_requested", "refunded"].includes(r.stage)).length;
-    const pendingCount = Math.max(0, totalOrders - completedCount - closedCount);
+    const needsActionCount = allRows.filter((r) => bucketOfRow(r) === "needs_action").length;
+    const completedCount = allRows.filter((r) => bucketOfRow(r) === "completed").length;
+    const closedCount = allRows.filter((r) => bucketOfRow(r) === "closed").length;
+    const exceptionCount = allRows.filter((r) => bucketOfRow(r) === "exception").length;
+    const pendingCount = allRows.filter((r) => bucketOfRow(r) === "pending").length;
 
     const counts = {
       all: totalOrders,
@@ -745,19 +745,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (data.bucket && data.bucket !== "all") {
       switch (data.bucket) {
         case "needs_action":
-          filtered = filtered.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status));
+          filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
           break;
         case "completed":
-          filtered = filtered.filter((r) => ["completed", "order_completed", "consultation_completed"].includes(r.fulfillment_status));
+          filtered = filtered.filter((r) => bucketOfRow(r) === "completed");
           break;
         case "closed":
-          filtered = filtered.filter((r) => ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status));
+          filtered = filtered.filter((r) => bucketOfRow(r) === "closed");
           break;
         case "pending":
-          filtered = filtered.filter((r) => !["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status));
+          filtered = filtered.filter((r) => bucketOfRow(r) === "pending");
           break;
         case "exception":
-          filtered = filtered.filter((r) => ["uninterested", "refund_requested", "refunded"].includes(r.stage));
+          filtered = filtered.filter((r) => bucketOfRow(r) === "exception");
           break;
       }
     }
@@ -775,9 +775,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // Filter by action status
     if (data.actionStatus && data.actionStatus !== "all") {
       if (data.actionStatus === "action_required") {
-        filtered = filtered.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status));
+        filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
       } else if (data.actionStatus === "processed") {
-        filtered = filtered.filter((r) => !["order_received", "form_submitted"].includes(r.fulfillment_status));
+        filtered = filtered.filter((r) => bucketOfRow(r) !== "needs_action");
       }
     }
 
