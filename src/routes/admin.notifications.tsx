@@ -22,13 +22,26 @@ export const Route = createFileRoute("/admin/notifications")({
   component: NotificationsPage,
 });
 
-type Filter = "all" | "mentions" | "assignments" | "sla" | "system";
+type Filter = "all" | "assignments" | "orders" | "mentions" | "sla" | "system";
 
 function classifyFilter(n: Notification): Filter {
   const k = (n.kind ?? "").toLowerCase();
-  if (k.includes("mention")) return "mentions";
   if (k.includes("assign")) return "assignments";
-  if (k.includes("sla") || k.includes("overdue") || k.includes("breach")) return "sla";
+  if (
+    k.includes("customer_hold") ||
+    k.includes("form_link") ||
+    k.includes("order_status") ||
+    k.includes("order_reminder") ||
+    k.includes("workflow") ||
+    k.includes("delay") ||
+    k.includes("customer_reply") ||
+    k.includes("form_submitted") ||
+    k.includes("order")
+  ) {
+    return "orders";
+  }
+  if (k.includes("mention")) return "mentions";
+  if (k.includes("sla") || k.includes("overdue") || k.includes("breach") || k.includes("escalat")) return "sla";
   return "system";
 }
 
@@ -36,6 +49,7 @@ function kindIcon(n: Notification) {
   const f = classifyFilter(n);
   if (f === "mentions") return { Icon: AtSign, tone: "text-violet-600 bg-violet-50" };
   if (f === "assignments") return { Icon: UserPlus, tone: "text-indigo-600 bg-indigo-50" };
+  if (f === "orders") return { Icon: Clock, tone: "text-blue-600 bg-blue-50" };
   if (f === "sla") return { Icon: AlertTriangle, tone: "text-rose-600 bg-rose-50" };
   return { Icon: Info, tone: "text-sky-600 bg-sky-50" };
 }
@@ -54,11 +68,10 @@ function relative(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
 function NotificationsPage() {
@@ -98,7 +111,7 @@ function NotificationsPage() {
   const unread = allRows.filter((r) => !r.read_at).length;
 
   const counts = useMemo(() => {
-    const c = { all: allRows.length, mentions: 0, assignments: 0, sla: 0, system: 0 };
+    const c = { all: allRows.length, assignments: 0, orders: 0, mentions: 0, sla: 0, system: 0 };
     for (const n of allRows) c[classifyFilter(n)]++;
     return c;
   }, [allRows]);
@@ -144,9 +157,10 @@ function NotificationsPage() {
         <TabsList className="h-auto p-1 bg-slate-100">
           {([
             { id: "all", label: "All" },
-            { id: "mentions", label: "Mentions" },
             { id: "assignments", label: "Assignments" },
-            { id: "sla", label: "SLA" },
+            { id: "orders", label: "Order Updates" },
+            { id: "mentions", label: "Mentions" },
+            { id: "sla", label: "SLA / Alerts" },
             { id: "system", label: "System" },
           ] as { id: Filter; label: string }[]).map((f) => (
             <TabsTrigger key={f.id} value={f.id} className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">

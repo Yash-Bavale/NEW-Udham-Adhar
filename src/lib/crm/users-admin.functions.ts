@@ -344,31 +344,46 @@ export const setEmployeeWorkAccess = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const admin = await getAdmin();
-    // Upsert permissions per work module
+    // Upsert permissions per work module (syncing both work.* and short module keys)
+    const MODULE_KEY_PAIRS: Record<string, string[]> = {
+      "work.leads": ["work.leads", "leads"],
+      "work.orders": ["work.orders", "orders"],
+      "work.support": ["work.support", "support", "tickets", "complaints"],
+      "work.finance": ["work.finance", "finance", "payments", "invoices"],
+    };
+
+    const allKeysToReset: string[] = [];
     for (const m of WORK_MODULES) {
       const can = !!data.work[m];
-      const { error } = await admin.from("user_permissions").upsert({
-        user_id: data.user_id,
-        module_key: m,
-        can_view: can,
-        can_create: false,
-        can_edit: false,
-        can_delete: false,
-        scope_all: data.websites.length === 0 && data.services.length === 0,
-      }, { onConflict: "user_id,module_key" });
-      if (error) throw new Error(error.message);
+      const keysToSync = MODULE_KEY_PAIRS[m] || [m];
+      for (const k of keysToSync) {
+        allKeysToReset.push(k);
+        const { error } = await admin.from("user_permissions").upsert({
+          user_id: data.user_id,
+          module_key: k,
+          can_view: can,
+          can_create: false,
+          can_edit: false,
+          can_delete: false,
+          scope_all: data.websites.length === 0 && data.services.length === 0,
+        }, { onConflict: "user_id,module_key" });
+        if (error) throw new Error(error.message);
+      }
     }
     // Reset scopes for these modules, then rewrite
     const { error: dErr } = await admin.from("user_permission_scopes")
       .delete()
       .eq("user_id", data.user_id)
-      .in("module_key", WORK_MODULES as unknown as string[]);
+      .in("module_key", allKeysToReset as never);
     if (dErr) throw new Error(dErr.message);
     const rows: Array<{ user_id: string; module_key: string; website_id?: string; service_id?: string }> = [];
     for (const m of WORK_MODULES) {
       if (!data.work[m]) continue; // only scope enabled modules
-      for (const w of data.websites) rows.push({ user_id: data.user_id, module_key: m, website_id: w });
-      for (const s of data.services) rows.push({ user_id: data.user_id, module_key: m, service_id: s });
+      const keysToSync = MODULE_KEY_PAIRS[m] || [m];
+      for (const k of keysToSync) {
+        for (const w of data.websites) rows.push({ user_id: data.user_id, module_key: k, website_id: w });
+        for (const s of data.services) rows.push({ user_id: data.user_id, module_key: k, service_id: s });
+      }
     }
     if (rows.length) {
       const { error: iErr } = await admin.from("user_permission_scopes").insert(rows as never);

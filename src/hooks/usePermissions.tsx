@@ -16,7 +16,13 @@ export function usePermissions() {
   function can(moduleKey: string, action: PermAction = "view"): boolean {
     if (!perms) return false;
     if (perms.isAdmin) return true;
-    const m = perms.modules[moduleKey];
+    const m =
+      perms.modules[moduleKey] ??
+      (moduleKey === "leads" ? perms.modules["work.leads"] :
+       moduleKey === "work.leads" ? perms.modules["leads"] :
+       moduleKey === "orders" ? perms.modules["work.orders"] :
+       moduleKey === "work.orders" ? perms.modules["orders"] :
+       undefined);
     if (!m) return false;
     return !!m[action];
   }

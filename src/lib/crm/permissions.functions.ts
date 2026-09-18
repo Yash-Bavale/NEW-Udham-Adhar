@@ -18,6 +18,18 @@ export type MyPermissions = {
   modules: Record<string, ModulePerm>;
 };
 
+export function getModuleAliases(key: string): string[] {
+  if (key === "leads" || key === "work.leads") return ["leads", "work.leads"];
+  if (key === "orders" || key === "work.orders") return ["orders", "work.orders"];
+  if (key === "support" || key === "work.support" || key === "tickets" || key === "complaints") {
+    return ["support", "work.support", "tickets", "complaints"];
+  }
+  if (key === "finance" || key === "work.finance" || key === "payments" || key === "invoices") {
+    return ["finance", "work.finance", "payments", "invoices"];
+  }
+  return [key];
+}
+
 export const getMyPermissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyPermissions> => {
@@ -48,7 +60,7 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     if (customPerms.length > 0) {
       for (const p of customPerms) {
         const effectiveView = !!p.can_view || !!p.scope_all;
-        modules[p.module_key] = {
+        const permObj: ModulePerm = {
           view: effectiveView,
           create: !!p.can_create,
           edit: !!p.can_edit,
@@ -56,6 +68,9 @@ export const getMyPermissions = createServerFn({ method: "GET" })
           scopeAll: !!p.scope_all,
           scopes: [],
         };
+        for (const alias of getModuleAliases(p.module_key)) {
+          modules[alias] = { ...permObj, scopes: [] };
+        }
       }
     } else {
       // Fallback to strict role ACCESS_MATRIX
@@ -63,7 +78,7 @@ export const getMyPermissions = createServerFn({ method: "GET" })
         const acc = bestAccess(roleList, m);
         const canView = acc !== "none";
         const canEdit = acc === "full";
-        modules[m] = {
+        const permObj: ModulePerm = {
           view: canView,
           create: canEdit,
           edit: canEdit,
@@ -71,17 +86,22 @@ export const getMyPermissions = createServerFn({ method: "GET" })
           scopeAll: true,
           scopes: [],
         };
+        for (const alias of getModuleAliases(m)) {
+          modules[alias] = { ...permObj, scopes: [] };
+        }
       }
     }
 
     for (const s of scopesRes.data ?? []) {
-      const m = modules[s.module_key];
-      if (!m) continue;
-      m.scopes.push({
-        websiteId: s.website_id ?? null,
-        categoryId: s.category_id ?? null,
-        serviceId: s.service_id ?? null,
-      });
+      for (const alias of getModuleAliases(s.module_key)) {
+        const m = modules[alias];
+        if (!m) continue;
+        m.scopes.push({
+          websiteId: s.website_id ?? null,
+          categoryId: s.category_id ?? null,
+          serviceId: s.service_id ?? null,
+        });
+      }
     }
     return { isAdmin: false, modules };
   });
@@ -106,18 +126,21 @@ export async function getUserModulePermission(
     return { canView: true, canCreate: true, canEdit: true, canDelete: true, scopeAll: true, scopes: [] };
   }
 
+  const aliases = getModuleAliases(moduleKey);
+
   const [permRes, scopesRes] = await Promise.all([
     supabase
       .from("user_permissions")
       .select("can_view, can_create, can_edit, can_delete, scope_all")
       .eq("user_id", userId)
-      .eq("module_key", moduleKey)
+      .in("module_key", aliases)
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("user_permission_scopes")
       .select("website_id, category_id, service_id")
       .eq("user_id", userId)
-      .eq("module_key", moduleKey),
+      .in("module_key", aliases),
   ]);
 
   const perm = permRes.data;
