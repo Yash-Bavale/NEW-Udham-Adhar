@@ -2,6 +2,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { bestAccess, ALL_MODULES, type Module } from "@/lib/roles";
+
 export type ModulePerm = {
   view: boolean;
   create: boolean;
@@ -22,7 +24,8 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     // Admin detection
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    const isAdmin = !!roles?.some((r) => r.role === "admin" || r.role === "super_admin");
+    const roleList = (roles ?? []).map((r: { role: string }) => r.role);
+    const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
 
     if (isAdmin) return { isAdmin: true, modules: {} };
 
@@ -40,17 +43,37 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     if (scopesRes.error) throw new Error(scopesRes.error.message);
 
     const modules: Record<string, ModulePerm> = {};
-    for (const p of permsRes.data ?? []) {
-      const effectiveView = !!p.can_view || !!p.scope_all;
-      modules[p.module_key] = {
-        view: effectiveView,
-        create: !!p.can_create,
-        edit: !!p.can_edit,
-        delete: !!p.can_delete,
-        scopeAll: !!p.scope_all,
-        scopes: [],
-      };
+    const customPerms = permsRes.data ?? [];
+
+    if (customPerms.length > 0) {
+      for (const p of customPerms) {
+        const effectiveView = !!p.can_view || !!p.scope_all;
+        modules[p.module_key] = {
+          view: effectiveView,
+          create: !!p.can_create,
+          edit: !!p.can_edit,
+          delete: !!p.can_delete,
+          scopeAll: !!p.scope_all,
+          scopes: [],
+        };
+      }
+    } else {
+      // Fallback to strict role ACCESS_MATRIX
+      for (const m of ALL_MODULES) {
+        const acc = bestAccess(roleList, m);
+        const canView = acc !== "none";
+        const canEdit = acc === "full";
+        modules[m] = {
+          view: canView,
+          create: canEdit,
+          edit: canEdit,
+          delete: false,
+          scopeAll: true,
+          scopes: [],
+        };
+      }
     }
+
     for (const s of scopesRes.data ?? []) {
       const m = modules[s.module_key];
       if (!m) continue;
@@ -76,7 +99,8 @@ export async function getUserModulePermission(
   scopes: Array<{ websiteId: string | null; categoryId: string | null; serviceId: string | null }>;
 }> {
   const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-  const isAdmin = !!roles?.some((r: { role: string }) => r.role === "admin" || r.role === "super_admin");
+  const roleList = (roles ?? []).map((r: { role: string }) => r.role);
+  const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
 
   if (isAdmin) {
     return { canView: true, canCreate: true, canEdit: true, canDelete: true, scopeAll: true, scopes: [] };
@@ -98,7 +122,10 @@ export async function getUserModulePermission(
 
   const perm = permRes.data;
   if (!perm) {
-    return { canView: true, canCreate: true, canEdit: true, canDelete: false, scopeAll: true, scopes: [] };
+    const acc = bestAccess(roleList, moduleKey as Module);
+    const canView = acc !== "none";
+    const canEdit = acc === "full";
+    return { canView, canCreate: canEdit, canEdit, canDelete: false, scopeAll: true, scopes: [] };
   }
 
   const scopes = (scopesRes.data ?? []).map((s: any) => ({

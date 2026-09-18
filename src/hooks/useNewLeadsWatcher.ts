@@ -1,11 +1,10 @@
-// Subscribes to lead & order INSERTs, assignment UPDATEs for the current user,
-// and backend notifications. Fires desktop notifications, popup toasts, and configured ringtones.
 import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNotifications, playNotificationSound } from "@/hooks/useNotifications";
 import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
 
 export function useNewLeadsWatcher() {
@@ -14,27 +13,29 @@ export function useNewLeadsWatcher() {
   const { notify } = useNotifications();
   const qc = useQueryClient();
   const role = useRole();
+  const userPerms = usePermissions();
 
-  const isAdmin = role.hasAny(["admin", "super_admin"]);
-  const canSeeLeads = role.can("leads");
-  const canSeeOrders = role.can("orders");
+  const isAdm = role.hasAny(["admin", "super_admin"]);
+  const isLoaded = !role.loading && !userPerms.isLoading;
+  const canSeeLeads = isLoaded && (isAdm || (role.can("leads") && userPerms.can("leads", "view")));
+  const canSeeOrders = isLoaded && (isAdm || (role.can("orders") && userPerms.can("orders", "view")));
 
   // Keep live references to permissions to prevent stale closure issues in realtime websocket callbacks
   const livePermsRef = useRef({
-    isAdmin,
+    isAdmin: isAdm,
     canSeeLeads,
     canSeeOrders,
-    rolesLoading: role.loading,
+    rolesLoading: !isLoaded,
   });
 
   useEffect(() => {
     livePermsRef.current = {
-      isAdmin,
+      isAdmin: isAdm,
       canSeeLeads,
       canSeeOrders,
-      rolesLoading: role.loading,
+      rolesLoading: !isLoaded,
     };
-  }, [isAdmin, canSeeLeads, canSeeOrders, role.loading]);
+  }, [isAdm, canSeeLeads, canSeeOrders, isLoaded]);
 
   // Deduplication cache: key -> timestamp (ms) to avoid duplicate toasts & sounds for same event
   const notifiedKeysRef = useRef<Map<string, number>>(new Map());
@@ -114,9 +115,9 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "leads" },
           (payload: { new?: { id?: string; name?: string | null; full_name?: string | null; phone?: string | null; service_slug?: string | null; assigned_to?: string | null } }) => {
-            const { isAdmin: isAdm, canSeeLeads: canLeads } = livePermsRef.current;
-            // If user has no access to leads module, do NOT notify or play sound
-            if (!canLeads) return;
+            const { isAdmin: isAdm, canSeeLeads: canLeads, rolesLoading } = livePermsRef.current;
+            // If permissions still loading or user has no access to leads module, do NOT notify or play sound
+            if (rolesLoading || !canLeads) return;
 
             const lead = payload.new ?? {};
             if (!isAdm && lead.assigned_to !== uid) return;
@@ -133,8 +134,8 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "UPDATE", schema: "public", table: "leads" },
           (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; name?: string | null; full_name?: string | null; lead_code?: string | null; assigned_to?: string | null } }) => {
-            const { canSeeLeads: canLeads } = livePermsRef.current;
-            if (!canLeads) return;
+            const { canSeeLeads: canLeads, rolesLoading } = livePermsRef.current;
+            if (rolesLoading || !canLeads) return;
 
             const newLead = payload.new ?? {};
             const oldLead = payload.old ?? {};
@@ -163,8 +164,8 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "applications" },
           (payload: { new?: { id?: string; application_code?: string | null; assigned_to?: string | null } }) => {
-            const { isAdmin: isAdm, canSeeOrders: canOrders } = livePermsRef.current;
-            if (!canOrders) return;
+            const { isAdmin: isAdm, canSeeOrders: canOrders, rolesLoading } = livePermsRef.current;
+            if (rolesLoading || !canOrders) return;
 
             const app = payload.new ?? {};
             if (!isAdm && app.assigned_to !== uid) return;
@@ -181,8 +182,8 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "UPDATE", schema: "public", table: "applications" },
           (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; application_code?: string | null; assigned_to?: string | null } }) => {
-            const { canSeeOrders: canOrders } = livePermsRef.current;
-            if (!canOrders) return;
+            const { canSeeOrders: canOrders, rolesLoading } = livePermsRef.current;
+            if (rolesLoading || !canOrders) return;
 
             const newApp = payload.new ?? {};
             const oldApp = payload.old ?? {};
@@ -216,10 +217,10 @@ export function useNewLeadsWatcher() {
             qc.invalidateQueries({ queryKey: ["notifications"] });
             qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
 
-            const { canSeeOrders: canOrders, canSeeLeads: canLeads } = livePermsRef.current;
+            const { canSeeOrders: canOrders, canSeeLeads: canLeads, rolesLoading } = livePermsRef.current;
 
             if (notif.kind === "order_assigned") {
-              if (!canOrders) return;
+              if (rolesLoading || !canOrders) return;
               const dedupeKey = notif.entity_id ? `order-assigned-${notif.entity_id}` : `notif-${notif.id}`;
               const title = notif.title || "🎯 Order Assigned to You";
               const body = notif.body || "A new order has been assigned to your queue.";
@@ -227,7 +228,7 @@ export function useNewLeadsWatcher() {
 
               triggerNotification(dedupeKey, title, body, url, "order");
             } else if (notif.kind === "lead_assigned" || notif.kind === "new_lead") {
-              if (!canLeads) return;
+              if (rolesLoading || !canLeads) return;
               const dedupeKey = notif.entity_id ? `lead-assigned-${notif.entity_id}` : `notif-${notif.id}`;
               const title = notif.title || "🎯 Lead Assigned to You";
               const body = notif.body || "A new lead has been assigned to your queue.";

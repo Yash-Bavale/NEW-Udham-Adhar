@@ -13,12 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   ChevronLeft,
   User,
   History,
   MessageSquare,
   LayoutGrid,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,10 +33,12 @@ function LeadDetailPage() {
   const noteFn = useServerFn(addLeadNote);
   const staffFn = useServerFn(listStaff);
   const role = useRole();
+  const userPerms = usePermissions();
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.lead", leadId],
     queryFn: () => getFn({ data: { id: leadId } }),
+    enabled: userPerms.can("leads", "view") || userPerms.isLoading,
   });
 
   const { data: staffData } = useQuery({
@@ -44,6 +48,18 @@ function LeadDetailPage() {
 
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+
+  if (!userPerms.isLoading && !userPerms.can("leads", "view")) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You do not have permission to view the Leads module. Please contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) return <div className="p-10 text-center text-slate-500">Loading lead details…</div>;
   if (!data) return null;

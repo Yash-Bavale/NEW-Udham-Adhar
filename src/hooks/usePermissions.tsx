@@ -14,11 +14,11 @@ export function usePermissions() {
   const perms = q.data;
 
   function can(moduleKey: string, action: PermAction = "view"): boolean {
-    if (!perms) return true;
+    if (!perms) return false;
     if (perms.isAdmin) return true;
     const m = perms.modules[moduleKey];
-    if (!m) return true;
-    return m[action];
+    if (!m) return false;
+    return !!m[action];
   }
 
   function scopeIds(moduleKey: string): {
