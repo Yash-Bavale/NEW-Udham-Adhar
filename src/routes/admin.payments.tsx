@@ -93,10 +93,35 @@ function PaymentsPage() {
     return <Badge variant="secondary" className={`text-[10px] ${map[s] ?? ""}`}>{s.replace(/_/g, " ")}</Badge>;
   };
 
+  const groupedServices = useMemo(() => {
+    const raw = (meta.data?.services ?? []) as any[];
+    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
+
+    for (const s of activeOnly) {
+      const webId = s.website_id || s.website?.id || "main";
+      const webName = s.website?.name || s.website?.domain || "Main Website";
+      const domain = s.website?.domain || "";
+
+      if (!map.has(webId)) {
+        map.set(webId, { websiteName: webName, domain, services: [] });
+      }
+      map.get(webId)!.services.push(s);
+    }
+
+    return Array.from(map.entries()).map(([id, group]) => ({
+      id,
+      ...group,
+    }));
+  }, [meta.data?.services]);
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold">Payments</h1>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Payments Audit & Ledger</h1>
+          <p className="text-xs text-slate-500">Every Razorpay, PayU, CCAvenue, Cashfree webhook + system receipt</p>
+        </div>
         <div className="text-xs text-slate-500">{data ? `${data.total} payments` : ""}</div>
       </div>
 
@@ -126,9 +151,17 @@ function PaymentsPage() {
           <select
             value={filters.serviceId}
             onChange={(e) => setFilters({ ...filters, serviceId: e.target.value, page: 1 })}
-            className="rounded border px-2 py-1.5 text-sm">
-            <option value="">All services</option>
-            {meta.data?.services.map((s) => <option key={s.id} value={s.id}>{s.service_name}</option>)}
+            className="rounded border px-2 py-1.5 text-sm max-w-[220px]">
+            <option value="">All active services</option>
+            {groupedServices.map((g) => (
+              <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
+                {g.services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.service_name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
           <DateRangePicker
             value={{

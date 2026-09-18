@@ -5,12 +5,31 @@ import { assertRole } from "@/lib/audit";
 
 export const listServices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase } = context;
-    const { data, error } = await supabase
+  .inputValidator((raw: unknown) =>
+    z
+      .object({
+        includeInactive: z.boolean().optional(),
+        websiteId: z.string().uuid().optional(),
+      })
+      .optional()
+      .parse(raw)
+  )
+  .handler(async ({ data: input, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = supabaseAdmin
       .from("services")
-      .select("*")
+      .select("*, website:websites(id, name, domain, is_active)")
       .order("sort_order", { ascending: true });
+
+    if (!input?.includeInactive) {
+      q = q.eq("is_active", true);
+    }
+    if (input?.websiteId) {
+      q = q.eq("website_id", input.websiteId);
+    }
+
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
     return { rows: data ?? [] };
   });

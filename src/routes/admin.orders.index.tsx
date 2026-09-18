@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
 } from "@/components/ui/select";
 import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -254,6 +254,29 @@ function OrdersListPage() {
   }, [staffData]);
   const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
 
+  // Group active services website-wise
+  const groupedServices = useMemo(() => {
+    const raw = (svcData?.rows ?? []) as any[];
+    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
+
+    for (const s of activeOnly) {
+      const webId = s.website_id || s.website?.id || "main";
+      const webName = s.website?.name || s.website?.domain || "Main Website";
+      const domain = s.website?.domain || "";
+
+      if (!map.has(webId)) {
+        map.set(webId, { websiteName: webName, domain, services: [] });
+      }
+      map.get(webId)!.services.push(s);
+    }
+
+    return Array.from(map.entries()).map(([id, group]) => ({
+      id,
+      ...group,
+    }));
+  }, [svcData]);
+
   const queryPayload = useMemo(() => ({
     page,
     pageSize,
@@ -488,11 +511,22 @@ function OrdersListPage() {
 
           {/* Services Filter */}
           <Select value={serviceId} onValueChange={setServiceId}>
-            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All services" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All services</SelectItem>
-              {(svcData?.rows ?? []).map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>{s.service_name}</SelectItem>
+            <SelectTrigger className="h-9 w-[220px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="All services" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[380px]">
+              <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
+              {groupedServices.map((g) => (
+                <SelectGroup key={g.id}>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
+                    🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
+                  </SelectLabel>
+                  {g.services.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                      {s.service_name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>

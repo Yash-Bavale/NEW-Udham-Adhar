@@ -175,6 +175,28 @@ function LeadsPage() {
   }, [role.roles.join(",")]);
   const servicesFn = useServerFn(listServices);
   const { data: servicesData } = useQuery({ queryKey: ["admin.services"], queryFn: () => servicesFn() });
+
+  const groupedServices = useMemo(() => {
+    const raw = (servicesData?.rows ?? []) as any[];
+    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
+
+    for (const s of activeOnly) {
+      const webId = s.website_id || s.website?.id || "main";
+      const webName = s.website?.name || s.website?.domain || "Main Website";
+      const domain = s.website?.domain || "";
+
+      if (!map.has(webId)) {
+        map.set(webId, { websiteName: webName, domain, services: [] });
+      }
+      map.get(webId)!.services.push(s);
+    }
+
+    return Array.from(map.entries()).map(([id, group]) => ({
+      id,
+      ...group,
+    }));
+  }, [servicesData]);
   const websiteTreeFn = useServerFn(listWebsiteTree);
   const { data: websiteTreeData } = useQuery({ queryKey: ["admin.websiteTree"], queryFn: () => websiteTreeFn() });
 
@@ -364,12 +386,18 @@ function LeadsPage() {
         <select
           value={service}
           onChange={(e) => setService(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm max-w-[220px]"
+          className="rounded-lg border px-3 py-2 text-sm max-w-[240px]"
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
         >
-          <option value="">All services</option>
-          {servicesData?.rows.map((s: any) => (
-            <option key={s.id} value={s.service_name}>{s.service_name}</option>
+          <option value="">All active services</option>
+          {groupedServices.map((g) => (
+            <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
+              {g.services.map((s: any) => (
+                <option key={s.id} value={s.service_name}>
+                  {s.service_name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         {role.hasAny(["super_admin", "admin"]) && (
