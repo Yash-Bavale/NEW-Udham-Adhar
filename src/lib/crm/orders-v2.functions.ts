@@ -552,183 +552,35 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    let q = buildBaseQuery();
-
-    // Stage filter mapping
-    if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
-      switch (data.stage) {
-        case "payment_done":
-          q = q.is("form_submitted_at", null);
-          break;
-        case "form_not_submitted":
-          q = q.is("form_submitted_at", null);
-          break;
-        case "form_submitted":
-          q = q.not("form_submitted_at", "is", null);
-          break;
-        case "technical_delay":
-          q = q.in("fulfillment_status", ["technical_delay", "technical_hold"]);
-          break;
-        case "customer_delay":
-          q = q.in("fulfillment_status", ["customer_delay"]);
-          break;
-        case "submitted_to_govt":
-          q = q.in("fulfillment_status", [
-            "government_processing", "application_submitted", "under_processing", "awaiting_govt", "application_rejected", "certificate_rejected",
-          ]);
-          break;
-        case "certificate_ready":
-          q = q.or("fulfillment_status.eq.application_approved,certificate_uploaded_at.not.is.null");
-          break;
-        case "completed":
-          q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
-          break;
-        case "closed":
-          q = q.in("fulfillment_status", ["order_closed", "cancelled"]);
-          break;
-        case "under_review":
-          q = q.eq("fulfillment_status", "verification_pending");
-          break;
-        case "in_progress":
-          q = q.eq("fulfillment_status", "documents_received");
-          break;
-        case "consultation_completed":
-          q = q.eq("fulfillment_status", "consultation_completed");
-          break;
-        case "consultation_pending":
-          q = q.in("application_status", ["consultation_pending", "consultation_scheduled"]);
-          break;
-        case "refunded": {
-          const { data: excLeads } = await admin.from("leads").select("id").in("lead_status_v2", ["refunded", "closed_refunded"]);
-          const lIds = (excLeads ?? []).map((l: any) => l.id);
-          q = lIds.length ? q.in("lead_id", lIds) : q.eq("id", "00000000-0000-0000-0000-000000000000");
-          break;
-        }
-        case "refund_requested": {
-          const { data: excLeads } = await admin.from("leads").select("id").in("lead_status_v2", ["refund_requested", "refund_approved"]);
-          const lIds = (excLeads ?? []).map((l: any) => l.id);
-          q = lIds.length ? q.in("lead_id", lIds) : q.eq("id", "00000000-0000-0000-0000-000000000000");
-          break;
-        }
-        case "uninterested": {
-          const { data: excLeads } = await admin.from("leads").select("id").eq("lead_status_v2", "uninterested");
-          const lIds = (excLeads ?? []).map((l: any) => l.id);
-          q = lIds.length ? q.in("lead_id", lIds) : q.eq("id", "00000000-0000-0000-0000-000000000000");
-          break;
-        }
-        default:
-          q = q.eq("fulfillment_status", data.stage as never);
-          break;
-      }
-    } else if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-      q = q.eq("fulfillment_status", data.fulfillmentStatus as never);
-    }
-
-    // Bucket filter mapping
-    if (data.bucket && data.bucket !== "all") {
-      switch (data.bucket) {
-        case "needs_action":
-          q = q.in("fulfillment_status", ["order_received", "form_submitted"]);
-          break;
-        case "completed":
-          q = q.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
-          break;
-        case "closed":
-          q = q.in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
-          break;
-        case "pending":
-          q = q.not("fulfillment_status", "in", ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected", "certificate_rejected"]);
-          break;
-      }
-    }
-
-    // Action Status filter mapping
-    if (data.actionStatus && data.actionStatus !== "all") {
-      if (data.actionStatus === "action_required") {
-        q = q.in("fulfillment_status", ["order_received", "form_submitted"]);
-      } else if (data.actionStatus === "processed") {
-        q = q.not("fulfillment_status", "in", ["order_received", "form_submitted"]);
-      }
-    }
-
-    // Pending Age filter mapping
-    if (data.pendingAge && data.pendingAge !== "any") {
-      let days = 0;
-      if (data.pendingAge === "custom" && data.customDays) {
-        days = parseInt(data.customDays, 10) || 0;
-      } else {
-        days = parseInt(data.pendingAge, 10) || 0;
-      }
-      if (days > 0) {
-        const threshold = new Date(Date.now() - days * 86_400_000).toISOString();
-        q = q.lte("created_at", threshold);
-      }
-    }
-
+    // Fetch candidate applications matching base filters (date range, service, staff, search)
+    let baseQ = buildBaseQuery();
     if (data.sortField === "stage") {
-      q = q.order("fulfillment_status", { ascending: data.sortOrder === "asc" }).order("created_at", { ascending: false });
+      baseQ = baseQ.order("fulfillment_status", { ascending: data.sortOrder === "asc" }).order("created_at", { ascending: false });
     } else {
-      q = q.order("created_at", { ascending: data.sortOrder === "asc" });
+      baseQ = baseQ.order("created_at", { ascending: data.sortOrder === "asc" });
     }
 
-    // Parallel global count queries for buckets across all matching data
-    const [
-      totalRes,
-      needsActionRes,
-      completedRes,
-      closedRes,
-    ] = await Promise.all([
-      buildBaseQuery().range(0, 0),
-      buildBaseQuery().in("fulfillment_status", ["order_received", "form_submitted"]).range(0, 0),
-      buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]).range(0, 0),
-      buildBaseQuery().in("fulfillment_status", ["order_closed", "cancelled", "application_rejected", "certificate_rejected"]).range(0, 0),
-    ]);
-
-    const totalOrders = totalRes.count ?? 0;
-    const needsActionCount = needsActionRes.count ?? 0;
-    const completedCount = completedRes.count ?? 0;
-    const closedCount = closedRes.count ?? 0;
-    const pendingCount = Math.max(0, totalOrders - completedCount - closedCount);
-
-    const counts = {
-      all: totalOrders,
-      needs_action: needsActionCount,
-      pending: pendingCount,
-      completed: completedCount,
-      closed: closedCount,
-      exception: 0,
-      actionRequired: needsActionCount,
-      processed: completedCount + closedCount,
-    };
-
-    // Exact count of items matching the active filter/bucket/stage
-    const { count: filteredCount, error: countErr } = await q.range(0, 0);
-    if (countErr) throw new Error(countErr.message);
-    const total = filteredCount ?? 0;
-
-    if (total === 0) {
-      return {
-        rows: [],
-        total: 0,
-        counts,
-        page: data.page,
-        pageSize: data.pageSize,
-      };
-    }
-
-    const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
-    const page = Math.min(Math.max(1, data.page), maxPage);
-    const from = (page - 1) * data.pageSize;
-    const { data: apps, error } = await q.range(from, Math.min(from + data.pageSize, total) - 1);
-    if (error) throw new Error(error.message);
+    const { data: apps, error: appErr } = await baseQ.limit(2000);
+    if (appErr) throw new Error(appErr.message);
     const appList = apps ?? [];
+
+    const emptyCounts = {
+      all: 0,
+      needs_action: 0,
+      pending: 0,
+      completed: 0,
+      closed: 0,
+      exception: 0,
+      actionRequired: 0,
+      processed: 0,
+    };
 
     if (appList.length === 0) {
       return {
         rows: [],
-        total,
-        counts,
-        page,
+        total: 0,
+        counts: emptyCounts,
+        page: data.page,
         pageSize: data.pageSize,
       };
     }
@@ -784,7 +636,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    let rows = appList.map((a) => {
+    const allRows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
       const effectiveSvcId = a.service_id || lead?.service_id || null;
@@ -794,7 +646,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const paidSum = payments
         .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
-      const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
+      const totalAmount = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
+
+      const stage = computeOrderStage(
+        { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
+        {
+          form_submitted_at: a.form_submitted_at,
+          certificate_uploaded_at: a.certificate_uploaded_at,
+          fulfillment_status: a.fulfillment_status,
+          application_status: a.application_status,
+          workflow_status: (a as any).workflow_status,
+          closure_stage: (a as any).closure_stage,
+          refund_approved_at: (a as any).refund_approved_at,
+          refund_processed_at: (a as any).refund_processed_at,
+        },
+      );
+
+      const payment_status = rollupPaymentStatus(payments, totalAmount);
+
       return {
         id: a.id,
         application_code: a.application_code,
@@ -809,28 +678,58 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         customer_email: lead?.email ?? cust?.primary_email ?? null,
         service_id: effectiveSvcId,
         service_name: svc?.service_name ?? lead?.service ?? null,
-        total_amount: total,
-        payment_status: rollupPaymentStatus(payments, total),
+        total_amount: totalAmount,
+        payment_status,
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
-        stage: computeOrderStage(
-          { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-          {
-            form_submitted_at: a.form_submitted_at,
-            certificate_uploaded_at: a.certificate_uploaded_at,
-            fulfillment_status: a.fulfillment_status,
-            application_status: a.application_status,
-            workflow_status: (a as any).workflow_status,
-            closure_stage: (a as any).closure_stage,
-            refund_approved_at: (a as any).refund_approved_at,
-            refund_processed_at: (a as any).refund_processed_at,
-          },
-        ),
+        stage,
       };
     });
 
+    // Compute global tab counts
+    const totalOrders = allRows.length;
+    const needsActionCount = allRows.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status)).length;
+    const completedCount = allRows.filter((r) => ["completed", "order_completed", "consultation_completed"].includes(r.fulfillment_status)).length;
+    const closedCount = allRows.filter((r) => ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status)).length;
+    const exceptionCount = allRows.filter((r) => ["uninterested", "refund_requested", "refunded"].includes(r.stage)).length;
+    const pendingCount = Math.max(0, totalOrders - completedCount - closedCount);
+
+    const counts = {
+      all: totalOrders,
+      needs_action: needsActionCount,
+      pending: pendingCount,
+      completed: completedCount,
+      closed: closedCount,
+      exception: exceptionCount,
+      actionRequired: needsActionCount,
+      processed: completedCount + closedCount,
+    };
+
+    // Filter by tab bucket
+    let filtered = allRows;
+    if (data.bucket && data.bucket !== "all") {
+      switch (data.bucket) {
+        case "needs_action":
+          filtered = filtered.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status));
+          break;
+        case "completed":
+          filtered = filtered.filter((r) => ["completed", "order_completed", "consultation_completed"].includes(r.fulfillment_status));
+          break;
+        case "closed":
+          filtered = filtered.filter((r) => ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status));
+          break;
+        case "pending":
+          filtered = filtered.filter((r) => !["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(r.fulfillment_status));
+          break;
+        case "exception":
+          filtered = filtered.filter((r) => ["uninterested", "refund_requested", "refunded"].includes(r.stage));
+          break;
+      }
+    }
+
+    // Filter by stage dropdown
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
-      rows = rows.filter((r) => {
+      filtered = filtered.filter((r) => {
         if (data.stage === "form_not_submitted") {
           return r.stage === "form_not_submitted" || r.stage === "payment_done";
         }
@@ -838,9 +737,58 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       });
     }
 
-    if (data.paymentStatus && data.paymentStatus !== "all") {
-      rows = rows.filter((r) => r.payment_status === data.paymentStatus);
+    // Filter by fulfillment status
+    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
+      filtered = filtered.filter((r) => r.fulfillment_status === data.fulfillmentStatus);
     }
+
+    // Filter by action status
+    if (data.actionStatus && data.actionStatus !== "all") {
+      if (data.actionStatus === "action_required") {
+        filtered = filtered.filter((r) => ["order_received", "form_submitted"].includes(r.fulfillment_status));
+      } else if (data.actionStatus === "processed") {
+        filtered = filtered.filter((r) => !["order_received", "form_submitted"].includes(r.fulfillment_status));
+      }
+    }
+
+    // Filter by payment status
+    if (data.paymentStatus && data.paymentStatus !== "all") {
+      filtered = filtered.filter((r) => r.payment_status === data.paymentStatus);
+    }
+
+    // Filter by pending age
+    if (data.pendingAge && data.pendingAge !== "any") {
+      let days = 0;
+      if (data.pendingAge === "custom" && data.customDays) {
+        days = parseInt(data.customDays, 10) || 0;
+      } else {
+        days = parseInt(data.pendingAge, 10) || 0;
+      }
+      if (days > 0) {
+        const thresholdMs = Date.now() - days * 86_400_000;
+        filtered = filtered.filter((r) => new Date(r.created_at).getTime() <= thresholdMs);
+      }
+    }
+
+    // Sort
+    if (data.sortField === "stage") {
+      filtered.sort((a, b) => {
+        const cmp = a.stage.localeCompare(b.stage);
+        return data.sortOrder === "asc" ? cmp : -cmp;
+      });
+    } else {
+      filtered.sort((a, b) => {
+        const tA = new Date(a.created_at).getTime();
+        const tB = new Date(b.created_at).getTime();
+        return data.sortOrder === "asc" ? tA - tB : tB - tA;
+      });
+    }
+
+    const total = filtered.length;
+    const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
+    const page = Math.min(Math.max(1, data.page), maxPage);
+    const from = (page - 1) * data.pageSize;
+    const rows = filtered.slice(from, from + data.pageSize);
 
     return {
       rows,
