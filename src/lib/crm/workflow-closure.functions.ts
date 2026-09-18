@@ -89,6 +89,23 @@ export const closeOrder = createServerFn({ method: "POST" })
         const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
         const istFmt = (iso: string) =>
           new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+
+        // Load standard reply / description for closure reason
+        const { data: closureReasonRow } = await admin
+          .from("workflow_closure_reasons")
+          .select("description, label")
+          .eq("code", data.reasonCode)
+          .maybeSingle();
+        let defaultClosureReply = closureReasonRow?.description;
+        if (!defaultClosureReply) {
+          const { STANDARD_CLOSE_REASONS } = await import("@/lib/orders/actions/reasons.functions");
+          const std = STANDARD_CLOSE_REASONS.find(
+            (r) => r.id === data.reasonCode || `R${r.number}` === data.reasonCode || r.label.toLowerCase() === data.reasonLabel.toLowerCase()
+          );
+          defaultClosureReply = std?.standard_reply || null;
+        }
+        const closeRemarks = (data.notes && data.notes.trim()) ? data.notes.trim() : (defaultClosureReply || data.reasonLabel || "—");
+
         await enqueueFromTemplateInternal(
           "order_closure_confirmation",
           lead.email,
@@ -104,8 +121,10 @@ export const closeOrder = createServerFn({ method: "POST" })
             closure_date: istFmt(closedAt),
             closure_reason: data.reasonLabel,
             reason: data.reasonLabel,
-            reason_block: data.reasonLabel,
-            employee_remarks: (data.notes && data.notes.trim()) ? data.notes.trim() : "—",
+            reason_block: defaultClosureReply || data.reasonLabel,
+            employee_remarks: closeRemarks,
+            additional_remarks: closeRemarks,
+            remarks: closeRemarks,
             date: new Date().toLocaleDateString("en-IN"),
             company_name: COMPANY_NAME,
             support_email: SUPPORT_EMAIL,
@@ -251,10 +270,34 @@ export const decideRefundRequest = createServerFn({ method: "POST" })
       } as never)
       .eq("id", data.id);
 
-    if (data.decision === "approved" || data.decision === "rejected") {
+    if (data.decision === "approved") {
+      const nowIso = new Date().toISOString();
       await admin
         .from("applications")
-        .update({ workflow_status: data.decision === "approved" ? "refund_closed" : "closed" } as never)
+        .update({
+          workflow_status: "refund_closed",
+          closure_stage: "refund_approved",
+          fulfillment_status: "order_closed",
+          refund_approved_at: nowIso,
+          refund_approved_by: context.userId,
+        } as never)
+        .eq("id", row.application_id);
+
+      if (row.lead_id) {
+        try {
+          const { transitionLeadStatus } = await import("@/lib/crm/lead-status.functions");
+          await transitionLeadStatus({ data: { leadId: row.lead_id, toStatus: "refund_approved" } });
+        } catch (err) {
+          console.warn("[decideRefundRequest] lead transition to refund_approved failed:", err);
+        }
+      }
+    } else if (data.decision === "rejected") {
+      await admin
+        .from("applications")
+        .update({
+          workflow_status: "closed",
+          closure_stage: "closed",
+        } as never)
         .eq("id", row.application_id);
     }
 

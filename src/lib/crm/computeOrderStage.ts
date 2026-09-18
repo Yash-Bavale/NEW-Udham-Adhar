@@ -47,6 +47,7 @@ export interface ComputeStageApplication {
   refund_approved_at?: string | null;
   refund_processed_at?: string | null;
   closure_stage?: string | null;
+  refund_status?: string | null;
 }
 
 export function computeOrderStage(
@@ -59,18 +60,25 @@ export function computeOrderStage(
   if (
     leadStatus === "refunded" ||
     leadStatus === "closed_refunded" ||
+    leadStatus === "refund_approved" ||
     application?.fulfillment_status === "refunded" ||
-    Boolean(application?.refund_processed_at)
+    Boolean(application?.refund_processed_at) ||
+    application?.closure_stage === "refund_approved" ||
+    Boolean(application?.refund_approved_at) ||
+    application?.workflow_status === "refund_closed" ||
+    application?.refund_status === "approved" ||
+    application?.refund_status === "processed"
   ) {
     return "refunded";
   }
 
   if (
     leadStatus === "refund_requested" ||
-    leadStatus === "refund_approved" ||
-    application?.closure_stage === "refund_approved" ||
-    Boolean(application?.refund_approved_at) ||
-    application?.workflow_status === "refund_closed"
+    application?.workflow_status === "refund_review" ||
+    application?.closure_stage === "refund_requested" ||
+    application?.refund_status === "pending" ||
+    application?.refund_status === "info_needed" ||
+    application?.refund_status === "escalated"
   ) {
     return "refund_requested";
   }
@@ -97,7 +105,6 @@ export function computeOrderStage(
     fs === "order_closed" ||
     fs === "cancelled" ||
     ws === "closed" ||
-    ws === "refund_closed" ||
     application.application_status === "closed" ||
     application.closure_stage === "closed" ||
     application.closure_stage === "final_ticket_closed"

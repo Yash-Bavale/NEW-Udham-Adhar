@@ -544,7 +544,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code",
+          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
           { count: "exact" },
         )
         .eq("is_deleted", false);
@@ -913,7 +913,23 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(20)
         : Promise.resolve({ data: [] as any[] }),
+      admin
+        .from("refund_requests")
+        .select("id, status, refund_amount, refund_mode, deduction_amount, decided_at, created_at, reason")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
+
+    const refundReq = (refundRes as any)?.data;
+    if (refundReq?.status) {
+      (app as any).refund_status = refundReq.status;
+      if (refundReq.status === "approved") {
+        (app as any).refund_approved_at = (app as any).refund_approved_at || refundReq.decided_at || refundReq.created_at;
+        (app as any).closure_stage = "refund_approved";
+      }
+    }
 
     // Look up service_workflows by service_code if present
     let workflowStages: string[] = FULFILLMENT_STAGES;

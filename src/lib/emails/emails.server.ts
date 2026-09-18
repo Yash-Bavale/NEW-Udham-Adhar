@@ -448,8 +448,19 @@ async function backfillCommonVariables(
           hour: "2-digit", minute: "2-digit", hour12: true,
         });
       }
-      if (missing("employee_remarks")) {
-        out.employee_remarks = (app.closure_remarks && String(app.closure_remarks).trim()) || "—";
+      if (missing("employee_remarks") || missing("additional_remarks") || missing("remarks")) {
+        let defaultRemarks = (app.closure_remarks && String(app.closure_remarks).trim()) || "";
+        if (!defaultRemarks && app.closure_reason_id) {
+          const { data: r } = await supabaseAdmin
+            .from("order_close_reasons")
+            .select("standard_reply, label")
+            .eq("id", app.closure_reason_id)
+            .maybeSingle();
+          defaultRemarks = (r as any)?.standard_reply || (r as any)?.label || "";
+        }
+        if (missing("employee_remarks")) out.employee_remarks = defaultRemarks || "—";
+        if (missing("additional_remarks")) out.additional_remarks = defaultRemarks || "—";
+        if (missing("remarks")) out.remarks = defaultRemarks || "—";
       }
       if (missing("closure_reason")) {
         let label: string | null = null;
