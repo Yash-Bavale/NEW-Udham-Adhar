@@ -63,38 +63,37 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     const modules: Record<string, ModulePerm> = {};
     const customPerms = permsRes.data ?? [];
 
-    if (customPerms.length > 0) {
-      for (const p of customPerms) {
-        const effectiveView = !!p.can_view || !!p.can_create || !!p.can_edit;
-        const permObj: ModulePerm = {
-          view: effectiveView,
-          create: !!p.can_create,
-          edit: !!p.can_edit,
-          delete: !!p.can_delete,
-          scopeAll: !!p.scope_all,
-          scopes: [],
-        };
-        for (const alias of getModuleAliases(p.module_key)) {
-          modules[alias] = { ...permObj, scopes: [] };
-        }
+    // 1. Initialize all standard modules with the user's role defaults
+    for (const m of ALL_MODULES) {
+      const acc = bestAccess(roleList, m);
+      const canView = acc !== "none";
+      const canEdit = acc === "full";
+      const permObj: ModulePerm = {
+        view: canView,
+        create: canEdit,
+        edit: canEdit,
+        delete: false,
+        scopeAll: true,
+        scopes: [],
+      };
+      for (const alias of getModuleAliases(m)) {
+        modules[alias] = { ...permObj, scopes: [] };
       }
-    } else {
-      // Fallback to strict role ACCESS_MATRIX
-      for (const m of ALL_MODULES) {
-        const acc = bestAccess(roleList, m);
-        const canView = acc !== "none";
-        const canEdit = acc === "full";
-        const permObj: ModulePerm = {
-          view: canView,
-          create: canEdit,
-          edit: canEdit,
-          delete: false,
-          scopeAll: true,
-          scopes: [],
-        };
-        for (const alias of getModuleAliases(m)) {
-          modules[alias] = { ...permObj, scopes: [] };
-        }
+    }
+
+    // 2. Override with any custom user_permissions configured by admin
+    for (const p of customPerms) {
+      const effectiveView = !!p.can_view || !!p.can_create || !!p.can_edit;
+      const permObj: ModulePerm = {
+        view: effectiveView,
+        create: !!p.can_create,
+        edit: !!p.can_edit,
+        delete: !!p.can_delete,
+        scopeAll: !!p.scope_all,
+        scopes: [],
+      };
+      for (const alias of getModuleAliases(p.module_key)) {
+        modules[alias] = { ...permObj, scopes: [] };
       }
     }
 
