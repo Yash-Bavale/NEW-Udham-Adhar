@@ -575,28 +575,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // 1. Compute global tab counts across base query matching date range, service, staff, search
-    const { data: countRows } = await buildBaseQuery()
-      .select("id, fulfillment_status, application_status, workflow_status, closure_stage")
-      .limit(5000);
+    // 1. Compute exact global counts across full dataset using parallel head queries (no 1000 row capping)
+    const [allCountRes, completedCountRes, closedCountRes, needsActionCountRes] = await Promise.all([
+      buildBaseQuery().select("id", { count: "exact", head: true }),
+      buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]).select("id", { count: "exact", head: true }),
+      buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
+      buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
+    ]);
 
-    const totalCount = countRows?.length ?? 0;
-    const isClosedRow = (a: any) =>
-      ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(a.fulfillment_status) ||
-      a.application_status === "closed" ||
-      a.workflow_status === "closed" ||
-      a.workflow_status === "refund_closed" ||
-      a.closure_stage === "closed" ||
-      a.closure_stage === "final_ticket_closed";
-    const isCompletedRow = (a: any) =>
-      ["completed", "order_completed", "consultation_completed"].includes(a.fulfillment_status) ||
-      a.application_status === "completed";
-    const isNeedsActionRow = (a: any) =>
-      ["order_received", "form_submitted"].includes(a.fulfillment_status) && !isClosedRow(a) && !isCompletedRow(a);
-
-    const needsActionCount = (countRows ?? []).filter(isNeedsActionRow).length;
-    const completedCount = (countRows ?? []).filter(isCompletedRow).length;
-    const closedCount = (countRows ?? []).filter(isClosedRow).length;
+    const totalCount = allCountRes.count ?? 0;
+    const completedCount = completedCountRes.count ?? 0;
+    const closedCount = closedCountRes.count ?? 0;
+    const needsActionCount = needsActionCountRes.count ?? 0;
     const pendingCount = Math.max(0, totalCount - completedCount - closedCount);
 
     const globalCounts = {
@@ -615,7 +605,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     if (data.bucket === "needs_action" || data.actionStatus === "action_required") {
       baseQ = baseQ
-        .in("fulfillment_status", ["order_received", "form_submitted"])
+        .or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")')
         .not("closure_stage", "in", '("closed","final_ticket_closed")');
     } else if (data.bucket === "completed") {
       baseQ = baseQ.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
@@ -764,9 +754,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
-    // Use global counts computed across all applications matching base filters
-    const counts = globalCounts;
-
     // Filter by tab bucket
     let filtered = allRows;
     if (data.bucket && data.bucket !== "all") {
@@ -844,8 +831,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const total = filtered.length;
     const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
     const page = Math.min(Math.max(1, data.page), maxPage);
-    const from = (page - 1) * data.pageSize;
-    const rows = filtered.slice(from, from + data.pageSize);
+    const start = (page - 1) * data.pageSize;
+    const rows = filtered.slice(start, start + data.pageSize);
+
+    const counts = {
+      ...globalCounts,
+      ...(data.bucket === "needs_action" ? { needs_action: total, actionRequired: total } : {}),
+      ...(data.bucket === "completed" ? { completed: total } : {}),
+      ...(data.bucket === "closed" ? { closed: total } : {}),
+    };
 
     return {
       rows,
