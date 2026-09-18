@@ -575,8 +575,62 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // Fetch candidate applications matching base filters (date range, service, staff, search)
+    // 1. Compute global tab counts across base query matching date range, service, staff, search
+    const { data: countRows } = await buildBaseQuery()
+      .select("id, fulfillment_status, application_status, workflow_status, closure_stage")
+      .limit(5000);
+
+    const totalCount = countRows?.length ?? 0;
+    const isClosedRow = (a: any) =>
+      ["order_closed", "cancelled", "application_rejected", "certificate_rejected"].includes(a.fulfillment_status) ||
+      a.application_status === "closed" ||
+      a.workflow_status === "closed" ||
+      a.workflow_status === "refund_closed" ||
+      a.closure_stage === "closed" ||
+      a.closure_stage === "final_ticket_closed";
+    const isCompletedRow = (a: any) =>
+      ["completed", "order_completed", "consultation_completed"].includes(a.fulfillment_status) ||
+      a.application_status === "completed";
+    const isNeedsActionRow = (a: any) =>
+      ["order_received", "form_submitted"].includes(a.fulfillment_status) && !isClosedRow(a) && !isCompletedRow(a);
+
+    const needsActionCount = (countRows ?? []).filter(isNeedsActionRow).length;
+    const completedCount = (countRows ?? []).filter(isCompletedRow).length;
+    const closedCount = (countRows ?? []).filter(isClosedRow).length;
+    const pendingCount = Math.max(0, totalCount - completedCount - closedCount);
+
+    const globalCounts = {
+      all: totalCount,
+      needs_action: needsActionCount,
+      pending: pendingCount,
+      completed: completedCount,
+      closed: closedCount,
+      exception: 0,
+      actionRequired: needsActionCount,
+      processed: completedCount + closedCount,
+    };
+
+    // 2. Fetch candidate applications matching base filters + bucket/status filter
     let baseQ = buildBaseQuery();
+
+    if (data.bucket === "needs_action" || data.actionStatus === "action_required") {
+      baseQ = baseQ
+        .in("fulfillment_status", ["order_received", "form_submitted"])
+        .not("closure_stage", "in", '("closed","final_ticket_closed")');
+    } else if (data.bucket === "completed") {
+      baseQ = baseQ.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
+    } else if (data.bucket === "closed") {
+      baseQ = baseQ.or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")');
+    } else if (data.bucket === "pending") {
+      baseQ = baseQ
+        .not("fulfillment_status", "in", '("completed","order_completed","consultation_completed","order_closed","cancelled","application_rejected","certificate_rejected")')
+        .not("closure_stage", "in", '("closed","final_ticket_closed")');
+    }
+
+    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
+      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus);
+    }
+
     if (data.sortField === "stage") {
       baseQ = baseQ.order("fulfillment_status", { ascending: data.sortOrder === "asc" }).order("created_at", { ascending: false });
     } else {
@@ -587,22 +641,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (appErr) throw new Error(appErr.message);
     const appList = apps ?? [];
 
-    const emptyCounts = {
-      all: 0,
-      needs_action: 0,
-      pending: 0,
-      completed: 0,
-      closed: 0,
-      exception: 0,
-      actionRequired: 0,
-      processed: 0,
-    };
-
     if (appList.length === 0) {
       return {
         rows: [],
         total: 0,
-        counts: emptyCounts,
+        counts: globalCounts,
         page: data.page,
         pageSize: data.pageSize,
       };
@@ -721,24 +764,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
-    // Compute global tab counts using bucketOfRow for 100% consistency
-    const totalOrders = allRows.length;
-    const needsActionCount = allRows.filter((r) => bucketOfRow(r) === "needs_action").length;
-    const completedCount = allRows.filter((r) => bucketOfRow(r) === "completed").length;
-    const closedCount = allRows.filter((r) => bucketOfRow(r) === "closed").length;
-    const exceptionCount = allRows.filter((r) => bucketOfRow(r) === "exception").length;
-    const pendingCount = allRows.filter((r) => bucketOfRow(r) === "pending").length;
-
-    const counts = {
-      all: totalOrders,
-      needs_action: needsActionCount,
-      pending: pendingCount,
-      completed: completedCount,
-      closed: closedCount,
-      exception: exceptionCount,
-      actionRequired: needsActionCount,
-      processed: completedCount + closedCount,
-    };
+    // Use global counts computed across all applications matching base filters
+    const counts = globalCounts;
 
     // Filter by tab bucket
     let filtered = allRows;
