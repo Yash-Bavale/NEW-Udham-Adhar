@@ -866,7 +866,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !app) throw new Error("Order not found");
 
-    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes] = await Promise.all([
+    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes, refundRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
