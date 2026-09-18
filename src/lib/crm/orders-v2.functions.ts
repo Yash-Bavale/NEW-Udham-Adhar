@@ -618,7 +618,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus);
+      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus as any);
     }
 
     if (data.sortField === "stage") {
