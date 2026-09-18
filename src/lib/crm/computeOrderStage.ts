@@ -99,7 +99,8 @@ export function computeOrderStage(
     ws === "closed" ||
     ws === "refund_closed" ||
     application.application_status === "closed" ||
-    Boolean(application.closure_stage)
+    application.closure_stage === "closed" ||
+    application.closure_stage === "final_ticket_closed"
   ) return "closed";
 
   // S09/S10 near-terminals
