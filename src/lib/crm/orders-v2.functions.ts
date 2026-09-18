@@ -458,7 +458,7 @@ function parseDateBounds(dateFrom?: string, dateTo?: string) {
 async function fetchInChunks<T>(
   ids: string[],
   chunkSize: number,
-  fetchFn: (chunk: string[]) => Promise<{ data: T[] | null; error: any }>
+  fetchFn: (chunk: string[]) => PromiseLike<{ data: T[] | null; error: unknown }>
 ): Promise<T[]> {
   if (!ids || ids.length === 0) return [];
   const results: T[] = [];
@@ -615,19 +615,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
 
     const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
-      fetchInChunks(leadIds, 100, (chunk) =>
+      fetchInChunks<any>(leadIds, 100, (chunk) =>
         admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
       ),
-      fetchInChunks(customerIds, 100, (chunk) =>
+      fetchInChunks<any>(customerIds, 100, (chunk) =>
         admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", chunk)
       ),
-      fetchInChunks(ids, 100, (chunk) =>
+      fetchInChunks<any>(ids, 100, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("application_id", chunk)
       ),
-      fetchInChunks(leadIds, 100, (chunk) =>
+      fetchInChunks<any>(leadIds, 100, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("lead_id", chunk)
       ),
-      fetchInChunks(staffIds, 100, (chunk) =>
+      fetchInChunks<any>(staffIds, 100, (chunk) =>
         admin.from("profiles").select("id, display_name, email").in("id", chunk)
       ),
     ]);
@@ -642,7 +642,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       ].filter(Boolean))
     ) as string[];
 
-    const svcsData = await fetchInChunks(allServiceIds, 100, (chunk) =>
+    const svcsData = await fetchInChunks<any>(allServiceIds, 100, (chunk) =>
       admin.from("services").select("id, service_name").in("id", chunk)
     );
 

@@ -797,7 +797,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .from("payments")
       .select("id, amount, currency, gateway_name, customer_id, lead_id")
       .or(`application_id.eq.${data.orderId},lead_id.eq.${order.lead_id ?? "00000000-0000-0000-0000-000000000000"}`)
-      .in("status", ["paid", "success", "successful"])
+      .eq("status", "paid")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -959,17 +959,26 @@ export const reopenOrder = createServerFn({ method: "POST" })
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
 
     if (app?.lead_id) {
-      const { data: lead } = await supabaseAdmin
-        .from("leads")
-        .select("id, lead_status_v2, status, payment_successful_at")
-        .eq("id", app.lead_id)
-        .maybeSingle();
+      const [{ data: lead }, { data: paidPayment }] = await Promise.all([
+        supabaseAdmin
+          .from("leads")
+          .select("id, lead_status_v2, status")
+          .eq("id", app.lead_id)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("payments")
+          .select("id")
+          .eq("lead_id", app.lead_id)
+          .eq("status", "paid")
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
       if (lead) {
         const isClosedLead = ["closed", "closed_refunded", "uninterested"].includes(String(lead.lead_status_v2 ?? "")) ||
                              ["closed", "uninterested"].includes(String(lead.status ?? ""));
         if (isClosedLead) {
-          const nextLeadStatus = lead.payment_successful_at ? "payment_successful" : "contacted";
+          const nextLeadStatus = paidPayment ? "payment_successful" : "contacted";
           await supabaseAdmin
             .from("leads")
             .update({
