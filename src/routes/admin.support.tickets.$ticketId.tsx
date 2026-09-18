@@ -746,7 +746,7 @@ function TicketWorkspace() {
 // ── message bubble ─────────────────────────────────────────
 
 function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string | null }) {
-  const hasHtml = Boolean(msg.body_html && msg.body_html.trim());
+  const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
   const [viewMode, setViewMode] = useState<"html" | "text">(hasHtml ? "html" : "text");
 
   if (msg.kind === "note") {
