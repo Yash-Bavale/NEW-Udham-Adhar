@@ -455,6 +455,29 @@ function parseDateBounds(dateFrom?: string, dateTo?: string) {
   return { fromIso, toIso };
 }
 
+async function fetchInChunks<T>(
+  ids: string[],
+  chunkSize: number,
+  fetchFn: (chunk: string[]) => Promise<{ data: T[] | null; error: any }>
+): Promise<T[]> {
+  if (!ids || ids.length === 0) return [];
+  const results: T[] = [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    chunks.push(ids.slice(i, i + chunkSize));
+  }
+  const batchSize = 5;
+  for (let b = 0; b < chunks.length; b += batchSize) {
+    const currentBatch = chunks.slice(b, b + batchSize);
+    const resList = await Promise.all(currentBatch.map((c) => fetchFn(c)));
+    for (const res of resList) {
+      if (res.error) console.error("[fetchInChunks] error:", res.error);
+      if (res.data) results.push(...res.data);
+    }
+  }
+  return results;
+}
+
 /* ----------------------------- listOrders ------------------------------- */
 
 export const listOrdersV2 = createServerFn({ method: "POST" })
@@ -591,48 +614,60 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
     const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
 
-    const [leadsRes, custsRes, paysRes, staffRes] = await Promise.all([
-      leadIds.length
-        ? admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", leadIds)
-        : Promise.resolve({ data: [] as any[] }),
-      customerIds.length
-        ? admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", customerIds)
-        : Promise.resolve({ data: [] as any[] }),
-      ids.length
-        ? admin.from("payments").select("application_id, status, amount, payment_date").in("application_id", ids)
-        : Promise.resolve({ data: [] as any[] }),
-      staffIds.length
-        ? admin.from("profiles").select("id, display_name, email").in("id", staffIds)
-        : Promise.resolve({ data: [] as any[] }),
+    const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
+      fetchInChunks(leadIds, 100, (chunk) =>
+        admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
+      ),
+      fetchInChunks(customerIds, 100, (chunk) =>
+        admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", chunk)
+      ),
+      fetchInChunks(ids, 100, (chunk) =>
+        admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("application_id", chunk)
+      ),
+      fetchInChunks(leadIds, 100, (chunk) =>
+        admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("lead_id", chunk)
+      ),
+      fetchInChunks(staffIds, 100, (chunk) =>
+        admin.from("profiles").select("id, display_name, email").in("id", chunk)
+      ),
     ]);
 
-    const leadMap = new Map((leadsRes.data ?? []).map((l: any) => [l.id, l]));
+    const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
 
     // Gather all serviceIds from applications and linked leads
     const allServiceIds = Array.from(
       new Set([
         ...serviceIds,
-        ...(leadsRes.data ?? []).map((l: any) => l.service_id),
+        ...(leadsData ?? []).map((l: any) => l.service_id),
       ].filter(Boolean))
     ) as string[];
 
-    const { data: svcsData } = allServiceIds.length
-      ? await admin.from("services").select("id, service_name").in("id", allServiceIds)
-      : { data: [] as any[] };
+    const svcsData = await fetchInChunks(allServiceIds, 100, (chunk) =>
+      admin.from("services").select("id, service_name").in("id", chunk)
+    );
 
-    const custMap = new Map((custsRes.data ?? []).map((c: any) => [c.id, c]));
+    const custMap = new Map((custsData ?? []).map((c: any) => [c.id, c]));
     const svcMap  = new Map((svcsData ?? []).map((s: any) => [s.id, s]));
-    const staffMap = new Map((staffRes.data ?? []).map((s: any) => [s.id, s]));
+    const staffMap = new Map((staffData ?? []).map((s: any) => [s.id, s]));
+
     const payByApp = new Map<string, Array<{ status: string; amount: number }>>();
     const paidAtByApp = new Map<string, string>();
-    for (const p of paysRes.data ?? []) {
-      const arr = payByApp.get(p.application_id) ?? [];
-      arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
-      payByApp.set(p.application_id, arr);
-      if (["paid", "success", "successful"].includes(String(p.status)) && (p as any).payment_date) {
-        const prev = paidAtByApp.get(p.application_id);
-        const cur = (p as any).payment_date as string;
-        if (!prev || cur < prev) paidAtByApp.set(p.application_id, cur);
+    const allPaymentsMap = new Map<string, any>();
+    for (const p of [...paysByApp, ...paysByLead]) {
+      if (p && p.id) allPaymentsMap.set(p.id, p);
+    }
+
+    for (const p of allPaymentsMap.values()) {
+      const appId = p.application_id;
+      if (appId) {
+        const arr = payByApp.get(appId) ?? [];
+        arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
+        payByApp.set(appId, arr);
+        if (["paid", "success", "successful"].includes(String(p.status)) && p.payment_date) {
+          const prev = paidAtByApp.get(appId);
+          const cur = p.payment_date as string;
+          if (!prev || cur < prev) paidAtByApp.set(appId, cur);
+        }
       }
     }
 
@@ -729,12 +764,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // Filter by stage dropdown
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
-      filtered = filtered.filter((r) => {
-        if (data.stage === "form_not_submitted") {
-          return r.stage === "form_not_submitted" || r.stage === "payment_done";
-        }
-        return r.stage === data.stage;
-      });
+      filtered = filtered.filter((r) => r.stage === data.stage);
     }
 
     // Filter by fulfillment status
