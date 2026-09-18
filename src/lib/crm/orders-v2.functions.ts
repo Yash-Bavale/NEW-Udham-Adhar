@@ -577,10 +577,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // 1. Compute exact global counts across full dataset using parallel head queries (no 1000 row capping)
     const [allCountRes, completedCountRes, closedCountRes, needsActionCountRes] = await Promise.all([
-      buildBaseQuery().select("id", { count: "exact", head: true }),
-      buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]).select("id", { count: "exact", head: true }),
-      buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
-      buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
+      (buildBaseQuery() as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]) as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
     ]);
 
     const totalCount = allCountRes.count ?? 0;
@@ -618,7 +618,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus);
+      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus as any);
     }
 
     if (data.sortField === "stage") {
@@ -866,7 +866,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !app) throw new Error("Order not found");
 
-    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes] = await Promise.all([
+    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes, refundRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
