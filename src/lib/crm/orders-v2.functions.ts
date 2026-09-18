@@ -20,8 +20,11 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-async function assertStaff(supabase: any) {
-  const { data } = await supabase.from("user_roles").select("role").limit(50);
+async function assertStaff(_supabase: any, userId?: string) {
+  const admin = await getAdmin();
+  let query = admin.from("user_roles").select("role");
+  if (userId) query = query.eq("user_id", userId);
+  const { data } = await query;
   const roles = new Set((data ?? []).map((r: any) => r.role));
   const allowed = ["admin", "super_admin", "operations", "support", "accounts", "finance", "executive", "manager"];
   if (!allowed.some((r) => roles.has(r))) throw new Error("Forbidden");
@@ -505,7 +508,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       .parse(i ?? {}),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
+    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
     const perm = await getUserModulePermission(context.supabase, context.userId, "orders");

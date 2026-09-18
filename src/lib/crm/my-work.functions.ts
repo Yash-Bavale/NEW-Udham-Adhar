@@ -53,17 +53,25 @@ export type MyWorkSummary = {
 
 const SLA_HOURS = 48; // app stale after 48h without movement
 
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 export const getMyWorkSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyWorkSummary> => {
-    const { supabase, userId } = context;
-    const isAdmin = await isUserAdmin(supabase, userId);
+    const { userId } = context;
+    const admin = await getAdmin();
+    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", userId);
+    const roleList = (roles ?? []).map((r: { role: string }) => r.role);
+    const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
 
     // "Paid orders" = applications assigned to me that have at least one successful payment
     // AND are still open (not completed/closed/certificate-issued).
     const CLOSED_FULFILLMENT = ["completed", "order_closed", "certificate_issued"];
 
-    const { data: assignedAppRows, error: assignedErr } = await supabase
+    const { data: assignedAppRows, error: assignedErr } = await admin
       .from("applications")
       .select(
         "id, application_code, application_status, fulfillment_status, form_status, document_status, created_at, updated_at, lead:leads!fk_applications_lead(id, name, email, mobile, service)"
@@ -76,7 +84,7 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
     const assignedAppIds = (assignedAppRows ?? []).map((a: any) => a.id);
     let paidAppIdSet = new Set<string>();
     if (assignedAppIds.length > 0) {
-      const { data: paidRows, error: paidErr } = await supabase
+      const { data: paidRows, error: paidErr } = await admin
         .from("payments")
         .select("application_id, status")
         .in("application_id", assignedAppIds)
@@ -94,25 +102,25 @@ export const getMyWorkSummary = createServerFn({ method: "GET" })
 
     const [docsRes, leadsRes, totalLeadsRes, notifRes] = await Promise.all([
       isAdmin
-        ? supabase
+        ? admin
             .from("documents")
             .select("id, doc_type, file_name, uploaded_at, lead_id, application_id")
             .eq("status", "pending")
             .order("uploaded_at", { ascending: true })
             .limit(50)
         : Promise.resolve({ data: [], error: null } as any),
-      supabase
+      admin
         .from("leads")
         .select("id, lead_code, name, email, mobile, service, status, created_at")
         .eq("assigned_to", userId)
         .in("status", ["lead_created", "new_lead"])
         .order("created_at", { ascending: true })
         .limit(50),
-      supabase
+      admin
         .from("leads")
         .select("id", { count: "exact", head: true })
         .eq("assigned_to", userId),
-      supabase
+      admin
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)

@@ -74,12 +74,12 @@ function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderSta
 }
 
 const BUCKETS: { id: Bucket; label: string }[] = [
-  { id: "all",          label: "All" },
+  { id: "all", label: "All" },
   { id: "needs_action", label: "Needs Action" },
-  { id: "pending",      label: "Pending" },
-  { id: "completed",    label: "Completed" },
-  { id: "closed",       label: "Closed" },
-  { id: "exception",    label: "Exception" },
+  { id: "pending", label: "Pending" },
+  { id: "completed", label: "Completed" },
+  { id: "closed", label: "Closed" },
+  { id: "exception", label: "Exception" },
 ];
 
 const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> = [
@@ -97,11 +97,11 @@ const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> =
 
 type PendingAge = "any" | "1" | "2" | "3" | "7" | "custom";
 const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
-  { id: "any",    label: "Any age" },
-  { id: "1",      label: "1 day+ pending" },
-  { id: "2",      label: "2 days+ pending" },
-  { id: "3",      label: "3 days+ pending" },
-  { id: "7",      label: "7 days+ pending" },
+  { id: "any", label: "Any age" },
+  { id: "1", label: "1 day+ pending" },
+  { id: "2", label: "2 days+ pending" },
+  { id: "3", label: "3 days+ pending" },
+  { id: "7", label: "7 days+ pending" },
   { id: "custom", label: "Custom days…" },
 ];
 
@@ -112,759 +112,564 @@ function daysSince(iso: string | null | undefined): number {
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
-function OrdersListPage() {
-  const listFn = useServerFn(listOrdersV2);
-  const staffFn = useServerFn(listStaff);
-  const svcFn = useServerFn(listServices);
-  const role = useRole();
-  const userPerms = usePermissions();
 
-  if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
-    return (
-      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
-        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
-        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
-        <p className="text-sm text-slate-500 max-w-md mx-auto">
-          You do not have permission to view the Orders module. Please contact your administrator if you need access.
+// Preserve scroll position when navigating back from order detail view
+usePreserveScroll("admin.orders", !isLoading);
+
+// Real-time subscription to auto-refresh order cache silently when new orders/payments arrive
+useRealtimeTable("applications", () => {
+  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+});
+useRealtimeTable("payments", () => {
+  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+});
+
+// Background prefetch for next page
+useEffect(() => {
+  const totalPages = Math.ceil(total / pageSize);
+  if (page < totalPages) {
+    const nextPagePayload = { ...queryPayload, page: page + 1 };
+    qc.prefetchQuery({
+      queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
+      queryFn: () => listFn({ data: nextPagePayload }),
+      staleTime: 30 * 1000,
+    });
+  }
+}, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
+
+const isAdmin = role.hasAny(["admin", "super_admin"]);
+const bulkAssignFn = useServerFn(bulkAssignOrders);
+const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+const [assigningBusy, setAssigningBusy] = useState(false);
+
+async function handleBulkReassign(targetStaffId: string) {
+  if (!selectedOrderIds.length) return;
+  setAssigningBusy(true);
+  try {
+    const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
+    await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
+    const staffObj = staffProfiles.find((s) => s.id === targetStaffId);
+    const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
+    toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
+    setSelectedOrderIds([]);
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+  } catch (e) {
+    toast.error((e as Error).message || "Failed to reassign orders");
+  } finally {
+    setAssigningBusy(false);
+  }
+}
+
+// Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
+// Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
+const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
+
+const groups = useMemo(() => {
+  const g = new Map<string, any[]>();
+  for (const r of rows) {
+    const d = new Date(r.created_at);
+    const key = d.toDateString();
+    const arr = g.get(key) ?? [];
+    arr.push(r);
+    g.set(key, arr);
+  }
+  return Array.from(g.entries());
+}, [rows]);
+
+const isFilterActive =
+  search !== "" ||
+  fulfillmentStatus !== "all" ||
+  serviceId !== "all" ||
+  assignedTo !== "all" ||
+  paymentStatus !== "all" ||
+  actionStatusFilter !== "all" ||
+  stageFilter !== "all" ||
+  dateFrom !== "" ||
+  dateTo !== "" ||
+  pendingAge !== "any" ||
+  bucket !== "all";
+
+const resetFilters = () => {
+  setSearch("");
+  setDebouncedSearch("");
+  setFulfillmentStatus("all");
+  setServiceId("all");
+  setAssignedTo("all");
+  setPaymentStatus("all");
+  setActionStatusFilter("all");
+  setStageFilter("all");
+  setDateFrom("");
+  setDateTo("");
+  setPendingAge("any");
+  setCustomDays("");
+  setSortField("created_at");
+  setSortOrder("desc");
+  setBucket("all");
+  setPage(1);
+};
+
+const handleSortToggle = (field: "created_at" | "stage") => {
+  if (sortField === field) {
+    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+  } else {
+    setSortField(field);
+    setSortOrder(field === "created_at" ? "desc" : "asc");
+  }
+};
+
+if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
+  return (
+    <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+      <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+      <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+      <p className="text-sm text-slate-500 max-w-md mx-auto">
+        You do not have permission to view the Orders module. Please contact your administrator if you need access.
+      </p>
+    </div>
+  );
+}
+
+return (
+  <div className="w-full space-y-4">
+    {/* Header & Reset Button */}
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
+          {isFetching && !isLoading && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
+              <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
         </p>
       </div>
-    );
-  }
-  const hideMoney = role.hideMoney();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
+      {isFilterActive && (
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+        >
+          <RotateCcw className="size-3.5" /> Reset Filters
+        </button>
+      )}
+    </div>
 
-  const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
-
-  const [search, setSearch] = useState<string>(savedState?.search ?? "");
-  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedState?.debouncedSearch ?? "");
-  const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
-  const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
-  const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
-  const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
-  const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
-  const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
-  const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
-  const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
-  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
-  const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
-  const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
-  const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(savedState?.sortOrder ?? "desc");
-  const [page, setPage] = useState<number>(savedState?.page ?? 1);
-  const pageSize = 50;
-  const isInitialMount = useRef(true);
-
-  // Persist state across navigation
-  useEffect(() => {
-    saveModuleFilterState("admin.orders", {
-      search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
-      paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge,
-      customDays, sortField, sortOrder, page,
-    });
-  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
-
-  // Debounce search input by 350ms
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 350);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  // Reset page to 1 whenever filters change (skip on initial mount to preserve Page 2/3 when returning via Back button)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    setPage(1);
-  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
-
-  // Listener to reset all filters when clicking "Orders" in leftbar
-  useEffect(() => {
-    const handleReset = () => {
-      clearModuleFilterState("admin.orders");
-      setSearch("");
-      setDebouncedSearch("");
-      setFulfillmentStatus("all");
-      setServiceId("all");
-      setAssignedTo("all");
-      setPaymentStatus("all");
-      setActionStatusFilter("all");
-      setStageFilter("all");
-      setDateFrom("");
-      setDateTo("");
-      setBucket("all");
-      setPendingAge("any");
-      setCustomDays("");
-      setSortField("created_at");
-      setSortOrder("desc");
-      setPage(1);
-      const container = document.getElementById("admin-main-scroll");
-      if (container) container.scrollTop = 0;
-    };
-
-    window.addEventListener("reset-orders-filters", handleReset);
-    return () => window.removeEventListener("reset-orders-filters", handleReset);
-  }, []);
-
-  const routeSearch = Route.useSearch();
-
-  // Hydrate filters from URL query params (deep-links from dashboard KPIs).
-  useEffect(() => {
-    if (routeSearch.filter) {
-      switch (routeSearch.filter) {
-        case "pending": setBucket("pending"); break;
-        case "closed": setBucket("closed"); break;
-        case "completed": setBucket("completed"); break;
-        case "delayed_3d": setBucket("pending"); setPendingAge("3"); break;
-        case "delayed_7d": setBucket("pending"); setPendingAge("7"); break;
-        case "not_contacted": setBucket("needs_action"); break;
-        case "not_contacted_5h": setBucket("needs_action"); break;
-        case "technical_delay": setStageFilter("technical_delay"); break;
-        case "customer_delay": setStageFilter("customer_delay"); break;
-        case "form_not_submitted": setStageFilter("form_not_submitted"); break;
-      }
-    }
-    if (routeSearch.preset) {
-      const now = new Date();
-      if (routeSearch.preset === "today") {
-        const todayKey = istDateKey(now);
-        setDateFrom(todayKey);
-        setDateTo(todayKey);
-      } else if (routeSearch.preset === "yesterday") {
-        const yestKey = istDateKey(new Date(now.getTime() - 86400000));
-        setDateFrom(yestKey);
-        setDateTo(yestKey);
-      }
-    }
-    if (routeSearch.dateFrom) setDateFrom(routeSearch.dateFrom);
-    if (routeSearch.dateTo) setDateTo(routeSearch.dateTo);
-    if (routeSearch.stage) setStageFilter(routeSearch.stage);
-    if (routeSearch.search) setSearch(routeSearch.search);
-  }, [routeSearch]);
-
-  const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
-  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
-    if (Array.isArray(staffData)) return staffData;
-    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
-    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
-    return [];
-  }, [staffData]);
-  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
-
-  // Group active services website-wise
-  const groupedServices = useMemo(() => {
-    const raw = (svcData?.rows ?? []) as any[];
-    const activeOnly = raw.filter((s) => s.is_active !== false);
-    const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
-
-    for (const s of activeOnly) {
-      const webId = s.website_id || s.website?.id || "main";
-      const webName = s.website?.name || s.website?.domain || "Main Website";
-      const domain = s.website?.domain || "";
-
-      if (!map.has(webId)) {
-        map.set(webId, { websiteName: webName, domain, services: [] });
-      }
-      map.get(webId)!.services.push(s);
-    }
-
-    return Array.from(map.entries()).map(([id, group]) => ({
-      id,
-      ...group,
-    }));
-  }, [svcData]);
-
-  const queryPayload = useMemo(() => ({
-    page,
-    pageSize,
-    fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
-    serviceId: serviceId === "all" ? undefined : serviceId,
-    assignedTo: assignedTo === "all" ? undefined : assignedTo,
-    paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    search: debouncedSearch || undefined,
-    bucket: bucket || "all",
-    stage: stageFilter === "all" ? undefined : stageFilter,
-    actionStatus: actionStatusFilter || "all",
-    pendingAge: pendingAge === "any" ? undefined : pendingAge,
-    customDays: customDays || undefined,
-    sortField,
-    sortOrder,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
-
-  const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
-    queryFn: () => listFn({ data: queryPayload }),
-    placeholderData: keepPreviousData,
-    staleTime: 30 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const rows = (data?.rows ?? []) as any[];
-  const total = data?.total ?? 0;
-  const counts = data?.counts ?? {
-    all: 0,
-    needs_action: 0,
-    pending: 0,
-    completed: 0,
-    closed: 0,
-    exception: 0,
-    actionRequired: 0,
-    processed: 0,
-  };
-  const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
-
-  // Preserve scroll position when navigating back from order detail view
-  usePreserveScroll("admin.orders", !isLoading);
-
-  // Real-time subscription to auto-refresh order cache silently when new orders/payments arrive
-  useRealtimeTable("applications", () => {
-    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-  });
-  useRealtimeTable("payments", () => {
-    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-  });
-
-  // Background prefetch for next page
-  useEffect(() => {
-    const totalPages = Math.ceil(total / pageSize);
-    if (page < totalPages) {
-      const nextPagePayload = { ...queryPayload, page: page + 1 };
-      qc.prefetchQuery({
-        queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
-        queryFn: () => listFn({ data: nextPagePayload }),
-        staleTime: 30 * 1000,
-      });
-    }
-  }, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
-
-  const isAdmin = role.hasAny(["admin", "super_admin"]);
-  const bulkAssignFn = useServerFn(bulkAssignOrders);
-  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-  const [assigningBusy, setAssigningBusy] = useState(false);
-
-  async function handleBulkReassign(targetStaffId: string) {
-    if (!selectedOrderIds.length) return;
-    setAssigningBusy(true);
-    try {
-      const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
-      await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-      const staffObj = staffProfiles.find((s) => s.id === targetStaffId);
-      const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
-      toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
-      setSelectedOrderIds([]);
-      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-    } catch (e) {
-      toast.error((e as Error).message || "Failed to reassign orders");
-    } finally {
-      setAssigningBusy(false);
-    }
-  }
-
-  // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
-  // Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
-  const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
-
-  const groups = useMemo(() => {
-    const g = new Map<string, any[]>();
-    for (const r of rows) {
-      const d = new Date(r.created_at);
-      const key = d.toDateString();
-      const arr = g.get(key) ?? [];
-      arr.push(r);
-      g.set(key, arr);
-    }
-    return Array.from(g.entries());
-  }, [rows]);
-
-  const isFilterActive =
-    search !== "" ||
-    fulfillmentStatus !== "all" ||
-    serviceId !== "all" ||
-    assignedTo !== "all" ||
-    paymentStatus !== "all" ||
-    actionStatusFilter !== "all" ||
-    stageFilter !== "all" ||
-    dateFrom !== "" ||
-    dateTo !== "" ||
-    pendingAge !== "any" ||
-    bucket !== "all";
-
-  const resetFilters = () => {
-    setSearch("");
-    setDebouncedSearch("");
-    setFulfillmentStatus("all");
-    setServiceId("all");
-    setAssignedTo("all");
-    setPaymentStatus("all");
-    setActionStatusFilter("all");
-    setStageFilter("all");
-    setDateFrom("");
-    setDateTo("");
-    setPendingAge("any");
-    setCustomDays("");
-    setSortField("created_at");
-    setSortOrder("desc");
-    setBucket("all");
-    setPage(1);
-  };
-
-  const handleSortToggle = (field: "created_at" | "stage") => {
-    if (sortField === field) {
-      setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
-    } else {
-      setSortField(field);
-      setSortOrder(field === "created_at" ? "desc" : "asc");
-    }
-  };
-
-  return (
-    <div className="w-full space-y-4">
-      {/* Header & Reset Button */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
-            {isFetching && !isLoading && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
-                <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
-          </p>
+    {/* Modern Filter Card */}
+    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
+      <div className="flex flex-wrap gap-2.5 items-center">
+        {/* Search bar */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
+          <Input
+            placeholder="Search order #, customer, mobile, lead code…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-8 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
-        {isFilterActive && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
-          >
-            <RotateCcw className="size-3.5" /> Reset Filters
-          </button>
-        )}
-      </div>
 
-      {/* Modern Filter Card */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
-        <div className="flex flex-wrap gap-2.5 items-center">
-          {/* Search bar */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-            <Input
-              placeholder="Search order #, customer, mobile, lead code…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-8 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Stage Filter */}
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="All Stages" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {STAGE_FILTER_OPTIONS.map((st) => (
-                <SelectItem key={st.id} value={st.id}>
-                  <div className="flex items-center gap-1.5">
-                    {st.id !== "all" && (
-                      <span className={`size-2 rounded-full ${
-                        st.tone === "emerald" ? "bg-emerald-500" :
+        {/* Stage Filter */}
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectValue placeholder="All Stages" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px]">
+            {STAGE_FILTER_OPTIONS.map((st) => (
+              <SelectItem key={st.id} value={st.id}>
+                <div className="flex items-center gap-1.5">
+                  {st.id !== "all" && (
+                    <span className={`size-2 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
                         st.tone === "amber" ? "bg-amber-500" :
-                        st.tone === "indigo" ? "bg-indigo-500" :
-                        st.tone === "violet" ? "bg-violet-500" :
-                        st.tone === "sky" ? "bg-sky-500" :
-                        st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
+                          st.tone === "indigo" ? "bg-indigo-500" :
+                            st.tone === "violet" ? "bg-violet-500" :
+                              st.tone === "sky" ? "bg-sky-500" :
+                                st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
                       }`} />
-                    )}
-                    <span>{st.label}</span>
-                  </div>
+                  )}
+                  <span>{st.label}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Action Status Filter */}
+        <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
+          <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Action Status</SelectItem>
+            <SelectItem value="action_required">Action Required (Red)</SelectItem>
+            <SelectItem value="processed">Completed / Action Taken</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Services Filter */}
+        <Select value={serviceId} onValueChange={setServiceId}>
+          <SelectTrigger className="h-9 w-[220px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectValue placeholder="All services" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[380px]">
+            <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
+            {groupedServices.map((g) => (
+              <SelectGroup key={g.id}>
+                <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
+                  🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
+                </SelectLabel>
+                {g.services.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                    {s.service_name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Assignees Filter (Admin only) */}
+        {role.hasAny(["admin", "super_admin"]) && (
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All assignees</SelectItem>
+              {staffProfiles.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* Payment Status Filter */}
+        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+          <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All payment" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All payment</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Partially Paid">Partially paid</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Failed">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <DateRangePicker
+          value={{
+            from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+            to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
+          }}
+          onChange={(range) => {
+            if (!range.from) {
+              setDateFrom("");
+              setDateTo("");
+            } else {
+              setDateFrom(istDateKey(range.from));
+              setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+            }
+          }}
+        />
+
+        {/* Pending Age */}
+        <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+          <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectValue placeholder="Pending age" />
+          </SelectTrigger>
+          <SelectContent>
+            {PENDING_AGE_OPTIONS.map((o) => (
+              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {pendingAge === "custom" && (
+          <Input
+            type="number"
+            min={1}
+            value={customDays}
+            onChange={(e) => setCustomDays(e.target.value)}
+            placeholder="Days"
+            className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
+          />
+        )}
+        {/* Sort Selector */}
+        <Select
+          value={
+            sortField === "created_at"
+              ? sortOrder === "desc" ? "created_desc" : "created_asc"
+              : sortField === "stage"
+                ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
+                : "stage_journey_asc"
+          }
+          onValueChange={(v) => {
+            if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
+            else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
+            else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
+            else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
+            else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
+          }}
+        >
+          <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200">
+            <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+            <SelectValue placeholder="Sort order" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="created_desc">Latest First (Newest)</SelectItem>
+            <SelectItem value="created_asc">Older First (Oldest)</SelectItem>
+            <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
+            <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
+            <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    {/* Pending ageing summary */}
+    {(bucket === "pending" || pendingAge !== "any") && (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
+        <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
+        <AgeChip label="< 1d" n={ageBuckets.d1} />
+        <AgeChip label="1d+" n={ageBuckets.d2} />
+        <AgeChip label="2d+" n={ageBuckets.d3} />
+        <AgeChip label="3d+" n={ageBuckets.d7} />
+        <AgeChip label="7d+" n={ageBuckets.older} tone="rose" />
+      </div>
+    )}
+
+    {/* Bucket chips */}
+    <div className="flex flex-wrap gap-2">
+      {BUCKETS.map((b) => {
+        const active = bucket === b.id;
+        return (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => setBucket(b.id)}
+            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${active
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              }`}
+          >
+            <span>{b.label}</span>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
+              {counts[b.id] ?? 0}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+
+    {/* Bulk Action Bar (SuperAdmin & Admin) */}
+    {isAdmin && selectedOrderIds.length > 0 && (
+      <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center gap-2.5 text-sm font-medium">
+          <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+            {selectedOrderIds.length}
+          </span>
+          <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
+            <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
+              <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
+              <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassign">❌ Unassign Order</SelectItem>
+              {staffProfiles.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  👤 {s.display_name || s.name || s.email}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {/* Action Status Filter */}
-          <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Action Status</SelectItem>
-              <SelectItem value="action_required">Action Required (Red)</SelectItem>
-              <SelectItem value="processed">Completed / Action Taken</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Services Filter */}
-          <Select value={serviceId} onValueChange={setServiceId}>
-            <SelectTrigger className="h-9 w-[220px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="All services" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
-              {groupedServices.map((g) => (
-                <SelectGroup key={g.id}>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
-                    🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
-                  </SelectLabel>
-                  {g.services.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                      {s.service_name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Assignees Filter (Admin only) */}
-          {role.hasAny(["admin", "super_admin"]) && (
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All assignees</SelectItem>
-                {staffProfiles.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* Payment Status Filter */}
-          <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-            <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All payment" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All payment</SelectItem>
-              <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Partially Paid">Partially paid</SelectItem>
-              <SelectItem value="Refunded">Refunded</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <DateRangePicker
-            value={{
-              from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
-              to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
-            }}
-            onChange={(range) => {
-              if (!range.from) {
-                setDateFrom("");
-                setDateTo("");
-              } else {
-                setDateFrom(istDateKey(range.from));
-                setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
-              }
-            }}
-          />
-
-          {/* Pending Age */}
-          <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-            <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Pending age" />
-            </SelectTrigger>
-            <SelectContent>
-              {PENDING_AGE_OPTIONS.map((o) => (
-                <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {pendingAge === "custom" && (
-            <Input
-              type="number"
-              min={1}
-              value={customDays}
-              onChange={(e) => setCustomDays(e.target.value)}
-              placeholder="Days"
-              className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
-            />
-          )}
-          {/* Sort Selector */}
-          <Select
-            value={
-              sortField === "created_at"
-                ? sortOrder === "desc" ? "created_desc" : "created_asc"
-                : sortField === "stage"
-                ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
-                : "stage_journey_asc"
-            }
-            onValueChange={(v) => {
-              if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
-              else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
-              else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
-              else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
-              else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
-            }}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedOrderIds([])}
+            className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
           >
-            <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200">
-              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
-              <SelectValue placeholder="Sort order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_desc">Latest First (Newest)</SelectItem>
-              <SelectItem value="created_asc">Older First (Oldest)</SelectItem>
-              <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
-              <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
-              <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
-            </SelectContent>
-          </Select>
+            Clear Selection
+          </Button>
         </div>
       </div>
+    )}
 
-      {/* Pending ageing summary */}
-      {(bucket === "pending" || pendingAge !== "any") && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
-          <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
-          <AgeChip label="< 1d" n={ageBuckets.d1} />
-          <AgeChip label="1d+"  n={ageBuckets.d2} />
-          <AgeChip label="2d+"  n={ageBuckets.d3} />
-          <AgeChip label="3d+"  n={ageBuckets.d7} />
-          <AgeChip label="7d+"  n={ageBuckets.older} tone="rose" />
-        </div>
-      )}
-
-      {/* Bucket chips */}
-      <div className="flex flex-wrap gap-2">
-        {BUCKETS.map((b) => {
-          const active = bucket === b.id;
-          return (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setBucket(b.id)}
-              className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${
-                active
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-              }`}
-            >
-              <span>{b.label}</span>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
-                {counts[b.id] ?? 0}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Bulk Action Bar (SuperAdmin & Admin) */}
-      {isAdmin && selectedOrderIds.length > 0 && (
-        <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2.5 text-sm font-medium">
-            <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
-              {selectedOrderIds.length}
-            </span>
-            <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
-              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
-                <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
-                <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassign">❌ Unassign Order</SelectItem>
-                {staffProfiles.map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    👤 {s.display_name || s.name || s.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setSelectedOrderIds([])}
-              className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
-            >
-              Clear Selection
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Table View */}
-      <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-        <ScrollableTable>
-          <table className="w-full text-sm min-w-[950px]">
-            <thead>
-              <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
-                {isAdmin && (
-                  <th className="w-10 px-3 py-2.5 text-center">
-                    <Checkbox
-                      checked={rows.length > 0 && selectedOrderIds.length === rows.length}
-                      onCheckedChange={(checked) =>
-                        setSelectedOrderIds(checked ? rows.map((r) => r.id) : [])
-                      }
-                      aria-label="Select all orders"
-                    />
-                  </th>
-                )}
-                <th className="text-left font-semibold px-3 py-2.5">Order #</th>
-                <th
-                  onClick={() => handleSortToggle("created_at")}
-                  className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                  title="Click to toggle sorting by Created time"
-                >
-                  <div className="inline-flex items-center gap-1">
-                    <span>Created</span>
-                    {sortField === "created_at" ? (
-                      sortOrder === "desc" ? (
-                        <ArrowDown className="w-3 h-3 text-indigo-600" />
-                      ) : (
-                        <ArrowUp className="w-3 h-3 text-indigo-600" />
-                      )
-                    ) : (
-                      <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
-                    )}
-                  </div>
+    {/* Desktop Table View */}
+    <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+      <ScrollableTable>
+        <table className="w-full text-sm min-w-[950px]">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
+              {isAdmin && (
+                <th className="w-10 px-3 py-2.5 text-center">
+                  <Checkbox
+                    checked={rows.length > 0 && selectedOrderIds.length === rows.length}
+                    onCheckedChange={(checked) =>
+                      setSelectedOrderIds(checked ? rows.map((r) => r.id) : [])
+                    }
+                    aria-label="Select all orders"
+                  />
                 </th>
-                <th className="text-left font-semibold px-3 py-2.5">Customer</th>
-                <th className="text-left font-semibold px-3 py-2.5">Service</th>
-                <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
-                <th
-                  onClick={() => handleSortToggle("stage")}
-                  className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                  title="Click to toggle sorting by Stage"
-                >
-                  <div className="inline-flex items-center gap-1">
-                    <span>Stage</span>
-                    {sortField === "stage" ? (
-                      sortOrder === "desc" ? (
-                        <ArrowDown className="w-3 h-3 text-indigo-600" />
-                      ) : (
-                        <ArrowUp className="w-3 h-3 text-indigo-600" />
-                      )
-                    ) : sortField === "stage_journey" ? (
+              )}
+              <th className="text-left font-semibold px-3 py-2.5">Order #</th>
+              <th
+                onClick={() => handleSortToggle("created_at")}
+                className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                title="Click to toggle sorting by Created time"
+              >
+                <div className="inline-flex items-center gap-1">
+                  <span>Created</span>
+                  {sortField === "created_at" ? (
+                    sortOrder === "desc" ? (
                       <ArrowDown className="w-3 h-3 text-indigo-600" />
                     ) : (
-                      <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
-                    )}
-                  </div>
-                </th>
-                {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
-                {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
-              )}
-              {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
-              )}
-              {!isLoading && groups.map(([day, items]) => (
-                <Fragment key={`g-${day}`}>
-                  <tr className="bg-slate-900 text-white border-b border-slate-800">
-                    <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
-                      {formatDayHeader(day)}
-                    </td>
-                  </tr>
-                  {items.map((r) => (
-                    <OrderRow
-                      key={r.id}
-                      order={r}
-                      hideMoney={hideMoney}
-                      isAdmin={isAdmin}
-                      selected={selectedOrderIds.includes(r.id)}
-                      onToggleSelect={(id, checked) =>
-                        setSelectedOrderIds((prev) =>
-                          checked ? [...prev, id] : prev.filter((x) => x !== id),
-                        )
-                      }
-                      onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-                    />
-                  ))}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </ScrollableTable>
-      </div>
-
-      {/* Mobile Touch-Friendly Card View */}
-      <div className="block md:hidden space-y-4">
-        {isLoading && (
-          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
-            Loading orders…
-          </div>
-        )}
-        {!isLoading && rows.length === 0 && (
-          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
-            No orders match the selected filters.
-          </div>
-        )}
-        {!isLoading && groups.map(([day, items]) => (
-          <div key={`m-g-${day}`} className="space-y-2">
-            <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
-              {formatDayHeader(day)}
-            </div>
-            <div className="space-y-2.5">
-              {items.map((r) => (
-                <OrderCardMobile
-                  key={r.id}
-                  order={r}
-                  hideMoney={hideMoney}
-                  isAdmin={isAdmin}
-                  selected={selectedOrderIds.includes(r.id)}
-                  onToggleSelect={(id, checked) =>
-                    setSelectedOrderIds((prev) =>
-                      checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      <ArrowUp className="w-3 h-3 text-indigo-600" />
                     )
-                  }
-                  onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                  )}
+                </div>
+              </th>
+              <th className="text-left font-semibold px-3 py-2.5">Customer</th>
+              <th className="text-left font-semibold px-3 py-2.5">Service</th>
+              <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
+              <th
+                onClick={() => handleSortToggle("stage")}
+                className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                title="Click to toggle sorting by Stage"
+              >
+                <div className="inline-flex items-center gap-1">
+                  <span>Stage</span>
+                  {sortField === "stage" ? (
+                    sortOrder === "desc" ? (
+                      <ArrowDown className="w-3 h-3 text-indigo-600" />
+                    ) : (
+                      <ArrowUp className="w-3 h-3 text-indigo-600" />
+                    )
+                  ) : sortField === "stage_journey" ? (
+                    <ArrowDown className="w-3 h-3 text-indigo-600" />
+                  ) : (
+                    <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                  )}
+                </div>
+              </th>
+              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
+              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
+            )}
+            {!isLoading && groups.map(([day, items]) => (
+              <Fragment key={`g-${day}`}>
+                <tr className="bg-slate-900 text-white border-b border-slate-800">
+                  <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
+                    {formatDayHeader(day)}
+                  </td>
+                </tr>
+                {items.map((r) => (
+                  <OrderRow
+                    key={r.id}
+                    order={r}
+                    hideMoney={hideMoney}
+                    isAdmin={isAdmin}
+                    selected={selectedOrderIds.includes(r.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedOrderIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      )
+                    }
+                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                  />
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </ScrollableTable>
+    </div>
 
-      {/* Pagination bar (Bottom) */}
-      {total > pageSize && (
-        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
-          <div>
-            Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
-            >
-              <ChevronLeft className="size-3.5" /> Prev
-            </button>
-            <button
-              type="button"
-              onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-              disabled={page * pageSize >= total || isLoading}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
-            >
-              Next <ChevronRight className="size-3.5" />
-            </button>
-          </div>
+    {/* Mobile Touch-Friendly Card View */}
+    <div className="block md:hidden space-y-4">
+      {isLoading && (
+        <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+          Loading orders…
         </div>
       )}
+      {!isLoading && rows.length === 0 && (
+        <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+          No orders match the selected filters.
+        </div>
+      )}
+      {!isLoading && groups.map(([day, items]) => (
+        <div key={`m-g-${day}`} className="space-y-2">
+          <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+            {formatDayHeader(day)}
+          </div>
+          <div className="space-y-2.5">
+            {items.map((r) => (
+              <OrderCardMobile
+                key={r.id}
+                order={r}
+                hideMoney={hideMoney}
+                isAdmin={isAdmin}
+                selected={selectedOrderIds.includes(r.id)}
+                onToggleSelect={(id, checked) =>
+                  setSelectedOrderIds((prev) =>
+                    checked ? [...prev, id] : prev.filter((x) => x !== id),
+                  )
+                }
+                onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
-  );
+
+    {/* Pagination bar (Bottom) */}
+    {total > pageSize && (
+      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
+        <div>
+          Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || isLoading}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+          >
+            <ChevronLeft className="size-3.5" /> Prev
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+            disabled={page * pageSize >= total || isLoading}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+          >
+            Next <ChevronRight className="size-3.5" />
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);
 }
 
 function OrderCardMobile({
@@ -888,13 +693,13 @@ function OrderCardMobile({
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber:   "bg-amber-50 text-amber-700 border-amber-200",
-    rose:    "bg-rose-50 text-rose-700 border-rose-200",
-    slate:   "bg-slate-100 text-slate-700 border-slate-200",
-    blue:    "bg-sky-50 text-sky-700 border-sky-200",
-    sky:     "bg-sky-50 text-sky-700 border-sky-200",
-    indigo:  "bg-indigo-50 text-indigo-700 border-indigo-200",
-    violet:  "bg-violet-50 text-violet-700 border-violet-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-200",
+    sky: "bg-sky-50 text-sky-700 border-sky-200",
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    violet: "bg-violet-50 text-violet-700 border-violet-200",
   };
   const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700 border-emerald-200";
 
@@ -904,9 +709,8 @@ function OrderCardMobile({
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         onOpen(order.id);
       }}
-      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${
-        selected ? "border-indigo-500 bg-indigo-50/40" : "border-slate-200 hover:border-slate-300"
-      }`}
+      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${selected ? "border-indigo-500 bg-indigo-50/40" : "border-slate-200 hover:border-slate-300"
+        }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -1084,22 +888,21 @@ function OrderRow({
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
-    amber:   "bg-amber-50 text-amber-700",
-    rose:    "bg-rose-50 text-rose-700",
-    slate:   "bg-slate-100 text-slate-700",
-    blue:    "bg-sky-50 text-sky-700",
-    sky:     "bg-sky-50 text-sky-700",
-    indigo:  "bg-indigo-50 text-indigo-700",
-    violet:  "bg-violet-50 text-violet-700",
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+    slate: "bg-slate-100 text-slate-700",
+    blue: "bg-sky-50 text-sky-700",
+    sky: "bg-sky-50 text-sky-700",
+    indigo: "bg-indigo-50 text-indigo-700",
+    violet: "bg-violet-50 text-violet-700",
   };
   const stageTone = stageToneMap[meta?.tone ?? "emerald"] ?? "bg-emerald-50 text-emerald-700";
   const actionStatus = getOrderActionStatus(order);
 
   return (
     <tr
-      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${
-        selected ? "bg-indigo-50/40" : ""
-      }`}
+      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${selected ? "bg-indigo-50/40" : ""
+        }`}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
@@ -1183,7 +986,7 @@ function OrderRow({
             if (d < 1) return null;
             const tone = d >= 7 ? "bg-rose-50 text-rose-700 border-rose-200"
               : d >= 3 ? "bg-amber-50 text-amber-800 border-amber-200"
-              : "bg-slate-100 text-slate-600 border-slate-200";
+                : "bg-slate-100 text-slate-600 border-slate-200";
             return (
               <span
                 title={`Pending for ${d} day${d === 1 ? "" : "s"} (since order created)`}

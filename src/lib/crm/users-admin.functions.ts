@@ -425,10 +425,11 @@ export const setEmployeeActive = createServerFn({ method: "POST" })
 export const getMyStaffRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    const { userId } = context;
+    const admin = await getAdmin();
+    const { data, error } = await admin.from("user_roles").select("role").eq("user_id", userId);
     if (error) throw new Error(error.message);
-    const { data: prof } = await supabase
+    const { data: prof } = await admin
       .from("profiles")
       .select("display_name, full_name")
       .eq("id", userId)

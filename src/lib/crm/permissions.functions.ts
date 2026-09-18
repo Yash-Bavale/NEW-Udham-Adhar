@@ -30,23 +30,29 @@ export function getModuleAliases(key: string): string[] {
   return [key];
 }
 
+async function getAdmin() {
+  const m = await import("@/integrations/supabase/client.server");
+  return m.supabaseAdmin;
+}
+
 export const getMyPermissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<MyPermissions> => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    const admin = await getAdmin();
     // Admin detection
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", userId);
     const roleList = (roles ?? []).map((r: { role: string }) => r.role);
     const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
 
     if (isAdmin) return { isAdmin: true, modules: {} };
 
     const [permsRes, scopesRes] = await Promise.all([
-      supabase
+      admin
         .from("user_permissions")
         .select("module_key, can_view, can_create, can_edit, can_delete, scope_all")
         .eq("user_id", userId),
-      supabase
+      admin
         .from("user_permission_scopes")
         .select("module_key, website_id, category_id, service_id")
         .eq("user_id", userId),
@@ -59,7 +65,7 @@ export const getMyPermissions = createServerFn({ method: "GET" })
 
     if (customPerms.length > 0) {
       for (const p of customPerms) {
-        const effectiveView = !!p.can_view || !!p.scope_all;
+        const effectiveView = !!p.can_view || !!p.can_create || !!p.can_edit;
         const permObj: ModulePerm = {
           view: effectiveView,
           create: !!p.can_create,
@@ -107,7 +113,7 @@ export const getMyPermissions = createServerFn({ method: "GET" })
   });
 
 export async function getUserModulePermission(
-  supabase: any,
+  _supabase: any,
   userId: string,
   moduleKey: string
 ): Promise<{
@@ -118,7 +124,8 @@ export async function getUserModulePermission(
   scopeAll: boolean;
   scopes: Array<{ websiteId: string | null; categoryId: string | null; serviceId: string | null }>;
 }> {
-  const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const admin = await getAdmin();
+  const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", userId);
   const roleList = (roles ?? []).map((r: { role: string }) => r.role);
   const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
 
@@ -129,14 +136,14 @@ export async function getUserModulePermission(
   const aliases = getModuleAliases(moduleKey);
 
   const [permRes, scopesRes] = await Promise.all([
-    supabase
+    admin
       .from("user_permissions")
       .select("can_view, can_create, can_edit, can_delete, scope_all")
       .eq("user_id", userId)
       .in("module_key", aliases)
       .limit(1)
       .maybeSingle(),
-    supabase
+    admin
       .from("user_permission_scopes")
       .select("website_id, category_id, service_id")
       .eq("user_id", userId)
@@ -157,7 +164,7 @@ export async function getUserModulePermission(
     serviceId: s.service_id ?? null,
   }));
 
-  const effectiveView = !!perm.can_view || !!perm.scope_all;
+  const effectiveView = !!perm.can_view || !!perm.can_create || !!perm.can_edit;
   return {
     canView: effectiveView,
     canCreate: !!perm.can_create,

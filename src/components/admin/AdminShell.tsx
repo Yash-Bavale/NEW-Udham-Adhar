@@ -146,11 +146,23 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({
       ...g,
-      items: g.items.filter((it) =>
-        (!it.module || (role.can(it.module) && userPerms.can(it.module, "view"))) &&
-        (!it.requireRole || role.has(it.requireRole)) &&
-        (!it.requireAnyRole || it.requireAnyRole.some((r) => role.has(r))),
-      ),
+      items: g.items.filter((it) => {
+        if (it.module) {
+          const hasPerm = userPerms.can(it.module, "view");
+          if (hasPerm) return true;
+          if (userPerms.perms && !hasPerm) return false;
+          if (!role.can(it.module)) return false;
+        }
+
+        if (it.requireRole && !role.has(it.requireRole)) return false;
+        if (it.requireAnyRole && !it.requireAnyRole.some((r) => role.has(r))) {
+          if (!it.module || !userPerms.can(it.module, "view")) {
+            return false;
+          }
+        }
+
+        return true;
+      }),
     }))
     .filter((g) => g.items.length > 0);
   const flatVisible = visibleNav.flatMap((g) => g.items);

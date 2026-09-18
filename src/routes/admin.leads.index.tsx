@@ -86,18 +86,6 @@ function LeadsPage() {
   const role = useRole();
   const userPerms = usePermissions();
 
-  if (!userPerms.isLoading && !userPerms.can("leads", "view")) {
-    return (
-      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
-        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
-        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
-        <p className="text-sm text-slate-500 max-w-md mx-auto">
-          You do not have permission to view the Leads module. Please contact your administrator if you need access.
-        </p>
-      </div>
-    );
-  }
-
   const handleExport = async (format: "csv" | "excel", idsToExport?: string[]) => {
     setExporting(format);
     setExportOpen(false);
@@ -309,6 +297,18 @@ function LeadsPage() {
       toast.error(e?.message ?? "Bulk delete failed");
     } finally { setBusy(false); }
   };
+
+  if (!userPerms.isLoading && !userPerms.can("leads", "view")) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You do not have permission to view the Leads module. Please contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 pb-24">

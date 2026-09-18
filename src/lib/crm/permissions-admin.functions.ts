@@ -58,7 +58,7 @@ export const upsertUserPermission = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
     const admin = await getAdmin();
-    const effectiveCanView = data.canView || data.scopeAll || data.canCreate || data.canEdit;
+    const effectiveCanView = data.canView || data.canCreate || data.canEdit;
     const { error } = await admin.from("user_permissions").upsert(
       {
         user_id: data.userId,
