@@ -204,6 +204,7 @@ export function WorkspaceShell(p: Props) {
 
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
     qc.invalidateQueries({ queryKey: ["order-workflow-state", p.orderId] });
     qc.invalidateQueries({ queryKey: ["order-tickets", p.orderId] });
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.orderId] });

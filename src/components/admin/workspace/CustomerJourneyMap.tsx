@@ -226,6 +226,7 @@ export function CustomerJourneyMap(p: Props) {
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin.order", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
     qc.invalidateQueries({ queryKey: ["order-workflow-state", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["order-tickets", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.applicationId] });

@@ -37,6 +37,11 @@ BEGIN
   UPDATE public.applications
   SET order_status = 'FORM_RECEIVED',
       fulfillment_status = 'form_submitted',
+      workflow_status = NULL,
+      closure_stage = 'none',
+      application_status = 'form_submitted',
+      closure_reason_id = NULL,
+      closure_remarks = NULL,
       form_submitted_at = COALESCE(form_submitted_at, v_now),
       customer_hold_started_at = NULL,
       technical_hold_started_at = NULL,

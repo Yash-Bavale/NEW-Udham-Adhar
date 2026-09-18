@@ -691,6 +691,35 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       _ticket_id: ticket.id,
     });
     if (error) throw new Error(error.message);
+
+    // Reset all workflow & closure fields so computeOrderStage & deriveJourneyLiveState recognise the order as active
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    const { error: upErr } = await supabaseAdmin
+      .from("applications")
+      .update({
+        order_status: "FORM_RECEIVED",
+        fulfillment_status: "form_submitted",
+        workflow_status: null,
+        closure_stage: "none",
+        application_status: "form_submitted",
+        closure_reason_id: null,
+        closure_remarks: null,
+        closure_next_at: null,
+        cancellation_requested_at: null,
+        customer_hold_started_at: null,
+        technical_hold_started_at: null,
+        technical_hold_kind: null,
+        active_reason_id: null,
+        active_reason_text: null,
+        reopened_at: now,
+        reopened_by: context.userId,
+        updated_at: now,
+      } as never)
+      .eq("id", ticket.application_id);
+
+    if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
+
     return result as { ok: true; applicationId: string; cancelledCustomerDelayTimers: number };
   });
 
