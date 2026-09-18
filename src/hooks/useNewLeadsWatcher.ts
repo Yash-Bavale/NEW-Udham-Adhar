@@ -1,6 +1,5 @@
-// Subscribes to lead INSERTs, lead assignment UPDATEs for the current user,
-// and backend notifications. Fires desktop notifications and popup toasts.
-// (Final_CRM Part E & employee lead assignment popups.)
+// Subscribes to lead & order INSERTs, assignment UPDATEs for the current user,
+// and backend notifications. Fires desktop notifications, popup toasts, and configured ringtones.
 import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,7 +14,27 @@ export function useNewLeadsWatcher() {
   const { notify } = useNotifications();
   const qc = useQueryClient();
   const role = useRole();
+
   const isAdmin = role.hasAny(["admin", "super_admin"]);
+  const canSeeLeads = role.can("leads");
+  const canSeeOrders = role.can("orders");
+
+  // Keep live references to permissions to prevent stale closure issues in realtime websocket callbacks
+  const livePermsRef = useRef({
+    isAdmin,
+    canSeeLeads,
+    canSeeOrders,
+    rolesLoading: role.loading,
+  });
+
+  useEffect(() => {
+    livePermsRef.current = {
+      isAdmin,
+      canSeeLeads,
+      canSeeOrders,
+      rolesLoading: role.loading,
+    };
+  }, [isAdmin, canSeeLeads, canSeeOrders, role.loading]);
 
   // Deduplication cache: key -> timestamp (ms) to avoid duplicate toasts & sounds for same event
   const notifiedKeysRef = useRef<Map<string, number>>(new Map());
@@ -35,7 +54,19 @@ export function useNewLeadsWatcher() {
       qc.invalidateQueries({ queryKey: ["my-work"] });
     };
 
-    const triggerNotification = (dedupeKey: string, title: string, body: string, url: string, kind: "lead" | "order" = "lead") => {
+    const invalidateOrdersData = () => {
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders"] });
+      qc.invalidateQueries({ queryKey: ["my-work"] });
+    };
+
+    const triggerNotification = (
+      dedupeKey: string,
+      title: string,
+      body: string,
+      url: string,
+      kind: "lead" | "order" = "lead"
+    ) => {
       const now = Date.now();
       const lastTime = notifiedKeysRef.current.get(dedupeKey) ?? 0;
       if (now - lastTime < 10000) return; // Skip if notified within last 10s
@@ -46,8 +77,13 @@ export function useNewLeadsWatcher() {
         if (now - t > 60000) notifiedKeysRef.current.delete(k);
       }
 
-      setUnseen((n) => n + 1);
-      invalidateLeadsData();
+      if (kind === "lead") {
+        setUnseen((n) => n + 1);
+        invalidateLeadsData();
+      } else {
+        invalidateOrdersData();
+      }
+
       playNotificationSound(kind);
 
       notify({ title, body, url, tag: dedupeKey });
@@ -62,9 +98,11 @@ export function useNewLeadsWatcher() {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid || cancelled) return;
-      const topic = `user:${uid}:public:leads:watcher:${Math.random().toString(36).slice(2)}`;
+      const topic = `user:${uid}:crm:watcher:${Math.random().toString(36).slice(2)}`;
+
       channel = supabase
         .channel(topic)
+        // 1. Leads Table Events
         .on(
           "postgres_changes" as never,
           { event: "*", schema: "public", table: "leads" },
@@ -76,38 +114,92 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "leads" },
           (payload: { new?: { id?: string; name?: string | null; full_name?: string | null; phone?: string | null; service_slug?: string | null; assigned_to?: string | null } }) => {
+            const { isAdmin: isAdm, canSeeLeads: canLeads } = livePermsRef.current;
+            // If user has no access to leads module, do NOT notify or play sound
+            if (!canLeads) return;
+
             const lead = payload.new ?? {};
-            if (!isAdmin && lead.assigned_to !== uid) return;
+            if (!isAdm && lead.assigned_to !== uid) return;
 
             const dedupeKey = lead.id ? `lead-${lead.id}` : `lead-${lead.name}-${lead.phone}`;
             const title = "🔔 New lead received!";
             const body = [lead.name || lead.full_name, lead.service_slug, lead.phone].filter(Boolean).join(" · ") || "Open the leads queue";
             const url = lead.id ? `/admin/leads/${lead.id}` : "/admin/leads";
 
-            triggerNotification(dedupeKey, title, body, url);
+            triggerNotification(dedupeKey, title, body, url, "lead");
           },
         )
         .on(
           "postgres_changes" as never,
           { event: "UPDATE", schema: "public", table: "leads" },
           (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; name?: string | null; full_name?: string | null; lead_code?: string | null; assigned_to?: string | null } }) => {
+            const { canSeeLeads: canLeads } = livePermsRef.current;
+            if (!canLeads) return;
+
             const newLead = payload.new ?? {};
             const oldLead = payload.old ?? {};
 
             invalidateLeadsData();
 
             if (newLead.assigned_to === uid && oldLead.assigned_to !== uid) {
-              qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-
               const dedupeKey = newLead.id ? `lead-assigned-${newLead.id}` : `lead-assigned-${Date.now()}`;
               const title = "🎯 Lead Assigned to You";
               const body = `Lead ${newLead.name || newLead.full_name || newLead.lead_code || ""} is now assigned to your queue.`;
               const url = newLead.id ? `/admin/leads/${newLead.id}` : "/admin/leads";
 
-              triggerNotification(dedupeKey, title, body, url);
+              triggerNotification(dedupeKey, title, body, url, "lead");
             }
           },
         )
+        // 2. Applications (Orders) Table Events
+        .on(
+          "postgres_changes" as never,
+          { event: "*", schema: "public", table: "applications" },
+          () => {
+            invalidateOrdersData();
+          }
+        )
+        .on(
+          "postgres_changes" as never,
+          { event: "INSERT", schema: "public", table: "applications" },
+          (payload: { new?: { id?: string; application_code?: string | null; assigned_to?: string | null } }) => {
+            const { isAdmin: isAdm, canSeeOrders: canOrders } = livePermsRef.current;
+            if (!canOrders) return;
+
+            const app = payload.new ?? {};
+            if (!isAdm && app.assigned_to !== uid) return;
+
+            const dedupeKey = app.id ? `app-${app.id}` : `app-${Date.now()}`;
+            const title = "🔔 New Order Received!";
+            const body = `Order ${app.application_code || ""} has arrived in the system.`;
+            const url = app.id ? `/admin/orders/${app.id}` : "/admin/orders";
+
+            triggerNotification(dedupeKey, title, body, url, "order");
+          },
+        )
+        .on(
+          "postgres_changes" as never,
+          { event: "UPDATE", schema: "public", table: "applications" },
+          (payload: { old?: { assigned_to?: string | null }; new?: { id?: string; application_code?: string | null; assigned_to?: string | null } }) => {
+            const { canSeeOrders: canOrders } = livePermsRef.current;
+            if (!canOrders) return;
+
+            const newApp = payload.new ?? {};
+            const oldApp = payload.old ?? {};
+
+            invalidateOrdersData();
+
+            if (newApp.assigned_to === uid && oldApp.assigned_to !== uid) {
+              const dedupeKey = newApp.id ? `order-assigned-${newApp.id}` : `order-assigned-${Date.now()}`;
+              const title = "🎯 Order Assigned to You";
+              const body = `Order ${newApp.application_code || ""} is now assigned to your queue.`;
+              const url = newApp.id ? `/admin/orders/${newApp.id}` : "/admin/orders";
+
+              triggerNotification(dedupeKey, title, body, url, "order");
+            }
+          },
+        )
+        // 3. Onboarding Submissions
         .on(
           "postgres_changes" as never,
           { event: "*", schema: "public", table: "onboarding_submissions" },
@@ -115,6 +207,7 @@ export function useNewLeadsWatcher() {
             invalidateLeadsData();
           }
         )
+        // 4. Notifications Table (Direct user alerts)
         .on(
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${uid}` },
@@ -123,20 +216,27 @@ export function useNewLeadsWatcher() {
             qc.invalidateQueries({ queryKey: ["notifications"] });
             qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
 
-            // Only ring loudly for lead-assignment notifications; other CRM
-            // notifications (form_submitted, delay flags, status changes) go
-            // to the notifications tray silently to avoid alert fatigue.
-            if (notif.kind !== "order_assigned") return;
+            const { canSeeOrders: canOrders, canSeeLeads: canLeads } = livePermsRef.current;
 
-            const dedupeKey = notif.entity_id ? `lead-${notif.entity_id}` : `notif-${notif.id}`;
-            const title = notif.title || "🔔 New CRM Notification";
-            const body = notif.body || "A new update or task has arrived in your queue.";
-            const url = notif.href || "/admin/leads";
+            if (notif.kind === "order_assigned") {
+              if (!canOrders) return;
+              const dedupeKey = notif.entity_id ? `order-assigned-${notif.entity_id}` : `notif-${notif.id}`;
+              const title = notif.title || "🎯 Order Assigned to You";
+              const body = notif.body || "A new order has been assigned to your queue.";
+              const url = notif.href || "/admin/orders";
 
-            triggerNotification(dedupeKey, title, body, url, "order");
+              triggerNotification(dedupeKey, title, body, url, "order");
+            } else if (notif.kind === "lead_assigned" || notif.kind === "new_lead") {
+              if (!canLeads) return;
+              const dedupeKey = notif.entity_id ? `lead-assigned-${notif.entity_id}` : `notif-${notif.id}`;
+              const title = notif.title || "🎯 Lead Assigned to You";
+              const body = notif.body || "A new lead has been assigned to your queue.";
+              const url = notif.href || "/admin/leads";
+
+              triggerNotification(dedupeKey, title, body, url, "lead");
+            }
           },
         )
-
         .subscribe();
     })();
 
@@ -144,7 +244,7 @@ export function useNewLeadsWatcher() {
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [notify, qc, isAdmin]);
+  }, [notify, qc]);
 
   return { unseen };
 }

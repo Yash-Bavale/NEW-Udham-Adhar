@@ -110,6 +110,34 @@ export function playRingtonePattern(tone: RingtoneTone, ctx: AudioContext, offse
   }
 }
 
+let globalAudioCtx: AudioContext | null = null;
+
+function getOrCreateAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  if (!globalAudioCtx || globalAudioCtx.state === "closed") {
+    globalAudioCtx = new AudioContextClass();
+  }
+  if (globalAudioCtx.state === "suspended") {
+    globalAudioCtx.resume().catch(() => {});
+  }
+  return globalAudioCtx;
+}
+
+// Auto-unlock AudioContext on any user interaction in the portal window
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    const ctx = getOrCreateAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener("pointerdown", unlockAudio, { passive: true });
+  window.addEventListener("keydown", unlockAudio, { passive: true });
+  window.addEventListener("click", unlockAudio, { passive: true });
+}
 
 export function playNotificationSound(
   kind: "lead" | "order" | "preview",
@@ -127,6 +155,17 @@ export function playNotificationSound(
       if (!ordersEnabled) return;
     }
 
+    // Cross-tab deduplication (avoid multiple open tabs ringing simultaneously for the same event)
+    if (kind !== "preview") {
+      const dedupeKey = `udyam.sound.dedupe.${kind}`;
+      const now = Date.now();
+      const lastPlayed = Number(localStorage.getItem(dedupeKey) || 0);
+      if (now - lastPlayed < 2000) {
+        return; // Another tab or rapid event already played within the last 2s
+      }
+      localStorage.setItem(dedupeKey, String(now));
+    }
+
     const ringtoneKey = kind === "order" ? "udyam.sound.orders_ringtone" : "udyam.sound.leads_ringtone";
     const customUrlKey = kind === "order" ? "udyam.sound.orders_custom_url" : "udyam.sound.leads_custom_url";
 
@@ -135,34 +174,43 @@ export function playNotificationSound(
 
     if (ringtone === "custom" && customUrl.trim()) {
       const audio = new Audio(customUrl.trim());
+      audio.volume = 1.0;
       audio.play().catch((err) => {
         console.warn("[playNotificationSound] Custom MP3 audio play error:", err);
       });
       return;
     }
 
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getOrCreateAudioContext();
+    if (!ctx) return;
 
-    if (kind === "preview") {
-      playRingtonePattern(ringtone === "custom" ? "chime" : ringtone, ctx, 0);
-      setTimeout(() => { ctx.close().catch(() => {}); }, 1200);
-      return;
+    const playPattern = () => {
+      const toneToPlay = ringtone === "custom" ? "chime" : ringtone;
+      if (kind === "preview") {
+        playRingtonePattern(toneToPlay, ctx, 0);
+      } else {
+        const CYCLE = 0.9;
+        playRingtonePattern(toneToPlay, ctx, 0);
+        playRingtonePattern(toneToPlay, ctx, CYCLE);
+      }
+    };
+
+    if (ctx.state === "suspended") {
+      ctx.resume().then(playPattern).catch(playPattern);
+    } else {
+      playPattern();
     }
-
-    const CYCLE = 1.0;
-    const toneToPlay = ringtone === "custom" ? "chime" : ringtone;
-    playRingtonePattern(toneToPlay, ctx, 0);
-    playRingtonePattern(toneToPlay, ctx, CYCLE);
-    setTimeout(() => { ctx.close().catch(() => {}); }, CYCLE * 2 * 1000 + 400);
-  } catch {
-    // Ignore audio autoplay restrictions
+  } catch (err) {
+    console.warn("[playNotificationSound] error:", err);
   }
 }
 
 export function playLeadRingSound() {
   playNotificationSound("lead");
+}
+
+export function playOrderRingSound() {
+  playNotificationSound("order");
 }
 
 export function useNotifications() {

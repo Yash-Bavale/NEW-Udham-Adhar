@@ -330,5 +330,21 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
 
+    if (data.assignedTo) {
+      try {
+        const { emitToUsers } = await import("@/lib/notifications/emit.server");
+        await emitToUsers([data.assignedTo], {
+          kind: "order_assigned",
+          title: "🎯 Orders Assigned to You",
+          body: `${data.applicationIds.length} order(s) have been assigned to your queue.`,
+          href: "/admin/orders",
+          entityKind: "application",
+          entityId: data.applicationIds[0],
+        });
+      } catch (notifErr) {
+        console.warn("[bulkAssignOrders] Failed to emit notification:", notifErr);
+      }
+    }
+
     return { ok: true, count: data.applicationIds.length };
   });
