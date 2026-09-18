@@ -80,33 +80,22 @@ export const ACCESS_MATRIX: Record<Role, Partial<Record<Module, Access>>> = {
   }),
   executive: onlyModules({
     orders: "full",
-    customers: "read",
-    tasks: "full",
-    documents: "read",
   }),
   support: onlyModules({
     complaints: "full",
     tickets: "full",
-    tasks: "full",
   }),
   accounts: onlyModules({
     payments: "full",
     invoices: "full",
-    tasks: "read",
   }),
   finance: onlyModules({
     payments: "full",
     invoices: "full",
     reports: "full",
-    tasks: "read",
   }),
   operations: onlyModules({
     orders: "full",
-    customers: "read",
-    complaints: "read",
-    tickets: "read",
-    tasks: "full",
-    documents: "read",
   }),
 };
 

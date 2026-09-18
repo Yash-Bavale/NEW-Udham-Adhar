@@ -72,9 +72,9 @@ const NAV: NavGroup[] = [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: OPS_ROLES },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: OPS_ROLES },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: OPS_ROLES },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks" },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks", requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -149,14 +149,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       items: g.items.filter((it) => {
         if (it.module) {
           const hasPerm = userPerms.can(it.module, "view");
-          if (hasPerm) return true;
           if (userPerms.perms && !hasPerm) return false;
-          if (!role.can(it.module)) return false;
+          if (!userPerms.perms && !role.can(it.module)) return false;
         }
 
         if (it.requireRole && !role.has(it.requireRole)) return false;
         if (it.requireAnyRole && !it.requireAnyRole.some((r) => role.has(r))) {
-          if (!it.module || !userPerms.can(it.module, "view")) {
+          const OVERRIDABLE = ["leads", "orders"];
+          if (!it.module || !OVERRIDABLE.includes(it.module) || !userPerms.can(it.module, "view")) {
             return false;
           }
         }

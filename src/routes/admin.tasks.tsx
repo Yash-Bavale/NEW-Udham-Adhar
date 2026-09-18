@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -21,6 +21,19 @@ export const Route = createFileRoute("/admin/tasks")({
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
+  beforeLoad: async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) throw redirect({ to: "/admin-login" });
+    const { data: rows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    const roles = (rows ?? []).map((r) => r.role as string);
+    if (!roles.includes("admin") && !roles.includes("super_admin")) {
+      throw redirect({ to: "/admin/my-work" });
+    }
+  },
   component: TasksPage,
 });
 
