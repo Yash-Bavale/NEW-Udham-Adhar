@@ -577,10 +577,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // 1. Compute exact global counts across full dataset using parallel head queries (no 1000 row capping)
     const [allCountRes, completedCountRes, closedCountRes, needsActionCountRes] = await Promise.all([
-      buildBaseQuery().select("id", { count: "exact", head: true }),
-      buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]).select("id", { count: "exact", head: true }),
-      buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
-      buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")').select("id", { count: "exact", head: true }),
+      (buildBaseQuery() as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]) as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
+      (buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
     ]);
 
     const totalCount = allCountRes.count ?? 0;
