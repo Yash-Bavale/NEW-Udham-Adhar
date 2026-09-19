@@ -46,18 +46,18 @@ export const Route = createFileRoute("/admin/support/tickets/$ticketId")({
 // ── formatters & constants ─────────────────────────────────
 
 const STATUS_CONFIG: Record<TicketStatus, { bg: string; fg: string; border: string; label: string }> = {
-  open:              { bg: "bg-blue-50", fg: "text-blue-700", border: "border-blue-200", label: "Open" },
-  in_progress:       { bg: "bg-purple-50", fg: "text-purple-700", border: "border-purple-200", label: "In Progress" },
-  waiting_customer:  { bg: "bg-amber-50", fg: "text-amber-700", border: "border-amber-200", label: "Waiting Customer" },
-  resolved:          { bg: "bg-emerald-50", fg: "text-emerald-700", border: "border-emerald-200", label: "Resolved" },
-  closed:            { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Closed" },
+  open: { bg: "bg-blue-50", fg: "text-blue-700", border: "border-blue-200", label: "Open" },
+  in_progress: { bg: "bg-purple-50", fg: "text-purple-700", border: "border-purple-200", label: "In Progress" },
+  waiting_customer: { bg: "bg-amber-50", fg: "text-amber-700", border: "border-amber-200", label: "Waiting Customer" },
+  resolved: { bg: "bg-emerald-50", fg: "text-emerald-700", border: "border-emerald-200", label: "Resolved" },
+  closed: { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Closed" },
 };
 
 const PRIORITY_CONFIG: Record<TicketPriority, { bg: string; fg: string; border: string; label: string; dot: string }> = {
   urgent: { bg: "bg-rose-50", fg: "text-rose-700", border: "border-rose-200", label: "Urgent", dot: "bg-rose-500" },
-  high:   { bg: "bg-orange-50", fg: "text-orange-700", border: "border-orange-200", label: "High", dot: "bg-orange-500" },
+  high: { bg: "bg-orange-50", fg: "text-orange-700", border: "border-orange-200", label: "High", dot: "bg-orange-500" },
   medium: { bg: "bg-rose-50", fg: "text-rose-600", border: "border-rose-200", label: "Medium", dot: "bg-rose-500" },
-  low:    { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Low", dot: "bg-slate-400" },
+  low: { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Low", dot: "bg-slate-400" },
 };
 
 function ist(iso: string | null | undefined) {
@@ -98,34 +98,34 @@ function formatBytes(bytes?: number | null) {
 
 type Msg =
   | {
-      kind: "inbound";
-      id: string;
-      created_at: string;
-      from_email: string | null;
-      subject: string | null;
-      body_text: string;
-      body_html: string | null;
-      attachments?: Array<{ id: string; file_name: string; file_path: string; size_bytes?: number }>;
-    }
+    kind: "inbound";
+    id: string;
+    created_at: string;
+    from_email: string | null;
+    subject: string | null;
+    body_text: string;
+    body_html: string | null;
+    attachments?: Array<{ id: string; file_name: string; file_path: string; size_bytes?: number }>;
+  }
   | {
-      kind: "outbound";
-      id: string;
-      created_at: string;
-      from_email: string | null;
-      subject: string | null;
-      body_html: string | null;
-      body_text: string;
-      template_hint: string | null;
-      status: string | null;
-      author_name?: string | null;
-    }
+    kind: "outbound";
+    id: string;
+    created_at: string;
+    from_email: string | null;
+    subject: string | null;
+    body_html: string | null;
+    body_text: string;
+    template_hint: string | null;
+    status: string | null;
+    author_name?: string | null;
+  }
   | {
-      kind: "note";
-      id: string;
-      created_at: string;
-      author_name: string;
-      body_text: string;
-    };
+    kind: "note";
+    id: string;
+    created_at: string;
+    author_name: string;
+    body_text: string;
+  };
 
 function extractTemplateHint(subject: string | null, bodyHtml: string | null): string | null {
   const src = `${subject ?? ""} ${bodyHtml ?? ""}`;
@@ -211,7 +211,7 @@ function TicketWorkspace() {
         .then((res) => {
           if (res) setNavState({ prevId: res.prevId, nextId: res.nextId });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [ticketId]);
 
@@ -352,7 +352,7 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: (opts?: { closeAfter?: boolean }) =>
+    mutationFn: (opts?: { closeAfter?: boolean } | void) =>
       replyFn({
         data: {
           ticketId,
@@ -915,21 +915,19 @@ function TicketWorkspace() {
             <div className="flex items-center border-b border-slate-200 px-4 pt-2">
               <button
                 onClick={() => setComposeTab("reply")}
-                className={`px-4 py-2 text-xs font-bold transition-all relative ${
-                  composeTab === "reply"
+                className={`px-4 py-2 text-xs font-bold transition-all relative ${composeTab === "reply"
                     ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f]"
                     : "text-slate-500 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 Reply
               </button>
               <button
                 onClick={() => setComposeTab("note")}
-                className={`px-4 py-2 text-xs font-bold transition-all relative ${
-                  composeTab === "note"
+                className={`px-4 py-2 text-xs font-bold transition-all relative ${composeTab === "note"
                     ? "text-amber-700 border-b-2 border-amber-500"
                     : "text-slate-500 hover:text-slate-800"
-                }`}
+                  }`}
               >
                 Internal Note
               </button>
@@ -1025,11 +1023,10 @@ function TicketWorkspace() {
                     : "Type your reply here…"
                 }
                 rows={4}
-                className={`w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-lg border focus:outline-none focus:ring-1 resize-y transition-all ${
-                  composeTab === "note"
+                className={`w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-lg border focus:outline-none focus:ring-1 resize-y transition-all ${composeTab === "note"
                     ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950 placeholder:text-amber-800/50"
                     : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400"
-                }`}
+                  }`}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
                     sendReply.mutate();
@@ -1093,11 +1090,10 @@ function TicketWorkspace() {
                     <button
                       onClick={() => sendReply.mutate()}
                       disabled={!body.trim() || sendReply.isPending}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-l-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        composeTab === "note"
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-l-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${composeTab === "note"
                           ? "bg-amber-600 hover:bg-amber-700"
                           : "bg-[#1e3a5f] hover:bg-[#152b47]"
-                      }`}
+                        }`}
                     >
                       {sendReply.isPending ? (
                         <Loader2 className="size-3.5 animate-spin" />
@@ -1152,11 +1148,10 @@ function TicketWorkspace() {
 
         {/* ── 4. Right Context Sidebar ─────────────────────── */}
         <aside
-          className={`w-[320px] xl:w-[350px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
-            sidebarDrawerOpen
+          className={`w-[320px] xl:w-[350px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${sidebarDrawerOpen
               ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[320px] max-w-full"
               : "hidden lg:flex"
-          }`}
+            }`}
         >
           {sidebarDrawerOpen && (
             <div className="flex items-center justify-between pb-2 border-b border-slate-200 lg:hidden">
@@ -1347,13 +1342,12 @@ function TicketWorkspace() {
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">SLA</span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-                    slaTone === "healthy"
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${slaTone === "healthy"
                       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                       : slaTone === "warning"
-                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                      : "bg-rose-50 text-rose-800 border-rose-200"
-                  }`}
+                        ? "bg-amber-50 text-amber-800 border-amber-200"
+                        : "bg-rose-50 text-rose-800 border-rose-200"
+                    }`}
                 >
                   {slaText}
                 </span>
@@ -1671,17 +1665,15 @@ function MessageCard({
                   <div className="flex items-center gap-1 text-[11px]">
                     <button
                       onClick={() => setViewMode("html")}
-                      className={`px-2 py-0.5 rounded ${
-                        viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
-                      }`}
+                      className={`px-2 py-0.5 rounded ${viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
+                        }`}
                     >
                       Rich
                     </button>
                     <button
                       onClick={() => setViewMode("text")}
-                      className={`px-2 py-0.5 rounded ${
-                        viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
-                      }`}
+                      className={`px-2 py-0.5 rounded ${viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
+                        }`}
                     >
                       Plain
                     </button>
@@ -1790,17 +1782,15 @@ function MessageCard({
                 <div className="flex items-center gap-1 text-[11px]">
                   <button
                     onClick={() => setViewMode("html")}
-                    className={`px-2 py-0.5 rounded ${
-                      viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
-                    }`}
+                    className={`px-2 py-0.5 rounded ${viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
+                      }`}
                   >
                     Rich
                   </button>
                   <button
                     onClick={() => setViewMode("text")}
-                    className={`px-2 py-0.5 rounded ${
-                      viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
-                    }`}
+                    className={`px-2 py-0.5 rounded ${viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"
+                      }`}
                   >
                     Plain
                   </button>
@@ -2048,11 +2038,10 @@ function CannedResponsesModal({
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}
-                  className={`px-2.5 py-1 rounded-full capitalize font-semibold shrink-0 text-[11px] transition-colors ${
-                    category === cat
+                  className={`px-2.5 py-1 rounded-full capitalize font-semibold shrink-0 text-[11px] transition-colors ${category === cat
                       ? "bg-blue-600 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
