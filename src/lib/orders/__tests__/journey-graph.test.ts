@@ -77,17 +77,26 @@ describe("activeBranchesFor", () => {
   it("completed terminal → accept", () => {
     expect(activeBranchesFor("completed", "completed", null).has("accept")).toBe(true);
   });
-  it("closed reason A → form-nag", () => {
-    expect([...activeBranchesFor("closed", "closed", "A7")]).toEqual(["form-nag"]);
+  it("closed reason A → customer-delay + customer-delay-main", () => {
+    const branches = activeBranchesFor("closed", "closed", "A7");
+    expect(branches.has("customer-delay")).toBe(true);
+    expect(branches.has("customer-delay-main")).toBe(true);
   });
   it("closed reason A + customer workflow → customer-delay", () => {
-    expect([...activeBranchesFor("closed", "closed", "A3", "customer_hold")]).toEqual(["customer-delay"]);
+    const branches = activeBranchesFor("closed", "closed", "A3", "customer_hold");
+    expect(branches.has("customer-delay")).toBe(true);
+    expect(branches.has("customer-delay-main")).toBe(true);
   });
   it("closed waiting_for_customer workflow → customer-delay", () => {
-    expect([...activeBranchesFor("closed", "closed", "A3", "waiting_for_customer")]).toEqual(["customer-delay"]);
+    const branches = activeBranchesFor("closed", "closed", "A3", "waiting_for_customer");
+    expect(branches.has("customer-delay")).toBe(true);
+    expect(branches.has("customer-delay-main")).toBe(true);
   });
   it("closed reason B → reject", () => {
     expect([...activeBranchesFor("closed", "closed", "B4")]).toEqual(["reject"]);
+  });
+  it("closed reason RM02 → form-nag", () => {
+    expect([...activeBranchesFor("closed", "closed", "RM02")]).toEqual(["form-nag"]);
   });
 });
 
@@ -105,8 +114,8 @@ describe("customer delay workflow status", () => {
       workflowStatus: "waiting_for_customer",
     })).toBe("customer_delay");
   });
-  it("has no active buttons in waiting state during customer_delay", () => {
-    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual([]);
+  it("has resume button in waiting state during customer_delay", () => {
+    expect(PHASE_ENABLED_BUTTONS.customer_delay).toEqual(["B04"]);
   });
 });
 
@@ -136,10 +145,12 @@ describe("mainDoneEdgesFor", () => {
 describe("edgeState", () => {
   const findEdge = (id: string) => EDGES.find((e) => e.id === id)!;
 
-  it("marks form-nag closed when terminal=closed reason A", () => {
+  it("marks customer-delay closed when terminal=closed reason A", () => {
     const branches = activeBranchesFor("closed", "closed", "A7");
-    const done = mainDoneEdgesFor(2, "closed");
-    expect(edgeState(findEdge("e_b01_cl"), { activeBranches: branches, doneMainEdges: done, terminal: "closed" }))
+    const done = mainDoneEdgesFor(3, "closed");
+    expect(edgeState(findEdge("e_b04_cl"), { activeBranches: branches, doneMainEdges: done, terminal: "closed" }))
+      .toBe("closed");
+    expect(edgeState(findEdge("e_bot_b04"), { activeBranches: branches, doneMainEdges: done, terminal: "closed" }))
       .toBe("closed");
   });
   it("marks technical loop active during technical_delay", () => {

@@ -334,6 +334,7 @@ export function activeBranchesFor(
     case "form_submitted":     break;
     case "technical_delay":    s.add("technical"); break;
     case "customer_delay":
+      s.add("customer-delay");
       if (currentIdx !== undefined && currentIdx >= 4) {
         s.add("customer-delay-govt");
       } else if (techDelayResolved) {
@@ -350,15 +351,32 @@ export function activeBranchesFor(
     case "completed":          s.add("accept"); break;
     case "closed": {
       const rc = reasonCode?.toUpperCase() ?? "";
-      const ws = workflowStatus ?? "";
-      const isCustomerClose = rc.startsWith("C") || /customer|external_dependency|customer_hold|customer_delay|waiting_for_customer/i.test(ws);
-      const isRejectClose = rc.startsWith("B") || /reject/i.test(ws);
-      if (isRejectClose) s.add("reject");
-      else if (isCustomerClose) {
-        if (currentIdx !== undefined && currentIdx >= 4) s.add("customer-delay-govt");
-        else if (techDelayResolved) s.add("customer-delay-tech");
-        else s.add("customer-delay-main");
-      } else s.add("form-nag");
+      const ws = (workflowStatus ?? "").toLowerCase();
+      const reasonText = (rc + " " + ws).toLowerCase();
+
+      const isRejectClose =
+        rc.startsWith("B") ||
+        /reject|govt_reject|government_reject/i.test(reasonText);
+
+      const isFormNagClose =
+        (rc === "RM02" || rc === "RM01" || /form_pending_autoclose|form_not_submitted_autoclose/i.test(ws)) &&
+        !isRejectClose;
+
+      if (isRejectClose) {
+        s.add("reject");
+      } else if (isFormNagClose) {
+        s.add("form-nag");
+      } else {
+        // Customer Delay closure (Category A, Category C, R reasons, or standard customer delay closure)
+        s.add("customer-delay");
+        if (currentIdx !== undefined && currentIdx >= 4) {
+          s.add("customer-delay-govt");
+        } else if (techDelayResolved) {
+          s.add("customer-delay-tech");
+        } else {
+          s.add("customer-delay-main");
+        }
+      }
       break;
     }
   }
@@ -548,7 +566,7 @@ export interface NodeStateInput {
 }
 
 const STAGE_IDX: Record<string, number> = {
-  order_rec:     2,
+  order_rec:     1,
   form_not:      2,
   form_sub:      3,
   govt_portal:   4,
@@ -565,14 +583,19 @@ export function nodeState(nodeId: string, i: NodeStateInput): NodeState {
     return "idle";
   }
 
-
   if (nodeId === "b07_accept"  && i.terminal === "completed") return "terminal-ok";
   if (nodeId === "closed_e010" && i.terminal === "closed")    return "terminal-bad";
 
   if (i.currentStageNode && nodeId === i.currentStageNode && !i.terminal) return "active";
 
   const stageIdx = STAGE_IDX[nodeId];
-  if (stageIdx !== undefined && i.currentIdx > stageIdx) return "done";
+  if (stageIdx !== undefined) {
+    if (i.terminal === "closed" || i.terminal === "completed" || i.phase === "customer_delay" || i.phase === "technical_delay") {
+      if (i.currentIdx >= stageIdx) return "done";
+    } else {
+      if (i.currentIdx > stageIdx) return "done";
+    }
+  }
 
   const incident = EDGES.some(
     (e) => {

@@ -58,6 +58,8 @@ interface Props {
   closureStage?: string | null;
   closureNextAt?: string | null;
   closureReasonLabel?: string | null;
+  formSubmittedAt?: string | null;
+  fulfillmentStatus?: string | null;
   payments?: any[];
   hideAmount?: boolean;
   /** Admin override state — controlled by parent (WorkspaceShell). */
@@ -106,7 +108,9 @@ export function CustomerJourneyMap(p: Props) {
     workflowStatus: p.workflowStatus,
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel]);
+    formSubmittedAt: p.formSubmittedAt,
+    fulfillmentStatus: p.fulfillmentStatus,
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, p.formSubmittedAt, p.fulfillmentStatus]);
 
   const currentIdx = live.currentMainIndex;
   const isTalkToExpert = /talk|expert|consult/i.test(p.serviceCode ?? "") || !!p.isConsultationOrder;
@@ -174,11 +178,13 @@ export function CustomerJourneyMap(p: Props) {
     workflowStatus: p.workflowStatus,
     closureStage: p.closureStage,
     closureReasonLabel: p.closureReasonLabel,
+    formSubmittedAt: p.formSubmittedAt,
+    fulfillmentStatus: p.fulfillmentStatus,
     reminderCount,
     formLinkSent: isFormLinkSent,
     techDelayResolved,
     adminOverride: p.adminOverride,
-  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, reminderCount, isFormLinkSent, techDelayResolved, p.adminOverride]);
+  }), [p.stage, p.workflowStatus, p.closureStage, p.closureReasonLabel, p.formSubmittedAt, p.fulfillmentStatus, reminderCount, isFormLinkSent, techDelayResolved, p.adminOverride]);
 
   const enabledCodes = PHASE_ENABLED_BUTTONS[phase];
   const gate = (code: ButtonCode) => {

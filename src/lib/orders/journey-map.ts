@@ -337,15 +337,33 @@ export function deriveJourneyLiveState(input: {
   workflowStatus?: string | null;
   closureStage?: string | null;
   closureReasonLabel?: string | null;
+  formSubmittedAt?: string | null;
+  fulfillmentStatus?: string | null;
 }): JourneyLiveState {
-  const idx = stageToJourneyIndex(input.stage);
   const closureStageValue = (input.closureStage ?? "").toLowerCase();
   const isClosed = input.stage === "closed" || /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
   const isConsultationCompleted = input.stage === "consultation_completed";
   const isCompleted = input.stage === "completed" || isConsultationCompleted;
   const ws = (input.workflowStatus ?? "").toLowerCase();
-  const reasonMatch = (input.closureReasonLabel ?? "").match(/\b([ABC]\d{1,2})\b/i);
+  const fs = (input.fulfillmentStatus ?? "").toLowerCase();
+
+  const reasonMatch = (input.closureReasonLabel ?? "").match(/\b([ABC]\d{1,2}|RM\d{1,2}|R\d{1,2})\b/i);
   const reasonCode = reasonMatch ? reasonMatch[1].toUpperCase() : null;
+
+  let idx = stageToJourneyIndex(input.stage);
+  if (isClosed) {
+    if (/consultation/.test(fs) || /consultation/.test(ws)) {
+      idx = 4;
+    } else if (/submitted_to_govt|government_processing|under_processing|certificate/.test(fs) || /submitted_to_govt|government_processing/.test(ws)) {
+      idx = 4;
+    } else if (input.formSubmittedAt || /form_submitted|in_progress|under_review|customer_delay|technical_delay/.test(fs) || /form_submitted|customer_delay|technical_delay/.test(ws)) {
+      idx = 3;
+    } else if (reasonCode === "RM02" || reasonCode === "RM01" || /form_pending_autoclose|form_not_submitted_autoclose/.test(ws)) {
+      idx = 2;
+    } else {
+      idx = 3;
+    }
+  }
 
   let activeSubKey: JourneyLiveSubKey = null;
   if (isConsultationCompleted) {
@@ -359,18 +377,41 @@ export function deriveJourneyLiveState(input: {
   } else if (idx === 4 || idx === 5) {
     activeSubKey = "govt-awaiting";
   }
+
   if (isClosed) {
-    activeSubKey = reasonCode?.startsWith("B") ? "govt-rejected" : "force-closed";
+    if (reasonCode?.startsWith("B") || /govt_reject|rejected/i.test(ws)) {
+      activeSubKey = "govt-rejected";
+    } else if (reasonCode === "RM02" || reasonCode === "RM01" || /form_pending_autoclose|form_not_submitted_autoclose/.test(ws)) {
+      activeSubKey = "form-not-submitted";
+    } else {
+      activeSubKey = "customer-delay";
+    }
   }
 
   let subStateLabel = "In progress";
-  if (isClosed) subStateLabel = `Closed${reasonCode ? ` · ${reasonCode}` : ""}`;
-  else if (isConsultationCompleted) subStateLabel = "Order Completed";
-  else if (activeSubKey === "form-not-submitted") subStateLabel = "Form Not Submitted";
-  else if (activeSubKey === "customer-delay") subStateLabel = `Customer Delay${reasonCode ? ` (${reasonCode})` : ""}`;
-  else if (activeSubKey === "technical-delay") subStateLabel = `Technical Delay${reasonCode ? ` (${reasonCode})` : ""}`;
-  else if (activeSubKey === "govt-awaiting") subStateLabel = "Awaiting Govt Response";
-  else if (isCompleted) subStateLabel = "Completed";
+  if (isClosed) {
+    if (activeSubKey === "govt-rejected") {
+      subStateLabel = `Closed (Govt Rejected)${reasonCode ? ` · ${reasonCode}` : ""}`;
+    } else if (activeSubKey === "form-not-submitted") {
+      subStateLabel = `Closed (Form Not Submitted)${reasonCode ? ` · ${reasonCode}` : ""}`;
+    } else if (activeSubKey === "customer-delay" || reasonCode?.startsWith("A") || reasonCode?.startsWith("C")) {
+      subStateLabel = `Closed (Customer Delay)${reasonCode ? ` · ${reasonCode}` : ""}`;
+    } else {
+      subStateLabel = `Closed${reasonCode ? ` · ${reasonCode}` : ""}`;
+    }
+  } else if (isConsultationCompleted) {
+    subStateLabel = "Order Completed";
+  } else if (activeSubKey === "form-not-submitted") {
+    subStateLabel = "Form Not Submitted";
+  } else if (activeSubKey === "customer-delay") {
+    subStateLabel = `Customer Delay${reasonCode ? ` (${reasonCode})` : ""}`;
+  } else if (activeSubKey === "technical-delay") {
+    subStateLabel = `Technical Delay${reasonCode ? ` (${reasonCode})` : ""}`;
+  } else if (activeSubKey === "govt-awaiting") {
+    subStateLabel = "Awaiting Govt Response";
+  } else if (isCompleted) {
+    subStateLabel = "Completed";
+  }
 
   return {
     currentMainIndex: idx,
@@ -439,6 +480,8 @@ export interface DerivePhaseInput {
   workflowStatus?: string | null;
   closureStage?: string | null;
   closureReasonLabel?: string | null;
+  formSubmittedAt?: string | null;
+  fulfillmentStatus?: string | null;
   /** Number of E006 (reminder) emails/events sent for this order. */
   reminderCount?: number;
   /** True once B01 has been sent and we're still waiting for the customer. */
@@ -467,6 +510,8 @@ export function derivePhase(i: DerivePhaseInput): JourneyPhase {
     workflowStatus: i.workflowStatus,
     closureStage: i.closureStage,
     closureReasonLabel: i.closureReasonLabel,
+    formSubmittedAt: i.formSubmittedAt,
+    fulfillmentStatus: i.fulfillmentStatus,
   });
   if (live.terminal === "closed") {
     if (live.activeSubKey === "govt-rejected") {

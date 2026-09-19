@@ -586,7 +586,17 @@ export function WorkspaceShell(p: Props) {
           workflowStatus={(application as any).workflow_status}
           closureStage={(application as any).closure_stage}
           closureNextAt={(application as any).closure_next_at}
-          closureReasonLabel={(application as any).closure_reason_code}
+          closureReasonLabel={
+            (application as any).closure_reason_code ||
+            (application as any).closure_reason_text ||
+            (application as any).closure_remarks ||
+            (application as any).order_close_reasons?.label ||
+            (application as any).delay_reasons?.label ||
+            (application as any).active_reason_id ||
+            null
+          }
+          formSubmittedAt={(application as any).form_submitted_at}
+          fulfillmentStatus={(application as any).fulfillment_status}
           payments={payments}
           hideAmount={p.hideAmount}
           adminOverride={adminOverride}
