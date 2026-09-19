@@ -204,7 +204,7 @@ async function fetchRowsPaged<T>(queryBuilder: (from: number, to: number) => any
   return out;
 }
 
-async function safeQuery<T>(promise: Promise<T>, fallback: T): Promise<T> {
+async function safeQuery<T>(promise: PromiseLike<T>, fallback: T): Promise<T> {
   try {
     return await promise;
   } catch (err) {
@@ -389,9 +389,8 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
       // 9. Webhook errors (24h)
       webhookErrsRes,
 
-      // 10. Payments in range (paged to capture all transactions)
-      paidRows,
-      prevPaidData,
+      // 10. Payments in range (aggregated via RPC with paged fallback)
+      revAggData,
 
       // 11. Open uncontacted applications (point-in-time backlog)
       uncontactedAppsRes,
@@ -623,7 +622,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const avgOrderValue = paidOrders > 0 ? Math.round(revenueInclTax / paidOrders) : 0;
 
     const payuMode = process.env.PAYU_MODE ?? "test";
-    const payuLive = payuRevenue > 0 || paidRows.some((p) => p.gateway_name === "payu");
+    const payuLive = payuRevenue > 0;
 
     const queueRows = (emailQueueCountsRes.data ?? []) as { status: string }[];
     const queueDepth = queueRows.filter((r) => r.status === "queued" || r.status === "failed").length;
@@ -635,7 +634,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
         leadsPrev,
         revenueCurrent: revenueInclTax,
         revenuePrev,
-        paidPayments: paidRows.length,
+        paidPayments: revAggData.paidPaymentsCount,
         openApplications: openAppsRes.count ?? 0,
         documentsPending: docsPendingRes.count ?? 0,
         certificatesInRange: certsInRangeRes.count ?? 0,
@@ -721,7 +720,7 @@ export const getDashboardCharts = createServerFn({ method: "POST" })
 
     let rpcSuccess = false;
     try {
-      const { data: chartAgg, error: chartErr } = await admin.rpc("get_dashboard_chart_aggregates", {
+      const { data: chartAgg, error: chartErr } = await (admin as any).rpc("get_dashboard_chart_aggregates", {
         p_start: startIso,
         p_end: endIso,
       });
@@ -823,7 +822,7 @@ export const getDashboardTopServices = createServerFn({ method: "POST" })
     const endIso = end.toISOString();
 
     try {
-      const { data: topSvcData, error: topSvcErr } = await admin.rpc("get_dashboard_top_services", {
+      const { data: topSvcData, error: topSvcErr } = await (admin as any).rpc("get_dashboard_top_services", {
         p_start: startIso,
         p_end: endIso,
       });
