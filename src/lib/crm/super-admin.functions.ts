@@ -450,7 +450,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
       // Direct Database Aggregations for Revenue & Gateways (via RPC with fallback)
       (async () => {
         try {
-          const { data: aggData, error: aggErr } = await admin.rpc("get_dashboard_revenue_aggregates", {
+          const { data: aggData, error: aggErr } = await (admin as any).rpc("get_dashboard_revenue_aggregates", {
             p_start: startIso,
             p_end: endIso,
             p_prev_start: prevStartIso,
