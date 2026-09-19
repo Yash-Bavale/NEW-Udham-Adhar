@@ -387,6 +387,10 @@ function TicketWorkspace() {
       rendered.push({ divider: d });
       lastDate = d;
     }
+    rendered.push({ msg: m });
+    lastTime = t;
+  }
+
   const [sidebarView, setSidebarView] = useState<"overview" | "tabs">("overview");
 
   return (
