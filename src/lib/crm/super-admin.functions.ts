@@ -2,7 +2,7 @@
 // - Range-aware: today / yesterday / 7d / 30d / mtd / custom (all in IST).
 // - Day boundary = 00:00 Asia/Kolkata.
 // - Read open to admin + super_admin. Mutations stay super_admin only.
-// - High-performance modular architecture with in-memory TTL caching and parallel sub-queries.
+// - High-performance modular architecture with in-memory TTL caching, direct DB aggregations, and paged data retrieval.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -180,6 +180,34 @@ function presetLabel(p: RangePreset): string {
   }
 }
 
+/* -------------------- Pagination Helper -------------------- */
+
+const API_PAGE_SIZE = 1000;
+
+async function fetchRowsPaged<T>(queryBuilder: (from: number, to: number) => any, maxRows = 100_000): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < maxRows; from += API_PAGE_SIZE) {
+    try {
+      const { data, error } = await queryBuilder(from, from + API_PAGE_SIZE - 1);
+      if (error || !data || data.length === 0) break;
+      out.push(...(data as T[]));
+      if (data.length < API_PAGE_SIZE) break;
+    } catch {
+      break;
+    }
+  }
+  return out;
+}
+
+async function safeQuery<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (err) {
+    console.warn("Dashboard KPI subquery fallback triggered:", err);
+    return fallback;
+  }
+}
+
 /* -------------------- Output types -------------------- */
 
 export type GatewayCollectItem = {
@@ -296,16 +324,7 @@ export type DashboardSecondaryResult = {
   workflow: SuperAdminOverview["workflow"];
 };
 
-/* -------------------- 1. Fast KPI Sub-Query (30s cache) -------------------- */
-
-async function safeQuery<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await promise;
-  } catch (err) {
-    console.warn("Dashboard KPI subquery fallback triggered:", err);
-    return fallback;
-  }
-}
+/* -------------------- 1. KPI Sub-Query (30s cache) -------------------- */
 
 export const getDashboardKpis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -324,7 +343,6 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const prevEndIso = prevEnd.toISOString();
     const dayAgoIso = new Date(Date.now() - 86_400_000).toISOString();
     const now = new Date();
-    const nowIso = now.toISOString();
     const threeHoursAgoIso = new Date(now.getTime() - 3 * 3600 * 1000).toISOString();
     const fiveHoursAgoIso = new Date(now.getTime() - 5 * 3600 * 1000).toISOString();
     const threeDaysAgoIso = new Date(now.getTime() - 3 * 86_400_000).toISOString();
@@ -335,97 +353,192 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const emptyDataRes = { data: [], count: 0, error: null } as any;
 
     const [
-      leadsCur, leadsPrevRes,
+      // 1. Leads
+      leadsCurRes, leadsPrevRes,
       uniqueLeadsRes, uniqueLeadsPrevRes, repeatedLeadsRes,
-      leadStatusRowsRes,
-      paidPaymentsRes, paidPaymentsPrevRes,
+      leadsNotContactedRes, leadsContactedRes, leadsConvertedRes,
+
+      // 2. Orders (Applications) in Range
+      ordersTotalRes, ordersClosedRes, prevOrdersTotalRes,
+
+      // 3. Operational queues / Delays (Point-in-time)
       technicalDelayRes, customerDelayRes, formNotSubmittedRes,
       ordersDelayed3dRes, ordersDelayed7dRes,
+
+      // 4. Support Tickets
       ticketsRaisedRes, ticketsRaisedPrevRes, ticketsActiveRes, ticketsClosedRes, ticketsPending3dRes,
+
+      // 5. Refunds
       refundAcceptedRes, refundRejectedRes,
-      emailLogRes, emailQueueCountsRes,
+
+      // 6. Emails
+      emailSentRes, emailQueuedRes, emailFailedRes, emailQueueCountsRes,
+
+      // 7. Staff & Misc
       staffRolesRes,
-      openAppsRes, docsPendingRes, certsInRangeRes, totalCustomersRes, paidLeadsInRangeRes,
-      uncontactedAppsRes,
+      openAppsRes, docsPendingRes, certsInRangeRes, totalCustomersRes,
+
+      // 8. Gateways config
       gatewaysRes,
+
+      // 9. Webhook errors (24h)
       webhookErrsRes,
+
+      // 10. Payments in range (paged to capture all transactions)
+      paidRows,
+      prevPaidData,
+
+      // 11. Open uncontacted applications (point-in-time backlog)
+      uncontactedAppsRes,
     ] = await Promise.all([
-      // Leads counts
+      // Leads counts (direct exact DB counts)
       safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
       safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
       safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", true).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
-      safeQuery(admin.from("leads").select("status").eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).in("status", ["new_lead", "lead_created", "payment_pending"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).eq("status", "contacted").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).in("status", ["payment_successful", "details_pending", "documents_pending", "under_review", "under_process", "completed"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
 
-      // Payments & revenue
-      safeQuery(admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
-      safeQuery(admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).limit(5000), emptyDataRes),
+      // Orders (Applications in selected date range)
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).or("order_status.in.(COMPLETED,CLOSED,REFUND_PROCESSED),fulfillment_status.in.(completed,order_completed,order_closed,cancelled)").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
 
-      // Delays & alerts
+      // Point-in-time Delays & Alerts
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "technical_delay"), emptyCountRes),
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "customer_delay"), emptyCountRes),
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("fulfillment_status", ["awaiting_customer_form", "waiting_for_customer_submission"]), emptyCountRes),
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeDaysAgoIso), emptyCountRes),
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", sevenDaysAgoIso), emptyCountRes),
 
-      // Support tickets
+      // Support tickets (raised in range vs open point-in-time)
       safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
       safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)"), emptyCountRes),
       safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso), emptyCountRes),
 
-      // Refunds
+      // Refunds in range
       safeQuery(admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
 
-      // Email delivery
-      safeQuery(admin.from("email_send_log").select("message_id, status").gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
+      // Email delivery in range
+      safeQuery(admin.from("email_send_log").select("id", { count: "exact", head: true }).eq("status", "sent").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("email_send_log").select("id", { count: "exact", head: true }).in("status", ["queued", "pending", "processing"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("email_send_log").select("id", { count: "exact", head: true }).in("status", ["failed", "dlq", "bounced"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("email_queue").select("status"), emptyDataRes),
 
-      // Staff
+      // Staff & misc
       safeQuery(admin.from("user_roles").select("user_id"), emptyDataRes),
-
-      // Misc KPIs
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]), emptyCountRes),
       safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"), emptyCountRes),
       safeQuery(admin.from("certificates").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
       safeQuery(admin.from("customers").select("id", { count: "exact", head: true }), emptyCountRes),
-      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso).eq("status", "payment_successful"), emptyCountRes),
 
-      // Uncontacted applications
-      safeQuery(admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeHoursAgoIso).limit(500), emptyDataRes),
-
-      // Gateways
+      // Payment gateways
       safeQuery(admin.from("payment_gateways").select("id, gateway_name, display_name, is_enabled"), emptyDataRes),
 
-      // Webhook errors
+      // Webhook errors (24h)
       safeQuery(admin.from("webhook_error_log").select("id", { count: "exact", head: true }).gte("created_at", dayAgoIso), emptyCountRes),
+
+      // Direct Database Aggregations for Revenue & Gateways (via RPC with fallback)
+      (async () => {
+        try {
+          const { data: aggData, error: aggErr } = await admin.rpc("get_dashboard_revenue_aggregates", {
+            p_start: startIso,
+            p_end: endIso,
+            p_prev_start: prevStartIso,
+            p_prev_end: prevEndIso,
+          });
+          if (!aggErr && aggData) {
+            return {
+              isRpc: true,
+              revenueInclTax: Number(aggData.revenue_incl_tax ?? 0),
+              revenueExclTax: Number(aggData.revenue_excl_tax ?? 0),
+              taxCollected: Number(aggData.tax_collected ?? 0),
+              paidPaymentsCount: Number(aggData.paid_payments_count ?? 0),
+              revenuePrev: Number(aggData.revenue_prev ?? 0),
+              paidPaymentsPrevCount: Number(aggData.paid_payments_prev_count ?? 0),
+              payuRevenue: Number(aggData.payu_revenue ?? 0),
+              gateways: (aggData.gateways ?? []) as Array<{ code: string; revenue: number; count: number }>,
+            };
+          }
+        } catch {
+          // fallback to paged fetch
+        }
+
+        // Graceful Fallback if RPC not yet deployed
+        const [paidRows, prevPaidRows] = await Promise.all([
+          fetchRowsPaged<{ amount: number; base_amount: number | null; gst_amount: number | null; gateway_name: string | null }>(
+            (from, to) => admin.from("payments").select("amount, base_amount, gst_amount, gateway_name").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+          ),
+          fetchRowsPaged<{ amount: number }>(
+            (from, to) => admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).range(from, to)
+          ),
+        ]);
+        const prevTotal = prevPaidRows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
+        let revIncl = 0;
+        let revExcl = 0;
+        let tax = 0;
+        let payuRev = 0;
+        const gwMap = new Map<string, { code: string; revenue: number; count: number }>();
+        for (const p of paidRows) {
+          const amt = Number(p.amount ?? 0);
+          revIncl += amt;
+          if (p.base_amount != null && p.gst_amount != null) {
+            revExcl += Number(p.base_amount);
+            tax += Number(p.gst_amount);
+          } else {
+            const excl = amt / 1.18;
+            revExcl += excl;
+            tax += amt - excl;
+          }
+          const code = String(p.gateway_name ?? "payu").toLowerCase();
+          if (code === "payu") payuRev += amt;
+          const cur = gwMap.get(code) ?? { code, revenue: 0, count: 0 };
+          cur.revenue += amt;
+          cur.count += 1;
+          gwMap.set(code, cur);
+        }
+        return {
+          isRpc: false,
+          revenueInclTax: revIncl,
+          revenueExclTax: revExcl,
+          taxCollected: tax,
+          paidPaymentsCount: paidRows.length,
+          revenuePrev: prevTotal,
+          paidPaymentsPrevCount: prevPaidRows.length,
+          payuRevenue: payuRev,
+          gateways: Array.from(gwMap.values()),
+        };
+      })(),
+
+      // Open uncontacted applications backlog
+      safeQuery(
+        admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeHoursAgoIso).limit(2000),
+        emptyDataRes
+      ),
     ]);
 
-    // Lead status breakdown
-    const NOT_CONTACTED_STATUSES = new Set(["new_lead", "lead_created", "payment_pending"]);
-    const CONTACTED_STATUSES = new Set(["contacted"]);
-    const CONVERTED_STATUSES = new Set([
-      "payment_successful",
-      "details_pending",
-      "documents_pending",
-      "under_review",
-      "under_process",
-      "completed",
-    ]);
-    let leadsNotContacted = 0;
-    let leadsContacted = 0;
-    let leadsConverted = 0;
-    for (const r of (leadStatusRowsRes.data ?? []) as Array<{ status: string | null }>) {
-      const s = String(r.status ?? "");
-      if (NOT_CONTACTED_STATUSES.has(s)) leadsNotContacted += 1;
-      else if (CONTACTED_STATUSES.has(s)) leadsContacted += 1;
-      else if (CONVERTED_STATUSES.has(s)) leadsConverted += 1;
-    }
+    // 1. Leads breakdown
+    const leadsCurrent = leadsCurRes.count ?? 0;
+    const leadsPrev = leadsPrevRes.count ?? 0;
+    const uniqueLeads = uniqueLeadsRes.count ?? 0;
+    const uniqueLeadsPrev = uniqueLeadsPrevRes.count ?? 0;
+    const repeatedLeads = repeatedLeadsRes.count ?? 0;
+    const leadsNotContacted = leadsNotContactedRes.count ?? 0;
+    const leadsContacted = leadsContactedRes.count ?? 0;
+    const leadsConverted = leadsConvertedRes.count ?? 0;
 
-    // Payments & Gateway breakdown
+    // 2. Orders breakdown
+    const paidOrders = ordersTotalRes.count ?? 0;
+    const paidOrdersClosed = ordersClosedRes.count ?? 0;
+    const paidOrdersPending = Math.max(0, paidOrders - paidOrdersClosed);
+    const paidOrdersPrev = prevOrdersTotalRes.count ?? revAggData.paidPaymentsPrevCount;
+
+    // 3. Revenue & Gateway Breakdown
     const gwMap = new Map<string, GatewayCollectItem>();
     (gatewaysRes.data ?? []).forEach((gw: any) => {
       const code = String(gw.gateway_name ?? "").toLowerCase();
@@ -439,73 +552,31 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
       });
     });
 
-    const paidRows = (paidPaymentsRes.data ?? []) as Array<{
-      application_id: string | null;
-      amount: number;
-      base_amount: number | null;
-      gst_amount: number | null;
-      gateway_name: string | null;
-      applications: any;
-    }>;
-    const paidAppIds = new Set<string>();
-    let paidOrdersPending = 0;
-    let paidOrdersClosed = 0;
-    let revenueInclTax = 0;
-    let revenueExclTax = 0;
-    let taxCollected = 0;
-    let payuRevenue = 0;
-
-    for (const p of paidRows) {
-      if (p.application_id && !paidAppIds.has(p.application_id)) {
-        paidAppIds.add(p.application_id);
-        const app = Array.isArray(p.applications) ? p.applications[0] : p.applications;
-        const os = String(app?.order_status ?? "");
-        const fs = String(app?.fulfillment_status ?? "");
-        if (["COMPLETED", "CLOSED", "REFUND_PROCESSED"].includes(os) || ["completed", "order_completed", "order_closed", "cancelled"].includes(fs)) {
-          paidOrdersClosed += 1;
-        } else {
-          paidOrdersPending += 1;
-        }
-      }
-      const amt = Number(p.amount ?? 0);
-      revenueInclTax += amt;
-      if (p.base_amount != null && p.gst_amount != null) {
-        revenueExclTax += Number(p.base_amount);
-        taxCollected += Number(p.gst_amount);
-      } else {
-        const excl = amt / 1.18;
-        revenueExclTax += excl;
-        taxCollected += amt - excl;
-      }
-
-      const code = String(p.gateway_name ?? "payu").toLowerCase();
-      if (code === "payu") payuRevenue += amt;
+    for (const g of revAggData.gateways) {
+      const code = g.code.toLowerCase();
       let item = gwMap.get(code);
       if (!item) {
         const name = code === "payu" ? "PayU" : code === "ccavenue" ? "CCAvenue" : code === "cashfree" ? "Cashfree" : code === "razorpay" ? "Razorpay" : code.toUpperCase();
         item = { code, name, revenue: 0, count: 0, isEnabled: true };
         gwMap.set(code, item);
       }
-      item.revenue += amt;
-      item.count += 1;
+      item.revenue += g.revenue;
+      item.count += g.count;
     }
     const gatewaysCollected = Array.from(gwMap.values()).sort((a, b) => b.revenue - a.revenue);
-    const paidOrders = paidAppIds.size;
 
-    // Email delivery deduplicated by message_id
-    const latestByMsg = new Map<string, string>();
-    for (const r of (emailLogRes.data ?? []) as Array<{ message_id: string | null; status: string }>) {
-      if (!r.message_id) continue;
-      latestByMsg.set(r.message_id, r.status);
-    }
-    let emailSent = 0, emailQueued = 0, emailFailed = 0;
-    for (const s of latestByMsg.values()) {
-      if (s === "sent") emailSent += 1;
-      else if (s === "queued" || s === "pending" || s === "processing") emailQueued += 1;
-      else if (s === "failed" || s === "dlq" || s === "bounced") emailFailed += 1;
-    }
+    const revenueInclTax = revAggData.revenueInclTax;
+    const revenueExclTax = revAggData.revenueExclTax;
+    const taxCollected = revAggData.taxCollected;
+    const payuRevenue = revAggData.payuRevenue;
+    const revenuePrev = revAggData.revenuePrev;
 
-    // Staff activity
+    // 4. Email delivery counts
+    const emailSent = emailSentRes.count ?? 0;
+    const emailQueued = emailQueuedRes.count ?? 0;
+    const emailFailed = emailFailedRes.count ?? 0;
+
+    // 5. Staff activity
     const staffTotal = new Set(((staffRolesRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
     const staffRoleIds = new Set(((staffRolesRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
     let authRows: Array<{ id: string; last_sign_in_at: string | null }> = [];
@@ -521,7 +592,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const staffActiveToday = authRows.filter((u) => staffRoleIds.has(u.id) && u.last_sign_in_at && u.last_sign_in_at >= todayStartIso).length;
     const staffInactive = Math.max(0, staffTotal - staffActiveToday);
 
-    // Orders not contacted
+    // 6. Orders not contacted backlog
     const uncontactedApps = (uncontactedAppsRes.data ?? []) as Array<{ id: string; created_at: string; lead_id: string | null }>;
     const leadIdsToCheck = uncontactedApps.map((a) => a.lead_id).filter((id): id is string => !!id);
     let contactedLeadSet = new Set<string>();
@@ -530,7 +601,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
         const { data: contactedEvents } = await admin
           .from("lead_contact_events")
           .select("lead_id")
-          .in("lead_id", leadIdsToCheck.slice(0, 500));
+          .in("lead_id", leadIdsToCheck.slice(0, 1000));
         contactedLeadSet = new Set(((contactedEvents ?? []) as Array<{ lead_id: string }>).map((e) => e.lead_id));
       } catch {
         // ignore
@@ -540,20 +611,12 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const ordersNotContacted3h = realUncontacted.length;
     const ordersNotContacted5h = realUncontacted.filter((a) => a.created_at < fiveHoursAgoIso).length;
 
-    // Numbers & rates
-    const leadsCurrent = leadsCur.count ?? 0;
-    const leadsPrev = leadsPrevRes.count ?? 0;
-    const uniqueLeads = uniqueLeadsRes.count ?? 0;
-    const uniqueLeadsPrev = uniqueLeadsPrevRes.count ?? 0;
-    const prevPaidRows = (paidPaymentsPrevRes.data ?? []) as Array<{ amount: number }>;
-    const revenuePrev = prevPaidRows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
-    const paidOrdersPrev = prevPaidRows.length;
-    const paidLeads = paidLeadsInRangeRes.count ?? 0;
-    const conversionRate = leadsCurrent > 0 ? Math.round((paidLeads / leadsCurrent) * 1000) / 10 : 0;
+    // 7. Rates & Deltas
+    const revenuePrev = prevPaidData.totalRevenue;
+    const conversionRate = leadsCurrent > 0 ? Math.round((paidOrders / leadsCurrent) * 1000) / 10 : 0;
     const conversionRateV2 = uniqueLeads > 0 ? Math.round((paidOrders / uniqueLeads) * 1000) / 10 : 0;
     const conversionRatePrev = uniqueLeadsPrev > 0 ? Math.round((paidOrdersPrev / uniqueLeadsPrev) * 1000) / 10 : 0;
     const avgOrderValue = paidOrders > 0 ? Math.round(revenueInclTax / paidOrders) : 0;
-    const repeatedLeads = repeatedLeadsRes.count ?? 0;
 
     const payuMode = process.env.PAYU_MODE ?? "test";
     const payuLive = payuRevenue > 0 || paidRows.some((p) => p.gateway_name === "payu");
@@ -645,16 +708,69 @@ export const getDashboardCharts = createServerFn({ method: "POST" })
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    const [payTrend, leadsTrend, ordersTrend] = await Promise.all([
-      admin.from("payments").select("amount, created_at, payment_date").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
-      admin.from("leads").select("id, created_at").gte("created_at", startIso).lt("created_at", endIso).limit(10000),
-      admin.from("applications").select("id, created_at").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).limit(10000),
-    ]);
+    let dailyLeads: Record<string, number> = {};
+    let dailyOrders: Record<string, number> = {};
+    let dailyRev: Record<string, number> = {};
+    let hourlyLeads: Record<string, number> = {};
+    let hourlyOrders: Record<string, number> = {};
+    let hourlyRev: Record<string, number> = {};
+
+    let rpcSuccess = false;
+    try {
+      const { data: chartAgg, error: chartErr } = await admin.rpc("get_dashboard_chart_aggregates", {
+        p_start: startIso,
+        p_end: endIso,
+      });
+      if (!chartErr && chartAgg) {
+        dailyLeads = (chartAgg.daily_leads ?? {}) as Record<string, number>;
+        dailyOrders = (chartAgg.daily_orders ?? {}) as Record<string, number>;
+        dailyRev = (chartAgg.daily_rev ?? {}) as Record<string, number>;
+        hourlyLeads = (chartAgg.hourly_leads ?? {}) as Record<string, number>;
+        hourlyOrders = (chartAgg.hourly_orders ?? {}) as Record<string, number>;
+        hourlyRev = (chartAgg.hourly_rev ?? {}) as Record<string, number>;
+        rpcSuccess = true;
+      }
+    } catch {
+      // fallback
+    }
+
+    if (!rpcSuccess) {
+      const [payRows, leadRows, orderRows] = await Promise.all([
+        fetchRowsPaged<{ amount: number; created_at: string; payment_date?: string | null }>(
+          (from, to) => admin.from("payments").select("amount, created_at, payment_date").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+        ),
+        fetchRowsPaged<{ id: string; created_at: string }>(
+          (from, to) => admin.from("leads").select("id, created_at").gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+        ),
+        fetchRowsPaged<{ id: string; created_at: string }>(
+          (from, to) => admin.from("applications").select("id, created_at").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+        ),
+      ]);
+
+      for (const r of leadRows) {
+        const dk = getIstDateKey(r.created_at);
+        if (dk) dailyLeads[dk] = (dailyLeads[dk] ?? 0) + 1;
+        const hk = getIstHourKey(r.created_at);
+        if (hk) hourlyLeads[hk] = (hourlyLeads[hk] ?? 0) + 1;
+      }
+
+      for (const r of orderRows) {
+        const dk = getIstDateKey(r.created_at);
+        if (dk) dailyOrders[dk] = (dailyOrders[dk] ?? 0) + 1;
+        const hk = getIstHourKey(r.created_at);
+        if (hk) hourlyOrders[hk] = (hourlyOrders[hk] ?? 0) + 1;
+      }
+
+      for (const r of payRows) {
+        const dateVal = r.payment_date || r.created_at;
+        const dk = getIstDateKey(dateVal);
+        if (dk) dailyRev[dk] = (dailyRev[dk] ?? 0) + Number(r.amount ?? 0);
+        const hk = getIstHourKey(dateVal);
+        if (hk) hourlyRev[hk] = (hourlyRev[hk] ?? 0) + Number(r.amount ?? 0);
+      }
+    }
 
     const days: string[] = [];
-    const leadsByDay: Record<string, number> = {};
-    const ordersByDay: Record<string, number> = {};
-    const revByDay: Record<string, number> = {};
     {
       const firstDay = istDayStartUtc(start);
       const lastDay = istDayStartUtc(end);
@@ -662,56 +778,23 @@ export const getDashboardCharts = createServerFn({ method: "POST" })
         const key = getIstDateKey(cur);
         if (key && !days.includes(key)) {
           days.push(key);
-          leadsByDay[key] = 0;
-          ordersByDay[key] = 0;
-          revByDay[key] = 0;
         }
       }
       if (days.length > 366) days.length = 366;
     }
 
     const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
-    const leadsByHour: Record<string, number> = {};
-    const ordersByHour: Record<string, number> = {};
-    const revByHour: Record<string, number> = {};
-    hours.forEach((h) => {
-      leadsByHour[h] = 0;
-      ordersByHour[h] = 0;
-      revByHour[h] = 0;
-    });
-
-    for (const r of (leadsTrend.data ?? []) as Array<{ created_at: string }>) {
-      const dk = getIstDateKey(r.created_at);
-      if (dk in leadsByDay) leadsByDay[dk]! += 1;
-      const hk = getIstHourKey(r.created_at);
-      if (hk in leadsByHour) leadsByHour[hk]! += 1;
-    }
-
-    for (const r of (ordersTrend.data ?? []) as Array<{ created_at: string }>) {
-      const dk = getIstDateKey(r.created_at);
-      if (dk in ordersByDay) ordersByDay[dk]! += 1;
-      const hk = getIstHourKey(r.created_at);
-      if (hk in ordersByHour) ordersByHour[hk]! += 1;
-    }
-
-    for (const r of (payTrend.data ?? []) as Array<{ amount: number; created_at: string; payment_date?: string | null }>) {
-      const dateVal = r.payment_date || r.created_at;
-      const dk = getIstDateKey(dateVal);
-      if (dk in revByDay) revByDay[dk]! += Number(r.amount ?? 0);
-      const hk = getIstHourKey(dateVal);
-      if (hk in revByHour) revByHour[hk]! += Number(r.amount ?? 0);
-    }
 
     const result: DashboardChartsResult = {
       days,
-      leads: days.map((k) => leadsByDay[k] ?? 0),
-      orders: days.map((k) => ordersByDay[k] ?? 0),
-      revenueInr: days.map((k) => revByDay[k] ?? 0),
+      leads: days.map((k) => Number(dailyLeads[k] ?? 0)),
+      orders: days.map((k) => Number(dailyOrders[k] ?? 0)),
+      revenueInr: days.map((k) => Number(dailyRev[k] ?? 0)),
       hourly: {
         hours,
-        leads: hours.map((hk) => leadsByHour[hk] ?? 0),
-        orders: hours.map((hk) => ordersByHour[hk] ?? 0),
-        revenueInr: hours.map((hk) => revByHour[hk] ?? 0),
+        leads: hours.map((hk) => Number(hourlyLeads[hk] ?? 0)),
+        orders: hours.map((hk) => Number(hourlyOrders[hk] ?? 0)),
+        revenueInr: hours.map((hk) => Number(hourlyRev[hk] ?? 0)),
       },
     };
 
@@ -735,16 +818,30 @@ export const getDashboardTopServices = createServerFn({ method: "POST" })
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    const topServicesRes = await admin
-      .from("applications")
-      .select("service_id, leads!fk_applications_lead(total_amount), services(service_name)")
-      .eq("is_deleted", false)
-      .gte("created_at", startIso)
-      .lt("created_at", endIso)
-      .limit(2000);
+    try {
+      const { data: topSvcData, error: topSvcErr } = await admin.rpc("get_dashboard_top_services", {
+        p_start: startIso,
+        p_end: endIso,
+      });
+      if (!topSvcErr && topSvcData) {
+        const result = (topSvcData as Array<{ name: string; orders: number; revenueInr: number }>).map((s) => ({
+          name: s.name,
+          orders: Number(s.orders ?? 0),
+          revenueInr: Number(s.revenueInr ?? 0),
+        }));
+        setToCache(cacheKey, result, 60);
+        return result;
+      }
+    } catch {
+      // fallback
+    }
+
+    const topServicesRows = await fetchRowsPaged<{ service_id: string | null; leads: any; services: any }>(
+      (from, to) => admin.from("applications").select("service_id, leads!fk_applications_lead(total_amount), services(service_name)").eq("is_deleted", false).gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+    );
 
     const topMap = new Map<string, { name: string; orders: number; revenueInr: number }>();
-    for (const r of (topServicesRes.data ?? []) as Array<{ leads: any; services: any }>) {
+    for (const r of topServicesRows) {
       const svc = Array.isArray(r.services) ? r.services[0] : r.services;
       const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
       const name = svc?.service_name || "Unknown";

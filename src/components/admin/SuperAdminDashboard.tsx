@@ -382,7 +382,7 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
         </>}
       />
       <ModernKpi
-        icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsActive)} tone={m.ticketsActive > 0 ? "sky" : "slate"} delta={ticketsDelta}
+        icon={<ShieldCheck className="size-4" />} label="Support Tickets Raised" value={fmtN(m.ticketsRaised)} tone={m.ticketsRaised > 0 ? "sky" : "slate"} delta={ticketsDelta}
         href={withRange("/admin/support/tickets")}
         subs={<>
           <StatChip label="Closed" value={m.ticketsClosed} tone="emerald" href={withRange("/admin/support/tickets?status=closed")} />
