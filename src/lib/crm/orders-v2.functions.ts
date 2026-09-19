@@ -578,47 +578,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // 1. Compute exact global counts across full dataset using parallel head queries (no 1000 row capping)
-    const [allCountRes, completedCountRes, closedCountRes, needsActionCountRes] = await Promise.all([
-      (buildBaseQuery() as any).select("id", { count: "exact", head: true }),
-      (buildBaseQuery().in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]) as any).select("id", { count: "exact", head: true }),
-      (buildBaseQuery().or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
-      (buildBaseQuery().or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")').not("closure_stage", "in", '("closed","final_ticket_closed")') as any).select("id", { count: "exact", head: true }),
-    ]);
-
-    const totalCount = allCountRes.count ?? 0;
-    const completedCount = completedCountRes.count ?? 0;
-    const closedCount = closedCountRes.count ?? 0;
-    const needsActionCount = needsActionCountRes.count ?? 0;
-    const pendingCount = Math.max(0, totalCount - completedCount - closedCount);
-
-    const globalCounts = {
-      all: totalCount,
-      needs_action: needsActionCount,
-      pending: pendingCount,
-      completed: completedCount,
-      closed: closedCount,
-      exception: 0,
-      actionRequired: needsActionCount,
-      processed: completedCount + closedCount,
-    };
-
-    // 2. Fetch candidate applications matching base filters + bucket/status filter
+    // Fetch candidate applications matching base filters
     let baseQ = buildBaseQuery();
-
-    if (data.bucket === "needs_action" || data.actionStatus === "action_required") {
-      baseQ = baseQ
-        .or('fulfillment_status.is.null,fulfillment_status.in.("order_received","form_submitted")')
-        .not("closure_stage", "in", '("closed","final_ticket_closed")');
-    } else if (data.bucket === "completed") {
-      baseQ = baseQ.in("fulfillment_status", ["completed", "order_completed", "consultation_completed"]);
-    } else if (data.bucket === "closed") {
-      baseQ = baseQ.or('fulfillment_status.in.("order_closed","cancelled","application_rejected","certificate_rejected"),closure_stage.in.("closed","final_ticket_closed")');
-    } else if (data.bucket === "pending") {
-      baseQ = baseQ
-        .not("fulfillment_status", "in", '("completed","order_completed","consultation_completed","order_closed","cancelled","application_rejected","certificate_rejected")')
-        .not("closure_stage", "in", '("closed","final_ticket_closed")');
-    }
 
     if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
       baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus as any);
@@ -630,7 +591,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       baseQ = baseQ.order("created_at", { ascending: data.sortOrder === "asc" });
     }
 
-    const { data: apps, error: appErr } = await baseQ.limit(2000);
+    const { data: apps, error: appErr } = await baseQ.limit(5000);
     if (appErr) throw new Error(appErr.message);
     const appList = apps ?? [];
 
@@ -638,7 +599,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: globalCounts,
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
+        ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
       };
@@ -757,6 +719,47 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
+    // Compute exact counts across all candidates matching active global filters
+    const counts = {
+      all: allRows.length,
+      needs_action: 0,
+      pending: 0,
+      completed: 0,
+      closed: 0,
+      exception: 0,
+      actionRequired: 0,
+      processed: 0,
+    };
+    const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
+    const now = Date.now();
+
+    for (const r of allRows) {
+      const b = bucketOfRow(r);
+      if (b === "needs_action") {
+        counts.needs_action++;
+        counts.actionRequired++;
+      } else if (b === "pending") {
+        counts.pending++;
+      } else if (b === "completed") {
+        counts.completed++;
+        counts.processed++;
+      } else if (b === "closed") {
+        counts.closed++;
+        counts.processed++;
+      } else if (b === "exception") {
+        counts.exception++;
+      }
+
+      if (b === "pending" || b === "needs_action") {
+        const d = Math.max(0, Math.floor((now - new Date(r.created_at).getTime()) / 86_400_000));
+        if (d < 1) ageBuckets.d1++;
+        else if (d === 1) ageBuckets.d2++;
+        else if (d === 2) ageBuckets.d3++;
+        else if (d >= 3 && d < 7) ageBuckets.d7++;
+        else if (d >= 7) ageBuckets.older++;
+      }
+    }
+
     // Filter by tab bucket
     let filtered = allRows;
     if (data.bucket && data.bucket !== "all") {
@@ -837,17 +840,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const start = (page - 1) * data.pageSize;
     const rows = filtered.slice(start, start + data.pageSize);
 
-    const counts = {
-      ...globalCounts,
-      ...(data.bucket === "needs_action" ? { needs_action: total, actionRequired: total } : {}),
-      ...(data.bucket === "completed" ? { completed: total } : {}),
-      ...(data.bucket === "closed" ? { closed: total } : {}),
-    };
-
     return {
       rows,
       total,
       counts,
+      ageBuckets,
       page,
       pageSize: data.pageSize,
     };
