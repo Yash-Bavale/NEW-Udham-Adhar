@@ -34,6 +34,8 @@ export type WorkflowDashboard = {
   updatedAt: string;
 };
 
+let cachedWorkflow: { expiresAt: number; data: WorkflowDashboard } | null = null;
+
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
   return m.supabaseAdmin;
@@ -51,6 +53,10 @@ function tallyBy<T extends string>(rows: Array<{ [k: string]: unknown }>, key: s
 export const getWorkflowDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<WorkflowDashboard> => {
+    if (cachedWorkflow && Date.now() < cachedWorkflow.expiresAt) {
+      return cachedWorkflow.data;
+    }
+
     const admin = await getAdmin();
     const nowIso = new Date().toISOString();
     const in1hIso = new Date(Date.now() + 60 * 60_000).toISOString();
@@ -66,7 +72,8 @@ export const getWorkflowDashboard = createServerFn({ method: "GET" })
       admin
         .from("email_send_log")
         .select("message_id,status,created_at")
-        .gte("created_at", dayAgoIso),
+        .gte("created_at", dayAgoIso)
+        .limit(2000),
     ]);
 
     const stateRows = (statesRes.data ?? []) as Array<{
@@ -102,7 +109,7 @@ export const getWorkflowDashboard = createServerFn({ method: "GET" })
       (t) => t.fires_at && t.fires_at >= nowIso && t.fires_at <= in1hIso,
     ).length;
 
-    return {
+    const result: WorkflowDashboard = {
       states: {
         total: stateRows.length,
         paused: stateRows.filter((r) => r.paused).length,
@@ -130,4 +137,7 @@ export const getWorkflowDashboard = createServerFn({ method: "GET" })
       },
       updatedAt: new Date().toISOString(),
     };
+
+    cachedWorkflow = { expiresAt: Date.now() + 30_000, data: result };
+    return result;
   });

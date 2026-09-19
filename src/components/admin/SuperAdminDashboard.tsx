@@ -2,19 +2,28 @@
 // Mounted by both /admin/dashboard and /admin/super (super-mode adds quick actions).
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, memo } from "react";
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, ComposedChart, Bar, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import {
-  Activity, AlertTriangle, Award, Bell, Briefcase, Database, FileText, Globe, Mail,
+  Activity, AlertTriangle, Bell, Briefcase, Database, Mail,
   RefreshCw, Send, ShieldCheck, ShoppingBag, Target, TrendingDown, TrendingUp,
-  UserCheck, Users, Wallet,
+  UserCheck, Users, Wallet, Globe,
 } from "lucide-react";
 import {
-  getSuperAdminOverview, processEmailQueueNow, seedMissingEmailTemplates,
-  type RangePreset, type SuperAdminOverview,
+  getDashboardKpis,
+  getDashboardCharts,
+  getDashboardTopServices,
+  getDashboardSecondary,
+  processEmailQueueNow,
+  seedMissingEmailTemplates,
+  type RangePreset,
+  type DashboardKpisResult,
+  type DashboardChartsResult,
+  type DashboardTopServicesResult,
+  type DashboardSecondaryResult,
 } from "@/lib/crm/super-admin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,13 +81,55 @@ export function SuperAdminDashboard({
   onRangeChange: (r: DashboardRange) => void;
   title?: string;
 }) {
-  const fetchOverview = useServerFn(getSuperAdminOverview);
-  const { data, isLoading, isFetching, refetch } = useQuery<SuperAdminOverview>({
-    queryKey: ["super-admin-overview", range.preset, range.fromIso ?? "", range.toIso ?? ""],
-    queryFn: () => fetchOverview({ data: range }),
+  const fetchKpis = useServerFn(getDashboardKpis);
+  const fetchCharts = useServerFn(getDashboardCharts);
+  const fetchTopServices = useServerFn(getDashboardTopServices);
+  const fetchSecondary = useServerFn(getDashboardSecondary);
+
+  // 1. Critical KPIs query (loads first, prioritized)
+  const kpisQuery = useQuery<DashboardKpisResult>({
+    queryKey: ["dash-kpis", range.preset, range.fromIso ?? "", range.toIso ?? ""],
+    queryFn: () => fetchKpis({ data: range }),
+    placeholderData: keepPreviousData,
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
+
+  // 2. Trend chart query (loads independently)
+  const chartsQuery = useQuery<DashboardChartsResult>({
+    queryKey: ["dash-charts", range.preset, range.fromIso ?? "", range.toIso ?? ""],
+    queryFn: () => fetchCharts({ data: range }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+  });
+
+  // 3. Top services query (loads independently)
+  const topServicesQuery = useQuery<DashboardTopServicesResult>({
+    queryKey: ["dash-top-services", range.preset, range.fromIso ?? "", range.toIso ?? ""],
+    queryFn: () => fetchTopServices({ data: range }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+  });
+
+  // 4. Secondary features query (loads independently)
+  const secondaryQuery = useQuery<DashboardSecondaryResult>({
+    queryKey: ["dash-secondary", range.preset, range.fromIso ?? "", range.toIso ?? ""],
+    queryFn: () => fetchSecondary({ data: range }),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+  });
+
+  const isFetching = kpisQuery.isFetching || chartsQuery.isFetching || topServicesQuery.isFetching || secondaryQuery.isFetching;
+
+  const handleRefresh = () => {
+    kpisQuery.refetch();
+    chartsQuery.refetch();
+    topServicesQuery.refetch();
+    secondaryQuery.refetch();
+  };
 
   // Live IST clock
   const [now, setNow] = useState(() => new Date());
@@ -101,7 +152,7 @@ export function SuperAdminDashboard({
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">
-            {data?.range.label ?? "Loading…"} · auto-refresh every 60s
+            {kpisQuery.data?.range.label ?? "Loading…"} · auto-refresh every 60s
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -132,28 +183,28 @@ export function SuperAdminDashboard({
               }
             />
           )}
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-9 gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="h-9 gap-2">
             <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
 
-      <KpiGrid data={data} loading={isLoading} range={range} />
+      <KpiGrid data={kpisQuery.data} loading={kpisQuery.isLoading} range={range} />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <TrendCard data={data} loading={isLoading} className="lg:col-span-2" />
-        <TopServicesCard data={data} loading={isLoading} />
+        <TrendCard data={chartsQuery.data} rangePreset={range.preset} loading={chartsQuery.isLoading} className="lg:col-span-2" />
+        <TopServicesCard data={topServicesQuery.data} loading={topServicesQuery.isLoading} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <WorkflowCard data={data} loading={isLoading} />
-        <EmailQueueCard data={data} loading={isLoading} />
-        <AlertsCard data={data} loading={isLoading} />
+        <WorkflowCard data={secondaryQuery.data?.workflow} loading={secondaryQuery.isLoading} />
+        <EmailQueueCard data={secondaryQuery.data?.emailQueue} loading={secondaryQuery.isLoading} />
+        <AlertsCard data={secondaryQuery.data?.alerts} loading={secondaryQuery.isLoading} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <ActivityCard data={data} loading={isLoading} className={superMode ? "lg:col-span-2" : "lg:col-span-3"} />
-        {superMode && <SuperActionsCard onChanged={() => refetch()} />}
+        <ActivityCard data={secondaryQuery.data?.activity} loading={secondaryQuery.isLoading} className={superMode ? "lg:col-span-2" : "lg:col-span-3"} />
+        {superMode && <SuperActionsCard onChanged={handleRefresh} />}
       </div>
     </div>
   );
@@ -183,13 +234,6 @@ function DeltaPill({ d }: { d: { pct: number; up: boolean } | null }) {
       <Icon className="size-2.5" /> {d.pct}%
     </span>
   );
-}
-
-function parseHref(href: string): { path: string; search: Record<string, string> } {
-  const [path, qs] = href.split("?");
-  const search: Record<string, string> = {};
-  if (qs) for (const kv of qs.split("&")) { const [k, v] = kv.split("="); if (k) search[k] = decodeURIComponent(v ?? ""); }
-  return { path, search };
 }
 
 function StatChip({
@@ -275,7 +319,7 @@ function ModernKpi({
   return body;
 }
 
-function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading: boolean; range: DashboardRange }) {
+const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: DashboardKpisResult; loading: boolean; range: DashboardRange }) {
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -403,14 +447,14 @@ function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading:
         icon={<Globe className="size-4" />}
         label="Gateway Status"
         value={
-          (data?.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length > 1
-            ? `${(data?.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length} Gateways`
-            : (data?.gatewaysCollected?.[0]?.name ?? "PayU")
+          (data.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length > 1
+            ? `${(data.gatewaysCollected ?? []).filter((g) => g.revenue > 0).length} Gateways`
+            : (data.gatewaysCollected?.[0]?.name ?? "PayU")
         }
-        tone={data?.payu.isProduction ? "emerald" : "amber"}
+        tone={data.payu.isProduction ? "emerald" : "amber"}
         href="/admin/settings?tab=gateways"
         subs={<>
-          {(data?.gatewaysCollected ?? []).slice(0, 3).map((gw) => (
+          {(data.gatewaysCollected ?? []).slice(0, 3).map((gw) => (
             <StatChip
               key={gw.code}
               label={gw.name}
@@ -420,11 +464,11 @@ function KpiGrid({ data, loading, range }: { data?: SuperAdminOverview; loading:
             />
           ))}
         </>}
-        footer={data?.payu.isProduction ? "Live production mode" : "All webhooks healthy"}
+        footer={data.payu.isProduction ? "Live production mode" : "All webhooks healthy"}
       />
     </div>
   );
-}
+});
 
 /* ---------------- Custom Tooltip for Chart ---------------- */
 
@@ -467,8 +511,7 @@ function CustomTrendTooltip({ active, payload, label }: any) {
 
 /* ---------------- Trend (Day-wise & Hourly Time-wise) ---------------- */
 
-function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; loading: boolean; className?: string }) {
-  const rangePreset = data?.range.preset ?? "today";
+const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading, className }: { data?: DashboardChartsResult; rangePreset?: RangePreset; loading: boolean; className?: string }) {
   const isSingleDay = rangePreset === "today" || rangePreset === "yesterday";
   const [viewMode, setViewMode] = useState<"days" | "hourly">("days");
 
@@ -482,19 +525,19 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    if (viewMode === "hourly" && data.trend.hourly) {
-      return data.trend.hourly.hours.map((h, i) => ({
+    if (viewMode === "hourly" && data.hourly) {
+      return data.hourly.hours.map((h, i) => ({
         label: h,
-        Leads: data.trend.hourly.leads[i] ?? 0,
-        Orders: data.trend.hourly.orders?.[i] ?? 0,
-        Revenue: data.trend.hourly.revenueInr[i] ?? 0,
+        Leads: data.hourly.leads[i] ?? 0,
+        Orders: data.hourly.orders?.[i] ?? 0,
+        Revenue: data.hourly.revenueInr[i] ?? 0,
       }));
     }
-    return data.trend.days.map((d, i) => ({
+    return data.days.map((d, i) => ({
       label: d.slice(5), // MM-DD
-      Leads: data.trend.leads[i] ?? 0,
-      Orders: data.trend.orders?.[i] ?? 0,
-      Revenue: data.trend.revenueInr[i] ?? 0,
+      Leads: data.leads[i] ?? 0,
+      Orders: data.orders?.[i] ?? 0,
+      Revenue: data.revenueInr[i] ?? 0,
     }));
   }, [data, viewMode]);
 
@@ -583,12 +626,12 @@ function TrendCard({ data, loading, className }: { data?: SuperAdminOverview; lo
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Top services ---------------- */
 
-function TopServicesCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
-  const rows = data?.topServices ?? [];
+const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?: DashboardTopServicesResult; loading: boolean }) {
+  const rows = data ?? [];
   const max = Math.max(1, ...rows.map((r) => r.revenueInr));
   return (
     <Card>
@@ -623,18 +666,17 @@ function TopServicesCard({ data, loading }: { data?: SuperAdminOverview; loading
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Workflow ---------------- */
 
-function WorkflowCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
-  const w = data?.workflow;
+const WorkflowCard = memo(function WorkflowCard({ data, loading }: { data?: DashboardSecondaryResult["workflow"]; loading: boolean }) {
   const items = [
-    { label: "External Delay", value: w?.externalDelay ?? 0 },
-    { label: "Waiting on Customer", value: w?.onHold ?? 0 },
-    { label: "Refunds Pending", value: w?.refundPending ?? 0 },
-    { label: "Reminders Due", value: w?.remindersDue ?? 0 },
-    { label: "Closed in Range", value: w?.closedInRange ?? 0 },
+    { label: "External Delay", value: data?.externalDelay ?? 0 },
+    { label: "Waiting on Customer", value: data?.onHold ?? 0 },
+    { label: "Refunds Pending", value: data?.refundPending ?? 0 },
+    { label: "Reminders Due", value: data?.remindersDue ?? 0 },
+    { label: "Closed in Range", value: data?.closedInRange ?? 0 },
   ];
   return (
     <Card>
@@ -655,17 +697,16 @@ function WorkflowCard({ data, loading }: { data?: SuperAdminOverview; loading: b
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Email queue ---------------- */
 
-function EmailQueueCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
-  const q = data?.emailQueue;
+const EmailQueueCard = memo(function EmailQueueCard({ data, loading }: { data?: DashboardSecondaryResult["emailQueue"]; loading: boolean }) {
   const items = [
-    { label: "Queued", value: q?.queued ?? 0, tone: "default" as const },
-    { label: "Processing", value: q?.processing ?? 0, tone: "default" as const },
-    { label: "Failed", value: q?.failed ?? 0, tone: (q?.failed ?? 0) > 0 ? ("bad" as const) : ("default" as const) },
-    { label: "Sent", value: q?.sent ?? 0, tone: "good" as const },
+    { label: "Queued", value: data?.queued ?? 0, tone: "default" as const },
+    { label: "Processing", value: data?.processing ?? 0, tone: "default" as const },
+    { label: "Failed", value: data?.failed ?? 0, tone: (data?.failed ?? 0) > 0 ? ("bad" as const) : ("default" as const) },
+    { label: "Sent", value: data?.sent ?? 0, tone: "good" as const },
   ];
   const tones: Record<string, string> = {
     default: "",
@@ -691,12 +732,12 @@ function EmailQueueCard({ data, loading }: { data?: SuperAdminOverview; loading:
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Alerts ---------------- */
 
-function AlertsCard({ data, loading }: { data?: SuperAdminOverview; loading: boolean }) {
-  const alerts = data?.alerts ?? [];
+const AlertsCard = memo(function AlertsCard({ data, loading }: { data?: DashboardSecondaryResult["alerts"]; loading: boolean }) {
+  const alerts = data ?? [];
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -730,15 +771,16 @@ function AlertsCard({ data, loading }: { data?: SuperAdminOverview; loading: boo
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Activity ---------------- */
 
-function ActivityCard({
+const ActivityCard = memo(function ActivityCard({
   data, loading, className,
 }: {
-  data?: SuperAdminOverview; loading: boolean; className?: string;
+  data?: DashboardSecondaryResult["activity"]; loading: boolean; className?: string;
 }) {
+  const items = data ?? [];
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -750,12 +792,12 @@ function ActivityCard({
       <CardContent className="pt-0">
         {loading ? (
           <Skeleton className="h-[260px] w-full" />
-        ) : (data?.activity.length ?? 0) === 0 ? (
+        ) : items.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">No recent activity</div>
         ) : (
           <ScrollArea className="h-[260px] pr-3">
             <div className="divide-y divide-border">
-              {data?.activity.map((a) => (
+              {items.map((a) => (
                 <div key={a.id} className="flex items-start justify-between gap-3 py-2">
                   <span className="text-sm">{a.description}</span>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
@@ -769,7 +811,7 @@ function ActivityCard({
       </CardContent>
     </Card>
   );
-}
+});
 
 /* ---------------- Super actions ---------------- */
 
