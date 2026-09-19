@@ -490,6 +490,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
       item.count += 1;
     }
     const gatewaysCollected = Array.from(gwMap.values()).sort((a, b) => b.revenue - a.revenue);
+    const paidOrders = paidAppIds.size;
 
     // Email delivery deduplicated by message_id
     const latestByMsg = new Map<string, string>();
