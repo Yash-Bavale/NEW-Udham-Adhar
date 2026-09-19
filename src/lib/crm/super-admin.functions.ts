@@ -617,7 +617,6 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const ordersNotContacted5h = realUncontacted.filter((a) => a.created_at < fiveHoursAgoIso).length;
 
     // 7. Rates & Deltas
-    const revenuePrev = prevPaidData.totalRevenue;
     const conversionRate = leadsCurrent > 0 ? Math.round((paidOrders / leadsCurrent) * 1000) / 10 : 0;
     const conversionRateV2 = uniqueLeads > 0 ? Math.round((paidOrders / uniqueLeads) * 1000) / 10 : 0;
     const conversionRatePrev = uniqueLeadsPrev > 0 ? Math.round((paidOrdersPrev / uniqueLeadsPrev) * 1000) / 10 : 0;
