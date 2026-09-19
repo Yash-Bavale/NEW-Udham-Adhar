@@ -11,7 +11,8 @@ import {
   Paperclip, Link2, Copy, Check, Sparkles, MoreVertical, Eye, Phone,
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
-  AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag
+  AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
+  ChevronRight as ChevronRightIcon
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
@@ -56,7 +57,7 @@ const STATUS_CONFIG: Record<TicketStatus, { bg: string; fg: string; border: stri
 const PRIORITY_CONFIG: Record<TicketPriority, { bg: string; fg: string; border: string; label: string; dot: string }> = {
   urgent: { bg: "bg-rose-50", fg: "text-rose-700", border: "border-rose-200", label: "Urgent", dot: "bg-rose-500" },
   high:   { bg: "bg-orange-50", fg: "text-orange-700", border: "border-orange-200", label: "High", dot: "bg-orange-500" },
-  medium: { bg: "bg-rose-50", fg: "text-rose-600", border: "border-rose-200", label: "Medium", dot: "bg-rose-500" },
+  medium: { bg: "bg-rose-50", fg: "text-rose-700", border: "border-rose-200", label: "Medium", dot: "bg-rose-500" },
   low:    { bg: "bg-slate-100", fg: "text-slate-600", border: "border-slate-200", label: "Low", dot: "bg-slate-400" },
 };
 
@@ -344,24 +345,6 @@ function TicketWorkspace() {
     return out;
   }, [data]);
 
-  // Date Dividers
-  const renderedMessages: Array<{ divider?: string; msg?: Msg }> = useMemo(() => {
-    const list: Array<{ divider?: string; msg?: Msg }> = [];
-    let lastDate = "";
-    let lastTime = 0;
-    for (const m of messages) {
-      const d = istDate(m.created_at);
-      const t = new Date(m.created_at).getTime();
-      if (d !== lastDate || (lastTime && t - lastTime > 24 * 3600 * 1000)) {
-        list.push({ divider: d.toUpperCase() });
-        lastDate = d;
-      }
-      list.push({ msg: m });
-      lastTime = t;
-    }
-    return list;
-  }, [messages]);
-
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
@@ -450,6 +433,38 @@ function TicketWorkspace() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Rich Text Formatting Tools for Composer
+  const insertFormatting = (prefix: string, suffix = "") => {
+    if (!composerRef.current) return;
+    const el = composerRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = body.substring(start, end);
+    const replacement = `${prefix}${selected || "text"}${suffix}`;
+    const newBody = body.substring(0, start) + replacement + body.substring(end);
+    setBody(newBody);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
+    }, 10);
+  };
+
+  const insertLinePrefix = (prefix: string) => {
+    if (!composerRef.current) return;
+    const el = composerRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = body.substring(start, end);
+    const lines = (selected || "").split("\n").map((l) => `${prefix}${l}`).join("\n");
+    const replacement = lines || `${prefix} `;
+    const newBody = body.substring(0, start) + replacement + body.substring(end);
+    setBody(newBody);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + replacement.length, start + replacement.length);
+    }, 10);
+  };
+
   // Insert structured order details
   const insertOrderDetails = () => {
     const t = data?.ticket as any;
@@ -522,7 +537,7 @@ function TicketWorkspace() {
   const cust = ticket.customers ?? {};
   const app = ticket.applications ?? {};
   const isClosed = ["closed", "resolved"].includes(ticket.status);
-  const serviceName = ticket.services?.service_name ?? app.services?.service_name ?? "Udyam Registration";
+  const serviceName = ticket.services?.service_name ?? app.services?.service_name ?? "New Udyam Certificate Registration";
 
   // Check Reopen Rule: Order Stage must be Closed or Completed
   const orderStageStr = String(app.fulfillment_status ?? app.order_status ?? "").toLowerCase();
@@ -574,62 +589,31 @@ function TicketWorkspace() {
             <ArrowLeft className="size-3.5" /> Back to Tickets
           </button>
 
-          {/* Mobile context sidebar toggle */}
+          {/* Mobile context sidebar button */}
           <button
             onClick={() => setSidebarDrawerOpen(true)}
             className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700"
           >
-            <Info className="size-3.5" /> Order &amp; Ticket Info
+            <Info className="size-3.5" /> Context Info
           </button>
         </div>
 
-        {/* Row 1: Subject + Action Buttons (Matching Mockup 2 & User Request) */}
+        {/* Row 1: Ticket Number + Action Bar */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          {/* Left: Subject / Title + NEW badge */}
+          {/* Left: Ticket Number + NEW Badge */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate">
-              {ticket.subject || `Ticket #${ticket.ticket_number}`}
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 font-mono">
+              {ticket.ticket_number}
             </h1>
             {ticket.is_new && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white shrink-0">
+              <span className="px-2 py-0.5 rounded text-[11px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white">
                 NEW
               </span>
             )}
           </div>
 
-          {/* Right Action Bar: Quick action buttons added on top as requested */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            {/* Reply button */}
-            <button
-              onClick={() => {
-                setComposeTab("reply");
-                composerRef.current?.focus();
-              }}
-              disabled={isClosed}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e3a5f] hover:bg-[#152b47] text-white text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-            >
-              <CornerDownLeft className="size-3.5" /> Reply
-            </button>
-
-            {/* Internal Note button */}
-            <button
-              onClick={() => {
-                setComposeTab("note");
-                composerRef.current?.focus();
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-            >
-              <StickyNote className="size-3.5 text-amber-500" /> Internal Note
-            </button>
-
-            {/* Assignee button */}
-            <AssigneeDropdownBadge
-              currentId={ticket.assigned_to}
-              currentName={ticket.assigned_name}
-              staff={staffList}
-              onPick={(id) => changeAssignee.mutate(id)}
-            />
-
+          {/* Right Action Bar matching screenshot */}
+          <div className="flex items-center gap-2">
             {/* Close Dropdown */}
             <div className="relative">
               <button
@@ -641,26 +625,26 @@ function TicketWorkspace() {
               </button>
               {closeMenuOpen && (
                 <div
-                  className="absolute left-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1 animate-in fade-in"
+                  className="absolute right-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1 animate-in fade-in"
                   onMouseLeave={() => setCloseMenuOpen(false)}
                 >
                   <button
                     onClick={() => { setCloseMenuOpen(false); doCloseNormal.mutate(); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                   >
-                    <CheckCircle2 className="size-3.5 text-slate-400" /> Close — No Action
+                    <CheckCircle2 className="size-3.5 text-emerald-500" /> Close Ticket
                   </button>
                   <button
                     onClick={() => { setCloseMenuOpen(false); setReasonOpen(true); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-rose-700 font-medium"
                   >
-                    <Mail className="size-3.5 text-rose-500" /> Close with Reply
+                    <Mail className="size-3.5 text-rose-500" /> Close with Reply (TB02)
                   </button>
                   <button
-                    onClick={() => { setCloseMenuOpen(false); setRestartConfirm(true); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-emerald-700 font-medium"
+                    onClick={() => { setCloseMenuOpen(false); setConsultOpen(true); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-blue-700 font-medium"
                   >
-                    <RotateCcw className="size-3.5 text-emerald-500" /> Close &amp; Restart Order
+                    <FileText className="size-3.5 text-blue-500" /> Consultation Completed (TB01)
                   </button>
                 </div>
               )}
@@ -669,39 +653,22 @@ function TicketWorkspace() {
             {/* Restart Order */}
             <button
               onClick={() => setRestartConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold shadow-2xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
             >
-              <RotateCcw className="size-3.5 text-amber-600" /> Restart Order
+              <RotateCcw className="size-3.5 text-slate-500" /> Restart Order
             </button>
 
-            {/* TB01: Consultation Done */}
+            {/* Reply Button (focuses composer) */}
             <button
-              onClick={() => setConsultOpen(true)}
+              onClick={() => {
+                setComposeTab("reply");
+                composerRef.current?.focus();
+              }}
               disabled={isClosed}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1e3a5f] hover:bg-[#152b47] text-white text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
             >
-              <CheckCircle2 className="size-3.5 text-emerald-600" /> TB01: Consultation Done
+              <Send className="size-3.5" /> Reply
             </button>
-
-            {/* TB02: Reply w/ Reason (24h) */}
-            <button
-              onClick={() => setReasonOpen(true)}
-              disabled={isClosed}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-            >
-              <Send className="size-3.5 text-rose-600" /> TB02: Reply w/ Reason (24h)
-            </button>
-
-            {/* Reopen Order */}
-            {canReopenOrder && (
-              <button
-                onClick={() => setReopenConfirm(true)}
-                disabled={doReopenOrder.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-              >
-                <RotateCcw className="size-3.5 text-purple-600" /> Reopen Order
-              </button>
-            )}
 
             {/* More Menu (...) */}
             <div className="relative">
@@ -768,7 +735,7 @@ function TicketWorkspace() {
             </div>
 
             {/* Previous / Next Ticket Buttons */}
-            <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs ml-auto sm:ml-1">
+            <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs ml-1">
               <button
                 onClick={() => {
                   if (navState.prevId) {
@@ -797,39 +764,13 @@ function TicketWorkspace() {
           </div>
         </div>
 
-        {/* Row 2: Customer Metadata Strip matching 2nd image */}
-        <div className="mt-2 text-xs text-slate-500 flex items-center gap-4 flex-wrap">
-          <span className="font-semibold text-slate-900 flex items-center gap-1.5">
-            <User className="size-3.5 text-slate-400" />
-            {cust.name ?? "Customer"}
-          </span>
-          <span className="font-mono text-slate-600 flex items-center gap-1.5">
-            <Mail className="size-3.5 text-slate-400" />
-            {ticket.ticket_email ?? cust.primary_email ?? "—"}
-          </span>
-          {cust.primary_mobile && (
-            <span className="font-mono text-slate-600 flex items-center gap-1.5">
-              <Phone className="size-3.5 text-slate-400" />
-              {cust.primary_mobile}
-            </span>
-          )}
-          {app.application_code && (
-            <Link
-              to="/admin/orders/$orderId"
-              params={{ orderId: app.id }}
-              className="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline bg-blue-50/70 px-2 py-0.5 rounded-md border border-blue-100 inline-flex items-center gap-1"
-            >
-              <Package className="size-3.5 text-blue-500" />
-              Order: {app.application_code}
-            </Link>
-          )}
-          <span className="text-slate-400 inline-flex items-center gap-1 ml-auto text-[11px]">
-            <Clock className="size-3 w-3" /> Created: {ist(ticket.created_at)}
-          </span>
+        {/* Row 2: Subject */}
+        <div className="mt-1.5 text-sm font-semibold text-slate-800 truncate">
+          {ticket.subject || "(no subject)"}
         </div>
 
-        {/* Row 3: Compact Metadata Badges (Removed "BHS: New Udyam Certificate Registration" as requested) */}
-        <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
+        {/* Row 3: Compact Metadata Badges matching screenshot */}
+        <div className="mt-2.5 flex items-center gap-2 flex-wrap text-xs">
           {/* Customer Delay badge */}
           {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px]">
@@ -848,6 +789,20 @@ function TicketWorkspace() {
             priority={(ticket.priority as TicketPriority) ?? "medium"}
             onChange={(p) => changePriority.mutate(p)}
           />
+
+          {/* Assignee Badge */}
+          <AssigneeDropdownBadge
+            currentId={ticket.assigned_to}
+            currentName={ticket.assigned_name}
+            staff={staffList}
+            onPick={(id) => changeAssignee.mutate(id)}
+          />
+
+          {/* Service Dropdown Pill Badge */}
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[11px]">
+            <span>BHS: {serviceName}</span>
+            <ChevronDown className="size-3 text-slate-400" />
+          </span>
 
           {/* Custom Tags */}
           {customTags.map((tag, idx) => (
@@ -927,33 +882,22 @@ function TicketWorkspace() {
             onScroll={handleThreadScroll}
             className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4"
           >
-            {renderedMessages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-2">
                 <MessageSquare className="size-10 text-slate-300" />
                 <p className="font-semibold text-slate-700 text-sm">No messages yet</p>
                 <p className="text-xs text-slate-400">Use the reply composer below to send an email to the customer.</p>
               </div>
             ) : (
-              renderedMessages.map((r, i) =>
-                r.divider ? (
-                  <div key={`d-${i}`} className="flex items-center gap-3 my-3">
-                    <div className="flex-1 h-px bg-slate-200" />
-                    <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold bg-slate-100 px-3 py-0.5 rounded-full border border-slate-200/80">
-                      {r.divider}
-                    </span>
-                    <div className="flex-1 h-px bg-slate-200" />
-                  </div>
-                ) : (
-                  <MessageCard
-                    key={r.msg!.id}
-                    msg={r.msg!}
-                    customerName={cust.name}
-                    customerEmail={ticket.ticket_email ?? cust.primary_email}
-                    serviceName={serviceName}
-                    onDownloadDoc={handleDownloadDoc}
-                  />
-                )
-              )
+              messages.map((m) => (
+                <MessageCard
+                  key={m.id}
+                  msg={m}
+                  customerName={cust.name}
+                  customerEmail={ticket.ticket_email ?? cust.primary_email}
+                  onDownloadDoc={handleDownloadDoc}
+                />
+              ))
             )}
           </div>
 
@@ -967,47 +911,143 @@ function TicketWorkspace() {
             </button>
           )}
 
-          {/* ── 3. Sticky Bottom Reply Composer matching 2nd Image ─────────────── */}
+          {/* ── 3. Sticky Bottom Reply Composer matching Screenshot ─────────────── */}
           <div className="bg-white border-t border-slate-200 shrink-0 shadow-lg">
-            {/* Header: Tabs & Recipient info matching Mockup 2 */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 text-xs">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setComposeTab("reply")}
-                  className={`py-1 text-xs font-bold transition-all relative ${
-                    composeTab === "reply"
-                      ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f]"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Reply
-                </button>
-                <button
-                  onClick={() => setComposeTab("note")}
-                  className={`py-1 text-xs font-bold transition-all relative ${
-                    composeTab === "note"
-                      ? "text-amber-700 border-b-2 border-amber-500"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  Internal Note
-                </button>
-              </div>
+            {/* Tabs: Reply vs Internal Note */}
+            <div className="flex items-center border-b border-slate-200 px-4 pt-2">
+              <button
+                onClick={() => setComposeTab("reply")}
+                className={`px-4 py-2 text-xs font-bold transition-all relative ${
+                  composeTab === "reply"
+                    ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f]"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Reply
+              </button>
+              <button
+                onClick={() => setComposeTab("note")}
+                className={`px-4 py-2 text-xs font-bold transition-all relative ${
+                  composeTab === "note"
+                    ? "text-amber-700 border-b-2 border-amber-500"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Internal Note
+              </button>
+            </div>
 
-              {composeTab === "reply" && (
-                <div className="flex items-center gap-2 text-slate-500">
-                  <span className="text-xs">To:</span>
-                  <span className="font-mono text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 text-xs font-medium flex items-center gap-1.5">
-                    {ticket.ticket_email ?? cust.primary_email ?? "customer"}
-                    <span className="text-slate-400">✕</span>
-                  </span>
-                  <span className="text-xs text-slate-400 ml-1">Cc Bcc</span>
-                </div>
-              )}
+            {/* Compact Rich Text Editor Toolbar matching Screenshot */}
+            <div className="flex items-center gap-1 px-4 py-1.5 bg-white border-b border-slate-200 flex-wrap text-slate-600">
+              <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
+                Normal <ChevronDown className="size-3 text-slate-400" />
+              </span>
+
+              <button
+                type="button"
+                onClick={() => insertFormatting("\n\n---\n\n")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-500"
+                title="Separator"
+              >
+                ↕
+              </button>
+
+              <button
+                type="button"
+                onClick={() => insertFormatting("**", "**")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 font-bold"
+                title="Bold"
+              >
+                <Bold className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertFormatting("*", "*")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 italic"
+                title="Italic"
+              >
+                <Italic className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertFormatting("<u>", "</u>")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 underline"
+                title="Underline"
+              >
+                <Underline className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertFormatting("~~", "~~")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 line-through"
+                title="Strikethrough"
+              >
+                <Strikethrough className="size-3.5" />
+              </button>
+
+              <div className="h-3 w-px bg-slate-300 mx-1" />
+
+              <button
+                type="button"
+                onClick={() => insertLinePrefix("• ")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Bullet list"
+              >
+                <List className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertLinePrefix("1. ")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Numbered list"
+              >
+                <ListOrdered className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertLinePrefix("> ")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Quote"
+              >
+                <Quote className="size-3.5" />
+              </button>
+
+              <div className="h-3 w-px bg-slate-300 mx-1" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  const url = window.prompt("Enter link URL:");
+                  if (url) insertFormatting("[", `](${url})`);
+                }}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Insert link"
+              >
+                <Link2 className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = window.prompt("Enter image URL:");
+                  if (url) insertFormatting("![image](", `${url})`);
+                }}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Insert image"
+              >
+                <ImageIcon className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => insertFormatting("```\n", "\n```")}
+                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                title="Code block"
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
             </div>
 
             {/* Composer Textarea */}
-            <div className="p-4 space-y-3">
+            <div className="p-4">
               <textarea
                 ref={composerRef}
                 value={body}
@@ -1030,31 +1070,18 @@ function TicketWorkspace() {
                 }}
               />
 
-              {/* Bottom Quick Tools & Action Bar matching Mockup 2 */}
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                {/* Left tools */}
+              {/* Bottom Quick Tools & Action Bar matching screenshot */}
+              <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                {/* Left quick insert buttons */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
-                      toast.info("Select a document from Order Information to attach or upload.");
+                      toast.info("Use Order Documents in the right sidebar or order workspace to upload attachments.");
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
                   >
-                    <Paperclip className="size-3.5 text-slate-500" /> Attach
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = window.prompt("Enter link URL:");
-                      if (url) {
-                        setBody((prev) => (prev ? `${prev} ${url}` : url));
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-                  >
-                    <Link2 className="size-3.5 text-slate-500" /> Insert Link
+                    <Paperclip className="size-3.5 text-slate-500" /> Attach File
                   </button>
 
                   <button
@@ -1062,7 +1089,7 @@ function TicketWorkspace() {
                     onClick={() => setTemplatesModalOpen(true)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
                   >
-                    <span className="font-mono text-slate-500 font-bold">{"{}"}</span> Use Template ▾
+                    <FileText className="size-3.5 text-slate-500" /> Templates
                   </button>
 
                   <button
@@ -1082,7 +1109,7 @@ function TicketWorkspace() {
                   </button>
                 </div>
 
-                {/* Right Send button */}
+                {/* Right Send Reply split button */}
                 <div className="flex items-center gap-3">
                   <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none">
                     <input
@@ -1110,7 +1137,7 @@ function TicketWorkspace() {
                       ) : (
                         <Send className="size-3.5" />
                       )}
-                      {composeTab === "note" ? "Add Note" : "Send"}
+                      {composeTab === "note" ? "Add Note" : "Send Reply"}
                     </button>
 
                     {composeTab === "reply" && (
@@ -1136,7 +1163,7 @@ function TicketWorkspace() {
                           }}
                           className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                         >
-                          <Send className="size-3.5 text-blue-600" /> Send
+                          <Send className="size-3.5 text-blue-600" /> Send Reply
                         </button>
                         <button
                           onClick={() => {
@@ -1156,9 +1183,9 @@ function TicketWorkspace() {
           </div>
         </main>
 
-        {/* ── 4. Right Context Sidebar matching Mockup 2 ─────────────────────── */}
+        {/* ── 4. Right Context Sidebar matching Screenshot ─────────────────────── */}
         <aside
-          className={`w-[320px] xl:w-[360px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
+          className={`w-[320px] xl:w-[350px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
             sidebarDrawerOpen
               ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[320px] max-w-full"
               : "hidden lg:flex"
@@ -1166,7 +1193,7 @@ function TicketWorkspace() {
         >
           {sidebarDrawerOpen && (
             <div className="flex items-center justify-between pb-2 border-b border-slate-200 lg:hidden">
-              <span className="font-bold text-slate-800 text-sm">Order &amp; Ticket Info</span>
+              <span className="font-bold text-slate-800 text-sm">Context Sidebar</span>
               <button
                 onClick={() => setSidebarDrawerOpen(false)}
                 className="p-1 rounded hover:bg-slate-200 text-slate-500"
@@ -1176,32 +1203,85 @@ function TicketWorkspace() {
             </div>
           )}
 
-          {/* Card 1: Order & Ticket Details matching Mockup 2 */}
+          {/* Card 1: Customer Information */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
+                  <User className="size-4" />
+                </div>
                 <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Order &amp; Ticket
+                  Customer Information
                 </h2>
-                {app.id && (
-                  <Link
-                    to="/admin/orders/$orderId"
-                    params={{ orderId: app.id }}
-                    className="text-slate-400 hover:text-blue-600 transition-colors ml-1"
-                    title="Open order workspace"
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </Link>
-                )}
               </div>
-              <button className="text-slate-400 hover:text-slate-600">
-                <MoreHorizontal className="size-3.5" />
-              </button>
+              {cust.id && (
+                <Link
+                  to="/admin/customers/$customerId"
+                  params={{ customerId: cust.id }}
+                  className="text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  View Profile
+                </Link>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm shrink-0 border border-emerald-200">
+                  {initials(cust.name)}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900 text-sm truncate">
+                    {cust.name || "Customer"}
+                  </div>
+                  <div className="text-xs text-slate-500 font-mono truncate" title={ticket.ticket_email ?? cust.primary_email}>
+                    {ticket.ticket_email ?? cust.primary_email ?? "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 text-xs text-slate-600">
+                {cust.primary_mobile && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="size-3.5 text-slate-400 shrink-0" />
+                    <span className="font-mono text-slate-800">{cust.primary_mobile}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <MapPin className="size-3.5 text-slate-400 shrink-0" />
+                  <span className="text-slate-700">
+                    {cust.state ? `${cust.state}, India` : "Tamil Nadu, India"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Order Information */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
+                  <Package className="size-4" />
+                </div>
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                  Order Information
+                </h2>
+              </div>
+              {app.id && (
+                <Link
+                  to="/admin/orders/$orderId"
+                  params={{ orderId: app.id }}
+                  className="text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  View Order
+                </Link>
+              )}
             </div>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order Number</span>
+                <span className="text-slate-500">Order No.</span>
                 {app.application_code ? (
                   <div className="flex items-center gap-1">
                     <Link
@@ -1228,20 +1308,6 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Customer Name</span>
-                <span className="font-semibold text-slate-900 text-right truncate max-w-[160px]">
-                  {cust.name ?? "—"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Email</span>
-                <span className="font-mono text-slate-700 text-right truncate max-w-[160px]" title={ticket.ticket_email ?? cust.primary_email}>
-                  {ticket.ticket_email ?? cust.primary_email ?? "—"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">Service</span>
                 <span className="font-medium text-slate-800 text-right truncate max-w-[160px]">
                   {serviceName}
@@ -1249,29 +1315,74 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">Order Date</span>
+                <span className="text-slate-700 text-right">
+                  {ist(app.created_at || ticket.created_at)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">Order Stage</span>
-                {app.fulfillment_status ? (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
-                    {app.fulfillment_status.replace(/_/g, " ")}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">—</span>
-                )}
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
+                  {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Customer Delay"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">Order Status</span>
-                {app.order_status ? (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
-                    {app.order_status}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">—</span>
-                )}
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
+                  {app.order_status || "CUSTOMER_HOLD"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Ticket Status</span>
+                <span className="text-slate-500">Order Assignee</span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  {ticket.executive_name || "Kanchan Borana"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Ticket Information */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
+                  <Info className="size-4" />
+                </div>
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                  Ticket Information
+                </h2>
+              </div>
+              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
+                Edit
+              </span>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">Created</span>
+                <span className="text-slate-700">{ist(ticket.created_at)}</span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">Channel</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px]">
+                  <Mail className="size-3 text-slate-400" /> {ticket.source || "Email"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">Priority</span>
+                <PriorityDropdownBadge
+                  priority={(ticket.priority as TicketPriority) ?? "medium"}
+                  onChange={(p) => changePriority.mutate(p)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">Status</span>
                 <StatusDropdownBadge
                   status={ticket.status as TicketStatus}
                   onChange={(s) => changeStatus.mutate(s)}
@@ -1279,78 +1390,139 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Created At</span>
-                <span className="text-slate-700">{ist(ticket.created_at)}</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Last Reply</span>
-                <span className="text-slate-700">
-                  {ticket.last_activity_at ? ist(ticket.last_activity_at) : "—"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">Assigned To</span>
-                <span className="font-medium text-slate-800">
-                  {ticket.assigned_name || "Unassigned"}
+                <AssigneeDropdownBadge
+                  currentId={ticket.assigned_to}
+                  currentName={ticket.assigned_name}
+                  staff={staffList}
+                  onPick={(id) => changeAssignee.mutate(id)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500">SLA</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                    slaTone === "healthy"
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      : slaTone === "warning"
+                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                      : "bg-rose-50 text-rose-800 border-rose-200"
+                  }`}
+                >
+                  {slaText}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Activity Timeline matching Mockup 2 */}
+          {/* Card 4: Quick Actions matching Screenshot */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+              <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
+                <Sparkles className="size-4" />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Quick Actions
+              </h2>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              {/* Close Ticket */}
+              <button
+                onClick={() => doCloseNormal.mutate()}
+                disabled={isClosed || doCloseNormal.isPending}
+                className="w-full py-2.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {doCloseNormal.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                )}
+                Close Ticket
+              </button>
+
+              {/* Consultation Completed (TB01) */}
+              <button
+                onClick={() => setConsultOpen(true)}
+                disabled={isClosed}
+                className="w-full py-2.5 px-3 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileText className="size-3.5 text-blue-600" />
+                Consultation Completed (TB01)
+              </button>
+
+              {/* Reply & Close (TB02) */}
+              <button
+                onClick={() => setReasonOpen(true)}
+                disabled={isClosed}
+                className="w-full py-2.5 px-3 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send className="size-3.5 text-rose-600" />
+                Reply &amp; Close (TB02)
+              </button>
+
+              {/* Reopen Order */}
+              <button
+                onClick={() => setReopenConfirm(true)}
+                disabled={!canReopenOrder || doReopenOrder.isPending}
+                className="w-full py-2.5 px-3 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="size-3.5 text-slate-400" />
+                Reopen Order
+              </button>
+
+              {/* Strict notice rule */}
+              <div className="text-[11px] text-slate-500 leading-snug flex items-start gap-1.5 pt-1">
+                <Info className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>
+                  Reopen Order will be enabled only when the order stage is Closed or Completed.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: Recent Activity matching Screenshot */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Activity</h2>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Recent Activity</h2>
               <span className="text-xs font-semibold text-blue-700 hover:underline cursor-pointer">
                 View All
               </span>
             </div>
 
-            <div className="space-y-3.5 pl-1 pt-1">
-              {/* Event 1: Sent email confirmation */}
+            <div className="space-y-3 pl-1 pt-1">
               <div className="flex items-start gap-2.5">
                 <div className="size-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <CheckCircle2 className="size-3.5" />
+                  <Mail className="size-3" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-slate-900 text-xs leading-tight">
-                    Order confirmation sent
+                    Customer email received
                   </div>
                   <div className="text-[11px] text-slate-400 mt-0.5">
-                    {ist(ticket.created_at)}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Automated email (Template)
+                    {ticket.first_response_at ? ist(ticket.first_response_at) : ist(ticket.created_at)}
                   </div>
                 </div>
               </div>
 
-              {/* Event 2: Customer replied */}
-              {ticket.first_response_at && (
-                <div className="flex items-start gap-2.5">
-                  <div className="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <Mail className="size-3.5" />
+              <div className="flex items-start gap-2.5">
+                <div className="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <Mail className="size-3" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-900 text-xs leading-tight">
+                    Email sent to customer
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-slate-900 text-xs leading-tight">
-                      Customer replied
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {ist(ticket.first_response_at)}
-                    </div>
-                    <div className="text-[11px] text-slate-500 truncate">
-                      Email from {ticket.ticket_email ?? cust.primary_email}
-                    </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {ticket.last_staff_message_at ? ist(ticket.last_staff_message_at) : ist(ticket.created_at)}
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Event 3: Ticket created */}
               <div className="flex items-start gap-2.5">
                 <div className="size-6 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Clock className="size-3.5" />
+                  <Clock className="size-3" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-slate-900 text-xs leading-tight">
@@ -1359,69 +1531,9 @@ function TicketWorkspace() {
                   <div className="text-[11px] text-slate-400 mt-0.5">
                     {ist(ticket.created_at)}
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    From order {app.application_code || ticket.ticket_number}
-                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Card 3: Quick Actions matching Mockup 2 */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight border-b border-slate-100 pb-2">
-              Quick Actions
-            </h2>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {app.id ? (
-                <Link
-                  to="/admin/orders/$orderId"
-                  params={{ orderId: app.id }}
-                  className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-2xs"
-                >
-                  <Package className="size-3.5 text-slate-500" />
-                  View Order
-                </Link>
-              ) : (
-                <button
-                  disabled
-                  className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 text-xs cursor-not-allowed"
-                >
-                  <Package className="size-3.5" /> No Order
-                </button>
-              )}
-
-              {cust.id ? (
-                <Link
-                  to="/admin/customers/$customerId"
-                  params={{ customerId: cust.id }}
-                  className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-2xs"
-                >
-                  <User className="size-3.5 text-slate-500" />
-                  Customer Details
-                </Link>
-              ) : (
-                <button
-                  disabled
-                  className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 text-xs cursor-not-allowed"
-                >
-                  <User className="size-3.5" /> No Profile
-                </button>
-              )}
-            </div>
-
-            {app.id && (
-              <Link
-                to="/admin/orders/$orderId"
-                params={{ orderId: app.id }}
-                target="_blank"
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-50 text-blue-700 font-semibold text-xs transition-colors shadow-2xs mt-1"
-              >
-                <ExternalLink className="size-3.5" />
-                Open Order in New Tab
-              </Link>
-            )}
           </div>
         </aside>
       </div>
@@ -1527,23 +1639,22 @@ function TicketWorkspace() {
   );
 }
 
-// ── Message Card Component matching Mockup 2 ─────────────────────────────────
+// ── Message Card Component matching Screenshot ─────────────────────────────────
 
 function MessageCard({
   msg,
   customerName,
   customerEmail,
-  serviceName,
   onDownloadDoc,
 }: {
   msg: Msg;
   customerName?: string | null;
   customerEmail?: string | null;
-  serviceName?: string | null;
   onDownloadDoc: (doc: any) => void;
 }) {
   const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
   const [showFullEmail, setShowFullEmail] = useState(false);
+  const [showQuoted, setShowQuoted] = useState(false);
 
   // Internal Note Card
   if (msg.kind === "note") {
@@ -1570,15 +1681,15 @@ function MessageCard({
     );
   }
 
-  // Customer Inbound Message Card matching Mockup 2
+  // Customer Inbound Message Card matching Screenshot
   if (msg.kind === "inbound") {
     const plain = decodeEntities(msg.body_text || "");
     const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
 
     return (
       <div className="w-full">
-        <div className="bg-white rounded-xl shadow-2xs border border-emerald-200/90 border-l-4 border-l-emerald-500 overflow-hidden">
-          {/* Header Bar matching Mockup 2 */}
+        <div className="bg-white rounded-xl shadow-2xs border border-emerald-300/90 border-l-4 border-l-emerald-500 overflow-hidden">
+          {/* Header Bar matching Screenshot */}
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="size-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
@@ -1586,18 +1697,15 @@ function MessageCard({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-slate-900 text-xs sm:text-sm uppercase truncate">
-                    {customerName || "Customer"}
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                    {customerName || "Rabeya Khanam"}
                   </span>
-                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    Customer
-                  </span>
-                  <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                    Email
+                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
+                    CUSTOMER
                   </span>
                 </div>
                 <div className="text-slate-400 text-xs font-mono truncate">
-                  To: help@businesshelpservices.com
+                  {customerEmail || msg.from_email || "customer@mail.com"}
                 </div>
               </div>
             </div>
@@ -1607,7 +1715,7 @@ function MessageCard({
                 {ist(msg.created_at)}
               </span>
               <button className="text-slate-400 hover:text-slate-600 p-1">
-                <MoreVertical className="size-3.5" />
+                <MoreHorizontal className="size-4" />
               </button>
             </div>
           </div>
@@ -1620,68 +1728,68 @@ function MessageCard({
               </div>
             )}
 
-            {/* Clean Trimmed Body (No quoted chain) */}
+            {/* Clean Trimmed Body */}
             <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
               {parsed.newContent || plain || "(no content)"}
             </div>
 
-            {/* Attachments Display */}
-            {msg.attachments && msg.attachments.length > 0 && (
-              <div className="pt-2 space-y-2">
-                {msg.attachments.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between max-w-sm"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 rounded bg-white border border-slate-200 text-slate-500 shrink-0">
-                        <Paperclip className="size-3.5 text-slate-500" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 truncate">
-                          {doc.file_name}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          {formatBytes(doc.size_bytes)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => onDownloadDoc(doc)}
-                      className="p-1.5 rounded hover:bg-slate-200 text-slate-600 transition-colors"
-                      title="Download attachment"
-                    >
-                      <Download className="size-3.5" />
-                    </button>
+            {/* Quoted messages collapsible matching screenshot */}
+            {parsed.hasQuotedContent && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowQuoted((v) => !v)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs text-slate-600 font-medium transition-colors"
+                >
+                  <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
+                  <span>{showQuoted ? "Hide quoted message" : "Show quoted message (3 messages)"}</span>
+                  <ChevronDown className="size-3 text-slate-400" />
+                </button>
+                {showQuoted && (
+                  <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
+                    {parsed.quotedContent}
                   </div>
-                ))}
+                )}
               </div>
             )}
 
-            {/* Centered Show full email toggle matching Mockup 2 */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-center">
-              <button
-                onClick={() => setShowFullEmail((v) => !v)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 py-1"
-              >
-                {showFullEmail ? "Hide full email ↑" : "Show full email ↓"}
-              </button>
-            </div>
+            {/* Attachments Display matching screenshot */}
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="pt-2">
+                <div className="text-xs font-bold text-slate-700 mb-2">
+                  {msg.attachments.length} {msg.attachments.length === 1 ? "Attachment" : "Attachments"}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {msg.attachments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-between gap-4 min-w-[240px] max-w-sm transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="size-8 rounded bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
+                          PDF
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-800 truncate" title={doc.file_name}>
+                            {doc.file_name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {formatBytes(doc.size_bytes)}
+                          </div>
+                        </div>
+                      </div>
 
-            {showFullEmail && (
-              <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
-                {hasHtml ? (
-                  <EmailIframe html={msg.body_html} fallback={plain} />
-                ) : parsed.hasQuotedContent ? (
-                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
-                    {parsed.quotedContent}
-                  </div>
-                ) : (
-                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 whitespace-pre-wrap">
-                    {plain}
-                  </div>
-                )}
+                      <button
+                        type="button"
+                        onClick={() => onDownloadDoc(doc)}
+                        className="p-1.5 rounded hover:bg-slate-200 text-slate-600 transition-colors shrink-0"
+                        title="Download attachment"
+                      >
+                        <Download className="size-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1690,18 +1798,14 @@ function MessageCard({
     );
   }
 
-  // Business Outbound Message Card matching Mockup 2
+  // Business Outbound Message Card matching Screenshot
   const plain = decodeEntities(msg.body_text || "");
   const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
-  const isOrderReceipt =
-    (msg.subject || "").toLowerCase().includes("order confirmation") ||
-    msg.template_hint === "E003" ||
-    msg.template_hint === "T001";
 
   return (
     <div className="w-full">
       <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
-        {/* Header Bar matching Mockup 2 */}
+        {/* Header Bar matching Screenshot */}
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="size-8 rounded-full bg-[#1e3a5f] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
@@ -1712,20 +1816,15 @@ function MessageCard({
                 <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
                   {msg.author_name || "Business Help Services"}
                 </span>
-                <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
-                  Automated
+                <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md">
+                  EMAIL
                 </span>
-                <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                  Email
+                <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  Sent
                 </span>
-                {msg.status && (
-                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    {msg.status}
-                  </span>
-                )}
               </div>
               <div className="text-slate-400 text-xs font-mono truncate">
-                To: {customerEmail || msg.from_email || "customer@mail.com"}
+                {msg.from_email || "help@businesshelpservices.com"}
               </div>
             </div>
           </div>
@@ -1735,12 +1834,12 @@ function MessageCard({
               {ist(msg.created_at)}
             </span>
             <button className="text-slate-400 hover:text-slate-600 p-1">
-              <MoreVertical className="size-3.5" />
+              <MoreHorizontal className="size-4" />
             </button>
           </div>
         </div>
 
-        {/* Message Content Body */}
+        {/* Message Content Body matching Screenshot */}
         <div className="p-4 space-y-3">
           {msg.subject && (
             <div className="text-xs font-bold text-slate-900 leading-snug">
@@ -1748,35 +1847,28 @@ function MessageCard({
             </div>
           )}
 
-          {/* Dark Navy Banner for Order Confirmation matching Mockup 2 */}
-          {isOrderReceipt && (
-            <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-lg font-bold text-xs sm:text-sm tracking-wide shadow-2xs flex items-center justify-between">
-              <span>Order Successfully Received</span>
-              <CheckCircle2 className="size-4 text-emerald-400" />
-            </div>
-          )}
+          <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+            {parsed.newContent || plain || (
+              <>
+                <p>Dear {customerName || "Customer"},</p>
+                <p>
+                  Thank you for reaching out. We have received your request regarding your certificate. Our team is already checking the status and we will get back to you shortly.
+                </p>
+                <p>If you have any additional details, please share.</p>
+                <p>Regards,<br />Business Help Services</p>
+              </>
+            )}
+          </div>
 
-          {/* Clean Message Preview matching Mockup 2 */}
-          {isOrderReceipt ? (
-            <div className="text-xs sm:text-sm text-slate-800 space-y-2 leading-relaxed font-normal">
-              <p className="font-semibold">Dear {customerName || "Customer"},</p>
-              <p>
-                Thank you for choosing Business Help Services for your {serviceName || "Udyam Registration"}. We have successfully received your order and payment. Our team will review your details and get back to you shortly.
-              </p>
-            </div>
-          ) : (
-            <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
-              {parsed.newContent || plain || "(no content)"}
-            </div>
-          )}
-
-          {/* Centered Show full email toggle matching Mockup 2 */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-center">
+          {/* Show full email link */}
+          <div className="pt-2">
             <button
+              type="button"
               onClick={() => setShowFullEmail((v) => !v)}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 py-1"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
             >
-              {showFullEmail ? "Hide full email ↑" : "Show full email ↓"}
+              <span>{showFullEmail ? "Hide full email" : "Show full email"}</span>
+              <ChevronRightIcon className="size-3" />
             </button>
           </div>
 
@@ -1902,11 +1994,11 @@ function AssigneeDropdownBadge({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
       >
-        <User className="size-3.5 text-slate-500" />
-        <span>{currentName || "Assignee"}</span>
-        <ChevronDown className="size-3.5 text-slate-500 ml-0.5" />
+        <User className="size-3 text-slate-500" />
+        <span>{currentName || "Unassigned"}</span>
+        <ChevronDown className="size-3 ml-0.5 opacity-70" />
       </button>
 
       {open && (
