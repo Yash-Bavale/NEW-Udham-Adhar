@@ -13,10 +13,12 @@ export interface ParsedEmail {
   hasQuotedContent: boolean;
 }
 
-const GMAIL_QUOTE = /\bOn\s+[^\n]{1,200}\bwrote:\s*[\r\n]/i;
-const OUTLOOK_QUOTE = /\r?\n[-]{0,}\s*From:\s.+\r?\n(?:Sent|Date):\s/i;
+const GMAIL_QUOTE = /(?:\n|\.\s+|\s{2,}|\b)On\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s\S]{1,250}?\bwrote\s*:\s*/i;
+const GENERIC_ON_WROTE = /\bOn\s+[\s\S]{1,200}?\bwrote\s*:\s*/i;
+const OUTLOOK_QUOTE = /(?:\r?\n|\s{2,})[-]{0,}\s*From:\s.+?(?:Sent|Date):\s/i;
 const ORIGINAL_MSG = /[-]{2,}\s*Original Message\s*[-]{2,}/i;
 const FORWARDED_MSG = /[-]{2,}\s*Forwarded message\s*[-]{2,}/i;
+const ORDER_RECEIPT_QUOTE = /(?:\bOrder Successfully Received\b|\bThank you for choosing Business Help Services\b)/i;
 const SIG_DIVIDER = /\n[-_]{3,}\s*\n/;
 const SENT_FROM_DEVICE = /\n\s*(Sent from my (iPhone|iPad|Android|Samsung|BlackBerry)|Get Outlook for (iOS|Android))[^\n]*/i;
 
@@ -32,10 +34,16 @@ export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail
 
   let cutAt = -1;
 
-  const patterns: RegExp[] = [GMAIL_QUOTE, OUTLOOK_QUOTE, ORIGINAL_MSG, FORWARDED_MSG];
+  const patterns: RegExp[] = [GMAIL_QUOTE, GENERIC_ON_WROTE, OUTLOOK_QUOTE, ORIGINAL_MSG, FORWARDED_MSG];
   for (const rx of patterns) {
     const m = rx.exec(body);
     if (m && (cutAt === -1 || m.index < cutAt)) cutAt = m.index;
+  }
+
+  // Fallback: If "Order Successfully Received" is present further down in a customer reply
+  if (cutAt === -1) {
+    const m = ORDER_RECEIPT_QUOTE.exec(body);
+    if (m && m.index > 10) cutAt = m.index;
   }
 
   // Generic "> quoted" block: cut at the first quoted line that is followed
