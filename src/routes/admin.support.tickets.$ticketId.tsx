@@ -8,6 +8,7 @@ import {
   ArrowLeft, ChevronDown, CornerDownLeft, Loader2, Mail, MoreHorizontal,
   RotateCcw, Send, StickyNote, X, User, Package, Info, History,
   ExternalLink, AlertTriangle, MessageSquare, CheckCircle2, Clock,
+  Paperclip, Link2, Copy, Check, ChevronUp, Sparkles, MoreVertical, Eye, Phone
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import { replyToTicket, updateTicket, type TicketStatus, type TicketPriority } from "@/lib/crm/tickets.functions";
@@ -386,72 +387,93 @@ function TicketWorkspace() {
       rendered.push({ divider: d });
       lastDate = d;
     }
-    lastTime = t;
-    rendered.push({ msg: m });
-  }
+  const [sidebarView, setSidebarView] = useState<"overview" | "tabs">("overview");
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex bg-slate-50 min-w-0 overflow-hidden">
-      {/* ── Column B — Conversation ───────────────────────── */}
+    <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex bg-slate-100 min-w-0 overflow-hidden">
+      {/* ── Center Section — Conversation ─────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col h-full bg-white border-r border-slate-200 overflow-hidden">
-        {/* B1: Sticky header */}
-        <header className="border-b border-slate-200 px-4 py-3 shrink-0 bg-white">
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <button
-              onClick={() => navigate({ to: "/admin/support/tickets" })}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors mr-1"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Tickets
-            </button>
-            <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-xs">{ticket.ticket_number}</span>
-            <StatusBadge status={ticket.status} onChange={(s) => changeStatus.mutate(s)} />
-            <PriorityBadge
-              priority={(ticket.priority as TicketPriority) ?? "medium"}
-              onChange={(p) => changePriority.mutate(p)}
-            />
+        {/* B1: Modern Header (Matching Mockup) */}
+        <header className="border-b border-slate-200 px-5 py-3.5 shrink-0 bg-white shadow-2xs">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <button
+                onClick={() => navigate({ to: "/admin/support/tickets" })}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors"
+                title="Back to tickets list"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Back
+              </button>
+              
+              <h2 className="text-base font-bold text-slate-900 tracking-tight truncate flex items-center gap-2">
+                <span>{ticket.subject || "(no subject)"}</span>
+                {ticket.is_new && (
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold uppercase tracking-wide bg-rose-600 text-white shrink-0">
+                    NEW
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                {ticket.ticket_number}
+              </span>
+              <StatusBadge status={ticket.status} onChange={(s) => changeStatus.mutate(s)} />
+              <PriorityBadge
+                priority={(ticket.priority as TicketPriority) ?? "medium"}
+                onChange={(p) => changePriority.mutate(p)}
+              />
+            </div>
+          </div>
+
+          {/* Customer Metadata Strip */}
+          <div className="mt-2 text-xs text-slate-500 flex items-center gap-4 flex-wrap">
+            <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-slate-400" />
+              {cust.name ?? "Customer"}
+            </span>
+            <span className="font-mono text-slate-600 flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-slate-400" />
+              {ticket.ticket_email ?? cust.primary_email ?? "—"}
+            </span>
+            {cust.primary_mobile && (
+              <span className="font-mono text-slate-600 flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-slate-400" />
+                {cust.primary_mobile}
+              </span>
+            )}
             {app.application_code && (
               <Link
                 to="/admin/orders/$orderId"
                 params={{ orderId: app.id }}
-                className="font-mono text-xs font-semibold text-indigo-600 hover:underline bg-slate-100 hover:bg-indigo-50 px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1"
+                className="font-mono text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline bg-indigo-50/70 px-2 py-0.5 rounded-md border border-indigo-100 inline-flex items-center gap-1"
               >
-                <Package className="h-3 w-3" /> {app.application_code}
+                <Package className="h-3.5 w-3.5 text-indigo-500" />
+                Order: {app.application_code}
               </Link>
             )}
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wide">
-              {ticket.source ?? "internal"}
+            <span className="text-slate-400 inline-flex items-center gap-1 ml-auto text-[11px]">
+              <Clock className="h-3 w-3" /> Created: {ist(ticket.created_at)}
             </span>
-            <span className="text-slate-400 inline-flex items-center gap-1 ml-auto">
-              <Clock className="h-3 w-3" /> {ist(ticket.created_at)}
-            </span>
-          </div>
-          <h2 className="mt-2 text-base font-semibold text-slate-900 leading-snug">
-            {ticket.subject || "(no subject)"}
-          </h2>
-          <div className="mt-1 text-xs text-slate-500 flex items-center gap-3 flex-wrap">
-            <span className="font-medium text-slate-800">{cust.name ?? "Customer"}</span>
-            <span className="font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
-            {cust.primary_mobile && <span>{cust.primary_mobile}</span>}
-            {ticket.first_response_at && (
-              <span className="text-slate-400">First reply {rel(ticket.first_response_at)}</span>
-            )}
           </div>
         </header>
 
-        {/* B2: Action bar */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 flex-wrap shrink-0">
+        {/* B2: Action Bar (Matching Mockup) */}
+        <div className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200 px-5 py-2.5 flex items-center gap-2 flex-wrap shrink-0">
           <button
             onClick={openReply}
             disabled={isClosed}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1e3a5f] text-white text-xs font-medium hover:bg-[#152b47] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1e3a5f] text-white text-xs font-semibold hover:bg-[#152b47] disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-all"
           >
             <CornerDownLeft className="h-3.5 w-3.5" /> Reply
           </button>
+          
           <button
             onClick={openNote}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50 shadow-2xs transition-all"
           >
-            <StickyNote className="h-3.5 w-3.5" /> Internal Note
+            <StickyNote className="h-3.5 w-3.5 text-amber-500" /> Internal Note
           </button>
 
           <AssigneePicker
@@ -461,145 +483,192 @@ function TicketWorkspace() {
             onPick={(id) => changeAssignee.mutate(id)}
           />
 
-          <div className="flex-1" />
-
           {!isClosed && (
             <>
               <div className="relative">
                 <button
                   onClick={() => setCloseMenuOpen((v) => !v)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 shadow-2xs transition-all"
                 >
-                  Close <ChevronDown className="h-3 w-3" />
+                  Close <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
                 </button>
                 {closeMenuOpen && (
                   <div
-                    className="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-lg z-20 text-xs"
+                    className="absolute left-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-20 text-xs py-1 animate-in fade-in"
                     onMouseLeave={() => setCloseMenuOpen(false)}
                   >
                     <button
                       onClick={() => { setCloseMenuOpen(false); doCloseNormal.mutate(); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                     >
-                      <X className="h-3.5 w-3.5 text-slate-500" /> Close — No Action
+                      <X className="h-3.5 w-3.5 text-slate-400" /> Close — No Action
                     </button>
                     <button
                       onClick={() => { setCloseMenuOpen(false); setReasonOpen(true); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-rose-700 font-medium"
                     >
-                      <Mail className="h-3.5 w-3.5 text-slate-500" /> Close with Reply (TB02)
+                      <Mail className="h-3.5 w-3.5 text-rose-500" /> Close with Reply (TB02)
                     </button>
                     <button
                       onClick={() => { setCloseMenuOpen(false); setRestartConfirm(true); }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2"
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-emerald-700 font-medium"
                     >
-                      <RotateCcw className="h-3.5 w-3.5 text-slate-500" /> Close &amp; Restart Order
+                      <RotateCcw className="h-3.5 w-3.5 text-emerald-500" /> Close &amp; Restart Order
                     </button>
                   </div>
                 )}
               </div>
 
+              <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
+
               <button
                 onClick={() => setRestartConfirm(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium shadow-2xs transition-all"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Restart Order
               </button>
+              
               <button
                 onClick={() => setConsultOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-teal-600 text-white text-xs font-medium hover:bg-teal-700"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium shadow-2xs transition-all"
               >
                 TB01: Consultation Done
               </button>
+              
               <button
                 onClick={() => setReasonOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-medium hover:bg-rose-700"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium shadow-2xs transition-all"
               >
                 TB02: Reply w/ Reason (24h)
               </button>
-              <button
-                title="More actions (coming soon)"
-                className="p-1.5 rounded-md border border-slate-300 text-slate-500 hover:bg-slate-50"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
             </>
           )}
+
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              onClick={() => invalidate()}
+              className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
+              title="Refresh messages"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* B3: Thread */}
-        <div ref={threadRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
+        {/* B3: Conversation Thread Feed (Matching Mockup) */}
+        <div ref={threadRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-4 bg-slate-50/60">
           {rendered.length === 0 && (
-            <div className="text-center py-16 text-sm text-slate-500 flex flex-col items-center gap-2">
-              <MessageSquare className="h-8 w-8 text-slate-300" />
-              No messages yet. Start the conversation by clicking Reply.
+            <div className="text-center py-20 text-sm text-slate-500 flex flex-col items-center gap-2">
+              <MessageSquare className="h-10 w-10 text-slate-300" />
+              <p className="font-semibold text-slate-700">No messages in this ticket yet</p>
+              <p className="text-xs text-slate-400">Click Reply below to send an email to the customer.</p>
             </div>
           )}
           {rendered.map((r, i) =>
             r.divider ? (
-              <div key={`d-${i}`} className="flex items-center gap-3 my-2">
+              <div key={`d-${i}`} className="flex items-center gap-3 my-3">
                 <div className="flex-1 h-px bg-slate-200" />
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/60">
                   {r.divider}
                 </span>
                 <div className="flex-1 h-px bg-slate-200" />
               </div>
             ) : (
-              <MessageBubble key={r.msg!.id} msg={r.msg!} customerName={cust.name} />
+              <MessageBubble
+                key={r.msg!.id}
+                msg={r.msg!}
+                customerName={cust.name}
+                customerEmail={ticket.ticket_email ?? cust.primary_email}
+              />
             )
           )}
         </div>
 
-        {/* B4: Composer */}
-        <div className="border-t border-slate-200 bg-white shrink-0">
+        {/* B4: Redesigned Composer (Matching Mockup) */}
+        <div className="border-t border-slate-200 bg-white shrink-0 shadow-lg">
           {composeMode === null ? (
-            <button
-              onClick={openReply}
-              disabled={isClosed}
-              className="w-full text-left px-4 py-3 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <CornerDownLeft className="h-3.5 w-3.5" />
-              {isClosed ? "Ticket is closed — reopen to reply" : "Reply to customer…"}
-            </button>
+            <div className="p-3 bg-slate-50/50 flex items-center justify-between gap-3">
+              <button
+                onClick={openReply}
+                disabled={isClosed}
+                className="flex-1 text-left px-4 py-2.5 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-2xs transition-all font-medium"
+              >
+                <CornerDownLeft className="h-3.5 w-3.5 text-slate-400" />
+                {isClosed ? "Ticket is closed — reopen to reply" : "Click to reply to customer…"}
+              </button>
+
+              <button
+                onClick={openNote}
+                className="px-3.5 py-2.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg flex items-center gap-1.5 shadow-2xs transition-all"
+              >
+                <StickyNote className="h-3.5 w-3.5 text-amber-600" /> Note
+              </button>
+            </div>
           ) : (
-            <div className="p-3">
-              <div className="flex items-center gap-2 mb-2 text-xs">
-                <button
-                  onClick={() => setComposeMode("reply")}
-                  className={`px-2 py-1 rounded ${composeMode === "reply" ? "bg-[#1e3a5f] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                >
-                  <CornerDownLeft className="h-3 w-3 inline mr-1" /> Reply
-                </button>
-                <button
-                  onClick={() => setComposeMode("note")}
-                  className={`px-2 py-1 rounded ${composeMode === "note" ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-100"}`}
-                >
-                  <StickyNote className="h-3 w-3 inline mr-1" /> Internal Note
-                </button>
+            <div className="p-4 space-y-3">
+              {/* Composer Header & Recipient Info */}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 text-xs">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => setComposeMode("reply")}
+                    className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                      composeMode === "reply"
+                        ? "bg-[#1e3a5f] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <CornerDownLeft className="h-3 w-3 inline mr-1" /> Reply
+                  </button>
+                  <button
+                    onClick={() => setComposeMode("note")}
+                    className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                      composeMode === "note"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <StickyNote className="h-3 w-3 inline mr-1" /> Internal Note
+                  </button>
+                </div>
+
                 {composeMode === "reply" && (
-                  <span className="text-slate-500 ml-2">
-                    To: <span className="font-mono">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
-                  </span>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span>To:</span>
+                    <span className="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-[11px] font-medium">
+                      {ticket.ticket_email ?? cust.primary_email ?? "—"}
+                    </span>
+                    <span className="text-[11px] text-slate-400">Cc Bcc</span>
+                  </div>
                 )}
+
                 <button
-                  onClick={() => { setComposeMode(null); setBody(""); setSelectedTemplateId(null); setSelectedTemplateName(null); }}
-                  className="ml-auto text-slate-400 hover:text-slate-700"
+                  onClick={() => {
+                    setComposeMode(null);
+                    setBody("");
+                    setSelectedTemplateId(null);
+                    setSelectedTemplateName(null);
+                  }}
+                  className="size-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors ml-auto"
+                  title="Close composer"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
+              {/* Template pills / selector */}
               {composeMode === "reply" && (canned?.length ?? 0) > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                  <span className="text-[11px] text-slate-500 font-medium">📌 Templates:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                    <Sparkles className="size-3 text-indigo-500" /> Templates:
+                  </span>
                   {(canned ?? []).slice(0, 8).map((c: any) => (
                     <button
                       key={c.id}
                       onClick={() => applyTemplate(c.id)}
-                      className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
+                      className={`text-[11px] px-2.5 py-1 rounded-full border transition-all font-medium ${
                         selectedTemplateId === c.id
-                          ? "bg-blue-100 border-blue-400 text-blue-800"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-2xs"
                       }`}
                     >
                       {c.title}
@@ -609,21 +678,30 @@ function TicketWorkspace() {
               )}
 
               {selectedTemplateName && (
-                <div className="mb-2 text-[11px] bg-blue-50 border border-blue-200 text-blue-800 px-2 py-1 rounded flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3 w-3" /> Using template: {selectedTemplateName}
+                <div className="text-[11px] bg-indigo-50 border border-indigo-200 text-indigo-900 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-indigo-600" /> Applied template: {selectedTemplateName}
+                  </span>
+                  <button
+                    onClick={() => { setSelectedTemplateId(null); setSelectedTemplateName(null); }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800"
+                  >
+                    Clear
+                  </button>
                 </div>
               )}
 
+              {/* Textarea */}
               <textarea
                 ref={composerRef}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder={composeMode === "note" ? "Add an internal note (only staff can see this)…" : "Reply to customer…"}
-                rows={5}
-                className={`w-full text-sm px-3 py-2 border rounded-md focus:outline-none focus:ring-1 resize-y ${
+                placeholder={composeMode === "note" ? "Add an internal note (only visible to staff)…" : "Type your reply here…"}
+                rows={4}
+                className={`w-full text-sm px-3.5 py-2.5 border rounded-xl focus:outline-none focus:ring-2 resize-y transition-all ${
                   composeMode === "note"
-                    ? "bg-amber-50 border-amber-200 focus:ring-amber-400 focus:border-amber-400"
-                    : "border-slate-200 focus:ring-blue-500 focus:border-blue-500"
+                    ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 focus:border-amber-400"
+                    : "bg-white border-slate-200 focus:ring-blue-500 focus:border-blue-500"
                 }`}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
@@ -633,72 +711,389 @@ function TicketWorkspace() {
               />
 
               {body.includes("[MISSING:") && (
-                <div className="mt-2 text-[11px] bg-red-50 border border-red-200 text-red-700 px-2 py-1 rounded flex items-center gap-1.5">
-                  <AlertTriangle className="h-3 w-3" /> Missing variables — please review before sending.
+                <div className="text-[11px] bg-rose-50 border border-rose-200 text-rose-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-rose-500" /> Missing variables found in template — please fill before sending.
                 </div>
               )}
 
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">Ctrl+Enter to send</span>
-                <button
-                  onClick={() => sendReply.mutate()}
-                  disabled={!body.trim() || sendReply.isPending}
-                  title={!body.trim() ? "Type a message first" : ""}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1e3a5f] text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#152b47]"
-                >
-                  {sendReply.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  {composeMode === "note" ? "Add Note" : "Send Reply"}
-                </button>
+              {/* Bottom Composer Toolbar */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 shadow-2xs font-medium"
+                    title="Attach file (coming soon)"
+                  >
+                    <Paperclip className="size-3.5" /> Attach
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 shadow-2xs font-medium"
+                    title="Insert link (coming soon)"
+                  >
+                    <Link2 className="size-3.5" /> Insert Link
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                    Press <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] text-slate-600">Ctrl+Enter</kbd> to send
+                  </span>
+
+                  <button
+                    onClick={() => sendReply.mutate()}
+                    disabled={!body.trim() || sendReply.isPending}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e3a5f] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#152b47] shadow-xs transition-all"
+                  >
+                    {sendReply.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    {composeMode === "note" ? "Add Note" : "Send"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       </section>
 
-      {/* ── Column C — Info Panel ─────────────────────────── */}
-      <aside className="hidden lg:flex w-[340px] shrink-0 flex-col h-full bg-white border-l border-slate-200 overflow-hidden">
-        <div className="flex border-b border-slate-200 text-xs shrink-0 bg-white">
-          {(["details", "customer", "order", "history"] as const).map((t) => {
-            const Icon = t === "details" ? Info : t === "customer" ? User : t === "order" ? Package : History;
-            return (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2.5 flex items-center justify-center gap-1 capitalize font-medium transition-colors ${
-                  tab === t
-                    ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50/50"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" /> {t}
-              </button>
-            );
-          })}
+      {/* ── Column C — Info Panel (Matching Mockup) ───────── */}
+      <aside className="hidden lg:flex w-[340px] xl:w-[380px] shrink-0 flex-col h-full bg-slate-50 border-l border-slate-200 overflow-hidden">
+        {/* View Switcher Top Bar */}
+        <div className="p-3 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+            <button
+              onClick={() => setSidebarView("overview")}
+              className={`px-3 py-1 rounded-md transition-all ${
+                sidebarView === "overview"
+                  ? "bg-white text-slate-900 shadow-xs font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setSidebarView("tabs")}
+              className={`px-3 py-1 rounded-md transition-all ${
+                sidebarView === "tabs"
+                  ? "bg-white text-slate-900 shadow-xs font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Tabs &amp; Details
+            </button>
+          </div>
+
+          <span className="text-[11px] font-mono font-bold text-slate-400">
+            {ticket.ticket_number}
+          </span>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 text-xs">
-          {tab === "details" && (
-            <DetailsTab
-              ticket={ticket}
-              slaHours={Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 3600000)}
-            />
-          )}
-          {tab === "customer" && (
-            <CustomerTab
-              cust={cust}
-              customerStats={(data as any).customerStats}
-              hideFinancial={isSupportOnly}
-            />
-          )}
-          {tab === "order" && <OrderTab app={app} />}
-          {tab === "history" && (
-            <HistoryTab
-              previous={(data as any).previousTickets ?? []}
-              currentId={ticket.id}
-            />
+
+        {/* Sidebar Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 text-xs">
+          {sidebarView === "overview" ? (
+            <>
+              {/* Card 1: Order & Ticket Details (Matching Image 3) */}
+              <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    Order &amp; Ticket
+                    {app.id && (
+                      <Link
+                        to="/admin/orders/$orderId"
+                        params={{ orderId: app.id }}
+                        className="text-slate-400 hover:text-indigo-600 transition-colors"
+                        title="Open order"
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </Link>
+                    )}
+                  </h3>
+                  <button className="text-slate-400 hover:text-slate-600">
+                    <MoreHorizontal className="size-3.5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  {/* Order Number */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Order Number</span>
+                    {app.application_code ? (
+                      <span className="font-mono font-bold text-indigo-600 flex items-center gap-1">
+                        {app.application_code}
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(app.application_code);
+                            toast.success("Order number copied");
+                          }}
+                          className="text-slate-400 hover:text-slate-700"
+                          title="Copy order number"
+                        >
+                          <Copy className="size-3" />
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic">—</span>
+                    )}
+                  </div>
+
+                  {/* Customer Name */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Customer Name</span>
+                    <span className="font-semibold text-slate-900 truncate max-w-[180px]">
+                      {cust.name ?? "—"}
+                    </span>
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Email</span>
+                    <span className="font-mono text-slate-700 truncate max-w-[180px]" title={ticket.ticket_email ?? cust.primary_email}>
+                      {ticket.ticket_email ?? cust.primary_email ?? "—"}
+                    </span>
+                  </div>
+
+                  {/* Service */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Service</span>
+                    <span className="font-medium text-slate-800 truncate max-w-[180px]">
+                      {ticket.services?.service_name ?? app.services?.service_name ?? "—"}
+                    </span>
+                  </div>
+
+                  {/* Order Stage */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Order Stage</span>
+                    {app.fulfillment_status ? (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200 capitalize">
+                        {app.fulfillment_status.replace(/_/g, " ")}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </div>
+
+                  {/* Order Status */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Order Status</span>
+                    {app.order_status ? (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
+                        {app.order_status}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </div>
+
+                  {/* Ticket Status */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Ticket Status</span>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[11px] font-bold border"
+                      style={{ background: statusPill.bg, color: statusPill.fg }}
+                    >
+                      {statusPill.label}
+                    </span>
+                  </div>
+
+                  {/* Created At */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Created At</span>
+                    <span className="text-slate-700">{ist(ticket.created_at)}</span>
+                  </div>
+
+                  {/* Last Reply */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Last Reply</span>
+                    <span className="text-slate-700">
+                      {ticket.last_activity_at ? ist(ticket.last_activity_at) : "—"}
+                    </span>
+                  </div>
+
+                  {/* Assigned To */}
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500">Assigned To</span>
+                    <span className="font-medium text-slate-800">
+                      {ticket.assigned_name || "Unassigned"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Activity Timeline (Matching Image 3) */}
+              <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <h3 className="font-bold text-slate-900 text-sm">Activity</h3>
+                  <button
+                    onClick={() => setSidebarView("tabs")}
+                    className="text-xs font-semibold text-blue-700 hover:underline"
+                  >
+                    View All
+                  </button>
+                </div>
+
+                <div className="space-y-3.5 pl-1 pt-1">
+                  {/* Event 1: Sent email / confirmation */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                      <CheckCircle2 className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 text-xs leading-tight">
+                        Order confirmation sent
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {ist(ticket.created_at)}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Automated email (Template)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Event 2: Customer replied */}
+                  {ticket.first_response_at && (
+                    <div className="flex items-start gap-2.5">
+                      <div className="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <Mail className="size-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-slate-900 text-xs leading-tight">
+                          Customer replied
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {ist(ticket.first_response_at)}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          Email from {ticket.ticket_email ?? cust.primary_email}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Event 3: Ticket created */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-6 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
+                      <Clock className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-slate-900 text-xs leading-tight">
+                        Ticket created
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {ist(ticket.created_at)}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        From {ticket.source ?? "email channel"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Quick Actions (Matching Image 3) */}
+              <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
+                <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+                  Quick Actions
+                </h3>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {app.id ? (
+                    <Link
+                      to="/admin/orders/$orderId"
+                      params={{ orderId: app.id }}
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-2xs"
+                    >
+                      <Package className="size-3.5 text-slate-500" />
+                      View Order
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 text-xs cursor-not-allowed"
+                    >
+                      <Package className="size-3.5" /> No Order
+                    </button>
+                  )}
+
+                  {cust.id ? (
+                    <Link
+                      to="/admin/customers/$customerId"
+                      params={{ customerId: cust.id }}
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-2xs"
+                    >
+                      <User className="size-3.5 text-slate-500" />
+                      Customer
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 text-xs cursor-not-allowed"
+                    >
+                      <User className="size-3.5" /> No Profile
+                    </button>
+                  )}
+                </div>
+
+                {app.id && (
+                  <Link
+                    to="/admin/orders/$orderId"
+                    params={{ orderId: app.id }}
+                    target="_blank"
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs transition-colors shadow-2xs"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Open Order in New Tab
+                  </Link>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex border-b border-slate-200 text-xs shrink-0 bg-white rounded-lg p-1 border">
+                {(["details", "customer", "order", "history"] as const).map((t) => {
+                  const Icon = t === "details" ? Info : t === "customer" ? User : t === "order" ? Package : History;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTab(t)}
+                      className={`flex-1 py-1.5 flex items-center justify-center gap-1 capitalize font-medium rounded-md transition-colors ${
+                        tab === t
+                          ? "text-blue-700 bg-blue-50 font-bold shadow-2xs"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" /> {t}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
+                {tab === "details" && (
+                  <DetailsTab
+                    ticket={ticket}
+                    slaHours={Math.floor((Date.now() - new Date(ticket.created_at).getTime()) / 3600000)}
+                  />
+                )}
+                {tab === "customer" && (
+                  <CustomerTab
+                    cust={cust}
+                    customerStats={(data as any).customerStats}
+                    hideFinancial={isSupportOnly}
+                  />
+                )}
+                {tab === "order" && <OrderTab app={app} />}
+                {tab === "history" && (
+                  <HistoryTab
+                    previous={(data as any).previousTickets ?? []}
+                    currentId={ticket.id}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
       </aside>
@@ -743,27 +1138,32 @@ function TicketWorkspace() {
 
 // ── message bubble ─────────────────────────────────────────
 
-// ── message bubble ─────────────────────────────────────────
-
-function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string | null }) {
+function MessageBubble({
+  msg,
+  customerName,
+  customerEmail,
+}: {
+  msg: Msg;
+  customerName?: string | null;
+  customerEmail?: string | null;
+}) {
   const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
   const [viewMode, setViewMode] = useState<"html" | "text">(hasHtml ? "html" : "text");
+  const [showFullEmail, setShowFullEmail] = useState(false);
 
   if (msg.kind === "note") {
     return (
-      <div className="max-w-3xl mx-auto">
-        <div
-          className="rounded-lg p-3 shadow-sm"
-          style={{ background: "#fffbeb", borderLeft: "3px solid #f59e0b" }}
-        >
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-              <span>👁</span> {msg.author_name}
-              <span className="ml-1 text-[10px] font-medium bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded uppercase tracking-wide">
+      <div className="max-w-4xl mx-auto w-full">
+        <div className="rounded-xl p-4 shadow-2xs border border-amber-200/90 bg-amber-50/60 border-l-4 border-l-amber-500">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="font-bold text-amber-900 flex items-center gap-2">
+              <span className="p-1 rounded bg-amber-200 text-amber-950 text-[10px]">👁</span>
+              {msg.author_name}
+              <span className="text-[10px] font-bold bg-amber-200/90 text-amber-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Internal Note
               </span>
             </span>
-            <span className="text-amber-700/70">{ist(msg.created_at)}</span>
+            <span className="text-amber-800/70 text-[11px] font-medium">{ist(msg.created_at)}</span>
           </div>
           <div className="text-sm text-amber-950 whitespace-pre-wrap leading-relaxed">
             {msg.body_text}
@@ -778,71 +1178,98 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
     const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
 
     return (
-      <div className="max-w-3xl mr-auto w-full">
-        <div
-          className="bg-white rounded-lg p-3.5 shadow-sm border border-slate-200"
-          style={{ borderLeft: "4px solid #22c55e" }}
-        >
-          <div className="flex items-center justify-between text-xs mb-2.5 flex-wrap gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs"
-                style={{ background: "#16a34a" }}
-              >
+      <div className="max-w-4xl mr-auto w-full">
+        <div className="bg-white rounded-xl shadow-2xs border-2 border-emerald-500/80 overflow-hidden">
+          {/* Header Bar */}
+          <div className="bg-emerald-50/40 border-b border-emerald-100 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="size-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-emerald-600 shadow-2xs">
                 {initials(customerName)}
               </span>
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-                  {customerName || "Customer"}
-                  <span className="text-[10px] font-medium bg-green-100 text-green-800 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                    Received Email
+                <div className="font-bold text-slate-900 truncate flex items-center gap-2">
+                  <span>{customerName || "Customer"}</span>
+                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                    Customer
+                  </span>
+                  <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                    Email
                   </span>
                 </div>
-                <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "—"}</div>
+                <div className="text-slate-500 text-[11px] truncate">
+                  To: <span className="font-mono text-slate-700">help@businesshelpservices.com</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {hasHtml && (
-                <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded border border-slate-200 text-[10px]">
-                  <button
-                    onClick={() => setViewMode("html")}
-                    className={`px-2 py-0.5 rounded transition-colors ${
-                      viewMode === "html" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    🌐 Rich Email
-                  </button>
-                  <button
-                    onClick={() => setViewMode("text")}
-                    className={`px-2 py-0.5 rounded transition-colors ${
-                      viewMode === "text" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    📝 Text
-                  </button>
-                </div>
-              )}
-              <span className="text-slate-400 shrink-0 text-[11px]" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-slate-500 text-[11px] font-medium" title={ist(msg.created_at)}>
+                {ist(msg.created_at)}
+              </span>
+              <button className="text-slate-400 hover:text-slate-600">
+                <MoreVertical className="size-3.5" />
+              </button>
             </div>
           </div>
 
-          {msg.subject && (
-            <div className="text-xs font-semibold text-slate-800 mb-2 pb-1 border-b border-slate-100">
-              Subject: {msg.subject}
-            </div>
-          )}
-
-          {viewMode === "html" && hasHtml ? (
-            <EmailIframe html={msg.body_html} fallback={parsed.newContent} />
-          ) : (
-            <>
-              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed bg-slate-50/50 p-2.5 rounded border border-slate-100">
-                {parsed.newContent || "(no content)"}
+          {/* Subject & Body */}
+          <div className="p-4 space-y-2.5">
+            {msg.subject && (
+              <div className="text-xs font-bold text-slate-900 leading-snug">
+                {msg.subject}
               </div>
-              {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
-            </>
-          )}
+            )}
+
+            {/* Message Content */}
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+              {parsed.newContent || plain || "(no content)"}
+            </div>
+
+            {/* Expand / Quoted toggle */}
+            {(hasHtml || parsed.hasQuotedContent) && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={() => setShowFullEmail((v) => !v)}
+                  className="text-xs font-semibold text-blue-700 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  {showFullEmail ? "Hide full email ↑" : "Show full email ↓"}
+                </button>
+
+                {hasHtml && (
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <button
+                      onClick={() => setViewMode("html")}
+                      className={`px-2 py-0.5 rounded ${viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"}`}
+                    >
+                      Rich
+                    </button>
+                    <button
+                      onClick={() => setViewMode("text")}
+                      className={`px-2 py-0.5 rounded ${viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"}`}
+                    >
+                      Plain
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {showFullEmail && (
+              <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                {hasHtml && viewMode === "html" ? (
+                  <EmailIframe html={msg.body_html} fallback={parsed.newContent} />
+                ) : parsed.hasQuotedContent ? (
+                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 font-mono whitespace-pre-wrap">
+                    {parsed.quotedContent}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 whitespace-pre-wrap">
+                    {plain}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -851,83 +1278,120 @@ function MessageBubble({ msg, customerName }: { msg: Msg; customerName?: string 
   // outbound
   const plain = decodeEntities(msg.body_text || "");
   const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
+  const isOrderReceipt = (msg.subject || "").toLowerCase().includes("order confirmation") || (msg.template_hint === "E003" || msg.template_hint === "T001");
 
   return (
-    <div className="max-w-3xl ml-auto w-full">
-      <div
-        className="rounded-lg p-3.5 shadow-sm border border-slate-200"
-        style={{ background: "#f8fafc", borderRight: "4px solid #1e3a5f" }}
-      >
-        <div className="flex items-center justify-between text-xs mb-2.5 flex-wrap gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-xs"
-              style={{ background: "#1e3a5f" }}
-            >
+    <div className="max-w-4xl mr-auto w-full">
+      <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+        {/* Top Header Bar */}
+        <div className="bg-slate-50/80 border-b border-slate-100 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="size-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 bg-[#1e3a5f] shadow-2xs">
               BHS
             </span>
             <div className="min-w-0">
-              <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">
-                {msg.author_name || "Business Help Services"}
-                {msg.template_hint && (
-                  <span className="text-[10px] font-medium bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">
+              <div className="font-bold text-slate-900 truncate flex items-center gap-2">
+                <span>{msg.author_name || "Business Help Services"}</span>
+                {msg.template_hint ? (
+                  <span className="text-[10px] font-semibold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full font-mono">
                     {msg.template_hint}
                   </span>
+                ) : (
+                  <span className="text-[10px] font-semibold bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full">
+                    Automated
+                  </span>
                 )}
-                <span className="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                  Sent Email
+                <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                  Email
                 </span>
                 {msg.status && (
-                  <span className="text-[10px] font-medium bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded capitalize">
+                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full capitalize">
                     {msg.status}
                   </span>
                 )}
               </div>
-              <div className="text-slate-500 font-mono text-[10px] truncate">{msg.from_email ?? "help@businesshelpservices.com"}</div>
+              <div className="text-slate-500 text-[11px] truncate">
+                To: <span className="font-mono text-slate-700">{customerEmail || msg.from_email || "customer"}</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {hasHtml && (
-              <div className="flex items-center gap-0.5 bg-slate-200/70 p-0.5 rounded text-[10px]">
-                <button
-                  onClick={() => setViewMode("html")}
-                  className={`px-2 py-0.5 rounded transition-colors ${
-                    viewMode === "html" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  🌐 Rich Email
-                </button>
-                <button
-                  onClick={() => setViewMode("text")}
-                  className={`px-2 py-0.5 rounded transition-colors ${
-                    viewMode === "text" ? "bg-white text-blue-700 font-semibold shadow-xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  📝 Text
-                </button>
-              </div>
-            )}
-            <span className="text-slate-400 shrink-0 text-[11px]" title={ist(msg.created_at)}>{rel(msg.created_at)}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-slate-500 text-[11px] font-medium" title={ist(msg.created_at)}>
+              {ist(msg.created_at)}
+            </span>
+            <button className="text-slate-400 hover:text-slate-600">
+              <MoreVertical className="size-3.5" />
+            </button>
           </div>
         </div>
 
-        {msg.subject && (
-          <div className="text-xs font-semibold text-slate-800 mb-2 pb-1 border-b border-slate-200/60">
-            Subject: {msg.subject}
-          </div>
-        )}
-
-        {viewMode === "html" && hasHtml ? (
-          <EmailIframe html={msg.body_html} fallback={msg.body_text} />
-        ) : (
-          <>
-            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed bg-white p-2.5 rounded border border-slate-200/60 shadow-2xs">
-              {parsed.newContent || msg.body_text || "(no content)"}
+        {/* Content Body */}
+        <div className="p-4 space-y-3">
+          {msg.subject && (
+            <div className="text-xs font-bold text-slate-900 leading-snug">
+              {msg.subject}
             </div>
-            {parsed.hasQuotedContent && <QuotedToggle text={parsed.quotedContent} />}
-          </>
-        )}
+          )}
+
+          {/* Dark Navy Banner matching Image 3 */}
+          {isOrderReceipt && (
+            <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-lg font-bold text-xs tracking-wide shadow-2xs flex items-center justify-between">
+              <span>Order Successfully Received</span>
+              <CheckCircle2 className="size-3.5 text-emerald-400" />
+            </div>
+          )}
+
+          {/* Message Content */}
+          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+            {parsed.newContent || msg.body_text || "(no content)"}
+          </div>
+
+          {/* Expand / Quoted toggle */}
+          {(hasHtml || parsed.hasQuotedContent) && (
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={() => setShowFullEmail((v) => !v)}
+                className="text-xs font-semibold text-blue-700 hover:text-blue-800 hover:underline flex items-center gap-1"
+              >
+                {showFullEmail ? "Hide full email ↑" : "Show full email ↓"}
+              </button>
+
+              {hasHtml && (
+                <div className="flex items-center gap-1 text-[11px]">
+                  <button
+                    onClick={() => setViewMode("html")}
+                    className={`px-2 py-0.5 rounded ${viewMode === "html" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"}`}
+                  >
+                    Rich
+                  </button>
+                  <button
+                    onClick={() => setViewMode("text")}
+                    className={`px-2 py-0.5 rounded ${viewMode === "text" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-500"}`}
+                  >
+                    Plain
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showFullEmail && (
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+              {hasHtml && viewMode === "html" ? (
+                <EmailIframe html={msg.body_html} fallback={msg.body_text} />
+              ) : parsed.hasQuotedContent ? (
+                <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 font-mono whitespace-pre-wrap">
+                  {parsed.quotedContent}
+                </div>
+              ) : (
+                <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 whitespace-pre-wrap">
+                  {plain}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

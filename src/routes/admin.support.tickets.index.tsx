@@ -5,7 +5,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, Inbox, Plus, UserCheck, CheckCircle2,
-  AlertCircle, Clock, ShieldAlert, Sparkles, MessageSquare, Tag, Flag
+  AlertCircle, Clock, ShieldAlert, Sparkles, MessageSquare, Tag, Flag,
+  MoreVertical, Copy, ExternalLink, Eye
 } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
@@ -466,38 +467,33 @@ function SupportTicketsOperationsPage() {
     dateTo !== "" ||
     sortField !== "last_activity";
 
-  const colCount = 12;
+  const colCount = 13;
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-[1700px] mx-auto min-w-0">
+    <div className="p-4 md:p-6 space-y-4 w-full min-w-0">
       {/* ── 1. Top Header ───────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-[#1e3a5f] text-white shadow-xs">
-              <Inbox className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                Support / Tickets
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                  {total.toLocaleString("en-IN")} Total
-                </span>
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Dense operational ticket management with real-time customer conversation sync.
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-[#1e3a5f] text-white shadow-sm flex items-center justify-center">
+            <Inbox className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+              Support / Tickets
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5 font-normal">
+              Manage customer conversations, resolve issues and <span className="text-emerald-600 font-medium">deliver better support</span>.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Button
             size="sm"
             variant="outline"
             onClick={() => invalidate()}
             disabled={isFetching}
-            className="h-8 text-xs text-slate-700 bg-white border-slate-200 hover:bg-slate-50"
+            className="h-9 px-3.5 text-xs font-medium text-slate-700 bg-white border-slate-200 hover:bg-slate-50 shadow-2xs rounded-lg transition-all"
           >
             <RotateCcw className={`size-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
@@ -506,7 +502,7 @@ function SupportTicketsOperationsPage() {
           <Button
             size="sm"
             onClick={() => setAddTicketOpen(true)}
-            className="h-8 text-xs font-medium bg-[#1e3a5f] hover:bg-[#152b47] text-white shadow-xs"
+            className="h-9 px-4 text-xs font-semibold bg-[#1e3a5f] hover:bg-[#152b47] text-white shadow-xs rounded-lg transition-all"
           >
             <Plus className="size-3.5 mr-1.5" />
             New Ticket
@@ -514,8 +510,8 @@ function SupportTicketsOperationsPage() {
         </div>
       </div>
 
-      {/* ── 2. Clickable KPI / Bucket Chips ─────────────────── */}
-      <div className="flex flex-wrap gap-2 pt-1">
+      {/* ── 2. Clickable KPI Stat Cards (Matching Mockup) ─────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
           let count = statsData?.total ?? 0;
@@ -527,7 +523,75 @@ function SupportTicketsOperationsPage() {
           else if (b.id === "open") count = statsData?.open ?? 0;
           else if (b.id === "closed") count = statsData?.closed ?? 0;
 
-          const isUrgentTone = (b.id === "new" || b.id === "unread" || b.id === "awaiting_action") && count > 0;
+          // Distinct color themes per bucket
+          const themeMap: Record<Bucket, { bg: string; border: string; activeBorder: string; text: string; countColor: string; icon: string }> = {
+            all: {
+              bg: "bg-white",
+              border: "border-slate-200",
+              activeBorder: "ring-2 ring-slate-900 border-slate-900 bg-slate-50",
+              text: "text-slate-600",
+              countColor: "text-slate-900",
+              icon: "📁",
+            },
+            new: {
+              bg: "bg-rose-50/50 hover:bg-rose-50",
+              border: "border-rose-100",
+              activeBorder: "ring-2 ring-rose-500 border-rose-400 bg-rose-50",
+              text: "text-rose-700",
+              countColor: "text-rose-600",
+              icon: "🚨",
+            },
+            unread: {
+              bg: "bg-rose-50/40 hover:bg-rose-50",
+              border: "border-rose-100",
+              activeBorder: "ring-2 ring-rose-500 border-rose-400 bg-rose-50",
+              text: "text-rose-700",
+              countColor: "text-rose-600",
+              icon: "✉️",
+            },
+            awaiting_action: {
+              bg: "bg-amber-50/40 hover:bg-amber-50",
+              border: "border-amber-100",
+              activeBorder: "ring-2 ring-amber-500 border-amber-400 bg-amber-50",
+              text: "text-amber-700",
+              countColor: "text-amber-600",
+              icon: "⚡",
+            },
+            awaiting_customer: {
+              bg: "bg-sky-50/40 hover:bg-sky-50",
+              border: "border-sky-100",
+              activeBorder: "ring-2 ring-sky-500 border-sky-400 bg-sky-50",
+              text: "text-sky-700",
+              countColor: "text-sky-600",
+              icon: "⏳",
+            },
+            replied: {
+              bg: "bg-purple-50/40 hover:bg-purple-50",
+              border: "border-purple-100",
+              activeBorder: "ring-2 ring-purple-500 border-purple-400 bg-purple-50",
+              text: "text-purple-700",
+              countColor: "text-purple-600",
+              icon: "💬",
+            },
+            open: {
+              bg: "bg-blue-50/40 hover:bg-blue-50",
+              border: "border-blue-100",
+              activeBorder: "ring-2 ring-blue-500 border-blue-400 bg-blue-50",
+              text: "text-blue-700",
+              countColor: "text-blue-600",
+              icon: "📂",
+            },
+            closed: {
+              bg: "bg-emerald-50/40 hover:bg-emerald-50",
+              border: "border-emerald-100",
+              activeBorder: "ring-2 ring-emerald-500 border-emerald-400 bg-emerald-50",
+              text: "text-emerald-700",
+              countColor: "text-emerald-600",
+              icon: "✅",
+            },
+          };
+
+          const theme = themeMap[b.id] ?? themeMap.all;
 
           return (
             <button
@@ -537,119 +601,33 @@ function SupportTicketsOperationsPage() {
                 setBucket(b.id);
                 setStatusFilter("all");
                 setResponseStateFilter("all");
+                setPage(1);
               }}
-              className={`inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-medium transition-all border shadow-xs ${
-                active
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : isUrgentTone
-                  ? "bg-white text-slate-800 border-rose-200 hover:bg-rose-50/50"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-              }`}
+              className={`p-3 rounded-xl text-left transition-all border shadow-2xs cursor-pointer flex flex-col justify-between ${
+                theme.bg
+              } ${active ? theme.activeBorder : theme.border}`}
             >
-              <span>{b.label}</span>
-              <span
-                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                  active
-                    ? "bg-slate-800 text-white"
-                    : isUrgentTone
-                    ? "bg-rose-100 text-rose-800"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className={`text-[11px] font-semibold truncate ${theme.text}`}>
+                  {b.label}
+                </span>
+                <span className="text-xs opacity-75">{theme.icon}</span>
+              </div>
+              <div className={`text-xl font-extrabold tracking-tight ${theme.countColor}`}>
                 {count.toLocaleString("en-IN")}
-              </span>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* ── 3. Filters Toolbar ──────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs space-y-2.5">
+      {/* ── 3. Filters Toolbar (Matching Mockup) ─────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3">
+        {/* Row 1: Dropdown Filters & Date Range */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-[260px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ticket, customer, email, mobile, order number, subject…"
-              className="h-9 pl-8 pr-8 text-xs bg-slate-50/50 border-slate-200 focus:bg-white"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Response State Filter */}
-          <Select value={responseStateFilter} onValueChange={setResponseStateFilter}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Response State" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Responses</SelectItem>
-              <SelectItem value="new">NEW (Unreplied)</SelectItem>
-              <SelectItem value="unread">Unread by Staff</SelectItem>
-              <SelectItem value="awaiting_action">Awaiting Action</SelectItem>
-              <SelectItem value="awaiting_customer">Awaiting Customer</SelectItem>
-              <SelectItem value="replied">Staff Replied</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Ticket Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Ticket Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {TICKET_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {STATUS_PILL[s].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Priority Filter */}
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="h-9 w-[125px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {PRIORITIES.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {PRIORITY_PILL[p].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Assigned Staff Filter */}
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Assigned Staff" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Staff</SelectItem>
-              <SelectItem value="unassigned">❌ Unassigned</SelectItem>
-              {staffProfiles.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>
-                  👤 {s.display_name || s.name || s.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           {/* Service Filter */}
-          <Select value={serviceId} onValueChange={setServiceId}>
-            <SelectTrigger className="h-9 w-[220px] text-xs bg-slate-50/50 border-slate-200">
+          <Select value={serviceId} onValueChange={(v) => { setServiceId(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
               <SelectValue placeholder="All Services" />
             </SelectTrigger>
             <SelectContent className="max-h-[380px]">
@@ -670,9 +648,9 @@ function SupportTicketsOperationsPage() {
           </Select>
 
           {/* Order Stage Filter */}
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue placeholder="Order Stage" />
+          <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+              <SelectValue placeholder="All Order Stages" />
             </SelectTrigger>
             <SelectContent>
               {STAGE_FILTER_OPTIONS.map((st) => (
@@ -680,6 +658,68 @@ function SupportTicketsOperationsPage() {
                   {st.label}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          {/* Priority Filter */}
+          <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+              <SelectValue placeholder="All Priorities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priorities</SelectItem>
+              {PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {PRIORITY_PILL[p].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Ticket Status Filter */}
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[135px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {TICKET_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {STATUS_PILL[s].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Assigned Staff Filter */}
+          <Select value={assignedTo} onValueChange={(v) => { setAssignedTo(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[135px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+              <SelectValue placeholder="All Staff" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Staff</SelectItem>
+              <SelectItem value="unassigned">❌ Unassigned</SelectItem>
+              {staffProfiles.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  👤 {s.display_name || s.name || s.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Response State Filter */}
+          <Select value={responseStateFilter} onValueChange={(v) => { setResponseStateFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-9 w-[145px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+              <SelectValue placeholder="All Responses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Responses</SelectItem>
+              <SelectItem value="new">NEW (Unreplied)</SelectItem>
+              <SelectItem value="unread">Unread by Staff</SelectItem>
+              <SelectItem value="awaiting_action">Awaiting Action</SelectItem>
+              <SelectItem value="awaiting_customer">Awaiting Customer</SelectItem>
+              <SelectItem value="replied">Staff Replied</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
 
@@ -697,36 +737,128 @@ function SupportTicketsOperationsPage() {
                 setDateFrom(istDateKey(range.from));
                 setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
               }
+              setPage(1);
             }}
           />
-
-          {/* Sort Selector */}
-          <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
-            <SelectTrigger className="h-9 w-[165px] text-xs bg-slate-50/50 border-slate-200">
-              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
-              <SelectValue placeholder="Sort order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="last_activity">Latest Activity First</SelectItem>
-              <SelectItem value="newest">Created (Newest)</SelectItem>
-              <SelectItem value="oldest">Created (Oldest)</SelectItem>
-              <SelectItem value="highest_priority">Highest Priority</SelectItem>
-              <SelectItem value="unassigned">Unassigned First</SelectItem>
-              <SelectItem value="updated">Recently Updated</SelectItem>
-            </SelectContent>
-          </Select>
 
           {/* Reset button */}
           {isFiltering && (
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               onClick={handleResetFilters}
-              className="h-9 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              className="h-9 px-3 text-xs text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-50"
             >
-              <X className="size-3.5 mr-1" /> Reset
+              <X className="size-3.5 mr-1 text-slate-400" /> Clear
             </Button>
           )}
+        </div>
+
+        {/* Row 2: Search, Sort & Counter / Pagination */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+            {/* Search Box */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Search ticket, customer, email, mobile, order no, subject…"
+                className="h-8 pl-8 pr-8 text-xs bg-slate-50/50 border-slate-200 focus:bg-white rounded-lg"
+              />
+              {search && (
+                <button
+                  onClick={() => { setSearch(""); setPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Sort Selector */}
+            <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
+              <SelectTrigger className="h-8 w-[165px] text-xs bg-slate-50/50 border-slate-200 rounded-lg">
+                <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+                <SelectValue placeholder="Sort order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="last_activity">Latest Activity First</SelectItem>
+                <SelectItem value="newest">Created (Newest)</SelectItem>
+                <SelectItem value="oldest">Created (Oldest)</SelectItem>
+                <SelectItem value="highest_priority">Highest Priority</SelectItem>
+                <SelectItem value="unassigned">Unassigned First</SelectItem>
+                <SelectItem value="updated">Recently Updated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Ticket Count & Compact Pagination */}
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span className="font-semibold text-slate-700">
+              {total.toLocaleString("en-IN")} {total === 1 ? "ticket" : "tickets"}
+            </span>
+
+            {total > pageSize && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="size-7 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-600"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="size-3.5" />
+                </button>
+
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, Math.ceil(total / pageSize)) }, (_, i) => {
+                  const pNum = i + 1;
+                  return (
+                    <button
+                      key={pNum}
+                      type="button"
+                      onClick={() => setPage(pNum)}
+                      className={`size-7 rounded-md text-xs font-medium transition-all ${
+                        page === pNum
+                          ? "bg-slate-900 text-white font-bold"
+                          : "border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  );
+                })}
+
+                {Math.ceil(total / pageSize) > 5 && (
+                  <>
+                    <span className="px-1 text-slate-400">…</span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(Math.ceil(total / pageSize))}
+                      className={`size-7 rounded-md text-xs font-medium ${
+                        page === Math.ceil(total / pageSize)
+                          ? "bg-slate-900 text-white font-bold"
+                          : "border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      {Math.ceil(total / pageSize)}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+                  disabled={page * pageSize >= total || isLoading}
+                  className="size-7 rounded-md border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-600"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -837,6 +969,7 @@ function SupportTicketsOperationsPage() {
                 <th className="text-left font-semibold px-3 py-2.5">Priority</th>
                 <th className="text-left font-semibold px-3 py-2.5">Assigned</th>
                 <th className="text-left font-semibold px-3 py-2.5">Last Activity</th>
+                <th className="w-10 px-2 py-2.5 text-center"></th>
               </tr>
             </thead>
             <tbody>
@@ -1180,6 +1313,18 @@ function TicketTableRow({
             {formatAge(Date.now() - new Date(ticket.last_activity_at).getTime())}
           </span>
         </div>
+      </td>
+
+      {/* Row Actions (3-dots) */}
+      <td className="w-10 px-2 py-2.5 text-center whitespace-nowrap" data-no-row-click onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onOpen(ticket.id)}
+          className="size-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors mx-auto"
+          title="Open ticket workspace"
+        >
+          <MoreVertical className="size-4" />
+        </button>
       </td>
     </tr>
   );
