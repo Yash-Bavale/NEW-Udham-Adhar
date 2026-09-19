@@ -360,6 +360,7 @@ function TicketWorkspace() {
   const [consultNote, setConsultNote] = useState("");
   const [reasonOpen, setReasonOpen] = useState(false);
   const [tab, setTab] = useState<"details" | "customer" | "order" | "history">("details");
+  const [sidebarView, setSidebarView] = useState<"overview" | "tabs">("overview");
 
   if (isLoading || !data) {
     return (
@@ -390,8 +391,6 @@ function TicketWorkspace() {
     rendered.push({ msg: m });
     lastTime = t;
   }
-
-  const [sidebarView, setSidebarView] = useState<"overview" | "tabs">("overview");
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex bg-slate-100 min-w-0 overflow-hidden">

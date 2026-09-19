@@ -118,6 +118,7 @@ function OrdersListPage() {
   const svcFn = useServerFn(listServices);
   const role = useRole();
   const userPerms = usePermissions();
+  const isAdmin = role.hasAny(["admin", "super_admin"]) || Boolean(userPerms.perms?.isAdmin);
 
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
@@ -135,7 +136,7 @@ function OrdersListPage() {
   const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
-  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? "all");
+  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? (isAdmin ? "all" : "needs_action"));
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
   const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
@@ -170,6 +171,19 @@ function OrdersListPage() {
     setPage(1);
   }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
 
+  const routeSearch = Route.useSearch();
+
+  // Ensure employees land on "needs_action" by default when permissions/roles resolve if no bucket was saved or in URL
+  const roleLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!role.loading && !userPerms.isLoading && !roleLoadedRef.current) {
+      roleLoadedRef.current = true;
+      if (!savedState?.bucket && !routeSearch.filter) {
+        setBucket(isAdmin ? "all" : "needs_action");
+      }
+    }
+  }, [role.loading, userPerms.isLoading, isAdmin, savedState?.bucket, routeSearch.filter]);
+
   // Listener to reset all filters when clicking "Orders" in leftbar
   useEffect(() => {
     const handleReset = () => {
@@ -184,7 +198,7 @@ function OrdersListPage() {
       setStageFilter("all");
       setDateFrom("");
       setDateTo("");
-      setBucket("all");
+      setBucket(isAdmin ? "all" : "needs_action");
       setPendingAge("any");
       setCustomDays("");
       setSortField("created_at");
@@ -196,9 +210,7 @@ function OrdersListPage() {
 
     window.addEventListener("reset-orders-filters", handleReset);
     return () => window.removeEventListener("reset-orders-filters", handleReset);
-  }, []);
-
-  const routeSearch = Route.useSearch();
+  }, [isAdmin]);
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs).
   useEffect(() => {
@@ -332,7 +344,6 @@ useEffect(() => {
   }
 }, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
 
-const isAdmin = role.hasAny(["admin", "super_admin"]);
 const bulkAssignFn = useServerFn(bulkAssignOrders);
 const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 const [assigningBusy, setAssigningBusy] = useState(false);
@@ -382,7 +393,7 @@ const isFilterActive =
   dateFrom !== "" ||
   dateTo !== "" ||
   pendingAge !== "any" ||
-  bucket !== "all";
+  bucket !== (isAdmin ? "all" : "needs_action");
 
 const resetFilters = () => {
   setSearch("");
@@ -399,7 +410,7 @@ const resetFilters = () => {
   setCustomDays("");
   setSortField("created_at");
   setSortOrder("desc");
-  setBucket("all");
+  setBucket(isAdmin ? "all" : "needs_action");
   setPage(1);
 };
 
