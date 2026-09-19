@@ -189,10 +189,15 @@ async function fetchRowsPaged<T>(queryBuilder: (from: number, to: number) => any
   for (let from = 0; from < maxRows; from += API_PAGE_SIZE) {
     try {
       const { data, error } = await queryBuilder(from, from + API_PAGE_SIZE - 1);
-      if (error || !data || data.length === 0) break;
+      if (error) {
+        console.error(`[fetchRowsPaged] Query error at offset ${from}:`, error);
+        break;
+      }
+      if (!data || data.length === 0) break;
       out.push(...(data as T[]));
       if (data.length < API_PAGE_SIZE) break;
-    } catch {
+    } catch (err) {
+      console.error(`[fetchRowsPaged] Exception at offset ${from}:`, err);
       break;
     }
   }

@@ -2,8 +2,8 @@
 // Mounted by both /admin/dashboard and /admin/super (super-mode adds quick actions).
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, keepPreviousData } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, memo } from "react";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, memo, useRef } from "react";
 import {
   ResponsiveContainer, ComposedChart, Bar, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
@@ -81,18 +81,23 @@ export function SuperAdminDashboard({
   onRangeChange: (r: DashboardRange) => void;
   title?: string;
 }) {
+  const queryClient = useQueryClient();
   const fetchKpis = useServerFn(getDashboardKpis);
   const fetchCharts = useServerFn(getDashboardCharts);
   const fetchTopServices = useServerFn(getDashboardTopServices);
   const fetchSecondary = useServerFn(getDashboardSecondary);
 
-  // 1. Critical KPIs query (loads first, prioritized)
+  const isToday = range.preset === "today";
+  const kpiStaleTime = isToday ? 30_000 : 300_000;
+  const analyticsStaleTime = isToday ? 60_000 : 300_000;
+
+  // 1. Critical KPIs query (priority 1 — loads first)
   const kpisQuery = useQuery<DashboardKpisResult>({
     queryKey: ["dash-kpis", range.preset, range.fromIso ?? "", range.toIso ?? ""],
     queryFn: () => fetchKpis({ data: range }),
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: isToday ? 60_000 : false,
+    staleTime: kpiStaleTime,
   });
 
   // 2. Trend chart query (loads independently)
@@ -100,8 +105,8 @@ export function SuperAdminDashboard({
     queryKey: ["dash-charts", range.preset, range.fromIso ?? "", range.toIso ?? ""],
     queryFn: () => fetchCharts({ data: range }),
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
-    staleTime: 60_000,
+    refetchInterval: isToday ? 60_000 : false,
+    staleTime: analyticsStaleTime,
   });
 
   // 3. Top services query (loads independently)
@@ -109,8 +114,8 @@ export function SuperAdminDashboard({
     queryKey: ["dash-top-services", range.preset, range.fromIso ?? "", range.toIso ?? ""],
     queryFn: () => fetchTopServices({ data: range }),
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
-    staleTime: 60_000,
+    refetchInterval: isToday ? 60_000 : false,
+    staleTime: analyticsStaleTime,
   });
 
   // 4. Secondary features query (loads independently)
@@ -121,6 +126,38 @@ export function SuperAdminDashboard({
     refetchInterval: 60_000,
     staleTime: 60_000,
   });
+
+  // Staggered background prefetch for common ranges (after Today loads)
+  const prefetchedRef = useRef(false);
+  useEffect(() => {
+    if (!kpisQuery.data || prefetchedRef.current || range.preset !== "today") return;
+    prefetchedRef.current = true;
+
+    const commonPresets: RangePreset[] = ["7d", "15d", "30d", "mtd"];
+    const timeouts: NodeJS.Timeout[] = [];
+
+    commonPresets.forEach((preset, index) => {
+      const delay = (index + 1) * 800; // 800ms, 1600ms, 2400ms, 3200ms
+      const t = setTimeout(() => {
+        const prefetchRange: DashboardRange = { preset };
+        queryClient.prefetchQuery({
+          queryKey: ["dash-kpis", preset, "", ""],
+          queryFn: () => fetchKpis({ data: prefetchRange }),
+          staleTime: 300_000,
+        });
+        queryClient.prefetchQuery({
+          queryKey: ["dash-charts", preset, "", ""],
+          queryFn: () => fetchCharts({ data: prefetchRange }),
+          staleTime: 300_000,
+        });
+      }, delay);
+      timeouts.push(t);
+    });
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
+  }, [kpisQuery.data, range.preset, queryClient, fetchKpis, fetchCharts]);
 
   const isFetching = kpisQuery.isFetching || chartsQuery.isFetching || topServicesQuery.isFetching || secondaryQuery.isFetching;
 
