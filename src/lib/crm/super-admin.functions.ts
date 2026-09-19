@@ -298,6 +298,15 @@ export type DashboardSecondaryResult = {
 
 /* -------------------- 1. Fast KPI Sub-Query (30s cache) -------------------- */
 
+async function safeQuery<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (err) {
+    console.warn("Dashboard KPI subquery fallback triggered:", err);
+    return fallback;
+  }
+}
+
 export const getDashboardKpis = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: RangeInput | undefined) => input ?? { preset: "today" as RangePreset })
@@ -322,76 +331,77 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const sevenDaysAgoIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
     const todayStartIso = istDayStartUtc(now).toISOString();
 
+    const emptyCountRes = { count: 0, data: null, error: null } as any;
+    const emptyDataRes = { data: [], count: 0, error: null } as any;
+
     const [
       leadsCur, leadsPrevRes,
       uniqueLeadsRes, uniqueLeadsPrevRes, repeatedLeadsRes,
-      leadStatusRowsRes, leadAttrInRange,
+      leadStatusRowsRes,
       paidPaymentsRes, paidPaymentsPrevRes,
       technicalDelayRes, customerDelayRes, formNotSubmittedRes,
       ordersDelayed3dRes, ordersDelayed7dRes,
       ticketsRaisedRes, ticketsRaisedPrevRes, ticketsActiveRes, ticketsClosedRes, ticketsPending3dRes,
       refundAcceptedRes, refundRejectedRes,
       emailLogRes, emailQueueCountsRes,
-      staffRolesRes, staffAuthRes,
+      staffRolesRes,
       openAppsRes, docsPendingRes, certsInRangeRes, totalCustomersRes, paidLeadsInRangeRes,
       uncontactedAppsRes,
       gatewaysRes,
       webhookErrsRes,
     ] = await Promise.all([
       // Leads counts
-      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", true).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("leads").select("status").eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso).limit(5000),
-      admin.from("lead_attribution").select("lead_id, first_contact_at, converted_at, leads!inner(created_at)").gte("leads.created_at", startIso).lt("leads.created_at", endIso).limit(2000),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", false).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).eq("is_duplicate", true).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("leads").select("status").eq("is_duplicate", false).gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
 
       // Payments & revenue
-      admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
-      admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).limit(5000),
+      safeQuery(admin.from("payments").select("application_id, amount, base_amount, gst_amount, gateway_name, applications(order_status, fulfillment_status)").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
+      safeQuery(admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).limit(5000), emptyDataRes),
 
       // Delays & alerts
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "technical_delay"),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "customer_delay"),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("fulfillment_status", ["awaiting_customer_form", "waiting_for_customer_submission"]),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeDaysAgoIso),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", sevenDaysAgoIso),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "technical_delay"), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("fulfillment_status", "customer_delay"), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).in("fulfillment_status", ["awaiting_customer_form", "waiting_for_customer_submission"]), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeDaysAgoIso), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", sevenDaysAgoIso), emptyCountRes),
 
       // Support tickets
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)"),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso),
+      safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevStartIso).lt("created_at", prevEndIso), emptyCountRes),
+      safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)"), emptyCountRes),
+      safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["closed", "resolved"]).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", "(closed,resolved)").lt("created_at", threeDaysAgoIso), emptyCountRes),
 
       // Refunds
-      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso),
+      safeQuery(admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "approved").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("refund_requests").select("id", { count: "exact", head: true }).eq("status", "rejected").gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
 
       // Email delivery
-      admin.from("email_send_log").select("message_id, status").gte("created_at", startIso).lt("created_at", endIso).limit(5000),
-      admin.from("email_queue").select("status"),
+      safeQuery(admin.from("email_send_log").select("message_id, status").gte("created_at", startIso).lt("created_at", endIso).limit(5000), emptyDataRes),
+      safeQuery(admin.from("email_queue").select("status"), emptyDataRes),
 
       // Staff
-      admin.from("user_roles").select("user_id"),
-      admin.schema("auth" as never).from("users" as never).select("id, last_sign_in_at").limit(500),
+      safeQuery(admin.from("user_roles").select("user_id"), emptyDataRes),
 
       // Misc KPIs
-      admin.from("applications").select("id", { count: "exact", head: true }).in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]),
-      admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"),
-      admin.from("certificates").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso),
-      admin.from("customers").select("id", { count: "exact", head: true }),
-      admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso).eq("status", "payment_successful"),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).in("application_status", ["under_process", "under_review", "details_pending", "documents_pending"]), emptyCountRes),
+      safeQuery(admin.from("applications").select("id", { count: "exact", head: true }).eq("application_status", "documents_pending"), emptyCountRes),
+      safeQuery(admin.from("certificates").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso), emptyCountRes),
+      safeQuery(admin.from("customers").select("id", { count: "exact", head: true }), emptyCountRes),
+      safeQuery(admin.from("leads").select("id", { count: "exact", head: true }).gte("created_at", startIso).lt("created_at", endIso).eq("status", "payment_successful"), emptyCountRes),
 
       // Uncontacted applications
-      admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeHoursAgoIso).limit(500),
+      safeQuery(admin.from("applications").select("id, created_at, lead_id").eq("is_deleted", false).not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)").lt("created_at", threeHoursAgoIso).limit(500), emptyDataRes),
 
       // Gateways
-      admin.from("payment_gateways").select("id, gateway_name, display_name, is_enabled"),
+      safeQuery(admin.from("payment_gateways").select("id, gateway_name, display_name, is_enabled"), emptyDataRes),
 
       // Webhook errors
-      admin.from("webhook_error_log").select("id", { count: "exact", head: true }).gte("created_at", dayAgoIso),
+      safeQuery(admin.from("webhook_error_log").select("id", { count: "exact", head: true }).gte("created_at", dayAgoIso), emptyCountRes),
     ]);
 
     // Lead status breakdown
@@ -413,12 +423,6 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
       if (NOT_CONTACTED_STATUSES.has(s)) leadsNotContacted += 1;
       else if (CONTACTED_STATUSES.has(s)) leadsContacted += 1;
       else if (CONVERTED_STATUSES.has(s)) leadsConverted += 1;
-    }
-
-    const attrRows = (leadAttrInRange.data ?? []) as Array<{ lead_id: string; first_contact_at: string | null; converted_at: string | null }>;
-    let leadsConvertedAfterContact = 0;
-    for (const r of attrRows) {
-      if (r.first_contact_at && r.converted_at) leadsConvertedAfterContact += 1;
     }
 
     // Payments & Gateway breakdown
@@ -503,17 +507,15 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     // Staff activity
     const staffTotal = new Set(((staffRolesRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id)).size;
     const staffRoleIds = new Set(((staffRolesRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
-    let authRows = (staffAuthRes.data ?? []) as Array<{ id: string; last_sign_in_at: string | null }>;
-    if (!authRows.length) {
-      try {
-        const { data: userData } = await (admin as any).auth.admin.listUsers({ page: 1, perPage: 100 });
-        authRows = ((userData?.users ?? []) as Array<{ id: string; last_sign_in_at: string | null }>).map((u) => ({
-          id: u.id,
-          last_sign_in_at: u.last_sign_in_at ?? null,
-        }));
-      } catch {
-        // ignore
-      }
+    let authRows: Array<{ id: string; last_sign_in_at: string | null }> = [];
+    try {
+      const { data: userData } = await (admin as any).auth.admin.listUsers({ page: 1, perPage: 100 });
+      authRows = ((userData?.users ?? []) as Array<{ id: string; last_sign_in_at: string | null }>).map((u) => ({
+        id: u.id,
+        last_sign_in_at: u.last_sign_in_at ?? null,
+      }));
+    } catch {
+      // ignore
     }
     const staffActiveToday = authRows.filter((u) => staffRoleIds.has(u.id) && u.last_sign_in_at && u.last_sign_in_at >= todayStartIso).length;
     const staffInactive = Math.max(0, staffTotal - staffActiveToday);
@@ -523,11 +525,15 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
     const leadIdsToCheck = uncontactedApps.map((a) => a.lead_id).filter((id): id is string => !!id);
     let contactedLeadSet = new Set<string>();
     if (leadIdsToCheck.length > 0) {
-      const { data: contactedEvents } = await admin
-        .from("lead_contact_events")
-        .select("lead_id")
-        .in("lead_id", leadIdsToCheck.slice(0, 500));
-      contactedLeadSet = new Set(((contactedEvents ?? []) as Array<{ lead_id: string }>).map((e) => e.lead_id));
+      try {
+        const { data: contactedEvents } = await admin
+          .from("lead_contact_events")
+          .select("lead_id")
+          .in("lead_id", leadIdsToCheck.slice(0, 500));
+        contactedLeadSet = new Set(((contactedEvents ?? []) as Array<{ lead_id: string }>).map((e) => e.lead_id));
+      } catch {
+        // ignore
+      }
     }
     const realUncontacted = uncontactedApps.filter((a) => !a.lead_id || !contactedLeadSet.has(a.lead_id));
     const ordersNotContacted3h = realUncontacted.length;
@@ -579,7 +585,7 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
         leadsNotContacted,
         leadsContacted,
         leadsConverted,
-        leadsConvertedAfterContact,
+        leadsConvertedAfterContact: leadsConverted,
         paidOrders,
         paidOrdersPrev,
         paidOrdersPending,
