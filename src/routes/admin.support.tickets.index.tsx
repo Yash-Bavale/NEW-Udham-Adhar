@@ -1023,7 +1023,12 @@ function SupportTicketsOperationsPage() {
                             checked ? [...prev, id] : prev.filter((x) => x !== id)
                           )
                         }
-                        onOpen={(id) => navigate({ to: `/admin/support/tickets/${id}` as any })}
+                        onOpen={(id) => {
+                          try {
+                            sessionStorage.setItem("bhs_ticket_ids_context", JSON.stringify(tickets.map((x) => x.id)));
+                          } catch {}
+                          navigate({ to: `/admin/support/tickets/${id}` as any });
+                        }}
                       />
                     ))}
                   </Fragment>
@@ -1063,7 +1068,12 @@ function SupportTicketsOperationsPage() {
                         checked ? [...prev, id] : prev.filter((x) => x !== id)
                       )
                     }
-                    onOpen={(id) => navigate({ to: `/admin/support/tickets/${id}` as any })}
+                    onOpen={(id) => {
+                      try {
+                        sessionStorage.setItem("bhs_ticket_ids_context", JSON.stringify(tickets.map((x) => x.id)));
+                      } catch {}
+                      navigate({ to: `/admin/support/tickets/${id}` as any });
+                    }}
                   />
                 ))}
               </div>

@@ -759,3 +759,38 @@ export const searchCustomerOptions = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { rows: rows ?? [] };
   });
+
+export const getAdjacentTickets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { data: curr } = await admin
+      .from("support_tickets")
+      .select("created_at")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (!curr) return { prevId: null, nextId: null };
+
+    const [prevRes, nextRes] = await Promise.all([
+      admin
+        .from("support_tickets")
+        .select("id")
+        .gt("created_at", curr.created_at)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      admin
+        .from("support_tickets")
+        .select("id")
+        .lt("created_at", curr.created_at)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    return {
+      prevId: prevRes.data?.id ?? null,
+      nextId: nextRes.data?.id ?? null,
+    };
+  });
