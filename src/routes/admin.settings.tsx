@@ -146,10 +146,12 @@ function StatusList({ title, items }: { title: string; items: string[] }) {
 }
 
 import { AppSettingsCard } from "@/components/admin/AppSettingsCard";
+import { ReminderAudioSettingsCard } from "@/components/admin/ReminderAudioSettingsCard";
 
 function NotificationsTab() {
   return (
     <div className="space-y-6">
+      <ReminderAudioSettingsCard />
       <AppSettingsCard />
     </div>
   );

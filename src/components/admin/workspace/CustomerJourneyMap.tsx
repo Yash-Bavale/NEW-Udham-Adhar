@@ -12,6 +12,7 @@ import {
   Clock, XCircle, CheckCircle2, ClipboardCheck,
   Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
   ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag, ShieldAlert,
+  PhoneCall, Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ import { listOrderTickets } from "@/lib/tickets/list-order-tickets.functions";
 import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayDialog";
 import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
+import { CallbackReminderDialog } from "@/components/admin/workspace/CallbackReminderDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 import { CountdownChip } from "./CountdownChip";
 
@@ -48,6 +50,7 @@ import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
+import { getActiveOrderCallback } from "@/lib/orders/actions/callback-reminder.functions";
 
 interface Props {
   applicationId: string;
@@ -219,6 +222,13 @@ export function CustomerJourneyMap(p: Props) {
   // Single source of truth for the "Current" label — derived stage from computeOrderStage.
   const currentStageLabel = useMemo(() => STAGE_META[p.stage].label, [p.stage]);
 
+  const getActiveCallbackFn = useServerFn(getActiveOrderCallback);
+  const activeCallbackQ = useQuery({
+    queryKey: ["active-order-callback", p.applicationId],
+    queryFn: () => getActiveCallbackFn({ data: { orderId: p.applicationId } }),
+    staleTime: 10_000,
+  });
+  const activeCallback = activeCallbackQ.data;
 
   const [dialog, setDialog] = useState<
     | null
@@ -228,6 +238,7 @@ export function CustomerJourneyMap(p: Props) {
     | { kind: "govt_rejected" }
     | { kind: "complete_with_cert" }
     | { kind: "consultation_completed" }
+    | { kind: "callback_reminder" }
   >(null);
 
   const invalidate = () => {
@@ -615,7 +626,66 @@ export function CustomerJourneyMap(p: Props) {
             <XCircle className="size-3.5" />
             Force Close (B10)
           </button>
+
+          {/* Call Back / Reminder */}
+          <button
+            type="button"
+            onClick={() => setDialog({ kind: "callback_reminder" })}
+            disabled={closed}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none",
+              activeCallback?.isDue
+                ? "bg-rose-600 hover:bg-rose-700 animate-pulse ring-2 ring-rose-400"
+                : activeCallback
+                  ? "bg-indigo-600 hover:bg-indigo-700"
+                  : "bg-blue-600 hover:bg-blue-700"
+            )}
+            title="Set customer callback reminder (order becomes Hot Order when reminder ends)"
+          >
+            {activeCallback?.isDue ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
+            {activeCallback?.isDue
+              ? "Call Due Now (HOT ORDER)"
+              : activeCallback
+                ? "Callback Scheduled"
+                : "Call Back / Reminder"}
+          </button>
         </div>
+
+        {activeCallback && !closed && (
+          <div className={cn(
+            "mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2 text-xs",
+            activeCallback.isDue
+              ? "border-rose-300 bg-rose-50 text-rose-900"
+              : "border-indigo-200 bg-indigo-50/80 text-indigo-900"
+          )}>
+            <div className="flex items-center gap-2">
+              {activeCallback.isDue ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                  <Flame className="size-3" /> HOT ORDER NOW
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                  <Clock className="size-3" /> Scheduled Callback
+                </span>
+              )}
+              <span className="font-semibold">
+                Due: {formatIST(activeCallback.fires_at)}
+              </span>
+              <span className="text-slate-600">
+                · <b>Reason:</b> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
+                {activeCallback.parsedRemarks?.note ? ` (${activeCallback.parsedRemarks.note})` : null}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setDialog({ kind: "callback_reminder" })}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+            >
+              Manage Callback
+            </button>
+          </div>
+        )}
 
         {(view.hasEngine && view.nextTimer && !closed) || closureArmed || closed ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-600">
@@ -633,6 +703,12 @@ export function CustomerJourneyMap(p: Props) {
       </section>
 
       {/* Dialogs */}
+      {dialog?.kind === "callback_reminder" && (
+        <CallbackReminderDialog
+          orderId={p.applicationId}
+          onClose={() => { setDialog(null); invalidate(); }}
+        />
+      )}
       <CustomerDelayDialog
         applicationId={p.applicationId}
         open={dialog?.kind === "customer_delay"}

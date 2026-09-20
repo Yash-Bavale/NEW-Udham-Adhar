@@ -353,7 +353,7 @@ async function ensurePaidOrdersIntegrated(admin: any) {
   }
 }
 
-export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
+export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -364,7 +364,7 @@ const COMPLETED_FS = new Set<string>([
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 
-export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
+export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
@@ -378,7 +378,20 @@ export function isPendingRow(row: { fulfillment_status?: string | null; stage: O
   return b === "pending" || b === "needs_action";
 }
 
-export function getOrderActionStatus(order: { fulfillment_status?: string | null; stage: OrderStage; form_link_sent_at?: string | null }): { label: string; tone: "red" | "green" | "blue" } {
+export function getOrderActionStatus(order: {
+  fulfillment_status?: string | null;
+  stage: OrderStage;
+  form_link_sent_at?: string | null;
+  is_hot?: boolean;
+  is_callback_scheduled?: boolean;
+}): { label: string; tone: "red" | "green" | "blue" | "purple" } {
+  if (order.is_hot) {
+    return { label: "Call Due Now", tone: "red" };
+  }
+  if (order.is_callback_scheduled) {
+    return { label: "Scheduled Callback", tone: "blue" };
+  }
+
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
@@ -599,7 +612,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -612,7 +625,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
     const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
 
-    const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
+    const [leadsData, custsData, paysByApp, paysByLead, staffData, callbackSchedulers] = await Promise.all([
       fetchInChunks<any>(leadIds, 100, (chunk) =>
         admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
       ),
@@ -628,9 +641,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       fetchInChunks<any>(staffIds, 100, (chunk) =>
         admin.from("profiles").select("id, display_name, email").in("id", chunk)
       ),
+      fetchInChunks<any>(ids, 100, (chunk) =>
+        admin
+          .from("order_schedulers")
+          .select("id, application_id, status, fires_at, remarks, created_at, created_by")
+          .in("application_id", chunk)
+          .eq("scheduler_type", "callback_reminder")
+          .eq("status", "active")
+      ),
     ]);
 
     const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
+    const callbackMap = new Map((callbackSchedulers ?? []).map((s: any) => [s.application_id, s]));
 
     // Gather all serviceIds from applications and linked leads
     const allServiceIds = Array.from(
@@ -669,6 +691,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
+    const now = Date.now();
+
     const allRows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
       const cust = a.customer_id ? custMap.get(a.customer_id) : null;
@@ -697,6 +721,30 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       const payment_status = rollupPaymentStatus(payments, totalAmount);
 
+      // Callback / Reminder / Hot Order status
+      const cb = callbackMap.get(a.id);
+      let parsedRemarks = null;
+      if (cb?.remarks) {
+        try {
+          parsedRemarks = typeof cb.remarks === "string" ? JSON.parse(cb.remarks) : cb.remarks;
+        } catch {
+          parsedRemarks = { reason: "custom", reasonLabel: cb.remarks };
+        }
+      }
+      const firesAtTime = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
+      const is_due = firesAtTime > 0 && firesAtTime <= now;
+      const is_hot = is_due;
+      const is_callback_scheduled = !!cb;
+      const callback_reminder = cb
+        ? {
+            id: cb.id,
+            fires_at: cb.fires_at,
+            is_due,
+            remarks: parsedRemarks,
+            created_at: cb.created_at,
+          }
+        : null;
+
       return {
         id: a.id,
         application_code: a.application_code,
@@ -716,6 +764,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_to: a.assigned_to,
         assigned_name: staff?.display_name ?? staff?.email ?? null,
         stage,
+        is_hot,
+        is_callback_scheduled,
+        callback_reminder,
       };
     });
 
@@ -729,11 +780,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       exception: 0,
       actionRequired: 0,
       processed: 0,
+      reminders: 0,
+      hot_orders: 0,
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
-    const now = Date.now();
 
     for (const r of allRows) {
+      if (r.is_callback_scheduled) counts.reminders++;
+      if (r.is_hot) counts.hot_orders++;
+
       const b = bucketOfRow(r);
       if (b === "needs_action") {
         counts.needs_action++;
@@ -767,6 +822,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         case "needs_action":
           filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
           break;
+        case "reminders":
+          filtered = filtered.filter((r) => r.is_callback_scheduled);
+          break;
+        case "hot_orders":
+          filtered = filtered.filter((r) => r.is_hot);
+          break;
         case "completed":
           filtered = filtered.filter((r) => bucketOfRow(r) === "completed");
           break;
@@ -798,6 +859,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
       } else if (data.actionStatus === "processed") {
         filtered = filtered.filter((r) => bucketOfRow(r) !== "needs_action");
+      } else if (data.actionStatus === "hot_orders") {
+        filtered = filtered.filter((r) => r.is_hot);
+      } else if (data.actionStatus === "scheduled_callback") {
+        filtered = filtered.filter((r) => r.is_callback_scheduled && !r.is_hot);
       }
     }
 
@@ -820,14 +885,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Sort
+    // Sort: Hot Orders always float to the top!
     if (data.sortField === "stage") {
       filtered.sort((a, b) => {
+        if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const cmp = a.stage.localeCompare(b.stage);
         return data.sortOrder === "asc" ? cmp : -cmp;
       });
     } else {
       filtered.sort((a, b) => {
+        if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
         return data.sortOrder === "asc" ? tA - tB : tB - tA;

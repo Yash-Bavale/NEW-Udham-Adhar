@@ -32,6 +32,7 @@ import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
+import { ReminderNotificationManager } from "@/components/admin/ReminderNotificationManager";
 import { clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import type { Module } from "@/lib/roles";
 
@@ -416,6 +417,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       </nav>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <ReminderNotificationManager />
     </div>
   );
 }

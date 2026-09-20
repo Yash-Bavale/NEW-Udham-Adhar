@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -59,7 +59,7 @@ const COMPLETED_FS = new Set<string>([
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 
-function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all"> {
+function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
@@ -73,9 +73,11 @@ function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderSta
   return b === "pending" || b === "needs_action";
 }
 
-const BUCKETS: { id: Bucket; label: string }[] = [
+const BUCKETS: { id: Bucket; label: string; icon?: string; badgeSuffix?: string; tone?: "red" | "indigo" }[] = [
   { id: "all", label: "All" },
   { id: "needs_action", label: "Needs Action" },
+  { id: "reminders", label: "Reminders", icon: "⏱", badgeSuffix: "Active", tone: "indigo" },
+  { id: "hot_orders", label: "Hot Orders", icon: "🔥", badgeSuffix: "Due Now", tone: "red" },
   { id: "pending", label: "Pending" },
   { id: "completed", label: "Completed" },
   { id: "closed", label: "Closed" },
@@ -513,9 +515,11 @@ return (
 
         {/* Action Status Filter */}
         <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-          <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Action Status</SelectItem>
+            <SelectItem value="hot_orders">🔥 Hot Orders (Call Due Now)</SelectItem>
+            <SelectItem value="scheduled_callback">⏱ Scheduled Callbacks</SelectItem>
             <SelectItem value="action_required">Action Required (Red)</SelectItem>
             <SelectItem value="processed">Completed / Action Taken</SelectItem>
           </SelectContent>
@@ -549,6 +553,7 @@ return (
             <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All assignees</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
               {staffProfiles.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
               ))}
@@ -558,14 +563,44 @@ return (
 
         {/* Payment Status Filter */}
         <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All payment" /></SelectTrigger>
+          <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Payment status" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All payment</SelectItem>
+            <SelectItem value="all">All payments</SelectItem>
             <SelectItem value="Paid">Paid</SelectItem>
-            <SelectItem value="Partially Paid">Partially paid</SelectItem>
-            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
             <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
             <SelectItem value="Failed">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Fulfillment Stage Dropdown */}
+        <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
+          <SelectTrigger className="h-9 w-[180px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectValue placeholder="Fulfillment stage" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[360px]">
+            <SelectItem value="all">All Fulfillment Stages</SelectItem>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
+              <SelectItem value="order_received">Order Received</SelectItem>
+              <SelectItem value="form_submitted">Form Submitted</SelectItem>
+              <SelectItem value="technical_delay">Technical Delay</SelectItem>
+              <SelectItem value="customer_delay">Customer Delay</SelectItem>
+              <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
+              <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
+              <SelectItem value="application_approved">Application Approved</SelectItem>
+              <SelectItem value="order_completed">Order Completed</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
+              <SelectItem value="application_rejected">Application Rejected</SelectItem>
+              <SelectItem value="order_closed">Order Closed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
 
@@ -654,19 +689,47 @@ return (
     <div className="flex flex-wrap gap-2">
       {BUCKETS.map((b) => {
         const active = bucket === b.id;
+        const countVal = (counts as any)[b.id] ?? 0;
+        const isHotTab = b.id === "hot_orders";
+        const isReminderTab = b.id === "reminders";
+
+        let buttonCls = "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300";
+        let badgeCls = "bg-slate-100 text-slate-600";
+
+        if (active) {
+          if (isHotTab) {
+            buttonCls = "bg-rose-600 text-white border-rose-600 shadow-sm";
+            badgeCls = "bg-white text-rose-700 font-bold";
+          } else if (isReminderTab) {
+            buttonCls = "bg-indigo-600 text-white border-indigo-600 shadow-sm";
+            badgeCls = "bg-white text-indigo-700 font-bold";
+          } else {
+            buttonCls = "bg-slate-900 text-white border-slate-900";
+            badgeCls = "bg-slate-800 text-white";
+          }
+        } else {
+          if (isHotTab && countVal > 0) {
+            buttonCls = "bg-rose-50/90 text-rose-800 border-rose-300 hover:bg-rose-100";
+            badgeCls = "bg-rose-600 text-white font-bold";
+          } else if (isReminderTab && countVal > 0) {
+            buttonCls = "bg-indigo-50/90 text-indigo-800 border-indigo-200 hover:bg-indigo-100";
+            badgeCls = "bg-indigo-600 text-white font-bold";
+          }
+        }
+
         return (
           <button
             key={b.id}
             type="button"
             onClick={() => setBucket(b.id)}
-            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${active
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-              }`}
+            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${buttonCls}`}
           >
-            <span>{b.label}</span>
-            <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>
-              {counts[b.id] ?? 0}
+            <span className="flex items-center gap-1">
+              {b.icon && <span>{b.icon}</span>}
+              <span>{b.label}</span>
+            </span>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeCls}`}>
+              {countVal} {b.badgeSuffix ? `${b.badgeSuffix}` : ""}
             </span>
           </button>
         );
@@ -915,11 +978,16 @@ function OrderCardMobile({
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         onOpen(order.id);
       }}
-      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${selected ? "border-indigo-500 bg-indigo-50/40" : "border-slate-200 hover:border-slate-300"
-        }`}
+      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${
+        order.is_hot
+          ? "border-l-4 border-l-rose-500 bg-rose-50/25 border-rose-200"
+          : selected
+            ? "border-indigo-500 bg-indigo-50/40"
+            : "border-slate-200 hover:border-slate-300"
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isAdmin && (
             <div data-no-row-click onClick={(e) => e.stopPropagation()}>
               <Checkbox
@@ -928,7 +996,12 @@ function OrderCardMobile({
               />
             </div>
           )}
-          <span className="font-mono text-xs font-semibold text-slate-800">{order.application_code}</span>
+          <span className="font-mono text-xs font-bold text-slate-900">{order.application_code}</span>
+          {order.is_hot && (
+            <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+              <Flame className="size-2.5" /> HOT ORDER NOW
+            </span>
+          )}
           {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
               {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
@@ -958,19 +1031,27 @@ function OrderCardMobile({
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {actionStatus.tone === "red" && (
+          {order.is_hot ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+              <PhoneCall className="size-3 text-rose-600" />
+              Call Due Now
+            </span>
+          ) : order.is_callback_scheduled ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <PhoneForwarded className="size-3 text-indigo-600" />
+              Scheduled Callback
+            </span>
+          ) : actionStatus.tone === "red" ? (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
               <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
               {actionStatus.label}
             </span>
-          )}
-          {actionStatus.tone === "green" && (
+          ) : actionStatus.tone === "green" ? (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="size-1.5 rounded-full bg-emerald-500" />
               {actionStatus.label}
             </span>
-          )}
-          {actionStatus.tone === "blue" && (
+          ) : (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
               <span className="size-1.5 rounded-full bg-sky-500" />
               {actionStatus.label}
@@ -1016,6 +1097,13 @@ function formatDayHeader(day: string): string {
 }
 
 export function getOrderActionStatus(order: any): { label: string; tone: "red" | "green" | "blue" } {
+  if (order.is_hot) {
+    return { label: "Call Due Now", tone: "red" };
+  }
+  if (order.is_callback_scheduled) {
+    return { label: "Scheduled Callback", tone: "blue" };
+  }
+
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
@@ -1107,8 +1195,13 @@ function OrderRow({
 
   return (
     <tr
-      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${selected ? "bg-indigo-50/40" : ""
-        }`}
+      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${
+        order.is_hot
+          ? "border-l-4 border-l-rose-500 bg-rose-50/30 hover:bg-rose-50/50"
+          : selected
+            ? "bg-indigo-50/40"
+            : ""
+      }`}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
@@ -1128,7 +1221,16 @@ function OrderRow({
       )}
 
       {/* 1. Order # */}
-      <td className="px-2 py-2.5 font-mono text-[12px] text-slate-600 whitespace-nowrap">{order.application_code}</td>
+      <td className="px-2 py-2.5 font-mono text-[12px] whitespace-nowrap">
+        <div className="space-y-1">
+          <div className="font-bold text-slate-900">{order.application_code}</div>
+          {order.is_hot && (
+            <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+              <Flame className="size-2.5" /> HOT ORDER NOW
+            </span>
+          )}
+        </div>
+      </td>
 
       {/* 2. Created */}
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
@@ -1161,19 +1263,27 @@ function OrderRow({
 
       {/* 5. Action Status */}
       <td className="px-2 py-2.5 whitespace-nowrap">
-        {actionStatus.tone === "red" && (
+        {order.is_hot ? (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+            <PhoneCall className="size-3 text-rose-600" />
+            Call Due Now
+          </span>
+        ) : order.is_callback_scheduled ? (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <PhoneForwarded className="size-3 text-indigo-600" />
+            Scheduled Callback
+          </span>
+        ) : actionStatus.tone === "red" ? (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
             {actionStatus.label}
           </span>
-        )}
-        {actionStatus.tone === "green" && (
+        ) : actionStatus.tone === "green" ? (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="size-1.5 rounded-full bg-emerald-500" />
             {actionStatus.label}
           </span>
-        )}
-        {actionStatus.tone === "blue" && (
+        ) : (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
             <span className="size-1.5 rounded-full bg-sky-500" />
             {actionStatus.label}
