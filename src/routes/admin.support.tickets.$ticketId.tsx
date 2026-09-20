@@ -30,7 +30,7 @@ import { reopenOrder } from "@/lib/orders/order-actions.functions";
 import { getOrderDocumentSignedUrl } from "@/lib/crm/orders-v2.functions";
 import { ReasonPicker } from "@/components/admin/workspace/ReasonPicker";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
-import { parseEmailReply } from "@/lib/support/emailParser";
+import { parseEmailMessage, parseEmailReply, decodeHtmlEntities, htmlToPlainText } from "@/lib/support/emailParser";
 import { useRole } from "@/hooks/useRole";
 
 export const Route = createFileRoute("/admin/support/tickets/$ticketId")({
@@ -93,21 +93,6 @@ function formatTimeOnly(iso: string | null | undefined) {
 function initials(name: string | null | undefined) {
   if (!name) return "?";
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
-}
-
-function decodeHtmlEntities(s: string | null | undefined): string {
-  if (!s) return "";
-  return s
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&#x2F;/gi, "/")
-    .replace(/&mdash;/gi, "—")
-    .replace(/&ndash;/gi, "–");
 }
 
 function formatBytes(bytes?: number | null) {
@@ -1730,8 +1715,15 @@ function MessageCard({
   customerEmail?: string | null;
   onDownloadDoc: (doc: any) => void;
 }) {
-  const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
   const [showQuoted, setShowQuoted] = useState(false);
+  const parsed = useMemo(
+    () =>
+      parseEmailMessage({
+        bodyHtml: (msg as any).body_html,
+        bodyText: msg.body_text,
+      }),
+    [(msg as any).body_html, msg.body_text]
+  );
 
   // 1. Internal Note Card (Centered with amber highlight)
   if (msg.kind === "note") {
@@ -1760,9 +1752,6 @@ function MessageCard({
 
   // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
-    const plain = decodeHtmlEntities(msg.body_text || "");
-    const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
-
     return (
       <div className="w-full flex justify-start">
         <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] mr-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
@@ -1799,20 +1788,27 @@ function MessageCard({
 
           {/* Message Content Body */}
           <div className="px-4 pb-4 space-y-3">
+            {/* Subject if different from main thread */}
+            {msg.subject && (
+              <div className="text-xs font-semibold text-slate-600 pb-1 border-b border-slate-100">
+                {decodeHtmlEntities(msg.subject)}
+              </div>
+            )}
+
             {/* Clean Trimmed Body / HTML rendered */}
-            {hasHtml && !parsed.newContent ? (
+            {parsed.isHtml ? (
               <div
-                className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline"
+                className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans"
                 dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(msg.body_html!, {
+                  __html: DOMPurify.sanitize(parsed.content, {
                     WHOLE_DOCUMENT: false,
-                    ADD_ATTR: ["target"],
+                    ADD_ATTR: ["target", "style", "class"],
                   }),
                 }}
               />
             ) : (
               <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
-                {parsed.newContent || plain || "(no content)"}
+                {parsed.content || "(no content)"}
               </div>
             )}
 
@@ -1854,7 +1850,7 @@ function MessageCard({
             )}
 
             {/* Quoted messages collapsible matching screenshot */}
-            {parsed.hasQuotedContent && (
+            {parsed.hasQuoted && (
               <div className="pt-1">
                 <button
                   type="button"
@@ -1865,8 +1861,19 @@ function MessageCard({
                   <span>{showQuoted ? "Hide quoted content" : "Show quoted content (3 messages)"}</span>
                 </button>
                 {showQuoted && (
-                  <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
-                    {parsed.quotedContent}
+                  <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                    {parsed.isHtml ? (
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(parsed.quotedContent, {
+                            WHOLE_DOCUMENT: false,
+                            ADD_ATTR: ["target", "style", "class"],
+                          }),
+                        }}
+                      />
+                    ) : (
+                      parsed.quotedContent
+                    )}
                   </div>
                 )}
               </div>
@@ -1878,9 +1885,6 @@ function MessageCard({
   }
 
   // 3. Business Outbound Message Card (RIGHT ALIGNED)
-  const plain = decodeHtmlEntities(msg.body_text || "");
-  const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
-
   return (
     <div className="w-full flex justify-end">
       <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
@@ -1920,19 +1924,19 @@ function MessageCard({
 
         {/* Message Content Body matching Screenshot */}
         <div className="px-4 pb-4 space-y-3">
-          {hasHtml && !parsed.newContent ? (
+          {parsed.isHtml ? (
             <div
-              className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline"
+              className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans"
               dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(msg.body_html!, {
+                __html: DOMPurify.sanitize(parsed.content, {
                   WHOLE_DOCUMENT: false,
-                  ADD_ATTR: ["target"],
+                  ADD_ATTR: ["target", "style", "class"],
                 }),
               }}
             />
           ) : (
             <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
-              {parsed.newContent || plain || (
+              {parsed.content || (
                 <div className="space-y-2">
                   <p>Dear {customerName || "Customer"},</p>
                   <p>
@@ -1946,7 +1950,7 @@ function MessageCard({
           )}
 
           {/* Quoted messages collapsible matching screenshot */}
-          {parsed.hasQuotedContent && (
+          {parsed.hasQuoted && (
             <div className="pt-1">
               <button
                 type="button"
@@ -1957,8 +1961,19 @@ function MessageCard({
                 <span>{showQuoted ? "Hide quoted content" : "Show quoted content"}</span>
               </button>
               {showQuoted && (
-                <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
-                  {parsed.quotedContent}
+                <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                  {parsed.isHtml ? (
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(parsed.quotedContent, {
+                          WHOLE_DOCUMENT: false,
+                          ADD_ATTR: ["target", "style", "class"],
+                        }),
+                      }}
+                    />
+                  ) : (
+                    parsed.quotedContent
+                  )}
                 </div>
               )}
             </div>

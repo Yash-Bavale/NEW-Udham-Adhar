@@ -598,13 +598,21 @@ async function openOrAppendTicket(input: {
 
 function stripHtml(html: string | null): string {
   if (!html) return "";
-  const withoutTags = html
+  const withBreaks = html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n\s+\n/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return decodeEntities(withoutTags);
+  return decodeEntities(withBreaks);
 }
 
 /** Decode the common HTML entities that leak into inbound Zoho subjects and text bodies. */

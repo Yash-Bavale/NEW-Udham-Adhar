@@ -1,16 +1,84 @@
 /**
- * Parse an inbound customer email body and return only what the sender
- * actually wrote in *this* reply, separating out the quoted history so it
- * can be shown collapsed in the UI.
+ * Email Parser & Content Sanitization Pipeline
  *
- * Handles Gmail ("On … wrote:"), Outlook (From:/Sent:/To:/Subject: block),
- * "-----Original Message-----" dividers, and generic "> " line quoting.
+ * Provides:
+ * 1. decodeHtmlEntities — converts &amp;, &nbsp;, numeric entities, etc.
+ * 2. htmlToPlainText — safely converts rich HTML to formatted plain text preserving newlines
+ * 3. parseEmailText — separates current reply text from quoted historical email chains
+ * 4. parseEmailHtml — separates current reply HTML from quoted historical email blocks (gmail_quote, Outlook divs, blockquotes)
+ * 5. parseEmailMessage — unified handler taking body_html and/or body_text and returning clean renderable content
  */
 
-export interface ParsedEmail {
+export interface ParsedEmailText {
   newContent: string;
   quotedContent: string;
   hasQuotedContent: boolean;
+}
+
+export interface ParsedEmailHtml {
+  newHtml: string;
+  quotedHtml: string;
+  hasQuotedHtml: boolean;
+}
+
+export interface ParsedEmailMessage {
+  isHtml: boolean;
+  content: string;
+  quotedContent: string;
+  hasQuoted: boolean;
+  rawHtml: string | null;
+  rawText: string | null;
+}
+
+/** Decode common and numerical HTML entities */
+export function decodeHtmlEntities(input: string | null | undefined): string {
+  if (!input) return "";
+  return input
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      try {
+        return String.fromCodePoint(parseInt(h, 16));
+      } catch {
+        return _;
+      }
+    })
+    .replace(/&#(\d+);/g, (_, d) => {
+      try {
+        return String.fromCodePoint(parseInt(d, 10));
+      } catch {
+        return _;
+      }
+    })
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&hellip;/gi, "…")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–")
+    .replace(/&rsquo;|&lsquo;/gi, "'")
+    .replace(/&rdquo;|&ldquo;/gi, '"');
+}
+
+/** Convert HTML to readable plain text while maintaining paragraph/line structure */
+export function htmlToPlainText(html: string | null | undefined): string {
+  if (!html) return "";
+  const withBreaks = html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n\s+\n/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return decodeHtmlEntities(withBreaks);
 }
 
 const GMAIL_QUOTE = /(?:\n|\.\s+|\s{2,}|\b)On\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\s\S]{1,250}?\bwrote\s*:\s*/i;
@@ -26,7 +94,10 @@ function trimBody(s: string): string {
   return s.replace(/\s+$/g, "").replace(/^\s+/g, "");
 }
 
-export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail {
+/**
+ * Parse plain text email body and separate new reply text from quoted history
+ */
+export function parseEmailReply(rawBody: string | null | undefined): ParsedEmailText {
   const body = (rawBody ?? "").replace(/\r\n/g, "\n");
   if (!body.trim()) {
     return { newContent: "", quotedContent: "", hasQuotedContent: false };
@@ -46,8 +117,7 @@ export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail
     if (m && m.index > 10) cutAt = m.index;
   }
 
-  // Generic "> quoted" block: cut at the first quoted line that is followed
-  // by more quoted lines (avoids clipping single stray '>' inside prose).
+  // Generic "> quoted" block: cut at the first quoted line that is followed by more quoted lines
   if (cutAt === -1) {
     const lines = body.split("\n");
     for (let i = 0; i < lines.length - 1; i++) {
@@ -61,13 +131,13 @@ export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail
   let newContent = cutAt >= 0 ? body.slice(0, cutAt) : body;
   const quotedContent = cutAt >= 0 ? body.slice(cutAt) : "";
 
-  // Drop "Sent from my iPhone"-style tail on the visible portion only.
+  // Drop "Sent from my iPhone"-style tail on the visible portion only
   newContent = newContent.replace(SENT_FROM_DEVICE, "");
-  // Drop signature separators from the visible portion.
+  // Drop signature separators from the visible portion
   const sigIdx = newContent.search(SIG_DIVIDER);
   if (sigIdx > 40) newContent = newContent.slice(0, sigIdx);
 
-  // Clean any leading metadata lines like "From: ..." or "Subject: ..." prepended during email ingestion
+  // Clean any leading metadata lines like "From: ..." or "Subject: ..." prepended during ingestion
   newContent = newContent.replace(/^\s*From:\s*[^\n]+\n*/i, "");
   newContent = newContent.replace(/^\s*(?:Sent|To|Subject):\s*[^\n]+\n*/gi, "");
 
@@ -77,5 +147,84 @@ export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail
     newContent: newContent || trimBody(body),
     quotedContent: trimBody(quotedContent),
     hasQuotedContent: quotedContent.trim().length > 0,
+  };
+}
+
+// Regex patterns for detecting quoted containers inside HTML emails
+const HTML_QUOTE_PATTERNS = [
+  /<(?:div|blockquote)[^>]*class=["'][^"']*\bgmail_quote\b[^"']*["'][^>]*>[\s\S]*$/i,
+  /<div[^>]*id=["']divRplyFwdMsg["'][^>]*>[\s\S]*$/i,
+  /<div[^>]*id=["']appendonsend["'][^>]*>[\s\S]*$/i,
+  /<hr[^>]*id=["']stopSpelling["'][^>]*>[\s\S]*$/i,
+  /<div[^>]*style=["'][^"']*border-top:\s*solid\s*#?[a-f0-9]{3,6}[^"']*["'][^>]*>[\s\S]*$/i,
+  /<blockquote[^>]*>[\s\S]*<\/blockquote>$/i,
+];
+
+/**
+ * Parse HTML email body and isolate quoted blocks
+ */
+export function parseEmailHtml(rawHtml: string | null | undefined): ParsedEmailHtml {
+  if (!rawHtml || !rawHtml.trim()) {
+    return { newHtml: "", quotedHtml: "", hasQuotedHtml: false };
+  }
+
+  const html = rawHtml.trim();
+
+  for (const pattern of HTML_QUOTE_PATTERNS) {
+    const match = pattern.exec(html);
+    if (match && match.index > 0) {
+      const newHtml = html.slice(0, match.index).trim();
+      const quotedHtml = html.slice(match.index).trim();
+      // Ensure newHtml actually has visible text or media
+      const textPreview = htmlToPlainText(newHtml);
+      if (textPreview.length > 5) {
+        return {
+          newHtml,
+          quotedHtml,
+          hasQuotedHtml: true,
+        };
+      }
+    }
+  }
+
+  return {
+    newHtml: html,
+    quotedHtml: "",
+    hasQuotedHtml: false,
+  };
+}
+
+/**
+ * High-level helper to produce clean display content for any email record
+ */
+export function parseEmailMessage(input: {
+  bodyHtml?: string | null;
+  bodyText?: string | null;
+}): ParsedEmailMessage {
+  const rawHtml = input.bodyHtml && input.bodyHtml.trim() ? input.bodyHtml : null;
+  const rawText = input.bodyText && input.bodyText.trim() ? input.bodyText : null;
+
+  if (rawHtml) {
+    const parsedHtml = parseEmailHtml(rawHtml);
+    return {
+      isHtml: true,
+      content: parsedHtml.newHtml || rawHtml,
+      quotedContent: parsedHtml.quotedHtml,
+      hasQuoted: parsedHtml.hasQuotedHtml,
+      rawHtml,
+      rawText: rawText ? decodeHtmlEntities(rawText) : htmlToPlainText(rawHtml),
+    };
+  }
+
+  const decodedText = decodeHtmlEntities(rawText || "");
+  const parsedText = parseEmailReply(decodedText);
+
+  return {
+    isHtml: false,
+    content: parsedText.newContent || decodedText,
+    quotedContent: parsedText.quotedContent,
+    hasQuoted: parsedText.hasQuotedContent,
+    rawHtml: null,
+    rawText: decodedText,
   };
 }
