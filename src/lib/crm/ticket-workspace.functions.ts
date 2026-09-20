@@ -233,6 +233,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       previousOrders: prevOrdersRes.data ?? [],
       complaints: complaintsRes.data ?? [],
       refunds: refundsRes.data ?? [],
+      emails: allMatchedEmails,
       customerStats: {
         lifetimeValue,
         totalOrders: Number(t.customers?.total_applications ?? (prevOrdersRes.data ?? []).length),

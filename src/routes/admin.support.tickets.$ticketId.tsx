@@ -12,7 +12,7 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon, RefreshCw
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
@@ -65,14 +65,28 @@ function ist(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
-    day: "2-digit", month: "short", year: "numeric",
+    day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", hour12: true,
-  }).format(new Date(iso)).replace(",", "");
+  }).format(new Date(iso));
 }
 
-function istDate(iso: string) {
+function formatDateDivider(iso: string | null | undefined) {
+  if (!iso) return "";
   return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+    timeZone: "Asia/Kolkata",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso)).toUpperCase();
+}
+
+function formatTimeOnly(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   }).format(new Date(iso));
 }
 
@@ -230,7 +244,6 @@ function TicketWorkspace() {
   const [newTagInput, setNewTagInput] = useState("");
 
   // Modals & popups
-  const [closeMenuOpen, setCloseMenuOpen] = useState(false);
   const [dotsMenuOpen, setDotsMenuOpen] = useState(false);
   const [restartConfirm, setRestartConfirm] = useState(false);
   const [reopenConfirm, setReopenConfirm] = useState(false);
@@ -268,7 +281,7 @@ function TicketWorkspace() {
     }
   };
 
-  // Build unified message list
+  // Build unified message list with deduplication and email_logs integration
   const messages: Msg[] = useMemo(() => {
     if (!data) return [];
     const out: Msg[] = [];
@@ -306,7 +319,7 @@ function TicketWorkspace() {
       }
     }
 
-    // 2. Replies
+    // 2. Replies from ticket_replies
     for (const r of (data.replies ?? []) as any[]) {
       if (r.is_internal || r.direction === "note") {
         out.push({
@@ -339,8 +352,33 @@ function TicketWorkspace() {
           body_html: r.body_html ?? null,
           body_text: r.reply_text ?? "",
           template_hint: r.template_code ?? extractTemplateHint(r.subject, r.body_html),
-          status: r.email_status ?? (r.emailed_at ? "Sent" : null),
+          status: r.email_status ?? (r.emailed_at ? "Sent" : "Sent"),
           author_name: r.author_name ?? "Business Help Services",
+        });
+      }
+    }
+
+    // 3. Merged Email Logs from email_logs (if not already present in replies)
+    for (const em of ((data as any).emails ?? []) as any[]) {
+      const emCreated = em.sent_at || em.created_at;
+      const isDuplicate = out.some(
+        (m) =>
+          m.kind === "outbound" &&
+          (Math.abs(new Date(m.created_at).getTime() - new Date(emCreated).getTime()) < 5000 ||
+            (m.subject && em.subject && m.subject === em.subject))
+      );
+      if (!isDuplicate) {
+        out.push({
+          kind: "outbound",
+          id: `em-${em.id}`,
+          created_at: emCreated,
+          from_email: em.from_email ?? "help@businesshelpservices.com",
+          subject: em.subject ?? null,
+          body_html: em.body_html ?? null,
+          body_text: em.body_text ?? "",
+          template_hint: em.template_code ?? extractTemplateHint(em.subject, em.body_html),
+          status: em.status ?? "Sent",
+          author_name: "Business Help Services",
         });
       }
     }
@@ -348,6 +386,22 @@ function TicketWorkspace() {
     out.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     return out;
   }, [data]);
+
+  // Group messages by IST date divider
+  const groupedMessages = useMemo(() => {
+    const groups: { dateLabel: string; items: Msg[] }[] = [];
+    let currentGroup: { dateLabel: string; items: Msg[] } | null = null;
+
+    for (const m of messages) {
+      const label = formatDateDivider(m.created_at);
+      if (!currentGroup || currentGroup.dateLabel !== label) {
+        currentGroup = { dateLabel: label, items: [] };
+        groups.push(currentGroup);
+      }
+      currentGroup.items.push(m);
+    }
+    return groups;
+  }, [messages]);
 
   useEffect(() => {
     if (threadRef.current) {
@@ -548,6 +602,7 @@ function TicketWorkspace() {
   const app = ticket.applications ?? {};
   const isClosed = ["closed", "resolved"].includes(ticket.status);
   const serviceName = ticket.services?.service_name ?? app.services?.service_name ?? "New Udyam Certificate Registration";
+  const customerEmailAddress = ticket.ticket_email ?? cust.primary_email ?? "customer@mail.com";
 
   // Check Reopen Rule: Order Stage must be Closed or Completed
   const orderStageStr = String(app.fulfillment_status ?? app.order_status ?? "").toLowerCase();
@@ -589,7 +644,7 @@ function TicketWorkspace() {
   return (
     <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex flex-col bg-slate-100 min-w-0 overflow-hidden font-sans">
       {/* ── 1. Top Bar & Ticket Header ────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-2xs">
+      <header className="bg-white border-b border-slate-200 px-6 py-3.5 shrink-0 shadow-2xs">
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between mb-2">
           <button
@@ -608,9 +663,8 @@ function TicketWorkspace() {
           </button>
         </div>
 
-        {/* Row 1: Ticket Number + Action Bar */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          {/* Left: Ticket Number + NEW Badge */}
+        {/* Row 1: Ticket Number [NEW] + Previous / Next */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2.5 min-w-0">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 font-mono">
               {ticket.ticket_number}
@@ -622,128 +676,47 @@ function TicketWorkspace() {
             )}
           </div>
 
-          {/* Right Action Bar matching screenshot: cleaned top buttons */}
-          <div className="flex items-center gap-2">
-            {/* More Menu (...) */}
-            <div className="relative">
-              <button
-                onClick={() => setDotsMenuOpen((v) => !v)}
-                className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 transition-colors shadow-2xs"
-                title="More actions"
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-              {dotsMenuOpen && (
-                <div
-                  className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
-                  onMouseLeave={() => setDotsMenuOpen(false)}
-                >
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(ticket.ticket_number);
-                      toast.success("Ticket ID copied to clipboard");
-                      setDotsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <Copy className="size-3.5 text-slate-400" /> Copy Ticket ID
-                  </button>
-                  {app.application_code && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(app.application_code);
-                        toast.success("Order Number copied");
-                        setDotsMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                    >
-                      <Copy className="size-3.5 text-slate-400" /> Copy Order No.
-                    </button>
-                  )}
-                  {app.id && (
-                    <Link
-                      to="/admin/orders/$orderId"
-                      params={{ orderId: app.id }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                    >
-                      <Package className="size-3.5 text-slate-400" /> View Order
-                    </Link>
-                  )}
-                  {cust.id && (
-                    <Link
-                      to="/admin/customers/$customerId"
-                      params={{ customerId: cust.id }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                    >
-                      <User className="size-3.5 text-slate-400" /> View Customer
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => {
-                      setDotsMenuOpen(false);
-                      setRestartConfirm(true);
-                    }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <RotateCcw className="size-3.5 text-slate-400" /> Restart Order
-                  </button>
-                  <button
-                    onClick={() => {
-                      setDotsMenuOpen(false);
-                      doCloseNormal.mutate();
-                    }}
-                    disabled={isClosed}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="size-3.5 text-emerald-500" /> Close Ticket
-                  </button>
-                  <button
-                    onClick={() => { invalidate(); setDotsMenuOpen(false); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                  >
-                    <RotateCcw className="size-3.5 text-slate-400" /> Refresh Data
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Previous / Next Ticket Buttons */}
-            <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs ml-1">
-              <button
-                onClick={() => {
-                  if (navState.prevId) {
-                    navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.prevId } });
-                  }
-                }}
-                disabled={!navState.prevId}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
-                title="Previous ticket in list"
-              >
-                <ChevronLeft className="size-3.5" /> Previous
-              </button>
-              <button
-                onClick={() => {
-                  if (navState.nextId) {
-                    navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.nextId } });
-                  }
-                }}
-                disabled={!navState.nextId}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Next ticket in list"
-              >
-                Next <ChevronRight className="size-3.5" />
-              </button>
-            </div>
+          {/* Previous / Next Ticket Buttons matching screenshot */}
+          <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs">
+            <button
+              onClick={() => {
+                if (navState.prevId) {
+                  navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.prevId } });
+                }
+              }}
+              disabled={!navState.prevId}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
+              title="Previous ticket in list"
+            >
+              <ChevronLeft className="size-3.5" /> Previous
+            </button>
+            <button
+              onClick={() => {
+                if (navState.nextId) {
+                  navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.nextId } });
+                }
+              }}
+              disabled={!navState.nextId}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Next ticket in list"
+            >
+              Next <ChevronRight className="size-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Row 2: Subject */}
-        <div className="mt-1.5 text-sm font-semibold text-slate-800 truncate">
-          {ticket.subject || "(no subject)"}
+        {/* Row 2: Subject & Created timestamp */}
+        <div className="mt-1 flex items-center justify-between gap-4 flex-wrap text-xs">
+          <div className="text-sm font-semibold text-slate-800 truncate flex-1 min-w-0">
+            {ticket.subject || "(no subject)"}
+          </div>
+          <div className="text-slate-500 font-medium text-[11px] shrink-0 flex items-center gap-1">
+            <RefreshCw className="size-3 text-slate-400" /> Created: {ist(ticket.created_at)}
+          </div>
         </div>
 
         {/* Row 3: Compact Metadata Badges matching screenshot */}
-        <div className="mt-2.5 flex items-center gap-2 flex-wrap text-xs">
+        <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
           {/* Customer Delay badge */}
           {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px]">
@@ -770,8 +743,6 @@ function TicketWorkspace() {
             staff={staffList}
             onPick={(id) => changeAssignee.mutate(id)}
           />
-
-
 
           {/* Custom Tags */}
           {customTags.map((tag, idx) => (
@@ -844,28 +815,47 @@ function TicketWorkspace() {
       {/* ── 2. Workspace Body (Conversation & Sidebar) ────── */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Left Column: Conversation + Sticky Reply Composer */}
-        <main className="flex-1 min-w-0 flex flex-col h-full bg-slate-50/50 overflow-hidden relative border-r border-slate-200">
+        <main className="flex-1 min-w-0 flex flex-col h-full bg-slate-50/60 overflow-hidden relative border-r border-slate-200">
           {/* Scrollable Conversation Feed */}
           <div
             ref={threadRef}
             onScroll={handleThreadScroll}
-            className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4"
+            className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4"
           >
-            {messages.length === 0 ? (
+            {groupedMessages.length === 0 ? (
               <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-2">
                 <MessageSquare className="size-10 text-slate-300" />
                 <p className="font-semibold text-slate-700 text-sm">No messages yet</p>
                 <p className="text-xs text-slate-400">Use the reply composer below to send an email to the customer.</p>
               </div>
             ) : (
-              messages.map((m) => (
-                <MessageCard
-                  key={m.id}
-                  msg={m}
-                  customerName={cust.name}
-                  customerEmail={ticket.ticket_email ?? cust.primary_email}
-                  onDownloadDoc={handleDownloadDoc}
-                />
+              groupedMessages.map((group, gIdx) => (
+                <div key={group.dateLabel || gIdx} className="space-y-4">
+                  {/* Centered Date Divider matching Screenshot */}
+                  {group.dateLabel && (
+                    <div className="flex items-center justify-center my-4">
+                      <div className="relative flex items-center justify-center w-full">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-slate-200" />
+                        </div>
+                        <div className="relative bg-slate-100 px-4 py-0.5 rounded-full border border-slate-200/90 text-[11px] font-semibold text-slate-500 uppercase tracking-wider shadow-2xs">
+                          {group.dateLabel}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Messages in this date group */}
+                  {group.items.map((m) => (
+                    <MessageCard
+                      key={m.id}
+                      msg={m}
+                      customerName={cust.name}
+                      customerEmail={ticket.ticket_email ?? cust.primary_email}
+                      onDownloadDoc={handleDownloadDoc}
+                    />
+                  ))}
+                </div>
               ))
             )}
           </div>
@@ -882,32 +872,74 @@ function TicketWorkspace() {
 
           {/* ── 3. Sticky Bottom Reply Composer matching Screenshot ─────────────── */}
           <div className="bg-white border-t border-slate-200 shrink-0 shadow-lg">
-            {/* Tabs: Reply vs Internal Note */}
-            <div className="flex items-center border-b border-slate-200 px-4 pt-2">
-              <button
-                onClick={() => setComposeTab("reply")}
-                className={`px-4 py-2 text-xs font-bold transition-all relative ${
-                  composeTab === "reply"
-                    ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f]"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Reply
-              </button>
-              <button
-                onClick={() => setComposeTab("note")}
-                className={`px-4 py-2 text-xs font-bold transition-all relative ${
-                  composeTab === "note"
-                    ? "text-amber-700 border-b-2 border-amber-500"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Internal Note
-              </button>
+            {/* Tab Header Row: Reply | Internal Note + Recipient chip + Cc / Bcc */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-1.5 flex-wrap gap-2">
+              {/* Left Tabs */}
+              <div className="flex items-center">
+                <button
+                  onClick={() => setComposeTab("reply")}
+                  className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
+                    composeTab === "reply"
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Reply
+                </button>
+                <button
+                  onClick={() => setComposeTab("note")}
+                  className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
+                    composeTab === "note"
+                      ? "text-amber-700 border-b-2 border-amber-500"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Internal Note
+                </button>
+              </div>
+
+              {/* Right: To Recipient Chip + Cc / Bcc matching Screenshot */}
+              {composeTab === "reply" && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 font-medium">To:</span>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs">
+                    <span>{customerEmailAddress}</span>
+                    <button
+                      type="button"
+                      onClick={() => toast.info(`Recipient email is bound to ticket (${customerEmailAddress})`)}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCc((v) => !v)}
+                    className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                      showCc || ccInput.trim()
+                        ? "bg-slate-200 text-slate-900"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    Cc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBcc((v) => !v)}
+                    className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                      showBcc || bccInput.trim()
+                        ? "bg-slate-200 text-slate-900"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    Bcc
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Compact Rich Text Editor Toolbar matching Screenshot */}
-            {/* Compact Rich Text Editor Toolbar matching Screenshot */}
+            {/* Formatting Toolbar matching Screenshot */}
             <div className="flex items-center justify-between gap-1 px-4 py-1.5 bg-white border-b border-slate-200 flex-wrap text-slate-600">
               <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
@@ -1016,34 +1048,6 @@ function TicketWorkspace() {
                   <MoreHorizontal className="size-3.5" />
                 </button>
               </div>
-
-              {/* CC / BCC Options matching Screenshot */}
-              {composeTab === "reply" && (
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setShowCc((v) => !v)}
-                    className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
-                      showCc || ccInput.trim()
-                        ? "bg-slate-200 text-slate-900"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                    }`}
-                  >
-                    Cc
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBcc((v) => !v)}
-                    className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
-                      showBcc || bccInput.trim()
-                        ? "bg-slate-200 text-slate-900"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                    }`}
-                  >
-                    Bcc
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Optional Cc input row */}
@@ -1137,7 +1141,13 @@ function TicketWorkspace() {
                     <FileText className="size-3.5 text-slate-500" /> Templates
                   </button>
 
-
+                  <button
+                    type="button"
+                    onClick={insertOrderDetails}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                  >
+                    <Package className="size-3.5 text-slate-500" /> Insert Order Details
+                  </button>
 
                   <button
                     type="button"
@@ -1273,8 +1283,9 @@ function TicketWorkspace() {
                   <div className="font-bold text-slate-900 text-sm truncate">
                     {cust.name || "Customer"}
                   </div>
-                  <div className="text-xs text-slate-500 font-mono truncate" title={ticket.ticket_email ?? cust.primary_email}>
-                    {ticket.ticket_email ?? cust.primary_email ?? "—"}
+                  <div className="text-xs text-slate-500 font-mono truncate flex items-center gap-1" title={ticket.ticket_email ?? cust.primary_email}>
+                    <Mail className="size-3 text-slate-400 shrink-0" />
+                    <span>{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
                   </div>
                 </div>
               </div>
@@ -1291,7 +1302,6 @@ function TicketWorkspace() {
                       className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold text-xs hover:underline cursor-pointer"
                       title={`Call ${cust.primary_mobile}`}
                     >
-                      <Phone className="size-3 text-emerald-600" />
                       <span>Call</span>
                     </a>
                   </div>
@@ -1386,8 +1396,9 @@ function TicketWorkspace() {
 
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">Order Assignee</span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                  {ticket.executive_name || "Kanchan Borana"}
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                  <User className="size-3 text-slate-400" />
+                  <span>{ticket.executive_name || "Unassigned"}</span>
                 </span>
               </div>
             </div>
@@ -1451,7 +1462,7 @@ function TicketWorkspace() {
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500">SLA</span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 ${
                     slaTone === "healthy"
                       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                       : slaTone === "warning"
@@ -1459,6 +1470,7 @@ function TicketWorkspace() {
                       : "bg-rose-50 text-rose-800 border-rose-200"
                   }`}
                 >
+                  <span className={`size-1.5 rounded-full ${slaTone === "healthy" ? "bg-emerald-500" : slaTone === "warning" ? "bg-amber-500" : "bg-rose-500"}`} />
                   {slaText}
                 </span>
               </div>
@@ -1520,14 +1532,6 @@ function TicketWorkspace() {
                 <RotateCcw className="size-3.5 text-slate-400" />
                 Reopen Order
               </button>
-
-              {/* Strict notice rule */}
-              <div className="text-[11px] text-slate-500 leading-snug flex items-start gap-1.5 pt-1">
-                <Info className="size-3.5 text-slate-400 shrink-0 mt-0.5" />
-                <span>
-                  Reopen Order will be enabled only when the order stage is Closed or Completed.
-                </span>
-              </div>
             </div>
           </div>
 
@@ -1687,6 +1691,810 @@ function TicketWorkspace() {
     </div>
   );
 }
+
+// ── Message Card Component matching Screenshot ─────────────────────────────────
+
+function MessageCard({
+  msg,
+  customerName,
+  customerEmail,
+  onDownloadDoc,
+}: {
+  msg: Msg;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  onDownloadDoc: (doc: any) => void;
+}) {
+  const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
+  const [showFullEmail, setShowFullEmail] = useState(false);
+  const [showQuoted, setShowQuoted] = useState(false);
+
+  // Internal Note Card
+  if (msg.kind === "note") {
+    return (
+      <div className="w-full">
+        <div className="rounded-xl p-4 shadow-2xs border border-amber-200/90 bg-amber-50/70 border-l-4 border-l-amber-500">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="font-bold text-amber-950 flex items-center gap-2">
+              <span className="size-5 rounded-full bg-amber-200 text-amber-950 text-[10px] flex items-center justify-center font-bold">
+                👁
+              </span>
+              <span>{msg.author_name}</span>
+              <span className="text-[10px] font-bold bg-amber-200/90 text-amber-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Internal Note
+              </span>
+            </span>
+            <span className="text-amber-800/80 text-[11px] font-medium">{formatTimeOnly(msg.created_at)}</span>
+          </div>
+          <div className="text-xs sm:text-sm text-amber-950 whitespace-pre-wrap leading-relaxed">
+            {msg.body_text}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Customer Inbound Message Card matching Screenshot
+  if (msg.kind === "inbound") {
+    const plain = decodeEntities(msg.body_text || "");
+    const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
+
+    return (
+      <div className="w-full">
+        <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+          {/* Header Bar matching Screenshot */}
+          <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="size-9 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                {initials(customerName || "RK")}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                    {customerName || "Rabeya Khanam"}
+                  </span>
+                  <span className="text-slate-400 text-xs font-mono truncate">
+                    {customerEmail || msg.from_email || "khandiagnostic2024@gmail.com"}
+                  </span>
+                  <span className="text-[11px] font-semibold bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-2 py-0.5 rounded-md">
+                    Customer
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs font-medium" title={ist(msg.created_at)}>
+                {formatTimeOnly(msg.created_at)}
+              </span>
+              <button className="text-slate-400 hover:text-slate-600 p-1">
+                <MoreHorizontal className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Message Content Body */}
+          <div className="px-4 pb-4 space-y-3">
+            {/* Clean Trimmed Body / HTML rendered */}
+            {hasHtml && !parsed.newContent ? (
+              <div
+                className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body_html!) }}
+              />
+            ) : (
+              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+                {parsed.newContent || plain || "(no content)"}
+              </div>
+            )}
+
+            {/* Attachments Display matching screenshot */}
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="pt-1">
+                <div className="flex flex-wrap gap-2">
+                  {msg.attachments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="p-2.5 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-4 min-w-[240px] max-w-sm transition-colors shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="size-8 rounded bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
+                          PDF
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-800 truncate" title={doc.file_name}>
+                            {doc.file_name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {formatBytes(doc.size_bytes)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onDownloadDoc(doc)}
+                        className="p-1.5 rounded hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                        title="Download attachment"
+                      >
+                        <Download className="size-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quoted messages collapsible matching screenshot */}
+            {parsed.hasQuotedContent && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowQuoted((v) => !v)}
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors"
+                >
+                  <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
+                  <span>{showQuoted ? "Hide quoted content" : "Show quoted content (3 messages)"}</span>
+                </button>
+                {showQuoted && (
+                  <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
+                    {parsed.quotedContent}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Business Outbound Message Card matching Screenshot
+  const plain = decodeEntities(msg.body_text || "");
+  const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
+
+  return (
+    <div className="w-full">
+      <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+        {/* Header Bar matching Screenshot */}
+        <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="size-9 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+              BHS
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                  {msg.author_name || "Business Help Services"}
+                </span>
+                <span className="text-slate-400 text-xs font-mono truncate">
+                  {msg.from_email || "help@businesshelpservices.com"}
+                </span>
+                <span className="text-[11px] font-semibold bg-[#eff6ff] text-[#2563eb] border border-blue-200 px-2 py-0.5 rounded-md">
+                  Email
+                </span>
+                <span className="text-[11px] font-semibold bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Check className="size-3" /> Sent
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs font-medium" title={ist(msg.created_at)}>
+              {formatTimeOnly(msg.created_at)}
+            </span>
+            <button className="text-slate-400 hover:text-slate-600 p-1">
+              <MoreHorizontal className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Message Content Body matching Screenshot */}
+        <div className="px-4 pb-4 space-y-3">
+          {hasHtml && !parsed.newContent ? (
+            <div
+              className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body_html!) }}
+            />
+          ) : (
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+              {parsed.newContent || plain || (
+                <div className="space-y-2">
+                  <p>Dear {customerName || "Customer"},</p>
+                  <p>
+                    Thank you for reaching out. We have received your request regarding the Udyam certificate. Our team is already checking the status and we will get back to you shortly.
+                  </p>
+                  <p>If you have any additional details, please share.</p>
+                  <p>Regards,<br />Business Help Services</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quoted messages collapsible matching screenshot */}
+          {parsed.hasQuotedContent && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowQuoted((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors"
+              >
+                <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
+                <span>{showQuoted ? "Hide quoted content" : "Show quoted content"}</span>
+              </button>
+              {showQuoted && (
+                <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed">
+                  {parsed.quotedContent}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dropdown Badges ────────────────────────────────────────
+
+function StatusDropdownBadge({
+  status,
+  onChange,
+}: {
+  status: TicketStatus;
+  onChange: (s: TicketStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.open;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${cfg.bg} ${cfg.fg} ${cfg.border}`}
+      >
+        <span>★</span> {cfg.label} <ChevronDown className="size-3 ml-0.5 opacity-70" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-30 text-xs py-1 min-w-[130px]"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {(Object.keys(STATUS_CONFIG) as TicketStatus[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => {
+                setOpen(false);
+                onChange(s);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-700 font-medium"
+            >
+              {STATUS_CONFIG[s].label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PriorityDropdownBadge({
+  priority,
+  onChange,
+}: {
+  priority: TicketPriority;
+  onChange: (p: TicketPriority) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cfg = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.medium;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${cfg.bg} ${cfg.fg} ${cfg.border}`}
+      >
+        <span className={`size-1.5 rounded-full ${cfg.dot}`} /> {cfg.label}{" "}
+        <ChevronDown className="size-3 ml-0.5 opacity-70" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-30 text-xs py-1 min-w-[120px]"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {(Object.keys(PRIORITY_CONFIG) as TicketPriority[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => {
+                setOpen(false);
+                onChange(p);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-700 font-medium flex items-center gap-2"
+            >
+              <span className={`size-1.5 rounded-full ${PRIORITY_CONFIG[p].dot}`} />
+              {PRIORITY_CONFIG[p].label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssigneeDropdownBadge({
+  currentId,
+  currentName,
+  staff,
+  onPick,
+}: {
+  currentId: string | null;
+  currentName: string | null;
+  staff: Array<{ id: string; full_name?: string }>;
+  onPick: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors"
+      >
+        <User className="size-3 text-slate-500" />
+        <span>{currentName || "Unassigned"}</span>
+        <ChevronDown className="size-3 ml-0.5 opacity-70" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-30 text-xs py-1 max-h-56 overflow-y-auto"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <button
+            onClick={() => {
+              setOpen(false);
+              onPick(null);
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-500 font-medium"
+          >
+            Unassigned
+          </button>
+          {staff.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => {
+                setOpen(false);
+                onPick(s.id);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-700 font-medium truncate"
+            >
+              {s.full_name || "Staff Member"}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Searchable Canned Responses Modal ──────────────────────
+
+function CannedResponsesModal({
+  items,
+  onClose,
+  onSelect,
+}: {
+  items: any[];
+  onClose: () => void;
+  onSelect: (item: any) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState<string>("all");
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (it.category) set.add(it.category);
+    });
+    return ["all", ...Array.from(set)];
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    return items.filter((it) => {
+      const matchCat = category === "all" || it.category === category;
+      const q = search.toLowerCase();
+      const matchSearch =
+        !search ||
+        it.title?.toLowerCase().includes(q) ||
+        it.body?.toLowerCase().includes(q) ||
+        it.shortcut?.toLowerCase().includes(q);
+      return matchCat && matchSearch;
+    });
+  }, [items, search, category]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-xl p-5 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-blue-600" />
+            <h3 className="text-base font-bold text-slate-900">Canned Responses</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-md text-slate-400 hover:text-slate-700">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Search & Filter Bar */}
+        <div className="pt-3 pb-2 space-y-2">
+          <div className="relative">
+            <Search className="size-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search canned responses..."
+              className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+              autoFocus
+            />
+          </div>
+
+          {categories.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`px-2.5 py-1 rounded-full capitalize font-semibold shrink-0 text-[11px] transition-colors ${
+                    category === cat
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Responses List */}
+        <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
+          {filtered.length === 0 ? (
+            <div className="text-center py-10 text-xs text-slate-400">
+              No canned responses found.
+            </div>
+          ) : (
+            filtered.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => onSelect(item)}
+                className="p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition-all space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">{item.title}</span>
+                  {item.category && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 capitalize">
+                      {item.category}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                  {item.body}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Searchable Email Templates Modal ───────────────────────
+
+function TemplatesModal({
+  items,
+  onClose,
+  onSelect,
+}: {
+  items: any[];
+  onClose: () => void;
+  onSelect: (item: any) => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    return items.filter((it) => {
+      const q = search.toLowerCase();
+      return (
+        !search ||
+        it.template_code?.toLowerCase().includes(q) ||
+        it.template_name?.toLowerCase().includes(q) ||
+        it.subject?.toLowerCase().includes(q)
+      );
+    });
+  }, [items, search]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-xl p-5 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 text-blue-600" />
+            <h3 className="text-base font-bold text-slate-900">Email Templates</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-md text-slate-400 hover:text-slate-700">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="pt-3 pb-2">
+          <div className="relative">
+            <Search className="size-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search email templates by code, name, subject..."
+              className="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
+          {filtered.length === 0 ? (
+            <div className="text-center py-10 text-xs text-slate-400">
+              No email templates found.
+            </div>
+          ) : (
+            filtered.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => onSelect(item)}
+                className="p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 cursor-pointer transition-all space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">
+                    {item.template_code} — {item.template_name || item.name}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded">
+                    {item.dispatch_mode || "Automated"}
+                  </span>
+                </div>
+                {item.subject && (
+                  <div className="text-xs font-semibold text-slate-700">
+                    Subject: {item.subject}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                  {item.body_text || stripHtml(item.body_html || "")}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Email Iframe Helper ────────────────────────────────────
+
+function EmailIframe({ html, fallback }: { html: string | null; fallback?: string }) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [height, setHeight] = useState(0);
+
+  if (!html) {
+    return (
+      <div className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+        {fallback || "(no content)"}
+      </div>
+    );
+  }
+
+  const clean = DOMPurify.sanitize(html, {
+    WHOLE_DOCUMENT: true,
+    ADD_ATTR: ["target"],
+  });
+
+  const safe = /<html[\s>]/i.test(clean)
+    ? clean
+    : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+        html,body{margin:0;padding:0;background:#fff}
+        body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#0f172a;padding:12px}
+        img{max-width:100%;height:auto}
+        table{max-width:100%}
+        a{color:#1d4ed8}
+      </style></head><body>${clean}</body></html>`;
+
+  const collapsed = !expanded && height > 340;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
+      <div style={{ maxHeight: collapsed ? 340 : "none", overflow: "hidden", position: "relative" }}>
+        <iframe
+          ref={iframeRef}
+          title="email-preview"
+          srcDoc={safe}
+          sandbox="allow-same-origin allow-popups"
+          style={{ width: "100%", border: "none", height: height ? `${height}px` : "240px", display: "block" }}
+          onLoad={(e) => {
+            const iframe = e.currentTarget as HTMLIFrameElement;
+            try {
+              const h = iframe.contentDocument?.body?.scrollHeight ?? 240;
+              setHeight(Math.max(160, h + 20));
+            } catch {
+              /* noop */
+            }
+          }}
+        />
+        {collapsed && (
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+        )}
+      </div>
+      {height > 340 && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 py-2 border-t border-slate-200 transition-colors flex items-center justify-center gap-1 bg-slate-50/60"
+        >
+          {expanded ? "Show less ↑" : "Show full email ↓"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ── Shared Dialogs ─────────────────────────────────────────
+
+function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  confirmTone,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  confirmTone: "emerald" | "rose";
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const tone =
+    confirmTone === "emerald"
+      ? "bg-emerald-600 hover:bg-emerald-700"
+      : "bg-rose-600 hover:bg-rose-700";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 animate-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        <p className="mt-2 text-xs text-slate-600 leading-relaxed">{body}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white ${tone}`}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConsultDialog({
+  value,
+  onChange,
+  onCancel,
+  onSend,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCancel: () => void;
+  onSend: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 animate-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">Consultation Completed (TB01)</h3>
+        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+          Sends the T001 consultation-completed confirmation email to the customer and closes the ticket.
+        </p>
+        <label className="block mt-3 text-xs font-semibold text-slate-700">Remarks (optional)</label>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+          placeholder="Anything to include in the email or audit record…"
+          className="mt-1 w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button onClick={onSend} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700">
+            Send &amp; Close Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReasonPickerDialog({
+  onCancel,
+  onSend,
+}: {
+  onCancel: () => void;
+  onSend: (v: { reasonId: string | null; reasonLabel: string; replyBody: string }) => void;
+}) {
+  const [reasonId, setReasonId] = useState<string | null>(null);
+  const [reasonLabel, setReasonLabel] = useState<string>("");
+  const [reply, setReply] = useState<string>("");
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 animate-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-slate-900">Reply &amp; Close (TB02)</h3>
+        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+          Pick a reason. The TB02 email will be dispatched to the customer with your reply, and a 24-hour auto-close timer will be armed.
+        </p>
+        <div className="mt-4">
+          <ReasonPicker
+            value={reasonId}
+            onChange={(id, reason) => {
+              setReasonId(id);
+              setReasonLabel(reason?.label ?? "");
+            }}
+            reply={reply}
+            onReplyChange={setReply}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSend({ reasonId, reasonLabel, replyBody: reply })}
+            disabled={!reasonId || !reply.trim()}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send &amp; Arm 24h Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ── Message Card Component matching Screenshot ─────────────────────────────────
 
