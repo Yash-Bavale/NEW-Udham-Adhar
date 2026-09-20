@@ -1,6 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Volume2, VolumeX, Play, Bell, BellRing, Flame, Sparkles, Check } from "lucide-react";
+import {
+  Volume2,
+  VolumeX,
+  Play,
+  BellRing,
+  Check,
+  Upload,
+  Music,
+  Trash2,
+  FileAudio,
+} from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 import {
   getSoundSettings,
@@ -11,7 +21,7 @@ import {
   type SoundSettings,
 } from "@/lib/audio/reminder-sounds";
 
-const SOUND_OPTIONS: { id: SoundTone; label: string; description: string }[] = [
+const BUILTIN_SOUND_OPTIONS: { id: SoundTone; label: string; description: string }[] = [
   { id: "chime", label: "Harmonic Chime (Default)", description: "3-note melodic chime (pleasant & clear)" },
   { id: "bell", label: "Crystal Bell", description: "High-resonance ringing alert bell" },
   { id: "digital_ring", label: "Digital Ring", description: "Urgent dual-pulse digital beep" },
@@ -22,6 +32,7 @@ const SOUND_OPTIONS: { id: SoundTone; label: string; description: string }[] = [
 export function ReminderAudioSettingsCard() {
   const [settings, setSettings] = useState<SoundSettings>(getSoundSettings);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -38,6 +49,51 @@ export function ReminderAudioSettingsCard() {
   const handleTest = (tone?: SoundTone) => {
     playReminderSound(tone ?? settings.tone, settings.volume);
     toast.info(`Playing preview for ${tone ?? settings.tone}`);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate audio file type
+    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|ogg|m4a|aac)$/i)) {
+      toast.error("Please upload a valid audio file (.mp3, .wav, .ogg, .m4a, .aac)");
+      return;
+    }
+
+    // Limit to 4MB for fast in-memory playback
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Audio file size should be less than 4MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const updated = saveSoundSettings({
+        customAudioUrl: dataUrl,
+        customAudioName: file.name,
+        tone: "custom",
+      });
+      setSettings(updated);
+      toast.success(`Custom audio "${file.name}" uploaded & selected!`);
+      playReminderSound("custom", updated.volume);
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read audio file");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCustomAudio = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = saveSoundSettings({
+      customAudioUrl: null,
+      customAudioName: null,
+      tone: "chime",
+    });
+    setSettings(updated);
+    toast.info("Custom audio removed. Reset to default Harmonic Chime.");
   };
 
   const requestPermission = async () => {
@@ -76,14 +132,82 @@ export function ReminderAudioSettingsCard() {
           Configure the sound and screen notifications triggered on employee laptops whenever a customer callback reminder ends and the order transitions into a <b className="text-rose-600">🔥 Hot Order</b>.
         </div>
 
-        {/* 1. Tone Selector */}
+        {/* 1. Tone Selector & Custom Sound Upload */}
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-            Alert Sound Tone
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              Alert Sound Tone &amp; Custom Ringtones
+            </label>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg transition shadow-2xs cursor-pointer"
+            >
+              <Upload className="size-3.5" /> Upload Custom Audio (.mp3/.wav)
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {SOUND_OPTIONS.map((opt) => {
+            {/* Custom Uploaded Tone Card (if uploaded) */}
+            {settings.customAudioUrl && (
+              <div
+                onClick={() => {
+                  update({ tone: "custom" });
+                  playReminderSound("custom", settings.volume);
+                }}
+                className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition cursor-pointer select-none ${
+                  settings.tone === "custom"
+                    ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs"
+                    : "border-slate-200 bg-slate-50/40 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 truncate">
+                      <Music className="size-3.5 text-emerald-600 shrink-0" />
+                      {settings.customAudioName || "Custom Sound"}
+                    </span>
+                    {settings.tone === "custom" && <Check className="size-4 text-emerald-600 shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Custom uploaded alert sound file
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    onClick={handleRemoveCustomAudio}
+                    className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-700 font-semibold p-1 hover:bg-rose-50 rounded"
+                    title="Remove custom audio"
+                  >
+                    <Trash2 className="size-3" /> Remove
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTest("custom");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
+                  >
+                    <Play className="size-2.5" /> Play
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Built-in Tones */}
+            {BUILTIN_SOUND_OPTIONS.map((opt) => {
               const isSelected = settings.tone === opt.id;
               return (
                 <div
@@ -126,6 +250,17 @@ export function ReminderAudioSettingsCard() {
               );
             })}
           </div>
+
+          {/* Quick upload dropzone hint */}
+          {!settings.customAudioUrl && (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs text-slate-500 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition"
+            >
+              <FileAudio className="size-4 text-slate-400" />
+              <span>Want your own sound? Click here to upload an <b>MP3 / WAV / OGG</b> custom ringtone.</span>
+            </div>
+          )}
         </div>
 
         {/* 2. Volume Slider & Enable Toggle */}
@@ -139,7 +274,7 @@ export function ReminderAudioSettingsCard() {
               <button
                 type="button"
                 onClick={() => update({ enabled: !settings.enabled })}
-                className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                className={`text-[11px] font-bold px-2 py-0.5 rounded cursor-pointer transition ${
                   settings.enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
                 }`}
               >
@@ -172,7 +307,7 @@ export function ReminderAudioSettingsCard() {
                 <button
                   type="button"
                   onClick={requestPermission}
-                  className="rounded bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-blue-700"
+                  className="rounded bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-blue-700 cursor-pointer"
                 >
                   Enable Notifications
                 </button>

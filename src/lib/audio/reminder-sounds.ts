@@ -1,13 +1,15 @@
-// Web Audio API synthesized sound generator & audio alert preferences.
-// 100% reliable in modern browsers with zero external file dependencies or missing asset issues.
+// Web Audio API synthesized sound generator & custom audio file upload support.
+// 100% reliable in modern browsers with support for custom uploaded audio (.mp3, .wav, .ogg, etc.)
 
-export type SoundTone = "chime" | "bell" | "digital_ring" | "radar" | "soft_ping";
+export type SoundTone = "chime" | "bell" | "digital_ring" | "radar" | "soft_ping" | "custom";
 
 export interface SoundSettings {
   enabled: boolean;
   tone: SoundTone;
   volume: number; // 0.0 to 1.0
   desktopNotifications: boolean;
+  customAudioUrl?: string | null;
+  customAudioName?: string | null;
 }
 
 const STORAGE_KEY = "bhs_reminder_sound_settings";
@@ -17,6 +19,8 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   tone: "chime",
   volume: 0.8,
   desktopNotifications: true,
+  customAudioUrl: null,
+  customAudioName: null,
 };
 
 export function getSoundSettings(): SoundSettings {
@@ -42,7 +46,7 @@ export function saveSoundSettings(settings: Partial<SoundSettings>): SoundSettin
 }
 
 /**
- * Play a synthesized sound tone using the Web Audio API.
+ * Play a sound tone (either custom uploaded audio file or synthesized Web Audio tone).
  */
 export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: number) {
   if (typeof window === "undefined") return;
@@ -53,6 +57,29 @@ export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: num
   const tone = toneOverride ?? settings.tone;
   const volume = volumeOverride !== undefined ? volumeOverride : settings.volume;
 
+  // 1. If custom uploaded audio is selected and available
+  if (tone === "custom" && settings.customAudioUrl) {
+    try {
+      const audio = new Audio(settings.customAudioUrl);
+      audio.volume = Math.max(0, Math.min(1, volume));
+      audio.play().catch((err) => {
+        console.warn("[playReminderSound] custom audio failed to play, falling back to chime:", err);
+        playSynthesizedTone("chime", volume);
+      });
+      return;
+    } catch (err) {
+      console.warn("[playReminderSound] custom audio error:", err);
+    }
+  }
+
+  // 2. Otherwise play synthesized tone
+  playSynthesizedTone(tone === "custom" ? "chime" : tone, volume);
+}
+
+/**
+ * Synthesize audio tones using the Web Audio API.
+ */
+function playSynthesizedTone(tone: Exclude<SoundTone, "custom">, volume: number) {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
