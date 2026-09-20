@@ -138,7 +138,13 @@ type Msg =
 function extractTemplateHint(subject: string | null, bodyHtml: string | null): string | null {
   const src = `${subject ?? ""} ${bodyHtml ?? ""}`;
   const m = src.match(/\b(E0\d{2}|T0\d{2}|TB0\d{2})\b/i);
-  return m ? m[1].toUpperCase() : null;
+  if (m) return m[1].toUpperCase();
+  if (/Order Confirmation & Tax Invoice/i.test(src)) return "E001";
+  if (/Temporary Processing Hold|Operational Hold/i.test(src)) return "E003";
+  if (/Service Changed|Service Has Been Updated/i.test(src)) return "E012";
+  if (/Consultation Completed/i.test(src)) return "TB01";
+  if (/Reply & Close/i.test(src)) return "TB02";
+  return null;
 }
 
 // ── main component ─────────────────────────────────────────
@@ -1244,15 +1250,15 @@ function TicketWorkspace() {
 
         {/* ── 4. Right Context Sidebar (Fixed compact width matching Screenshot) ─────── */}
         <aside
-          className={`w-[320px] xl:w-[340px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
+          className={`w-[300px] xl:w-[320px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-2.5 space-y-2 text-xs ${
             sidebarDrawerOpen
-              ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[320px] max-w-full"
+              ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[300px] max-w-full p-3"
               : "hidden lg:flex"
           }`}
         >
           {sidebarDrawerOpen && (
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 lg:hidden">
-              <span className="font-bold text-slate-800 text-sm">Context Sidebar</span>
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 lg:hidden">
+              <span className="font-bold text-slate-800 text-xs">Context Sidebar</span>
               <button
                 onClick={() => setSidebarDrawerOpen(false)}
                 className="p-1 rounded hover:bg-slate-200 text-slate-500"
@@ -1263,13 +1269,13 @@ function TicketWorkspace() {
           )}
 
           {/* Card 1: Customer Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
-                  <User className="size-4" />
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                  <User className="size-3.5" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
                   Customer Information
                 </h2>
               </div>
@@ -1277,48 +1283,48 @@ function TicketWorkspace() {
                 <Link
                   to="/admin/customers/$customerId"
                   params={{ customerId: cust.id }}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
+                  className="text-[11px] font-semibold text-blue-600 hover:underline"
                 >
                   View Profile
                 </Link>
               )}
             </div>
 
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm shrink-0 border border-emerald-200">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-200">
                   {initials(cust.name)}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-bold text-slate-900 text-sm truncate">
+                  <div className="font-bold text-slate-900 text-xs truncate">
                     {cust.name || "Customer"}
                   </div>
-                  <div className="text-xs text-slate-500 font-mono truncate flex items-center gap-1" title={ticket.ticket_email ?? cust.primary_email}>
-                    <Mail className="size-3 text-slate-400 shrink-0" />
+                  <div className="text-[11px] text-slate-500 font-mono truncate flex items-center gap-1" title={ticket.ticket_email ?? cust.primary_email}>
+                    <Mail className="size-2.5 text-slate-400 shrink-0" />
                     <span>{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5 pt-2 text-xs text-slate-600">
+              <div className="space-y-1 pt-1 text-[11px] text-slate-600">
                 {cust.primary_mobile && (
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Phone className="size-3.5 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="size-3 text-slate-400 shrink-0" />
                       <span className="font-mono text-slate-800">{cust.primary_mobile}</span>
                     </div>
                     <a
                       href={`tel:${cust.primary_mobile}`}
-                      className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold text-xs hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-0.5 text-emerald-600 hover:text-emerald-700 font-bold text-[11px] hover:underline cursor-pointer"
                       title={`Call ${cust.primary_mobile}`}
                     >
                       <span>Call</span>
                     </a>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-3.5 text-slate-400 shrink-0" />
-                  <span className="text-slate-700">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="size-3 text-slate-400 shrink-0" />
+                  <span className="text-slate-700 truncate">
                     {cust.state ? `${cust.state}, India` : "Tamil Nadu, India"}
                   </span>
                 </div>
@@ -1327,13 +1333,13 @@ function TicketWorkspace() {
           </div>
 
           {/* Card 2: Order Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
-                  <Package className="size-4" />
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-1.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                  <Package className="size-3.5" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
                   Order Information
                 </h2>
               </div>
@@ -1341,22 +1347,22 @@ function TicketWorkspace() {
                 <Link
                   to="/admin/orders/$orderId"
                   params={{ orderId: app.id }}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
+                  className="text-[11px] font-semibold text-blue-600 hover:underline"
                 >
                   View Order
                 </Link>
               )}
             </div>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-1 text-xs">
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order No.</span>
+                <span className="text-slate-500 text-[11px]">Order No.</span>
                 {app.application_code ? (
                   <div className="flex items-center gap-1">
                     <Link
                       to="/admin/orders/$orderId"
                       params={{ orderId: app.id }}
-                      className="font-mono font-bold text-blue-700 hover:underline"
+                      className="font-mono font-bold text-blue-700 hover:underline text-[11px]"
                     >
                       {app.application_code}
                     </Link>
@@ -1368,46 +1374,46 @@ function TicketWorkspace() {
                       className="text-slate-400 hover:text-slate-700 p-0.5"
                       title="Copy order number"
                     >
-                      <Copy className="size-3" />
+                      <Copy className="size-2.5" />
                     </button>
                   </div>
                 ) : (
-                  <span className="text-slate-400 italic">—</span>
+                  <span className="text-slate-400 italic text-[11px]">—</span>
                 )}
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Service</span>
-                <span className="font-medium text-slate-800 text-right truncate max-w-[160px]">
+                <span className="text-slate-500 text-[11px]">Service</span>
+                <span className="font-medium text-slate-800 text-right truncate max-w-[150px] text-[11px]">
                   {serviceName}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order Date</span>
-                <span className="text-slate-700 text-right">
+                <span className="text-slate-500 text-[11px]">Order Date</span>
+                <span className="text-slate-700 text-right text-[11px]">
                   {ist(app.created_at || ticket.created_at)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order Stage</span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
+                <span className="text-slate-500 text-[11px]">Order Stage</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
                   {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Customer Delay"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order Status</span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
+                <span className="text-slate-500 text-[11px]">Order Status</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
                   {app.order_status || "CUSTOMER_HOLD"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Order Assignee</span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
-                  <User className="size-3 text-slate-400" />
+                <span className="text-slate-500 text-[11px]">Order Assignee</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                  <User className="size-2.5 text-slate-400" />
                   <span>{ticket.executive_name || "Unassigned"}</span>
                 </span>
               </div>
@@ -1415,36 +1421,36 @@ function TicketWorkspace() {
           </div>
 
           {/* Card 3: Ticket Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
-                  <Info className="size-4" />
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-1.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                  <Info className="size-3.5" />
                 </div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
                   Ticket Information
                 </h2>
               </div>
-              <span className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
+              <span className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
                 Edit
               </span>
             </div>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-1 text-xs">
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Created</span>
-                <span className="text-slate-700">{ist(ticket.created_at)}</span>
+                <span className="text-slate-500 text-[11px]">Created</span>
+                <span className="text-slate-700 text-[11px]">{ist(ticket.created_at)}</span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Channel</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px]">
-                  <Mail className="size-3 text-slate-400" /> {ticket.source || "Email"}
+                <span className="text-slate-500 text-[11px]">Channel</span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px]">
+                  <Mail className="size-2.5 text-slate-400" /> {ticket.source || "Email"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Priority</span>
+                <span className="text-slate-500 text-[11px]">Priority</span>
                 <PriorityDropdownBadge
                   priority={(ticket.priority as TicketPriority) ?? "medium"}
                   onChange={(p) => changePriority.mutate(p)}
@@ -1452,7 +1458,7 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Status</span>
+                <span className="text-slate-500 text-[11px]">Status</span>
                 <StatusDropdownBadge
                   status={ticket.status as TicketStatus}
                   onChange={(s) => changeStatus.mutate(s)}
@@ -1460,7 +1466,7 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">Assigned To</span>
+                <span className="text-slate-500 text-[11px]">Assigned To</span>
                 <AssigneeDropdownBadge
                   currentId={ticket.assigned_to}
                   currentName={ticket.assigned_name}
@@ -1470,9 +1476,9 @@ function TicketWorkspace() {
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500">SLA</span>
+                <span className="text-slate-500 text-[11px]">SLA</span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1 ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
                     slaTone === "healthy"
                       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                       : slaTone === "warning"
@@ -1488,27 +1494,27 @@ function TicketWorkspace() {
           </div>
 
           {/* Card 4: Quick Actions matching Screenshot */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-2.5">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-              <div className="p-1.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
-                <Sparkles className="size-4" />
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
+            <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                <Sparkles className="size-3.5" />
               </div>
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
                 Quick Actions
               </h2>
             </div>
 
-            <div className="space-y-2 pt-1">
+            <div className="space-y-1.5 pt-0.5">
               {/* Close Ticket */}
               <button
                 onClick={() => doCloseNormal.mutate()}
                 disabled={isClosed || doCloseNormal.isPending}
-                className="w-full py-2.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-1.5 px-2.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {doCloseNormal.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader2 className="size-3 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                  <CheckCircle2 className="size-3 text-emerald-600" />
                 )}
                 Close Ticket
               </button>
@@ -1517,9 +1523,9 @@ function TicketWorkspace() {
               <button
                 onClick={() => setConsultOpen(true)}
                 disabled={isClosed}
-                className="w-full py-2.5 px-3 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-1.5 px-2.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <FileText className="size-3.5 text-blue-600" />
+                <FileText className="size-3 text-blue-600" />
                 Consultation Completed (TB01)
               </button>
 
@@ -1527,9 +1533,9 @@ function TicketWorkspace() {
               <button
                 onClick={() => setReasonOpen(true)}
                 disabled={isClosed}
-                className="w-full py-2.5 px-3 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-1.5 px-2.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send className="size-3.5 text-rose-600" />
+                <Send className="size-3 text-rose-600" />
                 Reply &amp; Close (TB02)
               </button>
 
@@ -1537,61 +1543,61 @@ function TicketWorkspace() {
               <button
                 onClick={() => setReopenConfirm(true)}
                 disabled={!canReopenOrder || doReopenOrder.isPending}
-                className="w-full py-2.5 px-3 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <RotateCcw className="size-3.5 text-slate-400" />
+                <RotateCcw className="size-3 text-slate-400" />
                 Reopen Order
               </button>
             </div>
           </div>
 
           {/* Card 5: Recent Activity matching Screenshot */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Recent Activity</h2>
-              <span className="text-xs font-semibold text-blue-700 hover:underline cursor-pointer">
+          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight">Recent Activity</h2>
+              <span className="text-[11px] font-semibold text-blue-700 hover:underline cursor-pointer">
                 View All
               </span>
             </div>
 
-            <div className="space-y-3 pl-1 pt-1">
-              <div className="flex items-start gap-2.5">
-                <div className="size-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <Mail className="size-3" />
+            <div className="space-y-2 pt-0.5">
+              <div className="flex items-start gap-2">
+                <div className="size-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <Mail className="size-2.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-xs leading-tight">
+                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
                     Customer email received
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
+                  <div className="text-[10px] text-slate-400 mt-0.5">
                     {ticket.first_response_at ? ist(ticket.first_response_at) : ist(ticket.created_at)}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
-                <div className="size-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <Mail className="size-3" />
+              <div className="flex items-start gap-2">
+                <div className="size-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <Mail className="size-2.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-xs leading-tight">
+                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
                     Email sent to customer
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
+                  <div className="text-[10px] text-slate-400 mt-0.5">
                     {ticket.last_staff_message_at ? ist(ticket.last_staff_message_at) : ist(ticket.created_at)}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
-                <div className="size-6 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Clock className="size-3" />
+              <div className="flex items-start gap-2">
+                <div className="size-5 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
+                  <Clock className="size-2.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-xs leading-tight">
+                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
                     Ticket created
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
+                  <div className="text-[10px] text-slate-400 mt-0.5">
                     {ist(ticket.created_at)}
                   </div>
                 </div>
@@ -1716,6 +1722,7 @@ function MessageCard({
   onDownloadDoc: (doc: any) => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const parsed = useMemo(
     () =>
       parseEmailMessage({
@@ -1752,13 +1759,15 @@ function MessageCard({
 
   // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
+    const isLongHtml = parsed.isHtml && parsed.content.length > 500;
+
     return (
       <div className="w-full flex justify-start">
         <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] mr-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
           {/* Header Bar matching Screenshot */}
-          <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="size-9 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+          <div className="px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/80 bg-white">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
                 {initials(customerName || "RK")}
               </div>
               <div className="min-w-0">
@@ -1769,7 +1778,7 @@ function MessageCard({
                   <span className="text-slate-400 text-xs font-mono truncate">
                     {customerEmail || msg.from_email || "khandiagnostic2024@gmail.com"}
                   </span>
-                  <span className="text-[11px] font-semibold bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <span className="text-[10px] font-bold uppercase bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-1.5 py-0.5 rounded">
                     Customer
                   </span>
                 </div>
@@ -1787,25 +1796,47 @@ function MessageCard({
           </div>
 
           {/* Message Content Body */}
-          <div className="px-4 pb-4 space-y-3">
+          <div className="px-4 py-3 space-y-2.5">
             {/* Subject if different from main thread */}
             {msg.subject && (
-              <div className="text-xs font-semibold text-slate-600 pb-1 border-b border-slate-100">
+              <div className="text-xs font-semibold text-slate-700 pb-1">
                 {decodeHtmlEntities(msg.subject)}
               </div>
             )}
 
             {/* Clean Trimmed Body / HTML rendered */}
             {parsed.isHtml ? (
-              <div
-                className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans"
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(parsed.content, {
-                    WHOLE_DOCUMENT: false,
-                    ADD_ATTR: ["target", "style", "class"],
-                  }),
-                }}
-              />
+              <div className="relative">
+                <div
+                  className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
+                    isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                  }`}
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(parsed.content, {
+                      WHOLE_DOCUMENT: false,
+                      ADD_ATTR: ["target", "style", "class"],
+                    }),
+                  }}
+                />
+                {isLongHtml && !isExpanded && (
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+                )}
+                {isLongHtml && (
+                  <div className="pt-2 text-center border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded((v) => !v)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1"
+                    >
+                      {isExpanded ? (
+                        <>Show less <ChevronUp className="size-3.5" /></>
+                      ) : (
+                        <>Show full email <ChevronDown className="size-3.5" /></>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
                 {parsed.content || "(no content)"}
@@ -1819,17 +1850,17 @@ function MessageCard({
                   {msg.attachments.map((doc) => (
                     <div
                       key={doc.id}
-                      className="p-2.5 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-4 min-w-[240px] max-w-sm transition-colors shadow-2xs"
+                      className="p-2 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 min-w-[220px] max-w-sm transition-colors shadow-2xs"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="size-8 rounded bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
+                        <div className="size-7 rounded bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
                           PDF
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-semibold text-slate-800 truncate" title={doc.file_name}>
                             {doc.file_name}
                           </div>
-                          <div className="text-[11px] text-slate-400">
+                          <div className="text-[10px] text-slate-400">
                             {formatBytes(doc.size_bytes)}
                           </div>
                         </div>
@@ -1838,10 +1869,10 @@ function MessageCard({
                       <button
                         type="button"
                         onClick={() => onDownloadDoc(doc)}
-                        className="p-1.5 rounded hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                        className="p-1 rounded hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
                         title="Download attachment"
                       >
-                        <Download className="size-4" />
+                        <Download className="size-3.5" />
                       </button>
                     </div>
                   ))}
@@ -1885,29 +1916,36 @@ function MessageCard({
   }
 
   // 3. Business Outbound Message Card (RIGHT ALIGNED)
+  const isLongHtml = parsed.isHtml && parsed.content.length > 400;
+
   return (
     <div className="w-full flex justify-end">
       <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
-        {/* Header Bar matching Screenshot */}
-        <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="size-9 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+        {/* Header Bar matching Screenshot 2 & 3 */}
+        <div className="px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/80 bg-white">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-8 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
               BHS
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
                   {msg.author_name || "Business Help Services"}
                 </span>
-                <span className="text-slate-400 text-xs font-mono truncate">
-                  {msg.from_email || "help@businesshelpservices.com"}
-                </span>
-                <span className="text-[11px] font-semibold bg-[#eff6ff] text-[#2563eb] border border-blue-200 px-2 py-0.5 rounded-md">
+                {msg.template_hint && (
+                  <span className="text-[10px] font-bold font-mono bg-[#e0f2fe] text-[#0369a1] border border-sky-200 px-1.5 py-0.2 rounded">
+                    {msg.template_hint}
+                  </span>
+                )}
+                <span className="text-[10px] font-bold uppercase bg-[#eff6ff] text-[#2563eb] border border-blue-200 px-1.5 py-0.2 rounded">
                   Email
                 </span>
-                <span className="text-[11px] font-semibold bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <Check className="size-3" /> Sent
+                <span className="text-[10px] font-bold uppercase bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-1.5 py-0.2 rounded flex items-center gap-1">
+                  <Check className="size-2.5" /> Sent
                 </span>
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono truncate">
+                {msg.from_email || "help@businesshelpservices.com"}
               </div>
             </div>
           </div>
@@ -1922,18 +1960,46 @@ function MessageCard({
           </div>
         </div>
 
-        {/* Message Content Body matching Screenshot */}
-        <div className="px-4 pb-4 space-y-3">
+        {/* Message Content Body matching Screenshot 2 & 3 */}
+        <div className="px-4 py-3 space-y-2.5">
+          {msg.subject && (
+            <div className="text-xs font-semibold text-slate-800 pb-1">
+              {decodeHtmlEntities(msg.subject)}
+            </div>
+          )}
+
           {parsed.isHtml ? (
-            <div
-              className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans"
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(parsed.content, {
-                  WHOLE_DOCUMENT: false,
-                  ADD_ATTR: ["target", "style", "class"],
-                }),
-              }}
-            />
+            <div className="relative">
+              <div
+                className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
+                  isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                }`}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(parsed.content, {
+                    WHOLE_DOCUMENT: false,
+                    ADD_ATTR: ["target", "style", "class"],
+                  }),
+                }}
+              />
+              {isLongHtml && !isExpanded && (
+                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+              )}
+              {isLongHtml && (
+                <div className="pt-2 text-center border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded((v) => !v)}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1"
+                  >
+                    {isExpanded ? (
+                      <>Show less <ChevronUp className="size-3.5" /></>
+                    ) : (
+                      <>Show full email <ChevronDown className="size-3.5" /></>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
               {parsed.content || (
