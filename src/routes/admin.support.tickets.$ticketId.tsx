@@ -504,7 +504,7 @@ function TicketWorkspace() {
           ticketId,
           message: finalMessage,
           isInternal: composeTab === "note",
-          armAutoclose: false,
+          armAutoclose: opts?.armAutoclose ?? false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
         },
@@ -513,6 +513,8 @@ function TicketWorkspace() {
     onSuccess: async (r: any, variables) => {
       if (composeTab === "note") {
         toast.success("Internal note added");
+      } else if (variables && typeof variables === "object" && (variables as any).armAutoclose) {
+        toast.success("Reply sent — 24h auto-close timer started (E010 will be sent upon closure)");
       } else if (r?.emailed === false) {
         toast.warning(`Reply saved but email not sent: ${r.reason ?? "unknown"}`);
       } else {
@@ -1224,9 +1226,9 @@ function TicketWorkspace() {
                   </button>
                 </div>
 
-                {/* Right Send Reply split button */}
-                <div className="flex items-center gap-3">
-                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none">
+                {/* Right Send buttons */}
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none mr-1.5">
                     <input
                       type="checkbox"
                       checked={sendCopy}
@@ -1236,12 +1238,25 @@ function TicketWorkspace() {
                     <span>Send me a copy</span>
                   </label>
 
-                  {/* Send button with dropdown */}
-                  <div className="relative inline-flex rounded-md shadow-2xs">
+                  {composeTab === "reply" && (
                     <button
-                      onClick={() => sendReply.mutate({})}
+                      type="button"
+                      onClick={() => sendReply.mutate({ armAutoclose: true })}
                       disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-md text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                      title="Sends reply and automatically closes ticket after 24 hours with E010 closure notice if customer does not reply"
+                    >
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      <span>Send &amp; Close Ticket</span>
+                    </button>
+                  )}
+
+                  {/* Send button with dropdown */}
+                  <div className="relative inline-flex rounded-lg shadow-2xs">
+                    <button
+                      onClick={() => sendReply.mutate({ armAutoclose: false })}
+                      disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         composeTab === "note"
                           ? "bg-amber-600 hover:bg-amber-700"
                           : "bg-[#1e3a5f] hover:bg-[#152b47]"
@@ -1259,7 +1274,7 @@ function TicketWorkspace() {
                       <button
                         onClick={() => setSendOptionsOpen((v) => !v)}
                         disabled={!body.trim() || sendReply.isPending}
-                        className="px-1.5 py-1.5 rounded-r-md bg-[#152b47] hover:bg-[#0f1f33] text-white border-l border-blue-900 disabled:opacity-50"
+                        className="px-1.5 py-1.5 rounded-r-lg bg-[#152b47] hover:bg-[#0f1f33] text-white border-l border-blue-900 disabled:opacity-50"
                         title="Send options"
                       >
                         <ChevronDown className="size-3.5" />
@@ -1268,13 +1283,13 @@ function TicketWorkspace() {
 
                     {sendOptionsOpen && (
                       <div
-                        className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
+                        className="absolute right-0 bottom-full mb-1 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
                         onMouseLeave={() => setSendOptionsOpen(false)}
                       >
                         <button
                           onClick={() => {
                             setSendOptionsOpen(false);
-                            sendReply.mutate({});
+                            sendReply.mutate({ armAutoclose: false });
                           }}
                           className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                         >
@@ -1283,11 +1298,11 @@ function TicketWorkspace() {
                         <button
                           onClick={() => {
                             setSendOptionsOpen(false);
-                            sendReply.mutate({ closeAfter: true });
+                            sendReply.mutate({ armAutoclose: true });
                           }}
                           className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-emerald-700 font-medium"
                         >
-                          <CheckCircle2 className="size-3.5 text-emerald-600" /> Send &amp; Close Ticket
+                          <CheckCircle2 className="size-3.5 text-emerald-600" /> Send &amp; Close Ticket (24h Auto-Close)
                         </button>
                       </div>
                     )}
@@ -1669,9 +1684,25 @@ function TicketWorkspace() {
               .replace(/\{\{customer_name\}\}/gi, cust.name ?? "[Customer]")
               .replace(/\{\{order_number\}\}/gi, app.application_code ?? "[Order No]")
               .replace(/\{\{ticket_number\}\}/gi, ticket.ticket_number ?? "");
-            setBody((prev) => (prev.trim() ? `${prev}\n\n${filled}` : filled));
+            
+            const formatted = filled
+              .split(/\n{2,}/)
+              .map((p) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+              .join("");
+
+            if (composerRef.current) {
+              const currentContent = composerRef.current.innerHTML.trim();
+              if (!currentContent || currentContent === "<br>" || currentContent === "<p><br></p>") {
+                composerRef.current.innerHTML = formatted;
+              } else {
+                composerRef.current.innerHTML = `${currentContent}<br /><br />${formatted}`;
+              }
+              setBody(composerRef.current.innerHTML);
+              composerRef.current.focus();
+            } else {
+              setBody((prev) => (prev.trim() ? `${prev}\n\n${filled}` : filled));
+            }
             setCannedModalOpen(false);
-            composerRef.current?.focus();
             toast.success(`Inserted canned response: ${item.title}`);
           }}
         />
@@ -1683,15 +1714,34 @@ function TicketWorkspace() {
           items={(templatesList ?? []) as any[]}
           onClose={() => setTemplatesModalOpen(false)}
           onSelect={(item) => {
-            const rawBody = item.body_text || item.body_html || "";
-            const plain = decodeHtmlEntities(rawBody.replace(/<[^>]+>/g, " "));
-            const filled = plain
+            const rawBody = item.body_html || item.body_text || "";
+            const isHtml = /<[a-z][\s\S]*>/i.test(rawBody);
+            const filled = rawBody
               .replace(/\{\{customer_name\}\}/gi, cust.name ?? "[Customer]")
               .replace(/\{\{order_number\}\}/gi, app.application_code ?? "[Order No]")
               .replace(/\{\{ticket_number\}\}/gi, ticket.ticket_number ?? "");
-            setBody((prev) => (prev.trim() ? `${prev}\n\n${filled}` : filled));
+            
+            let formatted = filled;
+            if (!isHtml) {
+              formatted = filled
+                .split(/\n{2,}/)
+                .map((p) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+                .join("");
+            }
+
+            if (composerRef.current) {
+              const currentContent = composerRef.current.innerHTML.trim();
+              if (!currentContent || currentContent === "<br>" || currentContent === "<p><br></p>") {
+                composerRef.current.innerHTML = formatted;
+              } else {
+                composerRef.current.innerHTML = `${currentContent}<br /><br />${formatted}`;
+              }
+              setBody(composerRef.current.innerHTML);
+              composerRef.current.focus();
+            } else {
+              setBody((prev) => (prev.trim() ? `${prev}\n\n${filled}` : filled));
+            }
             setTemplatesModalOpen(false);
-            composerRef.current?.focus();
             toast.success(`Inserted template: ${item.template_name || item.template_code}`);
           }}
         />
@@ -1713,11 +1763,9 @@ function MessageCard({
   customerEmail?: string | null;
   onDownloadDoc: (doc: any) => void;
 }) {
-  const [showQuoted, setShowQuoted] = useState(false);
   const [showRawText, setShowRawText] = useState(false);
-  // Inbound (customer) messages start expanded so full content is immediately visible.
-  // Outbound (BHS) templates start collapsed since agents only need a quick preview.
-  const [isExpanded, setIsExpanded] = useState(msg.kind === "inbound");
+  // Default compact view so messages open cleanly and agent reads fresh reply first
+  const [isExpanded, setIsExpanded] = useState(false);
   const parsed = useMemo(
     () =>
       parseEmailMessage({
@@ -1755,6 +1803,7 @@ function MessageCard({
   // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
     const rawContent = msg.body_text || parsed.rawText || (msg as any).body_html || "";
+    const hasLongBody = (parsed.content && parsed.content.length > 300) || parsed.hasQuoted || Boolean(parsed.quotedContent) || Boolean((msg as any).body_html);
 
     return (
       <div className="w-full flex justify-start">
@@ -1799,29 +1848,81 @@ function MessageCard({
               </div>
             )}
 
-            {/* Clean Customer Message Body */}
+            {/* Clean Customer Message Body (compact view by default) */}
             {showRawText ? (
               <div className="p-3 bg-slate-900 text-slate-100 font-mono text-xs rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed">
                 {rawContent}
               </div>
-            ) : parsed.isHtml ? (
-              <div className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(parsed.content, {
-                      WHOLE_DOCUMENT: false,
-                      ADD_ATTR: ["target", "style", "class"],
-                    }),
-                  }}
-                />
-              </div>
             ) : (
-              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
-                {parsed.content || "(no content)"}
+              <div className="relative">
+                <div
+                  className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
+                    hasLongBody && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                  }`}
+                >
+                  {parsed.isHtml ? (
+                    <div>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(parsed.content, {
+                            WHOLE_DOCUMENT: false,
+                            ADD_ATTR: ["target", "style", "class"],
+                          }),
+                        }}
+                      />
+                      {isExpanded && parsed.quotedContent && (
+                        <div
+                          className="mt-3 pt-3 border-t border-slate-200 text-slate-600"
+                          dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(parsed.quotedContent, {
+                              WHOLE_DOCUMENT: false,
+                              ADD_ATTR: ["target", "style", "class"],
+                            }),
+                          }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">
+                      {isExpanded && parsed.quotedContent
+                        ? `${parsed.content}\n\n${parsed.quotedContent}`
+                        : parsed.content || rawContent || "(no content)"}
+                    </div>
+                  )}
+                </div>
+
+                {hasLongBody && !isExpanded && (
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+                )}
+
+                {hasLongBody && (
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded((v) => !v)}
+                      className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {isExpanded ? (
+                        <>Show less <ChevronUp className="size-3.5" /></>
+                      ) : (
+                        <>Show full email <ChevronDown className="size-3.5" /></>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowRawText((v) => !v)}
+                      className="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors ml-auto"
+                      title="Toggle raw original email text"
+                    >
+                      {showRawText ? "Show Formatted" : "Raw Text"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Attachments Display matching Image 2 */}
+            {/* Attachments Display */}
             {msg.attachments && msg.attachments.length > 0 && (
               <div className="pt-2">
                 <div className="flex flex-wrap gap-2">
@@ -1857,51 +1958,6 @@ function MessageCard({
                 </div>
               </div>
             )}
-
-            {/* Quoted / Full email toggle matching Image 2 precisely */}
-            {(parsed.hasQuoted || parsed.quotedContent || msg.body_text || (msg as any).body_html) && (
-              <div className="pt-1 flex items-center justify-between gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setShowQuoted((v) => !v)}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
-                >
-                  <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
-                  <span>{showQuoted ? "Hide quoted content" : "Show quoted content (3 messages)"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowRawText((v) => !v)}
-                  className="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors ml-auto"
-                  title="Toggle raw original email text"
-                >
-                  {showRawText ? "Show Formatted" : "Raw Text"}
-                </button>
-              </div>
-            )}
-
-            {/* Expanded Quoted messages block */}
-            {showQuoted && (
-              <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
-                {parsed.quotedContent ? (
-                  parsed.isHtml ? (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(parsed.quotedContent, {
-                          WHOLE_DOCUMENT: false,
-                          ADD_ATTR: ["target", "style", "class"],
-                        }),
-                      }}
-                    />
-                  ) : (
-                    parsed.quotedContent
-                  )
-                ) : (
-                  rawContent
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1909,7 +1965,7 @@ function MessageCard({
   }
 
   // 3. Business Outbound Message Card (RIGHT ALIGNED)
-  const isLongHtml = parsed.isHtml && parsed.content.length > 400;
+  const isLongHtml = parsed.isHtml && (parsed.content.length > 300 || parsed.hasQuoted || Boolean((msg as any).body_html));
 
   return (
     <div className="w-full flex justify-end">
@@ -1968,10 +2024,15 @@ function MessageCard({
                   isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
                 }`}
                 dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(parsed.content, {
-                    WHOLE_DOCUMENT: false,
-                    ADD_ATTR: ["target", "style", "class"],
-                  }),
+                  __html: DOMPurify.sanitize(
+                    isExpanded && parsed.quotedContent
+                      ? `${parsed.content}<div class="mt-3 pt-3 border-t border-slate-200">${parsed.quotedContent}</div>`
+                      : parsed.content,
+                    {
+                      WHOLE_DOCUMENT: false,
+                      ADD_ATTR: ["target", "style", "class"],
+                    }
+                  ),
                 }}
               />
               {isLongHtml && !isExpanded && (
@@ -2003,36 +2064,6 @@ function MessageCard({
                   </p>
                   <p>If you have any additional details, please share.</p>
                   <p>Regards,<br />Business Help Services</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Quoted messages collapsible matching screenshot */}
-          {parsed.hasQuoted && (
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setShowQuoted((v) => !v)}
-                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors"
-              >
-                <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
-                <span>{showQuoted ? "Hide quoted content" : "Show quoted content"}</span>
-              </button>
-              {showQuoted && (
-                <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
-                  {parsed.isHtml ? (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(parsed.quotedContent, {
-                          WHOLE_DOCUMENT: false,
-                          ADD_ATTR: ["target", "style", "class"],
-                        }),
-                      }}
-                    />
-                  ) : (
-                    parsed.quotedContent
-                  )}
                 </div>
               )}
             </div>
