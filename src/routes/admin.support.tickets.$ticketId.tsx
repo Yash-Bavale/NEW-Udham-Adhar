@@ -34,6 +34,10 @@ import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { parseEmailMessage, parseEmailReply, decodeHtmlEntities, htmlToPlainText } from "@/lib/support/emailParser";
 import { useRole } from "@/hooks/useRole";
 
+function escapeHtml(str: string) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export const Route = createFileRoute("/admin/support/tickets/$ticketId")({
   head: ({ params }) => ({
     meta: [
@@ -1132,7 +1136,7 @@ function TicketWorkspace() {
                 }}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
-                    sendReply.mutate();
+                    sendReply.mutate({});
                   }
                 }}
                 data-placeholder={
@@ -1270,7 +1274,7 @@ function TicketWorkspace() {
                         <button
                           onClick={() => {
                             setSendOptionsOpen(false);
-                            sendReply.mutate();
+                            sendReply.mutate({});
                           }}
                           className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                         >
