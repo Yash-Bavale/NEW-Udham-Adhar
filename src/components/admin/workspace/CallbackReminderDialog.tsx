@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  PhoneCall, PhoneOff, PhoneForwarded, Clock, CheckCircle2,
-  XCircle, AlertTriangle, Flame, Calendar, MessageSquare,
-  Sparkles, WifiOff, FileClock, X, Check
+  Clock, X, Check, Flame, BellRing, MessageSquare,
+  Briefcase, FileText, CheckCircle2, Calendar, Zap,
+  PhoneOff, PhoneCall, ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIST } from "@/lib/datetime";
@@ -15,70 +15,60 @@ import {
   completeOrderCallback,
   getActiveOrderCallback,
 } from "@/lib/orders/actions/callback-reminder.functions";
+import { getOrderDetailV2 } from "@/lib/crm/orders-v2.functions";
 
 interface Props {
   orderId: string;
   orderCode?: string;
   customerName?: string;
   customerMobile?: string;
+  assignedName?: string;
   onClose: () => void;
 }
 
 const OUTCOMES = [
   {
     id: "unreachable",
-    label: "Customer Unreachable / Not Picking",
-    description: "Ringing but no answer, unreachable after multiple attempts",
-    icon: PhoneOff,
-    tone: "rose",
+    label: "Customer Unreachable / No Answer",
+    description: "Rang 3 times, disconnected or switched off",
+    defaultNote: "Customer unreachable after multiple call attempts. Phone ringing / no response.",
+    dotClass: "bg-rose-500",
+    icon: null,
   },
   {
     id: "call_back_later",
-    label: "Customer Asked to Call Back Later",
-    description: "Customer requested specific follow-up time",
-    icon: PhoneForwarded,
-    tone: "indigo",
+    label: "Customer Told: Call Back Later",
+    description: "Customer gave explicit preferred time",
+    defaultNote: "Customer answered and requested callback later. Will follow up at scheduled time.",
+    dotClass: "bg-blue-600 animate-pulse",
+    icon: null,
   },
   {
-    id: "network_issue",
-    label: "Busy / Network / Switched Off",
-    description: "Line busy, call failed, or phone switched off",
-    icon: WifiOff,
-    tone: "amber",
+    id: "busy_meeting",
+    label: "Busy / Driving / In Meeting",
+    description: "Customer cannot speak right now",
+    defaultNote: "Customer is currently busy / in meeting / driving. Asked to call back shortly.",
+    dotClass: null,
+    icon: Briefcase,
+    iconClass: "text-slate-500",
   },
   {
     id: "docs_pending",
-    label: "Requested Info / Docs Pending",
-    description: "Waiting for customer to check details or send documents",
-    icon: FileClock,
-    tone: "emerald",
+    label: "Document Pending from Customer",
+    description: "Fetching Aadhaar / PAN / Bill",
+    defaultNote: "Customer fetching required documents (Aadhaar / PAN / Bill). Callback set to collect details.",
+    dotClass: null,
+    icon: FileText,
+    iconClass: "text-emerald-600",
   },
-];
-
-const PRESET_DURATIONS = [
-  { label: "15 Mins", minutes: 15 },
-  { label: "30 Mins", minutes: 30 },
-  { label: "1 Hour", minutes: 60 },
-  { label: "2 Hours", minutes: 120 },
-  { label: "3 Hours", minutes: 180 },
-  { label: "4 Hours", minutes: 240 },
-  { label: "1 Day", minutes: 1440 },
-  { label: "Custom", minutes: -1 },
-];
-
-const QUICK_NOTES = [
-  "Will arrange documents on WhatsApp",
-  "Busy in meeting, call after 2 hrs",
-  "Discuss with partner & confirm",
-  "Number was busy, retry soon",
-  "OTP verification pending from client",
 ];
 
 export function CallbackReminderDialog({
   orderId,
-  orderCode,
-  customerName,
-  customerMobile,
+  orderCode: propOrderCode,
+  customerName: propCustomerName,
+  customerMobile: propCustomerMobile,
+  assignedName: propAssignedName,
   onClose,
 }: Props) {
   const qc = useQueryClient();
@@ -87,39 +77,80 @@ export function CallbackReminderDialog({
   const scheduleFn = useServerFn(scheduleOrderCallback);
   const cancelFn = useServerFn(cancelOrderCallback);
   const completeFn = useServerFn(completeOrderCallback);
+  const getDetailFn = useServerFn(getOrderDetailV2);
 
-  const { data: activeCallback, isLoading: loadingActive } = useQuery({
+  // Fetch active callback
+  const { data: activeCallback } = useQuery({
     queryKey: ["active-order-callback", orderId],
     queryFn: () => getActiveFn({ data: { orderId } }),
     staleTime: 5_000,
   });
 
+  // Fetch full order info if props not passed
+  const { data: orderDetail } = useQuery({
+    queryKey: ["order-detail-v2", orderId],
+    queryFn: () => getDetailFn({ data: { orderId } }),
+    enabled: !propOrderCode || !propCustomerName,
+    staleTime: 60_000,
+  });
+
+  const orderCode = propOrderCode || orderDetail?.application?.application_code || "Order";
+  const customerName = propCustomerName || orderDetail?.customer?.name || orderDetail?.lead?.name || "Customer";
+  const customerMobile = propCustomerMobile || orderDetail?.customer?.primary_mobile || orderDetail?.lead?.mobile || "";
+  const staffName = propAssignedName || orderDetail?.assigned_staff?.display_name || orderDetail?.assigned_staff?.email || "Assigned Executive";
+
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");
-  const [selectedMinutes, setSelectedMinutes] = useState<number>(60);
+  const [durationPreset, setDurationPreset] = useState<string>("2h"); // '60m' | '2h' | '3h' | '4h' | 'tomorrow' | 'custom'
   const [customDateTime, setCustomDateTime] = useState<string>(() => {
-    const d = new Date(Date.now() + 60 * 60_000);
-    // Format YYYY-MM-DDTHH:mm for datetime-local
+    const d = new Date(Date.now() + 120 * 60_000);
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
-  const [note, setNote] = useState<string>("");
+
+  const [note, setNote] = useState<string>("Customer answered and requested callback after 2 hours. Will keep Aadhaar OTP ready for verification.");
   const [completeNote, setCompleteNote] = useState<string>("");
 
+  // Automated trigger toggles
+  const [hotOrderSurge, setHotOrderSurge] = useState(true);
+  const [desktopAlert, setDesktopAlert] = useState(true);
+  const [whatsappReminder, setWhatsappReminder] = useState(true);
+
+  // Calculate target date
   const targetDate = useMemo(() => {
-    if (selectedMinutes > 0) {
-      return new Date(Date.now() + selectedMinutes * 60_000);
-    }
-    if (customDateTime) {
+    const now = new Date();
+    if (durationPreset === "60m") {
+      return new Date(now.getTime() + 60 * 60_000);
+    } else if (durationPreset === "2h") {
+      return new Date(now.getTime() + 120 * 60_000);
+    } else if (durationPreset === "3h") {
+      return new Date(now.getTime() + 180 * 60_000);
+    } else if (durationPreset === "4h") {
+      return new Date(now.getTime() + 240 * 60_000);
+    } else if (durationPreset === "tomorrow") {
+      const t = new Date(now);
+      t.setDate(t.getDate() + 1);
+      t.setHours(10, 30, 0, 0);
+      return t;
+    } else if (durationPreset === "custom" && customDateTime) {
       const d = new Date(customDateTime);
       if (!isNaN(d.getTime())) return d;
     }
-    return new Date(Date.now() + 60 * 60_000);
-  }, [selectedMinutes, customDateTime]);
+    return new Date(now.getTime() + 120 * 60_000);
+  }, [durationPreset, customDateTime]);
+
+  // When outcome changes, update default note if user hasn't heavily modified it
+  const handleSelectOutcome = (outcomeId: string) => {
+    setSelectedOutcome(outcomeId);
+    const found = OUTCOMES.find((o) => o.id === outcomeId);
+    if (found?.defaultNote) {
+      setNote(found.defaultNote);
+    }
+  };
 
   const scheduleMut = useMutation({
     mutationFn: async () => {
       const outcomeObj = OUTCOMES.find((o) => o.id === selectedOutcome) || {
-        id: "custom",
+        id: "call_back_later",
         label: "Customer Follow-Up",
       };
 
@@ -128,14 +159,13 @@ export function CallbackReminderDialog({
           orderId,
           reason: outcomeObj.id,
           reasonLabel: outcomeObj.label,
-          durationMinutes: selectedMinutes > 0 ? selectedMinutes : undefined,
-          customFiresAt: selectedMinutes <= 0 ? new Date(customDateTime).toISOString() : undefined,
+          customFiresAt: targetDate.toISOString(),
           note: note.trim() || null,
         },
       });
     },
     onSuccess: () => {
-      toast.success("Callback & Reminder scheduled successfully! Order will turn Hot when due.");
+      toast.success(`Callback scheduled for ${formatIST(targetDate.toISOString())}. Order tagged as HOT.`);
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
       qc.invalidateQueries({ queryKey: ["orders-v2"] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", orderId] });
@@ -173,259 +203,483 @@ export function CallbackReminderDialog({
 
   const isBusy = scheduleMut.isPending || cancelMut.isPending || completeMut.isPending;
 
+  // Formatted trigger string
+  const formattedTrigger = useMemo(() => {
+    return formatIST(targetDate.toISOString());
+  }, [targetDate]);
+
+  // Staff initials
+  const initials = useMemo(() => {
+    const parts = staffName.trim().split(" ");
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return staffName.slice(0, 2).toUpperCase();
+  }, [staffName]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-4 text-white">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-400 shadow-inner">
-              <PhoneCall className="size-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-[6px] overflow-y-auto"
+      id="callbackModalWrapper"
+    >
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200 border border-slate-200 flex flex-col max-h-[92vh]">
+        {/* Modal Header Banner */}
+        <div className="bg-slate-900 px-6 py-4 flex items-start justify-between gap-4 border-b border-slate-800 shrink-0">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-teal-300 shrink-0 mt-0.5 border border-slate-700 shadow-inner">
+              <Clock className="size-6" />
             </div>
-            <div>
+            <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white tracking-tight">
-                  Schedule Customer Call Back & Reminder
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                  <Flame className="size-3 text-rose-400" /> HOT ORDER AT END
+                <span className="font-bold text-base md:text-lg text-white tracking-tight">
+                  Schedule Customer Callback &amp; Reminder
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                {orderCode ? <span className="font-semibold text-slate-300">{orderCode}</span> : null}
-                {customerName ? <span> · {customerName}</span> : null}
-                {customerMobile ? <span> ({customerMobile})</span> : null}
+              <p className="text-xs text-slate-300 mt-0.5 leading-snug">
+                Customer is unreachable or requested a later callback. Set reminder timer &amp; hot order trigger.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isBusy}
-            className="grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition cursor-pointer"
-          >
-            <X className="size-5" />
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-200 text-[11px] font-semibold uppercase tracking-wider border border-slate-700">
+              Order #{orderCode}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isBusy}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 text-slate-800">
+        {/* Modal Body Content */}
+        <div className="p-4 md:p-5 space-y-4 overflow-y-auto flex-1 text-slate-800">
           {/* Active Reminder Banner if exists */}
           {activeCallback && (
             <div className={cn(
-              "rounded-xl border p-4 shadow-xs",
+              "rounded-xl border p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3",
               activeCallback.isDue
                 ? "border-rose-300 bg-rose-50 text-rose-950"
-                : "border-indigo-200 bg-indigo-50/70 text-indigo-950"
+                : "border-indigo-200 bg-indigo-50/80 text-indigo-950"
             )}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    {activeCallback.isDue ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[11px] font-black uppercase text-white shadow-xs">
-                        <Flame className="size-3" /> Call Due Now (HOT ORDER)
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-black uppercase text-white shadow-xs">
-                        <Clock className="size-3" /> Scheduled Reminder Active
-                      </span>
-                    )}
-                    <span className="text-xs font-semibold text-slate-700">
-                      Due: {formatIST(activeCallback.fires_at)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-700">
-                    <b>Reason:</b> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
-                    {activeCallback.parsedRemarks?.note ? ` — "${activeCallback.parsedRemarks.note}"` : null}
-                  </p>
-                  {activeCallback.parsedRemarks?.created_by_name && (
-                    <p className="text-[11px] text-slate-500">
-                      Set by {activeCallback.parsedRemarks.created_by_name}
-                    </p>
-                  )}
-                </div>
-
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => cancelMut.mutate()}
-                    disabled={isBusy}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-rose-600 transition cursor-pointer"
-                  >
-                    Cancel Reminder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => completeMut.mutate()}
-                    disabled={isBusy}
-                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
-                  >
-                    <Check className="size-3.5" /> Complete Call
-                  </button>
+                  {activeCallback.isDue ? (
+                    <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                      <Flame className="size-3" /> Call Due Now (HOT ORDER)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                      <Clock className="size-3" /> Scheduled Reminder Active
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-slate-700">
+                    Due: {formatIST(activeCallback.fires_at)}
+                  </span>
                 </div>
+                <p className="text-xs text-slate-600">
+                  <b>Reason:</b> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
+                  {activeCallback.parsedRemarks?.note ? ` — "${activeCallback.parsedRemarks.note}"` : null}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => cancelMut.mutate()}
+                  disabled={isBusy}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-rose-600 transition cursor-pointer"
+                >
+                  Cancel Reminder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => completeMut.mutate()}
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+                >
+                  <Check className="size-3.5" /> Complete Call
+                </button>
               </div>
             </div>
           )}
 
-          {/* Section 1: Call Outcome / Reason */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              1. Select Call Outcome / Reason (Why Call Back?)
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Section 1: Why is callback needed? (Call Outcome) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[11px] font-bold">
+                  1
+                </span>
+                Why is callback needed? (Call Outcome)
+              </label>
+              <span className="text-[11px] text-rose-600 font-bold tracking-wide uppercase">
+                Mandatory
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {OUTCOMES.map((item) => {
-                const Icon = item.icon;
                 const isSelected = selectedOutcome === item.id;
+                const Icon = item.icon;
+
                 return (
-                  <button
+                  <label
                     key={item.id}
-                    type="button"
-                    onClick={() => setSelectedOutcome(item.id)}
+                    onClick={() => handleSelectOutcome(item.id)}
                     className={cn(
-                      "flex items-start gap-3 rounded-xl border p-3 text-left transition cursor-pointer select-none",
+                      "group relative flex items-start gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all border select-none",
                       isSelected
-                        ? "border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs"
-                        : "border-slate-200 bg-slate-50/40 hover:border-slate-300 hover:bg-slate-50"
+                        ? "bg-blue-50/70 border-blue-500/60 shadow-xs ring-1 ring-blue-500/30"
+                        : "bg-slate-50/50 hover:bg-slate-50 border-slate-200"
                     )}
                   >
-                    <div className={cn(
-                      "grid size-8 shrink-0 place-items-center rounded-lg shadow-xs",
-                      isSelected ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200"
-                    )}>
-                      <Icon className="size-4" />
-                    </div>
-                    <div>
-                      <div className={cn("text-xs font-bold", isSelected ? "text-blue-950" : "text-slate-800")}>
-                        {item.label}
+                    <input
+                      type="radio"
+                      name="call_outcome"
+                      checked={isSelected}
+                      onChange={() => handleSelectOutcome(item.id)}
+                      className="mt-0.5 accent-blue-600"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {item.dotClass && (
+                          <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", item.dotClass)} />
+                        )}
+                        {Icon && (
+                          <Icon className={cn("size-3.5 shrink-0", item.iconClass)} />
+                        )}
+                        <span className={cn(
+                          "text-xs font-bold truncate",
+                          isSelected ? "text-blue-950" : "text-slate-800"
+                        )}>
+                          {item.label}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
                         {item.description}
-                      </div>
+                      </p>
                     </div>
-                  </button>
+
+                    {isSelected && (
+                      <CheckCircle2 className="size-4 text-blue-600 ml-auto shrink-0 mt-0.5" />
+                    )}
+                  </label>
                 );
               })}
             </div>
           </div>
 
-          {/* Section 2: Reminder Duration */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                2. Reminder Duration (When to Call?)
+          {/* Section 2: Set Reminder Duration */}
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[11px] font-bold">
+                  2
+                </span>
+                Set Reminder Duration
               </label>
-              <span className="text-[11px] font-medium text-slate-500">
-                Order becomes <b className="text-rose-600">Hot Order</b> at timer completion
-              </span>
+
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs shadow-2xs">
+                <Zap className="size-3 text-indigo-600 fill-indigo-600" />
+                <span>
+                  Calculated Trigger: <strong className="font-bold text-slate-900">{formattedTrigger}</strong>
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-              {PRESET_DURATIONS.map((preset) => {
-                const isSelected = selectedMinutes === preset.minutes;
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => setSelectedMinutes(preset.minutes)}
-                    className={cn(
-                      "flex flex-col items-center justify-center rounded-lg border py-2 px-1 text-center transition cursor-pointer select-none",
-                      isSelected
-                        ? "border-blue-600 bg-blue-600 text-white font-bold shadow-xs"
-                        : "border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 hover:border-slate-300"
-                    )}
-                  >
-                    <span className="text-xs">{preset.label}</span>
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              {/* Quick +60 Mins */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("60m")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
+                  durationPreset === "60m"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "60m" ? "text-blue-100" : "text-slate-400")}>
+                  Quick
+                </div>
+                <div className="text-xs font-bold">+60 Mins</div>
+              </button>
+
+              {/* Recommended 2 Hours */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("2h")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
+                  durationPreset === "2h"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "2h" ? "text-blue-100" : "text-blue-600 font-bold")}>
+                  Recommended
+                </div>
+                <div className="text-xs font-bold flex items-center justify-center gap-1">
+                  2 Hours
+                  {durationPreset === "2h" && <Check className="size-3" />}
+                </div>
+              </button>
+
+              {/* Evening 3 Hours */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("3h")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
+                  durationPreset === "3h"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "3h" ? "text-blue-100" : "text-slate-400")}>
+                  Evening
+                </div>
+                <div className="text-xs font-bold">3 Hours</div>
+              </button>
+
+              {/* Later Today 4 Hours */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("4h")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
+                  durationPreset === "4h"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "4h" ? "text-blue-100" : "text-slate-400")}>
+                  Later Today
+                </div>
+                <div className="text-xs font-bold">4 Hours</div>
+              </button>
+
+              {/* Tomorrow 10:30 AM */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("tomorrow")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
+                  durationPreset === "tomorrow"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "tomorrow" ? "text-blue-100" : "text-slate-400")}>
+                  Tomorrow
+                </div>
+                <div className="text-xs font-bold">10:30 AM</div>
+              </button>
+
+              {/* Custom */}
+              <button
+                type="button"
+                onClick={() => setDurationPreset("custom")}
+                className={cn(
+                  "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer flex flex-col items-center justify-center",
+                  durationPreset === "custom"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
+                    : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
+                )}
+              >
+                <Calendar className={cn("size-3.5 mb-0.5", durationPreset === "custom" ? "text-white" : "text-slate-400")} />
+                <div className="text-xs font-bold">Custom</div>
+              </button>
             </div>
 
-            {selectedMinutes === -1 && (
-              <div className="pt-2">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Custom Callback Date & Time (IST)
+            {durationPreset === "custom" && (
+              <div className="pt-2 animate-in fade-in duration-150">
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  Select Custom Callback Date &amp; Time (IST)
                 </label>
                 <input
                   type="datetime-local"
                   value={customDateTime}
                   onChange={(e) => setCustomDateTime(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
             )}
           </div>
 
-          {/* Section 3: Target Time Preview Banner */}
-          <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 p-3.5 shadow-xs">
-            <div className="flex items-center justify-between gap-2">
+          {/* Section 3: Employee Calling Note */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <span className="grid size-6 place-items-center rounded-full bg-blue-600 text-white">
-                  <Clock className="size-3.5" />
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[11px] font-bold">
+                    3
+                  </span>
+                  Employee Calling Note
+                </label>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                  <Zap className="size-3" /> Auto-generated note from outcome
                 </span>
-                <div>
-                  <div className="text-[11px] font-medium text-slate-600">Target Callback Time:</div>
-                  <div className="text-sm font-black text-blue-950">
-                    {formatIST(targetDate.toISOString())}
-                  </div>
-                </div>
               </div>
-
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-700 shadow-2xs">
-                <Flame className="size-3 text-rose-500" /> Hot Order Trigger
+              <span className="text-[11px] text-slate-400 font-mono">
+                {note.length} / 500 chars
               </span>
             </div>
-            <p className="mt-2 text-[11px] text-slate-600">
-              When this reminder ends, the order will float to the top of your order list with a <b className="text-rose-700">🔥 Hot Order</b> badge and a desktop sound alert will notify you.
-            </p>
+
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 space-y-2">
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value.slice(0, 500))}
+                rows={2}
+                className="w-full bg-transparent text-xs text-slate-900 resize-none focus:outline-none placeholder:text-slate-400 leading-normal"
+                placeholder="Enter specific notes about the customer call..."
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-200/80">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[11px] font-semibold text-slate-400 mr-0.5">Quick Add:</span>
+                  {[
+                    "Keep Aadhaar ready",
+                    "Spoke to spouse",
+                    "Switched off",
+                    "In meeting",
+                    "WhatsApp link sent",
+                  ].map((quick) => (
+                    <button
+                      key={quick}
+                      type="button"
+                      onClick={() => setNote((prev) => (prev ? `${prev} | ${quick}` : quick))}
+                      className="px-2 py-0.5 rounded bg-white hover:bg-blue-600 hover:text-white border border-slate-200 text-[11px] font-medium text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      + {quick}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium ml-auto">
+                  {customerMobile && (
+                    <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                      <ShieldCheck className="size-3.5" /> +91 {customerMobile}
+                    </span>
+                  )}
+                  <span>• {staffName}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Section 4: Notes */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              3. Call Notes & Specifics (Optional)
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_NOTES.map((quick) => (
-                <button
-                  key={quick}
-                  type="button"
-                  onClick={() => setNote((prev) => (prev ? `${prev} | ${quick}` : quick))}
-                  className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition cursor-pointer select-none"
-                >
-                  + {quick}
-                </button>
-              ))}
+          {/* Section 4: Automated System Triggers */}
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Zap className="size-4 text-blue-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Automated System Triggers
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500">
+                {[hotOrderSurge, desktopAlert, whatsappReminder].filter(Boolean).length} triggers active
+              </span>
             </div>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="E.g., Customer said driving, call back after 3 PM. Need to re-confirm Aadhaar OTP."
-              className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Trigger 1: Hot Order Surge */}
+              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={hotOrderSurge}
+                  onChange={(e) => setHotOrderSurge(e.target.checked)}
+                  className="w-4 h-4 rounded accent-rose-600"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 truncate">
+                    🔥 Hot Order Surge
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    Top list at {formatIST(targetDate.toISOString(), { timeOnly: true })} IST
+                  </div>
+                </div>
+              </label>
+
+              {/* Trigger 2: Desktop Alert + Audio */}
+              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={desktopAlert}
+                  onChange={(e) => setDesktopAlert(e.target.checked)}
+                  className="w-4 h-4 rounded accent-blue-600"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 truncate">
+                    🔔 Desktop Alert + Audio
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    Instant popup &amp; sound tone
+                  </div>
+                </div>
+              </label>
+
+              {/* Trigger 3: WhatsApp Reminder */}
+              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={whatsappReminder}
+                  onChange={(e) => setWhatsappReminder(e.target.checked)}
+                  className="w-4 h-4 rounded accent-emerald-600"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 truncate">
+                    💬 WhatsApp Reminder
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    Auto-SMS to customer
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3.5">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isBusy}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-100 transition cursor-pointer"
-          >
-            Close
-          </button>
+        {/* Modal Footer */}
+        <div className="bg-slate-50 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-xs font-bold border border-slate-300">
+              {initials}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-slate-900 leading-tight">
+                {staffName}
+              </span>
+              <span className="text-[11px] text-slate-500 leading-tight">
+                Assigned Executive
+              </span>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => scheduleMut.mutate()}
-            disabled={isBusy}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition cursor-pointer disabled:opacity-50"
-          >
-            <PhoneCall className="size-4" />
-            {scheduleMut.isPending ? "Scheduling Reminder…" : "Set Call Back & Reminder"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isBusy}
+              className="px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={() => scheduleMut.mutate()}
+              disabled={isBusy}
+              className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold shadow-md flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <Clock className="size-4" />
+              <span>{scheduleMut.isPending ? "Setting Timer…" : "Confirm & Set Callback Timer"}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
