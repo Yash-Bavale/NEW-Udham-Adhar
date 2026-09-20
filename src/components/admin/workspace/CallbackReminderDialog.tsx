@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIST } from "@/lib/datetime";
+import { CustomDateTimePicker } from "./CustomDateTimePicker";
 import {
   scheduleOrderCallback,
   cancelOrderCallback,
@@ -101,11 +102,7 @@ export function CallbackReminderDialog({
 
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");
   const [durationPreset, setDurationPreset] = useState<string>("2h"); // '60m' | '2h' | '3h' | '4h' | 'tomorrow' | 'custom'
-  const [customDateTime, setCustomDateTime] = useState<string>(() => {
-    const d = new Date(Date.now() + 120 * 60_000);
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
+  const [customDate, setCustomDate] = useState<Date>(() => new Date(Date.now() + 120 * 60_000));
 
   const [note, setNote] = useState<string>("Customer answered and requested callback after 2 hours. Will keep Aadhaar OTP ready for verification.");
   const [completeNote, setCompleteNote] = useState<string>("");
@@ -131,12 +128,11 @@ export function CallbackReminderDialog({
       t.setDate(t.getDate() + 1);
       t.setHours(10, 30, 0, 0);
       return t;
-    } else if (durationPreset === "custom" && customDateTime) {
-      const d = new Date(customDateTime);
-      if (!isNaN(d.getTime())) return d;
+    } else if (durationPreset === "custom") {
+      return customDate;
     }
     return new Date(now.getTime() + 120 * 60_000);
-  }, [durationPreset, customDateTime]);
+  }, [durationPreset, customDate]);
 
   // When outcome changes, update default note if user hasn't heavily modified it
   const handleSelectOutcome = (outcomeId: string) => {
@@ -498,14 +494,9 @@ export function CallbackReminderDialog({
 
             {durationPreset === "custom" && (
               <div className="pt-2 animate-in fade-in duration-150">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Select Custom Callback Date &amp; Time (IST)
-                </label>
-                <input
-                  type="datetime-local"
-                  value={customDateTime}
-                  onChange={(e) => setCustomDateTime(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                <CustomDateTimePicker
+                  value={customDate}
+                  onChange={(d) => setCustomDate(d)}
                 />
               </div>
             )}
