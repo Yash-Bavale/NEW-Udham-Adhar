@@ -428,15 +428,15 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: (opts?: { closeAfter?: boolean; cc?: string; bcc?: string } | void) =>
+    mutationFn: (opts?: { closeAfter?: boolean; cc?: string; bcc?: string }) =>
       replyFn({
         data: {
           ticketId,
           message: body.trim(),
           isInternal: composeTab === "note",
           armAutoclose: false,
-          cc: opts?.cc ?? (ccInput.trim() || undefined),
-          bcc: opts?.bcc ?? (bccInput.trim() || undefined),
+          cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
+          bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
         },
       }),
     onSuccess: async (r: any, variables) => {
@@ -448,7 +448,7 @@ function TicketWorkspace() {
         toast.success("Reply sent successfully");
       }
 
-      if (variables?.closeAfter) {
+      if (variables && typeof variables === "object" && (variables as any).closeAfter) {
         await closeNormal({ data: { ticketId } });
         toast.success("Ticket closed");
       }
@@ -636,236 +636,203 @@ function TicketWorkspace() {
   }));
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex flex-col bg-slate-100 min-w-0 overflow-hidden font-sans">
-      {/* ── 1. Top Bar & Ticket Header (Cleaned per Specification) ────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-4 py-1.5 shrink-0 shadow-2xs">
-        {/* Row 1: Back + Ticket# + Subject + Prev/Next — all in ONE compact row */}
-        <div className="flex items-center gap-2 min-w-0 mb-1">
-          {/* Back to Tickets */}
-          <button
-            onClick={() => navigate({ to: "/admin/support/tickets" })}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition-colors shrink-0"
-          >
-            <ArrowLeft className="size-3" /> Back to Tickets
-          </button>
-
-          <span className="text-slate-300 shrink-0">|</span>
-
-          {/* Ticket Number */}
-          <h1 className="text-sm font-bold tracking-tight text-slate-900 font-mono shrink-0">
-            {ticket.ticket_number}
-          </h1>
-          {ticket.is_new && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white shrink-0">
-              NEW
-            </span>
-          )}
-
-          {/* Subject — truncated, fills remaining space */}
-          <span className="text-[11px] font-semibold text-slate-600 truncate flex-1 min-w-0">
-            {ticket.subject || "(no subject)"}
-          </span>
-
-          {/* Created timestamp */}
-          <span className="text-slate-400 font-medium text-[10px] shrink-0 hidden xl:flex items-center gap-1">
-            <RefreshCw className="size-2.5 text-slate-300" /> {ist(ticket.created_at)}
-          </span>
-
-          {/* Previous / Next Ticket Buttons */}
-          <div className="flex items-center rounded border border-slate-200 bg-white overflow-hidden shadow-2xs shrink-0">
+    <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 p-3 md:p-4 bg-slate-100/70 flex gap-3 md:gap-4 overflow-hidden font-sans min-w-0">
+      {/* ── LEFT COLUMN: Ticket Header + Conversation Feed + Reply Composer ── */}
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+        {/* ── 1. Ticket Header Card matching Image 2 ────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs shrink-0 mb-3">
+          {/* Row 1: Back to Tickets Link */}
+          <div className="flex items-center justify-between mb-1.5">
             <button
-              onClick={() => {
-                if (navState.prevId) {
-                  navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.prevId } });
-                }
-              }}
-              disabled={!navState.prevId}
-              className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
-              title="Previous ticket in list"
+              onClick={() => navigate({ to: "/admin/support/tickets" })}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
             >
-              <ChevronLeft className="size-3" /> Prev
+              <ArrowLeft className="size-3.5" /> Back to Tickets
             </button>
+
+            {/* Mobile context sidebar button */}
             <button
-              onClick={() => {
-                if (navState.nextId) {
-                  navigate({ to: "/admin/support/tickets/$ticketId", params: { ticketId: navState.nextId } });
-                }
-              }}
-              disabled={!navState.nextId}
-              className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Next ticket in list"
+              onClick={() => setSidebarDrawerOpen(true)}
+              className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700"
             >
-              Next <ChevronRight className="size-3" />
+              <Info className="size-3.5" /> Info
             </button>
           </div>
 
-          {/* Mobile context sidebar button */}
-          <button
-            onClick={() => setSidebarDrawerOpen(true)}
-            className="lg:hidden inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-700 shrink-0"
-          >
-            <Info className="size-3" />
-          </button>
-        </div>
+          {/* Row 2: Ticket Number + NEW Badge (Left) & Quick Action Buttons (Right) */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-mono">
+                {ticket.ticket_number}
+              </h1>
+              {ticket.is_new && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white shrink-0 shadow-2xs">
+                  NEW
+                </span>
+              )}
+            </div>
 
-        {/* Row 2: Badges — NOWRAP, horizontal scroll, never wraps to 2nd line */}
-        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-none pb-0.5">
-          {/* Customer Delay badge */}
-          {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[10px] shrink-0">
-              <span className="size-1.5 rounded-full bg-[#d97706]" /> Customer Delay
-            </span>
-          )}
-
-          {/* Status Badge */}
-          <div className="shrink-0">
-            <StatusDropdownBadge
-              status={ticket.status as TicketStatus}
-              onChange={(s) => changeStatus.mutate(s)}
-            />
-          </div>
-
-          {/* Priority Badge */}
-          <div className="shrink-0">
-            <PriorityDropdownBadge
-              priority={(ticket.priority as TicketPriority) ?? "medium"}
-              onChange={(p) => changePriority.mutate(p)}
-            />
-          </div>
-
-          {/* Assignee Badge */}
-          <div className="shrink-0">
-            <AssigneeDropdownBadge
-              currentId={ticket.assigned_to}
-              currentName={ticket.assigned_name}
-              staff={staffList}
-              onPick={(id) => changeAssignee.mutate(id)}
-            />
-          </div>
-
-          {/* Custom Tags */}
-          {customTags.map((tag, idx) => (
-            <span
-              key={idx}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-medium shrink-0"
-            >
-              {tag}
+            {/* Action Buttons: Close Ticket | TB01 | TB02 | Reopen */}
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => setCustomTags((prev) => prev.filter((_, i) => i !== idx))}
-                className="hover:text-blue-900"
+                onClick={() => doCloseNormal.mutate()}
+                disabled={isClosed || doCloseNormal.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
               >
-                <X className="size-2.5" />
+                {doCloseNormal.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                )}
+                Close Ticket
               </button>
-            </span>
-          ))}
 
-          {/* + Add Tag */}
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setAddTagOpen((v) => !v)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-[10px] font-medium transition-colors"
-            >
-              <Plus className="size-2.5" /> Add Tag
-            </button>
-            {addTagOpen && (
-              <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg p-2 shadow-lg z-30">
-                <div className="text-[11px] font-bold text-slate-500 mb-1">Enter tag:</div>
-                <input
-                  type="text"
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newTagInput.trim()) {
-                      setCustomTags((prev) => [...prev, newTagInput.trim()]);
-                      setNewTagInput("");
-                      setAddTagOpen(false);
-                    }
-                  }}
-                  placeholder="e.g. VIP, Urgent Followup"
-                  className="w-full text-xs px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-1 mt-2">
-                  <button
-                    onClick={() => setAddTagOpen(false)}
-                    className="px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100 rounded"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (newTagInput.trim()) {
+              <button
+                onClick={() => setConsultOpen(true)}
+                disabled={isClosed}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+              >
+                <FileText className="size-3.5 text-blue-600" />
+                Consultation Completed (TB01)
+              </button>
+
+              <button
+                onClick={() => setReasonOpen(true)}
+                disabled={isClosed}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+              >
+                <Send className="size-3.5 text-rose-600" />
+                Reply &amp; Close (TB02)
+              </button>
+
+              {canReopenOrder && (
+                <button
+                  onClick={() => setReopenConfirm(true)}
+                  disabled={doReopenOrder.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                >
+                  <RotateCcw className="size-3.5 text-slate-500" />
+                  Reopen Order
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 3: Subject / Subtitle */}
+          <div className="mt-1 text-xs font-semibold text-slate-600 truncate">
+            {ticket.subject ? `Re: ${ticket.subject}` : "(no subject)"}
+          </div>
+
+          {/* Row 4: Badges Row (Customer Delay, Status, Priority, Assignee, Add Tag) */}
+          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+            {/* Customer Delay badge */}
+            {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px] shrink-0 shadow-2xs">
+                <span className="size-1.5 rounded-full bg-[#d97706]" /> Customer Delay
+              </span>
+            )}
+
+            {/* Status Badge */}
+            <div className="shrink-0">
+              <StatusDropdownBadge
+                status={ticket.status as TicketStatus}
+                onChange={(s) => changeStatus.mutate(s)}
+              />
+            </div>
+
+            {/* Priority Badge */}
+            <div className="shrink-0">
+              <PriorityDropdownBadge
+                priority={(ticket.priority as TicketPriority) ?? "medium"}
+                onChange={(p) => changePriority.mutate(p)}
+              />
+            </div>
+
+            {/* Assignee Badge */}
+            <div className="shrink-0">
+              <AssigneeDropdownBadge
+                currentId={ticket.assigned_to}
+                currentName={ticket.assigned_name}
+                staff={staffList}
+                onPick={(id) => changeAssignee.mutate(id)}
+              />
+            </div>
+
+            {/* Custom Tags */}
+            {customTags.map((tag, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-medium shrink-0"
+              >
+                {tag}
+                <button
+                  onClick={() => setCustomTags((prev) => prev.filter((_, i) => i !== idx))}
+                  className="hover:text-blue-900"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+
+            {/* + Add Tag */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setAddTagOpen((v) => !v)}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-[11px] font-medium transition-colors"
+              >
+                <Plus className="size-3" /> Add Tag
+              </button>
+              {addTagOpen && (
+                <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg p-2 shadow-lg z-30">
+                  <div className="text-[11px] font-bold text-slate-500 mb-1">Enter tag:</div>
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newTagInput.trim()) {
                         setCustomTags((prev) => [...prev, newTagInput.trim()]);
                         setNewTagInput("");
                         setAddTagOpen(false);
                       }
                     }}
-                    className="px-2 py-0.5 text-[11px] bg-blue-600 text-white rounded font-medium"
-                  >
-                    Add
-                  </button>
+                    placeholder="e.g. VIP, Urgent Followup"
+                    className="w-full text-xs px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-1 mt-2">
+                    <button
+                      onClick={() => setAddTagOpen(false)}
+                      className="px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100 rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (newTagInput.trim()) {
+                          setCustomTags((prev) => [...prev, newTagInput.trim()]);
+                          setNewTagInput("");
+                          setAddTagOpen(false);
+                        }
+                      }}
+                      className="px-2 py-0.5 text-[11px] bg-blue-600 text-white rounded font-medium"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Row 3: Quick Action Buttons — NOWRAP, horizontal scroll, buttons never wrap */}
-        <div className="mt-1 pt-1 border-t border-slate-100 flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => doCloseNormal.mutate()}
-            disabled={isClosed || doCloseNormal.isPending}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
-          >
-            {doCloseNormal.isPending ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-3 text-emerald-600" />
-            )}
-            Close Ticket
-          </button>
-
-          <button
-            onClick={() => setConsultOpen(true)}
-            disabled={isClosed}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
-          >
-            <FileText className="size-3 text-blue-600" />
-            Consultation Completed (TB01)
-          </button>
-
-          <button
-            onClick={() => setReasonOpen(true)}
-            disabled={isClosed}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
-          >
-            <Send className="size-3 text-rose-600" />
-            Reply &amp; Close (TB02)
-          </button>
-
-          {canReopenOrder && (
-            <button
-              onClick={() => setReopenConfirm(true)}
-              disabled={doReopenOrder.isPending}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
-            >
-              <RotateCcw className="size-3 text-slate-500" />
-              Reopen Order
-            </button>
-          )}
-        </div>
-      </header>
-
-
-      {/* ── 2. Workspace Body (Conversation & Sidebar) ────── */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Left Column: Conversation + Sticky Reply Composer */}
-        <main className="flex-1 min-w-0 flex flex-col h-full bg-slate-50/60 overflow-hidden relative border-r border-slate-200">
+        {/* ── 2. Conversation Box + Sticky Reply Composer Container ──────── */}
+        <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex flex-col overflow-hidden relative">
           {/* Scrollable Conversation Feed */}
           <div
             ref={threadRef}
             onScroll={handleThreadScroll}
-            className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3"
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50/40"
           >
             {groupedMessages.length === 0 ? (
               <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-2">
@@ -916,7 +883,7 @@ function TicketWorkspace() {
           )}
 
           {/* ── 3. Sticky Bottom Reply Composer matching Screenshot ─────────────── */}
-          <div className="bg-white border-t border-slate-200 shrink-0 shadow-lg">
+          <div className="bg-white border-t border-slate-200 shrink-0">
             {/* Tab Header Row: Reply | Internal Note + Recipient chip + Cc / Bcc */}
             <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1 flex-wrap gap-1.5">
               {/* Left Tabs */}
@@ -1224,308 +1191,308 @@ function TicketWorkspace() {
               </div>
             </div>
           </div>
-        </main>
-
-        {/* ── 4. Right Context Sidebar (Fixed compact width matching Screenshot) ─────── */}
-        <aside
-          className={`w-[280px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-2 space-y-1.5 text-xs ${
-            sidebarDrawerOpen
-              ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[300px] max-w-full p-3"
-              : "hidden lg:flex"
-          }`}
-        >
-          {sidebarDrawerOpen && (
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 lg:hidden">
-              <span className="font-bold text-slate-800 text-xs">Context Sidebar</span>
-              <button
-                onClick={() => setSidebarDrawerOpen(false)}
-                className="p-1 rounded hover:bg-slate-200 text-slate-500"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Card 1: Customer Information */}
-          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-              <div className="flex items-center gap-1.5">
-                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
-                  <User className="size-3.5" />
-                </div>
-                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
-                  Customer Information
-                </h2>
-              </div>
-              {cust.id && (
-                <Link
-                  to="/admin/customers/$customerId"
-                  params={{ customerId: cust.id }}
-                  className="text-[11px] font-semibold text-blue-600 hover:underline"
-                >
-                  View Profile
-                </Link>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="size-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 border border-emerald-200">
-                  {initials(cust.name)}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-bold text-slate-900 text-xs truncate">
-                    {cust.name || "Customer"}
-                  </div>
-                  <div className="text-[11px] text-slate-500 font-mono truncate flex items-center gap-1" title={ticket.ticket_email ?? cust.primary_email}>
-                    <Mail className="size-2.5 text-slate-400 shrink-0" />
-                    <span>{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1 pt-1 text-[11px] text-slate-600">
-                {cust.primary_mobile && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="size-3 text-slate-400 shrink-0" />
-                      <span className="font-mono text-slate-800">{cust.primary_mobile}</span>
-                    </div>
-                    <a
-                      href={`tel:${cust.primary_mobile}`}
-                      className="inline-flex items-center gap-0.5 text-emerald-600 hover:text-emerald-700 font-bold text-[11px] hover:underline cursor-pointer"
-                      title={`Call ${cust.primary_mobile}`}
-                    >
-                      <span>Call</span>
-                    </a>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="size-3 text-slate-400 shrink-0" />
-                  <span className="text-slate-700 truncate">
-                    {cust.state ? `${cust.state}, India` : "Tamil Nadu, India"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Order Information */}
-          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-              <div className="flex items-center gap-1.5">
-                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
-                  <Package className="size-3.5" />
-                </div>
-                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
-                  Order Information
-                </h2>
-              </div>
-              {app.id && (
-                <Link
-                  to="/admin/orders/$orderId"
-                  params={{ orderId: app.id }}
-                  className="text-[11px] font-semibold text-blue-600 hover:underline"
-                >
-                  View Order
-                </Link>
-              )}
-            </div>
-
-            <div className="space-y-0.5 text-xs">
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Order No.</span>
-                {app.application_code ? (
-                  <div className="flex items-center gap-1">
-                    <Link
-                      to="/admin/orders/$orderId"
-                      params={{ orderId: app.id }}
-                      className="font-mono font-bold text-blue-700 hover:underline text-[11px]"
-                    >
-                      {app.application_code}
-                    </Link>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(app.application_code);
-                        toast.success("Order number copied");
-                      }}
-                      className="text-slate-400 hover:text-slate-700 p-0.5"
-                      title="Copy order number"
-                    >
-                      <Copy className="size-2.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-slate-400 italic text-[11px]">—</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Service</span>
-                <span className="font-medium text-slate-800 text-right truncate max-w-[150px] text-[11px]">
-                  {serviceName}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Order Date</span>
-                <span className="text-slate-700 text-right text-[11px]">
-                  {ist(app.created_at || ticket.created_at)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Order Stage</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
-                  {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Customer Delay"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Order Status</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 capitalize">
-                  {app.order_status || "CUSTOMER_HOLD"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Order Assignee</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
-                  <User className="size-2.5 text-slate-400" />
-                  <span>{ticket.executive_name || "Unassigned"}</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Ticket Information */}
-          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-              <div className="flex items-center gap-1.5">
-                <div className="p-1 rounded-md bg-blue-50 text-blue-600">
-                  <Info className="size-3.5" />
-                </div>
-                <h2 className="text-xs font-bold text-slate-900 tracking-tight">
-                  Ticket Information
-                </h2>
-              </div>
-              <span className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
-                Edit
-              </span>
-            </div>
-
-            <div className="space-y-0.5 text-xs">
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Created</span>
-                <span className="text-slate-700 text-[11px]">{ist(ticket.created_at)}</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Channel</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px]">
-                  <Mail className="size-2.5 text-slate-400" /> {ticket.source || "Email"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Priority</span>
-                <PriorityDropdownBadge
-                  priority={(ticket.priority as TicketPriority) ?? "medium"}
-                  onChange={(p) => changePriority.mutate(p)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Status</span>
-                <StatusDropdownBadge
-                  status={ticket.status as TicketStatus}
-                  onChange={(s) => changeStatus.mutate(s)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">Assigned To</span>
-                <AssigneeDropdownBadge
-                  currentId={ticket.assigned_to}
-                  currentName={ticket.assigned_name}
-                  staff={staffList}
-                  onPick={(id) => changeAssignee.mutate(id)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2 py-0.5">
-                <span className="text-slate-500 text-[11px]">SLA</span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
-                    slaTone === "healthy"
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                      : slaTone === "warning"
-                      ? "bg-amber-50 text-amber-800 border-amber-200"
-                      : "bg-rose-50 text-rose-800 border-rose-200"
-                  }`}
-                >
-                  <span className={`size-1.5 rounded-full ${slaTone === "healthy" ? "bg-emerald-500" : slaTone === "warning" ? "bg-amber-500" : "bg-rose-500"}`} />
-                  {slaText}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: Recent Activity matching Screenshot */}
-          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-              <h2 className="text-xs font-bold text-slate-900 tracking-tight">Recent Activity</h2>
-              <span className="text-[11px] font-semibold text-blue-700 hover:underline cursor-pointer">
-                View All
-              </span>
-            </div>
-
-            <div className="space-y-1.5 pt-0.5">
-              <div className="flex items-start gap-2">
-                <div className="size-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <Mail className="size-2.5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
-                    Customer email received
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {ticket.first_response_at ? ist(ticket.first_response_at) : ist(ticket.created_at)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <div className="size-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <Mail className="size-2.5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
-                    Email sent to customer
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {ticket.last_staff_message_at ? ist(ticket.last_staff_message_at) : ist(ticket.created_at)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <div className="size-5 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
-                  <Clock className="size-2.5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-slate-900 text-[11px] leading-tight">
-                    Ticket created
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {ist(ticket.created_at)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
+        </div>
       </div>
+
+      {/* ── RIGHT COLUMN: Context Sidebar Cards Starting From The Top (Matching Image 2) ── */}
+      <aside
+        className={`w-[300px] xl:w-[320px] shrink-0 flex flex-col h-full overflow-y-auto space-y-3 pb-2 ${
+          sidebarDrawerOpen
+            ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl p-4 w-[320px] max-w-full"
+            : "hidden lg:flex"
+        }`}
+      >
+        {sidebarDrawerOpen && (
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 lg:hidden">
+            <span className="font-bold text-slate-800 text-xs">Context Information</span>
+            <button
+              onClick={() => setSidebarDrawerOpen(false)}
+              className="p-1 rounded hover:bg-slate-200 text-slate-500"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Card 1: Customer Information */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                <User className="size-3.5" />
+              </div>
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
+                Customer Information
+              </h2>
+            </div>
+            {cust.id && (
+              <Link
+                to="/admin/customers/$customerId"
+                params={{ customerId: cust.id } as any}
+                className="text-[11px] font-semibold text-blue-600 hover:underline"
+              >
+                View Profile
+              </Link>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-200">
+                {initials(cust.name)}
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900 text-xs truncate">
+                  {cust.name || "Customer"}
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono truncate flex items-center gap-1" title={ticket.ticket_email ?? cust.primary_email}>
+                  <Mail className="size-3 text-slate-400 shrink-0" />
+                  <span className="truncate">{ticket.ticket_email ?? cust.primary_email ?? "—"}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-1 text-xs text-slate-600 border-t border-slate-50">
+              {cust.primary_mobile && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="size-3 text-slate-400 shrink-0" />
+                    <span className="font-mono text-slate-800 text-[11px]">{cust.primary_mobile}</span>
+                  </div>
+                  <a
+                    href={`tel:${cust.primary_mobile}`}
+                    className="inline-flex items-center gap-0.5 text-blue-600 hover:text-blue-700 font-bold text-[11px] hover:underline cursor-pointer"
+                    title={`Call ${cust.primary_mobile}`}
+                  >
+                    <span>Call</span>
+                  </a>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <MapPin className="size-3 text-slate-400 shrink-0" />
+                <span className="text-slate-700 truncate text-[11px]">
+                  {cust.state ? `${cust.state}, India` : "Tamil Nadu, India"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Order Information */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                <Package className="size-3.5" />
+              </div>
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
+                Order Information
+              </h2>
+            </div>
+            {app.id && (
+              <Link
+                to="/admin/orders/$orderId"
+                params={{ orderId: app.id } as any}
+                className="text-[11px] font-semibold text-blue-600 hover:underline"
+              >
+                View Order
+              </Link>
+            )}
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Order No.</span>
+              {app.application_code ? (
+                <div className="flex items-center gap-1">
+                  <Link
+                    to="/admin/orders/$orderId"
+                    params={{ orderId: app.id } as any}
+                    className="font-mono font-bold text-blue-700 hover:underline text-[11px]"
+                  >
+                    {app.application_code}
+                  </Link>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(app.application_code);
+                      toast.success("Order number copied");
+                    }}
+                    className="text-slate-400 hover:text-slate-700 p-0.5"
+                    title="Copy order number"
+                  >
+                    <Copy className="size-2.5" />
+                  </button>
+                </div>
+              ) : (
+                <span className="text-slate-400 italic text-[11px]">—</span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Service</span>
+              <span className="font-medium text-slate-800 text-right truncate max-w-[170px] text-[11px]">
+                {serviceName}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Order Date</span>
+              <span className="text-slate-700 text-right text-[11px]">
+                {ist(app.created_at || ticket.created_at)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Order Stage</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
+                {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Customer Delay"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Order Status</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">
+                {app.order_status || "CUSTOMER_HOLD"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Order Assignee</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                <User className="size-2.5 text-slate-400" />
+                <span>{ticket.executive_name || "Unassigned"}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Ticket Information */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-blue-50 text-blue-600">
+                <Info className="size-3.5" />
+              </div>
+              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
+                Ticket Information
+              </h2>
+            </div>
+            <span className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">
+              Edit
+            </span>
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Created</span>
+              <span className="text-slate-700 text-[11px]">{ist(ticket.created_at)}</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Channel</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px]">
+                <Mail className="size-2.5 text-slate-400" /> {ticket.source || "Email"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Priority</span>
+              <PriorityDropdownBadge
+                priority={(ticket.priority as TicketPriority) ?? "medium"}
+                onChange={(p) => changePriority.mutate(p)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Status</span>
+              <StatusDropdownBadge
+                status={ticket.status as TicketStatus}
+                onChange={(s) => changeStatus.mutate(s)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">Assigned To</span>
+              <AssigneeDropdownBadge
+                currentId={ticket.assigned_to}
+                currentName={ticket.assigned_name}
+                staff={staffList}
+                onPick={(id) => changeAssignee.mutate(id)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="text-slate-500 text-[11px]">SLA</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
+                  slaTone === "healthy"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                    : slaTone === "warning"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-rose-50 text-rose-800 border-rose-200"
+                }`}
+              >
+                <span className={`size-1.5 rounded-full ${slaTone === "healthy" ? "bg-emerald-500" : slaTone === "warning" ? "bg-amber-500" : "bg-rose-500"}`} />
+                {slaText}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Recent Activity matching Image 2 */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h2 className="text-xs font-bold text-slate-900 tracking-tight">Recent Activity</h2>
+            <span className="text-[11px] font-semibold text-blue-700 hover:underline cursor-pointer">
+              View All
+            </span>
+          </div>
+
+          <div className="space-y-2 pt-0.5">
+            <div className="flex items-start gap-2.5">
+              <div className="size-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                <Mail className="size-2.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-slate-900 text-[11px] leading-tight">
+                  Customer email received
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {ticket.first_response_at ? ist(ticket.first_response_at) : ist(ticket.created_at)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <div className="size-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                <Mail className="size-2.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-slate-900 text-[11px] leading-tight">
+                  Email sent to customer
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {ticket.last_staff_message_at ? ist(ticket.last_staff_message_at) : ist(ticket.created_at)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <div className="size-5 rounded-full bg-slate-400 text-white flex items-center justify-center shrink-0 mt-0.5">
+                <Clock className="size-2.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-slate-900 text-[11px] leading-tight">
+                  Ticket created
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {ist(ticket.created_at)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
 
       {/* ── Dialogs & Popups ──────────────────────────────── */}
 
