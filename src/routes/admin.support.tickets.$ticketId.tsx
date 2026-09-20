@@ -1239,7 +1239,7 @@ function TicketWorkspace() {
                   {/* Send button with dropdown */}
                   <div className="relative inline-flex rounded-md shadow-2xs">
                     <button
-                      onClick={() => sendReply.mutate()}
+                      onClick={() => sendReply.mutate({})}
                       disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
                       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-md text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         composeTab === "note"
