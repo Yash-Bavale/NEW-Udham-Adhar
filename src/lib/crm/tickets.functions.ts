@@ -176,17 +176,17 @@ export const listTickets = createServerFn({ method: "POST" })
           .from("customers")
           .select("id")
           .or(`primary_email.ilike.${like},name.ilike.${like},primary_mobile.ilike.${like}`)
-          .limit(300),
+          .limit(50),
         admin
           .from("applications")
           .select("id")
           .ilike("application_code", like)
-          .limit(300),
+          .limit(50),
         admin
           .from("email_logs")
           .select("customer_id, application_id")
           .or(`to_email.ilike.${like},from_email.ilike.${like}`)
-          .limit(300),
+          .limit(100),
       ]);
 
       const custIds = new Set<string>((custRes.data ?? []).map((r: any) => r.id));
@@ -196,8 +196,13 @@ export const listTickets = createServerFn({ method: "POST" })
         if (r.application_id) appIds.add(r.application_id);
       });
 
-      if (custIds.size) ors.push(`customer_id.in.(${Array.from(custIds).join(",")})`);
-      if (appIds.size) ors.push(`application_id.in.(${Array.from(appIds).join(",")})`);
+      // Cap the ID lists: a very long IN(...) makes the PostgREST URL exceed
+      // limits and the underlying fetch fails outright.
+      const capped = (s: Set<string>) => Array.from(s).slice(0, 60);
+      const custList = capped(custIds);
+      const appList = capped(appIds);
+      if (custList.length) ors.push(`customer_id.in.(${custList.join(",")})`);
+      if (appList.length) ors.push(`application_id.in.(${appList.join(",")})`);
 
       q = q.or(ors.join(","));
     }
@@ -205,8 +210,25 @@ export const listTickets = createServerFn({ method: "POST" })
     // Apply pagination range
     q = q.range(from, to);
 
-    const { data: rows, error, count } = await q;
-    if (error) throw new Error(error.message);
+    // Transient network failures (undici "fetch failed") should not blank the page.
+    let rows: any[] | null = null;
+    let count: number | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await q;
+        if (res.error) throw new Error(res.error.message);
+        rows = res.data as any[];
+        count = res.count ?? null;
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+      }
+    }
+    if (lastErr) throw new Error(lastErr instanceof Error ? lastErr.message : String(lastErr));
+
 
     const assignees = Array.from(
       new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean))
