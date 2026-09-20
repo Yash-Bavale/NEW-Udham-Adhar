@@ -457,7 +457,7 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: async (opts?: { closeAfter?: boolean; cc?: string; bcc?: string }) => {
+    mutationFn: async (opts?: { closeAfter?: boolean; armAutoclose?: boolean; cc?: string; bcc?: string }) => {
       let finalMessage = body.trim();
 
       if (attachedFiles.length > 0) {
@@ -1687,7 +1687,7 @@ function TicketWorkspace() {
             
             const formatted = filled
               .split(/\n{2,}/)
-              .map((p) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+              .map((p: string) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
               .join("");
 
             if (composerRef.current) {
@@ -1725,7 +1725,7 @@ function TicketWorkspace() {
             if (!isHtml) {
               formatted = filled
                 .split(/\n{2,}/)
-                .map((p) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+                .map((p: string) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
                 .join("");
             }
 
