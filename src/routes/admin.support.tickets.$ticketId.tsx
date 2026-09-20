@@ -457,7 +457,7 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: async (opts?: { closeAfter?: boolean; cc?: string; bcc?: string }) => {
+    mutationFn: async (opts?: { closeAfter?: boolean; armAutoclose?: boolean; cc?: string; bcc?: string }) => {
       let finalMessage = body.trim();
 
       if (attachedFiles.length > 0) {
