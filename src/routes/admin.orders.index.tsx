@@ -374,9 +374,11 @@ async function handleBulkReassign(targetStaffId: string) {
 // Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
 const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
-const groups = useMemo(() => {
+const hotRows = useMemo(() => rows.filter((r) => r.is_hot), [rows]);
+
+const regularGroups = useMemo(() => {
   const g = new Map<string, any[]>();
-  for (const r of rows) {
+  for (const r of rows.filter((r) => !r.is_hot)) {
     const d = new Date(r.created_at);
     const key = d.toDateString();
     const arr = g.get(key) ?? [];
@@ -846,7 +848,34 @@ return (
             {!isLoading && rows.length === 0 && (
               <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
             )}
-            {!isLoading && groups.map(([day, items]) => (
+            {!isLoading && hotRows.length > 0 && (
+              <Fragment key="hot-orders-group">
+                <tr className="bg-gradient-to-r from-rose-950 via-rose-900 to-rose-950 text-white border-b border-rose-800">
+                  <td colSpan={colCount} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-rose-100">
+                    <div className="flex items-center gap-2">
+                      <Flame className="size-3.5 text-rose-400 animate-pulse fill-rose-400" />
+                      <span>HOT ORDERS — ACTION / CALL DUE NOW ({hotRows.length})</span>
+                    </div>
+                  </td>
+                </tr>
+                {hotRows.map((r) => (
+                  <OrderRow
+                    key={r.id}
+                    order={r}
+                    hideMoney={hideMoney}
+                    isAdmin={isAdmin}
+                    selected={selectedOrderIds.includes(r.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedOrderIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      )
+                    }
+                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                  />
+                ))}
+              </Fragment>
+            )}
+            {!isLoading && regularGroups.map(([day, items]) => (
               <Fragment key={`g-${day}`}>
                 <tr className="bg-slate-900 text-white border-b border-slate-800">
                   <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
@@ -887,7 +916,32 @@ return (
           No orders match the selected filters.
         </div>
       )}
-      {!isLoading && groups.map(([day, items]) => (
+      {!isLoading && hotRows.length > 0 && (
+        <div key="m-hot-orders-group" className="space-y-2">
+          <div className="sticky top-0 z-10 bg-gradient-to-r from-rose-950 to-rose-900 text-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg shadow-xs flex items-center gap-1.5 border border-rose-700/50">
+            <Flame className="size-3 text-rose-400 animate-pulse fill-rose-400" />
+            HOT ORDERS — ACTION / CALL DUE NOW ({hotRows.length})
+          </div>
+          <div className="space-y-2.5">
+            {hotRows.map((r) => (
+              <OrderCardMobile
+                key={r.id}
+                order={r}
+                hideMoney={hideMoney}
+                isAdmin={isAdmin}
+                selected={selectedOrderIds.includes(r.id)}
+                onToggleSelect={(id, checked) =>
+                  setSelectedOrderIds((prev) =>
+                    checked ? [...prev, id] : prev.filter((x) => x !== id),
+                  )
+                }
+                onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {!isLoading && regularGroups.map(([day, items]) => (
         <div key={`m-g-${day}`} className="space-y-2">
           <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
             {formatDayHeader(day)}
