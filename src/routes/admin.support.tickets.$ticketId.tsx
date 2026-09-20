@@ -34,6 +34,10 @@ import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { parseEmailMessage, parseEmailReply, decodeHtmlEntities, htmlToPlainText } from "@/lib/support/emailParser";
 import { useRole } from "@/hooks/useRole";
 
+function escapeHtml(str: string) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export const Route = createFileRoute("/admin/support/tickets/$ticketId")({
   head: ({ params }) => ({
     meta: [
@@ -1132,7 +1136,7 @@ function TicketWorkspace() {
                 }}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
-                    sendReply.mutate();
+                    sendReply.mutate({});
                   }
                 }}
                 data-placeholder={
@@ -1235,7 +1239,7 @@ function TicketWorkspace() {
                   {/* Send button with dropdown */}
                   <div className="relative inline-flex rounded-md shadow-2xs">
                     <button
-                      onClick={() => sendReply.mutate()}
+                      onClick={() => sendReply.mutate({})}
                       disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
                       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-md text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         composeTab === "note"
@@ -1270,7 +1274,7 @@ function TicketWorkspace() {
                         <button
                           onClick={() => {
                             setSendOptionsOpen(false);
-                            sendReply.mutate();
+                            sendReply.mutate({});
                           }}
                           className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
                         >
