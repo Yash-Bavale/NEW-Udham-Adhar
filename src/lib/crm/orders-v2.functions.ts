@@ -607,7 +607,40 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const { data: apps, error: appErr } = await baseQ.limit(5000);
     if (appErr) throw new Error(appErr.message);
-    const appList = apps ?? [];
+
+    // Fetch all active callback schedulers globally so hot orders and active reminders are NEVER filtered out
+    const { data: globalActiveSchedulers } = await admin
+      .from("order_schedulers")
+      .select("id, application_id, status, fires_at, remarks, created_at, created_by")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    const activeAppIds = Array.from(
+      new Set((globalActiveSchedulers ?? []).map((s) => s.application_id).filter(Boolean))
+    ) as string[];
+
+    let extraActiveApps: any[] = [];
+    if (activeAppIds.length > 0) {
+      const { data: extraApps } = await admin
+        .from("applications")
+        .select(
+          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at"
+        )
+        .in("id", activeAppIds)
+        .eq("is_deleted", false);
+      extraActiveApps = extraApps ?? [];
+    }
+
+    const appMapById = new Map<string, any>();
+    for (const a of (apps ?? [])) {
+      appMapById.set(a.id, a);
+    }
+    for (const a of extraActiveApps) {
+      if (!isAdmin && a.assigned_to !== context.userId) continue;
+      appMapById.set(a.id, a);
+    }
+    const appList = Array.from(appMapById.values());
 
     if (appList.length === 0) {
       return {
@@ -626,7 +659,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
     const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
 
-    const [leadsData, custsData, paysByApp, paysByLead, staffData, callbackSchedulers] = await Promise.all([
+    const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
       fetchInChunks<any>(leadIds, 100, (chunk) =>
         admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
       ),
@@ -642,20 +675,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       fetchInChunks<any>(staffIds, 100, (chunk) =>
         admin.from("profiles").select("id, display_name, email").in("id", chunk)
       ),
-      fetchInChunks<any>(ids, 100, (chunk) =>
-        admin
-          .from("order_schedulers")
-          .select("id, application_id, status, fires_at, remarks, created_at, created_by")
-          .in("application_id", chunk)
-          .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
-          .eq("status", "active")
-      ),
     ]);
 
     const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
 
-    // Sort schedulers so newest created_at is first and map by application_id
-    const sortedSchedulers = [...(callbackSchedulers ?? [])].sort((a: any, b: any) => {
+    // Map latest active scheduler per application
+    const sortedSchedulers = [...(globalActiveSchedulers ?? [])].sort((a: any, b: any) => {
       const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return tB - tA;
