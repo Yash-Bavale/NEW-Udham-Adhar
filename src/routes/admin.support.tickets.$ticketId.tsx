@@ -660,9 +660,9 @@ function TicketWorkspace() {
   return (
     <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex flex-col bg-slate-100 min-w-0 overflow-hidden font-sans">
       {/* ── 1. Top Bar & Ticket Header (Cleaned per Specification) ────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-6 py-3.5 shrink-0 shadow-2xs">
+      <header className="bg-white border-b border-slate-200 px-4 py-2 shrink-0 shadow-2xs">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center justify-between mb-1">
           <button
             onClick={() => navigate({ to: "/admin/support/tickets" })}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
@@ -680,9 +680,9 @@ function TicketWorkspace() {
         </div>
 
         {/* Row 1: Ticket Number [NEW] + Previous / Next */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 font-mono">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-base font-bold tracking-tight text-slate-900 font-mono">
               {ticket.ticket_number}
             </h1>
             {ticket.is_new && (
@@ -722,8 +722,8 @@ function TicketWorkspace() {
         </div>
 
         {/* Row 2: Subject & Created timestamp */}
-        <div className="mt-1 flex items-center justify-between gap-4 flex-wrap text-xs">
-          <div className="text-sm font-semibold text-slate-800 truncate flex-1 min-w-0">
+        <div className="mt-0.5 flex items-center justify-between gap-3 flex-wrap text-xs">
+          <div className="text-xs font-semibold text-slate-700 truncate flex-1 min-w-0">
             {ticket.subject || "(no subject)"}
           </div>
           <div className="text-slate-500 font-medium text-[11px] shrink-0 flex items-center gap-1">
@@ -732,7 +732,7 @@ function TicketWorkspace() {
         </div>
 
         {/* Row 3: Compact Metadata Badges matching screenshot */}
-        <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs">
           {/* Customer Delay badge */}
           {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px]">
@@ -826,6 +826,51 @@ function TicketWorkspace() {
             )}
           </div>
         </div>
+
+        {/* Row 4: Quick Action Buttons matching Reference Screenshot */}
+        <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => doCloseNormal.mutate()}
+            disabled={isClosed || doCloseNormal.isPending}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+          >
+            {doCloseNormal.isPending ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-3 text-emerald-600" />
+            )}
+            Close Ticket
+          </button>
+
+          <button
+            onClick={() => setConsultOpen(true)}
+            disabled={isClosed}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+          >
+            <FileText className="size-3 text-blue-600" />
+            Consultation Completed (TB01)
+          </button>
+
+          <button
+            onClick={() => setReasonOpen(true)}
+            disabled={isClosed}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+          >
+            <Send className="size-3 text-rose-600" />
+            Reply &amp; Close (TB02)
+          </button>
+
+          {canReopenOrder && (
+            <button
+              onClick={() => setReopenConfirm(true)}
+              disabled={doReopenOrder.isPending}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+            >
+              <RotateCcw className="size-3 text-slate-500" />
+              Reopen Order
+            </button>
+          )}
+        </div>
       </header>
 
       {/* ── 2. Workspace Body (Conversation & Sidebar) ────── */}
@@ -836,7 +881,7 @@ function TicketWorkspace() {
           <div
             ref={threadRef}
             onScroll={handleThreadScroll}
-            className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4"
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3"
           >
             {groupedMessages.length === 0 ? (
               <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-2">
@@ -889,7 +934,7 @@ function TicketWorkspace() {
           {/* ── 3. Sticky Bottom Reply Composer matching Screenshot ─────────────── */}
           <div className="bg-white border-t border-slate-200 shrink-0 shadow-lg">
             {/* Tab Header Row: Reply | Internal Note + Recipient chip + Cc / Bcc */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-1.5 flex-wrap gap-2">
+            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1 flex-wrap gap-1.5">
               {/* Left Tabs */}
               <div className="flex items-center">
                 <button
@@ -956,7 +1001,7 @@ function TicketWorkspace() {
             </div>
 
             {/* Formatting Toolbar matching Screenshot */}
-            <div className="flex items-center justify-between gap-1 px-4 py-1.5 bg-white border-b border-slate-200 flex-wrap text-slate-600">
+            <div className="flex items-center justify-between gap-1 px-3 py-1 bg-white border-b border-slate-200 flex-wrap text-slate-600">
               <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
                   Normal <ChevronDown className="size-3 text-slate-400" />
@@ -1112,7 +1157,7 @@ function TicketWorkspace() {
             )}
 
             {/* Composer Textarea */}
-            <div className="p-4">
+            <div className="p-3">
               <textarea
                 ref={composerRef}
                 value={body}
@@ -1122,8 +1167,8 @@ function TicketWorkspace() {
                     ? "Add an internal note (only visible to staff members)…"
                     : "Type your reply here…"
                 }
-                rows={4}
-                className={`w-full text-xs sm:text-sm px-3.5 py-2.5 rounded-lg border focus:outline-none focus:ring-1 resize-y transition-all ${
+                rows={3}
+                className={`w-full text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-1 resize-y transition-all ${
                   composeTab === "note"
                     ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950 placeholder:text-amber-800/50"
                     : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400"
@@ -1136,41 +1181,41 @@ function TicketWorkspace() {
               />
 
               {/* Bottom Quick Tools & Action Bar matching screenshot */}
-              <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+              <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
                 {/* Left quick insert buttons */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
                       toast.info("Use Order Documents in the right sidebar or order workspace to upload attachments.");
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
                   >
-                    <Paperclip className="size-3.5 text-slate-500" /> Attach File
+                    <Paperclip className="size-3 text-slate-500" /> Attach File
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setTemplatesModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
                   >
-                    <FileText className="size-3.5 text-slate-500" /> Templates
+                    <FileText className="size-3 text-slate-500" /> Templates
                   </button>
 
                   <button
                     type="button"
                     onClick={insertOrderDetails}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
                   >
-                    <Package className="size-3.5 text-slate-500" /> Insert Order Details
+                    <Package className="size-3 text-slate-500" /> Insert Order Details
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setCannedModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
                   >
-                    <Sparkles className="size-3.5 text-slate-500" /> Canned Responses
+                    <Sparkles className="size-3 text-slate-500" /> Canned Responses
                   </button>
                 </div>
 
@@ -1187,11 +1232,11 @@ function TicketWorkspace() {
                   </label>
 
                   {/* Send button with dropdown */}
-                  <div className="relative inline-flex rounded-lg shadow-2xs">
+                  <div className="relative inline-flex rounded-md shadow-2xs">
                     <button
                       onClick={() => sendReply.mutate()}
                       disabled={!body.trim() || sendReply.isPending}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-l-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-md text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         composeTab === "note"
                           ? "bg-amber-600 hover:bg-amber-700"
                           : "bg-[#1e3a5f] hover:bg-[#152b47]"
@@ -1209,7 +1254,7 @@ function TicketWorkspace() {
                       <button
                         onClick={() => setSendOptionsOpen((v) => !v)}
                         disabled={!body.trim() || sendReply.isPending}
-                        className="px-2 py-2 rounded-r-lg bg-[#152b47] hover:bg-[#0f1f33] text-white border-l border-blue-900 disabled:opacity-50"
+                        className="px-1.5 py-1.5 rounded-r-md bg-[#152b47] hover:bg-[#0f1f33] text-white border-l border-blue-900 disabled:opacity-50"
                         title="Send options"
                       >
                         <ChevronDown className="size-3.5" />
@@ -1250,7 +1295,7 @@ function TicketWorkspace() {
 
         {/* ── 4. Right Context Sidebar (Fixed compact width matching Screenshot) ─────── */}
         <aside
-          className={`w-[300px] xl:w-[320px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-2.5 space-y-2 text-xs ${
+          className={`w-[280px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-2 space-y-1.5 text-xs ${
             sidebarDrawerOpen
               ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[300px] max-w-full p-3"
               : "hidden lg:flex"
@@ -1269,8 +1314,8 @@ function TicketWorkspace() {
           )}
 
           {/* Card 1: Customer Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
               <div className="flex items-center gap-1.5">
                 <div className="p-1 rounded-md bg-blue-50 text-blue-600">
                   <User className="size-3.5" />
@@ -1290,9 +1335,9 @@ function TicketWorkspace() {
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2.5">
-                <div className="size-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-200">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="size-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0 border border-emerald-200">
                   {initials(cust.name)}
                 </div>
                 <div className="min-w-0">
@@ -1333,8 +1378,8 @@ function TicketWorkspace() {
           </div>
 
           {/* Card 2: Order Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
               <div className="flex items-center gap-1.5">
                 <div className="p-1 rounded-md bg-blue-50 text-blue-600">
                   <Package className="size-3.5" />
@@ -1354,7 +1399,7 @@ function TicketWorkspace() {
               )}
             </div>
 
-            <div className="space-y-1 text-xs">
+            <div className="space-y-0.5 text-xs">
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500 text-[11px]">Order No.</span>
                 {app.application_code ? (
@@ -1421,8 +1466,8 @@ function TicketWorkspace() {
           </div>
 
           {/* Card 3: Ticket Information */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
               <div className="flex items-center gap-1.5">
                 <div className="p-1 rounded-md bg-blue-50 text-blue-600">
                   <Info className="size-3.5" />
@@ -1436,7 +1481,7 @@ function TicketWorkspace() {
               </span>
             </div>
 
-            <div className="space-y-1 text-xs">
+            <div className="space-y-0.5 text-xs">
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500 text-[11px]">Created</span>
                 <span className="text-slate-700 text-[11px]">{ist(ticket.created_at)}</span>
@@ -1493,74 +1538,16 @@ function TicketWorkspace() {
             </div>
           </div>
 
-          {/* Card 4: Quick Actions matching Screenshot */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
-            <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-              <div className="p-1 rounded-md bg-blue-50 text-blue-600">
-                <Sparkles className="size-3.5" />
-              </div>
-              <h2 className="text-xs font-bold text-slate-900 tracking-tight">
-                Quick Actions
-              </h2>
-            </div>
-
-            <div className="space-y-1.5 pt-0.5">
-              {/* Close Ticket */}
-              <button
-                onClick={() => doCloseNormal.mutate()}
-                disabled={isClosed || doCloseNormal.isPending}
-                className="w-full py-1.5 px-2.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {doCloseNormal.isPending ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="size-3 text-emerald-600" />
-                )}
-                Close Ticket
-              </button>
-
-              {/* Consultation Completed (TB01) */}
-              <button
-                onClick={() => setConsultOpen(true)}
-                disabled={isClosed}
-                className="w-full py-1.5 px-2.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FileText className="size-3 text-blue-600" />
-                Consultation Completed (TB01)
-              </button>
-
-              {/* Reply & Close (TB02) */}
-              <button
-                onClick={() => setReasonOpen(true)}
-                disabled={isClosed}
-                className="w-full py-1.5 px-2.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="size-3 text-rose-600" />
-                Reply &amp; Close (TB02)
-              </button>
-
-              {/* Reopen Order */}
-              <button
-                onClick={() => setReopenConfirm(true)}
-                disabled={!canReopenOrder || doReopenOrder.isPending}
-                className="w-full py-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RotateCcw className="size-3 text-slate-400" />
-                Reopen Order
-              </button>
-            </div>
-          </div>
-
           {/* Card 5: Recent Activity matching Screenshot */}
-          <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+          <div className="bg-white rounded-lg border border-slate-200/90 p-2 shadow-2xs space-y-1.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
               <h2 className="text-xs font-bold text-slate-900 tracking-tight">Recent Activity</h2>
               <span className="text-[11px] font-semibold text-blue-700 hover:underline cursor-pointer">
                 View All
               </span>
             </div>
 
-            <div className="space-y-2 pt-0.5">
+            <div className="space-y-1.5 pt-0.5">
               <div className="flex items-start gap-2">
                 <div className="size-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                   <Mail className="size-2.5" />
@@ -1749,7 +1736,7 @@ function MessageCard({
             </span>
             <span className="text-amber-800/80 text-[11px] font-medium">{formatTimeOnly(msg.created_at)}</span>
           </div>
-          <div className="text-xs sm:text-sm text-amber-950 whitespace-pre-wrap leading-relaxed">
+          <div className="text-xs text-amber-950 whitespace-pre-wrap leading-relaxed">
             {msg.body_text}
           </div>
         </div>
@@ -1763,16 +1750,16 @@ function MessageCard({
 
     return (
       <div className="w-full flex justify-start">
-        <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] mr-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+        <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[84%] mr-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
           {/* Header Bar matching Screenshot */}
-          <div className="px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/80 bg-white">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="size-8 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+          <div className="px-3 py-2 flex items-center justify-between flex-wrap gap-1.5 border-b border-slate-100/80 bg-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="size-7 rounded-full bg-[#10b981] text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
                 {initials(customerName || "RK")}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                  <span className="font-bold text-slate-900 text-xs truncate">
                     {customerName || "Rabeya Khanam"}
                   </span>
                   <span className="text-slate-400 text-xs font-mono truncate">
@@ -1796,7 +1783,7 @@ function MessageCard({
           </div>
 
           {/* Message Content Body */}
-          <div className="px-4 py-3 space-y-2.5">
+          <div className="px-3 py-2 space-y-2">
             {/* Subject if different from main thread */}
             {msg.subject && (
               <div className="text-xs font-semibold text-slate-700 pb-1">
@@ -1920,11 +1907,11 @@ function MessageCard({
 
   return (
     <div className="w-full flex justify-end">
-      <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+      <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[84%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
         {/* Header Bar matching Screenshot 2 & 3 */}
-        <div className="px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100/80 bg-white">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="size-8 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+        <div className="px-3 py-2 flex items-center justify-between flex-wrap gap-1.5 border-b border-slate-100/80 bg-white">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="size-7 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
               BHS
             </div>
             <div className="min-w-0">
@@ -1961,7 +1948,7 @@ function MessageCard({
         </div>
 
         {/* Message Content Body matching Screenshot 2 & 3 */}
-        <div className="px-4 py-3 space-y-2.5">
+        <div className="px-3 py-2 space-y-2">
           {msg.subject && (
             <div className="text-xs font-semibold text-slate-800 pb-1">
               {decodeHtmlEntities(msg.subject)}
