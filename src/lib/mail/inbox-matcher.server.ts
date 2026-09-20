@@ -118,8 +118,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       return;
     }
 
-    await appendReplyToTicket({
-      ticketId: ticketMatch.ticketId,
+    const newTicketId = await createTicketForIncoming({
       applicationId: ticketMatch.applicationId,
       customerId: ticketMatch.customerId,
       leadId: ticketMatch.leadId,
@@ -137,16 +136,18 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
 
     const { cancelTicketAutocloseByTicket: cancelByTicket } = await import("@/lib/scheduling/schedulers.server");
     await cancelByTicket(ticketMatch.ticketId, "customer_replied").catch(() => {});
+    if (newTicketId) {
+      await cancelByTicket(newTicketId, "customer_replied").catch(() => {});
+    }
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
-      // A customer reply opens/updates support, but the customer-delay closure
-      // clock keeps running until staff explicitly clicks Restart Order.
+      // A customer reply creates a new support ticket under this order
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
         await dispatchEvent({
           type: "TicketOpened",
           applicationId: ticketMatch.applicationId,
-          ticketId: ticketMatch.ticketId,
+          ticketId: newTicketId ?? ticketMatch.ticketId,
         });
       } catch (e) {
         console.error("[workflow] dispatch TicketOpened failed", e);
@@ -363,8 +364,7 @@ async function matchTicket(input: {
   return null;
 }
 
-async function appendReplyToTicket(input: {
-  ticketId: string;
+async function createTicketForIncoming(input: {
   applicationId: string | null;
   customerId: string | null;
   leadId: string | null;
@@ -378,7 +378,29 @@ async function appendReplyToTicket(input: {
   references: string[];
   zohoUid: string;
   receivedAt: string;
-}) {
+}): Promise<string | null> {
+  const { data: created, error: tErr } = await supabaseAdmin
+    .from("support_tickets")
+    .insert({
+      application_id: input.applicationId,
+      customer_id: input.customerId,
+      subject: input.subject.slice(0, 250),
+      description: input.bodyText.slice(0, 2000),
+      status: "open",
+      priority: "medium",
+      source: "email_inbound",
+      ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
+      last_customer_message_at: input.receivedAt,
+    } as never)
+    .select("id")
+    .single();
+
+  if (tErr) {
+    console.error("[zoho-inbox] ticket creation failed", tErr.message);
+    return null;
+  }
+  const ticketId = (created as { id: string }).id;
+
   await supabaseAdmin
     .from("email_logs")
     .insert({
@@ -400,7 +422,7 @@ async function appendReplyToTicket(input: {
     } as never);
 
   await supabaseAdmin.from("ticket_replies").insert({
-    ticket_id: input.ticketId,
+    ticket_id: ticketId,
     reply_text: input.bodyText.slice(0, 8000),
     is_internal: false,
     direction: "inbound",
@@ -408,14 +430,7 @@ async function appendReplyToTicket(input: {
     email_in_reply_to: input.inReplyTo,
   } as never);
 
-  await supabaseAdmin
-    .from("support_tickets")
-    .update({
-      status: "open",
-      last_customer_message_at: input.receivedAt,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", input.ticketId);
+  return ticketId;
 }
 
 // ─────────────────────────── Matching ───────────────────────────
@@ -533,46 +548,27 @@ async function openOrAppendTicket(input: {
   messageId?: string | null;
   inReplyTo?: string | null;
 }): Promise<string | null> {
-  // Find any open ticket for this order in the last 30 days.
-  const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-  let existingQuery = supabaseAdmin
+  const { data: created, error } = await supabaseAdmin
     .from("support_tickets")
+    .insert({
+      application_id: input.applicationId,
+      customer_id: input.customerId,
+      subject: input.subject.slice(0, 250),
+      description: input.body.slice(0, 2000),
+      status: "open",
+      priority: "medium",
+      source: "email_inbound",
+      ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
+      last_customer_message_at: new Date().toISOString(),
+    } as never)
     .select("id")
-    .in("status", ["open", "in_progress", "waiting_customer"])
-    .gte("created_at", cutoff)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  existingQuery = input.applicationId
-    ? existingQuery.eq("application_id", input.applicationId)
-    : input.customerId
-      ? existingQuery.eq("customer_id", input.customerId).is("application_id", null)
-      : existingQuery.eq("ticket_email", input.fromEmail ?? "").is("application_id", null);
-  const { data: existing } = await existingQuery.maybeSingle();
+    .single();
 
-  const ticket = existing as { id: string } | null;
-  let ticketId = ticket?.id ?? null;
-
-  if (!ticketId) {
-    const { data: created, error } = await supabaseAdmin
-      .from("support_tickets")
-      .insert({
-        application_id: input.applicationId,
-        customer_id: input.customerId,
-        subject: input.subject.slice(0, 250),
-        description: input.body.slice(0, 2000),
-        status: "open",
-        priority: "medium",
-        source: "email_inbound",
-        ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
-      } as never)
-      .select("id")
-      .single();
-    if (error) {
-      console.error("[zoho-inbox] ticket insert failed", error.message);
-      return null;
-    }
-    ticketId = (created as { id: string }).id;
+  if (error) {
+    console.error("[zoho-inbox] ticket insert failed", error.message);
+    return null;
   }
+  const ticketId = (created as { id: string }).id;
 
   await supabaseAdmin.from("ticket_replies").insert({
     ticket_id: ticketId,
@@ -582,16 +578,6 @@ async function openOrAppendTicket(input: {
     email_message_id: input.messageId ?? null,
     email_in_reply_to: input.inReplyTo ?? null,
   } as never);
-
-  // Update ticket state: customer replied → move to open + timestamp
-  await supabaseAdmin
-    .from("support_tickets")
-    .update({
-      status: "open",
-      last_customer_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", ticketId);
 
   return ticketId;
 }

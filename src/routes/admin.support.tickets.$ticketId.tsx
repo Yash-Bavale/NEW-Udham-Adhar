@@ -504,26 +504,19 @@ function TicketWorkspace() {
           ticketId,
           message: finalMessage,
           isInternal: composeTab === "note",
-          armAutoclose: opts?.armAutoclose ?? false,
+          armAutoclose: false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
         },
       });
     },
-    onSuccess: async (r: any, variables) => {
+    onSuccess: async (r: any) => {
       if (composeTab === "note") {
         toast.success("Internal note added");
-      } else if (variables && typeof variables === "object" && (variables as any).armAutoclose) {
-        toast.success("Reply sent — 24h auto-close timer started (E010 will be sent upon closure)");
       } else if (r?.emailed === false) {
-        toast.warning(`Reply saved but email not sent: ${r.reason ?? "unknown"}`);
+        toast.warning(`Reply saved and ticket closed: ${r.reason ?? "unknown"}`);
       } else {
-        toast.success("Reply sent successfully");
-      }
-
-      if (variables && typeof variables === "object" && (variables as any).closeAfter) {
-        await closeNormal({ data: { ticketId } });
-        toast.success("Ticket closed");
+        toast.success("Reply sent & ticket closed in CRM");
       }
 
       setBody("");
@@ -1226,7 +1219,7 @@ function TicketWorkspace() {
                   </button>
                 </div>
 
-                {/* Right Send buttons */}
+                {/* Right Send button */}
                 <div className="flex items-center gap-2">
                   <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none mr-1.5">
                     <input
@@ -1238,75 +1231,36 @@ function TicketWorkspace() {
                     <span>Send me a copy</span>
                   </label>
 
-                  {composeTab === "reply" && (
+                  {composeTab === "reply" ? (
                     <button
                       type="button"
-                      onClick={() => sendReply.mutate({ armAutoclose: true })}
+                      onClick={() => sendReply.mutate({})}
                       disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
-                      title="Sends reply and automatically closes ticket after 24 hours with E010 closure notice if customer does not reply"
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                      title="Sends reply email to customer and instantly closes ticket in CRM"
                     >
-                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      {sendReply.isPending ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="size-3.5 text-white" />
+                      )}
                       <span>Send &amp; Close Ticket</span>
                     </button>
-                  )}
-
-                  {/* Send button with dropdown */}
-                  <div className="relative inline-flex rounded-lg shadow-2xs">
+                  ) : (
                     <button
-                      onClick={() => sendReply.mutate({ armAutoclose: false })}
+                      type="button"
+                      onClick={() => sendReply.mutate({})}
                       disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-lg text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        composeTab === "note"
-                          ? "bg-amber-600 hover:bg-amber-700"
-                          : "bg-[#1e3a5f] hover:bg-[#152b47]"
-                      }`}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
                     >
                       {sendReply.isPending ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : (
                         <Send className="size-3.5" />
                       )}
-                      {composeTab === "note" ? "Add Note" : "Send Reply"}
+                      <span>Add Note</span>
                     </button>
-
-                    {composeTab === "reply" && (
-                      <button
-                        onClick={() => setSendOptionsOpen((v) => !v)}
-                        disabled={!body.trim() || sendReply.isPending}
-                        className="px-1.5 py-1.5 rounded-r-lg bg-[#152b47] hover:bg-[#0f1f33] text-white border-l border-blue-900 disabled:opacity-50"
-                        title="Send options"
-                      >
-                        <ChevronDown className="size-3.5" />
-                      </button>
-                    )}
-
-                    {sendOptionsOpen && (
-                      <div
-                        className="absolute right-0 bottom-full mb-1 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1"
-                        onMouseLeave={() => setSendOptionsOpen(false)}
-                      >
-                        <button
-                          onClick={() => {
-                            setSendOptionsOpen(false);
-                            sendReply.mutate({ armAutoclose: false });
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
-                        >
-                          <Send className="size-3.5 text-blue-600" /> Send Reply
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSendOptionsOpen(false);
-                            sendReply.mutate({ armAutoclose: true });
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-emerald-700 font-medium"
-                        >
-                          <CheckCircle2 className="size-3.5 text-emerald-600" /> Send &amp; Close Ticket (24h Auto-Close)
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

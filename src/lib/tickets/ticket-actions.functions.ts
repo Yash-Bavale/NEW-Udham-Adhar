@@ -314,18 +314,46 @@ export const replyToTicket = createServerFn({ method: "POST" })
       return { ok: true, emailed: false, reason: "internal_note" };
     }
 
-    // Flip status → waiting_customer + timestamps
+    // Close ticket instantly inside CRM when staff replies.
+    // No closure template email is sent to customer — customer only receives the typed reply email.
     const patch: Record<string, unknown> = {
-      status: "waiting_customer",
+      status: "closed",
+      resolved_at: now,
+      resolved_by: context.userId,
+      closed_at: now,
       updated_at: now,
       last_staff_message_at: now,
     };
     if (!ticket.first_response_at) patch.first_response_at = now;
     await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
 
+    // Cancel any pending auto-close timers
+    try {
+      const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+      await cancelTicketAutocloseByTicket(ticket.id, "closed_on_reply");
+    } catch { /* non-fatal */ }
+
+    // Dispatch workflow event if linked to an application
+    if (ticket.application_id) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent(
+          {
+            type: "TicketClosed",
+            applicationId: ticket.application_id,
+            ticketId: ticket.id,
+            outcome: "cooperating",
+            actorId: context.userId,
+          },
+          context.userId,
+        );
+      } catch (e) {
+        console.error("[workflow] TicketClosed dispatch failed", e);
+      }
+    }
+
     // Try to send the reply email. If the customer has no email on file we
-    // still keep the reply row — staff can see it, but flag that nothing was
-    // emailed so the UI can show a warning.
+    // still keep the reply row and close the ticket in CRM.
     const cust = await loadCustomer(ticket.customer_id);
     const recipient = ticket.ticket_email || cust.email;
     if (!recipient) {
@@ -341,19 +369,10 @@ export const replyToTicket = createServerFn({ method: "POST" })
         cc: data.cc,
         bcc: data.bcc,
       });
-      // Arm ticket-autoclose only after the email actually leaves the system.
-      if (data.armAutoclose) {
-        const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
-        await startTicketAutocloseScheduler({
-          ticketId: ticket.id,
-          applicationId: ticket.application_id ?? null,
-          createdBy: context.userId,
-        });
-      }
       return { ok: true, emailed: true, recipient: result.recipient };
     } catch (e) {
       console.error("[tickets] reply email failed", e);
-      throw new Error(e instanceof Error ? e.message : "Reply was saved, but the email was not sent.");
+      throw new Error(e instanceof Error ? e.message : "Reply was saved and ticket closed in CRM, but the email was not sent.");
     }
   });
 
