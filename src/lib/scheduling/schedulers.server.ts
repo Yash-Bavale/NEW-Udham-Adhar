@@ -639,10 +639,25 @@ export async function startTicketAutocloseScheduler(input: {
     .eq("ticket_id", input.ticketId)
     .in("status", ["active", "paused"]);
 
+  // Only one active/paused scheduler is allowed per order (unique index
+  // `one_open_scheduler_per_order`). If the order already has one running
+  // (e.g. customer-delay), arm this ticket timer without the order link —
+  // firing resolves the application from the ticket itself.
+  let applicationId = input.applicationId ?? null;
+  if (applicationId) {
+    const { data: openOnOrder } = await supabaseAdmin
+      .from("order_schedulers")
+      .select("id")
+      .eq("application_id", applicationId)
+      .in("status", ["active", "paused"])
+      .limit(1);
+    if ((openOnOrder ?? []).length > 0) applicationId = null;
+  }
+
   const { data, error } = await supabaseAdmin
     .from("order_schedulers")
     .insert({
-      application_id: input.applicationId ?? null,
+      application_id: applicationId,
       ticket_id: input.ticketId,
       scheduler_type: SCHEDULER_TICKET_AUTOCLOSE,
       status: "active",
