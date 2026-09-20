@@ -95,11 +95,19 @@ function initials(name: string | null | undefined) {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
-function decodeEntities(s: string) {
+function decodeHtmlEntities(s: string | null | undefined): string {
+  if (!s) return "";
   return s
-    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&mdash;/gi, "—")
+    .replace(/&ndash;/gi, "–");
 }
 
 function formatBytes(bytes?: number | null) {
@@ -244,7 +252,6 @@ function TicketWorkspace() {
   const [newTagInput, setNewTagInput] = useState("");
 
   // Modals & popups
-  const [dotsMenuOpen, setDotsMenuOpen] = useState(false);
   const [restartConfirm, setRestartConfirm] = useState(false);
   const [reopenConfirm, setReopenConfirm] = useState(false);
   const [consultOpen, setConsultOpen] = useState(false);
@@ -281,7 +288,7 @@ function TicketWorkspace() {
     }
   };
 
-  // Build unified message list with deduplication and email_logs integration
+  // Build unified message list with accurate direction detection and email_logs integration
   const messages: Msg[] = useMemo(() => {
     if (!data) return [];
     const out: Msg[] = [];
@@ -303,7 +310,7 @@ function TicketWorkspace() {
           id: `ticket-desc-${t.id}`,
           created_at: t.created_at,
           author_name: t.assigned_name || "Staff",
-          body_text: desc,
+          body_text: decodeHtmlEntities(desc),
         });
       } else {
         out.push({
@@ -312,7 +319,7 @@ function TicketWorkspace() {
           created_at: t.created_at,
           from_email: t.ticket_email ?? cust.primary_email ?? null,
           subject: t.subject ?? null,
-          body_text: desc,
+          body_text: decodeHtmlEntities(desc),
           body_html: null,
           attachments: docs.length > 0 ? docs.slice(0, 2) : undefined,
         });
@@ -327,10 +334,10 @@ function TicketWorkspace() {
           id: `n-${r.id}`,
           created_at: r.created_at,
           author_name: r.author_name ?? "Staff",
-          body_text: r.reply_text ?? "",
+          body_text: decodeHtmlEntities(r.reply_text ?? ""),
         });
-      } else if (r.direction === "inbound") {
-        const text = r.reply_text ?? "";
+      } else if (r.direction === "inbound" || r.direction === "incoming") {
+        const text = decodeHtmlEntities(r.reply_text ?? "");
         const hasAttachmentMention = /attach|document|proof|pdf|file/i.test(text);
         out.push({
           kind: "inbound",
@@ -350,7 +357,7 @@ function TicketWorkspace() {
           from_email: r.from_email ?? "help@businesshelpservices.com",
           subject: r.subject ?? null,
           body_html: r.body_html ?? null,
-          body_text: r.reply_text ?? "",
+          body_text: decodeHtmlEntities(r.reply_text ?? ""),
           template_hint: r.template_code ?? extractTemplateHint(r.subject, r.body_html),
           status: r.email_status ?? (r.emailed_at ? "Sent" : "Sent"),
           author_name: r.author_name ?? "Business Help Services",
@@ -358,28 +365,46 @@ function TicketWorkspace() {
       }
     }
 
-    // 3. Merged Email Logs from email_logs (if not already present in replies)
+    // 3. Merged Email Logs from email_logs (with proper direction detection)
     for (const em of ((data as any).emails ?? []) as any[]) {
       const emCreated = em.sent_at || em.created_at;
+      const isInbound = em.direction === "incoming" || em.direction === "inbound";
+
       const isDuplicate = out.some(
         (m) =>
-          m.kind === "outbound" &&
+          m.kind === (isInbound ? "inbound" : "outbound") &&
           (Math.abs(new Date(m.created_at).getTime() - new Date(emCreated).getTime()) < 5000 ||
             (m.subject && em.subject && m.subject === em.subject))
       );
+
       if (!isDuplicate) {
-        out.push({
-          kind: "outbound",
-          id: `em-${em.id}`,
-          created_at: emCreated,
-          from_email: em.from_email ?? "help@businesshelpservices.com",
-          subject: em.subject ?? null,
-          body_html: em.body_html ?? null,
-          body_text: em.body_text ?? "",
-          template_hint: em.template_code ?? extractTemplateHint(em.subject, em.body_html),
-          status: em.status ?? "Sent",
-          author_name: "Business Help Services",
-        });
+        if (isInbound) {
+          const text = decodeHtmlEntities(em.body_text ?? "");
+          const hasAttachmentMention = /attach|document|proof|pdf|file/i.test(text);
+          out.push({
+            kind: "inbound",
+            id: `em-${em.id}`,
+            created_at: emCreated,
+            from_email: em.from_email ?? t.ticket_email ?? cust.primary_email ?? null,
+            subject: em.subject ?? null,
+            body_html: em.body_html ?? null,
+            body_text: text,
+            attachments: hasAttachmentMention && docs.length > 0 ? docs : undefined,
+          });
+        } else {
+          out.push({
+            kind: "outbound",
+            id: `em-${em.id}`,
+            created_at: emCreated,
+            from_email: em.from_email ?? "help@businesshelpservices.com",
+            subject: em.subject ?? null,
+            body_html: em.body_html ?? null,
+            body_text: decodeHtmlEntities(em.body_text ?? ""),
+            template_hint: em.template_code ?? extractTemplateHint(em.subject, em.body_html),
+            status: em.status ?? "Sent",
+            author_name: "Business Help Services",
+          });
+        }
       }
     }
 
@@ -643,10 +668,10 @@ function TicketWorkspace() {
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex flex-col bg-slate-100 min-w-0 overflow-hidden font-sans">
-      {/* ── 1. Top Bar & Ticket Header ────────────────────── */}
+      {/* ── 1. Top Bar & Ticket Header (Cleaned per Specification) ────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-6 py-3.5 shrink-0 shadow-2xs">
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1.5">
           <button
             onClick={() => navigate({ to: "/admin/support/tickets" })}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
@@ -1232,9 +1257,9 @@ function TicketWorkspace() {
           </div>
         </main>
 
-        {/* ── 4. Right Context Sidebar matching Screenshot ─────────────────────── */}
+        {/* ── 4. Right Context Sidebar (Fixed compact width matching Screenshot) ─────── */}
         <aside
-          className={`w-[320px] xl:w-[350px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
+          className={`w-[320px] xl:w-[340px] shrink-0 bg-slate-50/90 border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4 ${
             sidebarDrawerOpen
               ? "fixed inset-y-0 right-0 z-50 bg-slate-50 shadow-2xl w-[320px] max-w-full"
               : "hidden lg:flex"
@@ -1676,7 +1701,7 @@ function TicketWorkspace() {
           onClose={() => setTemplatesModalOpen(false)}
           onSelect={(item) => {
             const rawBody = item.body_text || item.body_html || "";
-            const plain = decodeEntities(rawBody.replace(/<[^>]+>/g, " "));
+            const plain = decodeHtmlEntities(rawBody.replace(/<[^>]+>/g, " "));
             const filled = plain
               .replace(/\{\{customer_name\}\}/gi, cust.name ?? "[Customer]")
               .replace(/\{\{order_number\}\}/gi, app.application_code ?? "[Order No]")
@@ -1692,7 +1717,7 @@ function TicketWorkspace() {
   );
 }
 
-// ── Message Card Component matching Screenshot ─────────────────────────────────
+// ── Message Card Component with Left/Right Chat Thread Hierarchy ─────────────────
 
 function MessageCard({
   msg,
@@ -1706,14 +1731,13 @@ function MessageCard({
   onDownloadDoc: (doc: any) => void;
 }) {
   const hasHtml = Boolean((msg as any).body_html && (msg as any).body_html.trim());
-  const [showFullEmail, setShowFullEmail] = useState(false);
   const [showQuoted, setShowQuoted] = useState(false);
 
-  // Internal Note Card
+  // 1. Internal Note Card (Centered with amber highlight)
   if (msg.kind === "note") {
     return (
-      <div className="w-full">
-        <div className="rounded-xl p-4 shadow-2xs border border-amber-200/90 bg-amber-50/70 border-l-4 border-l-amber-500">
+      <div className="w-full flex justify-center">
+        <div className="w-full max-w-[90%] sm:max-w-[85%] rounded-xl p-4 shadow-2xs border border-amber-200/90 bg-amber-50/70 border-l-4 border-l-amber-500">
           <div className="flex items-center justify-between text-xs mb-2">
             <span className="font-bold text-amber-950 flex items-center gap-2">
               <span className="size-5 rounded-full bg-amber-200 text-amber-950 text-[10px] flex items-center justify-center font-bold">
@@ -1734,14 +1758,14 @@ function MessageCard({
     );
   }
 
-  // Customer Inbound Message Card matching Screenshot
+  // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
-    const plain = decodeEntities(msg.body_text || "");
+    const plain = decodeHtmlEntities(msg.body_text || "");
     const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
 
     return (
-      <div className="w-full">
-        <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+      <div className="w-full flex justify-start">
+        <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] mr-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
           {/* Header Bar matching Screenshot */}
           <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3 min-w-0">
@@ -1778,8 +1802,13 @@ function MessageCard({
             {/* Clean Trimmed Body / HTML rendered */}
             {hasHtml && !parsed.newContent ? (
               <div
-                className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body_html!) }}
+                className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(msg.body_html!, {
+                    WHOLE_DOCUMENT: false,
+                    ADD_ATTR: ["target"],
+                  }),
+                }}
               />
             ) : (
               <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
@@ -1848,13 +1877,13 @@ function MessageCard({
     );
   }
 
-  // Business Outbound Message Card matching Screenshot
-  const plain = decodeEntities(msg.body_text || "");
+  // 3. Business Outbound Message Card (RIGHT ALIGNED)
+  const plain = decodeHtmlEntities(msg.body_text || "");
   const parsed = parseEmailReply(plain || (msg.body_html ? stripHtml(msg.body_html) : ""));
 
   return (
-    <div className="w-full">
-      <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+    <div className="w-full flex justify-end">
+      <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[82%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
         {/* Header Bar matching Screenshot */}
         <div className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3 min-w-0">
@@ -1893,8 +1922,13 @@ function MessageCard({
         <div className="px-4 pb-4 space-y-3">
           {hasHtml && !parsed.newContent ? (
             <div
-              className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body_html!) }}
+              className="text-sm text-slate-800 leading-relaxed font-normal prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(msg.body_html!, {
+                  WHOLE_DOCUMENT: false,
+                  ADD_ATTR: ["target"],
+                }),
+              }}
             />
           ) : (
             <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
@@ -2294,73 +2328,6 @@ function TemplatesModal({
   );
 }
 
-// ── Email Iframe Helper ────────────────────────────────────
-
-function EmailIframe({ html, fallback }: { html: string | null; fallback?: string }) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [height, setHeight] = useState(0);
-
-  if (!html) {
-    return (
-      <div className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-        {fallback || "(no content)"}
-      </div>
-    );
-  }
-
-  const clean = DOMPurify.sanitize(html, {
-    WHOLE_DOCUMENT: true,
-    ADD_ATTR: ["target"],
-  });
-
-  const safe = /<html[\s>]/i.test(clean)
-    ? clean
-    : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-        html,body{margin:0;padding:0;background:#fff}
-        body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#0f172a;padding:12px}
-        img{max-width:100%;height:auto}
-        table{max-width:100%}
-        a{color:#1d4ed8}
-      </style></head><body>${clean}</body></html>`;
-
-  const collapsed = !expanded && height > 340;
-
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-2xs">
-      <div style={{ maxHeight: collapsed ? 340 : "none", overflow: "hidden", position: "relative" }}>
-        <iframe
-          ref={iframeRef}
-          title="email-preview"
-          srcDoc={safe}
-          sandbox="allow-same-origin allow-popups"
-          style={{ width: "100%", border: "none", height: height ? `${height}px` : "240px", display: "block" }}
-          onLoad={(e) => {
-            const iframe = e.currentTarget as HTMLIFrameElement;
-            try {
-              const h = iframe.contentDocument?.body?.scrollHeight ?? 240;
-              setHeight(Math.max(160, h + 20));
-            } catch {
-              /* noop */
-            }
-          }}
-        />
-        {collapsed && (
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
-        )}
-      </div>
-      {height > 340 && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="w-full text-xs font-semibold text-blue-700 hover:bg-blue-50 py-2 border-t border-slate-200 transition-colors flex items-center justify-center gap-1 bg-slate-50/60"
-        >
-          {expanded ? "Show less ↑" : "Show full email ↓"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 function stripHtml(html: string) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -2494,6 +2461,7 @@ function ReasonPickerDialog({
     </div>
   );
 }
+
 
 
 // ── Message Card Component matching Screenshot ─────────────────────────────────
