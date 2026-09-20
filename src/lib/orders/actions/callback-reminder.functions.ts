@@ -91,7 +91,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
-      .eq("scheduler_type", "callback_reminder")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active");
 
     // 2. Insert new callback reminder
@@ -99,7 +99,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       .from("order_schedulers")
       .insert({
         application_id: data.orderId,
-        scheduler_type: "callback_reminder",
+        scheduler_type: "our_side_reminder",
         status: "active",
         started_at: now.toISOString(),
         fires_at: firesAtIso,
@@ -167,7 +167,7 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
-      .eq("scheduler_type", "callback_reminder")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active");
 
     if (data.schedulerId) {
@@ -219,7 +219,7 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
-      .eq("scheduler_type", "callback_reminder")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active");
 
     if (data.schedulerId) {
@@ -256,7 +256,7 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
       .from("order_schedulers")
       .select("id, application_id, status, fires_at, remarks, created_at, created_by")
       .eq("application_id", data.orderId)
-      .eq("scheduler_type", "callback_reminder")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(1)
@@ -299,7 +299,7 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
     const { data: schedulers, error } = await admin
       .from("order_schedulers")
       .select("id, application_id, status, fires_at, remarks, created_at, created_by")
-      .eq("scheduler_type", "callback_reminder")
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active")
       .lte("fires_at", nowIso)
       .order("fires_at", { ascending: true })

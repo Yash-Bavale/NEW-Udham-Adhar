@@ -646,7 +646,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           .from("order_schedulers")
           .select("id, application_id, status, fires_at, remarks, created_at, created_by")
           .in("application_id", chunk)
-          .eq("scheduler_type", "callback_reminder")
+          .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
           .eq("status", "active")
       ),
     ]);
