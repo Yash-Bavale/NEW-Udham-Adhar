@@ -261,7 +261,8 @@ function TicketWorkspace() {
   const [showBcc, setShowBcc] = useState(false);
   const [ccInput, setCcInput] = useState("");
   const [bccInput, setBccInput] = useState("");
-  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
@@ -453,6 +454,7 @@ function TicketWorkspace() {
       }
 
       setBody("");
+      if (composerRef.current) composerRef.current.innerHTML = "";
       setCcInput("");
       setBccInput("");
       setShowCc(false);
@@ -513,51 +515,27 @@ function TicketWorkspace() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Rich Text Formatting Tools for Composer
-  const insertFormatting = (prefix: string, suffix = "") => {
-    if (!composerRef.current) return;
-    const el = composerRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = body.substring(start, end);
-    const replacement = `${prefix}${selected || "text"}${suffix}`;
-    const newBody = body.substring(0, start) + replacement + body.substring(end);
-    setBody(newBody);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
-    }, 10);
+  // execCommand-based rich text formatting for contenteditable
+  const execFmt = (command: string, value?: string) => {
+    composerRef.current?.focus();
+    document.execCommand(command, false, value ?? "");
+    // Sync body state from innerHTML after command
+    if (composerRef.current) {
+      setBody(composerRef.current.innerHTML);
+    }
   };
 
-  const insertLinePrefix = (prefix: string) => {
-    if (!composerRef.current) return;
-    const el = composerRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = body.substring(start, end);
-    const lines = (selected || "").split("\n").map((l) => `${prefix}${l}`).join("\n");
-    const replacement = lines || `${prefix} `;
-    const newBody = body.substring(0, start) + replacement + body.substring(end);
-    setBody(newBody);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + replacement.length, start + replacement.length);
-    }, 10);
-  };
-
-  // Insert structured order details
   const insertOrderDetails = () => {
     const t = data?.ticket as any;
     const app = t?.applications ?? {};
     const serviceName = t?.services?.service_name ?? app?.services?.service_name ?? "Service";
-    const details = [
-      `Order No: ${app.application_code || "—"}`,
-      `Service: ${serviceName}`,
-      `Order Date: ${ist(app.created_at || t.created_at)}`,
-      `Order Stage: ${app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Processing"}`,
-    ].join("\n");
+    const details = `<p><strong>Order No:</strong> ${app.application_code || "—"}</p><p><strong>Service:</strong> ${serviceName}</p><p><strong>Order Date:</strong> ${ist(app.created_at || t.created_at)}</p><p><strong>Order Stage:</strong> ${app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Processing"}</p>`;
 
-    setBody((prev) => (prev.trim() ? `${prev}\n\n${details}\n` : `${details}\n\n`));
+    if (composerRef.current) {
+      composerRef.current.focus();
+      document.execCommand("insertHTML", false, details);
+      setBody(composerRef.current.innerHTML);
+    }
     toast.success("Order details inserted");
     composerRef.current?.focus();
   };
@@ -660,40 +638,41 @@ function TicketWorkspace() {
   return (
     <div className="h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 -mb-24 md:-mb-6 flex flex-col bg-slate-100 min-w-0 overflow-hidden font-sans">
       {/* ── 1. Top Bar & Ticket Header (Cleaned per Specification) ────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-4 py-2 shrink-0 shadow-2xs">
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between mb-1">
+      <header className="bg-white border-b border-slate-200 px-4 py-1.5 shrink-0 shadow-2xs">
+        {/* Row 1: Back + Ticket# + Subject + Prev/Next — all in ONE compact row */}
+        <div className="flex items-center gap-2 min-w-0 mb-1">
+          {/* Back to Tickets */}
           <button
             onClick={() => navigate({ to: "/admin/support/tickets" })}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition-colors shrink-0"
           >
-            <ArrowLeft className="size-3.5" /> Back to Tickets
+            <ArrowLeft className="size-3" /> Back to Tickets
           </button>
 
-          {/* Mobile context sidebar button */}
-          <button
-            onClick={() => setSidebarDrawerOpen(true)}
-            className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700"
-          >
-            <Info className="size-3.5" /> Context Info
-          </button>
-        </div>
+          <span className="text-slate-300 shrink-0">|</span>
 
-        {/* Row 1: Ticket Number [NEW] + Previous / Next */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-base font-bold tracking-tight text-slate-900 font-mono">
-              {ticket.ticket_number}
-            </h1>
-            {ticket.is_new && (
-              <span className="px-2 py-0.5 rounded text-[11px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white">
-                NEW
-              </span>
-            )}
-          </div>
+          {/* Ticket Number */}
+          <h1 className="text-sm font-bold tracking-tight text-slate-900 font-mono shrink-0">
+            {ticket.ticket_number}
+          </h1>
+          {ticket.is_new && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white shrink-0">
+              NEW
+            </span>
+          )}
 
-          {/* Previous / Next Ticket Buttons matching screenshot */}
-          <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs">
+          {/* Subject — truncated, fills remaining space */}
+          <span className="text-[11px] font-semibold text-slate-600 truncate flex-1 min-w-0">
+            {ticket.subject || "(no subject)"}
+          </span>
+
+          {/* Created timestamp */}
+          <span className="text-slate-400 font-medium text-[10px] shrink-0 hidden xl:flex items-center gap-1">
+            <RefreshCw className="size-2.5 text-slate-300" /> {ist(ticket.created_at)}
+          </span>
+
+          {/* Previous / Next Ticket Buttons */}
+          <div className="flex items-center rounded border border-slate-200 bg-white overflow-hidden shadow-2xs shrink-0">
             <button
               onClick={() => {
                 if (navState.prevId) {
@@ -701,10 +680,10 @@ function TicketWorkspace() {
                 }
               }}
               disabled={!navState.prevId}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
+              className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed border-r border-slate-200 transition-colors"
               title="Previous ticket in list"
             >
-              <ChevronLeft className="size-3.5" /> Previous
+              <ChevronLeft className="size-3" /> Prev
             </button>
             <button
               onClick={() => {
@@ -713,76 +692,80 @@ function TicketWorkspace() {
                 }
               }}
               disabled={!navState.nextId}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Next ticket in list"
             >
-              Next <ChevronRight className="size-3.5" />
+              Next <ChevronRight className="size-3" />
             </button>
           </div>
+
+          {/* Mobile context sidebar button */}
+          <button
+            onClick={() => setSidebarDrawerOpen(true)}
+            className="lg:hidden inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-700 shrink-0"
+          >
+            <Info className="size-3" />
+          </button>
         </div>
 
-        {/* Row 2: Subject & Created timestamp */}
-        <div className="mt-0.5 flex items-center justify-between gap-3 flex-wrap text-xs">
-          <div className="text-xs font-semibold text-slate-700 truncate flex-1 min-w-0">
-            {ticket.subject || "(no subject)"}
-          </div>
-          <div className="text-slate-500 font-medium text-[11px] shrink-0 flex items-center gap-1">
-            <RefreshCw className="size-3 text-slate-400" /> Created: {ist(ticket.created_at)}
-          </div>
-        </div>
-
-        {/* Row 3: Compact Metadata Badges matching screenshot */}
-        <div className="mt-1 flex items-center gap-1.5 flex-wrap text-xs">
+        {/* Row 2: Badges — NOWRAP, horizontal scroll, never wraps to 2nd line */}
+        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-none pb-0.5">
           {/* Customer Delay badge */}
           {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px]">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[10px] shrink-0">
               <span className="size-1.5 rounded-full bg-[#d97706]" /> Customer Delay
             </span>
           )}
 
           {/* Status Badge */}
-          <StatusDropdownBadge
-            status={ticket.status as TicketStatus}
-            onChange={(s) => changeStatus.mutate(s)}
-          />
+          <div className="shrink-0">
+            <StatusDropdownBadge
+              status={ticket.status as TicketStatus}
+              onChange={(s) => changeStatus.mutate(s)}
+            />
+          </div>
 
           {/* Priority Badge */}
-          <PriorityDropdownBadge
-            priority={(ticket.priority as TicketPriority) ?? "medium"}
-            onChange={(p) => changePriority.mutate(p)}
-          />
+          <div className="shrink-0">
+            <PriorityDropdownBadge
+              priority={(ticket.priority as TicketPriority) ?? "medium"}
+              onChange={(p) => changePriority.mutate(p)}
+            />
+          </div>
 
           {/* Assignee Badge */}
-          <AssigneeDropdownBadge
-            currentId={ticket.assigned_to}
-            currentName={ticket.assigned_name}
-            staff={staffList}
-            onPick={(id) => changeAssignee.mutate(id)}
-          />
+          <div className="shrink-0">
+            <AssigneeDropdownBadge
+              currentId={ticket.assigned_to}
+              currentName={ticket.assigned_name}
+              staff={staffList}
+              onPick={(id) => changeAssignee.mutate(id)}
+            />
+          </div>
 
           {/* Custom Tags */}
           {customTags.map((tag, idx) => (
             <span
               key={idx}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-medium"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-medium shrink-0"
             >
               {tag}
               <button
                 onClick={() => setCustomTags((prev) => prev.filter((_, i) => i !== idx))}
                 className="hover:text-blue-900"
               >
-                <X className="size-3" />
+                <X className="size-2.5" />
               </button>
             </span>
           ))}
 
           {/* + Add Tag */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               onClick={() => setAddTagOpen((v) => !v)}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-[11px] font-medium transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-[10px] font-medium transition-colors"
             >
-              <Plus className="size-3" /> Add Tag
+              <Plus className="size-2.5" /> Add Tag
             </button>
             {addTagOpen && (
               <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg p-2 shadow-lg z-30">
@@ -827,12 +810,12 @@ function TicketWorkspace() {
           </div>
         </div>
 
-        {/* Row 4: Quick Action Buttons matching Reference Screenshot */}
-        <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
+        {/* Row 3: Quick Action Buttons — NOWRAP, horizontal scroll, buttons never wrap */}
+        <div className="mt-1 pt-1 border-t border-slate-100 flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-none">
           <button
             onClick={() => doCloseNormal.mutate()}
             disabled={isClosed || doCloseNormal.isPending}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
           >
             {doCloseNormal.isPending ? (
               <Loader2 className="size-3 animate-spin" />
@@ -845,7 +828,7 @@ function TicketWorkspace() {
           <button
             onClick={() => setConsultOpen(true)}
             disabled={isClosed}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
           >
             <FileText className="size-3 text-blue-600" />
             Consultation Completed (TB01)
@@ -854,7 +837,7 @@ function TicketWorkspace() {
           <button
             onClick={() => setReasonOpen(true)}
             disabled={isClosed}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
           >
             <Send className="size-3 text-rose-600" />
             Reply &amp; Close (TB02)
@@ -864,7 +847,7 @@ function TicketWorkspace() {
             <button
               onClick={() => setReopenConfirm(true)}
               disabled={doReopenOrder.isPending}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 whitespace-nowrap"
             >
               <RotateCcw className="size-3 text-slate-500" />
               Reopen Order
@@ -872,6 +855,7 @@ function TicketWorkspace() {
           )}
         </div>
       </header>
+
 
       {/* ── 2. Workspace Body (Conversation & Sidebar) ────── */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
@@ -1000,115 +984,61 @@ function TicketWorkspace() {
               )}
             </div>
 
-            {/* Formatting Toolbar matching Screenshot */}
-            <div className="flex items-center justify-between gap-1 px-3 py-1 bg-white border-b border-slate-200 flex-wrap text-slate-600">
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
-                  Normal <ChevronDown className="size-3 text-slate-400" />
-                </span>
+            {/* Formatting Toolbar — real execCommand WYSIWYG buttons */}
+            <div className="flex items-center gap-1 px-3 py-1 bg-white border-b border-slate-200 flex-wrap text-slate-600">
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("bold"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 font-bold" title="Bold"><Bold className="size-3.5" /></button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("italic"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 italic" title="Italic"><Italic className="size-3.5" /></button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("underline"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 underline" title="Underline"><Underline className="size-3.5" /></button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("strikeThrough"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 line-through" title="Strikethrough"><Strikethrough className="size-3.5" /></button>
 
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("\n\n---\n\n")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-500"
-                  title="Separator"
-                >
-                  ↕
-                </button>
+              <div className="h-3 w-px bg-slate-300 mx-1" />
 
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("**", "**")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 font-bold"
-                  title="Bold"
-                >
-                  <Bold className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("*", "*")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 italic"
-                  title="Italic"
-                >
-                  <Italic className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("<u>", "</u>")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 underline"
-                  title="Underline"
-                >
-                  <Underline className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("~~", "~~")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 line-through"
-                  title="Strikethrough"
-                >
-                  <Strikethrough className="size-3.5" />
-                </button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertUnorderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Bullet list"><List className="size-3.5" /></button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertOrderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Numbered list"><ListOrdered className="size-3.5" /></button>
+              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("formatBlock", "blockquote"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Quote"><Quote className="size-3.5" /></button>
 
-                <div className="h-3 w-px bg-slate-300 mx-1" />
+              <div className="h-3 w-px bg-slate-300 mx-1" />
 
-                <button
-                  type="button"
-                  onClick={() => insertLinePrefix("• ")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Bullet list"
-                >
-                  <List className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertLinePrefix("1. ")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Numbered list"
-                >
-                  <ListOrdered className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertLinePrefix("> ")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Quote"
-                >
-                  <Quote className="size-3.5" />
-                </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const url = window.prompt("Enter link URL:");
+                  if (url) execFmt("createLink", url);
+                }}
+                className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert link"
+              >
+                <Link2 className="size-3.5" />
+              </button>
 
-                <div className="h-3 w-px bg-slate-300 mx-1" />
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = window.prompt("Enter link URL:");
-                    if (url) insertFormatting("[", `](${url})`);
-                  }}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Insert link"
-                >
-                  <Link2 className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = window.prompt("Enter image URL:");
-                    if (url) insertFormatting("![image](", `${url})`);
-                  }}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Insert image"
-                >
-                  <ImageIcon className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("```\n", "\n```")}
-                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                  title="Code block"
-                >
-                  <MoreHorizontal className="size-3.5" />
-                </button>
-              </div>
+              {/* Image: file upload → base64 inline */}
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); imageInputRef.current?.click(); }}
+                className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert image"
+              >
+                <ImageIcon className="size-3.5" />
+              </button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    const src = ev.target?.result as string;
+                    composerRef.current?.focus();
+                    document.execCommand("insertHTML", false, `<img src="${src}" style="max-width:100%;height:auto;border-radius:4px;margin:4px 0" />`);
+                    if (composerRef.current) setBody(composerRef.current.innerHTML);
+                  };
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }}
+              />
             </div>
 
             {/* Optional Cc input row */}
@@ -1156,28 +1086,31 @@ function TicketWorkspace() {
               </div>
             )}
 
-            {/* Composer Textarea */}
+            {/* Composer — contenteditable WYSIWYG div */}
             <div className="p-3">
-              <textarea
+              <div
                 ref={composerRef}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={
-                  composeTab === "note"
-                    ? "Add an internal note (only visible to staff members)…"
-                    : "Type your reply here…"
-                }
-                rows={3}
-                className={`w-full text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-1 resize-y transition-all ${
-                  composeTab === "note"
-                    ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950 placeholder:text-amber-800/50"
-                    : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800 placeholder:text-slate-400"
-                }`}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => {
+                  if (composerRef.current) setBody(composerRef.current.innerHTML);
+                }}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
                     sendReply.mutate();
                   }
                 }}
+                data-placeholder={
+                  composeTab === "note"
+                    ? "Add an internal note (only visible to staff members)…"
+                    : "Type your reply here…"
+                }
+                className={`w-full min-h-[72px] max-h-48 overflow-y-auto text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-1 transition-all [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-slate-400 ${
+                  composeTab === "note"
+                    ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950"
+                    : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800"
+                }`}
+                style={{ lineHeight: "1.5", fontFamily: "inherit" }}
               />
 
               {/* Bottom Quick Tools & Action Bar matching screenshot */}
@@ -1235,7 +1168,7 @@ function TicketWorkspace() {
                   <div className="relative inline-flex rounded-md shadow-2xs">
                     <button
                       onClick={() => sendReply.mutate()}
-                      disabled={!body.trim() || sendReply.isPending}
+                      disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
                       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-l-md text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         composeTab === "note"
                           ? "bg-amber-600 hover:bg-amber-700"
@@ -1709,7 +1642,9 @@ function MessageCard({
   onDownloadDoc: (doc: any) => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Inbound (customer) messages start expanded so full content is immediately visible.
+  // Outbound (BHS) templates start collapsed since agents only need a quick preview.
+  const [isExpanded, setIsExpanded] = useState(msg.kind === "inbound");
   const parsed = useMemo(
     () =>
       parseEmailMessage({
@@ -1746,7 +1681,8 @@ function MessageCard({
 
   // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
-    const isLongHtml = parsed.isHtml && parsed.content.length > 500;
+    // Only collapse if email is extremely long (>1200 chars of HTML)
+    const isLongHtml = parsed.isHtml && parsed.content.length > 1200;
 
     return (
       <div className="w-full flex justify-start">
@@ -1791,12 +1727,12 @@ function MessageCard({
               </div>
             )}
 
-            {/* Clean Trimmed Body / HTML rendered */}
+            {/* Clean Trimmed Body / HTML rendered - ALWAYS FULLY VISIBLE for inbound */}
             {parsed.isHtml ? (
               <div className="relative">
                 <div
                   className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
-                    isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                    isLongHtml && !isExpanded ? "max-h-80 overflow-hidden" : ""
                   }`}
                   dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(parsed.content, {
@@ -1806,14 +1742,14 @@ function MessageCard({
                   }}
                 />
                 {isLongHtml && !isExpanded && (
-                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
+                  <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-none" />
                 )}
                 {isLongHtml && (
-                  <div className="pt-2 text-center border-t border-slate-100">
+                  <div className="pt-2 flex justify-start border-t border-slate-100 mt-1">
                     <button
                       type="button"
                       onClick={() => setIsExpanded((v) => !v)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md px-3 py-1 transition-colors inline-flex items-center gap-1"
                     >
                       {isExpanded ? (
                         <>Show less <ChevronUp className="size-3.5" /></>
@@ -1972,11 +1908,11 @@ function MessageCard({
                 <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
               )}
               {isLongHtml && (
-                <div className="pt-2 text-center border-t border-slate-100">
+                <div className="pt-2 flex justify-start border-t border-slate-100 mt-1">
                   <button
                     type="button"
                     onClick={() => setIsExpanded((v) => !v)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1"
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md px-3 py-1 transition-colors inline-flex items-center gap-1"
                   >
                     {isExpanded ? (
                       <>Show less <ChevronUp className="size-3.5" /></>

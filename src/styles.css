@@ -358,5 +358,12 @@ body { top: 0 !important; }
   font-weight: 600 !important;
   transition: all 0.15s ease;
 }
-
-
+/* ── Scrollbar utilities for nowrap overflow rows ─────────────────────── */
+/* Hides scrollbar visually while keeping scroll functionality */
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE/Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;             /* Chrome/Safari/Opera */
+}

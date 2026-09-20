@@ -244,8 +244,13 @@ async function sendTicketAdHocReply(opts: {
   const ticketNumber = opts.ticket.ticket_number ?? opts.ticket.id.slice(0, 8);
   const subjectBase = thread.threadSubject || `[#${ticketNumber}] ${opts.ticket.subject}`;
   const subject = subjectBase.toLowerCase().startsWith("re:") ? subjectBase : `Re: ${subjectBase}`;
-  const bodyText = opts.message;
-  const bodyHtml = `<div>${escapeHtml(opts.message).replace(/\n/g, "<br />")}</div><p style="margin-top:16px;color:#64748b;font-size:12px">${escapeHtml(actorName)} · Business Help Services</p>`;
+  const bodyText = opts.message.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim() || opts.message;
+  // If the agent composed rich HTML (contenteditable), send it directly.
+  // If plain text, wrap in a div and convert newlines to <br>.
+  const isHtmlBody = /<[a-z][\s\S]*>/i.test(opts.message);
+  const bodyHtml = isHtmlBody
+    ? `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${opts.message}</div>`
+    : `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(opts.message).replace(/\n/g, "<br />")}</div>`;
 
   const { enqueueEmailInternal } = await import("@/lib/emails/emails.server");
   const result = await enqueueEmailInternal({
