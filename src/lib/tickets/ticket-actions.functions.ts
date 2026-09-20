@@ -820,5 +820,67 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getTicketAttachmentUploadUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketId: z.string().uuid(),
+        fileName: z.string().min(1).max(200),
+        mimeType: z.string().min(1).max(120),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
+    const safeName = data.fileName.replace(/[^a-z0-9._-]/gi, "_").slice(0, 50);
+    const path = `tickets/${data.ticketId}/${Date.now()}_${safeName}`;
+    const { data: signed, error } = await admin.storage.from("documents").createSignedUploadUrl(path);
+    if (error || !signed) throw new Error(error?.message ?? "Could not create attachment upload URL.");
+    return { path, token: signed.token, signedUrl: signed.signedUrl };
+  });
+
+export const confirmTicketAttachment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketId: z.string().uuid(),
+        applicationId: z.string().uuid().nullable().optional(),
+        filePath: z.string().min(1),
+        fileName: z.string().min(1),
+        mimeType: z.string().min(1),
+        sizeBytes: z.number().int().min(1),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const { data: signed } = await admin.storage.from("documents").createSignedUrl(data.filePath, 31536000);
+    const signedUrl = signed?.signedUrl ?? null;
+
+    if (data.applicationId) {
+      try {
+        await admin.from("documents").insert({
+          application_id: data.applicationId,
+          doc_type: "support_attachment",
+          file_name: data.fileName,
+          file_path: data.filePath,
+          mime_type: data.mimeType,
+          size_bytes: data.sizeBytes,
+          status: "verified",
+          uploaded_at: new Date().toISOString(),
+          uploaded_by: context.userId,
+          remarks: `Uploaded via ticket reply (Ticket ID: ${data.ticketId})`,
+        } as any);
+      } catch {
+        /* ignore duplicate/constraint errors */
+      }
+    }
+    return { filePath: data.filePath, fileName: data.fileName, url: signedUrl };
+  });
+
+
 
 

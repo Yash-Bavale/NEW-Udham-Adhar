@@ -22,6 +22,7 @@ import {
 import {
   closeTicketNormalT001, closeTicketRestartT001,
   closeTicketConsultationT001, closeTicketReplyReasonT002,
+  getTicketAttachmentUploadUrl, confirmTicketAttachment,
 } from "@/lib/tickets/ticket-actions.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { listEmailTemplates } from "@/lib/emails/emails.functions";
@@ -166,6 +167,8 @@ function TicketWorkspace() {
   const adjacentFn = useServerFn(getAdjacentTickets);
   const getDocUrlFn = useServerFn(getOrderDocumentSignedUrl);
   const reopenOrderFn = useServerFn(reopenOrder);
+  const getAttachmentUploadUrlFn = useServerFn(getTicketAttachmentUploadUrl);
+  const confirmAttachmentFn = useServerFn(confirmTicketAttachment);
 
   const closeNormal = useServerFn(closeTicketNormalT001);
   const closeRestart = useServerFn(closeTicketRestartT001);
@@ -261,10 +264,32 @@ function TicketWorkspace() {
   const [showBcc, setShowBcc] = useState(false);
   const [ccInput, setCcInput] = useState("");
   const [bccInput, setBccInput] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<
+    Array<{ id: string; file: File; name: string; size: number; mimeType: string }>
+  >([]);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    const items = files.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      file: f,
+      name: f.name,
+      size: f.size,
+      mimeType: f.type || "application/octet-stream",
+    }));
+    setAttachedFiles((prev) => [...prev, ...items]);
+    if (e.target) e.target.value = "";
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachedFiles((prev) => prev.filter((a) => a.id !== id));
+  };
 
   // Scroll listener for "Jump to latest"
   const handleThreadScroll = () => {
@@ -428,17 +453,59 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: (opts?: { closeAfter?: boolean; cc?: string; bcc?: string }) =>
-      replyFn({
+    mutationFn: async (opts?: { closeAfter?: boolean; cc?: string; bcc?: string }) => {
+      let finalMessage = body.trim();
+
+      if (attachedFiles.length > 0) {
+        let attachLinksHtml = "";
+        for (const item of attachedFiles) {
+          try {
+            const { path, token } = await getAttachmentUploadUrlFn({
+              data: { ticketId, fileName: item.name, mimeType: item.mimeType },
+            });
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { error: upErr } = await supabase.storage
+              .from("documents")
+              .uploadToSignedUrl(path, token, item.file, {
+                contentType: item.mimeType,
+                upsert: true,
+              });
+            if (upErr) throw upErr;
+
+            const confirmed = await confirmAttachmentFn({
+              data: {
+                ticketId,
+                applicationId: data?.ticket?.application_id ?? null,
+                filePath: path,
+                fileName: item.name,
+                mimeType: item.mimeType,
+                sizeBytes: item.size,
+              },
+            });
+
+            if (confirmed?.url) {
+              attachLinksHtml += `<p style="margin:4px 0;">📎 <strong>Attachment:</strong> <a href="${confirmed.url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${escapeHtml(item.name)}</a> (${formatBytes(item.size)})</p>`;
+            }
+          } catch (err: any) {
+            toast.error(`Failed to upload ${item.name}: ${err?.message ?? "Upload error"}`);
+          }
+        }
+        if (attachLinksHtml) {
+          finalMessage += `<div style="margin-top:16px;padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;color:#334155">${attachLinksHtml}</div>`;
+        }
+      }
+
+      return replyFn({
         data: {
           ticketId,
-          message: body.trim(),
+          message: finalMessage,
           isInternal: composeTab === "note",
           armAutoclose: false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
         },
-      }),
+      });
+    },
     onSuccess: async (r: any, variables) => {
       if (composeTab === "note") {
         toast.success("Internal note added");
@@ -454,6 +521,7 @@ function TicketWorkspace() {
       }
 
       setBody("");
+      setAttachedFiles([]);
       if (composerRef.current) composerRef.current.innerHTML = "";
       setCcInput("");
       setBccInput("");
@@ -659,10 +727,10 @@ function TicketWorkspace() {
             </button>
           </div>
 
-          {/* Row 2: Ticket Number + NEW Badge (Left) & Quick Action Buttons (Right) */}
+          {/* Row 1: Ticket Number + NEW Badge (Left) & Quick Action Buttons (Right) */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-mono">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-mono shrink-0">
                 {ticket.ticket_number}
               </h1>
               {ticket.is_new && (
@@ -718,17 +786,17 @@ function TicketWorkspace() {
             </div>
           </div>
 
-          {/* Row 3: Subject / Subtitle */}
-          <div className="mt-1 text-xs font-semibold text-slate-600 truncate">
+          {/* Row 2: Subject / Subtitle */}
+          <div className="mt-1 text-xs font-semibold text-slate-700 truncate">
             {ticket.subject ? `Re: ${ticket.subject}` : "(no subject)"}
           </div>
 
-          {/* Row 4: Badges Row (Customer Delay, Status, Priority, Assignee, Add Tag) */}
-          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+          {/* Row 3: Badges Row (Customer Delay, Status, Priority, Assignee, Add Tag) matching Image 2 */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
             {/* Customer Delay badge */}
             {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] border border-amber-200 font-semibold text-[11px] shrink-0 shadow-2xs">
-                <span className="size-1.5 rounded-full bg-[#d97706]" /> Customer Delay
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fffbe6] text-[#b45309] border border-[#fde68a] font-semibold text-[11px] shrink-0 shadow-2xs">
+                <span className="size-1.5 rounded-full bg-[#f59e0b]" /> Customer Delay
               </span>
             )}
 
@@ -778,7 +846,7 @@ function TicketWorkspace() {
             <div className="relative shrink-0">
               <button
                 onClick={() => setAddTagOpen((v) => !v)}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-[11px] font-medium transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-[11px] font-medium transition-colors"
               >
                 <Plus className="size-3" /> Add Tag
               </button>
@@ -1080,19 +1148,52 @@ function TicketWorkspace() {
                 style={{ lineHeight: "1.5", fontFamily: "inherit" }}
               />
 
+              {/* Attached files pills display */}
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
+                  {attachedFiles.map((att) => (
+                    <div
+                      key={att.id}
+                      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700 shadow-2xs"
+                    >
+                      <Paperclip className="size-3.5 text-slate-500" />
+                      <span className="font-medium truncate max-w-[160px]" title={att.name}>
+                        {att.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400">({formatBytes(att.size)})</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="text-slate-400 hover:text-slate-700 p-0.5"
+                        title="Remove file"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Bottom Quick Tools & Action Bar matching screenshot */}
               <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
                 {/* Left quick insert buttons */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
-                    onClick={() => {
-                      toast.info("Use Order Documents in the right sidebar or order workspace to upload attachments.");
-                    }}
+                    onClick={() => attachmentInputRef.current?.click()}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
                   >
                     <Paperclip className="size-3 text-slate-500" /> Attach File
                   </button>
+
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                    className="hidden"
+                    onChange={handleAttachmentSelect}
+                  />
 
                   <button
                     type="button"
@@ -1609,6 +1710,7 @@ function MessageCard({
   onDownloadDoc: (doc: any) => void;
 }) {
   const [showQuoted, setShowQuoted] = useState(false);
+  const [showRawText, setShowRawText] = useState(false);
   // Inbound (customer) messages start expanded so full content is immediately visible.
   // Outbound (BHS) templates start collapsed since agents only need a quick preview.
   const [isExpanded, setIsExpanded] = useState(msg.kind === "inbound");
@@ -1648,8 +1750,7 @@ function MessageCard({
 
   // 2. Customer Inbound Message Card (LEFT ALIGNED)
   if (msg.kind === "inbound") {
-    // Only collapse if email is extremely long (>1200 chars of HTML)
-    const isLongHtml = parsed.isHtml && parsed.content.length > 1200;
+    const rawContent = msg.body_text || parsed.rawText || (msg as any).body_html || "";
 
     return (
       <div className="w-full flex justify-start">
@@ -1663,10 +1764,10 @@ function MessageCard({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-slate-900 text-xs truncate">
-                    {customerName || "Rabeya Khanam"}
+                    {customerName || "Customer"}
                   </span>
                   <span className="text-slate-400 text-xs font-mono truncate">
-                    {customerEmail || msg.from_email || "khandiagnostic2024@gmail.com"}
+                    {customerEmail || msg.from_email || ""}
                   </span>
                   <span className="text-[10px] font-bold uppercase bg-[#ecfdf5] text-[#059669] border border-emerald-200 px-1.5 py-0.5 rounded">
                     Customer
@@ -1686,21 +1787,22 @@ function MessageCard({
           </div>
 
           {/* Message Content Body */}
-          <div className="px-3 py-2 space-y-2">
-            {/* Subject if different from main thread */}
+          <div className="px-3.5 py-3 space-y-2">
+            {/* Subject if present */}
             {msg.subject && (
-              <div className="text-xs font-semibold text-slate-700 pb-1">
+              <div className="text-xs font-bold text-slate-800 pb-1">
                 {decodeHtmlEntities(msg.subject)}
               </div>
             )}
 
-            {/* Clean Trimmed Body / HTML rendered - ALWAYS FULLY VISIBLE for inbound */}
-            {parsed.isHtml ? (
-              <div className="relative">
+            {/* Clean Customer Message Body */}
+            {showRawText ? (
+              <div className="p-3 bg-slate-900 text-slate-100 font-mono text-xs rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                {rawContent}
+              </div>
+            ) : parsed.isHtml ? (
+              <div className="text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans">
                 <div
-                  className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
-                    isLongHtml && !isExpanded ? "max-h-80 overflow-hidden" : ""
-                  }`}
                   dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(parsed.content, {
                       WHOLE_DOCUMENT: false,
@@ -1708,24 +1810,6 @@ function MessageCard({
                     }),
                   }}
                 />
-                {isLongHtml && !isExpanded && (
-                  <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-none" />
-                )}
-                {isLongHtml && (
-                  <div className="pt-2 flex justify-start border-t border-slate-100 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsExpanded((v) => !v)}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md px-3 py-1 transition-colors inline-flex items-center gap-1"
-                    >
-                      {isExpanded ? (
-                        <>Show less <ChevronUp className="size-3.5" /></>
-                      ) : (
-                        <>Show full email <ChevronDown className="size-3.5" /></>
-                      )}
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
@@ -1733,9 +1817,9 @@ function MessageCard({
               </div>
             )}
 
-            {/* Attachments Display matching screenshot */}
+            {/* Attachments Display matching Image 2 */}
             {msg.attachments && msg.attachments.length > 0 && (
-              <div className="pt-1">
+              <div className="pt-2">
                 <div className="flex flex-wrap gap-2">
                   {msg.attachments.map((doc) => (
                     <div
@@ -1770,32 +1854,47 @@ function MessageCard({
               </div>
             )}
 
-            {/* Quoted messages collapsible matching screenshot */}
-            {parsed.hasQuoted && (
-              <div className="pt-1">
+            {/* Quoted / Full email toggle matching Image 2 precisely */}
+            {(parsed.hasQuoted || parsed.quotedContent || msg.body_text || (msg as any).body_html) && (
+              <div className="pt-1 flex items-center justify-between gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setShowQuoted((v) => !v)}
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors"
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 transition-colors"
                 >
                   <ChevronRightIcon className={`size-3.5 transition-transform ${showQuoted ? "rotate-90" : ""}`} />
                   <span>{showQuoted ? "Hide quoted content" : "Show quoted content (3 messages)"}</span>
                 </button>
-                {showQuoted && (
-                  <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
-                    {parsed.isHtml ? (
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: DOMPurify.sanitize(parsed.quotedContent, {
-                            WHOLE_DOCUMENT: false,
-                            ADD_ATTR: ["target", "style", "class"],
-                          }),
-                        }}
-                      />
-                    ) : (
-                      parsed.quotedContent
-                    )}
-                  </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRawText((v) => !v)}
+                  className="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors ml-auto"
+                  title="Toggle raw original email text"
+                >
+                  {showRawText ? "Show Formatted" : "Raw Text"}
+                </button>
+              </div>
+            )}
+
+            {/* Expanded Quoted messages block */}
+            {showQuoted && (
+              <div className="mt-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed overflow-x-auto">
+                {parsed.quotedContent ? (
+                  parsed.isHtml ? (
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(parsed.quotedContent, {
+                          WHOLE_DOCUMENT: false,
+                          ADD_ATTR: ["target", "style", "class"],
+                        }),
+                      }}
+                    />
+                  ) : (
+                    parsed.quotedContent
+                  )
+                ) : (
+                  rawContent
                 )}
               </div>
             )}
@@ -1851,7 +1950,7 @@ function MessageCard({
         </div>
 
         {/* Message Content Body matching Screenshot 2 & 3 */}
-        <div className="px-3 py-2 space-y-2">
+        <div className="px-3.5 py-3 space-y-2">
           {msg.subject && (
             <div className="text-xs font-semibold text-slate-800 pb-1">
               {decodeHtmlEntities(msg.subject)}
@@ -1879,7 +1978,7 @@ function MessageCard({
                   <button
                     type="button"
                     onClick={() => setIsExpanded((v) => !v)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md px-3 py-1 transition-colors inline-flex items-center gap-1"
+                    className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
                   >
                     {isExpanded ? (
                       <>Show less <ChevronUp className="size-3.5" /></>
