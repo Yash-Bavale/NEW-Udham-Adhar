@@ -120,6 +120,8 @@ export async function enqueueEmailInternal(input: {
   allowWithoutTemplate?: boolean;
   /** Set true for genuinely repeatable sends (manual resend, support replies). */
   allowDuplicate?: boolean;
+  cc?: string | string[];
+  bcc?: string | string[];
 }) {
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
@@ -146,6 +148,8 @@ export async function enqueueEmailInternal(input: {
   if (input.attachments && input.attachments.length > 0) {
     variables.__attachments = input.attachments;
   }
+  if (input.cc) variables.__cc = input.cc;
+  if (input.bcc) variables.__bcc = input.bcc;
   const scheduled = input.delaySeconds && input.delaySeconds > 0
     ? new Date(Date.now() + input.delaySeconds * 1000).toISOString()
     : null;
@@ -788,9 +792,13 @@ async function sendQueueRow(row: QueueRow) {
       typeof (variables as { __message_id?: string }).__message_id === "string"
         ? ((variables as { __message_id?: string }).__message_id as string)
         : undefined;
+    const cc = (variables as { __cc?: string | string[] }).__cc;
+    const bcc = (variables as { __bcc?: string | string[] }).__bcc;
 
     const res = await sendViaActiveProvider({
       to: recipient,
+      cc,
+      bcc,
       subject: row.subject,
       html: row.body_html,
       text: plainText,

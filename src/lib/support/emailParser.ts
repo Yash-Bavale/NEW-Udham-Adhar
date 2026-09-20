@@ -67,6 +67,10 @@ export function parseEmailReply(rawBody: string | null | undefined): ParsedEmail
   const sigIdx = newContent.search(SIG_DIVIDER);
   if (sigIdx > 40) newContent = newContent.slice(0, sigIdx);
 
+  // Clean any leading metadata lines like "From: ..." or "Subject: ..." prepended during email ingestion
+  newContent = newContent.replace(/^\s*From:\s*[^\n]+\n*/i, "");
+  newContent = newContent.replace(/^\s*(?:Sent|To|Subject):\s*[^\n]+\n*/gi, "");
+
   newContent = trimBody(newContent);
 
   return {

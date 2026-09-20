@@ -66,6 +66,24 @@ export async function sendViaZepto(input: ZeptoSendInput): Promise<ZeptoSendResu
       subject: input.subject,
       htmlbody: input.html,
     };
+
+    if (input.cc) {
+      const ccList = (Array.isArray(input.cc) ? input.cc : input.cc.split(/[,;\s]+/))
+        .map((e) => e.trim())
+        .filter(Boolean);
+      if (ccList.length > 0) {
+        body.cc = ccList.map((addr) => ({ email_address: { address: addr } }));
+      }
+    }
+
+    if (input.bcc) {
+      const bccList = (Array.isArray(input.bcc) ? input.bcc : input.bcc.split(/[,;\s]+/))
+        .map((e) => e.trim())
+        .filter(Boolean);
+      if (bccList.length > 0) {
+        body.bcc = bccList.map((addr) => ({ email_address: { address: addr } }));
+      }
+    }
     // ZeptoMail only accepts custom headers under `mime_headers`, and it sets
     // Message-ID itself, so that one must not be sent.
     const mimeHeaders: Record<string, string> = {};

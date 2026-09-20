@@ -246,6 +246,10 @@ function TicketWorkspace() {
   // Composer state
   const [composeTab, setComposeTab] = useState<"reply" | "note">("reply");
   const [body, setBody] = useState("");
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [ccInput, setCcInput] = useState("");
+  const [bccInput, setBccInput] = useState("");
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -353,13 +357,15 @@ function TicketWorkspace() {
 
   // Mutations
   const sendReply = useMutation({
-    mutationFn: (opts?: { closeAfter?: boolean } | void) =>
+    mutationFn: (opts?: { closeAfter?: boolean; cc?: string; bcc?: string } | void) =>
       replyFn({
         data: {
           ticketId,
           message: body.trim(),
           isInternal: composeTab === "note",
           armAutoclose: false,
+          cc: opts?.cc ?? (ccInput.trim() || undefined),
+          bcc: opts?.bcc ?? (bccInput.trim() || undefined),
         },
       }),
     onSuccess: async (r: any, variables) => {
@@ -377,6 +383,10 @@ function TicketWorkspace() {
       }
 
       setBody("");
+      setCcInput("");
+      setBccInput("");
+      setShowCc(false);
+      setShowBcc(false);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -612,64 +622,8 @@ function TicketWorkspace() {
             )}
           </div>
 
-          {/* Right Action Bar matching screenshot */}
+          {/* Right Action Bar matching screenshot: cleaned top buttons */}
           <div className="flex items-center gap-2">
-            {/* Close Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setCloseMenuOpen((v) => !v)}
-                disabled={isClosed}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-              >
-                Close <ChevronDown className="size-3.5 text-slate-500" />
-              </button>
-              {closeMenuOpen && (
-                <div
-                  className="absolute right-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-30 text-xs py-1 animate-in fade-in"
-                  onMouseLeave={() => setCloseMenuOpen(false)}
-                >
-                  <button
-                    onClick={() => { setCloseMenuOpen(false); doCloseNormal.mutate(); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
-                  >
-                    <CheckCircle2 className="size-3.5 text-emerald-500" /> Close Ticket
-                  </button>
-                  <button
-                    onClick={() => { setCloseMenuOpen(false); setReasonOpen(true); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-rose-700 font-medium"
-                  >
-                    <Mail className="size-3.5 text-rose-500" /> Close with Reply (TB02)
-                  </button>
-                  <button
-                    onClick={() => { setCloseMenuOpen(false); setConsultOpen(true); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-blue-700 font-medium"
-                  >
-                    <FileText className="size-3.5 text-blue-500" /> Consultation Completed (TB01)
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Restart Order */}
-            <button
-              onClick={() => setRestartConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-            >
-              <RotateCcw className="size-3.5 text-slate-500" /> Restart Order
-            </button>
-
-            {/* Reply Button (focuses composer) */}
-            <button
-              onClick={() => {
-                setComposeTab("reply");
-                composerRef.current?.focus();
-              }}
-              disabled={isClosed}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1e3a5f] hover:bg-[#152b47] text-white text-xs font-semibold shadow-2xs transition-colors disabled:opacity-50"
-            >
-              <Send className="size-3.5" /> Reply
-            </button>
-
             {/* More Menu (...) */}
             <div className="relative">
               <button
@@ -724,6 +678,25 @@ function TicketWorkspace() {
                       <User className="size-3.5 text-slate-400" /> View Customer
                     </Link>
                   )}
+                  <button
+                    onClick={() => {
+                      setDotsMenuOpen(false);
+                      setRestartConfirm(true);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <RotateCcw className="size-3.5 text-slate-400" /> Restart Order
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDotsMenuOpen(false);
+                      doCloseNormal.mutate();
+                    }}
+                    disabled={isClosed}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="size-3.5 text-emerald-500" /> Close Ticket
+                  </button>
                   <button
                     onClick={() => { invalidate(); setDotsMenuOpen(false); }}
                     className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
@@ -798,11 +771,7 @@ function TicketWorkspace() {
             onPick={(id) => changeAssignee.mutate(id)}
           />
 
-          {/* Service Dropdown Pill Badge */}
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[11px]">
-            <span>BHS: {serviceName}</span>
-            <ChevronDown className="size-3 text-slate-400" />
-          </span>
+
 
           {/* Custom Tags */}
           {customTags.map((tag, idx) => (
@@ -938,113 +907,189 @@ function TicketWorkspace() {
             </div>
 
             {/* Compact Rich Text Editor Toolbar matching Screenshot */}
-            <div className="flex items-center gap-1 px-4 py-1.5 bg-white border-b border-slate-200 flex-wrap text-slate-600">
-              <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
-                Normal <ChevronDown className="size-3 text-slate-400" />
-              </span>
+            {/* Compact Rich Text Editor Toolbar matching Screenshot */}
+            <div className="flex items-center justify-between gap-1 px-4 py-1.5 bg-white border-b border-slate-200 flex-wrap text-slate-600">
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-xs font-semibold text-slate-600 pr-2 border-r border-slate-300 flex items-center gap-1 cursor-pointer hover:text-slate-900">
+                  Normal <ChevronDown className="size-3 text-slate-400" />
+                </span>
 
-              <button
-                type="button"
-                onClick={() => insertFormatting("\n\n---\n\n")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-500"
-                title="Separator"
-              >
-                ↕
-              </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("\n\n---\n\n")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-500"
+                  title="Separator"
+                >
+                  ↕
+                </button>
 
-              <button
-                type="button"
-                onClick={() => insertFormatting("**", "**")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 font-bold"
-                title="Bold"
-              >
-                <Bold className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertFormatting("*", "*")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 italic"
-                title="Italic"
-              >
-                <Italic className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertFormatting("<u>", "</u>")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 underline"
-                title="Underline"
-              >
-                <Underline className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertFormatting("~~", "~~")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 line-through"
-                title="Strikethrough"
-              >
-                <Strikethrough className="size-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("**", "**")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 font-bold"
+                  title="Bold"
+                >
+                  <Bold className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("*", "*")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 italic"
+                  title="Italic"
+                >
+                  <Italic className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("<u>", "</u>")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 underline"
+                  title="Underline"
+                >
+                  <Underline className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("~~", "~~")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700 line-through"
+                  title="Strikethrough"
+                >
+                  <Strikethrough className="size-3.5" />
+                </button>
 
-              <div className="h-3 w-px bg-slate-300 mx-1" />
+                <div className="h-3 w-px bg-slate-300 mx-1" />
 
-              <button
-                type="button"
-                onClick={() => insertLinePrefix("• ")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Bullet list"
-              >
-                <List className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertLinePrefix("1. ")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Numbered list"
-              >
-                <ListOrdered className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertLinePrefix("> ")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Quote"
-              >
-                <Quote className="size-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => insertLinePrefix("• ")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Bullet list"
+                >
+                  <List className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertLinePrefix("1. ")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Numbered list"
+                >
+                  <ListOrdered className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertLinePrefix("> ")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Quote"
+                >
+                  <Quote className="size-3.5" />
+                </button>
 
-              <div className="h-3 w-px bg-slate-300 mx-1" />
+                <div className="h-3 w-px bg-slate-300 mx-1" />
 
-              <button
-                type="button"
-                onClick={() => {
-                  const url = window.prompt("Enter link URL:");
-                  if (url) insertFormatting("[", `](${url})`);
-                }}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Insert link"
-              >
-                <Link2 className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = window.prompt("Enter image URL:");
-                  if (url) insertFormatting("![image](", `${url})`);
-                }}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Insert image"
-              >
-                <ImageIcon className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => insertFormatting("```\n", "\n```")}
-                className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
-                title="Code block"
-              >
-                <MoreHorizontal className="size-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = window.prompt("Enter link URL:");
+                    if (url) insertFormatting("[", `](${url})`);
+                  }}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Insert link"
+                >
+                  <Link2 className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = window.prompt("Enter image URL:");
+                    if (url) insertFormatting("![image](", `${url})`);
+                  }}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Insert image"
+                >
+                  <ImageIcon className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting("```\n", "\n```")}
+                  className="p-1 rounded hover:bg-slate-100 hover:text-slate-900 text-slate-700"
+                  title="Code block"
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </button>
+              </div>
+
+              {/* CC / BCC Options matching Screenshot */}
+              {composeTab === "reply" && (
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowCc((v) => !v)}
+                    className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
+                      showCc || ccInput.trim()
+                        ? "bg-slate-200 text-slate-900"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    Cc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBcc((v) => !v)}
+                    className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
+                      showBcc || bccInput.trim()
+                        ? "bg-slate-200 text-slate-900"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    Bcc
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* Optional Cc input row */}
+            {composeTab === "reply" && showCc && (
+              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
+                <span className="font-semibold text-slate-500 w-9 shrink-0">Cc:</span>
+                <input
+                  type="text"
+                  value={ccInput}
+                  onChange={(e) => setCcInput(e.target.value)}
+                  placeholder="Enter CC email addresses (comma separated)..."
+                  className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowCc(false); setCcInput(""); }}
+                  className="text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Clear Cc"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Optional Bcc input row */}
+            {composeTab === "reply" && showBcc && (
+              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
+                <span className="font-semibold text-slate-500 w-9 shrink-0">Bcc:</span>
+                <input
+                  type="text"
+                  value={bccInput}
+                  onChange={(e) => setBccInput(e.target.value)}
+                  placeholder="Enter BCC email addresses (comma separated)..."
+                  className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowBcc(false); setBccInput(""); }}
+                  className="text-slate-400 hover:text-slate-600 p-0.5"
+                  title="Clear Bcc"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Composer Textarea */}
             <div className="p-4">
@@ -1092,13 +1137,7 @@ function TicketWorkspace() {
                     <FileText className="size-3.5 text-slate-500" /> Templates
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={insertOrderDetails}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-                  >
-                    <Package className="size-3.5 text-slate-500" /> Insert Order Details
-                  </button>
+
 
                   <button
                     type="button"
@@ -1242,9 +1281,19 @@ function TicketWorkspace() {
 
               <div className="space-y-1.5 pt-2 text-xs text-slate-600">
                 {cust.primary_mobile && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="size-3.5 text-slate-400 shrink-0" />
-                    <span className="font-mono text-slate-800">{cust.primary_mobile}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Phone className="size-3.5 text-slate-400 shrink-0" />
+                      <span className="font-mono text-slate-800">{cust.primary_mobile}</span>
+                    </div>
+                    <a
+                      href={`tel:${cust.primary_mobile}`}
+                      className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-bold text-xs hover:underline cursor-pointer"
+                      title={`Call ${cust.primary_mobile}`}
+                    >
+                      <Phone className="size-3 text-emerald-600" />
+                      <span>Call</span>
+                    </a>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
@@ -1723,13 +1772,13 @@ function MessageCard({
           {/* Message Content Body */}
           <div className="p-4 space-y-3">
             {msg.subject && (
-              <div className="text-xs font-bold text-slate-900 leading-snug">
+              <div className="text-sm font-bold text-slate-900 leading-snug">
                 {msg.subject}
               </div>
             )}
 
             {/* Clean Trimmed Body */}
-            <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
               {parsed.newContent || plain || "(no content)"}
             </div>
 
@@ -1842,21 +1891,21 @@ function MessageCard({
         {/* Message Content Body matching Screenshot */}
         <div className="p-4 space-y-3">
           {msg.subject && (
-            <div className="text-xs font-bold text-slate-900 leading-snug">
+            <div className="text-sm font-bold text-slate-900 leading-snug">
               {msg.subject}
             </div>
           )}
 
-          <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
+          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-normal">
             {parsed.newContent || plain || (
-              <>
+              <div className="space-y-2">
                 <p>Dear {customerName || "Customer"},</p>
                 <p>
-                  Thank you for reaching out. We have received your request regarding your certificate. Our team is already checking the status and we will get back to you shortly.
+                  Thank you for reaching out. We have received your request regarding the Udyam certificate. Our team is already checking the status and we will get back to you shortly.
                 </p>
                 <p>If you have any additional details, please share.</p>
                 <p>Regards,<br />Business Help Services</p>
-              </>
+              </div>
             )}
           </div>
 

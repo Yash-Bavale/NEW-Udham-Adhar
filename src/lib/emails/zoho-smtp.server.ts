@@ -15,6 +15,8 @@ export type ZohoSendInput = {
   text?: string | null;
   fromName?: string | null;
   replyTo?: string | null;
+  cc?: string | string[];
+  bcc?: string | string[];
   attachments?: ZohoAttachment[];
   headers?: Record<string, string>;
   /** Threading + BHS trace headers — used by incoming-mail matching. */
@@ -220,6 +222,13 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
       ? await Promise.all(input.attachments.map((attachment) => uploadAttachment(accountId, attachment)))
       : undefined;
 
+    const ccAddress = input.cc
+      ? (Array.isArray(input.cc) ? input.cc.join(",") : input.cc).trim()
+      : undefined;
+    const bccAddress = input.bcc
+      ? (Array.isArray(input.bcc) ? input.bcc.join(",") : input.bcc).trim()
+      : undefined;
+
     const response = await zohoApi<{ data?: { messageId?: string; status?: string; message?: string }; status?: { code?: number; description?: string } }>(
       `/api/accounts/${accountId}/messages`,
       {
@@ -227,6 +236,8 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
         body: JSON.stringify({
           fromAddress: fromEmail,
           toAddress: input.to,
+          ...(ccAddress ? { ccAddress } : {}),
+          ...(bccAddress ? { bccAddress } : {}),
           subject: input.subject,
           content: input.html,
           mailFormat: "html",

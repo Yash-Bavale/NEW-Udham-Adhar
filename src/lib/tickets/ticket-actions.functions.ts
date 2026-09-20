@@ -232,6 +232,8 @@ async function sendTicketAdHocReply(opts: {
   actorId: string;
   message: string;
   replyId: string;
+  cc?: string;
+  bcc?: string;
 }) {
   const cust = await loadCustomer(opts.ticket.customer_id);
   const recipient = opts.ticket.ticket_email || cust.email;
@@ -252,11 +254,15 @@ async function sendTicketAdHocReply(opts: {
     subject,
     bodyHtml,
     bodyText,
+    cc: opts.cc,
+    bcc: opts.bcc,
     applicationId: opts.ticket.application_id ?? undefined,
     variables: {
       __allow_without_template: true,
       __in_reply_to: thread.inReplyTo,
       __references: thread.references,
+      ...(opts.cc ? { __cc: opts.cc } : {}),
+      ...(opts.bcc ? { __bcc: opts.bcc } : {}),
     },
     allowWithoutTemplate: true,
     requireImmediateSuccess: true,
@@ -273,6 +279,8 @@ const ReplyInput = z.object({
   message: z.string().min(1),
   isInternal: z.boolean().optional(),
   armAutoclose: z.boolean().default(true),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
 });
 
 export const replyToTicket = createServerFn({ method: "POST" })
@@ -325,6 +333,8 @@ export const replyToTicket = createServerFn({ method: "POST" })
         actorId: context.userId,
         replyId: (replyRow as { id: string }).id,
         message: data.message,
+        cc: data.cc,
+        bcc: data.bcc,
       });
       // Arm ticket-autoclose only after the email actually leaves the system.
       if (data.armAutoclose) {
