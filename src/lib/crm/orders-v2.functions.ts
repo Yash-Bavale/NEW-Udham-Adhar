@@ -364,16 +364,17 @@ const COMPLETED_FS = new Set<string>([
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 
-export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
+export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
+  if (row.is_hot) return "needs_action";
   if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
   return "pending";
 }
 
-export function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage }): boolean {
+export function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): boolean {
   const b = bucketOfRow(row);
   return b === "pending" || b === "needs_action";
 }
@@ -652,7 +653,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ]);
 
     const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
-    const callbackMap = new Map((callbackSchedulers ?? []).map((s: any) => [s.application_id, s]));
+
+    // Sort schedulers so newest created_at is first and map by application_id
+    const sortedSchedulers = [...(callbackSchedulers ?? [])].sort((a: any, b: any) => {
+      const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tB - tA;
+    });
+    const callbackMap = new Map<string, any>();
+    for (const s of sortedSchedulers) {
+      if (s && s.application_id && !callbackMap.has(s.application_id)) {
+        callbackMap.set(s.application_id, s);
+      }
+    }
 
     // Gather all serviceIds from applications and linked leads
     const allServiceIds = Array.from(

@@ -294,19 +294,19 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertStaff(context.supabase);
     const admin = await getAdmin();
-    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
 
+    // Fetch all active callback reminders
     const { data: schedulers, error } = await admin
       .from("order_schedulers")
       .select("id, application_id, status, fires_at, remarks, created_at, created_by")
       .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active")
-      .lte("fires_at", nowIso)
       .order("fires_at", { ascending: true })
-      .limit(50);
+      .limit(100);
 
     if (error || !schedulers || schedulers.length === 0) {
-      return { dueReminders: [] };
+      return { dueReminders: [], upcomingReminders: [] };
     }
 
     const appIds = Array.from(new Set(schedulers.map((s) => s.application_id).filter(Boolean))) as string[];
@@ -324,7 +324,7 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
     const appMap = new Map((apps ?? []).map((a) => [a.id, a]));
     const leadMap = new Map((leads ?? []).map((l) => [l.id, l]));
 
-    const dueReminders = schedulers.map((s) => {
+    const mapped = schedulers.map((s) => {
       const app = s.application_id ? appMap.get(s.application_id) : null;
       const lead = app?.lead_id ? leadMap.get(app.lead_id) : null;
 
@@ -337,6 +337,9 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
         }
       }
 
+      const firesAtTime = s.fires_at ? new Date(s.fires_at).getTime() : 0;
+      const isDue = firesAtTime > 0 && firesAtTime <= nowMs;
+
       return {
         id: s.id,
         application_id: s.application_id,
@@ -346,10 +349,14 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
         customer_mobile: lead?.mobile || "",
         service_name: lead?.service || "Service",
         fires_at: s.fires_at,
+        isDue,
         remarks: parsedRemarks,
         created_at: s.created_at,
       };
     });
 
-    return { dueReminders };
+    const dueReminders = mapped.filter((m) => m.isDue);
+    const upcomingReminders = mapped.filter((m) => !m.isDue);
+
+    return { dueReminders, upcomingReminders };
   });

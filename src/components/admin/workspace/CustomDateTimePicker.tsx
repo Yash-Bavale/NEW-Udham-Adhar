@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -61,6 +61,23 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
   const [minute, setMinute] = useState<number>(rawMinutes);
   const [period, setPeriod] = useState<"AM" | "PM">(initialPeriod);
 
+  // String buffers for typing
+  const [hourInput, setHourInput] = useState<string>(initial12Hour.toString().padStart(2, "0"));
+  const [minuteInput, setMinuteInput] = useState<string>(rawMinutes.toString().padStart(2, "0"));
+
+  // Keep internal string states in sync when value changes externally
+  useEffect(() => {
+    const rh = value.getHours();
+    const rm = value.getMinutes();
+    const p = rh >= 12 ? "PM" : "AM";
+    const h12 = rh % 12 === 0 ? 12 : rh % 12;
+    setHour12(h12);
+    setMinute(rm);
+    setPeriod(p);
+    setHourInput(h12.toString().padStart(2, "0"));
+    setMinuteInput(rm.toString().padStart(2, "0"));
+  }, [value]);
+
   // Helper to commit date & time change
   const commitChange = (
     year: number,
@@ -86,6 +103,7 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
     if (nextH > 12) nextH = 1;
     if (nextH < 1) nextH = 12;
     setHour12(nextH);
+    setHourInput(nextH.toString().padStart(2, "0"));
     commitChange(selectedYear, selectedMonth, selectedDay, nextH, minute, period);
   };
 
@@ -94,7 +112,52 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
     if (nextM >= 60) nextM = 0;
     if (nextM < 0) nextM = 59;
     setMinute(nextM);
+    setMinuteInput(nextM.toString().padStart(2, "0"));
     commitChange(selectedYear, selectedMonth, selectedDay, hour12, nextM, period);
+  };
+
+  const handleHourInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    setHourInput(raw);
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) {
+      setHour12(parsed);
+      commitChange(selectedYear, selectedMonth, selectedDay, parsed, minute, period);
+    }
+  };
+
+  const handleHourBlur = () => {
+    const parsed = parseInt(hourInput, 10);
+    let finalH = hour12;
+    if (isNaN(parsed) || parsed < 1) finalH = 1;
+    else if (parsed > 12) finalH = 12;
+    else finalH = parsed;
+
+    setHour12(finalH);
+    setHourInput(finalH.toString().padStart(2, "0"));
+    commitChange(selectedYear, selectedMonth, selectedDay, finalH, minute, period);
+  };
+
+  const handleMinuteInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    setMinuteInput(raw);
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 59) {
+      setMinute(parsed);
+      commitChange(selectedYear, selectedMonth, selectedDay, hour12, parsed, period);
+    }
+  };
+
+  const handleMinuteBlur = () => {
+    const parsed = parseInt(minuteInput, 10);
+    let finalM = minute;
+    if (isNaN(parsed) || parsed < 0) finalM = 0;
+    else if (parsed > 59) finalM = 59;
+    else finalM = parsed;
+
+    setMinute(finalM);
+    setMinuteInput(finalM.toString().padStart(2, "0"));
+    commitChange(selectedYear, selectedMonth, selectedDay, hour12, finalM, period);
   };
 
   const handlePeriodChange = (newPeriod: "AM" | "PM") => {
@@ -106,6 +169,8 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
     setHour12(slot.hour);
     setMinute(slot.minute);
     setPeriod(slot.period);
+    setHourInput(slot.hour.toString().padStart(2, "0"));
+    setMinuteInput(slot.minute.toString().padStart(2, "0"));
     commitChange(selectedYear, selectedMonth, selectedDay, slot.hour, slot.minute, slot.period);
   };
 
@@ -121,7 +186,7 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
     // Next Monday calculation
     const nextMon = new Date(today);
     const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday...
-    const daysUntilNextMon = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+    const daysUntilNextMon = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
     nextMon.setDate(today.getDate() + daysUntilNextMon);
 
     const formatChipLabel = (d: Date) => {
@@ -460,7 +525,7 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
             </div>
           </div>
 
-          {/* Exact Callback Hour & Minute Stepper */}
+          {/* Exact Callback Hour & Minute Stepper with Direct Typing Support */}
           <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center mb-2">
               Exact Callback Hour &amp; Minute
@@ -477,9 +542,14 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
                 >
                   <ChevronUp className="size-4" />
                 </button>
-                <div className="w-14 py-1 bg-white border border-blue-200 rounded-xl text-xl font-bold text-blue-700 text-center shadow-2xs">
-                  {hour12.toString().padStart(2, "0")}
-                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={hourInput}
+                  onChange={handleHourInputChange}
+                  onBlur={handleHourBlur}
+                  className="w-14 py-1 bg-white border border-blue-200 rounded-xl text-xl font-bold text-blue-700 text-center shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
                 <button
                   type="button"
                   onClick={() => handleHourStep(-1)}
@@ -500,18 +570,23 @@ export function CustomDateTimePicker({ value, onChange }: CustomDateTimePickerPr
               <div className="flex flex-col items-center">
                 <button
                   type="button"
-                  onClick={() => handleMinuteStep(5)}
+                  onClick={() => handleMinuteStep(1)}
                   className="p-1 rounded hover:bg-blue-100 text-blue-600 transition"
                   aria-label="Increment Minute"
                 >
                   <ChevronUp className="size-4" />
                 </button>
-                <div className="w-14 py-1 bg-white border border-blue-200 rounded-xl text-xl font-bold text-blue-700 text-center shadow-2xs">
-                  {minute.toString().padStart(2, "0")}
-                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={minuteInput}
+                  onChange={handleMinuteInputChange}
+                  onBlur={handleMinuteBlur}
+                  className="w-14 py-1 bg-white border border-blue-200 rounded-xl text-xl font-bold text-blue-700 text-center shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
                 <button
                   type="button"
-                  onClick={() => handleMinuteStep(-5)}
+                  onClick={() => handleMinuteStep(-1)}
                   className="p-1 rounded hover:bg-blue-100 text-blue-600 transition"
                   aria-label="Decrement Minute"
                 >

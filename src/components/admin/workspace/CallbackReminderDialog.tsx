@@ -163,7 +163,7 @@ export function CallbackReminderDialog({
     onSuccess: () => {
       toast.success(`Callback scheduled for ${formatIST(targetDate.toISOString())}. Order tagged as HOT.`);
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
-      qc.invalidateQueries({ queryKey: ["orders-v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", orderId] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
@@ -178,7 +178,7 @@ export function CallbackReminderDialog({
     onSuccess: () => {
       toast.success("Callback reminder cancelled");
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
-      qc.invalidateQueries({ queryKey: ["orders-v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
     },
@@ -190,7 +190,7 @@ export function CallbackReminderDialog({
     onSuccess: () => {
       toast.success("Callback marked as completed!");
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
-      qc.invalidateQueries({ queryKey: ["orders-v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
     },

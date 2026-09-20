@@ -59,16 +59,17 @@ const COMPLETED_FS = new Set<string>([
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
 
-function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
+function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
+  if (row.is_hot) return "needs_action";
   if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
   return "pending";
 }
 
-function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage }): boolean {
+function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): boolean {
   const b = bucketOfRow(row);
   return b === "pending" || b === "needs_action";
 }
@@ -303,7 +304,8 @@ function OrdersListPage() {
     queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
-    staleTime: 30 * 1000,
+    refetchInterval: 5_000,
+    staleTime: 2_000,
     gcTime: 10 * 60 * 1000,
   });
 
