@@ -1687,7 +1687,7 @@ function TicketWorkspace() {
             
             const formatted = filled
               .split(/\n{2,}/)
-              .map((p) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
+              .map((p: string) => `<p style="margin: 0 0 8px 0;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`)
               .join("");
 
             if (composerRef.current) {
